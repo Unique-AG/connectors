@@ -168,7 +168,7 @@ UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-i
 | `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `60` | Access token TTL |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `2592000` | Refresh token TTL (30 days) |
-| `UNIQUE_ROOT_SCOPE_PATH` | `OneNote-MCP` | Root folder path in Unique |
+| `UNIQUE_ROOT_SCOPE_ID` | - | Root scope ID under which to create notebook folders (required) |
 | `UNIQUE_USER_FETCH_CONCURRENCY` | `5` | Concurrent user resolution limit |
 
 ### Generating Secrets
