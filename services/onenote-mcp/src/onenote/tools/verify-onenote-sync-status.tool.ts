@@ -65,7 +65,7 @@ export class VerifyOneNoteSyncStatusTool {
 
     const state = await this.deltaService.getDeltaStatus(userProfileId);
     const isSyncRunning = this.syncService.isSyncRunning(userProfileId);
-    const throttleRemainingMs = GlobalThrottleMiddleware.currentThrottleRemainingMs();
+    const throttleRemainingMs = GlobalThrottleMiddleware.currentThrottleRemainingMs(userProfileId);
 
     const statusParts: string[] = [];
 

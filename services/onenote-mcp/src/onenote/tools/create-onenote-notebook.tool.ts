@@ -76,7 +76,7 @@ export class CreateOneNoteNotebookTool {
       'Tool create_onenote_notebook called',
     );
 
-    const throttleBefore = GlobalThrottleMiddleware.snapshotWaitMs();
+    const throttleBefore = GlobalThrottleMiddleware.snapshotWaitMs(userProfileId);
 
     try {
       const client = this.graphClientFactory.createClientForUser(userProfileId);
@@ -87,8 +87,8 @@ export class CreateOneNoteNotebookTool {
         'Created OneNote notebook',
       );
 
-      const throttleWaitMs = GlobalThrottleMiddleware.snapshotWaitMs() - throttleBefore;
-      const statusNote = GlobalThrottleMiddleware.buildStatusNote(throttleWaitMs, [
+      const throttleWaitMs = GlobalThrottleMiddleware.snapshotWaitMs(userProfileId) - throttleBefore;
+      const statusNote = GlobalThrottleMiddleware.buildStatusNote(userProfileId, throttleWaitMs, [
         'The notebook was created successfully.',
       ]);
 
@@ -103,8 +103,8 @@ export class CreateOneNoteNotebookTool {
     } catch (error) {
       const safeError = extractSafeGraphError(error);
       this.logger.error({ userProfileId, ...safeError }, 'Failed to create OneNote notebook');
-      const throttleWaitMs = GlobalThrottleMiddleware.snapshotWaitMs() - throttleBefore;
-      const statusNote = GlobalThrottleMiddleware.buildStatusNote(throttleWaitMs, [
+      const throttleWaitMs = GlobalThrottleMiddleware.snapshotWaitMs(userProfileId) - throttleBefore;
+      const statusNote = GlobalThrottleMiddleware.buildStatusNote(userProfileId, throttleWaitMs, [
         `The notebook could not be created: ${safeError.message}`,
       ]);
       return {

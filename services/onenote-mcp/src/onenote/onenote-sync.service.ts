@@ -98,6 +98,7 @@ export class OneNoteSyncService {
     const notebooks = await withThrottleRetry(
       () => this.graphService.listNotebooks(client),
       'listNotebooks',
+      userProfileId,
     );
     span?.setAttribute('notebook_count', notebooks.length);
 
@@ -218,10 +219,12 @@ export class OneNoteSyncService {
     const sections = await withThrottleRetry(
       () => this.graphService.listSections(client, notebook.id),
       `listSections(${notebook.displayName})`,
+      userProfileId,
     );
     const sectionGroups = await withThrottleRetry(
       () => this.graphService.listSectionGroups(client, notebook.id),
       `listSectionGroups(${notebook.displayName})`,
+      userProfileId,
     );
 
     this.logger.log(
@@ -286,6 +289,7 @@ export class OneNoteSyncService {
     const sections = await withThrottleRetry(
       () => this.graphService.listSectionsInGroup(client, group.id),
       `listSectionsInGroup(${group.displayName})`,
+      userProfileId,
     );
 
     this.logger.log(
@@ -340,6 +344,7 @@ export class OneNoteSyncService {
     const pages = await withThrottleRetry(
       () => this.graphService.listPages(client, section.id),
       `listPages(${section.displayName})`,
+      userProfileId,
     );
 
     this.logger.log(
@@ -393,6 +398,7 @@ export class OneNoteSyncService {
       const htmlContent = await withThrottleRetry(
         () => this.graphService.getPageContent(client, page.id),
         `getPageContent(${pageTitle})`,
+        userProfileId,
       );
 
       this.logger.debug(

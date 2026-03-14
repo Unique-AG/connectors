@@ -71,7 +71,7 @@ export class StartOneNoteSyncTool {
       ? Math.round((Date.now() - deltaStatus.lastSyncedAt.getTime()) / 1000)
       : null;
 
-    const throttleRemainingMs = GlobalThrottleMiddleware.currentThrottleRemainingMs();
+    const throttleRemainingMs = GlobalThrottleMiddleware.currentThrottleRemainingMs(userProfileId);
     const throttlePart = throttleRemainingMs > 0
       ? ` Microsoft OneNote is currently rate-limiting requests, so the sync may take longer than usual (~${Math.round(throttleRemainingMs / 1000)}s). This resolves on its own.`
       : '';

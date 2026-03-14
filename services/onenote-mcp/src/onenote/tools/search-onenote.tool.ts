@@ -213,7 +213,7 @@ export class SearchOneNoteTool {
   ): Promise<z.infer<typeof SyncStatusSchema>> {
     const deltaStatus = await this.deltaService.getDeltaStatus(userProfileId);
     const isSyncing = this.syncService.isSyncRunning(userProfileId);
-    const throttleRemainingMs = GlobalThrottleMiddleware.currentThrottleRemainingMs();
+    const throttleRemainingMs = GlobalThrottleMiddleware.currentThrottleRemainingMs(userProfileId);
 
     const extras: string[] = [];
     if (isSyncing) {

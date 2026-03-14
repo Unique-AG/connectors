@@ -57,7 +57,7 @@ export class GraphClientFactory {
     );
 
     const authenticationHandler = new AuthenticationHandler(tokenProvider);
-    const globalThrottle = new GlobalThrottleMiddleware();
+    const globalThrottle = new GlobalThrottleMiddleware(userProfileId);
     const retryHandler = new RetryHandler(new RetryHandlerOptions(5, 5));
     const redirectHandler = new RedirectHandler(new RedirectHandlerOptions());
     const telemetryHandler = new TelemetryHandler();

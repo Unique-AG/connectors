@@ -1,11 +1,13 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { fullJitter, upto } from '@proventuslabs/retry-strategies';
 import {
   type FetchFn,
   pipeline,
   withBaseUrl,
   withHeaders,
   withResponseError,
+  withRetryStatus,
 } from '@qfetch/qfetch';
 import type { UniqueConfigNamespaced } from '~/config';
 import { DrizzleModule } from '../drizzle/drizzle.module';
@@ -66,6 +68,10 @@ function redactHeaderValue(key: string, value: string): string {
           withBaseUrl(uniqueConfig.apiBaseUrl),
           withHeaders(headers),
           withResponseError(),
+          withRetryStatus({
+            strategy: () => upto(5, fullJitter(1_000, 30_000)),
+            retryableStatuses: new Set([429, 502, 503, 504]),
+          }),
         )(fetch);
       },
     },

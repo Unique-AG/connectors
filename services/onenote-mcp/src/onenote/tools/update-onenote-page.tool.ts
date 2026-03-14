@@ -85,7 +85,7 @@ export class UpdateOneNotePageTool {
       'Tool update_onenote_page called',
     );
 
-    const throttleBefore = GlobalThrottleMiddleware.snapshotWaitMs();
+    const throttleBefore = GlobalThrottleMiddleware.snapshotWaitMs(userProfileId);
 
     try {
       const client = this.graphClientFactory.createClientForUser(userProfileId);
@@ -106,10 +106,10 @@ export class UpdateOneNotePageTool {
 
       this.syncService.debouncedSync(userProfileId);
 
-      const throttleWaitMs = GlobalThrottleMiddleware.snapshotWaitMs() - throttleBefore;
-      const statusNote = GlobalThrottleMiddleware.buildStatusNote(throttleWaitMs, [
+      const throttleWaitMs = GlobalThrottleMiddleware.snapshotWaitMs(userProfileId) - throttleBefore;
+      const statusNote = GlobalThrottleMiddleware.buildStatusNote(userProfileId, throttleWaitMs, [
         'The page was updated successfully. A background sync is running so the changes will appear in search results within the next couple of minutes.',
-      ]);
+        ]);
 
       return {
         success: true,
@@ -120,8 +120,8 @@ export class UpdateOneNotePageTool {
     } catch (error) {
       const safeError = extractSafeGraphError(error);
       this.logger.error({ userProfileId, pageId: input.pageId, ...safeError }, 'Failed to update OneNote page');
-      const throttleWaitMs = GlobalThrottleMiddleware.snapshotWaitMs() - throttleBefore;
-      const statusNote = GlobalThrottleMiddleware.buildStatusNote(throttleWaitMs, [
+      const throttleWaitMs = GlobalThrottleMiddleware.snapshotWaitMs(userProfileId) - throttleBefore;
+      const statusNote = GlobalThrottleMiddleware.buildStatusNote(userProfileId, throttleWaitMs, [
         `The page could not be updated: ${safeError.message}`,
       ]);
       return {
