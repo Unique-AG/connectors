@@ -35,6 +35,10 @@ export class IngestEmailLiveCatchupMessageCommand {
       where: eq(inboxConfiguration.userProfileId, subscription.userProfileId),
     });
 
+    // For live catchup there is no point in checking the version because.
+    // 1. Live catchup should be fairly fast and the version would change quite ofter
+    // 2. We can have the case that live catchup finished -> we started a new one and we still have to process the last batch
+    //    so this will lead in dropping messages which we need to process.
     const filters = inboxConfig
       ? inboxConfigurationMailFilters.parse(inboxConfig.filters)
       : undefined;
