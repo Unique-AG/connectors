@@ -307,6 +307,9 @@ describe('LiveCatchUpCommand', () => {
         filters: DEFAULT_FILTERS,
         pendingLiveMessageIds: [],
       },
+      // acquireLock stores all 3 webhook IDs in pendingLiveMessageIds;
+      // flush reads them back and publishes only msg-3 (msg-1 & msg-2 are in scheduledIds)
+      flushResult: { pendingLiveMessageIds: ['msg-1', 'msg-2', 'msg-3'] },
     });
     const command = createCommand({ graphApi, amqp, db });
 
@@ -339,6 +342,9 @@ describe('LiveCatchUpCommand', () => {
         filters: DEFAULT_FILTERS,
         pendingLiveMessageIds: [],
       },
+      // acquireLock stores the webhook IDs in pendingLiveMessageIds;
+      // flush publishes both since the batch scheduled nothing
+      flushResult: { pendingLiveMessageIds: ['webhook-1', 'webhook-2'] },
     });
     const command = createCommand({ graphApi, amqp, db });
 
@@ -455,7 +461,7 @@ describe('LiveCatchUpCommand', () => {
     expect(amqp.publish).not.toHaveBeenCalled();
   });
 
-  it('skips pending message IDs during batch publishing', async () => {
+  it('does not re-publish pending messages already covered by the batch', async () => {
     const emails = [
       makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
       makeEmail('msg-2', '2024-06-02T00:00:00Z', '2024-06-02T01:00:00Z'),
@@ -468,20 +474,26 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
         filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: ['msg-1'],
+        pendingLiveMessageIds: [],
       },
+      // msg-1 was previously buffered in pendingLiveMessageIds; the batch covers it,
+      // so flush deduplicates it (alreadyScheduledIds contains msg-1 and msg-2)
+      flushResult: { pendingLiveMessageIds: ['msg-1'] },
     });
     const command = createCommand({ graphApi, amqp, db });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
-    // msg-1 is in pendingLiveMessageIds, so only msg-2 is published from batch
+    // Batch publishes both msg-1 and msg-2; flush skips msg-1 (already scheduled)
     const publishedMessageIds = amqp.publish.mock.calls.map((call: any[]) => {
       const event = call[2] as { payload: { messageId: string } };
       return event.payload.messageId;
     });
+    expect(publishedMessageIds).toHaveLength(2);
+    expect(publishedMessageIds).toContain('msg-1');
     expect(publishedMessageIds).toContain('msg-2');
-    expect(publishedMessageIds).not.toContain('msg-1');
+    // msg-1 published exactly once — not re-published from flush
+    expect(publishedMessageIds.filter((id: string) => id === 'msg-1')).toHaveLength(1);
   });
 
   it('flushes pending messages not already scheduled', async () => {

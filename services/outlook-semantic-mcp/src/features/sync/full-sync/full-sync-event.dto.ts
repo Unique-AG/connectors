@@ -5,4 +5,12 @@ const FullSyncRecoveryEvent = z.object({
   payload: z.object({ userProfileId: z.string() }),
 });
 
-export const FullSyncEventDto = z.discriminatedUnion('type', [FullSyncRecoveryEvent]);
+const FullSyncRecoveryRequestedEvent = z.object({
+  type: z.literal('unique.outlook-semantic-mcp.full-sync.recovery-requested'),
+  payload: z.object({ userProfileId: z.string() }),
+});
+
+export const FullSyncEventDto = z.discriminatedUnion('type', [
+  FullSyncRecoveryEvent,
+  FullSyncRecoveryRequestedEvent,
+]);

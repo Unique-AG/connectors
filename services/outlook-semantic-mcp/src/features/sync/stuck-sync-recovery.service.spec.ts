@@ -84,39 +84,43 @@ describe('StuckSyncRecoveryService', () => {
       expect(traceEvent).not.toHaveBeenCalled();
     });
 
-    it('resets state to ready and emits trace event for a stuck live catch-up', async () => {
-      // Core behavioral change: a row with liveCatchUpState='running' and a stale
-      // liveCatchUpHeartbeatAt (> threshold) but a fresh updatedAt is detected as stuck.
-      // The DB query uses COALESCE(liveCatchUpHeartbeatAt, updatedAt) instead of updatedAt,
-      // which is what this test simulates by returning the row from the select query.
+    it('publishes a recovery event and emits trace event for a stuck live catch-up', async () => {
+      const amqp = createMockAmqp();
       const db = createMockDb({
         liveCatchUpRows: [{ userProfileId: USER_PROFILE_ID_1 }],
       });
-      const service = createService({ db });
+      const service = createService({ amqp, db });
 
       await service.runRecoveryScan();
 
-      expect(db.update).toHaveBeenCalledTimes(1);
-      expect(db.__updateSet).toHaveBeenCalledWith({ liveCatchUpState: 'ready' });
-      expect(db.__updateWhere).toHaveBeenCalledTimes(1);
+      expect(amqp.publish).toHaveBeenCalledTimes(1);
+      expect(amqp.publish).toHaveBeenCalledWith(
+        expect.any(String),
+        'unique.outlook-semantic-mcp.live-catch-up.recovery',
+        expect.objectContaining({
+          type: 'unique.outlook-semantic-mcp.live-catch-up.recovery',
+          payload: { userProfileId: USER_PROFILE_ID_1 },
+        }),
+      );
       expect(traceEvent).toHaveBeenCalledWith('live-catch-up stuck recovery triggered', {
         count: 1,
         userProfileIds: [USER_PROFILE_ID_1],
       });
     });
 
-    it('resets state and traces for each stuck live catch-up config', async () => {
+    it('publishes recovery events and traces for each stuck live catch-up config', async () => {
+      const amqp = createMockAmqp();
       const db = createMockDb({
         liveCatchUpRows: [
           { userProfileId: USER_PROFILE_ID_1 },
           { userProfileId: USER_PROFILE_ID_2 },
         ],
       });
-      const service = createService({ db });
+      const service = createService({ amqp, db });
 
       await service.runRecoveryScan();
 
-      expect(db.update).toHaveBeenCalledTimes(2);
+      expect(amqp.publish).toHaveBeenCalledTimes(2);
       expect(traceEvent).toHaveBeenCalledWith('live-catch-up stuck recovery triggered', {
         count: 2,
         userProfileIds: [USER_PROFILE_ID_1, USER_PROFILE_ID_2],

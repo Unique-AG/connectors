@@ -39,7 +39,7 @@ function makeFilters() {
 
 function makeInboxConfig(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    fullSyncState: 'fetching-emails',
+    fullSyncState: 'running',
     fullSyncVersion: VERSION,
     filters: makeFilters(),
     oldestCreatedDateTime: null,
@@ -197,7 +197,7 @@ describe('ExecuteFullSyncCommand', () => {
     expect(syncDirectories.run).not.toHaveBeenCalled();
   });
 
-  it('discards event when state is not fetching-emails', async () => {
+  it('discards event when state is not running', async () => {
     const db = createMockDb(makeInboxConfig({ fullSyncState: 'ready' }));
     const command = createCommand({ graphApi, amqp, syncDirectories, db });
 

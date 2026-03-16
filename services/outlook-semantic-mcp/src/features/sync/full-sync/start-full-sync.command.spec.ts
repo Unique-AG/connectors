@@ -25,16 +25,16 @@ function makeInboxConfig(overrides: Record<string, unknown> = {}): Record<string
 // Mock factories
 // ---------------------------------------------------------------------------
 
-function createMockAmqp() {
-  return { publish: vi.fn().mockResolvedValue(undefined) };
-}
-
 function createMockGetSubscriptionAndUserProfileQuery() {
   return {
     run: vi.fn().mockResolvedValue({
       userProfile: { id: USER_PROFILE_ID, email: 'user@example.com' },
     }),
   };
+}
+
+function createMockExecuteFullSyncCommand() {
+  return { run: vi.fn().mockResolvedValue({ status: 'completed' }) };
 }
 
 function createMockDb(inboxConfig: Record<string, unknown> | undefined) {
@@ -66,19 +66,19 @@ function createMockDb(inboxConfig: Record<string, unknown> | undefined) {
 }
 
 function createCommand({
-  amqp,
   getSubscriptionAndUserProfileQuery,
+  executeFullSyncCommand,
   db,
 }: {
-  amqp: ReturnType<typeof createMockAmqp>;
   getSubscriptionAndUserProfileQuery: ReturnType<
     typeof createMockGetSubscriptionAndUserProfileQuery
   >;
+  executeFullSyncCommand: ReturnType<typeof createMockExecuteFullSyncCommand>;
   db: ReturnType<typeof createMockDb>;
 }): StartFullSyncCommand {
   return new StartFullSyncCommand(
-    amqp as any,
     getSubscriptionAndUserProfileQuery as any,
+    executeFullSyncCommand as any,
     db as any,
   );
 }
@@ -88,18 +88,18 @@ function createCommand({
 // ---------------------------------------------------------------------------
 
 describe('StartFullSyncCommand', () => {
-  let amqp: ReturnType<typeof createMockAmqp>;
   let getQuery: ReturnType<typeof createMockGetSubscriptionAndUserProfileQuery>;
+  let executeFullSyncCommand: ReturnType<typeof createMockExecuteFullSyncCommand>;
 
   beforeEach(() => {
-    amqp = createMockAmqp();
     getQuery = createMockGetSubscriptionAndUserProfileQuery();
+    executeFullSyncCommand = createMockExecuteFullSyncCommand();
     vi.clearAllMocks();
   });
 
   it('always sets fullSyncNextLink to START_DELTA_LINK when starting', async () => {
     const db = createMockDb(makeInboxConfig({ fullSyncState: 'ready' }));
-    const command = createCommand({ amqp, getSubscriptionAndUserProfileQuery: getQuery, db });
+    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
@@ -123,7 +123,7 @@ describe('StartFullSyncCommand', () => {
         newestLastModifiedDateTime: savedModifiedDateTime,
       }),
     );
-    const command = createCommand({ amqp, getSubscriptionAndUserProfileQuery: getQuery, db });
+    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
@@ -135,7 +135,6 @@ describe('StartFullSyncCommand', () => {
         fullSyncState: 'running',
         fullSyncNextLink: START_DELTA_LINK,
         newestLastModifiedDateTime: savedModifiedDateTime,
-        newestCreatedDateTime: null,
         oldestCreatedDateTime: null,
       }),
     );
@@ -143,22 +142,22 @@ describe('StartFullSyncCommand', () => {
 
   it('skips when inbox configuration is missing', async () => {
     const db = createMockDb(undefined);
-    const command = createCommand({ amqp, getSubscriptionAndUserProfileQuery: getQuery, db });
+    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
     expect(result.status).toBe('skipped');
-    expect(amqp.publish).not.toHaveBeenCalled();
+    expect(executeFullSyncCommand.run).not.toHaveBeenCalled();
   });
 
   it('skips when sync is already running', async () => {
     const db = createMockDb(makeInboxConfig({ fullSyncState: 'running' }));
-    const command = createCommand({ amqp, getSubscriptionAndUserProfileQuery: getQuery, db });
+    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
     expect(result.status).toBe('skipped');
-    expect(amqp.publish).not.toHaveBeenCalled();
+    expect(executeFullSyncCommand.run).not.toHaveBeenCalled();
   });
 
   it('skips when sync ran recently', async () => {
@@ -168,39 +167,33 @@ describe('StartFullSyncCommand', () => {
     const db = createMockDb(
       makeInboxConfig({ fullSyncState: 'ready', lastFullSyncRunAt: oneMinuteAgo }),
     );
-    const command = createCommand({ amqp, getSubscriptionAndUserProfileQuery: getQuery, db });
+    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
     expect(result.status).toBe('skipped');
-    expect(amqp.publish).not.toHaveBeenCalled();
+    expect(executeFullSyncCommand.run).not.toHaveBeenCalled();
   });
 
-  it('publishes execute event on successful start', async () => {
+  it('fires execute command on successful start', async () => {
     const db = createMockDb(makeInboxConfig());
-    const command = createCommand({ amqp, getSubscriptionAndUserProfileQuery: getQuery, db });
+    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
     expect(result.status).toBe('started');
-    expect(amqp.publish).toHaveBeenCalledTimes(1);
-    expect(amqp.publish).toHaveBeenCalledWith(
-      expect.any(String),
-      'unique.outlook-semantic-mcp.full-sync.execute',
-      expect.objectContaining({
-        type: 'unique.outlook-semantic-mcp.full-sync.execute',
-        payload: expect.objectContaining({ userProfileId: USER_PROFILE_ID }),
-      }),
+    expect(executeFullSyncCommand.run).toHaveBeenCalledWith(
+      expect.objectContaining({ userProfileId: USER_PROFILE_ID, version: expect.any(String) }),
     );
   });
 
   it('allows start when previous sync failed', async () => {
     const db = createMockDb(makeInboxConfig({ fullSyncState: 'failed' }));
-    const command = createCommand({ amqp, getSubscriptionAndUserProfileQuery: getQuery, db });
+    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
     expect(result.status).toBe('started');
-    expect(amqp.publish).toHaveBeenCalledTimes(1);
+    expect(executeFullSyncCommand.run).toHaveBeenCalledTimes(1);
   });
 });

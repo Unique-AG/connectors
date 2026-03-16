@@ -25,7 +25,7 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   filters: jsonb(`filters`).$type<Record<string, unknown>>().notNull(),
   lastFullSyncRunAt: timestamp(`last_full_sync_run_at`),
   fullSyncState: inboxSyncState(`full_sync_state`).notNull().default('ready'),
-  fullSyncHeartbeatAt: timestamp(`last_full_sync_started_at`),
+  fullSyncHeartbeatAt: timestamp(`full_sync_heartbeat_at`),
   lastFullSyncStartedAt: timestamp(`last_full_sync_started_at`),
   fullSyncVersion: uuid(`full_sync_version`),
   liveCatchUpState: liveCatchUpState(`live_catch_up_state`).notNull().default('ready'),

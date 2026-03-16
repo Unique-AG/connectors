@@ -70,7 +70,7 @@ export class SearchEmailsQuery {
       and: [
         {
           operator: UniqueQLOperator.CONTAINS,
-          value: [`uniquepathid://${rootScope.id}/${rootScopeForUser}`],
+          value: [`uniquepathid://${rootScope.id}/${rootScopeForUser.id}`],
           path: [`folderIdPath`],
         },
       ],
