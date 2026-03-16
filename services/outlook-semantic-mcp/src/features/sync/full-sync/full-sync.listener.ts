@@ -28,7 +28,7 @@ export class FullSyncListener {
     this.logger.log({ msg: 'Full sync event received', type: event.type });
 
     switch (event.type) {
-      case 'unique.outlook-semantic-mcp.full-sync.recovery':
+      case 'unique.outlook-semantic-mcp.full-sync.recovery-requested':
         return await this.recoverFullSyncCommand.run(event.payload);
     }
   }

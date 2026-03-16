@@ -14,6 +14,10 @@ data:
   MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
   {{- end }}
 
+  {{- if .Values.app.debugMode }}
+  MCP_DEBUG_MODE: {{ .Values.mcpConfig.app.debugMode | quote }}
+  {{- end }}
+
   LOGS_DIAGNOSTICS_DATA_POLICY: {{ .Values.mcpConfig.logs.diagnosticsDataPolicy | quote }}
 
   # Unique auth config

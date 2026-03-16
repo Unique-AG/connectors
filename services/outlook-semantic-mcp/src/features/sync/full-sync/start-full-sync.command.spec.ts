@@ -99,7 +99,11 @@ describe('StartFullSyncCommand', () => {
 
   it('always sets fullSyncNextLink to START_DELTA_LINK when starting', async () => {
     const db = createMockDb(makeInboxConfig({ fullSyncState: 'ready' }));
-    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
+    const command = createCommand({
+      getSubscriptionAndUserProfileQuery: getQuery,
+      executeFullSyncCommand,
+      db,
+    });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
@@ -123,7 +127,11 @@ describe('StartFullSyncCommand', () => {
         newestLastModifiedDateTime: savedModifiedDateTime,
       }),
     );
-    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
+    const command = createCommand({
+      getSubscriptionAndUserProfileQuery: getQuery,
+      executeFullSyncCommand,
+      db,
+    });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
@@ -142,7 +150,11 @@ describe('StartFullSyncCommand', () => {
 
   it('skips when inbox configuration is missing', async () => {
     const db = createMockDb(undefined);
-    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
+    const command = createCommand({
+      getSubscriptionAndUserProfileQuery: getQuery,
+      executeFullSyncCommand,
+      db,
+    });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
@@ -152,7 +164,11 @@ describe('StartFullSyncCommand', () => {
 
   it('skips when sync is already running', async () => {
     const db = createMockDb(makeInboxConfig({ fullSyncState: 'running' }));
-    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
+    const command = createCommand({
+      getSubscriptionAndUserProfileQuery: getQuery,
+      executeFullSyncCommand,
+      db,
+    });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
@@ -167,7 +183,11 @@ describe('StartFullSyncCommand', () => {
     const db = createMockDb(
       makeInboxConfig({ fullSyncState: 'ready', lastFullSyncRunAt: oneMinuteAgo }),
     );
-    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
+    const command = createCommand({
+      getSubscriptionAndUserProfileQuery: getQuery,
+      executeFullSyncCommand,
+      db,
+    });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
@@ -177,7 +197,11 @@ describe('StartFullSyncCommand', () => {
 
   it('fires execute command on successful start', async () => {
     const db = createMockDb(makeInboxConfig());
-    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
+    const command = createCommand({
+      getSubscriptionAndUserProfileQuery: getQuery,
+      executeFullSyncCommand,
+      db,
+    });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
@@ -189,7 +213,11 @@ describe('StartFullSyncCommand', () => {
 
   it('allows start when previous sync failed', async () => {
     const db = createMockDb(makeInboxConfig({ fullSyncState: 'failed' }));
-    const command = createCommand({ getSubscriptionAndUserProfileQuery: getQuery, executeFullSyncCommand, db });
+    const command = createCommand({
+      getSubscriptionAndUserProfileQuery: getQuery,
+      executeFullSyncCommand,
+      db,
+    });
 
     const result = await command.run(SUBSCRIPTION_ID);
 
