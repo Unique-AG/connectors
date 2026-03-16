@@ -1,3 +1,5 @@
+import he from 'he';
+
 interface Attachment {
   id: string;
   name: string | null;
@@ -13,7 +15,7 @@ interface Attachment {
  * - <attachment id="x"/>  →  [attachment: name] (or [attachment] if name unknown)
  * - Adaptive card JSON blobs  →  [card]
  * - All other tags stripped, text kept
- * - &amp; &lt; &gt; &nbsp; &quot; &#39; decoded
+ * - HTML entities decoded via `he`
  *
  * Returns '[deleted]' for blank/tombstone content.
  * Returns content unchanged when contentType is 'text'.
@@ -47,14 +49,8 @@ export function normalizeContent(
   // Strip remaining HTML tags (formatting like <strong>, <em>, etc. — text kept)
   result = result.replace(/<[^>]+>/g, '');
 
-  // Decode common HTML entities
-  result = result
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+  // Decode HTML entities
+  result = he.decode(result);
 
   // Collapse excess blank lines
   result = result.replace(/\n{3,}/g, '\n\n').trim();
