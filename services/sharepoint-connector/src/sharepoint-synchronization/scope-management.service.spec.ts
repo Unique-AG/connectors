@@ -108,6 +108,7 @@ describe('ScopeManagementService', () => {
     serviceUserId: 'user-123',
     rootPath: new Smeared('/test1', false),
     siteName: new Smeared('test-site', false),
+    managedPath: 'sites',
     siteConfig: createMockSiteConfig({
       siteId: new Smeared('site-123', false),
       scopeId: 'root-scope-123',

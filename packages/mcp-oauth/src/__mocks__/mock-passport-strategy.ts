@@ -41,7 +41,9 @@ export class MockPassportStrategy {
     if (!isCallback) {
       // This is the initial authorization - redirect to callback with state
       const callbackUrl = new URL('/auth/callback', 'http://mock-idp-server.example');
-      if (options.state) callbackUrl.searchParams.set('state', options.state);
+      if (options.state) {
+        callbackUrl.searchParams.set('state', options.state);
+      }
       callbackUrl.searchParams.set('code', 'mock-provider-code');
 
       return this.redirect(callbackUrl.toString());
@@ -57,8 +59,12 @@ export class MockPassportStrategy {
 
     // Simulate successful authentication by calling the verify callback
     this.verify('mock-access-token', 'mock-refresh-token', mockProfile, (error, user) => {
-      if (error) return this.error(error);
-      if (!user) return this.fail(this.options.failureMessage || 'Authentication failed');
+      if (error) {
+        return this.error(error);
+      }
+      if (!user) {
+        return this.fail(this.options.failureMessage || 'Authentication failed');
+      }
       return this.success(user);
     });
   }
@@ -68,7 +74,9 @@ export class MockPassportStrategy {
     req.user = user;
 
     const callback = (this as any)._callback;
-    if (callback && typeof callback === 'function') callback(null, user, info);
+    if (callback && typeof callback === 'function') {
+      callback(null, user, info);
+    }
   }
 
   private fail(challenge?: any, _status?: number) {
@@ -84,7 +92,9 @@ export class MockPassportStrategy {
 
   private redirect(url: string, status?: number) {
     const res = (this as any).res;
-    if (res) res.redirect(status || 302, url);
+    if (res) {
+      res.redirect(status || 302, url);
+    }
   }
 
   private error(err: any) {

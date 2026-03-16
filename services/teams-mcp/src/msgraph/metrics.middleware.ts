@@ -42,27 +42,43 @@ export class MetricsMiddleware implements Middleware {
   }
 
   private getStatusClass(statusCode: number): string {
-    if (statusCode >= 200 && statusCode < 300) return '2xx';
-    if (statusCode >= 300 && statusCode < 400) return '3xx';
-    if (statusCode >= 400 && statusCode < 500) return '4xx';
-    if (statusCode >= 500) return '5xx';
+    if (statusCode >= 200 && statusCode < 300) {
+      return '2xx';
+    }
+    if (statusCode >= 300 && statusCode < 400) {
+      return '3xx';
+    }
+    if (statusCode >= 400 && statusCode < 500) {
+      return '4xx';
+    }
+    if (statusCode >= 500) {
+      return '5xx';
+    }
     return 'unknown';
   }
 
   private isThrottled(response: Response | undefined): boolean {
-    if (!response) return false;
+    if (!response) {
+      return false;
+    }
 
     // Check for 429 (Too Many Requests) status
-    if (response.status === 429) return true;
+    if (response.status === 429) {
+      return true;
+    }
 
     // Check for 503 (Service Unavailable) with Retry-After header
-    if (response.status === 503 && response.headers.get('Retry-After')) return true;
+    if (response.status === 503 && response.headers.get('Retry-After')) {
+      return true;
+    }
 
     return false;
   }
 
   private getThrottlePolicy(response: Response | undefined): string {
-    if (!response) return 'unknown';
+    if (!response) {
+      return 'unknown';
+    }
 
     // Check for standard Retry-After header
     const retryAfter = response.headers.get('Retry-After');
@@ -80,7 +96,9 @@ export class MetricsMiddleware implements Middleware {
   }
 
   public async execute(context: Context): Promise<void> {
-    if (!this.nextMiddleware) throw new Error('Next middleware not set');
+    if (!this.nextMiddleware) {
+      throw new Error('Next middleware not set');
+    }
 
     const endpoint = this.extractEndpoint(context.request);
     const method = this.extractMethod(context.options);

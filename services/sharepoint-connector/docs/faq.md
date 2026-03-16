@@ -127,7 +127,7 @@ sharepoint:
 
 ### Are subsites automatically included?
 
-**Answer:** Only if `subsitesScan` is set to `enabled` for a site. When enabled, the connector recursively discovers all subsites under the configured site and syncs their content using the parent site's `syncColumnName`. See [Subsites Scanning](./operator/configuration.md#subsites-scanning) for details.
+**Answer:** Only if `subsitesScan` is set to `enabled` for a site. When enabled, the connector recursively discovers all subsites under the configured site and syncs their content using the parent site's `syncColumnName`. See [Subsites Scanning](./operator/configuration.md#Subsites-Scanning) for details.
 
 ### How do I find SharePoint Site IDs?
 
@@ -217,11 +217,11 @@ The sync column must be set on individual files (not folders).
 - HTML (`.html`)
 - ASP/ASPX (`.asp`, `.aspx`)
 
-SharePoint pages (`.aspx`) bypass the MIME type filter and are always eligible regardless of configuration. Additional or fewer types can be configured via `allowedMimeTypes` in the [processing configuration](./operator/configuration.md#processing-configuration). Note: there is no schema-level default — `allowedMimeTypes` must be explicitly configured.
+SharePoint pages (`.aspx`) bypass the MIME type filter and are always eligible regardless of configuration. Additional or fewer types can be configured via `allowedMimeTypes` in the [processing configuration](./operator/configuration.md#Processing-Configuration). Note: there is no schema-level default — `allowedMimeTypes` must be explicitly configured.
 
 ### What is the maximum file size?
 
-**Answer:** Default is 200 MB, configurable via `maxFileSizeToIngestBytes` in the [processing configuration](./operator/configuration.md#processing-configuration). Larger files are skipped with a warning in the logs.
+**Answer:** Default is 200 MB, configurable via `maxFileSizeToIngestBytes` in the [processing configuration](./operator/configuration.md#Processing-Configuration). Larger files are skipped with a warning in the logs.
 
 ## Troubleshooting
 
@@ -244,7 +244,7 @@ SharePoint pages (`.aspx`) bypass the MIME type filter and are always eligible r
 - non-retryable item errors are logged and skipped
 - configuration/authentication problems require operator action and can fail a cycle early
 
-Detailed behavior by scenario is documented in [Flows](./technical/flows.md#error-handling-strategy).
+Detailed behavior by scenario is documented in [Flows](./technical/flows.md#Error-Handling-Strategy).
 
 ### Why do I see "Site not found" errors?
 
@@ -285,7 +285,7 @@ Detailed behavior by scenario is documented in [Flows](./technical/flows.md#erro
 
 **Solutions:**
 
-1. Increase `concurrency` in the [processing configuration](./operator/configuration.md#processing-configuration)
+1. Increase `concurrency` in the [processing configuration](./operator/configuration.md#Processing-Configuration)
 2. Review and reduce flagged files
 3. Check for rate limit warnings in logs
 4. Verify network connectivity

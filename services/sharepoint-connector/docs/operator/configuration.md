@@ -81,7 +81,7 @@ sharepoint:
     listId: 00000000-0000-0000-0000-000000000000
 ```
 
-You can use [the CSV import template](./Template [env-name] Sites to Sync to Unique.csv) when populating the SharePoint list for `sharepoint_list`-based configuration.
+You can use [the CSV import template](./sites-to-sync-template.csv) when populating the SharePoint list for `sharepoint_list`-based configuration.
 
 ## SharePoint Base Configuration
 
@@ -161,13 +161,14 @@ unique:
 
 The connector supports HTTP/HTTPS proxy for environments where internet access is only available through a proxy. Proxy settings are configured via environment variables (managed by the Helm chart's `proxyConfig` section).
 
-| Mode                | Description                  |
-| ------------------- | ---------------------------- |
-| `none`              | Proxy disabled (default)     |
-| `username_password` | Basic authentication proxy   |
-| `ssl_tls`           | TLS client certificate proxy |
+| Mode                | Description                          |
+| ------------------- | ------------------------------------ |
+| `none`              | Proxy disabled (default)             |
+| `no_auth`           | Proxy enabled without authentication |
+| `username_password` | Basic authentication proxy           |
+| `ssl_tls`           | TLS client certificate proxy         |
 
-**Common options** (required for `username_password` and `ssl_tls` modes):
+**Common options** (required for `no_auth`, `username_password`, and `ssl_tls` modes):
 
 | Variable                   | Description                                                      |
 | -------------------------- | ---------------------------------------------------------------- |
@@ -222,7 +223,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | Option                       | Values                                    | Default                      | Description                                                                         |
 | ---------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
 | `siteId`                     | UUID or compound ID                       | — (required)                 | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId` |
-| `syncColumnName`             | String                                    | `FinanceGPTKnowledge`        | Name of the sync flag column                                                        |
+| `syncColumnName`             | String                                    | `FinanceGPTKnowledge`        | Display name or internal name of the sync flag column (display name takes priority) |
 | `ingestionMode`              | `flat`, `recursive`                       | — (required)                 | Flat ingests all to one scope; recursive maintains hierarchy                        |
 | `scopeId`                    | String                                    | — (required)                 | Root scope ID in Unique                                                             |
 | `maxFilesToIngest`           | Number                                    | — (unlimited)                | Maximum new + updated files per sync cycle; sync fails for the site if exceeded     |
@@ -247,11 +248,11 @@ Only used when `syncMode` is `content_only`. It controls whether newly created s
 
 ### Finding SharePoint Site IDs
 
-Site IDs are required to configure which SharePoint sites the connector scans.
+Site IDs are required to configure which SharePoint sites the connector scans. The connector supports both `/sites/` and `/teams/` managed paths.
 
 **Via Browser:**
 
-Navigate to: `https://{tenant}.sharepoint.com/sites/your-site/_api/site/id`
+Navigate to: `https://{tenant}.sharepoint.com/sites/your-site/_api/site/id` (or `/teams/your-team/_api/site/id` for team sites)
 
 The response will be XML containing the site ID:
 
@@ -265,6 +266,12 @@ The response will be XML containing the site ID:
 GET https://graph.microsoft.com/v1.0/sites/{tenant}.sharepoint.com:/sites/{site}
 ```
 
+For team sites, use `/teams/` instead of `/sites/`:
+
+```
+GET https://graph.microsoft.com/v1.0/sites/{tenant}.sharepoint.com:/teams/{team}
+```
+
 Look for the `id` field in the response.
 
 **Via PowerShell:**
@@ -273,6 +280,8 @@ Look for the `id` field in the response.
 Connect-PnPOnline -Url "https://{tenant}.sharepoint.com/sites/your-site"
 Get-PnPSite -Includes Id | Select-Object Id
 ```
+
+For team sites, replace `/sites/` with `/teams/` in the URL.
 
 ### Finding Subsite Compound IDs
 
@@ -355,7 +364,19 @@ If a subsite is also configured as a standalone site (using its compound site ID
 - **Default value**: No (recommended)
 - **Require this column**: No
 
-**Important — Column Renaming:** SharePoint distinguishes between a column's **internal name** (set at creation time and immutable) and its **display name** (which can be changed later). The Microsoft Graph API returns items using the internal name. If you rename a sync column in the SharePoint UI, only the display name changes — the internal name used by the API remains the original value. The `syncColumnName` in the connector configuration must match the **internal name**, not the current display name. If a column was created as `UniqueAI` and later renamed to `SyncToUnique`, the connector must still use `UniqueAI`. It is recommended to create a new column with desired name instead of renaming to avoid confusion in the future.
+**Column name resolution:** SharePoint distinguishes between a column's **internal name** (set at creation time and immutable) and its **display name** (which can be changed later in the UI). The connector accepts either name in the `syncColumnName` configuration and resolves it per drive/list as follows:
+
+1. If a column's **display name** matches `syncColumnName`, the connector uses that column's internal name for filtering.
+2. Otherwise, if a column's **internal name** matches `syncColumnName`, that name is used directly.
+3. If neither matches, the drive or SitePages list is **skipped entirely** — the connector logs a warning and moves on to the next drive without scanning any items.
+
+This means you can configure `syncColumnName` using the human-readable display name shown in the SharePoint UI (e.g., `Sync to Unique`) even if the underlying internal name is different (e.g., `Sync_Unique`). When a display name is resolved to a different internal name, the connector logs the mapping for transparency.
+
+**Note on column renaming:** If a column was created as `UniqueAI` and later renamed to `SyncToUnique` in the UI, only the display name changes — the internal name remains `UniqueAI`. You can configure `syncColumnName` as either `SyncToUnique` (the current display name) or `UniqueAI` (the internal name). Using the display name is recommended as it is easier to verify in the SharePoint UI, but please be aware of this behavior in case of conflicts.
+
+#### Drive and List Skipping
+
+The connector checks each document library (drive) and the SitePages list for the presence of the configured sync column before scanning. If the column is not found on a drive, the entire drive is skipped — no items are fetched. This avoids unnecessary API calls for libraries that were never set up for sync. A warning is logged for each skipped drive so operators can verify the configuration.
 
 #### User Workflow
 
@@ -392,7 +413,7 @@ processing:
 | `stepTimeoutSeconds`       | `30`                        | Time limit (in seconds) for a single file processing step before the file is skipped                                                     |
 | `concurrency`              | `1`                         | Number of files to ingest into Unique concurrently                                                                                       |
 | `maxFileSizeToIngestBytes` | `209715200` (200 MB)        | Maximum file size in bytes. Files larger than this are skipped with a warning in the logs                                                |
-| `allowedMimeTypes`         | (none — must be configured) | List of MIME types the connector will process. The Helm chart ships sensible defaults; see [Supported File Types](#supported-file-types) |
+| `allowedMimeTypes`         | (none — must be configured) | List of MIME types the connector will process. The Helm chart ships sensible defaults; see [Supported File Types](#Supported-File-Types) |
 | `scanIntervalCron`         | `*/15 * * * *`              | Cron expression for the scheduled sync interval                                                                                          |
 
 ## Supported File Types

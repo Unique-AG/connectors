@@ -120,7 +120,9 @@ describe('ProcessingPipelineService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'processing.stepTimeoutSeconds') return 30;
+          if (key === 'processing.stepTimeoutSeconds') {
+            return 30;
+          }
           return undefined;
         }),
       }))
@@ -144,6 +146,7 @@ describe('ProcessingPipelineService', () => {
   const mockSyncContext: SharepointSyncContext = {
     siteConfig: createMockSiteConfig(),
     siteName: new Smeared('test-site', false),
+    managedPath: 'sites',
     serviceUserId: 'test-user-id',
     rootPath: new Smeared('/Root', false),
     isInitialSync: false,

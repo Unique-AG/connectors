@@ -46,7 +46,7 @@ export class FileDiffService {
         this.confluenceConfig.baseUrl,
       );
 
-      this.validateNoAccidentalFullDeletion(fileDiffItems, diffResponse);
+      await this.validateNoAccidentalFullDeletion(fileDiffItems, diffResponse, partialKey);
 
       result.newPageIds.push(...diffResponse.newFiles);
       result.updatedPageIds.push(...diffResponse.updatedFiles);
@@ -73,21 +73,27 @@ export class FileDiffService {
     }));
   }
 
-  private validateNoAccidentalFullDeletion(
+  private async validateNoAccidentalFullDeletion(
     submittedItems: FileDiffItem[],
     diffResponse: FileDiffResponse,
-  ): void {
+    partialKey: string,
+  ): Promise<void> {
+    // If there are no files to be deleted, there's no point in checking further, we will surely not
+    // perform full deletion.
     if (diffResponse.deletedFiles.length === 0) {
       return;
     }
 
-    const hasNewOrUpdated =
-      diffResponse.newFiles.length > 0 || diffResponse.updatedFiles.length > 0;
-
+    // If the file diff indicated we should delete all files by having submitted no files to the
+    // diff, it most probably means that we have some kind of bug in fetching the pages from
+    // Confluence and we should not proceed with the sync to avoid costly re-ingestions. In case
+    // user actually wants to delete all files from a space, they should leave one page labeled
+    // for synchronization.
     if (submittedItems.length === 0 && diffResponse.deletedFiles.length > 0) {
       this.logger.error({
         submittedCount: 0,
         deletedCount: diffResponse.deletedFiles.length,
+        partialKey,
         msg: 'File diff would delete all files because zero items were submitted. Aborting to prevent accidental full deletion.',
       });
       assert.fail(
@@ -95,14 +101,22 @@ export class FileDiffService {
       );
     }
 
-    if (!hasNewOrUpdated && diffResponse.deletedFiles.length >= submittedItems.length) {
+    // If the file diff indicated we should delete all files even when we submitted some files to
+    // the diff, it most probably means that we have some kind of bug in file diff or something
+    // unexpected changed in the logic (e.g. key format change). We should not proceed with the
+    // sync to avoid costly re-ingestions. If user actually wants to delete all files from a space,
+    // they should leave one page labeled for synchronization.
+    const totalFilesInUnique = await this.uniqueApiClient.files.getCountByKeyPrefix(partialKey);
+    if (diffResponse.deletedFiles.length === totalFilesInUnique) {
       this.logger.error({
         submittedCount: submittedItems.length,
         deletedCount: diffResponse.deletedFiles.length,
-        msg: 'File diff would delete all files with zero new or updated items. Aborting to prevent accidental full deletion.',
+        totalFilesInUnique,
+        partialKey,
+        msg: 'File diff would delete all files stored in Unique. Aborting to prevent accidental full deletion.',
       });
       assert.fail(
-        `File diff would delete ${diffResponse.deletedFiles.length} files with zero new or updated items. Aborting sync.`,
+        `File diff would delete all ${diffResponse.deletedFiles.length} files stored in Unique for partialKey "${partialKey}". Aborting sync to prevent accidental full deletion.`,
       );
     }
   }

@@ -48,7 +48,9 @@ export class McpOAuthStore implements IOAuthStore {
       where: { clientId: client_id },
     });
 
-    if (!client) return undefined;
+    if (!client) {
+      return undefined;
+    }
 
     return convertPrismaToOAuthClient(client);
   }
@@ -58,7 +60,9 @@ export class McpOAuthStore implements IOAuthStore {
       where: { clientName: client_name },
     });
 
-    if (!client) return undefined;
+    if (!client) {
+      return undefined;
+    }
 
     return convertPrismaToOAuthClient(client);
   }
@@ -80,7 +84,9 @@ export class McpOAuthStore implements IOAuthStore {
       where: { code },
     });
 
-    if (!authCode) return undefined;
+    if (!authCode) {
+      return undefined;
+    }
     if (authCode.expiresAt < new Date()) {
       await this.removeAuthCode(code);
       return undefined;
@@ -115,7 +121,9 @@ export class McpOAuthStore implements IOAuthStore {
       where: { sessionId },
     });
 
-    if (!session) return undefined;
+    if (!session) {
+      return undefined;
+    }
     if (session.expiresAt < new Date()) {
       await this.removeOAuthSession(sessionId);
       return undefined;
@@ -173,7 +181,9 @@ export class McpOAuthStore implements IOAuthStore {
       where: { id: profileId },
     });
 
-    if (!profile) return undefined;
+    if (!profile) {
+      return undefined;
+    }
 
     return {
       profile_id: profile.id,
@@ -189,7 +199,9 @@ export class McpOAuthStore implements IOAuthStore {
 
   public async storeAccessToken(token: string, metadata: AccessTokenMetadata): Promise<void> {
     const profile = await this.getUserProfileById(metadata.userProfileId);
-    if (!profile) throw new Error('User profile not found');
+    if (!profile) {
+      throw new Error('User profile not found');
+    }
 
     await this.prisma.token.create({
       data: {
@@ -225,7 +237,9 @@ export class McpOAuthStore implements IOAuthStore {
         userProfile: true,
       },
     });
-    if (!metadata) return undefined;
+    if (!metadata) {
+      return undefined;
+    }
     if (metadata.expiresAt < new Date()) {
       await this.removeAccessToken(token);
       return undefined;
@@ -251,7 +265,9 @@ export class McpOAuthStore implements IOAuthStore {
 
   public async storeRefreshToken(token: string, metadata: RefreshTokenMetadata): Promise<void> {
     const profile = await this.getUserProfileById(metadata.userProfileId);
-    if (!profile) throw new Error('User profile not found');
+    if (!profile) {
+      throw new Error('User profile not found');
+    }
 
     await this.prisma.token.create({
       data: {
@@ -287,7 +303,9 @@ export class McpOAuthStore implements IOAuthStore {
       where: { token },
     });
 
-    if (!metadata) return undefined;
+    if (!metadata) {
+      return undefined;
+    }
     if (metadata.expiresAt < new Date()) {
       await this.removeRefreshToken(token);
       return undefined;
@@ -361,7 +379,9 @@ export class McpOAuthStore implements IOAuthStore {
     const cacheKey = this.getAccessTokenCacheKey(token);
     const ttl = Math.max(0, Math.floor((metadata.expiresAt.getTime() - Date.now()) / 1000));
 
-    if (ttl > 0) await this.cacheManager.set(cacheKey, metadata, ttl);
+    if (ttl > 0) {
+      await this.cacheManager.set(cacheKey, metadata, ttl);
+    }
   }
 
   private async cacheRefreshTokenMetadata(
@@ -371,7 +391,9 @@ export class McpOAuthStore implements IOAuthStore {
     const cacheKey = this.getRefreshTokenCacheKey(token);
     const ttl = Math.max(0, Math.floor((metadata.expiresAt.getTime() - Date.now()) / 1000));
 
-    if (ttl > 0) await this.cacheManager.set(cacheKey, metadata, ttl);
+    if (ttl > 0) {
+      await this.cacheManager.set(cacheKey, metadata, ttl);
+    }
   }
 
   private async removeCachedAccessToken(token: string): Promise<void> {

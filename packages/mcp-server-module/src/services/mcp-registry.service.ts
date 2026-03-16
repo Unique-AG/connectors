@@ -333,7 +333,9 @@ export class McpRegistryService implements OnApplicationBootstrap {
   private convertUri(uri: string): string {
     if (uri.includes('://')) {
       const splitUri = uri.split('://');
-      if (!splitUri[1]) throw new Error('Invalid URI');
+      if (!splitUri[1]) {
+        throw new Error('Invalid URI');
+      }
 
       return splitUri[1];
     }
@@ -362,7 +364,9 @@ export class McpRegistryService implements OnApplicationBootstrap {
     const strippedInputUri = this.convertUri(uri);
 
     for (const t of resources) {
-      if (!t.uri) continue;
+      if (!t.uri) {
+        continue;
+      }
 
       const rawTemplate = t.uri;
       const templatePath = this.convertTemplate(this.convertUri(rawTemplate));
@@ -371,7 +375,9 @@ export class McpRegistryService implements OnApplicationBootstrap {
 
       if (result) {
         const foundResource = this.findResource(mcpModuleId, t.name);
-        if (!foundResource) continue;
+        if (!foundResource) {
+          continue;
+        }
 
         return {
           resource: foundResource,
@@ -404,7 +410,9 @@ export class McpRegistryService implements OnApplicationBootstrap {
     const strippedInputUri = this.convertUri(uri);
 
     for (const t of resourceTemplates) {
-      if (!t.uriTemplate) continue;
+      if (!t.uriTemplate) {
+        continue;
+      }
 
       const rawTemplate = t.uriTemplate;
       const templatePath = this.convertTemplate(this.convertUri(rawTemplate));
@@ -413,7 +421,9 @@ export class McpRegistryService implements OnApplicationBootstrap {
 
       if (result) {
         const foundResourceTemplate = this.findResourceTemplate(mcpModuleId, t.name);
-        if (!foundResourceTemplate) continue;
+        if (!foundResourceTemplate) {
+          continue;
+        }
 
         return {
           resourceTemplate: foundResourceTemplate,

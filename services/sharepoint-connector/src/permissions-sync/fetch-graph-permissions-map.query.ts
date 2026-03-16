@@ -18,14 +18,22 @@ type Permission = Membership;
 export type PermissionsMap = Record<string, Permission[]>;
 type PermissionsFetcher = Record<AnySharepointItem['itemType'], () => Promise<SimplePermission[]>>;
 
+const PERMISSIONS_FETCH_PROGRESS_LOG_INTERVAL = 100;
+
 @Injectable()
 export class FetchGraphPermissionsMapQuery {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(private readonly graphApiService: GraphApiService) {}
 
-  public async run(items: AnySharepointItem[], rootSiteName: Smeared): Promise<PermissionsMap> {
+  public async run(
+    items: AnySharepointItem[],
+    rootSiteName: Smeared,
+    siteId: Smeared,
+  ): Promise<PermissionsMap> {
+    const logPrefix = `[Site: ${siteId}]`;
     const permissionsMap: PermissionsMap = {};
+    let itemsFetched = 0;
     // TODO: Once API is batched and parallelised, change this to use Promise.allSettled.
     for (const item of items) {
       const permissionsFetcher: PermissionsFetcher = {
@@ -41,6 +49,13 @@ export class FetchGraphPermissionsMapQuery {
         item.item.id,
         rootSiteName,
       );
+
+      itemsFetched++;
+      if (itemsFetched % PERMISSIONS_FETCH_PROGRESS_LOG_INTERVAL === 0) {
+        this.logger.log(
+          `${logPrefix} Fetching permissions, ${itemsFetched}/${items.length} items processed so far`,
+        );
+      }
     }
     return permissionsMap;
   }

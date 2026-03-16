@@ -77,16 +77,21 @@ export class ZitadelOIDCStrategy extends Strategy {
       ?.then(() => {
         const { code, state, error } = req.query;
 
-        if (error) return this.fail({ message: `OAuth error: ${error}` }, 401);
+        if (error) {
+          return this.fail({ message: `OAuth error: ${error}` }, 401);
+        }
 
         if (!code) {
           const authState = options?.state;
           return this.redirectToAuth(authState);
         }
 
-        if (typeof code !== 'string') return this.fail({ message: 'Invalid code parameter' }, 401);
-        if (typeof state !== 'string')
+        if (typeof code !== 'string') {
+          return this.fail({ message: 'Invalid code parameter' }, 401);
+        }
+        if (typeof state !== 'string') {
           return this.fail({ message: 'Invalid state parameter' }, 401);
+        }
 
         this.handleCallback(req, code, state).catch((err) => {
           this.error(err as Error);
@@ -112,7 +117,9 @@ export class ZitadelOIDCStrategy extends Strategy {
   }
 
   private redirectToAuth(oauthState?: string): void {
-    if (!this.client) throw new Error('OIDC client not initialized');
+    if (!this.client) {
+      throw new Error('OIDC client not initialized');
+    }
 
     const authUrl = this.client.authorizationUrl({
       scope: this.options.scope?.join(' ') || 'openid profile email',
@@ -123,7 +130,9 @@ export class ZitadelOIDCStrategy extends Strategy {
   }
 
   private async handleCallback(req: Request, code: string, state: string): Promise<void> {
-    if (!this.client) throw new Error('OIDC client not initialized');
+    if (!this.client) {
+      throw new Error('OIDC client not initialized');
+    }
 
     try {
       const tokenSet: TokenSet = await this.client.callback(
@@ -132,7 +141,9 @@ export class ZitadelOIDCStrategy extends Strategy {
         { state },
       );
 
-      if (!tokenSet.access_token) return this.fail({ message: 'Invalid access token' }, 401);
+      if (!tokenSet.access_token) {
+        return this.fail({ message: 'Invalid access token' }, 401);
+      }
       const userinfo = await this.client.userinfo(tokenSet.access_token);
 
       const roles = await this.extractRoles(tokenSet);
@@ -158,8 +169,12 @@ export class ZitadelOIDCStrategy extends Strategy {
       };
 
       const done: ZitadelStrategyVerifyCallback = (error, user, info) => {
-        if (error) return this.error(error);
-        if (!user) return this.fail(info);
+        if (error) {
+          return this.error(error);
+        }
+        if (!user) {
+          return this.fail(info);
+        }
 
         return this.success(user, info);
       };

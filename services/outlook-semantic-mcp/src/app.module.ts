@@ -72,13 +72,17 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
               // this properties to the logs, in order to bridge the gap between logs and traces
               // I added them manually but we should debug the shared package.
               const span = trace.getActiveSpan();
-              if (!span?.isRecording()) return {};
+              if (!span?.isRecording()) {
+                return {};
+              }
               const ctx = span.spanContext();
               return { trace_id: ctx.traceId, span_id: ctx.spanId, trace_flags: ctx.traceFlags };
             },
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
-              if (!ctx) return typeid('trace').toString();
+              if (!ctx) {
+                return typeid('trace').toString();
+              }
               return ctx.traceId;
             },
           },

@@ -41,7 +41,9 @@ describe('ClientSecretAuthStrategy', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint') return mockSharepointConfig;
+          if (key === 'sharepoint') {
+            return mockSharepointConfig;
+          }
           return undefined;
         }),
       }))
