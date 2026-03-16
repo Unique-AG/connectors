@@ -1,4 +1,5 @@
 import he from 'he';
+import striptags from 'striptags';
 
 interface Attachment {
   id: string;
@@ -14,7 +15,7 @@ interface Attachment {
  * - <li>           →  "- " prefix
  * - <attachment id="x"/>  →  [attachment: name] (or [attachment] if name unknown)
  * - Adaptive card JSON blobs  →  [card]
- * - All other tags stripped, text kept
+ * - All other tags stripped via `striptags`
  * - HTML entities decoded via `he`
  *
  * Returns '[deleted]' for blank/tombstone content.
@@ -25,7 +26,9 @@ export function normalizeContent(
   contentType: string,
   attachments: Attachment[] = [],
 ): string {
-  if (contentType !== 'html') return content.trim() || '[deleted]';
+  if (contentType !== 'html') {
+    return content.trim() || '[deleted]';
+  }
 
   const attachmentMap = new Map(attachments.map((a) => [a.id, a.name]));
 
@@ -47,7 +50,7 @@ export function normalizeContent(
   });
 
   // Strip remaining HTML tags (formatting like <strong>, <em>, etc. — text kept)
-  result = result.replace(/<[^>]+>/g, '');
+  result = striptags(result);
 
   // Decode HTML entities
   result = he.decode(result);
