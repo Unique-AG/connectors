@@ -7,7 +7,7 @@ import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { LiveCatchUpEventDto } from './live-catch-up-event.dto';
 
-const LIVE_CATCH_UP_CRON_SCHEDULE = '*/10 * * * *';
+const LIVE_CATCH_UP_CRON_SCHEDULE = '*/15 * * * *';
 
 @Injectable()
 export class LiveCatchUpCronService implements OnModuleInit, OnModuleDestroy {
