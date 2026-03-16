@@ -69,9 +69,10 @@ export class ConfluenceSynchronizationService {
 
       if (diffResult.deletedItems.length > 0) {
         const contentKeys = diffResult.deletedItems.map((item) => `${item.partialKey}/${item.id}`);
-        await this.ingestionService.deleteContentByKeys(contentKeys);
+        const deletedCount = await this.ingestionService.deleteContentByKeys(contentKeys);
         this.logger.log({
-          count: diffResult.deletedItems.length,
+          requested: diffResult.deletedItems.length,
+          deleted: deletedCount,
           msg: 'Deleted content processed',
         });
       }

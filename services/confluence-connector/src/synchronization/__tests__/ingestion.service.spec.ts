@@ -215,30 +215,34 @@ describe('IngestionService', () => {
     ] as never);
     vi.mocked(uniqueApiClient.files.deleteByIds).mockResolvedValue(2);
 
-    await service.deleteContentByKeys(['k1', 'k2']);
+    const result = await service.deleteContentByKeys(['k1', 'k2']);
 
+    expect(result).toBe(2);
     expect(uniqueApiClient.files.getByKeys).toHaveBeenCalledWith(['k1', 'k2']);
     expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['content-1', 'content-2']);
   });
 
-  it('logs and returns when no content is found for delete keys', async () => {
+  it('logs warning and returns 0 when no content is found for delete keys', async () => {
     const { service, uniqueApiClient } = makeService();
     vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([]);
 
-    await service.deleteContentByKeys(['missing-key']);
+    const result = await service.deleteContentByKeys(['missing-key']);
 
+    expect(result).toBe(0);
     expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
-    expect(mockLogger.log).toHaveBeenCalledWith({
+    expect(mockLogger.warn).toHaveBeenCalledWith({
       keyCount: 1,
       msg: 'No content found for keys, nothing to delete',
     });
   });
 
-  it('logs delete errors and continues', async () => {
+  it('logs delete errors and returns 0', async () => {
     const { service, uniqueApiClient } = makeService();
     vi.mocked(uniqueApiClient.files.getByKeys).mockRejectedValue(new Error('delete failed'));
 
-    await service.deleteContentByKeys(['k1']);
+    const result = await service.deleteContentByKeys(['k1']);
+
+    expect(result).toBe(0);
 
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -249,11 +253,12 @@ describe('IngestionService', () => {
     );
   });
 
-  it('returns early for empty delete input', async () => {
+  it('returns 0 for empty delete input', async () => {
     const { service, uniqueApiClient } = makeService();
 
-    await service.deleteContentByKeys([]);
+    const result = await service.deleteContentByKeys([]);
 
+    expect(result).toBe(0);
     expect(uniqueApiClient.files.getByKeys).not.toHaveBeenCalled();
     expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
   });

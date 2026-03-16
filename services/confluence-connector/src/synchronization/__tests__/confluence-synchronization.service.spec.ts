@@ -90,7 +90,7 @@ describe('ConfluenceSynchronizationService', () => {
     mockIngestionService = {
       ingestPage: vi.fn().mockResolvedValue(undefined),
       ingestAttachment: vi.fn().mockResolvedValue(undefined),
-      deleteContentByKeys: vi.fn().mockResolvedValue(undefined),
+      deleteContentByKeys: vi.fn().mockResolvedValue(0),
     };
     service = createService(
       mockScanner,

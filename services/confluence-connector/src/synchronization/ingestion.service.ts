@@ -118,19 +118,19 @@ export class IngestionService {
     }
   }
 
-  public async deleteContentByKeys(contentKeys: string[]): Promise<void> {
+  public async deleteContentByKeys(contentKeys: string[]): Promise<number> {
     if (contentKeys.length === 0) {
-      return;
+      return 0;
     }
 
     try {
       const files = await this.uniqueApiClient.files.getByKeys(contentKeys);
       if (files.length === 0) {
-        this.logger.log({
+        this.logger.warn({
           keyCount: contentKeys.length,
           msg: 'No content found for keys, nothing to delete',
         });
-        return;
+        return 0;
       }
 
       const contentIds = files.map((f) => f.id);
@@ -141,8 +141,10 @@ export class IngestionService {
         deletedCount,
         msg: 'Content deleted',
       });
+      return deletedCount;
     } catch (error) {
       this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
+      return 0;
     }
   }
 
