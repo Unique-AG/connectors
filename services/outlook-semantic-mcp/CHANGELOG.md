@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.10](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.9...outlook-semantic-mcp@0.2.10) (2026-03-16)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,unique-api:** split sync into full sync and live catch-up with resume and buffering ([#360](https://github.com/Unique-AG/connectors/issues/360)) ([c6ee0bb](https://github.com/Unique-AG/connectors/commit/c6ee0bb4f9c1ba986f827ae6b4fa663f7c4b9ab7))
+
 ## [0.2.9](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.8...outlook-semantic-mcp@0.2.9) (2026-03-12)
 
 
