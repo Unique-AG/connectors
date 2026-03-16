@@ -1,16 +1,13 @@
 import crypto from 'node:crypto';
 import { createSmeared } from '@unique-ag/utils';
-import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish } from 'remeda';
-import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { GetSubscriptionAndUserProfileQuery } from '../user-utils/get-subscription-and-user-profile.query';
-import { FullSyncEventDto } from './dtos/full-sync-event.dto';
-import { START_DELTA_LINK } from './execute-full-sync.command';
+import { GetSubscriptionAndUserProfileQuery } from '../../user-utils/get-subscription-and-user-profile.query';
+import { ExecuteFullSyncCommand, START_DELTA_LINK } from './execute-full-sync.command';
 
 export type FullSyncRunStatus = 'skipped' | 'started';
 
@@ -19,8 +16,8 @@ export class StartFullSyncCommand {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly amqp: AmqpConnection,
     private readonly getSubscriptionAndUserProfileQuery: GetSubscriptionAndUserProfileQuery,
+    private readonly executeFullSyncCommand: ExecuteFullSyncCommand,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -56,11 +53,23 @@ export class StartFullSyncCommand {
       return { status: 'skipped' };
     }
 
-    const event = FullSyncEventDto.parse({
-      type: 'unique.outlook-semantic-mcp.full-sync.execute',
-      payload: { userProfileId: userProfile.id, version: guardResult.version },
-    });
-    await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
+    // This process can take a long time like 30 minutes for big inboxes so we do not await it.
+    this.executeFullSyncCommand
+      .run({
+        version: guardResult.version,
+        userProfileId: userProfile.id,
+      })
+      .then((result) => {
+        this.logger.debug({
+          msg: `Full sync finished with status: ${result.status}`,
+          subscriptionId,
+          userProfileId: userProfile.id,
+          userEmail,
+        });
+      })
+      .catch((err) => {
+        this.logger.error({ err, msg: `Full sync failed` });
+      });
 
     this.logger.log({
       subscriptionId,
@@ -83,7 +92,6 @@ export class StartFullSyncCommand {
           fullSyncNextLink: inboxConfiguration.fullSyncNextLink,
           oldestCreatedDateTime: inboxConfiguration.oldestCreatedDateTime,
           newestLastModifiedDateTime: inboxConfiguration.newestLastModifiedDateTime,
-          oldestLastModifiedDateTime: inboxConfiguration.oldestLastModifiedDateTime,
         })
         .from(inboxConfiguration)
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
@@ -120,18 +128,20 @@ export class StartFullSyncCommand {
       const now = new Date();
 
       const updateSet: Partial<typeof inboxConfiguration.$inferInsert> = {
-        fullSyncState: 'fetching-emails',
+        fullSyncState: 'running',
         fullSyncVersion: version,
         lastFullSyncStartedAt: now,
+        fullSyncHeartbeatAt: now,
       };
 
       const isFreshStart = isNullish(inboxConfig.fullSyncNextLink);
 
       if (isFreshStart) {
-        updateSet.newestCreatedDateTime = null;
         updateSet.oldestCreatedDateTime = null;
+        // If it's a fresh shart we put the newestLastModifiedDateTime to be now() because we will
+        // anyway read everything and full sync will get all the messages, the live catchup should
+        // only care about newer updates than this.
         updateSet.newestLastModifiedDateTime = inboxConfig.newestLastModifiedDateTime ?? now;
-        updateSet.oldestLastModifiedDateTime = null;
         updateSet.fullSyncNextLink = START_DELTA_LINK;
       }
 

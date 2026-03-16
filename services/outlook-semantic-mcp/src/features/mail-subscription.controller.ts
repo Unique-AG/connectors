@@ -19,8 +19,6 @@ import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { traceAttrs, traceError, traceEvent } from '~/features/tracing.utils';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
-import { StartFullSyncCommand } from './full-sync/start-full-sync.command';
-import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 import {
   ChangeNotificationCollectionDto,
   LifecycleChangeNotificationCollectionDto,
@@ -29,6 +27,8 @@ import {
 import { SubscriptionReauthorizeService } from './subscriptions/subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscriptions/subscription-remove.service';
 import { MailSubscriptionUtilsService } from './subscriptions/subscription-utils.service';
+import { StartFullSyncCommand } from './sync/full-sync/start-full-sync.command';
+import { LiveCatchUpEventDto } from './sync/live-catch-up/live-catch-up-event.dto';
 
 @Controller('mail-subscription')
 export class MailSubscriptionController {

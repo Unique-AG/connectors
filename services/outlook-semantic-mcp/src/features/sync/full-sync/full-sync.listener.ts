@@ -6,18 +6,14 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
-import { FullSyncEventDto } from './dtos/full-sync-event.dto';
-import { ExecuteFullSyncCommand } from './execute-full-sync.command';
+import { FullSyncEventDto } from './full-sync-event.dto';
 import { RecoverFullSyncCommand } from './recover-full-sync.command';
 
 @Injectable()
 export class FullSyncListener {
   private readonly logger = new Logger(FullSyncListener.name);
 
-  public constructor(
-    private readonly executeFullSyncCommand: ExecuteFullSyncCommand,
-    private readonly recoverFullSyncCommand: RecoverFullSyncCommand,
-  ) {}
+  public constructor(private readonly recoverFullSyncCommand: RecoverFullSyncCommand) {}
 
   @RabbitSubscribe({
     exchange: MAIN_EXCHANGE.name,
@@ -32,9 +28,7 @@ export class FullSyncListener {
     this.logger.log({ msg: 'Full sync event received', type: event.type });
 
     switch (event.type) {
-      case 'unique.outlook-semantic-mcp.full-sync.execute':
-        return await this.executeFullSyncCommand.run(event.payload);
-      case 'unique.outlook-semantic-mcp.full-sync.recovery-requested':
+      case 'unique.outlook-semantic-mcp.full-sync.recovery':
         return await this.recoverFullSyncCommand.run(event.payload);
     }
   }

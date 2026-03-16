@@ -6,11 +6,12 @@ import { and, eq, lt, notInArray, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 import { traceEvent } from '~/features/tracing.utils';
-import { FullSyncEventDto } from './dtos/full-sync-event.dto';
+import { FullSyncEventDto } from './full-sync/full-sync-event.dto';
+import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 
 const STUCK_FULL_SYNC_THRESHOLD_MINUTES = 15;
 const STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
-const RECOVERY_CRON_SCHEDULE = '* * * * *';
+const RECOVERY_CRON_SCHEDULE = '*/5 * * * *';
 
 @Injectable()
 export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
@@ -75,7 +76,7 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
           and(
             notInArray(inboxConfiguration.fullSyncState, ['ready']),
             lt(
-              sql`GREATEST(COALESCE(${inboxConfiguration.lastFullSyncStartedAt}, '-infinity'::timestamptz), ${inboxConfiguration.updatedAt})`,
+              sql`COALESCE(${inboxConfiguration.fullSyncHeartbeatAt}, '-infinity'::timestamptz)`,
               sql`NOW() - ${STUCK_FULL_SYNC_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
             ),
           ),
@@ -109,7 +110,7 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
         and(
           notInArray(inboxConfiguration.liveCatchUpState, ['ready']),
           lt(
-            sql`COALESCE(${inboxConfiguration.liveCatchUpHeartbeatAt}, ${inboxConfiguration.updatedAt})`,
+            sql`COALESCE(${inboxConfiguration.liveCatchUpHeartbeatAt}, '-infinity'::timestamptz)`,
             sql`NOW() - ${STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
           ),
         ),
@@ -129,15 +130,16 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
       count: stuckConfigs.length,
     });
 
-    for (const config of stuckConfigs) {
+    for (const { userProfileId } of stuckConfigs) {
       this.logger.log({
-        msg: 'Resetting stuck live catch-up state',
-        userProfileId: config.userProfileId,
+        msg: 'Publishing live catch-up recovery event',
+        userProfileId,
       });
-      await this.db
-        .update(inboxConfiguration)
-        .set({ liveCatchUpState: 'ready' })
-        .where(eq(inboxConfiguration.userProfileId, config.userProfileId));
+      const event = LiveCatchUpEventDto.parse({
+        type: 'unique.outlook-semantic-mcp.live-catch-up.recovery',
+        payload: { userProfileId },
+      });
+      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
     }
   }
 }

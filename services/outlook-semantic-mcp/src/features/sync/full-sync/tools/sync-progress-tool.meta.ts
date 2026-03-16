@@ -16,10 +16,10 @@ export const META = createMeta({
   If \`message\` is present and non-empty, show it as a blockquote below the status line.
 
   **Sync State** — Full sync: {syncStats.fullSyncState}, Live catch-up: {syncStats.liveCatchUpState}
-  - \`fullSyncState\` values: \`ready\` (initial fetch done), \`fetching-emails\` (fetch in progress), \`failed\` (error)
+  - \`fullSyncState\` values: \`ready\` (initial fetch done), \`running\` (in progress), \`failed\` (error)
   - \`liveCatchUpState\` values: \`ready\` (up to date), \`running\` (processing new emails), \`failed\` (error)
 
-  **Date Window** — Newest created: {syncStats.dateWindow.newestCreatedDateTime}, Oldest created: {syncStats.dateWindow.oldestCreatedDateTime}, Newest modified: {syncStats.dateWindow.newestLastModifiedDateTime}, Oldest modified: {syncStats.dateWindow.oldestLastModifiedDateTime}
+  **Date Window** — Newest created: {syncStats.dateWindow.newestCreatedDateTime}, Newest modified: {syncStats.dateWindow.newestLastModifiedDateTime}
 
   **Ingestion** — if \`ingestionStats.state\` is \`error\`, show: ❌ _Ingestion unavailable: {ingestionStats.message}_
   Otherwise (\`ingestionStats.state\` is \`finished\` or \`running\`):

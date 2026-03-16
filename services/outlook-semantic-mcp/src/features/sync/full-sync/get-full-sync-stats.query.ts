@@ -12,7 +12,7 @@ import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
-import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
+import { GetUserProfileQuery } from '../../user-utils/get-user-profile.query';
 
 const ingestionStatsError = z.object({
   state: z
@@ -40,7 +40,7 @@ export const GetFullSyncStatsResponse = z.object({
   message: z.string(),
   syncStats: z
     .object({
-      fullSyncState: z.enum(['ready', 'failed', 'fetching-emails']),
+      fullSyncState: z.enum(['ready', 'failed', 'running']),
       liveCatchUpState: z.enum(['ready', 'running', 'failed']),
       runAt: z.string().nullable(),
       startedAt: z.string().nullable(),
@@ -53,7 +53,6 @@ export const GetFullSyncStatsResponse = z.object({
         newestCreatedDateTime: z.string().nullable(),
         oldestCreatedDateTime: z.string().nullable(),
         newestLastModifiedDateTime: z.string().nullable(),
-        oldestLastModifiedDateTime: z.string().nullable(),
       }),
     })
     .nullable(),
@@ -177,7 +176,6 @@ export class GetFullSyncStatsQuery {
         newestCreatedDateTime: inboxConfig.newestCreatedDateTime?.toISOString() ?? null,
         oldestCreatedDateTime: inboxConfig.oldestCreatedDateTime?.toISOString() ?? null,
         newestLastModifiedDateTime: inboxConfig.newestLastModifiedDateTime?.toISOString() ?? null,
-        oldestLastModifiedDateTime: inboxConfig.oldestLastModifiedDateTime?.toISOString() ?? null,
       },
     };
 

@@ -8,7 +8,7 @@ import { traceAttrs } from '~/features/tracing.utils';
 import { IngestEmailCommand } from './ingest-email.command';
 
 @Injectable()
-export class IngestEmailViaSubscriptionCommand {
+export class IngestEmailLiveCatchupMessageCommand {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly ingestEmailCommand: IngestEmailCommand,

@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
+import { ContentMetadata, UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
 import { createSmeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -152,7 +152,7 @@ export class IngestEmailCommand {
       this.logger.log({ ...logContext, msg: `Update file metadata` });
       await this.uniqueApi.ingestion.updateMetadata({
         contentId: file.id,
-        metadata,
+        metadata: metadata as unknown as ContentMetadata,
       });
       return;
     }
@@ -195,7 +195,7 @@ export class IngestEmailCommand {
       // We pass byteSize as 1 because if we do not pass it the register content request will
       // create the content but the content will not be visible in Knowledge base.
       byteSize: 1,
-      metadata: metadata,
+      metadata: metadata as unknown as ContentMetadata,
       scopeId: rootScopeId,
       ownerType: UniqueOwnerType.Scope,
       sourceOwnerType: UniqueOwnerType.Company,

@@ -6,13 +6,13 @@ import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { MessageEventDto } from '../mail-ingestion/dtos/message-event.dto';
+import { MessageEventDto } from '../../mail-ingestion/dtos/message-event.dto';
 import {
   FullSyncGraphMessage,
   FullSyncGraphMessageFields,
   fullSyncGraphMessageResponseSchema,
-} from '../mail-ingestion/dtos/microsoft-graph.dtos';
-import { IngestionPriority } from '../mail-ingestion/utils/ingestion-queue.utils';
+} from '../../mail-ingestion/dtos/microsoft-graph.dtos';
+import { IngestionPriority } from '../../mail-ingestion/utils/ingestion-queue.utils';
 
 @Injectable()
 export class LiveCatchUpCommand {
@@ -57,33 +57,14 @@ export class LiveCatchUpCommand {
       return;
     }
 
-    const { watermark, pendingLiveMessageIds } = lockResult;
-    const pendingMessageIds = new Set(pendingLiveMessageIds);
+    const { watermark } = lockResult;
 
     try {
       const { totalScheduled, scheduledIds } = await this.fetchAndScheduleBatches({
         userProfileId,
         subscriptionId,
         watermark,
-        pendingMessageIds,
       });
-
-      const remainingIds = messageIds.filter((id) => !scheduledIds.has(id));
-      let webhookScheduled = 0;
-      if (remainingIds.length > 0) {
-        this.logger.debug({
-          msg: `Publishing remaining ids: ${remainingIds.length}`,
-          subscriptionId,
-        });
-        webhookScheduled = await this.publishMessages({
-          messageIds: remainingIds,
-          subscriptionId,
-        });
-      }
-
-      for (const id of remainingIds) {
-        scheduledIds.add(id);
-      }
 
       const flushedCount = await this.flushPendingMessages({
         userProfileId,
@@ -94,9 +75,8 @@ export class LiveCatchUpCommand {
       this.logger.log({
         userProfileId,
         subscriptionId,
-        totalScheduled: totalScheduled + webhookScheduled + flushedCount,
+        totalScheduled: totalScheduled + flushedCount,
         fromBatches: totalScheduled,
-        fromWebhook: webhookScheduled,
         fromPendingFlush: flushedCount,
         msg: 'Live catch-up completed',
       });
@@ -118,15 +98,12 @@ export class LiveCatchUpCommand {
   private async acquireLock(
     userProfileId: string,
     messageIds: string[],
-  ): Promise<
-    { status: 'proceed'; watermark: Date; pendingLiveMessageIds: string[] } | { status: 'skip' }
-  > {
+  ): Promise<{ status: 'proceed'; watermark: Date } | { status: 'skip' }> {
     return this.db.transaction(async (tx) => {
       const inboxConfig = await tx
         .select({
           liveCatchUpState: inboxConfiguration.liveCatchUpState,
           newestLastModifiedDateTime: inboxConfiguration.newestLastModifiedDateTime,
-          pendingLiveMessageIds: inboxConfiguration.pendingLiveMessageIds,
         })
         .from(inboxConfiguration)
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
@@ -179,14 +156,17 @@ export class LiveCatchUpCommand {
 
       await tx
         .update(inboxConfiguration)
-        .set({ liveCatchUpState: 'running', liveCatchUpHeartbeatAt: sql`NOW()` })
+        .set({
+          liveCatchUpState: 'running',
+          pendingLiveMessageIds: sql`array_cat(${inboxConfiguration.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
+          liveCatchUpHeartbeatAt: sql`NOW()`,
+        })
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
         .execute();
 
       return {
         status: 'proceed',
         watermark: inboxConfig.newestLastModifiedDateTime,
-        pendingLiveMessageIds: inboxConfig.pendingLiveMessageIds,
       };
     });
   }
@@ -195,12 +175,10 @@ export class LiveCatchUpCommand {
     userProfileId,
     subscriptionId,
     watermark,
-    pendingMessageIds,
   }: {
     userProfileId: string;
     subscriptionId: string;
     watermark: Date;
-    pendingMessageIds: Set<string>;
   }): Promise<{ totalScheduled: number; scheduledIds: Set<string> }> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     let totalScheduled = 0;
@@ -230,7 +208,6 @@ export class LiveCatchUpCommand {
       const batchScheduledIds = await this.publishBatch({
         batch,
         subscriptionId,
-        pendingMessageIds,
       });
       for (const id of batchScheduledIds) {
         scheduledIds.add(id);
@@ -270,21 +247,14 @@ export class LiveCatchUpCommand {
   private async publishBatch({
     batch,
     subscriptionId,
-    pendingMessageIds,
   }: {
     batch: FullSyncGraphMessage[];
     subscriptionId: string;
-    pendingMessageIds: Set<string>;
   }): Promise<string[]> {
     const publishedIds: string[] = [];
-    let skippedEvents = 0;
     let publishedEvents = 0;
 
     for (const email of batch) {
-      if (pendingMessageIds.has(email.id)) {
-        skippedEvents++;
-        continue;
-      }
       publishedEvents++;
       const event = MessageEventDto.encode({
         type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
@@ -298,7 +268,7 @@ export class LiveCatchUpCommand {
 
     this.logger.debug({
       subscriptionId,
-      msg: `PublishBatch - Skipped messages ${skippedEvents}. Published Messages: ${publishedEvents}`,
+      msg: `PublishBatch - Published Messages: ${publishedEvents}`,
     });
 
     return publishedIds;
@@ -377,17 +347,13 @@ export class LiveCatchUpCommand {
     const modifiedDates = batch.map((e) => new Date(e.lastModifiedDateTime));
 
     const batchNewestCreated = new Date(Math.max(...createdDates.map((d) => d.getTime())));
-    const batchOldestCreated = new Date(Math.min(...createdDates.map((d) => d.getTime())));
     const batchNewestModified = new Date(Math.max(...modifiedDates.map((d) => d.getTime())));
-    const batchOldestModified = new Date(Math.min(...modifiedDates.map((d) => d.getTime())));
 
     await this.db
       .update(inboxConfiguration)
       .set({
         newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestCreatedDateTime}, '-infinity'::timestamptz), ${batchNewestCreated})`,
-        oldestCreatedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestCreatedDateTime}, 'infinity'::timestamptz), ${batchOldestCreated})`,
         newestLastModifiedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestLastModifiedDateTime}, '-infinity'::timestamptz), ${batchNewestModified})`,
-        oldestLastModifiedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestLastModifiedDateTime}, 'infinity'::timestamptz), ${batchOldestModified})`,
         liveCatchUpHeartbeatAt: sql`NOW()`,
       })
       .where(eq(inboxConfiguration.userProfileId, userProfileId))

@@ -17,7 +17,6 @@ function makeInboxConfig(overrides: Record<string, unknown> = {}): Record<string
     filters: { ignoredBefore: '2024-01-01T00:00:00Z', ignoredSenders: [], ignoredContents: [] },
     oldestCreatedDateTime: null,
     newestLastModifiedDateTime: null,
-    oldestLastModifiedDateTime: null,
     ...overrides,
   };
 }
@@ -109,7 +108,7 @@ describe('StartFullSyncCommand', () => {
     const setCall = db.__tx.__txUpdate.set.mock.calls[0]?.[0];
     expect(setCall).toEqual(
       expect.objectContaining({
-        fullSyncState: 'fetching-emails',
+        fullSyncState: 'running',
         fullSyncNextLink: START_DELTA_LINK,
       }),
     );
@@ -133,12 +132,11 @@ describe('StartFullSyncCommand', () => {
     const setCall = db.__tx.__txUpdate.set.mock.calls[0]?.[0];
     expect(setCall).toEqual(
       expect.objectContaining({
-        fullSyncState: 'fetching-emails',
+        fullSyncState: 'running',
         fullSyncNextLink: START_DELTA_LINK,
         newestLastModifiedDateTime: savedModifiedDateTime,
         newestCreatedDateTime: null,
         oldestCreatedDateTime: null,
-        oldestLastModifiedDateTime: null,
       }),
     );
   });
@@ -154,7 +152,7 @@ describe('StartFullSyncCommand', () => {
   });
 
   it('skips when sync is already running', async () => {
-    const db = createMockDb(makeInboxConfig({ fullSyncState: 'fetching-emails' }));
+    const db = createMockDb(makeInboxConfig({ fullSyncState: 'running' }));
     const command = createCommand({ amqp, getSubscriptionAndUserProfileQuery: getQuery, db });
 
     const result = await command.run(SUBSCRIPTION_ID);

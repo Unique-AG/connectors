@@ -9,10 +9,7 @@ import { DirectoriesSyncModule } from './directories-sync/directories-sync.modul
 import { ListFoldersTool } from './directories-sync/tools';
 import { CreateDraftEmailTool } from './email-management/create-draft-email.tool';
 import { EmailManagementModule } from './email-management/email-management.module';
-import { RunFullSyncTool, SyncProgressTool } from './full-sync';
-import { FullSyncModule } from './full-sync/full-sync.module';
-import { IngestionListener } from './ingestion.listener';
-import { LiveCatchUpModule } from './live-catch-up/live-catch-up.module';
+import { IngestionListener } from './mail-ingestion/ingestion.listener';
 import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
 import { MailSubscriptionController } from './mail-subscription.controller';
 import { SubscriptionModule } from './subscriptions/subscription.module';
@@ -21,6 +18,9 @@ import {
   RemoveInboxConnectionTool,
   VerifyInboxConnectionTool,
 } from './subscriptions/tools';
+import { RunFullSyncTool, SyncProgressTool } from './sync/full-sync';
+import { FullSyncModule } from './sync/full-sync/full-sync.module';
+import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 
 const TOOLS = [
   ListFoldersTool,

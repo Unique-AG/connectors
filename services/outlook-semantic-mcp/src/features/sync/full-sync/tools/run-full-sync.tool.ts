@@ -9,7 +9,7 @@ import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import {
   FullSyncRunStatus,
   StartFullSyncCommand,
-} from '~/features/full-sync/start-full-sync.command';
+} from '~/features/sync/full-sync/start-full-sync.command';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { META } from './run-full-sync-tool.meta';
 

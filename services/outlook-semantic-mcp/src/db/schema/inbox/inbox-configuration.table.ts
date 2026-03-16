@@ -4,7 +4,7 @@ import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 
-export const inboxSyncState = pgEnum('inbox_sync_state', ['ready', 'failed', 'fetching-emails']);
+export const inboxSyncState = pgEnum('inbox_sync_state', ['ready', 'failed', 'running']);
 
 export const liveCatchUpState = pgEnum('live_catch_up_state', ['ready', 'running', 'failed']);
 
@@ -25,6 +25,7 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   filters: jsonb(`filters`).$type<Record<string, unknown>>().notNull(),
   lastFullSyncRunAt: timestamp(`last_full_sync_run_at`),
   fullSyncState: inboxSyncState(`full_sync_state`).notNull().default('ready'),
+  fullSyncHeartbeatAt: timestamp(`last_full_sync_started_at`),
   lastFullSyncStartedAt: timestamp(`last_full_sync_started_at`),
   fullSyncVersion: uuid(`full_sync_version`),
   liveCatchUpState: liveCatchUpState(`live_catch_up_state`).notNull().default('ready'),
@@ -36,7 +37,6 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   newestCreatedDateTime: timestamp(`newest_created_date_time`),
   oldestCreatedDateTime: timestamp(`oldest_created_date_time`),
   newestLastModifiedDateTime: timestamp(`newest_last_modified_date_time`),
-  oldestLastModifiedDateTime: timestamp(`oldest_last_modified_date_time`),
 
   ...timestamps,
 });

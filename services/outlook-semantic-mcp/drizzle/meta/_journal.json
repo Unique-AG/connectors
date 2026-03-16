@@ -127,6 +127,13 @@
       "when": 1773405168826,
       "tag": "0017_live_catch_up_heartbeat",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1773653998875,
+      "tag": "0018_light_leopardon",
+      "breakpoints": true
     }
   ]
 }

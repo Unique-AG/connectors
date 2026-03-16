@@ -1,8 +1,7 @@
 import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { AppConfig, appConfig } from '~/config';
 import {
   getRootScopeExternalId,
   getRootScopeExternalIdForUser,
@@ -16,61 +15,21 @@ import { traceAttrs } from '../tracing.utils';
 export class CreateRootScopeCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(
-    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
-  ) {}
+  public constructor(@InjectUniqueApi() private readonly uniqueApi: UniqueApiClient) {}
 
   @Span()
   public async run({ userProviderUserId }: { userProviderUserId: string }): Promise<void> {
     traceAttrs({ userProviderUserId: userProviderUserId });
-    const { id: parentScopeId } = await this.createScopeOnPath({
+    await this.createScopeOnPath({
       scopePath: getRootScopePath(),
       externalId: getRootScopeExternalId(),
       // This is a total hack until we fix this in the monorepo because they do not check permissions correctly for integrations
       xUserRoles: ['chat.admin.all'],
     });
-    const { id: userScopeId, created: userScopeCreated } = await this.createScopeOnPath({
+    await this.createScopeOnPath({
       scopePath: getRootScopePathForUser(userProviderUserId),
       externalId: getRootScopeExternalIdForUser(userProviderUserId),
     });
-
-    if (userScopeCreated) {
-      await this.addPermissions([parentScopeId, userScopeId]);
-    }
-  }
-
-  private async addPermissions(scopeIds: string[]): Promise<void> {
-    const { globalScopeAccess } = this.config;
-    if (!globalScopeAccess) {
-      this.logger.warn('Cannot add scope permissions: user id is not available');
-      return;
-    }
-
-    this.logger.debug(
-      `Adding MANAGE scope permissions for user ${globalScopeAccess.entityId}, type: ${globalScopeAccess.entityType} on scopes ${scopeIds.join(', ')}`,
-    );
-    await Promise.all(
-      scopeIds.map((scopeId) =>
-        this.uniqueApi.scopes.createAccesses(scopeId, [
-          {
-            type: 'MANAGE',
-            entityId: globalScopeAccess.entityId,
-            entityType: globalScopeAccess.entityType,
-          },
-          {
-            type: 'READ',
-            entityId: globalScopeAccess.entityId,
-            entityType: globalScopeAccess.entityType,
-          },
-          {
-            type: 'WRITE',
-            entityId: globalScopeAccess.entityId,
-            entityType: globalScopeAccess.entityType,
-          },
-        ]),
-      ),
-    );
   }
 
   private async createScopeOnPath({

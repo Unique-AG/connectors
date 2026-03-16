@@ -11,20 +11,26 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
-} from '../../db/schema/inbox/inbox-configuration-mail-filters.dto';
-import { SyncDirectoriesCommand } from '../directories-sync/sync-directories.command';
-import { MessageEventDto } from '../mail-ingestion/dtos/message-event.dto';
+} from '../../../db/schema/inbox/inbox-configuration-mail-filters.dto';
+import { SyncDirectoriesCommand } from '../../directories-sync/sync-directories.command';
+import { MessageEventDto } from '../../mail-ingestion/dtos/message-event.dto';
 import {
   FullSyncGraphMessage,
   FullSyncGraphMessageFields,
   fullSyncGraphMessageResponseSchema,
-} from '../mail-ingestion/dtos/microsoft-graph.dtos';
-import { IngestionPriority } from '../mail-ingestion/utils/ingestion-queue.utils';
-import { shouldSkipEmail } from '../mail-ingestion/utils/should-skip-email';
+} from '../../mail-ingestion/dtos/microsoft-graph.dtos';
+import { IngestionPriority } from '../../mail-ingestion/utils/ingestion-queue.utils';
+import { shouldSkipEmail } from '../../mail-ingestion/utils/should-skip-email';
 
 type InboxConfiguration = typeof inboxConfiguration.$inferSelect;
 
 export const START_DELTA_LINK = `SYNC_STARTED:__EMPTY_DELTA__`;
+
+export type ExecuteFullSyncRunStatus =
+  | 'interupted:version-missmatch'
+  | `skipped:${'no-inbox-configuration-found' | 'no-next-link--found' | 'full-sync-in-progress'}`
+  | 'completed'
+  | 'failed';
 
 @Injectable()
 export class ExecuteFullSyncCommand {
@@ -44,7 +50,9 @@ export class ExecuteFullSyncCommand {
   }: {
     userProfileId: string;
     version: string;
-  }): Promise<void> {
+  }): Promise<{
+    status: ExecuteFullSyncRunStatus;
+  }> {
     traceAttrs({ userProfileId, version });
     this.logger.log({ userProfileId, version, msg: 'Received full sync execute event' });
 
@@ -61,7 +69,7 @@ export class ExecuteFullSyncCommand {
 
     if (!inboxConfig) {
       this.logger.warn({ userProfileId, version, msg: 'No inbox configuration found, discarding' });
-      return;
+      return { status: 'skipped:no-inbox-configuration-found' };
     }
 
     const { fullSyncNextLink, fullSyncVersion, fullSyncState } = inboxConfig;
@@ -71,10 +79,10 @@ export class ExecuteFullSyncCommand {
         version,
         msg: 'Delta link is null cannot resume this full sync',
       });
-      return;
+      return { status: 'skipped:no-next-link--found' };
     }
 
-    if (fullSyncVersion !== version || fullSyncState !== 'fetching-emails') {
+    if (fullSyncVersion !== version || fullSyncState !== 'running') {
       this.logger.log({
         userProfileId,
         version,
@@ -82,7 +90,7 @@ export class ExecuteFullSyncCommand {
         currentState: fullSyncState,
         msg: 'Stale execute event, discarding',
       });
-      return;
+      return { status: 'skipped:full-sync-in-progress' };
     }
 
     const filters = inboxConfigurationMailFilters.parse(inboxConfig.filters);
@@ -97,20 +105,26 @@ export class ExecuteFullSyncCommand {
         msg: 'Fetching emails in batches',
       });
 
-      await this.fetchAndScheduleBatches({
+      const { status } = await this.fetchAndScheduleBatches({
         userProfileId,
         filters,
         version,
         initialDeltaLink: fullSyncNextLink,
       });
+      if (status === 'interupted:version-missmatch') {
+        return { status: 'interupted:version-missmatch' };
+      }
 
+      // We do not clear the version because the queue need to process remaining messages.
       await this.updateInboxConfigByVersion(userProfileId, version, {
         fullSyncState: 'ready',
         lastFullSyncRunAt: new Date(),
         fullSyncNextLink: null,
+        fullSyncHeartbeatAt: sql`NOW()`,
       });
 
       this.logger.log({ userProfileId, version, msg: 'Full sync completed' });
+      return { status: 'completed' };
     } catch (error) {
       this.logger.error({
         err: error,
@@ -118,9 +132,12 @@ export class ExecuteFullSyncCommand {
         userProfileId,
         version,
       });
+      // We do not clear the version because the queue need to process remaining messages.
       await this.updateInboxConfigByVersion(userProfileId, version, {
         fullSyncState: 'failed',
+        fullSyncHeartbeatAt: sql`NOW()`,
       });
+      return { status: 'failed' };
     }
   }
 
@@ -134,7 +151,7 @@ export class ExecuteFullSyncCommand {
     filters: InboxConfigurationMailFilters;
     version: string;
     initialDeltaLink: string;
-  }): Promise<void> {
+  }): Promise<{ status: 'interupted:version-missmatch' | 'completed' }> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     let totalScheduled = 0;
     let batchNumber = 0;
@@ -217,12 +234,13 @@ export class ExecuteFullSyncCommand {
           userProfileId,
           msg: `Sync cancelled — version mismatch`,
         });
-        return;
+        return { status: 'interupted:version-missmatch' };
       }
 
       nextLink = emailResponse['@odata.nextLink'] ?? null;
       await this.updateInboxConfigByVersion(userProfileId, version, {
         fullSyncNextLink: nextLink,
+        fullSyncHeartbeatAt: sql`NOW()`,
       });
     }
 
@@ -236,6 +254,7 @@ export class ExecuteFullSyncCommand {
       batchCount: batchNumber,
       msg: `All batches processed`,
     });
+    return { status: 'completed' };
   }
 
   private async processBatch({
@@ -280,18 +299,14 @@ export class ExecuteFullSyncCommand {
     version: string;
   }): Promise<boolean> {
     const createdDates = batch.map((e) => new Date(e.createdDateTime));
-    const modifiedDates = batch.map((e) => new Date(e.lastModifiedDateTime));
 
     const batchNewestCreated = new Date(Math.max(...createdDates.map((d) => d.getTime())));
     const batchOldestCreated = new Date(Math.min(...createdDates.map((d) => d.getTime())));
-    const batchNewestModified = new Date(Math.max(...modifiedDates.map((d) => d.getTime())));
-    const batchOldestModified = new Date(Math.min(...modifiedDates.map((d) => d.getTime())));
 
     return await this.updateInboxConfigByVersion(userProfileId, version, {
+      fullSyncHeartbeatAt: sql`NOW()`,
       newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestCreatedDateTime}, '-infinity'::timestamptz), ${batchNewestCreated})`,
       oldestCreatedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestCreatedDateTime}, 'infinity'::timestamptz), ${batchOldestCreated})`,
-      newestLastModifiedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestLastModifiedDateTime}, '-infinity'::timestamptz), ${batchNewestModified})`,
-      oldestLastModifiedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestLastModifiedDateTime}, 'infinity'::timestamptz), ${batchOldestModified})`,
     });
   }
 

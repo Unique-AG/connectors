@@ -28,14 +28,6 @@ const ConfigSchema = z
     mcpDebugMode: enabledDisabledBoolean(
       `Enables debug mode. In debug mode tools responses contain debugging data.`,
     ),
-    globalScopeAccess: json(
-      z.object({
-        entityId: z.string().describe(`The id of the entity which will get scope access`),
-        entityType: z.enum(['GROUP', 'USER']),
-      }),
-    )
-      .optional()
-      .describe('User / Group in unique which will get Access to the outlook mcp'),
   })
   .transform((c) => ({
     ...c,
@@ -50,8 +42,7 @@ export const appConfig = registerConfig('app', ConfigSchema, {
     'NODE_ENV',
     'SELF_URL',
     'DEFAULT_MAIL_FILTERS',
-    'GLOBAL_SCOPE_ACCESS',
-    'TOOLS_DEBUGGING',
+    'MCP_DEBUG_MODE',
   ]),
 });
 
