@@ -348,11 +348,10 @@ describe('FileDiffService', () => {
           { totalFilesInUnique: 6 },
         );
 
-        const result = await service.computeDiff([
-          basePage,
-          { ...basePage, id: 'p-2' },
-          { ...basePage, id: 'p-3' },
-        ], []);
+        const result = await service.computeDiff(
+          [basePage, { ...basePage, id: 'p-2' }, { ...basePage, id: 'p-3' }],
+          [],
+        );
 
         expect(result.deletedItems).toEqual([
           { id: 'p-old-1', partialKey: 'test-tenant/space-1_SP' },
@@ -416,11 +415,10 @@ describe('FileDiffService', () => {
           { totalFilesInUnique: 10 },
         );
 
-        const result = await service.computeDiff([
-          basePage,
-          { ...basePage, id: 'p-2' },
-          { ...basePage, id: 'p-3' },
-        ], []);
+        const result = await service.computeDiff(
+          [basePage, { ...basePage, id: 'p-2' }, { ...basePage, id: 'p-3' }],
+          [],
+        );
 
         expect(result.deletedItems).toEqual([
           { id: 'p-old-1', partialKey: 'test-tenant/space-1_SP' },
@@ -569,7 +567,10 @@ describe('FileDiffService', () => {
         );
 
         await expect(
-          service.computeDiff([basePage, { ...basePage, id: 'p-2' }, { ...basePage, id: 'p-3' }], []),
+          service.computeDiff(
+            [basePage, { ...basePage, id: 'p-2' }, { ...basePage, id: 'p-3' }],
+            [],
+          ),
         ).rejects.toThrow('File diff would delete all 3 files stored in Unique for partialKey');
       });
 

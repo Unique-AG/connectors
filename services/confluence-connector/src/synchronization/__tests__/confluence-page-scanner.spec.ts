@@ -1,5 +1,3 @@
-import { Smeared } from '@unique-ag/utils';
-
 vi.mock('@unique-ag/utils', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@unique-ag/utils')>();
   return {
