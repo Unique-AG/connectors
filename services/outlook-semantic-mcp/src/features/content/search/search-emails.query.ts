@@ -76,6 +76,8 @@ export class SearchEmailsQuery {
     const searchResult = await this.uniqueApi.content.search({
       prompt: input.search,
       metaDataFilter,
+      // TODO: Remove scope ids once we can filter only via the metadata filter for the scope.
+      scopeIds: [rootScopeForUser.id],
       limit: input.limit,
     });
 
