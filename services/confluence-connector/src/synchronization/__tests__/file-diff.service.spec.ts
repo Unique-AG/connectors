@@ -377,6 +377,23 @@ describe('FileDiffService', () => {
 
         expect(result.deletedPageIds).toEqual(['p-old']);
       });
+
+      it('allows when all files are deleted but new files with different IDs are being added', async () => {
+        // 2 submitted, 1 deleted = totalFilesInUnique, but new files have different IDs → allowed
+        const { service } = makeService(
+          async () => ({
+            newFiles: ['p-1', 'p-2'],
+            updatedFiles: [],
+            deletedFiles: ['p-old-1'],
+            movedFiles: [],
+          }),
+          { totalFilesInUnique: 1 },
+        );
+
+        const result = await service.computeDiff([basePage, { ...basePage, id: 'p-2' }]);
+
+        expect(result.deletedPageIds).toEqual(['p-old-1']);
+      });
     });
 
     describe('when deletions should be BLOCKED', () => {
@@ -412,7 +429,7 @@ describe('FileDiffService', () => {
         // 3 submitted, 3 deleted, and those 3 are ALL files in Unique for this space
         const { service } = makeService(
           async () => ({
-            newFiles: ['p-1'],
+            newFiles: [],
             updatedFiles: [],
             deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3'],
             movedFiles: [],
@@ -431,7 +448,7 @@ describe('FileDiffService', () => {
           async () => ({
             newFiles: ['p-1', 'p-2', 'p-3'],
             updatedFiles: [],
-            deletedFiles: ['p-old-1', 'p-old-2', 'p-old-3'],
+            deletedFiles: ['p-1', 'p-2', 'p-3'],
             movedFiles: [],
           }),
           { totalFilesInUnique: 3 },
@@ -446,7 +463,7 @@ describe('FileDiffService', () => {
         // Only 1 file in Unique and it would be deleted
         const { service } = makeService(
           async () => ({
-            newFiles: ['p-1'],
+            newFiles: [],
             updatedFiles: [],
             deletedFiles: ['p-old'],
             movedFiles: [],
@@ -457,6 +474,23 @@ describe('FileDiffService', () => {
         await expect(service.computeDiff([basePage])).rejects.toThrow(
           'File diff would delete all 1 files stored in Unique for partialKey',
         );
+      });
+
+      it('aborts when all files are deleted and new files share IDs with deleted keys (key format bug)', async () => {
+        // 2 submitted as new, but deleted keys overlap with submitted keys → key format bug
+        const { service } = makeService(
+          async () => ({
+            newFiles: ['p-1', 'p-2'],
+            updatedFiles: [],
+            deletedFiles: ['p-1', 'p-2'],
+            movedFiles: [],
+          }),
+          { totalFilesInUnique: 2 },
+        );
+
+        await expect(
+          service.computeDiff([basePage, { ...basePage, id: 'p-2' }]),
+        ).rejects.toThrow('File diff would delete all 2 files stored in Unique for partialKey');
       });
     });
   });
