@@ -158,7 +158,11 @@ export class LiveCatchUpCommand {
         .update(inboxConfiguration)
         .set({
           liveCatchUpState: 'running',
-          pendingLiveMessageIds: sql`array_cat(${inboxConfiguration.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
+          ...(messageIds.length > 0
+            ? {
+                pendingLiveMessageIds: sql`array_cat(${inboxConfiguration.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
+              }
+            : {}),
           liveCatchUpHeartbeatAt: sql`NOW()`,
         })
         .where(eq(inboxConfiguration.userProfileId, userProfileId))

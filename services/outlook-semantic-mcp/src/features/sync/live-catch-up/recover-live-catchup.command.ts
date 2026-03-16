@@ -15,7 +15,7 @@ export class RecoverLiveCatchupCommand {
 
   @Span()
   public async run({ userProfileId }: { userProfileId: string }): Promise<void> {
-    this.logger.log({ msg: 'Full sync recovery requested', userProfileId });
+    this.logger.log({ msg: 'Live catch-up recovery requested', userProfileId });
 
     await this.db
       .update(inboxConfiguration)
