@@ -20,6 +20,7 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
+import type { ManagedPath } from '../utils/paths.util';
 import { type Smeared, smearPath } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
@@ -250,8 +251,9 @@ export class SharepointSynchronizationService {
     }
 
     let siteName: Smeared;
+    let managedPath: ManagedPath;
     try {
-      siteName = await this.graphApiService.getSiteName(siteConfig.siteId);
+      ({ siteName, managedPath } = await this.graphApiService.getSiteInfo(siteConfig.siteId));
     } catch (error) {
       this.logger.error({
         msg: `${logPrefix} Failed to get site name`,
@@ -264,6 +266,7 @@ export class SharepointSynchronizationService {
       context: {
         siteConfig,
         siteName,
+        managedPath,
         serviceUserId: baseContext.serviceUserId,
         rootPath: baseContext.rootPath,
         isInitialSync: baseContext.isInitialSync,

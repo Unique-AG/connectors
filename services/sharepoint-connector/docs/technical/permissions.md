@@ -103,7 +103,7 @@ Grant-PnPAzureADAppSitePermission `
   -Permissions Write
 ```
 
-See [Authentication Guide](../operator/authentication.md#grant-site-specific-access-sitesselected-permission) for detailed instructions.
+See [Authentication Guide](../operator/authentication.md#4.-Grant-Site-Specific-Access) for detailed instructions.
 
 ## Permission Justification
 

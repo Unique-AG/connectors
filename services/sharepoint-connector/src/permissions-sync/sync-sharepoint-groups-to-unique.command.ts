@@ -49,7 +49,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
     const logPrefix = `[Site: ${siteId}]`;
 
-    const siteName = await this.graphApiService.getSiteName(siteId);
+    const { siteName } = await this.graphApiService.getSiteInfo(siteId);
     const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 
     const sharePointGroups = Object.values(sharePoint.groupsMap);

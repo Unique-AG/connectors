@@ -206,8 +206,8 @@ Used to obtain OAuth2 tokens for Microsoft Graph and SharePoint REST APIs.
 
 | Endpoint | Use Case |
 |----------|----------|
-| `{tenant}.sharepoint.com/sites/{siteName}/_api/web/sitegroups/getById({groupId})` | Fetch site group details |
-| `{tenant}.sharepoint.com/sites/{siteName}/_api/web/sitegroups/getById({groupId})/users` | Fetch site group members |
+| `{tenant}.sharepoint.com/{sites|teams}/{siteName}/_api/web/sitegroups/getById({groupId})` | Fetch site group details |
+| `{tenant}.sharepoint.com/{sites|teams}/{siteName}/_api/web/sitegroups/getById({groupId})/users` | Fetch site group members |
 
 ## Hosting Models
 

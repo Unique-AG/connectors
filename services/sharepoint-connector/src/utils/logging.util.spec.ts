@@ -47,9 +47,15 @@ describe('logging utilities', () => {
   });
 
   describe('smearSiteNameFromPath', () => {
-    it('smears site names in REST API paths', () => {
+    it('smears site names in /sites/ REST API paths', () => {
       expect(smearSiteNameFromPath('/sites/my-site/_api/web/lists')).toBe(
         '/sites/**-site/_api/web/lists',
+      );
+    });
+
+    it('smears site names in /teams/ REST API paths', () => {
+      expect(smearSiteNameFromPath('/teams/my-team/_api/web/lists')).toBe(
+        '/teams/**-team/_api/web/lists',
       );
     });
 
@@ -88,9 +94,15 @@ describe('logging utilities', () => {
   });
 
   describe('smearSiteIdFromPath', () => {
-    it('smears UUID site IDs in Graph API paths', () => {
+    it('smears UUID site IDs in /sites/ Graph API paths', () => {
       expect(smearSiteIdFromPath('/sites/1d045c6a-f230-48fd-b826-7cf8601d7729/lists')).toBe(
         '/sites/********-****-****-****-********7729/lists',
+      );
+    });
+
+    it('smears UUID site IDs in /teams/ Graph API paths', () => {
+      expect(smearSiteIdFromPath('/teams/1d045c6a-f230-48fd-b826-7cf8601d7729/lists')).toBe(
+        '/teams/********-****-****-****-********7729/lists',
       );
     });
 
@@ -120,7 +132,7 @@ describe('logging utilities', () => {
       );
     });
 
-    it('leaves paths without /sites/ untouched', () => {
+    it('leaves paths without /sites/ or /teams/ untouched', () => {
       expect(smearSiteIdFromPath('/drives/some-drive-id/items')).toBe(
         '/drives/some-drive-id/items',
       );

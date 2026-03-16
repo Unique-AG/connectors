@@ -10,11 +10,11 @@ export const PENDING_DELETE_PREFIX = 'spc:pending-delete:' as const;
 // https://learn.microsoft.com/en-us/sharepoint/dev/general-development/urls-and-tokens-in-sharepoint (_layouts)
 // https://learn.microsoft.com/en-us/sharepoint/dev/general-development/basic-uri-structure-and-path (_vti_bin)
 const SHAREPOINT_SITE_NAME_REGEX =
-  /\/sites\/((?![a-f0-9-]{36}(?:\/|$))[^/]+(?:\/[^/]+)*?)\/(_api|_layouts|_vti_bin)\//gi;
+  /\/(sites|teams)\/((?![a-f0-9-]{36}(?:\/|$))[^/]+(?:\/[^/]+)*?)\/(_api|_layouts|_vti_bin)\//gi;
 
 const guidPattern = regexes.guid.source.slice(2, -2);
 const SHAREPOINT_SITE_ID_REGEX = new RegExp(
-  `/sites/(${guidPattern}|[^/,]+,${guidPattern},${guidPattern})(?=/|$)`,
+  `/(sites|teams)/(${guidPattern}|[^/,]+,${guidPattern},${guidPattern})(?=/|$)`,
   'gi',
 );
 
@@ -39,8 +39,8 @@ export function smear(text: string | null | undefined, leaveOver = 4) {
 export function smearSiteNameFromPath(path: string): string {
   return path.replace(
     SHAREPOINT_SITE_NAME_REGEX,
-    (_, siteName: string, keyword: string) =>
-      `/sites/${siteName
+    (_, managedPath: string, siteName: string, keyword: string) =>
+      `/${managedPath}/${siteName
         .split('/')
         .map((segment) => smear(segment))
         .join('/')}/${keyword}/`,
@@ -48,14 +48,14 @@ export function smearSiteNameFromPath(path: string): string {
 }
 
 export function smearSiteIdFromPath(path: string): string {
-  return path.replace(SHAREPOINT_SITE_ID_REGEX, (_, siteId: string) => {
+  return path.replace(SHAREPOINT_SITE_ID_REGEX, (_, managedPath: string, siteId: string) => {
     const smeared = siteId.includes(',')
       ? siteId
           .split(',')
           .map((part) => smear(part))
           .join(',')
       : smear(siteId);
-    return `/sites/${smeared}`;
+    return `/${managedPath}/${smeared}`;
   });
 }
 
