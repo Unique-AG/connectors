@@ -14,7 +14,7 @@ data:
   MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
   {{- end }}
 
-  {{- if .Values.app.debugMode }}
+  {{- if .Values.mcpConfig.app.debugMode }}
   MCP_DEBUG_MODE: {{ .Values.mcpConfig.app.debugMode | quote }}
   {{- end }}
 
