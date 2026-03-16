@@ -1,6 +1,7 @@
 import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
 import { first } from 'remeda';
 import { z } from 'zod';
+import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
 
 const ArrayConditionFieldSchema = <T extends z.ZodArray>(itemSchema: T) =>
   z.object({
@@ -126,22 +127,16 @@ export const SearchEmailsInputSchema = z.object({
     .optional()
     .prefault(40)
     .describe('Maximum number of results to return. Must be between 40 and 100.'),
-  scoreThreshold: z
-    .number()
-    .min(0)
-    .max(1)
-    .optional()
-    .describe('Minimum relevance score threshold for returned results, between 0 and 1.'),
 });
 
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
 
-const METADATA_PATH: Record<keyof SearchCondition, string[]> = {
+const METADATA_PATH: Record<keyof SearchCondition, (keyof MessageMetadata)[]> = {
   dateFrom: ['receivedDateTime'],
   dateTo: ['receivedDateTime'],
-  fromSenders: ['from.emailAddress'],
-  toRecipients: ['toRecipients.emailAddresses'],
-  ccRecipients: ['ccRecipients.emailAddresses'],
+  fromSenders: ['fromEmailAddress'],
+  toRecipients: ['toRecipientsEmailAddresses'],
+  ccRecipients: ['ccRecipientsEmailAddresses'],
   directories: ['parentFolderId'],
   hasAttachments: ['hasAttachments'],
   categories: ['categories'],

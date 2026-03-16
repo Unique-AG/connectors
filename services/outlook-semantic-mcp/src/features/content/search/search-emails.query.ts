@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { SearchType, type UniqueApiClient } from '@unique-ag/unique-api';
+import { MetadataFilter, type UniqueApiClient, UniqueQLOperator } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -7,7 +7,10 @@ import { isNonNull } from 'remeda';
 import * as z from 'zod';
 import { type Directory, DRIZZLE, type DrizzleDatabase, directories, userProfiles } from '~/db';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
-import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
+import {
+  getRootScopeExternalId,
+  getRootScopeExternalIdForUser,
+} from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { findBestMatch } from '~/utils/find-best-match';
 import {
@@ -45,10 +48,12 @@ export class SearchEmailsQuery {
     assert.ok(userProfile, `User profile not found: ${userProfileId}`);
     assert.ok(userProfile.providerUserId, `providerUserId missing for: ${userProfileId}`);
 
-    const rootScope = await this.uniqueApi.scopes.getByExternalId(
+    const rootScope = await this.uniqueApi.scopes.getByExternalId(getRootScopeExternalId());
+    assert.ok(rootScope, `Root scope not found for user: ${userProfile.providerUserId}`);
+    const rootScopeForUser = await this.uniqueApi.scopes.getByExternalId(
       getRootScopeExternalIdForUser(userProfile.providerUserId),
     );
-    assert.ok(rootScope, `Root scope not found for user: ${userProfile.providerUserId}`);
+    assert.ok(rootScopeForUser, `Root scope not found for user: ${userProfile.providerUserId}`);
 
     const { conditions: resolvedConditions, searchSummary } = await this.sanitizeSearchConditions(
       userProfileId,
@@ -56,13 +61,23 @@ export class SearchEmailsQuery {
     );
 
     const uniqueQlMetadataFilter = buildSearchFilter(resolvedConditions);
+    const metaDataFilter: MetadataFilter = {
+      and: [
+        {
+          operator: UniqueQLOperator.CONTAINS,
+          value: `uniquepathid://${rootScope.id}/${rootScopeForUser.id}`,
+          path: [`folderIdPath`],
+        },
+      ],
+    };
+    if (uniqueQlMetadataFilter) {
+      metaDataFilter.and.push(uniqueQlMetadataFilter);
+    }
     const searchResult = await this.uniqueApi.content.search({
       prompt: input.search,
-      searchType: SearchType.VECTOR,
-      scopeIds: [rootScope.id],
-      metaDataFilter: uniqueQlMetadataFilter,
+      metaDataFilter,
       limit: input.limit,
-      scoreThreshold: input.scoreThreshold,
+      scoreThreshold: 0,
     });
 
     const results = searchResult.map((item) => {
@@ -75,7 +90,7 @@ export class SearchEmailsQuery {
         outlookWebLink: metadata?.webLink ?? '',
         emailId: metadata?.id ?? '',
         folderId: metadata?.parentFolderId ?? '',
-        from: metadata?.['from.emailAddress'] ?? '',
+        from: metadata?.fromEmailAddress ?? '',
         receivedDateTime: metadata?.receivedDateTime ?? '',
       };
     });

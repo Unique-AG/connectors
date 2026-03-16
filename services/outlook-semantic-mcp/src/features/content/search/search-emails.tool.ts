@@ -5,8 +5,8 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
 import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
-import { GetFullSyncStatsQuery } from '~/features/full-sync/get-full-sync-stats.query';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
+import { GetFullSyncStatsQuery } from '~/features/sync/full-sync/get-full-sync-stats.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { META } from './search-emails-tool.meta';
 

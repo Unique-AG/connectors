@@ -138,6 +138,8 @@ mcpConfig:
     # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
     # example: https://outlook.mcp.unique.app
     selfUrl: unset_default_value
+    # Debug mode for the mcp server
+    mcpDebugMode: disabled
 
   logs:
     diagnosticsDataPolicy: conceal

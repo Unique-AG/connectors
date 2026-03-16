@@ -99,6 +99,48 @@
       "when": 1773259038334,
       "tag": "0013_colorful_veda",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1773319948710,
+      "tag": "0014_sync_redesign_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1773400000000,
+      "tag": "0015_remove_running_from_inbox_sync_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1773400001000,
+      "tag": "0016_sync_checkpoint_and_buffering",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1773405168826,
+      "tag": "0017_live_catch_up_heartbeat",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1773653998875,
+      "tag": "0018_light_leopardon",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1773656638267,
+      "tag": "0019_right_karnak",
+      "breakpoints": true
     }
   ]
 }
