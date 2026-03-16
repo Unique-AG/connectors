@@ -27,7 +27,7 @@ type InboxConfiguration = typeof inboxConfiguration.$inferSelect;
 export const START_DELTA_LINK = `SYNC_STARTED:__EMPTY_DELTA__`;
 
 export type ExecuteFullSyncRunStatus =
-  | 'interupted:version-missmatch'
+  | 'interupted:version-mismatch'
   | `skipped:${'no-inbox-configuration-found' | 'no-next-link--found' | 'full-sync-in-progress'}`
   | 'completed'
   | 'failed';
@@ -111,8 +111,8 @@ export class ExecuteFullSyncCommand {
         version,
         initialDeltaLink: fullSyncNextLink,
       });
-      if (status === 'interupted:version-missmatch') {
-        return { status: 'interupted:version-missmatch' };
+      if (status === 'interupted:version-mismatch') {
+        return { status: 'interupted:version-mismatch' };
       }
 
       // We do not clear the version because the queue need to process remaining messages.
@@ -151,7 +151,7 @@ export class ExecuteFullSyncCommand {
     filters: InboxConfigurationMailFilters;
     version: string;
     initialDeltaLink: string;
-  }): Promise<{ status: 'interupted:version-missmatch' | 'completed' }> {
+  }): Promise<{ status: 'interupted:version-mismatch' | 'completed' }> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     let totalScheduled = 0;
     let batchNumber = 0;
@@ -234,7 +234,7 @@ export class ExecuteFullSyncCommand {
           userProfileId,
           msg: `Sync cancelled — version mismatch`,
         });
-        return { status: 'interupted:version-missmatch' };
+        return { status: 'interupted:version-mismatch' };
       }
 
       nextLink = emailResponse['@odata.nextLink'] ?? null;

@@ -115,6 +115,7 @@ export class LiveCatchUpCommand {
         return { status: 'skip' };
       }
 
+      // This function is defined here because it needs the transaction context
       const addMessagesToPendingMessages = async (): Promise<void> => {
         if (messageIds.length === 0) {
           return;
@@ -157,12 +158,12 @@ export class LiveCatchUpCommand {
       await tx
         .update(inboxConfiguration)
         .set({
-          liveCatchUpState: 'running',
           ...(messageIds.length > 0
             ? {
                 pendingLiveMessageIds: sql`array_cat(${inboxConfiguration.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
               }
             : {}),
+          liveCatchUpState: 'running',
           liveCatchUpHeartbeatAt: sql`NOW()`,
         })
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
@@ -307,7 +308,7 @@ export class LiveCatchUpCommand {
     subscriptionId: string;
     alreadyScheduledIds: Set<string>;
   }): Promise<number> {
-    const idsToFlush = await this.db.transaction(async (tx) => {
+    return await this.db.transaction(async (tx) => {
       const row = await tx
         .select({ pendingLiveMessageIds: inboxConfiguration.pendingLiveMessageIds })
         .from(inboxConfiguration)
@@ -316,10 +317,10 @@ export class LiveCatchUpCommand {
         .then((rows) => rows[0]);
 
       if (!row) {
-        return [];
+        return 0;
       }
 
-      const filtered = row.pendingLiveMessageIds.filter((id) => !alreadyScheduledIds.has(id));
+      const idsToFlush = row.pendingLiveMessageIds.filter((id) => !alreadyScheduledIds.has(id));
 
       await tx
         .update(inboxConfiguration)
@@ -327,17 +328,17 @@ export class LiveCatchUpCommand {
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
         .execute();
 
-      return filtered;
+      if (idsToFlush.length > 0) {
+        this.logger.debug({
+          msg: `Flushing buffered messages while running: ${idsToFlush.length}`,
+        });
+        await this.publishMessages({ messageIds: idsToFlush, subscriptionId });
+      } else {
+        this.logger.debug({ msg: `No messages to flush buffered messages is empty` });
+      }
+
+      return idsToFlush.length;
     });
-
-    if (idsToFlush.length > 0) {
-      this.logger.debug({ msg: `Flushing buffered messages while running: ${idsToFlush.length}` });
-      await this.publishMessages({ messageIds: idsToFlush, subscriptionId });
-    } else {
-      this.logger.debug({ msg: `No messages to flush buffered messages is empty` });
-    }
-
-    return idsToFlush.length;
   }
 
   private async updateWatermarks({
