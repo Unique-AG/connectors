@@ -139,7 +139,7 @@ mcpConfig:
     # example: https://outlook.mcp.unique.app
     selfUrl: unset_default_value
     # Debug mode for the mcp server
-    debugMode: unset_default_value
+    mcpDebugMode: disabled
 
   logs:
     diagnosticsDataPolicy: conceal
