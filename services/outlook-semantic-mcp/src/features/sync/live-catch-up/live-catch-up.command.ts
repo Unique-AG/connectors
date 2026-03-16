@@ -369,7 +369,9 @@ export class LiveCatchUpCommand {
 function sqlArray(arr: string[]): SQL {
   const chunks: SQLChunk[] = [new StringChunk('ARRAY[')];
   arr.forEach((item, index) => {
-    if (index > 0) chunks.push(new StringChunk(', '));
+    if (index > 0) {
+      chunks.push(new StringChunk(', '));
+    }
     chunks.push(sql`${item}`);
   });
   chunks.push(new StringChunk(']'));
