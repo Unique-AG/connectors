@@ -248,11 +248,11 @@ Only used when `syncMode` is `content_only`. It controls whether newly created s
 
 ### Finding SharePoint Site IDs
 
-Site IDs are required to configure which SharePoint sites the connector scans.
+Site IDs are required to configure which SharePoint sites the connector scans. The connector supports both `/sites/` and `/teams/` managed paths.
 
 **Via Browser:**
 
-Navigate to: `https://{tenant}.sharepoint.com/sites/your-site/_api/site/id`
+Navigate to: `https://{tenant}.sharepoint.com/sites/your-site/_api/site/id` (or `/teams/your-team/_api/site/id` for team sites)
 
 The response will be XML containing the site ID:
 
@@ -266,6 +266,12 @@ The response will be XML containing the site ID:
 GET https://graph.microsoft.com/v1.0/sites/{tenant}.sharepoint.com:/sites/{site}
 ```
 
+For team sites, use `/teams/` instead of `/sites/`:
+
+```
+GET https://graph.microsoft.com/v1.0/sites/{tenant}.sharepoint.com:/teams/{team}
+```
+
 Look for the `id` field in the response.
 
 **Via PowerShell:**
@@ -274,6 +280,8 @@ Look for the `id` field in the response.
 Connect-PnPOnline -Url "https://{tenant}.sharepoint.com/sites/your-site"
 Get-PnPSite -Includes Id | Select-Object Id
 ```
+
+For team sites, replace `/sites/` with `/teams/` in the URL.
 
 ### Finding Subsite Compound IDs
 

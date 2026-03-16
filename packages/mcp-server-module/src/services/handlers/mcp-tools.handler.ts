@@ -75,12 +75,17 @@ export class McpToolsHandler extends McpHandlerBase {
           }) as Tool['inputSchema'],
         };
 
-        if (tool.metadata.title) toolSchema.title = tool.metadata.title;
-        if (tool.metadata._meta) toolSchema._meta = tool.metadata._meta;
-        if (tool.metadata.outputSchema)
+        if (tool.metadata.title) {
+          toolSchema.title = tool.metadata.title;
+        }
+        if (tool.metadata._meta) {
+          toolSchema._meta = tool.metadata._meta;
+        }
+        if (tool.metadata.outputSchema) {
           toolSchema.outputSchema = z.toJSONSchema(
             tool.metadata.outputSchema,
           ) as Tool['outputSchema'];
+        }
 
         return toolSchema;
       });

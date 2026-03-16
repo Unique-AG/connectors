@@ -73,8 +73,12 @@ describe('GraphApiService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.graphApiRateLimitPerMinuteThousands') return 10;
-          if (key === 'processing.maxFilesToScan') return maxFilesToScanConfig;
+          if (key === 'sharepoint.graphApiRateLimitPerMinuteThousands') {
+            return 10;
+          }
+          if (key === 'processing.maxFilesToScan') {
+            return maxFilesToScanConfig;
+          }
           return undefined;
         }),
       }))
@@ -627,15 +631,27 @@ describe('GraphApiService', () => {
     });
   });
 
-  describe('getSiteName', () => {
-    it('extracts site name from a regular site URL', async () => {
+  describe('getSiteInfo', () => {
+    it('extracts site name and managed path from a /sites/ URL', async () => {
       vi.spyOn(service, 'getSiteWebUrl').mockResolvedValue(
         'https://contoso.sharepoint.com/sites/WealthManagement',
       );
 
-      const result = await service.getSiteName(new Smeared('site-1', false));
+      const result = await service.getSiteInfo(new Smeared('site-1', false));
 
-      expect(result.value).toBe('WealthManagement');
+      expect(result.siteName.value).toBe('WealthManagement');
+      expect(result.managedPath).toBe('sites');
+    });
+
+    it('extracts site name and managed path from a /teams/ URL', async () => {
+      vi.spyOn(service, 'getSiteWebUrl').mockResolvedValue(
+        'https://contoso.sharepoint.com/teams/Engineering',
+      );
+
+      const result = await service.getSiteInfo(new Smeared('site-1', false));
+
+      expect(result.siteName.value).toBe('Engineering');
+      expect(result.managedPath).toBe('teams');
     });
 
     it('extracts full path for a subsite URL', async () => {
@@ -643,9 +659,9 @@ describe('GraphApiService', () => {
         'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1',
       );
 
-      const result = await service.getSiteName(new Smeared('site-1', false));
+      const result = await service.getSiteInfo(new Smeared('site-1', false));
 
-      expect(result.value).toBe('WealthManagement/WMSub1');
+      expect(result.siteName.value).toBe('WealthManagement/WMSub1');
     });
 
     it('extracts full path for a deeply nested subsite URL', async () => {
@@ -653,9 +669,9 @@ describe('GraphApiService', () => {
         'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1/Nested',
       );
 
-      const result = await service.getSiteName(new Smeared('site-1', false));
+      const result = await service.getSiteInfo(new Smeared('site-1', false));
 
-      expect(result.value).toBe('WealthManagement/WMSub1/Nested');
+      expect(result.siteName.value).toBe('WealthManagement/WMSub1/Nested');
     });
 
     it('decodes URL-encoded site names', async () => {
@@ -663,9 +679,9 @@ describe('GraphApiService', () => {
         'https://contoso.sharepoint.com/sites/Wealth%20Management',
       );
 
-      const result = await service.getSiteName(new Smeared('site-1', false));
+      const result = await service.getSiteInfo(new Smeared('site-1', false));
 
-      expect(result.value).toBe('Wealth Management');
+      expect(result.siteName.value).toBe('Wealth Management');
     });
   });
 

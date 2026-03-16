@@ -27,6 +27,7 @@ import {
   SiteGroupMembership,
 } from '../microsoft-apis/sharepoint-rest/sharepoint-rest-client.service';
 import { sanitizeError } from '../utils/normalize-error';
+import type { ManagedPath } from '../utils/paths.util';
 import { createSmeared, type Smeared } from '../utils/smeared';
 import type {
   GroupDistinctId,
@@ -65,6 +66,7 @@ export class FetchGroupsWithMembershipsQuery {
   //    SharepointGroupWithMembers using the built cache of group memberships.
   public async run(
     siteId: Smeared,
+    managedPath: ManagedPath,
     groupPermissions: GroupMembership[],
   ): Promise<SharePointGroupsMap> {
     const logPrefix = `[Site: ${siteId}]`;
@@ -82,6 +84,7 @@ export class FetchGroupsWithMembershipsQuery {
 
     const groupMembershipsCache = await this.processSiteGroupsPermissions(
       siteGroupsPermissions,
+      managedPath,
       logPrefix,
     );
     const allMembershipsFromSiteGroups = pipe(groupMembershipsCache, values(), flat());
@@ -258,6 +261,7 @@ export class FetchGroupsWithMembershipsQuery {
 
   private async processSiteGroupsPermissions(
     siteGroupsPermissions: GroupMembership[],
+    managedPath: ManagedPath,
     logPrefix: string,
   ): Promise<Record<GroupDistinctId, Membership[]>> {
     // SiteGroups are site-collection-scoped, so all permissions share the same root site name.
@@ -293,7 +297,11 @@ export class FetchGroupsWithMembershipsQuery {
     );
 
     const result = pipe(
-      await this.sharepointRestClientService.getSiteGroupsMemberships(rootSiteName, siteGroupIds),
+      await this.sharepointRestClientService.getSiteGroupsMemberships(
+        rootSiteName,
+        managedPath,
+        siteGroupIds,
+      ),
       mapKeys((id) =>
         groupDistinctId({
           type: 'siteGroup',

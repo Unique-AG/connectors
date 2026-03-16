@@ -7,7 +7,7 @@ import { Dispatcher, interceptors } from 'undici';
 import { Config } from '../../config';
 import { ProxyService } from '../../proxy';
 import { shouldConcealLogs } from '../../utils/logging.util';
-import { encodeSiteNameForPath } from '../../utils/paths.util';
+import { encodeSiteNameForPath, type ManagedPath } from '../../utils/paths.util';
 import type { Smeared } from '../../utils/smeared';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
 import { createLoggingInterceptor } from './logging.interceptor';
@@ -69,11 +69,15 @@ export class SharepointRestHttpService {
   }
 
   // Call a single SharePoint REST API endpoint and gives back the body as a JSON object.
-  public async requestSingle<T>(siteName: Smeared, apiPath: string): Promise<T> {
+  public async requestSingle<T>(
+    siteName: Smeared,
+    managedPath: ManagedPath,
+    apiPath: string,
+  ): Promise<T> {
     const token = await this.microsoftAuthenticationService.getAccessToken('sharepoint-rest');
     const cleanedApiPath = apiPath.startsWith('/') ? apiPath.slice(1) : apiPath;
     const encodedSiteName = siteName.transform((value) => encodeSiteNameForPath(value));
-    const path = `/sites/${encodedSiteName.value}/_api/${cleanedApiPath}`;
+    const path = `/${managedPath}/${encodedSiteName.value}/_api/${cleanedApiPath}`;
     const { statusCode, body } = await this.client.request({
       origin: this.origin,
       method: 'GET',
@@ -97,7 +101,11 @@ export class SharepointRestHttpService {
   // 20 requests at a time.
   // It is built to typings-wise support multiple calls to the same endpoint, mixing responses is
   // not possible to type.
-  public async requestBatch<T>(siteName: Smeared, apiPaths: string[]): Promise<T[]> {
+  public async requestBatch<T>(
+    siteName: Smeared,
+    managedPath: ManagedPath,
+    apiPaths: string[],
+  ): Promise<T[]> {
     const token = await this.microsoftAuthenticationService.getAccessToken('sharepoint-rest');
     const responses: T[] = [];
     const chunkedApiPaths = chunk(apiPaths, BATCH_SIZE);
@@ -114,7 +122,7 @@ export class SharepointRestHttpService {
       const encodedSiteName = siteName.transform((value) => encodeSiteNameForPath(value));
       const fullApiPaths = apiPathsChunk
         .map((apiPath) => (apiPath.startsWith('/') ? apiPath.slice(1) : apiPath))
-        .map((apiPath) => `/sites/${encodedSiteName.value}/_api/web/${apiPath}`);
+        .map((apiPath) => `/${managedPath}/${encodedSiteName.value}/_api/web/${apiPath}`);
       const batchItems = fullApiPaths.map((apiPath) => this.buildBatchItem(apiPath, boundary));
 
       const redactedApiPaths = fullApiPaths.map((path) =>
@@ -130,7 +138,7 @@ export class SharepointRestHttpService {
       });
 
       const requestBody = `${batchItems.join('\r\n\r\n')}\r\n--${boundary}--\r\n`;
-      const path = `/sites/${encodedSiteName.value}/_api/$batch`;
+      const path = `/${managedPath}/${encodedSiteName.value}/_api/$batch`;
 
       const requestStartTime = Date.now();
       const { statusCode, body, headers } = await this.client.request({

@@ -20,7 +20,9 @@ describe('IngestionFinalizationStep', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((k: string) => {
-          if (k === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
+          if (k === 'sharepoint.baseUrl') {
+            return 'https://contoso.sharepoint.com';
+          }
           return undefined;
         }),
       }))
@@ -57,6 +59,7 @@ describe('IngestionFinalizationStep', () => {
       syncContext: {
         siteConfig: createMockSiteConfig(),
         siteName: new Smeared('test-site', false),
+        managedPath: 'sites',
         serviceUserId: 'user-1',
         rootPath: new Smeared('/Root', false),
         isInitialSync: false,
