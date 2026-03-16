@@ -1,0 +1,2 @@
+export const UNIQUE_FETCH = Symbol('UNIQUE_FETCH');
+export const UNIQUE_REQUEST_HEADERS = Symbol('UNIQUE_REQUEST_HEADERS');
