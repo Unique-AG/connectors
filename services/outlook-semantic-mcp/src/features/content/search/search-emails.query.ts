@@ -1,10 +1,5 @@
 import assert from 'node:assert';
-import {
-  MetadataFilter,
-  SearchType,
-  type UniqueApiClient,
-  UniqueQLOperator,
-} from '@unique-ag/unique-api';
+import { MetadataFilter, type UniqueApiClient, UniqueQLOperator } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -70,7 +65,7 @@ export class SearchEmailsQuery {
       and: [
         {
           operator: UniqueQLOperator.CONTAINS,
-          value: [`uniquepathid://${rootScope.id}/${rootScopeForUser.id}`],
+          value: `uniquepathid://${rootScope.id}/${rootScopeForUser.id}`,
           path: [`folderIdPath`],
         },
       ],
@@ -80,7 +75,6 @@ export class SearchEmailsQuery {
     }
     const searchResult = await this.uniqueApi.content.search({
       prompt: input.search,
-      searchType: SearchType.COMBINED,
       metaDataFilter,
       limit: input.limit,
     });

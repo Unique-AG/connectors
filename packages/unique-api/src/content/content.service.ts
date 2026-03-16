@@ -25,7 +25,7 @@ export class ContentService implements UniqueContentFacade {
     const { body } = await this.httpClient.request({
       method: 'POST',
       path: sanitizePath({
-        path: `${baseUrl.pathname}/v1/search`,
+        path: `${baseUrl.pathname}/v1/search/combinedSearch`,
         prefixWithSlash: true,
       }),
       body: JSON.stringify(request),

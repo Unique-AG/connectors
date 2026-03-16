@@ -39,16 +39,8 @@ export const MetadataFilterSchema: z.ZodType<MetadataFilterInput> = z.union([
 ]);
 export type MetadataFilter = z.infer<typeof MetadataFilterSchema>;
 
-export enum SearchType {
-  VECTOR = 'VECTOR',
-  COMBINED = 'COMBINED',
-  FULL_TEXT = 'FULL_TEXT',
-  POSTGRES_FULL_TEXT = 'POSTGRES_FULL_TEXT',
-}
-
 export const PublicSearchRequestSchema = z.object({
   prompt: z.string(),
-  searchType: z.enum(SearchType),
   chatId: z.string().optional(),
   scopeIds: z.array(z.string()).optional(),
   contentIds: z.array(z.string()).optional(),
