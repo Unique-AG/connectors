@@ -86,7 +86,9 @@ export class ChatService {
     // NOTE: match priority — topic substring first, then member display name for 1:1 chats.
     // Group chats without a topic are only matchable by topic; oneOnOne chats fall back to member name.
     const chat = chats.find((c) => {
-      if (c.topic?.toLowerCase().includes(lowerIdentifier)) return true;
+      if (c.topic?.toLowerCase().includes(lowerIdentifier)) {
+        return true;
+      }
       if (c.chatType === 'oneOnOne') {
         return c.members.some((m) => m.displayName?.toLowerCase().includes(lowerIdentifier));
       }
