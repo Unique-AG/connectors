@@ -176,6 +176,15 @@ export const CONTENT_ID_BY_SCOPE_AND_METADATA_KEY = gql`
     }
 `;
 
+export interface ContentByScopeInput {
+  skip: number;
+  take: number;
+  where: {
+    ownerId: { equals: string };
+    ownerType: { equals: string };
+  };
+}
+
 export interface ContentByScopeAndMetadataKeyInput {
   skip: number;
   take: number;

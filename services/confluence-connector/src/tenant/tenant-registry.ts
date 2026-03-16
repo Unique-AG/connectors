@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import {
+  type Scope,
   UNIQUE_API_CLIENT_FACTORY,
   UniqueApiClient,
   type UniqueApiClientFactory,
@@ -7,7 +8,12 @@ import {
 } from '@unique-ag/unique-api';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
-import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
+import {
+  getDeletedTenantConfigs,
+  getTenantConfigs,
+  UniqueAuthMode,
+  type UniqueConfig,
+} from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
 import { ConfluenceContentFetcher } from '../synchronization/confluence-content-fetcher';
 import { ConfluencePageScanner } from '../synchronization/confluence-page-scanner';
@@ -23,6 +29,7 @@ import { tenantStorage } from './tenant-context.storage';
 export class TenantRegistry implements OnModuleInit {
   private readonly logger = new Logger(TenantRegistry.name);
   private readonly tenants = new Map<string, TenantContext>();
+  private readonly deletedTenants = new Map<string, TenantContext>();
 
   public constructor(
     private readonly confluenceAuthFactory: ConfluenceAuthFactory,
@@ -109,6 +116,32 @@ export class TenantRegistry implements OnModuleInit {
         this.logger.log({ tenantName, msg: 'Tenant registered' });
       });
     }
+
+    const deletedConfigs = getDeletedTenantConfigs();
+    for (const { name: tenantName, config } of deletedConfigs) {
+      const tenant: TenantContext = { name: tenantName, config, isScanning: false };
+      this.deletedTenants.set(tenantName, tenant);
+
+      tenantStorage.run(tenant, () => {
+        const uniqueClient = this.uniqueApiFactory.create({
+          auth: this.buildUniqueAuthConfig(config.unique),
+          ingestion: {
+            baseUrl: config.unique.ingestionServiceBaseUrl,
+            rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
+          },
+          scopeManagement: {
+            baseUrl: config.unique.scopeManagementServiceBaseUrl,
+            rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
+          },
+          metadata: {
+            clientName: 'confluence-connector',
+            tenantKey: tenantName,
+          },
+        });
+        this.serviceRegistry.register(tenantName, UniqueApiClient, uniqueClient);
+        this.logger.log({ tenantName, msg: 'Deleted tenant registered for cleanup' });
+      });
+    }
   }
 
   public run<R>(tenant: TenantContext, fn: () => R): R {
@@ -127,6 +160,80 @@ export class TenantRegistry implements OnModuleInit {
 
   public get tenantCount(): number {
     return this.tenants.size;
+  }
+
+  public async processDeletedTenants(): Promise<void> {
+    for (const tenant of this.deletedTenants.values()) {
+      try {
+        await this.run(tenant, async () => {
+          const uniqueClient = this.serviceRegistry.getService(UniqueApiClient);
+          await this.cleanupTenant(tenant, uniqueClient);
+        });
+      } catch (error) {
+        this.logger.error({ tenantName: tenant.name, err: error, msg: 'Tenant cleanup failed' });
+      }
+    }
+  }
+
+  private async cleanupTenant(tenant: TenantContext, uniqueClient: UniqueApiClient): Promise<void> {
+    const { scopeId, useV1KeyFormat } = tenant.config.ingestion;
+
+    const rootScope = await uniqueClient.scopes.getById(scopeId);
+    if (!rootScope) {
+      this.logger.log({
+        tenantName: tenant.name,
+        msg: `Root scope ${scopeId} not found, skipping`,
+      });
+      return;
+    }
+
+    const childScopes = await uniqueClient.scopes.listChildren(scopeId);
+    const fileCount = useV1KeyFormat
+      ? childScopes.length
+      : await uniqueClient.files.getCountByKeyPrefix(tenant.name);
+
+    if (childScopes.length === 0 && fileCount === 0) {
+      this.logger.log({ tenantName: tenant.name, msg: 'Already cleaned up, skipping' });
+      return;
+    }
+
+    if (useV1KeyFormat) {
+      await this.deleteFilesByScopes(childScopes, uniqueClient);
+    } else {
+      const deletedCount = await uniqueClient.files.deleteByKeyPrefix(tenant.name);
+      this.logger.log({
+        tenantName: tenant.name,
+        deletedCount,
+        msg: 'Files deleted by key prefix',
+      });
+    }
+
+    for (const child of childScopes) {
+      const result = await uniqueClient.scopes.delete(child.id, { recursive: true });
+      this.logger.log({
+        tenantName: tenant.name,
+        scopeName: child.name,
+        succeeded: result.successFolders.length,
+        failed: result.failedFolders.length,
+        msg: 'Child scope deleted',
+      });
+    }
+
+    this.logger.log({ tenantName: tenant.name, msg: 'Tenant cleanup completed' });
+  }
+
+  private async deleteFilesByScopes(scopes: Scope[], uniqueClient: UniqueApiClient): Promise<void> {
+    for (const scope of scopes) {
+      const fileIds = await uniqueClient.files.getFileIdsByScope(scope.id);
+      if (fileIds.length > 0) {
+        await uniqueClient.files.deleteByIds(fileIds);
+        this.logger.log({
+          scopeName: scope.name,
+          deletedCount: fileIds.length,
+          msg: 'Files deleted by scope ownership',
+        });
+      }
+    }
   }
 
   private buildUniqueAuthConfig(

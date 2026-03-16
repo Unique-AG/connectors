@@ -3,6 +3,7 @@ export type { ConfluenceConfig } from './confluence.schema';
 export { AuthMode } from './confluence.schema';
 export type { ProcessingConfig } from './processing.schema';
 export {
+  getDeletedTenantConfigs,
   getTenantConfigs,
   type NamedTenantConfig,
   type TenantConfig,

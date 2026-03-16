@@ -12,6 +12,7 @@ import {
   CONTENT_UPDATE_MUTATION,
   type ContentByScopeAndMetadataKeyInput,
   type ContentByScopeAndMetadataKeyResult,
+  type ContentByScopeInput,
   type ContentDeleteByContentIdsMutationInput,
   type ContentDeleteByContentIdsMutationResult,
   type ContentDeleteMutationInput,
@@ -338,6 +339,31 @@ export class FilesService implements UniqueFilesFacade {
     }
 
     return successCount;
+  }
+
+  public async getFileIdsByScope(scopeId: string): Promise<string[]> {
+    let hasMore = true;
+    let skip = 0;
+    const ids: string[] = [];
+    while (hasMore) {
+      const batchResult = await this.ingestionClient.request<
+        ContentByScopeAndMetadataKeyResult,
+        ContentByScopeInput
+      >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
+        skip,
+        take: CONTENT_BATCH_SIZE,
+        where: {
+          ownerId: { equals: scopeId },
+          ownerType: { equals: 'SCOPE' },
+        },
+      });
+      for (const node of batchResult.paginatedContent.nodes) {
+        ids.push(node.id);
+      }
+      skip += CONTENT_BATCH_SIZE;
+      hasMore = CONTENT_BATCH_SIZE === batchResult.paginatedContent.nodes.length;
+    }
+    return ids;
   }
 
   public async getIdsByScopeAndMetadataKey(

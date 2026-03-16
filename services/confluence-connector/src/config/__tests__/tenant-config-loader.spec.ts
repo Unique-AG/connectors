@@ -318,7 +318,24 @@ describe('tenant-config-loader', () => {
       expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
     });
 
-    it('excludes deleted tenants without validating config', async () => {
+    it('excludes deleted tenants from active configs', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        { path: '/config/active-tenant-config.yaml', config: makeCloudOauth2loConfig() },
+        {
+          path: '/config/removed-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'deleted' }),
+        },
+      ]);
+
+      const result = getTenantConfigs();
+
+      expect(result).toHaveLength(1);
+      expect(assertFirstElement(result).name).toBe('active');
+    });
+
+    it('validates config for deleted tenants', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       const deletedConfig = { status: 'deleted', confluence: 'totally-invalid' };
@@ -327,10 +344,7 @@ describe('tenant-config-loader', () => {
         { path: '/config/removed-tenant-config.yaml', config: deletedConfig },
       ]);
 
-      const result = getTenantConfigs();
-
-      expect(result).toHaveLength(1);
-      expect(assertFirstElement(result).name).toBe('active');
+      expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
     });
 
     it('throws when all tenants are inactive or deleted', async () => {
@@ -341,7 +355,10 @@ describe('tenant-config-loader', () => {
           path: '/config/alpha-tenant-config.yaml',
           config: makeCloudOauth2loConfig({ status: 'inactive' }),
         },
-        { path: '/config/beta-tenant-config.yaml', config: { status: 'deleted' } },
+        {
+          path: '/config/beta-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'deleted' }),
+        },
       ]);
 
       expect(() => getTenantConfigs()).toThrow(
@@ -642,6 +659,73 @@ describe('tenant-config-loader', () => {
       expect(firstCall).toBe(secondCall);
       expect(globSync).toHaveBeenCalledTimes(1);
       expect(readFileSync).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getDeletedTenantConfigs', () => {
+    it('returns parsed configs for deleted tenants', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getDeletedTenantConfigs } = await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        { path: '/config/active-tenant-config.yaml', config: makeCloudOauth2loConfig() },
+        {
+          path: '/config/removed-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'deleted' }),
+        },
+      ]);
+
+      const result = getDeletedTenantConfigs();
+
+      expect(result).toHaveLength(1);
+      expect(assertFirstElement(result).name).toBe('removed');
+      expect(assertFirstElement(result).config.confluence.instanceType).toBe('cloud');
+    });
+
+    it('returns empty array when no deleted tenants exist', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getDeletedTenantConfigs } = await loadModule();
+      setupSingleConfig(globSync, readFileSync, makeCloudOauth2loConfig());
+
+      const result = getDeletedTenantConfigs();
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('populates cache via getTenantConfigs on first call', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getDeletedTenantConfigs } = await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        { path: '/config/active-tenant-config.yaml', config: makeCloudOauth2loConfig() },
+        {
+          path: '/config/removed-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'deleted' }),
+        },
+      ]);
+
+      const firstCall = getDeletedTenantConfigs();
+      const secondCall = getDeletedTenantConfigs();
+
+      expect(firstCall).toBe(secondCall);
+      expect(globSync).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares cache with getTenantConfigs', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getTenantConfigs, getDeletedTenantConfigs } =
+        await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        { path: '/config/active-tenant-config.yaml', config: makeCloudOauth2loConfig() },
+        {
+          path: '/config/removed-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'deleted' }),
+        },
+      ]);
+
+      getTenantConfigs();
+      const deleted = getDeletedTenantConfigs();
+
+      expect(deleted).toHaveLength(1);
+      expect(globSync).toHaveBeenCalledTimes(1);
     });
   });
 });
