@@ -86,7 +86,9 @@ describe('ItemProcessingOrchestratorService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'processing.concurrency') return 3;
+          if (key === 'processing.concurrency') {
+            return 3;
+          }
           return undefined;
         }),
       }))

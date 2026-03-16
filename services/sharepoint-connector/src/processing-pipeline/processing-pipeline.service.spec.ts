@@ -120,7 +120,9 @@ describe('ProcessingPipelineService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'processing.stepTimeoutSeconds') return 30;
+          if (key === 'processing.stepTimeoutSeconds') {
+            return 30;
+          }
           return undefined;
         }),
       }))

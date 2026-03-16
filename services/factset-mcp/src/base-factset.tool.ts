@@ -7,10 +7,18 @@ const FactsetApis = z.enum(['fundamentals', 'estimates', 'global-prices', 'stree
 type FactsetApis = z.infer<typeof FactsetApis>;
 
 function getStatusClass(statusCode: number): string {
-  if (statusCode >= 200 && statusCode < 300) return '2xx';
-  if (statusCode >= 300 && statusCode < 400) return '3xx';
-  if (statusCode >= 400 && statusCode < 500) return '4xx';
-  if (statusCode >= 500) return '5xx';
+  if (statusCode >= 200 && statusCode < 300) {
+    return '2xx';
+  }
+  if (statusCode >= 300 && statusCode < 400) {
+    return '3xx';
+  }
+  if (statusCode >= 400 && statusCode < 500) {
+    return '4xx';
+  }
+  if (statusCode >= 500) {
+    return '5xx';
+  }
   return 'unknown';
 }
 
@@ -78,10 +86,14 @@ export abstract class BaseFactsetTool {
   }
 
   protected incrementActionCounter(action: string, api: FactsetApis) {
-    if (this.actionCounter) this.actionCounter.add(1, { action, api });
+    if (this.actionCounter) {
+      this.actionCounter.add(1, { action, api });
+    }
   }
 
   protected incrementActionFailureCounter(action: string, api: FactsetApis, reason: string) {
-    if (this.actionFailureCounter) this.actionFailureCounter.add(1, { action, api, reason });
+    if (this.actionFailureCounter) {
+      this.actionFailureCounter.add(1, { action, api, reason });
+    }
   }
 }
