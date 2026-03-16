@@ -42,7 +42,7 @@ export type MetadataFilter = z.infer<typeof MetadataFilterSchema>;
 export const PublicSearchRequestSchema = z.object({
   prompt: z.string(),
   chatId: z.string().optional(),
-  scopeIds: z.array(z.string()).optional(),
+  scopeIds: z.array(z.string()).optional().nullable(),
   contentIds: z.array(z.string()).optional(),
   chatOnly: z.boolean().optional(),
   limit: z.number().int().min(1).max(1000).optional(),
