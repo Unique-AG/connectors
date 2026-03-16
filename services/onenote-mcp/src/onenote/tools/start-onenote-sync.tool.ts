@@ -87,6 +87,8 @@ export class StartOneNoteSyncTool {
       };
     }
 
+    await this.deltaService.enableSync(userProfileId);
+
     this.syncService.syncUser(userProfileId).catch((err) => {
       const safeError = extractSafeGraphError(err);
       this.logger.error({ userProfileId, ...safeError }, 'Background sync failed');

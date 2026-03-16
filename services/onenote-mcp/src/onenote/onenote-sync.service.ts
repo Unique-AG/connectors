@@ -517,7 +517,7 @@ export class OneNoteSyncService {
 
     if (!uniqueUser) {
       this.logger.log(
-        { userProfileId, email: profile.email },
+        { userProfileId },
         'User not found on the Unique platform — skipping user-level permission grant on the scope. The onenote-mcp sync and tools will still work via the service user.',
       );
       return;
@@ -533,7 +533,7 @@ export class OneNoteSyncService {
       ]);
 
       this.logger.log(
-        { userProfileId, email: profile.email, uniqueUserId: uniqueUser.id, userScopeId },
+        { userProfileId, uniqueUserId: uniqueUser.id, userScopeId },
         'Granted read access on user scope to matched Unique user',
       );
     } catch (error) {
