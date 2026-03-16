@@ -134,6 +134,13 @@
       "when": 1773653998875,
       "tag": "0018_light_leopardon",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1773656638267,
+      "tag": "0019_right_karnak",
+      "breakpoints": true
     }
   ]
 }
