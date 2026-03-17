@@ -1,3 +1,6 @@
+# Created by https://www.toptal.com/developers/gitignore/api/node,typescript,macos,linux,vim,jetbrains,visualstudiocode
+# Edit at https://www.toptal.com/developers/gitignore?templates=node,typescript,macos,linux,vim,jetbrains,visualstudiocode
+
 # Dependencies
 node_modules/
 .pnp
