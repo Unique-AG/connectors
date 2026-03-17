@@ -120,7 +120,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
   }
 
   // Data Center uses downloadPath directly, but Cloud uses the stable REST endpoint instead.
-  // The _links.download path could work via the Atlassian gateway, but its format is undocumented.
+  // The _links.download path does not work via the Atlassian API gateway (returns 500).
   public async getAttachmentDownloadStream(
     attachmentId: string,
     pageId: string,
