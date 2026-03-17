@@ -1,11 +1,19 @@
 import assert from 'node:assert';
 import { MetadataFilter, type UniqueApiClient, UniqueQLOperator } from '@unique-ag/unique-api';
+import { asAllOptions } from '@unique-ag/utils';
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNull } from 'remeda';
 import * as z from 'zod';
-import { type Directory, DRIZZLE, type DrizzleDatabase, directories, userProfiles } from '~/db';
+import {
+  type Directory,
+  DRIZZLE,
+  type DrizzleDatabase,
+  directories,
+  SystemDirectoryType,
+  userProfiles,
+} from '~/db';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
 import {
   getRootScopeExternalId,
@@ -112,7 +120,9 @@ export class SearchEmailsQuery {
     const userDirectories = await this.db
       .select()
       .from(directories)
-      .where(eq(directories.userProfileId, userProfileId));
+      .where(
+        and(eq(directories.userProfileId, userProfileId), eq(directories.ignoreForSync, false)),
+      );
 
     const allUnrecognized: string[] = [];
     const resolvedConditions: SearchCondition[] = [];
@@ -177,12 +187,19 @@ export class SearchEmailsQuery {
         continue;
       }
 
-      const bestDirectory = findBestMatch(
-        userDirectories,
-        (directory) => directory.displayName,
-        rawDirectoryId,
-        0.8,
-      );
+      const bestDirectory = findBestMatch({
+        items: userDirectories,
+        getLabel: (directory) => directory.displayName,
+        query: rawDirectoryId,
+        threshold: 0.8,
+        isNewItemBetter: (newItem, currentBestItem) => {
+          if (systemDirectories.includes(currentBestItem.internalType)) {
+            return false;
+          }
+
+          return systemDirectories.includes(newItem.internalType);
+        },
+      });
       if (bestDirectory) {
         resolvedIds.push(bestDirectory.providerDirectoryId);
       } else {
@@ -193,3 +210,18 @@ export class SearchEmailsQuery {
     return { resolvedIds, unrecognized };
   }
 }
+
+const systemDirectories = asAllOptions<SystemDirectoryType>()([
+  'Archive',
+  'Deleted Items',
+  'Drafts',
+  'Inbox',
+  'Junk Email',
+  'Outbox',
+  'Sent Items',
+  'Conversation History',
+  'Recoverable Items Deletions',
+  'Clutter',
+  // We cast to a string array because we use this array to check if systemDirectories.includes(currentBestItem.internalType)
+  // This check will fail because internalType can be outside of SystemDirectoryType, because of this we cast the array to string[]
+]) as string[];

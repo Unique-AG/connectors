@@ -1,11 +1,12 @@
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq, SQL, SQLChunk, StringChunk, sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { sqlArray } from '~/utils/sql-array';
 import { MessageEventDto } from '../../mail-ingestion/dtos/message-event.dto';
 import {
   FullSyncGraphMessage,
@@ -364,16 +365,4 @@ export class LiveCatchUpCommand {
       .where(eq(inboxConfiguration.userProfileId, userProfileId))
       .execute();
   }
-}
-
-function sqlArray(arr: string[]): SQL {
-  const chunks: SQLChunk[] = [new StringChunk('ARRAY[')];
-  arr.forEach((item, index) => {
-    if (index > 0) {
-      chunks.push(new StringChunk(', '));
-    }
-    chunks.push(sql`${item}`);
-  });
-  chunks.push(new StringChunk(']'));
-  return new SQL(chunks);
 }
