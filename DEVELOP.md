@@ -51,8 +51,10 @@ pnpm remove <package> --filter=@unique-ag/<package-name>
 pnpm dev -- --filter=@unique-ag/<service-name>
 
 # Examples:
-pnpm dev -- --filter=@unique-ag/factset-mcp
-pnpm dev -- --filter=@unique-ag/outlook-mcp
+pnpm dev -- --filter=@unique-ag/confluence-connector
+pnpm dev -- --filter=@unique-ag/outlook-semantic-mcp
+pnpm dev -- --filter=@unique-ag/sharepoint-connector
+pnpm dev -- --filter=@unique-ag/teams-mcp
 ```
 
 ### Building
@@ -67,7 +69,7 @@ pnpm build --filter=@unique-ag/<package-name>
 
 ### Docker
 
-You can test the Docker build and a production deployment by running:
+Each service has its own `docker-compose.prod.yaml`. To test a production deployment, run from the service directory:
 ```bash
 docker-compose -f docker-compose.prod.yaml --env-file .env up
 ```
@@ -123,6 +125,8 @@ Shared packages used across services:
 - **[mcp-oauth](./packages/mcp-oauth/README.md)** - OAuth 2.1 Authorization Code + PKCE flow for MCP servers
 - **[mcp-server-module](./packages/mcp-server-module/README.md)** - NestJS module for creating MCP servers
 - **[probe](./packages/probe/)** - Health check and monitoring utilities
+- **[unique-api](./packages/unique-api/)** - Shared NestJS module for Unique platform API integration
+- **[utils](./packages/utils/)** - Shared utility modules for the connectors monorepo
 
 ## Nix Development Environment
 
@@ -189,5 +193,4 @@ Prefer the single devShell approach unless there's a concrete need for separatio
 3. Make your changes
 4. Run tests: `pnpm test`
 5. Check code quality: `pnpm style` and `pnpm check-types`
-6. Bump version: `./version-bump.sh <service-name> <new-version>`
-7. Create a pull request
+6. Create a pull request — versioning is handled automatically by [release-please](https://github.com/googleapis/release-please)
