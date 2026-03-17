@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
 import { UniqueApiClient } from '@unique-ag/unique-api';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { z } from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -65,7 +65,9 @@ export class CreateDraftEmailCommand {
     let draftId: string;
     let webLink: string | undefined;
     try {
-      const message = CreateMessageResponseSchema.parse(await client.api('/me/messages').post(body));
+      const message = CreateMessageResponseSchema.parse(
+        await client.api('/me/messages').post(body),
+      );
       draftId = message.id;
       webLink = message.webLink;
     } catch (err) {
@@ -93,7 +95,12 @@ export class CreateDraftEmailCommand {
         });
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
-        this.logger.warn({ userProfileId: userProfileIdString, msg: 'Failed to attach content to draft', contentId, reason });
+        this.logger.warn({
+          userProfileId: userProfileIdString,
+          msg: 'Failed to attach content to draft',
+          contentId,
+          reason,
+        });
         attachmentsFailed.push({ contentId, reason });
       }
     }

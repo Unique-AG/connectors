@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { sanitizePath } from '@unique-ag/utils';
-import { first, isNullish } from 'remeda';
+import { first, isNullish, isString } from 'remeda';
 import { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueHttpClient } from '../clients/unique-http.client';
 import { Content, ContentSchema, DownloadedContent } from './content.dto';
@@ -60,15 +60,12 @@ export class ContentService implements UniqueContentFacade {
       typeof contentDisposition === 'string'
         ? contentDisposition.match(/filename="?([^";]+)"?/)
         : null;
-    const filename = filenameMatch ? filenameMatch[1] : contentId;
+    const filename = filenameMatch && isString(filenameMatch[1]) ? filenameMatch[1] : contentId;
 
     const contentType = result.headers['content-type'];
-    const mimeType =
-      typeof contentType === 'string'
-        ? contentType.split(';')[0].trim()
-        : 'application/octet-stream';
+    const mimeType = isString(contentType) ? contentType.split(';')[0]?.trim() : null;
 
-    return { data, filename, mimeType };
+    return { data, filename, mimeType: mimeType ?? 'application/octet-stream' };
   }
 
   public async getContentById(request: GetContentByIdRequest): Promise<Content> {
