@@ -42,7 +42,7 @@ export class ConfluencePageScanner {
     const acceptedRawPages = allUniquePages.filter((p) => acceptedPageIds.has(p.id));
 
     let discoveredAttachments: DiscoveredAttachment[] = [];
-    if (this.attachmentConfig.mode) {
+    if (this.attachmentConfig.enabled) {
       discoveredAttachments = this.extractDiscoveredAttachments(
         acceptedRawPages,
         discoveredPagesForIngestion.length,

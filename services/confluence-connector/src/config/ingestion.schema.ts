@@ -7,24 +7,28 @@ import { EnabledDisabledMode, IngestionMode } from '../constants/ingestion.const
 
 const IngestionModeSchema = z.enum([IngestionMode.Flat]).prefault(IngestionMode.Flat);
 
-const AttachmentConfigSchema = z.object({
-  mode: z
-    .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
-    .prefault(EnabledDisabledMode.Enabled)
-    .transform((v) => v === EnabledDisabledMode.Enabled)
-    .describe('Whether to ingest file attachments from Confluence pages'),
-  allowedExtensions: z
-    .array(z.string().min(1))
-    .prefault([...DEFAULT_ALLOWED_EXTENSIONS])
-    .transform((exts) => exts.map((ext) => ext.toLowerCase()))
-    .describe('File extensions to include when ingesting attachments'),
-  maxFileSizeMb: z
-    .number()
-    .int()
-    .positive()
-    .prefault(DEFAULT_MAX_FILE_SIZE_MB)
-    .describe('Maximum file size in megabytes for attachment ingestion'),
-});
+const AttachmentConfigSchema = z
+  .object({
+    mode: z
+      .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+      .prefault(EnabledDisabledMode.Enabled)
+      .describe('Whether to ingest file attachments from Confluence pages'),
+    allowedExtensions: z
+      .array(z.string().min(1))
+      .prefault([...DEFAULT_ALLOWED_EXTENSIONS])
+      .transform((exts) => exts.map((ext) => ext.toLowerCase()))
+      .describe('File extensions to include when ingesting attachments'),
+    maxFileSizeMb: z
+      .number()
+      .int()
+      .positive()
+      .prefault(DEFAULT_MAX_FILE_SIZE_MB)
+      .describe('Maximum file size in megabytes for attachment ingestion'),
+  })
+  .transform(({ mode, ...rest }) => ({
+    ...rest,
+    enabled: mode === EnabledDisabledMode.Enabled,
+  }));
 
 export const IngestionConfigSchema = z.object({
   ingestionMode: IngestionModeSchema.describe('Ingestion traversal mode'),
