@@ -64,6 +64,19 @@ describe('CloudConfluenceApiClient', () => {
       expect(decodedUrl).toContain('type != attachment');
     });
 
+    it('includes collaboration space type in filter (Cloud-only)', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
+
+      await client.searchPagesByLabel();
+
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
+      const decodedUrl = decodeURIComponent(url);
+      expect(decodedUrl).toContain('space.type=collaboration');
+    });
+
     it('uses api.atlassian.com/ex/confluence/{cloudId} base URL without os_authType', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],

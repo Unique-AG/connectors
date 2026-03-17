@@ -45,7 +45,7 @@ describe('DataCenterConfluenceApiClient', () => {
   });
 
   describe('searchPagesByLabel', () => {
-    it('constructs CQL with both labels and space.type=global filter', async () => {
+    it('constructs CQL with both labels and only space.type=global filter', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -57,7 +57,7 @@ describe('DataCenterConfluenceApiClient', () => {
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('label="sync"');
       expect(decodedUrl).toContain('label="sync-all"');
-      expect(decodedUrl).toContain('space.type=global');
+      expect(decodedUrl).toContain('AND space.type=global AND');
       expect(decodedUrl).toContain('type != attachment');
     });
 
@@ -74,7 +74,7 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(url).toContain('os_authType=basic');
     });
 
-    it('includes collaboration space type in filter', async () => {
+    it('does not include collaboration space type (unsupported by Data Center)', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -84,7 +84,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
-      expect(decodedUrl).toContain('space.type=collaboration');
+      expect(decodedUrl).not.toContain('space.type=collaboration');
     });
 
     it('uses limit=100 for search pages', async () => {
