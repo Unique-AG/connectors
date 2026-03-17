@@ -27,6 +27,8 @@ pnpm test:e2e         # e2e tests
 pnpm style            # lint/format (Biome)
 pnpm style:fix        # auto-fix
 pnpm check-types      # type checking
+pnpm check-all        # style + types + tests + syncpack
+pnpm fix-all          # auto-fix style + syncpack
 pnpm quality          # Helm chart linting
 ```
 
@@ -34,5 +36,5 @@ pnpm quality          # Helm chart linting
 
 1. `pnpm install`
 2. `docker-compose up -d`
-3. Make changes, run `pnpm test`, `pnpm style`, `pnpm check-types`
+3. Make changes, run `pnpm check-all`
 4. Open a PR — releases are automated via [release-please](https://github.com/googleapis/release-please)
