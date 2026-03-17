@@ -302,6 +302,18 @@ describe('CloudConfluenceApiClient', () => {
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).not.toContain('children.attachment');
     });
+
+    it('parses pages with children but without attachment field', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [makePage({ children: {} })],
+        _links: {},
+      });
+
+      const pages = await client.searchPagesByLabel();
+
+      expect(pages).toHaveLength(1);
+      expect(pages[0]?.children?.attachment).toBeUndefined();
+    });
   });
 
   describe('fetchMoreAttachments', () => {
