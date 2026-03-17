@@ -47,7 +47,9 @@ export class ConfluenceSynchronizationService {
 
       const itemIdsToProcess = new Set([...diffResult.newItemIds, ...diffResult.updatedItemIds]);
       const pagesToFetch = discoveredPages.filter((p) => itemIdsToProcess.has(p.id));
-      const attachmentsToIngest = discoveredAttachments.filter((a) => itemIdsToProcess.has(a.id));
+      const attachmentsToIngest = discoveredAttachments.filter((a) =>
+        itemIdsToProcess.has(`${a.pageId}::${a.id}`),
+      );
 
       if (pagesToFetch.length > 0 || attachmentsToIngest.length > 0) {
         const spaceKeys = [

@@ -87,7 +87,7 @@ export class IngestionService {
 
     let stream: Readable | undefined;
     try {
-      const baseKey = `${attachment.spaceId}_${attachment.spaceKey}/${attachment.id}`;
+      const baseKey = `${attachment.spaceId}_${attachment.spaceKey}/${attachment.pageId}::${attachment.id}`;
       const key = this.config.ingestion.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
 
       const registrationRequest = this.buildAttachmentRegistrationRequest(attachment, key, scopeId);

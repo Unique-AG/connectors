@@ -353,7 +353,7 @@ describe('IngestionService', () => {
 
       expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          key: `${TENANT_NAME}/space-1_SP/att-100`,
+          key: `${TENANT_NAME}/space-1_SP/42::att-100`,
           title: 'diagram.png',
           mimeType: 'image/png',
           byteSize: 2048,
@@ -387,7 +387,7 @@ describe('IngestionService', () => {
 
       expect(uniqueApiClient.ingestion.finalizeIngestion).toHaveBeenCalledWith(
         expect.objectContaining({
-          key: `${TENANT_NAME}/space-1_SP/att-100`,
+          key: `${TENANT_NAME}/space-1_SP/42::att-100`,
           fileUrl: 'https://blob.example.com/read',
         }),
       );

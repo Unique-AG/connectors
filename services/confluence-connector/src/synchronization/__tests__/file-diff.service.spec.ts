@@ -245,7 +245,11 @@ describe('FileDiffService', () => {
       expect(performFileDiff).toHaveBeenCalledWith(
         [
           { key: 'p-1', url: basePage.webUrl, updatedAt: basePage.versionTimestamp },
-          { key: 'att-1', url: baseAttachment.webUrl, updatedAt: baseAttachment.versionTimestamp },
+          {
+            key: 'p-1::att-1',
+            url: baseAttachment.webUrl,
+            updatedAt: baseAttachment.versionTimestamp,
+          },
         ],
         `${TENANT_NAME}/space-1_SP`,
         'ATLASSIAN_CONFLUENCE_CLOUD',
@@ -264,7 +268,7 @@ describe('FileDiffService', () => {
       await service.computeDiff([basePage], [attachment]);
 
       expect(performFileDiff).toHaveBeenCalledWith(
-        expect.arrayContaining([{ key: 'att-1', url: baseAttachment.webUrl, updatedAt: '' }]),
+        expect.arrayContaining([{ key: 'p-1::att-1', url: baseAttachment.webUrl, updatedAt: '' }]),
         expect.anything(),
         expect.anything(),
         expect.anything(),
@@ -281,7 +285,13 @@ describe('FileDiffService', () => {
 
       expect(performFileDiff).toHaveBeenCalledTimes(1);
       expect(performFileDiff).toHaveBeenCalledWith(
-        [{ key: 'att-1', url: baseAttachment.webUrl, updatedAt: baseAttachment.versionTimestamp }],
+        [
+          {
+            key: 'p-1::att-1',
+            url: baseAttachment.webUrl,
+            updatedAt: baseAttachment.versionTimestamp,
+          },
+        ],
         `${TENANT_NAME}/space-1_SP`,
         expect.anything(),
         expect.anything(),
@@ -316,7 +326,7 @@ describe('FileDiffService', () => {
       expect(performFileDiff).toHaveBeenCalledWith(
         [
           {
-            key: 'att-1',
+            key: 'p-1::att-1',
             url: attachmentInSpaceB.webUrl,
             updatedAt: attachmentInSpaceB.versionTimestamp,
           },

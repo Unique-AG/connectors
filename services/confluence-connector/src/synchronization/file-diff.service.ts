@@ -93,7 +93,7 @@ export class FileDiffService {
 
   private buildAttachmentDiffItems(attachments: DiscoveredAttachment[]): FileDiffItem[] {
     return attachments.map((attachment) => ({
-      key: attachment.id,
+      key: `${attachment.pageId}::${attachment.id}`,
       url: attachment.webUrl,
       updatedAt: attachment.versionTimestamp ?? '',
     }));

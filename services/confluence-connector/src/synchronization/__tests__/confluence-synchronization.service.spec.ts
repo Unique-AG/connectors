@@ -288,7 +288,7 @@ describe('ConfluenceSynchronizationService', () => {
         attachments: [attachment],
       });
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
-        newItemIds: ['1', 'att-1'],
+        newItemIds: ['1', '1::att-1'],
         updatedItemIds: [],
         deletedItems: [],
         movedItemIds: [],
@@ -352,7 +352,7 @@ describe('ConfluenceSynchronizationService', () => {
         attachments: [attachment],
       });
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
-        newItemIds: ['att-1'],
+        newItemIds: ['1::att-1'],
         updatedItemIds: [],
         deletedItems: [],
         movedItemIds: [],
@@ -396,7 +396,7 @@ describe('ConfluenceSynchronizationService', () => {
         attachments: [attachment],
       });
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
-        newItemIds: ['att-fail'],
+        newItemIds: ['1::att-fail'],
         updatedItemIds: [],
         deletedItems: [],
         movedItemIds: [],
