@@ -14,7 +14,7 @@ This provides all required tools (Node.js, pnpm, terraform, kubectl, helm, etc.)
 
 **Option B: Manual setup**
 
-- Node.js >= 22
+- Node.js >= 24
 - pnpm (specified version in `package.json` `packageManager` field)
 
 ### Installation
@@ -94,20 +94,17 @@ pnpm test:coverage
 ### Code Quality
 
 ```bash
-# Lint code
-pnpm lint
+# Lint / format (Biome)
+pnpm style
 
-# Fix linting issues
-pnpm lint:fix
-
-# Format code
-pnpm format
-
-# Fix formatting
-pnpm format:fix
+# Auto-fix lint and formatting
+pnpm style:fix
 
 # Type checking
 pnpm check-types
+
+# Helm chart linting
+pnpm quality
 ```
 
 ### Release
@@ -137,8 +134,7 @@ The repository includes a Nix flake (`flake.nix`) that provides a reproducible d
 # Enter the development shell
 nix develop
 
-# Or use direnv for automatic activation
-# Add "use flake" to .envrc
+# Or use direnv for automatic activation (`.envrc` is already committed)
 ```
 
 ### Included Tools
@@ -192,6 +188,6 @@ Prefer the single devShell approach unless there's a concrete need for separatio
 2. Start dependencies: `docker-compose up -d`
 3. Make your changes
 4. Run tests: `pnpm test`
-5. Check code quality: `pnpm lint` and `pnpm check-types`
+5. Check code quality: `pnpm style` and `pnpm check-types`
 6. Bump version: `./version-bump.sh <service-name> <new-version>`
 7. Create a pull request
