@@ -118,7 +118,7 @@ export class ExecuteFullSyncCommand {
       // We do not clear the version because the queue need to process remaining messages.
       await this.updateInboxConfigByVersion(userProfileId, version, {
         fullSyncState: 'ready',
-        lastFullSyncRunAt: new Date(),
+        fullSyncLastRunAt: new Date(),
         fullSyncNextLink: null,
         fullSyncHeartbeatAt: sql`NOW()`,
       });

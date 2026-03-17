@@ -165,8 +165,8 @@ export class GetFullSyncStatsQuery {
     const syncStats = {
       fullSyncState: inboxConfig.fullSyncState,
       liveCatchUpState: inboxConfig.liveCatchUpState,
-      runAt: inboxConfig.lastFullSyncRunAt?.toISOString() ?? null,
-      startedAt: inboxConfig.lastFullSyncStartedAt?.toISOString() ?? null,
+      runAt: inboxConfig.fullSyncLastRunAt?.toISOString() ?? null,
+      startedAt: inboxConfig.fullSyncLastStartedAt?.toISOString() ?? null,
       filters: {
         ignoredBefore: filters.ignoredBefore.toISOString() ?? null,
         ignoredSenders: filters.ignoredSenders.map((r) => r.toString()),

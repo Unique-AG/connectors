@@ -17,7 +17,13 @@
     "style": "biome check .",
     "style:fix": "biome check . --write",
     "check-types": "turbo check-types",
+    "check-all": "pnpm style && pnpm check-types && pnpm test && syncpack list-mismatches",
+    "fix-all": "pnpm style:fix && syncpack fix-mismatches",
     "syncpack": "syncpack",
+    "quality": "./scripts/lint.sh",
+    "ct:install": "ct install --config .github/configs/ct-install.yaml",
+    "helm-docs:sharepoint": "services/sharepoint-connector/deploy/helm-charts/helm-docs.sh",
+    "helm-docs:confluence": "services/confluence-connector/deploy/helm-charts/helm-docs.sh",
     "clean:force": "rimraf -g \"**/node_modules\" \"**/.turbo\" \"**/dist\" \"**/.turbo\" \"**/coverage\" \"**/@generated\" \"**/*.tsbuildinfo\" && pnpm store prune && pnpm cache delete"
   },
   "devDependencies": {

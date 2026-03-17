@@ -2,6 +2,7 @@ import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
 import { first } from 'remeda';
 import { z } from 'zod';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
+import { clampToValidDate } from '~/utils/clamp-to-valid-date';
 
 const ArrayConditionFieldSchema = <T extends z.ZodArray>(itemSchema: T) =>
   z.object({
@@ -50,21 +51,23 @@ const emailConditionsSchema = (label: string) =>
     )
     .optional();
 
+const clampedDatetime = z.preprocess(clampToValidDate, z.iso.datetime());
+
 export const SearchConditionSchema = z
   .object({
     dateFrom: SingularConditionFieldSchema(
-      z.iso
-        .datetime()
-        .describe(
-          'Filter emails received on or after this date. ISO 8601 format, e.g. "2024-01-01T00:00:00Z". Recommended operators: greaterThanOrEqual, greaterThan.',
-        ),
+      clampedDatetime.describe(
+        'Filter emails received on or after this date. UTC ISO 8601 format, e.g. "2024-01-01T00:00:00Z". ' +
+          'Must be a valid calendar date — February has 28 days in non-leap years (e.g. use "2026-02-28", not "2026-02-29"). ' +
+          'Recommended operators: greaterThanOrEqual, greaterThan.',
+      ),
     ).optional(),
     dateTo: SingularConditionFieldSchema(
-      z.iso
-        .datetime()
-        .describe(
-          'Filter emails received on or before this date. ISO 8601 format, e.g. "2024-12-31T23:59:59Z". Recommended operators: lessThanOrEqual, lessThan.',
-        ),
+      clampedDatetime.describe(
+        'Filter emails received on or before this date. UTC ISO 8601 format, e.g. "2024-12-31T23:59:59Z". ' +
+          'Must be a valid calendar date — February has 28 days in non-leap years (e.g. use "2026-02-28T23:59:59Z", not "2026-02-29T23:59:59Z"). ' +
+          'Recommended operators: lessThanOrEqual, lessThan.',
+      ),
     ).optional(),
     fromSenders: emailConditionsSchema('Sender'),
     toRecipients: emailConditionsSchema('To recipient'),
@@ -73,7 +76,12 @@ export const SearchConditionSchema = z
       z
         .array(z.string())
         .describe(
-          `Folder ID(s) to filter by, e.g. ["${EXAMPLE_FOLDER_IDS.first}", "${EXAMPLE_FOLDER_IDS.second}"]. Folder ids can be found using \`list_folders\` tool. Recommended operators: in or notIn.`,
+          `Folder ID(s) or system directory name(s) to filter by. ` +
+            `For well-known Outlook system folders pass the exact display name directly — no need to call \`list_folders\`: ` +
+            `"Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History". ` +
+            `Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized and will not return results. ` +
+            `For custom user-defined folders, pass the folder ID obtained from \`list_folders\`. ` +
+            `Example IDs: ["${EXAMPLE_FOLDER_IDS.first}", "${EXAMPLE_FOLDER_IDS.second}"]. Recommended operators: in or notIn.`,
         ),
     ).optional(),
     hasAttachments: SingularConditionFieldSchema(
