@@ -14,18 +14,17 @@ export abstract class ConfluenceApiClient {
 
   public abstract buildPageWebUrl(page: ConfluencePage): string;
 
+  public abstract buildAttachmentWebUrl(
+    pageId: string,
+    attachmentId: string,
+    attachmentTitle: string,
+  ): string;
+
   public abstract getAttachmentDownloadStream(
     attachmentId: string,
     pageId: string,
     downloadPath: string,
   ): Promise<Readable>;
 
-  protected abstract makeAuthenticatedRequest(url: string): Promise<unknown>;
-
-  /**
-   * The initial search request returns up to 25 attachments per page via the
-   * `expand=children.attachment` parameter. When a page has more than 25,
-   * this method fetches the remaining attachments.
-   */
-  protected abstract fetchMoreAttachments(pages: ConfluencePage[]): Promise<void>;
+  protected async fetchMoreAttachments(_pages: ConfluencePage[]): Promise<void> {}
 }

@@ -98,6 +98,15 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     return `${this.config.baseUrl}/pages/viewpage.action?pageId=${page.id}`;
   }
 
+  public buildAttachmentWebUrl(
+    pageId: string,
+    attachmentId: string,
+    attachmentTitle: string,
+  ): string {
+    const preview = encodeURIComponent(`/${pageId}/${attachmentId}/${attachmentTitle}`);
+    return `${this.config.baseUrl}/pages/viewpageattachments.action?pageId=${pageId}&preview=${preview}`;
+  }
+
   public async getAttachmentDownloadStream(
     _attachmentId: string,
     _pageId: string,
@@ -118,6 +127,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
       }
 
       const { size, limit, _links } = attachment;
+      // size < limit means all attachments fit in the first page, so there is nothing more to fetch.
       if (isNullish(size) || isNullish(limit) || size < limit || !_links?.next) {
         continue;
       }

@@ -107,6 +107,20 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return `${this.config.baseUrl}/wiki${page._links.webui}`;
   }
 
+  public buildAttachmentWebUrl(
+    pageId: string,
+    attachmentId: string,
+    attachmentTitle: string,
+  ): string {
+    // Cloud attachment IDs have an 'att' prefix (e.g. 'att360608') but the
+    // preview URL uses the numeric part only (e.g. '360608').
+    const numericId = attachmentId.replace(/^att/, '');
+    const preview = encodeURIComponent(`/${pageId}/${numericId}/${attachmentTitle}`);
+    return `${this.config.baseUrl}/wiki/pages/viewpageattachments.action?pageId=${pageId}&preview=${preview}`;
+  }
+
+  // Data Center uses downloadPath directly, but Cloud uses the stable REST endpoint instead.
+  // The _links.download path could work via the Atlassian gateway, but its format is undocumented.
   public async getAttachmentDownloadStream(
     attachmentId: string,
     pageId: string,
@@ -132,12 +146,12 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
         continue;
       }
 
-      const allAttachments = await this.fetchPageAttachmentsV2(page.id);
+      const allAttachments = await this.fetchPageAttachments(page.id);
       attachment.results = allAttachments;
     }
   }
 
-  private async fetchPageAttachmentsV2(pageId: string): Promise<ConfluenceAttachment[]> {
+  private async fetchPageAttachments(pageId: string): Promise<ConfluenceAttachment[]> {
     const schema = paginatedResponseSchema(confluenceAttachmentV2Schema);
     const results: ConfluenceAttachment[] = [];
     let url: string | undefined =

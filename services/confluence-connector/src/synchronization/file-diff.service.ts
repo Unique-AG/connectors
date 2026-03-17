@@ -28,6 +28,7 @@ export class FileDiffService {
 
     const pagesBySpace = groupBy(discoveredPages, (page) => page.spaceKey);
     const attachmentsBySpace = groupBy(discoveredAttachments, (attachment) => attachment.spaceKey);
+    // Attachment spaces are typically a subset of page spaces, but we include both for safety.
     const allSpaceKeys = new Set([
       ...Object.keys(pagesBySpace),
       ...Object.keys(attachmentsBySpace),

@@ -106,7 +106,7 @@ function makePage(
 function createScanner(
   apiClient: Pick<
     ConfluenceApiClient,
-    'searchPagesByLabel' | 'getDescendantPages' | 'buildPageWebUrl'
+    'searchPagesByLabel' | 'getDescendantPages' | 'buildPageWebUrl' | 'buildAttachmentWebUrl'
   >,
   processingConfig: ProcessingConfig = baseProcessingConfig,
   attachmentConfig: AttachmentConfig = disabledAttachmentConfig,
@@ -135,6 +135,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient);
@@ -157,6 +158,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient);
@@ -179,6 +181,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient);
@@ -202,6 +205,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient, limitedConfig);
@@ -218,6 +222,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient);
@@ -236,6 +241,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient);
@@ -257,6 +263,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient);
@@ -287,6 +294,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient, limitedConfig);
@@ -306,6 +314,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient);
@@ -327,6 +336,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient);
@@ -345,6 +355,7 @@ describe('ConfluencePageScanner', () => {
       buildPageWebUrl: vi.fn(
         (item: ConfluencePage) => `https://confluence.example.com/wiki/${item.id}`,
       ),
+      buildAttachmentWebUrl: vi.fn(),
     };
 
     const scanner = createScanner(apiClient);
@@ -368,6 +379,10 @@ describe('ConfluencePageScanner', () => {
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
         ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
+        ),
       };
 
       const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
@@ -385,7 +400,7 @@ describe('ConfluencePageScanner', () => {
           spaceId: 'space-1',
           spaceKey: 'SP',
           spaceName: 'Space',
-          webUrl: 'https://confluence.example.com/wiki/page-1',
+          webUrl: 'https://confluence.example.com/attachments/page-1/att-1/report.pdf',
         },
       ]);
     });
@@ -402,6 +417,10 @@ describe('ConfluencePageScanner', () => {
         getDescendantPages: vi.fn().mockResolvedValue([]),
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
         ),
       };
 
@@ -426,6 +445,10 @@ describe('ConfluencePageScanner', () => {
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
         ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
+        ),
       };
 
       const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
@@ -449,6 +472,10 @@ describe('ConfluencePageScanner', () => {
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
         ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
+        ),
       };
 
       const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
@@ -469,6 +496,10 @@ describe('ConfluencePageScanner', () => {
         getDescendantPages: vi.fn().mockResolvedValue([]),
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
         ),
       };
 
@@ -492,6 +523,10 @@ describe('ConfluencePageScanner', () => {
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
         ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
+        ),
       };
 
       const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
@@ -514,6 +549,10 @@ describe('ConfluencePageScanner', () => {
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
         ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
+        ),
       };
 
       const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
@@ -535,6 +574,10 @@ describe('ConfluencePageScanner', () => {
         getDescendantPages: vi.fn().mockResolvedValue([]),
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
         ),
       };
 
@@ -564,6 +607,10 @@ describe('ConfluencePageScanner', () => {
         getDescendantPages: vi.fn().mockResolvedValue([]),
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
         ),
       };
 
@@ -595,6 +642,10 @@ describe('ConfluencePageScanner', () => {
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
         ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
+        ),
       };
 
       const scanner = createScanner(apiClient, limitedConfig, enabledAttachmentConfig);
@@ -618,6 +669,10 @@ describe('ConfluencePageScanner', () => {
         getDescendantPages: vi.fn().mockResolvedValue([]),
         buildPageWebUrl: vi.fn(
           (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
         ),
       };
 

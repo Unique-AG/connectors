@@ -242,6 +242,34 @@ describe('CloudConfluenceApiClient', () => {
     });
   });
 
+  describe('buildAttachmentWebUrl', () => {
+    it('builds attachment preview URL with /wiki prefix and viewpageattachments.action', () => {
+      const url = client.buildAttachmentWebUrl('100', 'att200', 'report.pdf');
+
+      expect(url).toBe(
+        `${BASE_URL}/wiki/pages/viewpageattachments.action?pageId=100&preview=%2F100%2F200%2Freport.pdf`,
+      );
+    });
+
+    it('strips att prefix from Cloud attachment IDs', () => {
+      const url = client.buildAttachmentWebUrl('360558', 'att360608', 'astronaut.svg');
+
+      expect(url).toContain('preview=%2F360558%2F360608%2Fastronaut.svg');
+    });
+
+    it('handles attachment IDs without att prefix', () => {
+      const url = client.buildAttachmentWebUrl('100', '200', 'file.txt');
+
+      expect(url).toContain('preview=%2F100%2F200%2Ffile.txt');
+    });
+
+    it('encodes special characters in attachment title', () => {
+      const url = client.buildAttachmentWebUrl('100', 'att200', 'report (final).pdf');
+
+      expect(url).toContain('preview=%2F100%2F200%2Freport%20(final).pdf');
+    });
+  });
+
   describe('attachmentsEnabled option', () => {
     it('includes attachment expand fields when attachmentsEnabled is true', async () => {
       const clientWithAttachments = new CloudConfluenceApiClient(

@@ -234,6 +234,28 @@ describe('DataCenterConfluenceApiClient', () => {
     });
   });
 
+  describe('buildAttachmentWebUrl', () => {
+    it('builds attachment preview URL with viewpageattachments.action', () => {
+      const url = client.buildAttachmentWebUrl('327683', '327685', 'lock-icon.png');
+
+      expect(url).toBe(
+        `${BASE_URL}/pages/viewpageattachments.action?pageId=327683&preview=%2F327683%2F327685%2Flock-icon.png`,
+      );
+    });
+
+    it('does not strip any prefix from Data Center attachment IDs', () => {
+      const url = client.buildAttachmentWebUrl('100', '200', 'file.pdf');
+
+      expect(url).toContain('preview=%2F100%2F200%2Ffile.pdf');
+    });
+
+    it('encodes special characters in attachment title', () => {
+      const url = client.buildAttachmentWebUrl('100', '200', 'report (final).pdf');
+
+      expect(url).toContain('preview=%2F100%2F200%2Freport%20(final).pdf');
+    });
+  });
+
   describe('attachmentsEnabled option', () => {
     it('includes attachment expand fields when attachmentsEnabled is true', async () => {
       const clientWithAttachments = new DataCenterConfluenceApiClient(
