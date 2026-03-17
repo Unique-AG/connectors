@@ -4,7 +4,7 @@ export const META = createMeta({
   icon: 'search',
   systemPrompt: `Searches ingested Outlook emails semantically. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns matched passages from emails with metadata. Call list_folders first to get folder IDs for directory filtering.
 
-  Per default ALWAYS search in the inbox only.
+  By default ALWAYS search in the inbox only.
 
   Use the ID of that folder for the "directories" parameter.
   But ALWAYS ask at the end if other folders should be considered for the search.

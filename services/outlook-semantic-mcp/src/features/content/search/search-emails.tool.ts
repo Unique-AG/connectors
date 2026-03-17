@@ -87,7 +87,7 @@ export class SearchEmailsTool {
       return {
         success: true,
         syncWarning:
-          'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox. The sync process syncronizes newest emails first.',
+          'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox. The sync process synchronizes newest emails first.',
         results,
         searchSummary,
       };

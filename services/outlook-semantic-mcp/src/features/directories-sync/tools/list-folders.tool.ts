@@ -40,7 +40,7 @@ export class ListFoldersTool {
     name: 'list_folders',
     title: 'List Folders',
     description:
-      'List all Outlook mail folders available for the user. Returns a hierarchical tree of folders (e.g. Inbox, Sent, custom folders). Each folder has an id that can be passed to the `folderId` filter in `search_emails`.',
+      'List all Outlook mail folders available for the user. Returns a hierarchical tree of folders (e.g. Inbox, Sent, custom folders). Each folder has an id that can be passed to the `directories` filter in `search_emails`.',
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {

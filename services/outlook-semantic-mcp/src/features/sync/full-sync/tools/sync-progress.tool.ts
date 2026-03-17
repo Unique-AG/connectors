@@ -27,7 +27,7 @@ export class SyncProgressTool {
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: true,
-      openWorldHint: true,
+      openWorldHint: false,
     },
     _meta: META,
   })
