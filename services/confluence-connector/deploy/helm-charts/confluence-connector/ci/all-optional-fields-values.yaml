@@ -38,4 +38,5 @@ connectorConfig:
           allowedExtensions:
             - pdf
             - docx
+            - xlsx
           maxFileSizeMb: 100
