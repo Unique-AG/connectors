@@ -17,6 +17,7 @@
     "style": "biome check .",
     "style:fix": "biome check . --write",
     "check-types": "turbo check-types",
+    "check-all": "pnpm style && pnpm check-types && pnpm test",
     "syncpack": "syncpack",
     "quality": "./scripts/lint.sh",
     "ct:install": "ct install --config .github/configs/ct-install.yaml",
