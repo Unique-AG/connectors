@@ -1,6 +1,8 @@
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Span } from 'nestjs-otel';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 
 export interface CreateDraftEmailInput {
@@ -9,18 +11,26 @@ export interface CreateDraftEmailInput {
   contentType: 'html' | 'text';
   toRecipients: Array<{ name?: string; email: string }>;
   ccRecipients?: Array<{ name?: string; email: string }>;
-  attachments?: Array<{ filename: string; contentBytes: string; contentType: string }>;
+  attachmentIds?: string[];
 }
 
 export type CreateDraftEmailResult =
   | { success: false; message: string }
-  | { success: true; draftId: string; message: string };
+  | {
+      success: true;
+      draftId: string;
+      message: string;
+      attachmentsFailed?: Array<{ contentId: string; reason: string }>;
+    };
 
 @Injectable()
 export class CreateDraftEmailCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly graphClientFactory: GraphClientFactory) {}
+  public constructor(
+    private readonly graphClientFactory: GraphClientFactory,
+    @InjectUniqueApi() private readonly uniqueApiClient: UniqueApiClient,
+  ) {}
 
   @Span()
   public async run(
@@ -46,23 +56,12 @@ export class CreateDraftEmailCommand {
       }));
     }
 
-    if (input.attachments && input.attachments.length > 0) {
-      body.attachments = input.attachments.map((a) => ({
-        '@odata.type': '#microsoft.graph.fileAttachment',
-        name: a.filename,
-        contentType: a.contentType,
-        contentBytes: a.contentBytes,
-      }));
-    }
+    const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
+    let draftId: string;
     try {
-      const client = this.graphClientFactory.createClientForUser(userProfileIdString);
-      const message = await client.api('/me/messages').post(body);
-      return {
-        success: true,
-        draftId: message.id,
-        message: 'Draft email created successfully.',
-      };
+      const message = await client.api('/me/messages').post(body) as { id: string };
+      draftId = message.id;
     } catch (err) {
       this.logger.error({
         userProfileId: userProfileIdString,
@@ -71,5 +70,31 @@ export class CreateDraftEmailCommand {
       });
       throw new InternalServerErrorException('Failed to create draft email via Microsoft Graph');
     }
+
+    const attachmentsFailed: Array<{ contentId: string; reason: string }> = [];
+
+    if (input.attachmentIds && input.attachmentIds.length > 0) {
+      for (const contentId of input.attachmentIds) {
+        try {
+          const downloaded = await this.uniqueApiClient.content.downloadContentById(contentId);
+          await client.api(`/me/messages/${draftId}/attachments`).post({
+            '@odata.type': '#microsoft.graph.fileAttachment',
+            name: downloaded.filename,
+            contentType: downloaded.mimeType,
+            contentBytes: downloaded.data.toString('base64'),
+          });
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          attachmentsFailed.push({ contentId, reason });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      draftId,
+      message: 'Draft email created successfully.',
+      ...(attachmentsFailed.length > 0 && { attachmentsFailed }),
+    };
   }
 }
