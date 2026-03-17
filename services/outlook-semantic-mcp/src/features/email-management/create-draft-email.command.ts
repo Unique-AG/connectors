@@ -1,9 +1,12 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Span } from 'nestjs-otel';
+import { z } from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+
+const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string().optional() });
 
 export interface CreateDraftEmailInput {
   subject: string;
@@ -19,6 +22,7 @@ export type CreateDraftEmailResult =
   | {
       success: true;
       draftId: string;
+      webLink?: string;
       message: string;
       attachmentsFailed?: Array<{ contentId: string; reason: string }>;
     };
@@ -59,40 +63,45 @@ export class CreateDraftEmailCommand {
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
     let draftId: string;
+    let webLink: string | undefined;
     try {
-      const message = await client.api('/me/messages').post(body) as { id: string };
+      const message = CreateMessageResponseSchema.parse(await client.api('/me/messages').post(body));
       draftId = message.id;
+      webLink = message.webLink;
     } catch (err) {
       this.logger.error({
         userProfileId: userProfileIdString,
         msg: 'Failed to create draft email via Microsoft Graph',
         err,
       });
-      throw new InternalServerErrorException('Failed to create draft email via Microsoft Graph');
+      return {
+        success: false,
+        message: 'Failed to create draft email via Microsoft Graph',
+      };
     }
 
     const attachmentsFailed: Array<{ contentId: string; reason: string }> = [];
 
-    if (input.attachmentIds && input.attachmentIds.length > 0) {
-      for (const contentId of input.attachmentIds) {
-        try {
-          const downloaded = await this.uniqueApiClient.content.downloadContentById(contentId);
-          await client.api(`/me/messages/${draftId}/attachments`).post({
-            '@odata.type': '#microsoft.graph.fileAttachment',
-            name: downloaded.filename,
-            contentType: downloaded.mimeType,
-            contentBytes: downloaded.data.toString('base64'),
-          });
-        } catch (err) {
-          const reason = err instanceof Error ? err.message : String(err);
-          attachmentsFailed.push({ contentId, reason });
-        }
+    for (const contentId of input.attachmentIds ?? []) {
+      try {
+        const downloaded = await this.uniqueApiClient.content.downloadContentById(contentId);
+        await client.api(`/me/messages/${draftId}/attachments`).post({
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: downloaded.filename,
+          contentType: downloaded.mimeType,
+          contentBytes: downloaded.data.toString('base64'),
+        });
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        this.logger.warn({ userProfileId: userProfileIdString, msg: 'Failed to attach content to draft', contentId, reason });
+        attachmentsFailed.push({ contentId, reason });
       }
     }
 
     return {
       success: true,
       draftId,
+      ...(webLink && { webLink }),
       message: 'Draft email created successfully.',
       ...(attachmentsFailed.length > 0 && { attachmentsFailed }),
     };

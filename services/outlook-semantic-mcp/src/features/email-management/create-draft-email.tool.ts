@@ -50,7 +50,7 @@ const CreateDraftEmailInputSchema = z.object({
 const CreateDraftEmailOutputSchema = z.object({
   success: z.boolean(),
   draftId: z.string().optional(),
-  status: z.string().optional(),
+  webLink: z.string().optional().describe('Outlook Web App URL to open the draft.'),
   message: z.string(),
   attachmentsFailed: z
     .array(
