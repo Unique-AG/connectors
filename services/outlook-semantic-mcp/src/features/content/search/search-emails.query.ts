@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { MetadataFilter, type UniqueApiClient, UniqueQLOperator } from '@unique-ag/unique-api';
+import { asAllOptions } from '@unique-ag/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -10,8 +11,8 @@ import {
   DRIZZLE,
   type DrizzleDatabase,
   directories,
-  userProfiles,
   SystemDirectoryType,
+  userProfiles,
 } from '~/db';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
 import {
@@ -25,7 +26,6 @@ import {
   type SearchCondition,
   SearchEmailsInputSchema,
 } from './search-conditions.dto';
-import { asAllOptions } from '@unique-ag/utils';
 
 export interface SearchEmailResult {
   id: string;
