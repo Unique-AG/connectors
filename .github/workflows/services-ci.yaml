@@ -23,6 +23,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write # required for pnpm cache writes in _template-ci.yaml (reusable workflows cannot exceed caller permissions)
 
 jobs:
   detect-changes:
