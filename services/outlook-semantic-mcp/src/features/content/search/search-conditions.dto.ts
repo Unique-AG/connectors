@@ -2,6 +2,7 @@ import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
 import { first } from 'remeda';
 import { z } from 'zod';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
+import { clampToValidDate } from '~/utils/clamp-to-valid-date';
 
 const ArrayConditionFieldSchema = <T extends z.ZodArray>(itemSchema: T) =>
   z.object({
@@ -49,22 +50,6 @@ const emailConditionsSchema = (label: string) =>
       ),
     )
     .optional();
-
-export function clampToValidDate(val: unknown): unknown {
-  if (typeof val !== 'string') {
-    return val;
-  }
-  const match = val.match(/^(\d{4})-(\d{2})-(\d{2})(T.*)$/);
-  if (!match) {
-    return val;
-  }
-  const [, year, month, day, time] = match;
-  const lastDay = new Date(Number(year), Number(month), 0).getDate();
-  if (Number(day) <= lastDay) {
-    return val;
-  }
-  return `${year}-${month}-${String(lastDay).padStart(2, '0')}${time}`;
-}
 
 const clampedDatetime = z.preprocess(clampToValidDate, z.iso.datetime());
 

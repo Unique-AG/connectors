@@ -193,7 +193,7 @@ export class SearchEmailsQuery {
         query: rawDirectoryId,
         threshold: 0.8,
         isNewItemBetter: (newItem, currentBestItem) => {
-          if (systemDirectories.includes(currentBestItem?.internalType)) {
+          if (systemDirectories.includes(currentBestItem.internalType)) {
             return false;
           }
 
@@ -222,4 +222,6 @@ const systemDirectories = asAllOptions<SystemDirectoryType>()([
   'Conversation History',
   'Recoverable Items Deletions',
   'Clutter',
-]) as unknown as string[];
+  // We cast to a string array because we use this array to check if systemDirectories.includes(currentBestItem.internalType)
+  // This check will fail because internalType can be outside of SystemDirectoryType, because of this we cast the array to string[]
+]) as string[];

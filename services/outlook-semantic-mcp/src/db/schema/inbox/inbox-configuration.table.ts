@@ -28,8 +28,9 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   fullSyncHeartbeatAt: timestamp(`full_sync_heartbeat_at`),
   fullSyncVersion: uuid(`full_sync_version`),
   fullSyncNextLink: text(`full_sync_next_link`),
-  lastFullSyncRunAt: timestamp(`last_full_sync_run_at`),
-  lastFullSyncStartedAt: timestamp(`last_full_sync_started_at`),
+
+  fullSyncLastRunAt: timestamp(`full_sync_last_run_at`),
+  fullSyncLastStartedAt: timestamp(`full_sync_last_started_at`),
   // Live catchup specific columns
   liveCatchUpState: liveCatchUpState(`live_catch_up_state`).notNull().default('ready'),
   liveCatchUpHeartbeatAt: timestamp(`live_catch_up_heartbeat_at`),

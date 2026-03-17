@@ -87,7 +87,7 @@ export class StartFullSyncCommand {
       const inboxConfig = await tx
         .select({
           fullSyncState: inboxConfiguration.fullSyncState,
-          lastFullSyncRunAt: inboxConfiguration.lastFullSyncRunAt,
+          lastFullSyncRunAt: inboxConfiguration.fullSyncLastRunAt,
           filters: inboxConfiguration.filters,
           fullSyncNextLink: inboxConfiguration.fullSyncNextLink,
           oldestCreatedDateTime: inboxConfiguration.oldestCreatedDateTime,
@@ -130,7 +130,7 @@ export class StartFullSyncCommand {
       const updateSet: Partial<typeof inboxConfiguration.$inferInsert> = {
         fullSyncState: 'running',
         fullSyncVersion: version,
-        lastFullSyncStartedAt: now,
+        fullSyncLastStartedAt: now,
         fullSyncHeartbeatAt: now,
       };
 
