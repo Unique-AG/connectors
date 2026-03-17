@@ -119,8 +119,10 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     return `${this.config.baseUrl}/wiki/pages/viewpageattachments.action?pageId=${pageId}&preview=${preview}`;
   }
 
-  // Data Center uses downloadPath directly, but Cloud uses the stable REST endpoint instead.
-  // The _links.download path does not work via the Atlassian API gateway (returns 500).
+  // Cloud cannot use the _links.download path from the attachment response because it returns
+  // HTTP 500 when routed through the Atlassian API gateway. Instead, we use the stable v1 REST
+  // endpoint with pageId + attachmentId, which works reliably through the gateway.
+  // Data Center does not have this problem and uses _links.download directly (see DC client).
   public async getAttachmentDownloadStream(
     attachmentId: string,
     pageId: string,

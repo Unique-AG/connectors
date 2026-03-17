@@ -108,6 +108,9 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     return `${this.config.baseUrl}/pages/viewpageattachments.action?pageId=${pageId}&preview=${preview}`;
   }
 
+  // Data Center uses the _links.download path directly since requests go straight to the
+  // Confluence instance. Cloud cannot do this — the download path returns HTTP 500 through the
+  // Atlassian API gateway, so it uses a different endpoint (see Cloud client).
   public async getAttachmentDownloadStream(
     _attachmentId: string,
     _pageId: string,
