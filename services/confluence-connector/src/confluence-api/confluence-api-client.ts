@@ -25,6 +25,4 @@ export abstract class ConfluenceApiClient {
     pageId: string,
     downloadPath: string,
   ): Promise<Readable>;
-
-  protected async fetchMoreAttachments(_pages: ConfluencePage[]): Promise<void> {}
 }

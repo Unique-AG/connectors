@@ -10,6 +10,7 @@ export const DEFAULT_MAX_FILE_SIZE_MB = 200 as const;
 export const DEFAULT_ALLOWED_EXTENSIONS = [
   'pdf',
   'docx',
+  'xlsx',
   'ppt',
   'pptx',
   'txt',
