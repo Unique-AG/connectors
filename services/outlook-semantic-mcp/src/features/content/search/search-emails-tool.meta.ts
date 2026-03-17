@@ -9,10 +9,7 @@ export const META = createMeta({
   Use the ID of that folder for the "directories" parameter.
   But ALWAYS ask at the end if other folders should be considered for the search.
 
-  If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.
-
-  ### Resolving senders and recipients
-  The \`fromSenders\`, \`toRecipients\`, and \`ccRecipients\` condition fields require valid email addresses — not names. If you only have a person's name, call \`lookup_contacts\` first to resolve it to an email address before populating these fields.`,
+  If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.`,
   toolFormatInformation: `## Email Display Rules
   ALWAYS follow these rules when displaying results from \`search_emails\` or when referencing information extracted from emails.
   ### Format for listing emails

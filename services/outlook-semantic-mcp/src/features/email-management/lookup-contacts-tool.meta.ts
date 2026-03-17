@@ -3,7 +3,7 @@ import { createMeta } from '@unique-ag/mcp-server-module';
 export const META = createMeta({
   icon: 'users',
   systemPrompt:
-    "Resolves a person's name to one or more real email addresses by searching the Microsoft People directory and recent inbox senders. Call this tool whenever you have a name but no verified email address — before calling `create_draft_email`, `search_emails`, or any other tool that requires an email address.",
+    "Resolves a person's name to one or more real email addresses by searching the Microsoft People directory and recent inbox senders. Use this as a last resort when `search_emails` returns no relevant results and you still need to find a recipient's email address. Do not call this tool first — prefer `search_emails` and only fall back to `lookup_contacts` if that yields nothing.",
   toolFormatInformation: `### Format for contact results
 Display each contact on a single line — no headers, no extra blank lines:
 **{name}** — {email}
