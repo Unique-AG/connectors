@@ -57,8 +57,8 @@ data:
       {{- if $tenant.processing.scanIntervalCron }}
       scanIntervalCron: {{ $tenant.processing.scanIntervalCron | quote }}
       {{- end }}
-      {{- if $tenant.processing.maxPagesToScan }}
-      maxPagesToScan: {{ $tenant.processing.maxPagesToScan }}
+      {{- if $tenant.processing.maxItemsToScan }}
+      maxItemsToScan: {{ $tenant.processing.maxItemsToScan }}
       {{- end }}
     # Ingestion Configuration
     ingestion:
@@ -66,5 +66,18 @@ data:
       scopeId: {{ $tenant.ingestion.scopeId | quote }}
       storeInternally: {{ $tenant.ingestion.storeInternally | quote }}
       useV1KeyFormat: {{ $tenant.ingestion.useV1KeyFormat | quote }}
+      {{- if $tenant.ingestion.attachments }}
+      attachments:
+        mode: {{ $tenant.ingestion.attachments.mode | default "enabled" | quote }}
+        {{- if $tenant.ingestion.attachments.allowedExtensions }}
+        allowedExtensions:
+          {{- range $tenant.ingestion.attachments.allowedExtensions }}
+          - {{ . | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if $tenant.ingestion.attachments.maxFileSizeMb }}
+        maxFileSizeMb: {{ $tenant.ingestion.attachments.maxFileSizeMb | int }}
+        {{- end }}
+      {{- end }}
   {{- end }}
 {{- end }}

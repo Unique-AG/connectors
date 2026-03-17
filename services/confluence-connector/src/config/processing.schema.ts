@@ -13,12 +13,14 @@ export const ProcessingConfigSchema = z.object({
     .string()
     .prefault(CRON_EVERY_15_MINUTES)
     .describe('Cron expression for the scheduled page scan interval'),
-  maxPagesToScan: z
+  maxItemsToScan: z
     .preprocess(
       (val) => (val === '' ? undefined : val),
       z.coerce.number().int().positive().optional(),
     )
-    .describe('For testing purpose. Maximum number of pages to scan. Unlimited if not set'),
+    .describe(
+      'For testing purpose. Maximum number of items (pages + attachments) to scan. Unlimited if not set',
+    ),
 });
 
 export type ProcessingConfig = z.infer<typeof ProcessingConfigSchema>;

@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
@@ -10,7 +11,10 @@ export class RateLimitedHttpClient {
   private readonly dispatcher: Dispatcher;
 
   public constructor(ratePerMinute: number) {
-    this.dispatcher = new Agent().compose([interceptors.redirect(), interceptors.retry()]);
+    this.dispatcher = new Agent().compose([
+      interceptors.redirect({ maxRedirections: 10 }),
+      interceptors.retry(),
+    ]);
 
     this.limiter = new Bottleneck({
       reservoir: ratePerMinute,
@@ -22,7 +26,22 @@ export class RateLimitedHttpClient {
   }
 
   public async rateLimitedRequest(url: string, headers: Record<string, string>): Promise<unknown> {
-    return await this.limiter.schedule(async () => {
+    const body = await this.executeRequest(url, headers);
+    return body.json();
+  }
+
+  public async rateLimitedStreamRequest(
+    url: string,
+    headers: Record<string, string>,
+  ): Promise<Readable> {
+    return this.executeRequest(url, headers);
+  }
+
+  private async executeRequest(
+    url: string,
+    headers: Record<string, string>,
+  ): Promise<Dispatcher.ResponseData['body']> {
+    return this.limiter.schedule(async () => {
       const response = await request(url, {
         method: 'GET',
         headers,
@@ -30,7 +49,7 @@ export class RateLimitedHttpClient {
       });
 
       await handleErrorStatus(response.statusCode, response.body, url);
-      return response.body.json();
+      return response.body;
     });
   }
 
