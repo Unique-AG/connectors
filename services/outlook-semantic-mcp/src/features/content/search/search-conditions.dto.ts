@@ -50,21 +50,39 @@ const emailConditionsSchema = (label: string) =>
     )
     .optional();
 
+export function clampToValidDate(val: unknown): unknown {
+  if (typeof val !== 'string') {
+    return val;
+  }
+  const match = val.match(/^(\d{4})-(\d{2})-(\d{2})(T.*)$/);
+  if (!match) {
+    return val;
+  }
+  const [, year, month, day, time] = match;
+  const lastDay = new Date(Number(year), Number(month), 0).getDate();
+  if (Number(day) <= lastDay) {
+    return val;
+  }
+  return `${year}-${month}-${String(lastDay).padStart(2, '0')}${time}`;
+}
+
+const clampedDatetime = z.preprocess(clampToValidDate, z.iso.datetime());
+
 export const SearchConditionSchema = z
   .object({
     dateFrom: SingularConditionFieldSchema(
-      z.iso
-        .datetime()
-        .describe(
-          'Filter emails received on or after this date. ISO 8601 format, e.g. "2024-01-01T00:00:00Z". Recommended operators: greaterThanOrEqual, greaterThan.',
-        ),
+      clampedDatetime.describe(
+        'Filter emails received on or after this date. UTC ISO 8601 format, e.g. "2024-01-01T00:00:00Z". ' +
+          'Must be a valid calendar date — February has 28 days in non-leap years (e.g. use "2026-02-28", not "2026-02-29"). ' +
+          'Recommended operators: greaterThanOrEqual, greaterThan.',
+      ),
     ).optional(),
     dateTo: SingularConditionFieldSchema(
-      z.iso
-        .datetime()
-        .describe(
-          'Filter emails received on or before this date. ISO 8601 format, e.g. "2024-12-31T23:59:59Z". Recommended operators: lessThanOrEqual, lessThan.',
-        ),
+      clampedDatetime.describe(
+        'Filter emails received on or before this date. UTC ISO 8601 format, e.g. "2024-12-31T23:59:59Z". ' +
+          'Must be a valid calendar date — February has 28 days in non-leap years (e.g. use "2026-02-28T23:59:59Z", not "2026-02-29T23:59:59Z"). ' +
+          'Recommended operators: lessThanOrEqual, lessThan.',
+      ),
     ).optional(),
     fromSenders: emailConditionsSchema('Sender'),
     toRecipients: emailConditionsSchema('To recipient'),
