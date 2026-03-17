@@ -20,9 +20,9 @@ export const META = createMeta({
     **Do not ask the user for confirmation before searching.** Act immediately.
     Before drafting, you **must** resolve the recipient's email address:
     1. **Explicit address provided**: If the user gave you an email address directly, use it.
-    2. **No address provided — search immediately**: If the user refers to a person by name, role, or organization but did not provide an email address, **immediately** call the \`search_email\` tool. Do NOT ask the user whether you should search. Do NOT present a plan or options. Do NOT ask for confirmation. Just search.
-    3. **Ambiguous results**: If \`search_email\` returns multiple possible matches, present them to the user and ask which one to use.
-    4. **No results**: Only if \`search_email\` returns no relevant results, ask the user to provide the email address manually.
+    2. **No address provided — search immediately**: If the user refers to a person by name, role, or organization but did not provide an email address, **immediately** call the \`lookup_contacts\` tool. Do NOT ask the user whether you should search. Do NOT present a plan or options. Do NOT ask for confirmation. Just search.
+    3. **Ambiguous results**: If \`lookup_contacts\` returns multiple possible matches, present them to the user and ask which one to use.
+    4. **No results**: Only if \`lookup_contacts\` returns no results, ask the user to provide the email address manually.
     Never guess or fabricate an email address. Never skip step 2. Never ask for permission to search — just do it.
 
     ### Drafting Behavior
@@ -31,7 +31,7 @@ export const META = createMeta({
     2. **Infer everything you can** from the user's message — tone, intent, level of formality, content. Use reasonable defaults for anything not specified.
     3. **Draft a single email right away** and present it using the format specified below.
     4. **The user will correct you if needed.** Trust that the user will tell you if something is wrong. Do not try to get it perfect on the first ask — getting it done fast is more important.
-    The **only** exception: if after searching with \`search_email\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
+    The **only** exception: if after calling \`lookup_contacts\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
 
     ### what \`create_draft_email\` does:
     Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and base64-encoded file attachments. The draft is saved and can be reviewed or sent later.`,
