@@ -77,7 +77,7 @@ export class LookupContactsQuery {
       raw = await client
         .api('/me/people')
         .query({
-          $search: name.replace(/"/g, ''),
+          $search: `"${name.replace(/"/g, '')}"`,
           $top: 25,
           $select: 'displayName,scoredEmailAddresses',
         })
