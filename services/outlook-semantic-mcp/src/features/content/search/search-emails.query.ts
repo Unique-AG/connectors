@@ -192,8 +192,8 @@ export class SearchEmailsQuery {
         getLabel: (directory) => directory.displayName,
         query: rawDirectoryId,
         threshold: 0.8,
-        isNewItemBetter: (newItem, currentBestSimilarity) => {
-          if (systemDirectories.includes(currentBestSimilarity?.internalType)) {
+        isNewItemBetter: (newItem, currentBestItem) => {
+          if (systemDirectories.includes(currentBestItem?.internalType)) {
             return false;
           }
 

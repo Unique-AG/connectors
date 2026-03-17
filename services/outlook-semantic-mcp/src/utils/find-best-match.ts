@@ -12,7 +12,7 @@ export function findBestMatch<T>({
   getLabel: (item: T) => string;
   query: string;
   threshold: number;
-  isNewItemBetter?: (newItem: T, currentBestSimilarity: T) => boolean;
+  isNewItemBetter?: (newItem: T, currentBestItem: T) => boolean;
 }): T | undefined {
   const lowerQuery = query.toLowerCase();
   let bestSimilarity = 0;
