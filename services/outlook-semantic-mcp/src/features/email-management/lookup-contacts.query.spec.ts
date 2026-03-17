@@ -1,17 +1,25 @@
 import { describe, expect, it } from 'vitest';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { LookupContactsQuery } from './lookup-contacts.query';
 
-// biome-ignore lint/suspicious/noExplicitAny: test stub
-const USER_PROFILE_ID = { toString: () => 'user-1' } as any;
+const USER_PROFILE_ID = { toString: () => 'user-1' } as unknown as UserProfileTypeID;
+
+interface MockQueryChain {
+  get: () => Promise<unknown>;
+}
+
+interface MockClient {
+  api: (path: string) => { query: () => MockQueryChain };
+}
 
 function makeClient(opts: {
   people?: unknown;
   peopleError?: Error;
   inbox?: unknown;
   inboxError?: Error;
-}) {
-  // biome-ignore lint/suspicious/noExplicitAny: mock does not need full type fidelity
-  const client: any = {
+}): MockClient {
+  return {
     api: (path: string) => ({
       query: () => ({
         get: async () => {
@@ -29,15 +37,13 @@ function makeClient(opts: {
       }),
     }),
   };
-  return client;
 }
 
 function makeFactory(opts: Parameters<typeof makeClient>[0]) {
   const client = makeClient(opts);
   return {
-    // biome-ignore lint/suspicious/noExplicitAny: mock factory does not need full type fidelity
-    createClientForUser: (_id: string): any => client,
-  };
+    createClientForUser: (_id: string): MockClient => client,
+  } as unknown as GraphClientFactory;
 }
 
 describe('LookupContactsQuery.run', () => {
@@ -46,21 +52,26 @@ describe('LookupContactsQuery.run', () => {
       makeFactory({
         people: {
           value: [
-            { displayName: 'Alice Smith', scoredEmailAddresses: [{ address: 'alice@example.com' }] },
+            {
+              displayName: 'Alice Smith',
+              scoredEmailAddresses: [{ address: 'alice@example.com' }],
+            },
           ],
         },
         inbox: {
-          value: [{ from: { emailAddress: { name: 'Bob Jones', address: 'bob@example.com' } } }],
+          value: [
+            { from: { emailAddress: { name: 'Alice Brown', address: 'alice.brown@example.com' } } },
+          ],
         },
-      }) as any,
+      }),
     );
 
-    const result = await query.run(USER_PROFILE_ID, 'bob');
+    const result = await query.run(USER_PROFILE_ID, 'alice');
 
     expect(result).toEqual({
       contacts: [
         { name: 'Alice Smith', email: 'alice@example.com', source: 'people_api' },
-        { name: 'Bob Jones', email: 'bob@example.com', source: 'inbox' },
+        { name: 'Alice Brown', email: 'alice.brown@example.com', source: 'inbox' },
       ],
     });
   });
@@ -72,7 +83,7 @@ describe('LookupContactsQuery.run', () => {
         inbox: {
           value: [{ from: { emailAddress: { name: 'Bob Jones', address: 'bob@example.com' } } }],
         },
-      }) as any,
+      }),
     );
 
     const result = await query.run(USER_PROFILE_ID, 'bob');
@@ -87,11 +98,14 @@ describe('LookupContactsQuery.run', () => {
       makeFactory({
         people: {
           value: [
-            { displayName: 'Alice Smith', scoredEmailAddresses: [{ address: 'alice@example.com' }] },
+            {
+              displayName: 'Alice Smith',
+              scoredEmailAddresses: [{ address: 'alice@example.com' }],
+            },
           ],
         },
         inboxError: new Error('Inbox unavailable'),
-      }) as any,
+      }),
     );
 
     const result = await query.run(USER_PROFILE_ID, 'alice');
@@ -106,7 +120,7 @@ describe('LookupContactsQuery.run', () => {
       makeFactory({
         peopleError: new Error('People API unavailable'),
         inboxError: new Error('Inbox unavailable'),
-      }) as any,
+      }),
     );
 
     const result = await query.run(USER_PROFILE_ID, 'alice');
@@ -119,7 +133,10 @@ describe('LookupContactsQuery.run', () => {
       makeFactory({
         people: {
           value: [
-            { displayName: 'Alice Smith', scoredEmailAddresses: [{ address: 'Alice@Example.com' }] },
+            {
+              displayName: 'Alice Smith',
+              scoredEmailAddresses: [{ address: 'Alice@Example.com' }],
+            },
           ],
         },
         inbox: {
@@ -127,7 +144,7 @@ describe('LookupContactsQuery.run', () => {
             { from: { emailAddress: { name: 'Alice from Inbox', address: 'alice@example.com' } } },
           ],
         },
-      }) as any,
+      }),
     );
 
     const result = await query.run(USER_PROFILE_ID, 'alice');

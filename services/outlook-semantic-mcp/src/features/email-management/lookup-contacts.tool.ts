@@ -5,8 +5,8 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
-import { META } from './lookup-contacts-tool.meta';
 import { LookupContactsQuery } from './lookup-contacts.query';
+import { META } from './lookup-contacts-tool.meta';
 
 const LookupContactsInputSchema = z.object({
   name: z.string().min(2).describe('The name (or partial name) to search for among contacts.'),

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { filter, flatMap, pipe, uniqueBy } from 'remeda';
+import { filter, flatMap, isNonNullish, map, pipe, uniqueBy } from 'remeda';
 import { z } from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -95,10 +95,21 @@ export class LookupContactsQuery {
     return pipe(
       items,
       flatMap((person) => {
-        const email = person.scoredEmailAddresses?.[0]?.address;
-        return person.displayName && email
-          ? [{ name: person.displayName, email, source: 'people_api' as const }]
-          : [];
+        const { displayName } = person;
+        if (!displayName) {
+          return [];
+        }
+
+        return pipe(
+          person.scoredEmailAddresses ?? [],
+          map(({ address }) => address),
+          filter(isNonNullish),
+          map((address) => ({
+            name: displayName,
+            email: address,
+            source: 'people_api' as const,
+          })),
+        );
       }),
     );
   }
@@ -113,7 +124,7 @@ export class LookupContactsQuery {
       raw = await client
         .api('/me/messages')
         .query({
-          $select: 'from/emailAddress/name,from/emailAddress/address',
+          $select: 'from',
           $top: 100,
           $orderby: 'receivedDateTime desc',
         })
