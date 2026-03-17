@@ -51,6 +51,7 @@ function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
   return {
     getAllTenants: vi.fn().mockReturnValue(tenants),
     tenantCount: tenants.length,
+    processDeletedTenants: vi.fn().mockResolvedValue(undefined),
     run: vi
       .fn()
       .mockImplementation(
@@ -91,12 +92,28 @@ describe('TenantSyncScheduler', () => {
   });
 
   describe('onModuleInit', () => {
-    it('registers a cron job per tenant', () => {
+    it('calls processDeletedTenants before scheduling syncs', async () => {
       scheduler.onModuleInit();
 
-      expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(2);
-      expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith('sync:tenant-a', expect.anything());
-      expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith('sync:tenant-b', expect.anything());
+      await vi.waitFor(() => {
+        expect(tenantRegistry.processDeletedTenants).toHaveBeenCalledOnce();
+      });
+    });
+
+    it('registers a cron job per tenant', async () => {
+      scheduler.onModuleInit();
+
+      await vi.waitFor(() => {
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(2);
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+          'sync:tenant-a',
+          expect.anything(),
+        );
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+          'sync:tenant-b',
+          expect.anything(),
+        );
+      });
     });
 
     it('triggers initial sync for each tenant', async () => {
@@ -114,18 +131,20 @@ describe('TenantSyncScheduler', () => {
       });
     });
 
-    it('logs the scheduled cron expression', () => {
+    it('logs the scheduled cron expression', async () => {
       scheduler.onModuleInit();
 
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'tenant-a',
-          msg: 'Scheduled sync with cron: */5 * * * *',
-        }),
-      );
+      await vi.waitFor(() => {
+        expect(mockLogger.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tenantName: 'tenant-a',
+            msg: 'Scheduled sync with cron: */5 * * * *',
+          }),
+        );
+      });
     });
 
-    it('skips scheduling when no tenants are registered', () => {
+    it('skips scheduling when no tenants are registered', async () => {
       const emptyRegistry = createMockTenantRegistry([]);
       const emptyServiceRegistry = createMockServiceRegistry([]);
       const emptyScheduler = new TenantSyncScheduler(
@@ -136,6 +155,9 @@ describe('TenantSyncScheduler', () => {
 
       emptyScheduler.onModuleInit();
 
+      await vi.waitFor(() => {
+        expect(emptyRegistry.processDeletedTenants).toHaveBeenCalledOnce();
+      });
       expect(emptyRegistry.getAllTenants).not.toHaveBeenCalled();
       expect(schedulerRegistry.addCronJob).not.toHaveBeenCalled();
     });

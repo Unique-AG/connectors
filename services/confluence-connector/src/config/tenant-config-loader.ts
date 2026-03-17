@@ -41,6 +41,8 @@ export interface NamedTenantConfig {
 const logger = new Logger('TenantConfigLoader');
 
 let cachedConfigs: NamedTenantConfig[] | null = null;
+let cachedDeletedConfigs: NamedTenantConfig[] | null = null;
+
 export function getTenantConfigs(): NamedTenantConfig[] {
   if (cachedConfigs) {
     return cachedConfigs;
@@ -48,8 +50,18 @@ export function getTenantConfigs(): NamedTenantConfig[] {
 
   const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
   assert.ok(tenantConfigPathPattern, 'TENANT_CONFIG_PATH_PATTERN environment variable is not set');
-  cachedConfigs = loadTenantConfigs(tenantConfigPathPattern);
+  const { activeConfigs, deletedConfigs } = loadTenantConfigs(tenantConfigPathPattern);
+  cachedConfigs = activeConfigs;
+  cachedDeletedConfigs = deletedConfigs;
   return cachedConfigs;
+}
+
+export function getDeletedTenantConfigs(): NamedTenantConfig[] {
+  if (cachedDeletedConfigs) {
+    return cachedDeletedConfigs;
+  }
+  getTenantConfigs();
+  return cachedDeletedConfigs ?? [];
 }
 
 function extractTenantName(filePath: string): string {
@@ -77,7 +89,12 @@ function validateTenantNames(entries: { name: string; path: string }[]): void {
   }
 }
 
-function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
+interface LoadResult {
+  activeConfigs: NamedTenantConfig[];
+  deletedConfigs: NamedTenantConfig[];
+}
+
+function loadTenantConfigs(pathPattern: string): LoadResult {
   const files = globSync(pathPattern);
   assert.ok(
     files.length > 0,
@@ -92,6 +109,7 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
   validateTenantNames(entries);
 
   const activeConfigs: NamedTenantConfig[] = [];
+  const deletedConfigs: NamedTenantConfig[] = [];
 
   for (const entry of entries) {
     try {
@@ -103,14 +121,12 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
       );
 
       const { status } = TenantStatusSchema.parse(rawConfig);
+      const config = TenantConfigSchema.parse(rawConfig);
 
       if (status === TenantStatus.Deleted) {
-        // TODO implement deletion for ingested confluence-content
-        logger.log({ tenantName: entry.name, msg: `Tenant '${entry.name}' is deleted, skipping` });
+        deletedConfigs.push({ name: entry.name, config });
         continue;
       }
-
-      const config = TenantConfigSchema.parse(rawConfig);
 
       if (status === TenantStatus.Inactive) {
         logger.log({ tenantName: entry.name, msg: `Tenant '${entry.name}' is inactive, skipping` });
@@ -134,5 +150,5 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
     'No active tenant configurations found. At least one tenant must have status "active".',
   );
 
-  return activeConfigs;
+  return { activeConfigs, deletedConfigs };
 }
