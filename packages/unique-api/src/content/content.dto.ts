@@ -16,3 +16,9 @@ export const ContentSchema = z.object({
 });
 
 export type Content = z.infer<typeof ContentSchema>;
+
+export type DownloadedContent = {
+  data: Buffer;
+  filename: string;
+  mimeType: string;
+};
