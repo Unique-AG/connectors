@@ -6,6 +6,7 @@ import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { sqlArray } from '~/utils/sql-array';
 import { MessageEventDto } from '../../mail-ingestion/dtos/message-event.dto';
 import {
   FullSyncGraphMessage,
@@ -13,7 +14,6 @@ import {
   fullSyncGraphMessageResponseSchema,
 } from '../../mail-ingestion/dtos/microsoft-graph.dtos';
 import { IngestionPriority } from '../../mail-ingestion/utils/ingestion-queue.utils';
-import { sqlArray } from '~/utils/sql-array';
 
 @Injectable()
 export class LiveCatchUpCommand {
