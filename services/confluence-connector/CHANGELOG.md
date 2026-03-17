@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-alpha.4](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.3...confluence-connector@2.0.0-alpha.4) (2026-03-17)
+
+
+### Features
+
+* **confluence-connector:** file attachment ingestion ([#358](https://github.com/Unique-AG/connectors/issues/358)) ([69cdaff](https://github.com/Unique-AG/connectors/commit/69cdaff68bd972ec84e09e21d1cbc630239e3d42))
+
 ## [2.0.0-alpha.3](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.2...confluence-connector@2.0.0-alpha.3) (2026-03-16)
 
 
