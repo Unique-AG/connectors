@@ -107,11 +107,14 @@ export class StuckSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
       .select({ userProfileId: inboxConfiguration.userProfileId })
       .from(inboxConfiguration)
       .where(
-        and(
-          notInArray(inboxConfiguration.liveCatchUpState, ['ready']),
-          lt(
-            sql`COALESCE(${inboxConfiguration.liveCatchUpHeartbeatAt}, '-infinity'::timestamptz)`,
-            sql`NOW() - ${STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
+        or(
+          eq(inboxConfiguration.liveCatchUpState, 'failed'),
+          and(
+            notInArray(inboxConfiguration.liveCatchUpState, ['ready']),
+            lt(
+              sql`COALESCE(${inboxConfiguration.liveCatchUpHeartbeatAt}, '-infinity'::timestamptz)`,
+              sql`NOW() - ${STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
+            ),
           ),
         ),
       );

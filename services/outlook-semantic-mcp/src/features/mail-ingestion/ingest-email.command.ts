@@ -152,6 +152,8 @@ export class IngestEmailCommand {
       this.logger.log({ ...logContext, msg: `Update file metadata` });
       await this.uniqueApi.ingestion.updateMetadata({
         contentId: file.id,
+        // ContentMetadata value is Record<x, y> and metadata is an interface we do the type casting
+        // here because you cannot assign an interface to a record.
         metadata: metadata as unknown as ContentMetadata,
       });
       return;
@@ -195,6 +197,8 @@ export class IngestEmailCommand {
       // We pass byteSize as 1 because if we do not pass it the register content request will
       // create the content but the content will not be visible in Knowledge base.
       byteSize: 1,
+      // ContentMetadata value is Record<x, y> and metadata is an interface we do the type casting
+      // here because you cannot assign an interface to a record.
       metadata: metadata as unknown as ContentMetadata,
       scopeId: rootScopeId,
       ownerType: UniqueOwnerType.Scope,

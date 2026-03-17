@@ -46,8 +46,8 @@ export class IngestEmailLiveCatchupMessageCommand {
     await this.ingestEmailCommand.run({
       userProfileId: subscription.userProfileId,
       messageId,
-      // We pass filters in this case because we need to live catchup goes via updated at date and we in that case we need to check the filters
-      // on out side.
+      // Filters are applied client-side here because live catchup queries by updatedAt rather than
+      // receivedAt, so the Graph API cannot enforce sender/folder filters on our behalf.
       filters,
     });
   }
