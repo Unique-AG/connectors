@@ -165,7 +165,7 @@ export class ConfluencePageScanner {
     return true;
   }
 
-  // todo switch to mime type instead of checking the file extension
+  // TODO switch to mime type instead of checking the file extension
   private extractExtension(filename: string): string | undefined {
     const lastDot = filename.lastIndexOf('.');
     if (lastDot === -1 || lastDot === filename.length - 1) {
