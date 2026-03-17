@@ -45,7 +45,7 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(result).toEqual({
-      path: ['from.emailAddress'],
+      path: ['fromEmailAddress'],
       operator: UniqueQLOperator.IN,
       value: ['alice@example.com'],
     });
@@ -62,7 +62,7 @@ describe('buildSearchFilter', () => {
     ]);
 
     expect(result).toEqual({
-      path: ['from.emailAddress'],
+      path: ['fromEmailAddress'],
       operator: UniqueQLOperator.IN,
       value: ['alice@example.com', 'bob@example.com'],
     });
@@ -84,7 +84,7 @@ describe('buildSearchFilter', () => {
           value: '2024-01-01',
         },
         {
-          path: ['from.emailAddress'],
+          path: ['fromEmailAddress'],
           operator: UniqueQLOperator.IN,
           value: ['alice@example.com'],
         },
@@ -126,12 +126,12 @@ describe('buildSearchFilter', () => {
     expect(result).toEqual({
       and: [
         {
-          path: ['toRecipients.emailAddresses'],
+          path: ['toRecipientsEmailAddresses'],
           operator: UniqueQLOperator.IN,
           value: ['carol@example.com'],
         },
         {
-          path: ['ccRecipients.emailAddresses'],
+          path: ['ccRecipientsEmailAddresses'],
           operator: UniqueQLOperator.IN,
           value: ['dave@example.com'],
         },

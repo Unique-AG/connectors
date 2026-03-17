@@ -3,23 +3,28 @@ import { createMeta } from '@unique-ag/mcp-server-module';
 export const META = createMeta({
   icon: 'status',
   systemPrompt:
-    'Returns the current full sync progress including inbox configuration and ingestion statistics. Use this to monitor how many emails have been processed and their ingestion states.',
+    'Returns the current sync progress including inbox configuration, date windows, and ingestion statistics. Use this to monitor sync state and ingestion progress.',
   toolFormatInformation: `## Sync Progress Display Rules
 
-  Open with a status line, then show the two phases as compact sections. Omit any field that is \`null\`.
+  Open with a status line, then show the sync state and ingestion as compact sections. Omit any field that is \`null\`.
 
-  **Status line:**
-  - \`idle\` → ✅ **Sync complete**
-  - \`running\` → 🔄 **Sync in progress** — {progressPercentage}%
-  - \`failed\` → ❌ **Sync failed** — fetch & queue phase encountered an error.
-  - \`unknown\` → ⚠️ **Sync state unknown** — inbox connection could not be found.
+  **Status line** — based on top-level \`state\`:
+  - \`finished\` → ✅ **Sync complete**
+  - \`running\` → 🔄 **Sync in progress**
+  - \`error\` → ❌ **Sync error**
 
-  If \`message\` is present, show it as a blockquote below the status line.
+  If \`message\` is present and non-empty, show it as a blockquote below the status line.
 
-  **Fetch & Queue** ({toQueueForIngestionStats.state}) — received / queued / processed: {received} / {queuedForSync} / {processed}
-  If state is \`failed\`, append: ⚠️ _Fetch & queue phase encountered an error._
-  **Ingestion** ({ingestionStats.state}) — finished / in progress / failed: {finished} / {inProgress} / {failed} - Emails are ingested from newest emails received to oldest emails.
-  If \`failed\` > 0, append: ⚠️ _{failed} email(s) failed ingestion._
+  **Sync State** — Full sync: {syncStats.fullSyncState}, Live catch-up: {syncStats.liveCatchUpState}
+  - \`fullSyncState\` values: \`ready\` (initial fetch done), \`running\` (in progress), \`failed\` (error)
+  - \`liveCatchUpState\` values: \`ready\` (up to date), \`running\` (processing new emails), \`failed\` (error)
+
+  **Date Window** — Newest created: {syncStats.dateWindow.newestCreatedDateTime}, Newest modified: {syncStats.dateWindow.newestLastModifiedDateTime}
+
+  **Ingestion** — if \`ingestionStats.state\` is \`error\`, show: ❌ _Ingestion unavailable: {ingestionStats.message}_
+  Otherwise (\`ingestionStats.state\` is \`finished\` or \`running\`):
+  ({ingestionStats.state}) — finished / in progress / failed: {ingestionStats.finished} / {ingestionStats.inProgress} / {ingestionStats.failed} — Emails are ingested from newest to oldest.
+  If \`ingestionStats.failed\` > 0, append: ⚠️ _{ingestionStats.failed} email(s) failed ingestion._
 
   ### Active filters
   Always show the active filters section so the user understands what is being ingested.

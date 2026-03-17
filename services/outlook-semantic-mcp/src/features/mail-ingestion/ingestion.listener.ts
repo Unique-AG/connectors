@@ -6,18 +6,18 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
-import { MessageEventDto } from './mail-ingestion/dtos/message-event.dto';
-import { IngestEmailFromFullSyncCommand } from './mail-ingestion/ingest-email-from-full-sync.command';
-import { IngestEmailViaSubscriptionCommand } from './mail-ingestion/ingest-email-via-subscription.command';
-import { IngestionPriority } from './mail-ingestion/utils/ingestion-queue.utils';
+import { MessageEventDto } from './dtos/message-event.dto';
+import { IngestFullSyncMessageCommand } from './ingest-full-sync-message.command';
+import { IngestEmailLiveCatchupMessageCommand } from './ingest-live-catchup-message.command';
+import { IngestionPriority } from './utils/ingestion-queue.utils';
 
 @Injectable()
 export class IngestionListener {
   private readonly logger = new Logger(IngestionListener.name);
 
   public constructor(
-    private readonly ingestEmailViaSubscriptionCommand: IngestEmailViaSubscriptionCommand,
-    private readonly ingestEmailFromFullSyncCommand: IngestEmailFromFullSyncCommand,
+    private readonly ingestEmailLiveCatchupMessageCommand: IngestEmailLiveCatchupMessageCommand,
+    private readonly ingestFullSyncMessageCommand: IngestFullSyncMessageCommand,
   ) {}
 
   @RabbitSubscribe({
@@ -37,9 +37,9 @@ export class IngestionListener {
 
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received':
-        return await this.ingestEmailViaSubscriptionCommand.run(event.payload);
+        return await this.ingestEmailLiveCatchupMessageCommand.run(event.payload);
       case 'unique.outlook-semantic-mcp.mail-event.full-sync-change-notification-scheduled':
-        return await this.ingestEmailFromFullSyncCommand.run(event.payload);
+        return await this.ingestFullSyncMessageCommand.run(event.payload);
     }
   }
 }

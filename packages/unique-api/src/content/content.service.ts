@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { sanitizePath } from '@unique-ag/utils';
-import { first } from 'remeda';
+import { first, isNullish } from 'remeda';
 import { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueHttpClient } from '../clients/unique-http.client';
 import { Content, ContentSchema } from './content.dto';
@@ -22,10 +22,17 @@ export class ContentService implements UniqueContentFacade {
   public async search(request: PublicSearchRequest): Promise<SearchResult> {
     const baseUrl = new URL(this.baseUrl);
 
+    if (isNullish(request.scopeIds)) {
+      // After the file based access migration not passing the scope ids results in empty search
+      // because the scopeIds is defaulted to empty array in our search adapters which makes the query
+      // return empty results.
+      request.scopeIds = null;
+    }
+
     const { body } = await this.httpClient.request({
       method: 'POST',
       path: sanitizePath({
-        path: `${baseUrl.pathname}/v1/search`,
+        path: `${baseUrl.pathname}/v1/search/combinedSearch`,
         prefixWithSlash: true,
       }),
       body: JSON.stringify(request),

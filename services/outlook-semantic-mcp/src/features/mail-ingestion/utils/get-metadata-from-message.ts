@@ -1,8 +1,9 @@
-import { ContentMetadataValue } from '@unique-ag/unique-api';
+// import { ContentMetadataValue } from '@unique-ag/unique-api';
 import { filter, isNonNullish, map, pipe } from 'remeda';
 import { GraphMessage } from '../dtos/microsoft-graph.dtos';
 
-export interface MessageMetadata extends Record<string, ContentMetadataValue> {
+// We should never user `.` in metadata search because Qdrant thinks this is a subobject
+export interface MessageMetadata {
   id: string;
   subject: string;
   internetMessageId: string;
@@ -10,15 +11,15 @@ export interface MessageMetadata extends Record<string, ContentMetadataValue> {
   parentFolderId: string;
   sentDateTime: string;
   lastModifiedDateTime: string;
-  'from.emailAddress': string;
-  'from.name': string;
-  'sender.emailAddress': string;
-  'sender.name': string;
-  'toRecipients.emailAddresses': string[];
-  'toRecipients.names': string[];
+  fromEmailAddress: string;
+  fromName: string;
+  senderEmailAddress: string;
+  senderName: string;
+  toRecipientsEmailAddresses: string[];
+  toRecipientsNames: string[];
   receivedDateTime: string;
-  'ccRecipients.emailAddresses': string[];
-  'ccRecipients.names': string[];
+  ccRecipientsEmailAddresses: string[];
+  ccRecipientsNames: string[];
   categories: string[];
   isRead: boolean;
   isDraft: boolean;
@@ -26,7 +27,7 @@ export interface MessageMetadata extends Record<string, ContentMetadataValue> {
   importance: string;
   inferenceClassification: string;
   webLink: string;
-  'flag.flagStatus': string;
+  flagStatus: string;
 }
 
 const filterOutNilOrEmptyValues = (
@@ -70,15 +71,15 @@ export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata =
     parentFolderId: message.parentFolderId ?? '',
     sentDateTime: message.sentDateTime ?? '',
     lastModifiedDateTime: message.lastModifiedDateTime ?? '',
-    'from.emailAddress': message.from?.emailAddress?.address ?? '',
-    'from.name': message.from?.emailAddress?.name ?? '',
-    'sender.emailAddress': message.sender?.emailAddress?.address ?? '',
-    'sender.name': message.sender?.emailAddress?.name ?? '',
-    'toRecipients.emailAddresses': extractFromEmailArray(message.toRecipients, 'address'),
-    'toRecipients.names': extractFromEmailArray(message.toRecipients, 'name'),
+    fromEmailAddress: message.from?.emailAddress?.address ?? '',
+    fromName: message.from?.emailAddress?.name ?? '',
+    senderEmailAddress: message.sender?.emailAddress?.address ?? '',
+    senderName: message.sender?.emailAddress?.name ?? '',
+    toRecipientsEmailAddresses: extractFromEmailArray(message.toRecipients, 'address'),
+    toRecipientsNames: extractFromEmailArray(message.toRecipients, 'name'),
     receivedDateTime: message.receivedDateTime ?? '',
-    'ccRecipients.emailAddresses': extractFromEmailArray(message.ccRecipients, 'address'),
-    'ccRecipients.names': extractFromEmailArray(message.ccRecipients, 'name'),
+    ccRecipientsEmailAddresses: extractFromEmailArray(message.ccRecipients, 'address'),
+    ccRecipientsNames: extractFromEmailArray(message.ccRecipients, 'name'),
     categories: filterOutNilOrEmptyValues(message.categories),
     isRead: message.isRead ?? false,
     isDraft: message.isDraft ?? false,
@@ -86,6 +87,6 @@ export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata =
     hasAttachments: message.hasAttachments ?? false,
     importance: message.importance ?? '',
     inferenceClassification: message.inferenceClassification ?? '',
-    'flag.flagStatus': message.flag?.flagStatus ?? '',
+    flagStatus: message.flag?.flagStatus ?? '',
   };
 };
