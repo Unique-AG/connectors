@@ -91,7 +91,12 @@ export const SearchConditionSchema = z
       z
         .array(z.string())
         .describe(
-          `Folder ID(s) to filter by, e.g. ["${EXAMPLE_FOLDER_IDS.first}", "${EXAMPLE_FOLDER_IDS.second}"]. Folder ids can be found using \`list_folders\` tool. Recommended operators: in or notIn.`,
+          `Folder ID(s) or system directory name(s) to filter by. ` +
+            `For well-known Outlook system folders pass the exact display name directly — no need to call \`list_folders\`: ` +
+            `"Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History". ` +
+            `Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized and will not return results. ` +
+            `For custom user-defined folders, pass the folder ID obtained from \`list_folders\`. ` +
+            `Example IDs: ["${EXAMPLE_FOLDER_IDS.first}", "${EXAMPLE_FOLDER_IDS.second}"]. Recommended operators: in or notIn.`,
         ),
     ).optional(),
     hasAttachments: SingularConditionFieldSchema(
