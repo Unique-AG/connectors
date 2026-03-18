@@ -89,12 +89,12 @@ function validateTenantNames(entries: { name: string; path: string }[]): void {
   }
 }
 
-interface LoadResult {
+interface TenantConfigsByStatus {
   activeConfigs: NamedTenantConfig[];
   deletedConfigs: NamedTenantConfig[];
 }
 
-function loadTenantConfigs(pathPattern: string): LoadResult {
+function loadTenantConfigs(pathPattern: string): TenantConfigsByStatus {
   const files = globSync(pathPattern);
   assert.ok(
     files.length > 0,
