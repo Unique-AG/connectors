@@ -25,25 +25,25 @@ export class TenantCleanupService {
 
     const childScopes = await this.uniqueClient.scopes.listChildren(scopeId);
 
-    // For V1 tenants, files are owned by child scopes (flat hierarchy), so no child scopes = no files.
-    // For V2 tenants, files are keyed by tenant name prefix, so we check the file count directly.
-    const hasFiles = useV1KeyFormat
+    // For V1 tenants, content is owned by child scopes (flat hierarchy), so no child scopes = no content.
+    // For V2 tenants, content is keyed by tenant name prefix, so we check the count directly.
+    const hasContent = useV1KeyFormat
       ? childScopes.length > 0
       : (await this.uniqueClient.files.getCountByKeyPrefix(this.tenantName)) > 0;
 
-    if (childScopes.length === 0 && !hasFiles) {
+    if (childScopes.length === 0 && !hasContent) {
       this.logger.log({ tenantName: this.tenantName, msg: 'Already cleaned up, skipping' });
       return;
     }
 
     if (useV1KeyFormat) {
-      await this.deleteFilesByScopes(childScopes);
+      await this.deleteContentByScopes(childScopes);
     } else {
       const deletedCount = await this.uniqueClient.files.deleteByKeyPrefix(this.tenantName);
       this.logger.log({
         tenantName: this.tenantName,
         deletedCount,
-        msg: 'Files deleted by key prefix',
+        msg: 'Content deleted by key prefix',
       });
     }
 
@@ -79,16 +79,16 @@ export class TenantCleanupService {
     }
   }
 
-  private async deleteFilesByScopes(scopes: Scope[]): Promise<void> {
+  private async deleteContentByScopes(scopes: Scope[]): Promise<void> {
     for (const scope of scopes) {
-      const fileIds = await this.uniqueClient.files.getContentIdsByScope(scope.id);
-      if (fileIds.length > 0) {
-        await this.uniqueClient.files.deleteByIds(fileIds);
+      const contentIds = await this.uniqueClient.files.getContentIdsByScope(scope.id);
+      if (contentIds.length > 0) {
+        await this.uniqueClient.files.deleteByIds(contentIds);
         this.logger.log({
           tenantName: this.tenantName,
           scopeName: scope.name,
-          deletedCount: fileIds.length,
-          msg: 'Files deleted by scope ownership',
+          deletedCount: contentIds.length,
+          msg: 'Content deleted by scope ownership',
         });
       }
     }
