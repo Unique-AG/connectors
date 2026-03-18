@@ -1,5 +1,6 @@
 // Jaro-Winkler similarity implemented locally because available npm packages either
 // lacked TypeScript types or were ESM-only, which caused build issues with this project.
+// Reference code: https://github.com/jordanthomas/jaro-winkler
 
 /**
  * Computes the Jaro-Winkler similarity between two strings.
