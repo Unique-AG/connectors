@@ -100,9 +100,8 @@ export class LookupContactsQuery {
     // rather than guessing on the caller's behalf.
     const contacts = pipe(
       [...peopleContacts, ...inboxContacts],
-      map(({ email, ...contact }) => ({
+      map(({ ...contact }) => ({
         ...contact,
-        email: email.toLocaleLowerCase(),
         similarityScore: nameSimilarity(name, contact.name),
       })),
       // peopleContacts are already filtered server-side by the People API $search.
