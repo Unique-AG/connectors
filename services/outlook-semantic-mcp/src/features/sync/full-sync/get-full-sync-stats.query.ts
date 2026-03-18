@@ -1,18 +1,13 @@
-import { IngestionState, UniqueApiClient } from '@unique-ag/unique-api';
-import { asAllOptions } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { omit, sumBy, values } from 'remeda';
 import z from 'zod';
 import { AppConfig, appConfig } from '~/config';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions, UserProfile } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
-import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
-import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { NonNullishProps } from '~/utils/non-nullish-props';
 import { GetUserProfileQuery } from '../../user-utils/get-user-profile.query';
+import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 
 const ingestionStatsError = z.object({
   state: z
@@ -68,49 +63,15 @@ export const GetFullSyncStatsResponse = z.object({
 
 type FullSyncStats = z.infer<typeof GetFullSyncStatsResponse>;
 
-type FailedIngestionStates = Exclude<
-  IngestionState,
-  | IngestionState.CheckingIntegrity
-  | IngestionState.Finished
-  | IngestionState.IngestionChunking
-  | IngestionState.IngestionEmbedding
-  | IngestionState.IngestionReading
-  | IngestionState.MalwareScanning
-  | IngestionState.MetadataValidation
-  | IngestionState.Queued
-  | IngestionState.RebuildingMetadata
-  | IngestionState.RecreatingVecetordbIndex
-  | IngestionState.Retrying
-  | IngestionState.ReEmbedding
-  | IngestionState.ReIngesting
-  | IngestionState.ExtractingMetadata
->;
-
-const FAILED_INGESTION_STATUSES = asAllOptions<FailedIngestionStates>()([
-  IngestionState.Failed,
-  IngestionState.FailedCreatingChunks,
-  IngestionState.FailedEmbedding,
-  IngestionState.FailedGettingFile,
-  IngestionState.FailedImage,
-  IngestionState.FailedMalwareFound,
-  IngestionState.FailedMetadataValidation,
-  IngestionState.FailedMalwareScanTimeout,
-  IngestionState.FailedParsing,
-  IngestionState.FailedRedelivered,
-  IngestionState.FailedTimeout,
-  IngestionState.FailedTooLessContent,
-  IngestionState.FailedTableLimitExceeded,
-]);
-
 @Injectable()
 export class GetFullSyncStatsQuery {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
     private getUserProfileQuery: GetUserProfileQuery,
+    private getScopeIngestionStats: GetScopeIngestionStatsQuery,
   ) {}
 
   @Span()
@@ -146,7 +107,7 @@ export class GetFullSyncStatsQuery {
         message: `Live catch-up failed. Use \`run_full_sync\` tool to sync your inbox`,
       };
     }
-    const ingestionResult = await this.getIngestionStats(userProfile);
+    const ingestionResult = await this.getIngestionStats(userProfile.id);
     if (ingestionResult.state === 'error') {
       return {
         state: 'error',
@@ -193,43 +154,29 @@ export class GetFullSyncStatsQuery {
     };
   }
 
-  private async getIngestionStats(
-    userProfile: NonNullishProps<UserProfile, 'email'>,
-  ): Promise<z.infer<typeof ingestionStats>> {
-    const userProfileId = userProfile.id;
+  private async getIngestionStats(userProfileId: string): Promise<z.infer<typeof ingestionStats>> {
+    const result = await this.getScopeIngestionStats.run(userProfileId);
 
-    try {
-      const rootScopeId = getRootScopeExternalIdForUser(userProfile.providerUserId);
-      const rootScope = await this.uniqueApi.scopes.getByExternalId(rootScopeId);
-      if (!rootScope) {
-        this.logger.debug({ userProfileId, msg: 'Root scope is missing' });
-        return {
-          state: 'error',
-          message: `Could not find root scope, please reconnect your inbox`,
-        };
-      }
-      const ingestionStats = await this.uniqueApi.ingestion.getIngestionStats(rootScope.id);
-
-      this.logger.debug({ userProfileId, msg: 'Full sync progress retrieved' });
-
-      const failed = sumBy(FAILED_INGESTION_STATUSES, (status) => ingestionStats[status] ?? 0);
-      const finished = ingestionStats.FINISHED ?? 0;
-      const inProgress = sumBy(
-        values(omit(ingestionStats, [...FAILED_INGESTION_STATUSES, IngestionState.Finished])),
-        (item) => item ?? 0,
-      );
-
-      return { failed, finished, inProgress, state: inProgress > 0 ? 'running' : 'finished' };
-    } catch (error) {
-      this.logger.warn({
+    if (!result.ok) {
+      const message =
+        result.reason === 'no-root-scope'
+          ? 'Could not find root scope, please reconnect your inbox'
+          : 'Ingestion service is not reachable';
+      this.logger.debug({
         userProfileId,
-        msg: 'Failed to fetch ingestion stats from Unique API',
-        error,
+        reason: result.reason,
+        msg: 'Ingestion stats unavailable',
       });
-      return {
-        state: 'error',
-        message: `Ingestion service is not reachable`,
-      };
+      return { state: 'error', message };
     }
+
+    this.logger.debug({ userProfileId, msg: 'Full sync progress retrieved' });
+
+    return {
+      failed: result.failed,
+      finished: result.finished,
+      inProgress: result.inProgress,
+      state: result.inProgress > 0 ? 'running' : 'finished',
+    };
   }
 }
