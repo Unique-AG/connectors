@@ -632,9 +632,9 @@ describe('FileDiffService', () => {
           { totalFilesInUnique: 2 },
         );
 
-        await expect(service.computeDiff([basePage, { ...basePage, id: 'p-2' }], [])).rejects.toThrow(
-          'File diff would delete all 2 files stored in Unique for partialKey',
-        );
+        await expect(
+          service.computeDiff([basePage, { ...basePage, id: 'p-2' }], []),
+        ).rejects.toThrow('File diff would delete all 2 files stored in Unique for partialKey');
       });
     });
   });
