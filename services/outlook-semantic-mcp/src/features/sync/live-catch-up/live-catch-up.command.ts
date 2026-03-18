@@ -13,7 +13,6 @@ import {
   FullSyncGraphMessageFields,
   fullSyncGraphMessageResponseSchema,
 } from '../../mail-ingestion/dtos/microsoft-graph.dtos';
-import { IngestionPriority } from '../../mail-ingestion/utils/ingestion-queue.utils';
 
 @Injectable()
 export class LiveCatchUpCommand {
@@ -266,9 +265,7 @@ export class LiveCatchUpCommand {
         type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
         payload: { subscriptionId, messageId: email.id },
       });
-      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
-        priority: IngestionPriority.High,
-      });
+      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
       publishedIds.push(email.id);
     }
 
@@ -292,9 +289,7 @@ export class LiveCatchUpCommand {
         type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
         payload: { subscriptionId, messageId },
       });
-      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
-        priority: IngestionPriority.High,
-      });
+      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
     }
 
     return messageIds.length;
