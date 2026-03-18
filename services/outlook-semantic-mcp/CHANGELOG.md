@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.11](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.10...outlook-semantic-mcp@0.2.11) (2026-03-18)
+
+
+### Features
+
+* **outlook-semantic-mcp:** add lookup_contacts tool ([#377](https://github.com/Unique-AG/connectors/issues/377)) ([5aafbc6](https://github.com/Unique-AG/connectors/commit/5aafbc68b6545aaba32b9ce62343e6123cc1bc93))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** implemented UN-16563 tools audit ([#375](https://github.com/Unique-AG/connectors/issues/375)) ([d42c3bb](https://github.com/Unique-AG/connectors/commit/d42c3bbd7bbf60b21b090ad72075a1b0615062ca))
+
 ## [0.2.10](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.9...outlook-semantic-mcp@0.2.10) (2026-03-16)
 
 

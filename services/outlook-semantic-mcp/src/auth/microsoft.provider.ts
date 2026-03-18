@@ -11,6 +11,7 @@ export const SCOPES = [
   'Mail.ReadBasic', // (delegated):
   'MailboxSettings.Read', // (delegated):
   'Mail.ReadWrite', // (delegated):
+  'People.Read', // (delegated):
 ];
 
 export const MicrosoftOAuthProvider: OAuthProviderConfig = {
