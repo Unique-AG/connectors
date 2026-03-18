@@ -116,15 +116,17 @@ function createCommand({
   );
 }
 
-function makeRow(overrides: Partial<{
-  fullSyncState: string;
-  fullSyncVersion: string | null;
-  fullSyncNextLink: string | null;
-  fullSyncHeartbeatAt: Date | null;
-  fullSyncLastRunAt: Date | null;
-  fullSyncExpectedTotal: number | null;
-  newestLastModifiedDateTime: Date | null;
-}> = {}) {
+function makeRow(
+  overrides: Partial<{
+    fullSyncState: string;
+    fullSyncVersion: string | null;
+    fullSyncNextLink: string | null;
+    fullSyncHeartbeatAt: Date | null;
+    fullSyncLastRunAt: Date | null;
+    fullSyncExpectedTotal: number | null;
+    newestLastModifiedDateTime: Date | null;
+  }> = {},
+) {
   return {
     fullSyncState: 'ready' as string,
     fullSyncVersion: 'v1',
@@ -154,7 +156,9 @@ describe('FullSyncCommand', () => {
     it('proceeds from ready state with no cooldown', async () => {
       const batchCommand = createMockProcessFullSyncBatchCommand('completed');
       const updateByVersionCommand = createMockUpdateByVersionCommand(true);
-      const db = createMockDb({ row: makeRow({ fullSyncState: 'ready', fullSyncLastRunAt: null }) });
+      const db = createMockDb({
+        row: makeRow({ fullSyncState: 'ready', fullSyncLastRunAt: null }),
+      });
       const command = createCommand({ batchCommand, updateByVersionCommand, db });
 
       const result = await command.run(USER_PROFILE_ID);
@@ -250,7 +254,10 @@ describe('FullSyncCommand', () => {
       const batchCommand = createMockProcessFullSyncBatchCommand('completed');
       const updateByVersionCommand = createMockUpdateByVersionCommand(true);
       const db = createMockDb({
-        row: makeRow({ fullSyncState: 'failed', fullSyncNextLink: 'https://graph.microsoft.com/next' }),
+        row: makeRow({
+          fullSyncState: 'failed',
+          fullSyncNextLink: 'https://graph.microsoft.com/next',
+        }),
       });
       const command = createCommand({ batchCommand, updateByVersionCommand, db });
 
@@ -432,8 +439,8 @@ describe('FullSyncCommand', () => {
 
       // $count is only called on fresh starts; the graph API should not be called for $count
       // updateByVersionCommand should only be called for the completion update, not for $count
-      const countCalls = updateByVersionCommand.run.mock.calls.filter((call: any[]) =>
-        call[2] && 'fullSyncExpectedTotal' in call[2],
+      const countCalls = updateByVersionCommand.run.mock.calls.filter(
+        (call: any[]) => call[2] && 'fullSyncExpectedTotal' in call[2],
       );
       expect(countCalls).toHaveLength(0);
     });

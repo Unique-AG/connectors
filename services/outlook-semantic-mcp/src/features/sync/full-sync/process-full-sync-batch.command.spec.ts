@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { START_FULL_SYNC_LINK } from './full-sync.command';
+import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 
 vi.mock('~/features/tracing.utils', () => ({
   traceAttrs: vi.fn(),
@@ -20,7 +20,7 @@ import { shouldSkipEmail } from '../../mail-ingestion/utils/should-skip-email';
 
 const USER_PROFILE_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 const VERSION = 'test-version-uuid';
-const DEFAULT_FILTERS = {
+const _DEFAULT_FILTERS = {
   ignoredBefore: new Date('2020-01-01'),
   ignoredSenders: [],
   ignoredContents: [],
@@ -36,10 +36,7 @@ function makeMessage(id: string, createdDateTime = '2024-06-01T00:00:00Z') {
   };
 }
 
-function makeGraphResponse(
-  messages: ReturnType<typeof makeMessage>[],
-  nextLink?: string,
-) {
+function makeGraphResponse(messages: ReturnType<typeof makeMessage>[], nextLink?: string) {
   return {
     value: messages,
     ...(nextLink ? { '@odata.nextLink': nextLink } : {}),
@@ -131,7 +128,6 @@ function createCommand({
     findConfig as any,
     createMockMetricService() as any,
   );
-  // biome-ignore lint/suspicious/noExplicitAny: Mock private sleep to avoid real delays in tests
   vi.spyOn(command as any, 'sleep').mockResolvedValue(undefined);
   return command;
 }
@@ -254,9 +250,7 @@ describe('ProcessFullSyncBatchCommand', () => {
 
   describe('burst limit', () => {
     it('returns batch-uploaded after 100 successful ingestions', async () => {
-      const messages = Array.from({ length: 110 }, (_, i) =>
-        makeMessage(`msg-${i}`),
-      );
+      const messages = Array.from({ length: 110 }, (_, i) => makeMessage(`msg-${i}`));
       const graphApi = createMockGraphApi();
       graphApi.get.mockResolvedValue(makeGraphResponse(messages));
 
@@ -275,9 +269,7 @@ describe('ProcessFullSyncBatchCommand', () => {
     });
 
     it('does not count skipped messages toward burst limit', async () => {
-      const messages = Array.from({ length: 5 }, (_, i) =>
-        makeMessage(`msg-${i}`),
-      );
+      const messages = Array.from({ length: 5 }, (_, i) => makeMessage(`msg-${i}`));
       const graphApi = createMockGraphApi();
       graphApi.get.mockResolvedValue(makeGraphResponse(messages));
 
@@ -460,10 +452,7 @@ describe('ProcessFullSyncBatchCommand', () => {
 
       // First call (counter increment) succeeds, second call (page boundary save) fails
       const updateCommand = {
-        run: vi
-          .fn()
-          .mockResolvedValueOnce(true)
-          .mockResolvedValueOnce(false),
+        run: vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false),
       };
       const command = createCommand({ graphApi, updateCommand });
 
@@ -473,9 +462,7 @@ describe('ProcessFullSyncBatchCommand', () => {
     });
 
     it('returns version-mismatch when burst limit save fails', async () => {
-      const messages = Array.from({ length: 101 }, (_, i) =>
-        makeMessage(`msg-${i}`),
-      );
+      const messages = Array.from({ length: 101 }, (_, i) => makeMessage(`msg-${i}`));
       const graphApi = createMockGraphApi();
       graphApi.get.mockResolvedValue(makeGraphResponse(messages));
 

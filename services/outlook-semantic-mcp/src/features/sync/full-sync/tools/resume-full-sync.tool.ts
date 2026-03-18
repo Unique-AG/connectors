@@ -59,7 +59,10 @@ export class ResumeFullSyncTool {
     const result = await this.resumeFullSyncCommand.run(userProfileTypeId.toString());
 
     if (result.status === 'resumed') {
-      return { success: true, message: 'Full sync resumed. Use `sync_progress` to monitor progress.' };
+      return {
+        success: true,
+        message: 'Full sync resumed. Use `sync_progress` to monitor progress.',
+      };
     }
 
     if (result.status === 'not-found') {

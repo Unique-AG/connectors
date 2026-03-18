@@ -6,7 +6,9 @@ import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 type InboxConfig = typeof inboxConfiguration.$inferSelect;
 
 export type InboxConfigVersionedUpdate = Partial<{
-  [K in Exclude<keyof InboxConfig, 'userProfileId' | 'fullSyncVersion'>]: InboxConfig[K] | SQL<unknown>;
+  [K in Exclude<keyof InboxConfig, 'userProfileId' | 'fullSyncVersion'>]:
+    | InboxConfig[K]
+    | SQL<unknown>;
 }>;
 
 @Injectable()

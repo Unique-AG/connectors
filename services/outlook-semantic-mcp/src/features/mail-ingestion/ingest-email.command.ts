@@ -236,11 +236,18 @@ export class IngestEmailCommand {
       traceEvent(`File Ingestion Finished`);
       this.logger.debug({ ...logContext, msg: `Finalize Ingestion: Finished` });
     } catch (error) {
-      this.logger.warn({ ...logContext, msg: `Cleaning up registered content after ingestion failure` });
+      this.logger.warn({
+        ...logContext,
+        msg: `Cleaning up registered content after ingestion failure`,
+      });
       try {
         await this.uniqueApi.files.delete(content.id);
       } catch (cleanupError) {
-        this.logger.error({ ...logContext, err: cleanupError, msg: `Failed to clean up registered content` });
+        this.logger.error({
+          ...logContext,
+          err: cleanupError,
+          msg: `Failed to clean up registered content`,
+        });
       }
       throw error;
     }

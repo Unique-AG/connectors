@@ -8,7 +8,17 @@ import { SyncOnFilterChangeService } from './sync-on-filter-change.service';
 
 @Module({
   imports: [DrizzleModule, AMQPModule],
-  providers: [LiveCatchupRecoveryService, SyncOnFilterChangeService, LiveCatchUpCronService, FullSyncRecoveryService],
-  exports: [LiveCatchupRecoveryService, SyncOnFilterChangeService, LiveCatchUpCronService, FullSyncRecoveryService],
+  providers: [
+    LiveCatchupRecoveryService,
+    SyncOnFilterChangeService,
+    LiveCatchUpCronService,
+    FullSyncRecoveryService,
+  ],
+  exports: [
+    LiveCatchupRecoveryService,
+    SyncOnFilterChangeService,
+    LiveCatchUpCronService,
+    FullSyncRecoveryService,
+  ],
 })
 export class StuckSyncRecoveryModule {}

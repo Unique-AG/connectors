@@ -84,10 +84,7 @@ describe('FullSyncRecoveryService', () => {
     it('publishes retrigger events for multiple configs', async () => {
       const amqp = createMockAmqp();
       const db = createMockDb({
-        rows: [
-          { userProfileId: USER_PROFILE_ID_1 },
-          { userProfileId: USER_PROFILE_ID_2 },
-        ],
+        rows: [{ userProfileId: USER_PROFILE_ID_1 }, { userProfileId: USER_PROFILE_ID_2 }],
       });
       const service = createService({ amqp, db });
 
@@ -163,11 +160,11 @@ describe('FullSyncRecoveryService', () => {
       expect(db.select).toHaveBeenCalledOnce();
 
       // The chain: select({...}).from(...).where(...)
-      const selectResult = db.select.mock.results[0].value;
-      expect(selectResult.from).toHaveBeenCalledOnce();
+      const selectResult = db.select.mock.results?.[0]?.value;
+      expect(selectResult?.from).toHaveBeenCalledOnce();
 
-      const fromResult = selectResult.from.mock.results[0].value;
-      expect(fromResult.where).toHaveBeenCalledOnce();
+      const fromResult = selectResult.from.mock.results[0]?.value;
+      expect(fromResult?.where).toHaveBeenCalledOnce();
     });
   });
 
@@ -182,7 +179,10 @@ describe('FullSyncRecoveryService', () => {
 
       service.onModuleInit();
 
-      expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith('full-sync-recovery', expect.anything());
+      expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+        'full-sync-recovery',
+        expect.anything(),
+      );
     });
 
     it('stops cron job on module destroy', () => {

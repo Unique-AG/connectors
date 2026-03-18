@@ -1,8 +1,8 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FullSyncResetCommand } from './full-sync-reset.command';
 import { PauseFullSyncCommand } from './pause-full-sync.command';
 import { ResumeFullSyncCommand } from './resume-full-sync.command';
-import { FullSyncResetCommand } from './full-sync-reset.command';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -224,7 +224,7 @@ describe('FullSyncResetCommand', () => {
     expect(typeof result.version).toBe('string');
     expect(result.version.length).toBeGreaterThan(0);
 
-    const setCall = db.update.mock.results[0].value.set;
+    const setCall = db.update.mock?.results?.[0]?.value.set;
     expect(setCall).toHaveBeenCalledWith(
       expect.objectContaining({
         fullSyncVersion: result.version,

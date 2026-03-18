@@ -6,8 +6,8 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
-import { FullSyncEventDto } from './full-sync-event.dto';
 import { FullSyncCommand } from './full-sync.command';
+import { FullSyncEventDto } from './full-sync-event.dto';
 
 @Injectable()
 export class FullSyncListener {

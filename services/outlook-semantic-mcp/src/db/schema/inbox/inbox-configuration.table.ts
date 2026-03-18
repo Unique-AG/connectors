@@ -1,5 +1,14 @@
 import { relations, sql } from 'drizzle-orm';
-import { integer, jsonb, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
@@ -39,7 +48,9 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   fullSyncExpectedTotal: integer(`full_sync_expected_total`),
   fullSyncSkipped: integer(`full_sync_skipped`).notNull().default(0),
   fullSyncScheduledForIngestion: integer(`full_sync_scheduled_for_ingestion`).notNull().default(0),
-  fullSyncFailedToUploadForIngestion: integer(`full_sync_failed_to_upload_for_ingestion`).notNull().default(0),
+  fullSyncFailedToUploadForIngestion: integer(`full_sync_failed_to_upload_for_ingestion`)
+    .notNull()
+    .default(0),
 
   fullSyncLastRunAt: timestamp(`full_sync_last_run_at`),
   fullSyncLastStartedAt: timestamp(`full_sync_last_started_at`),

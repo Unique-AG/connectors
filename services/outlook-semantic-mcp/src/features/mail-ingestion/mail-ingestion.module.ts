@@ -8,10 +8,7 @@ import { GetMessageDetailsQuery } from './get-message-details.query';
 import { IngestEmailCommand } from './ingest-email.command';
 import { IngestEmailLiveCatchupMessageCommand } from './ingest-live-catchup-message.command';
 
-const COMMANDS: Provider[] = [
-  IngestEmailCommand,
-  IngestEmailLiveCatchupMessageCommand,
-];
+const COMMANDS: Provider[] = [IngestEmailCommand, IngestEmailLiveCatchupMessageCommand];
 
 const QUERIES: Provider[] = [GetMessageDetailsQuery];
 

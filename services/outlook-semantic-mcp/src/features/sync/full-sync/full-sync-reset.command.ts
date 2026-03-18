@@ -1,9 +1,7 @@
 import crypto from 'node:crypto';
-
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 
 @Injectable()

@@ -1,6 +1,6 @@
-import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, createMeta, Tool } from '@unique-ag/mcp-server-module';
+import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
