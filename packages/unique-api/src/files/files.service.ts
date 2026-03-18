@@ -341,7 +341,7 @@ export class FilesService implements UniqueFilesFacade {
     return successCount;
   }
 
-  public async getFileIdsByScope(scopeId: string): Promise<string[]> {
+  public async getContentIdsByScope(scopeId: string): Promise<string[]> {
     let hasMore = true;
     let skip = 0;
     const ids: string[] = [];

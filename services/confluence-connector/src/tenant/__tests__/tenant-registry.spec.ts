@@ -74,7 +74,7 @@ function createMockUniqueApiClient() {
       getByKeys: vi.fn(),
       getByKeyPrefix: vi.fn(),
       getCountByKeyPrefix: vi.fn(),
-      getFileIdsByScope: vi.fn(),
+      getContentIdsByScope: vi.fn(),
       delete: vi.fn(),
       deleteByIds: vi.fn(),
       deleteByKeyPrefix: vi.fn(),

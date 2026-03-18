@@ -25,7 +25,7 @@ function createMockUniqueApiClient() {
     },
     files: {
       getCountByKeyPrefix: vi.fn(),
-      getFileIdsByScope: vi.fn(),
+      getContentIdsByScope: vi.fn(),
       deleteByIds: vi.fn(),
       deleteByKeyPrefix: vi.fn(),
     },
@@ -89,7 +89,7 @@ describe('TenantCleanupService', () => {
       expect.objectContaining({ tenantName: 'my-tenant', msg: 'Already cleaned up, skipping' }),
     );
     expect(client.files.getCountByKeyPrefix).not.toHaveBeenCalled();
-    expect(client.files.getFileIdsByScope).not.toHaveBeenCalled();
+    expect(client.files.getContentIdsByScope).not.toHaveBeenCalled();
   });
 
   it('deletes files by key prefix and child scopes for V2 tenants', async () => {
@@ -125,7 +125,7 @@ describe('TenantCleanupService', () => {
 
     client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
     client.scopes.listChildren.mockResolvedValue(childScopes);
-    client.files.getFileIdsByScope.mockResolvedValue(['file-1', 'file-2']);
+    client.files.getContentIdsByScope.mockResolvedValue(['file-1', 'file-2']);
     client.files.deleteByIds.mockResolvedValue(2);
     client.scopes.delete.mockResolvedValue({
       successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
@@ -139,7 +139,7 @@ describe('TenantCleanupService', () => {
     );
     await service.cleanup();
 
-    expect(client.files.getFileIdsByScope).toHaveBeenCalledWith('child-1');
+    expect(client.files.getContentIdsByScope).toHaveBeenCalledWith('child-1');
     expect(client.files.deleteByIds).toHaveBeenCalledWith(['file-1', 'file-2']);
     expect(client.files.deleteByKeyPrefix).not.toHaveBeenCalled();
     expect(client.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
@@ -154,7 +154,7 @@ describe('TenantCleanupService', () => {
 
     client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
     client.scopes.listChildren.mockResolvedValue(childScopes);
-    client.files.getFileIdsByScope.mockResolvedValue([]);
+    client.files.getContentIdsByScope.mockResolvedValue([]);
     client.scopes.delete.mockResolvedValue({
       successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
       failedFolders: [],
@@ -181,7 +181,7 @@ describe('TenantCleanupService', () => {
 
     client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
     client.scopes.listChildren.mockResolvedValue(childScopes);
-    client.files.getFileIdsByScope
+    client.files.getContentIdsByScope
       .mockResolvedValueOnce(['file-1', 'file-2'])
       .mockResolvedValueOnce(['file-3'])
       .mockResolvedValueOnce([]);
@@ -198,10 +198,10 @@ describe('TenantCleanupService', () => {
     );
     await service.cleanup();
 
-    expect(client.files.getFileIdsByScope).toHaveBeenCalledTimes(3);
-    expect(client.files.getFileIdsByScope).toHaveBeenCalledWith('child-1');
-    expect(client.files.getFileIdsByScope).toHaveBeenCalledWith('child-2');
-    expect(client.files.getFileIdsByScope).toHaveBeenCalledWith('child-3');
+    expect(client.files.getContentIdsByScope).toHaveBeenCalledTimes(3);
+    expect(client.files.getContentIdsByScope).toHaveBeenCalledWith('child-1');
+    expect(client.files.getContentIdsByScope).toHaveBeenCalledWith('child-2');
+    expect(client.files.getContentIdsByScope).toHaveBeenCalledWith('child-3');
     expect(client.files.deleteByIds).toHaveBeenCalledTimes(2);
     expect(client.files.deleteByIds).toHaveBeenCalledWith(['file-1', 'file-2']);
     expect(client.files.deleteByIds).toHaveBeenCalledWith(['file-3']);

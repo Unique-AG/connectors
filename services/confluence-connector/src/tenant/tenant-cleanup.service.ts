@@ -81,7 +81,7 @@ export class TenantCleanupService {
 
   private async deleteFilesByScopes(scopes: Scope[]): Promise<void> {
     for (const scope of scopes) {
-      const fileIds = await this.uniqueClient.files.getFileIdsByScope(scope.id);
+      const fileIds = await this.uniqueClient.files.getContentIdsByScope(scope.id);
       if (fileIds.length > 0) {
         await this.uniqueClient.files.deleteByIds(fileIds);
         this.logger.log({
