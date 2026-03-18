@@ -51,6 +51,7 @@ function createMockTenantConfig(): TenantConfig {
       scopeId: 'scope-1',
       storeInternally: 'enabled',
       useV1KeyFormat: 'disabled',
+      attachments: { enabled: false, allowedExtensions: [], maxFileSizeMb: 10 },
     },
     processing: {},
   } as unknown as TenantConfig;
@@ -204,8 +205,12 @@ describe('TenantRegistry', () => {
       );
       registry.onModuleInit();
 
-      expect(mockApiClientFactory.create).toHaveBeenCalledWith(configA.confluence);
-      expect(mockApiClientFactory.create).toHaveBeenCalledWith(configB.confluence);
+      expect(mockApiClientFactory.create).toHaveBeenCalledWith(configA.confluence, {
+        attachmentsEnabled: false,
+      });
+      expect(mockApiClientFactory.create).toHaveBeenCalledWith(configB.confluence, {
+        attachmentsEnabled: false,
+      });
     });
 
     it('registers ConfluenceAuth, UniqueApiClient, and ConfluenceApiClient in ServiceRegistry for each tenant', () => {

@@ -32,7 +32,7 @@ server:
     - outlook-semantic-mcp-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/outlook-semantic-mcp
-    tag: 0.2.9 # x-release-please-version
+    tag: 0.2.11 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
@@ -138,6 +138,8 @@ mcpConfig:
     # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
     # example: https://outlook.mcp.unique.app
     selfUrl: unset_default_value
+    # Debug mode for the mcp server
+    mcpDebugMode: disabled
 
   logs:
     diagnosticsDataPolicy: conceal

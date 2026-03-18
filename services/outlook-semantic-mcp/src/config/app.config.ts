@@ -25,6 +25,9 @@ const ConfigSchema = z
     defaultMailFilters: json(inboxConfigurationMailFilters).describe(
       'Default mail filters applied when syncing emails (e.g. {"ignoredBefore":"2024-01-01", "ignoredSenders": [], "ignoredContents": [] }). ',
     ),
+    mcpDebugMode: enabledDisabledBoolean(
+      `Enables debug mode. In debug mode tools responses contain debugging data.`,
+    ),
   })
   .transform((c) => ({
     ...c,
@@ -33,7 +36,14 @@ const ConfigSchema = z
   }));
 
 export const appConfig = registerConfig('app', ConfigSchema, {
-  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'SELF_URL', 'DEFAULT_MAIL_FILTERS']),
+  whitelistKeys: new Set([
+    'LOG_LEVEL',
+    'PORT',
+    'NODE_ENV',
+    'SELF_URL',
+    'DEFAULT_MAIL_FILTERS',
+    'MCP_DEBUG_MODE',
+  ]),
 });
 
 export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;

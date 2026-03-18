@@ -4,7 +4,7 @@ import { Logger } from '@nestjs/common';
 import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind } from '../constants/ingestion.constants';
-import type { DiscoveredPage, FileDiffResult } from './sync.types';
+import type { DiscoveredAttachment, DiscoveredPage, FileDiffResult } from './sync.types';
 
 export class FileDiffService {
   private readonly logger = new Logger(FileDiffService.name);
@@ -16,25 +16,44 @@ export class FileDiffService {
     private readonly uniqueApiClient: UniqueApiClient,
   ) {}
 
-  public async computeDiff(discoveredPages: DiscoveredPage[]): Promise<FileDiffResult> {
-    this.logger.log({ pageCount: discoveredPages.length, msg: 'Performing file diff' });
+  public async computeDiff(
+    discoveredPages: DiscoveredPage[],
+    discoveredAttachments: DiscoveredAttachment[],
+  ): Promise<FileDiffResult> {
+    this.logger.log({
+      pageCount: discoveredPages.length,
+      attachmentCount: discoveredAttachments.length,
+      msg: 'Performing file diff',
+    });
 
     const pagesBySpace = groupBy(discoveredPages, (page) => page.spaceKey);
+    const attachmentsBySpace = groupBy(discoveredAttachments, (attachment) => attachment.spaceKey);
+    // Attachment spaces are typically a subset of page spaces, but we include both for safety.
+    const allSpaceKeys = new Set([
+      ...Object.keys(pagesBySpace),
+      ...Object.keys(attachmentsBySpace),
+    ]);
     const sourceKind = getSourceKind(this.confluenceConfig.instanceType);
 
     const result: FileDiffResult = {
-      newPageIds: [],
-      updatedPageIds: [],
-      deletedPageIds: [],
-      movedPageIds: [],
+      newItemIds: [],
+      updatedItemIds: [],
+      deletedItems: [],
+      movedItemIds: [],
     };
 
-    for (const [spaceKey, pages] of Object.entries(pagesBySpace)) {
-      const fileDiffItems = this.buildFileDiffItems(pages);
-      const firstPage = pages[0];
-      assert.ok(firstPage, `Expected at least one page for space "${spaceKey}"`);
+    for (const spaceKey of allSpaceKeys) {
+      const pages = pagesBySpace[spaceKey] ?? [];
+      const attachments = attachmentsBySpace[spaceKey] ?? [];
 
-      const basePartialKey = `${firstPage.spaceId}_${spaceKey}`;
+      const pageItems = this.buildPageDiffItems(pages);
+      const attachmentItems = this.buildAttachmentDiffItems(attachments);
+      const fileDiffItems = [...pageItems, ...attachmentItems];
+
+      const firstItem = pages[0] ?? attachments[0];
+      assert.ok(firstItem, `Expected at least one page or attachment for space "${spaceKey}"`);
+
+      const basePartialKey = `${firstItem.spaceId}_${spaceKey}`;
       const partialKey = this.useV1KeyFormat
         ? basePartialKey
         : `${this.tenantName}/${basePartialKey}`;
@@ -48,28 +67,36 @@ export class FileDiffService {
 
       await this.validateNoAccidentalFullDeletion(fileDiffItems, diffResponse, partialKey);
 
-      result.newPageIds.push(...diffResponse.newFiles);
-      result.updatedPageIds.push(...diffResponse.updatedFiles);
-      result.deletedPageIds.push(...diffResponse.deletedFiles);
-      result.movedPageIds.push(...diffResponse.movedFiles);
+      result.newItemIds.push(...diffResponse.newFiles);
+      result.updatedItemIds.push(...diffResponse.updatedFiles);
+      result.deletedItems.push(...diffResponse.deletedFiles.map((id) => ({ id, partialKey })));
+      result.movedItemIds.push(...diffResponse.movedFiles);
     }
 
     this.logger.log({
-      new: result.newPageIds.length,
-      updated: result.updatedPageIds.length,
-      deleted: result.deletedPageIds.length,
-      moved: result.movedPageIds.length,
+      newItems: result.newItemIds.length,
+      updatedItems: result.updatedItemIds.length,
+      deletedItems: result.deletedItems.length,
+      movedItems: result.movedItemIds.length,
       msg: 'File diff completed',
     });
 
     return result;
   }
 
-  private buildFileDiffItems(pages: DiscoveredPage[]): FileDiffItem[] {
+  private buildPageDiffItems(pages: DiscoveredPage[]): FileDiffItem[] {
     return pages.map((page) => ({
       key: page.id,
       url: page.webUrl,
       updatedAt: page.versionTimestamp,
+    }));
+  }
+
+  private buildAttachmentDiffItems(attachments: DiscoveredAttachment[]): FileDiffItem[] {
+    return attachments.map((attachment) => ({
+      key: `${attachment.pageId}::${attachment.id}`,
+      url: attachment.webUrl,
+      updatedAt: attachment.versionTimestamp ?? '',
     }));
   }
 

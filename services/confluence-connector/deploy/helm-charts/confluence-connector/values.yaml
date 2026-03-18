@@ -6,7 +6,7 @@ connector:
   env:
     LOG_LEVEL: info
     LOGS_DIAGNOSTICS_DATA_POLICY: conceal
-    MAX_FILE_SIZE_BYTES: "209715200"
+    MAX_FILE_SIZE_MB: "200"
     MAX_HEAP_MB: 896
     NODE_ENV: production
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
@@ -35,7 +35,7 @@ connector:
   extraEnvCM: []
   image:
     repository: ghcr.io/unique-ag/connectors/services/confluence-connector
-    tag: 2.0.0-alpha.2 # x-release-please-version
+    tag: 2.0.0-alpha.4 # x-release-please-version
   ports:
     application: 51349
     metrics: 51350
@@ -173,8 +173,8 @@ connectorConfig:
         concurrency: 1
         # -- cron expression for the scheduled Confluence scan interval default: every 15 minutes
         scanIntervalCron: "*/15 * * * *"
-        # -- maximum number of pages to scan per run (null/empty for unlimited, useful for testing)
-        # maxPagesToScan: 100
+        # -- maximum number of items (pages + attachments) to scan per run (null/empty for unlimited, useful for testing)
+        # maxItemsToScan: 100
 
       ingestion:
         # -- Ingestion traversal mode
@@ -185,3 +185,19 @@ connectorConfig:
         storeInternally: enabled
         # -- Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix
         useV1KeyFormat: disabled
+        # -- File attachment ingestion configuration (optional, all fields have defaults)
+        # attachments:
+        #   # -- Enable attachment ingestion (default: enabled)
+        #   mode: enabled
+        #   # -- File extensions to include (default: pdf, docx, xlsx, ppt, pptx, txt, csv, html)
+        #   allowedExtensions:
+        #     - pdf
+        #     - docx
+        #     - xlsx
+        #     - ppt
+        #     - pptx
+        #     - txt
+        #     - csv
+        #     - html
+        #   # -- Maximum file size in megabytes (default: 200, or MAX_FILE_SIZE_MB env)
+        #   maxFileSizeMb: 200

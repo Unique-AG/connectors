@@ -9,10 +9,8 @@ import { DirectoriesSyncModule } from './directories-sync/directories-sync.modul
 import { ListFoldersTool } from './directories-sync/tools';
 import { CreateDraftEmailTool } from './email-management/create-draft-email.tool';
 import { EmailManagementModule } from './email-management/email-management.module';
-import { RunFullSyncTool, SyncProgressTool } from './full-sync';
-import { FullSyncModule } from './full-sync/full-sync.module';
-import { FullSyncRecoveryListener } from './full-sync/full-sync-recovery.listener';
-import { IngestionListener } from './ingestion.listener';
+import { LookupContactsTool } from './email-management/lookup-contacts.tool';
+import { IngestionListener } from './mail-ingestion/ingestion.listener';
 import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
 import { MailSubscriptionController } from './mail-subscription.controller';
 import { SubscriptionModule } from './subscriptions/subscription.module';
@@ -21,6 +19,10 @@ import {
   RemoveInboxConnectionTool,
   VerifyInboxConnectionTool,
 } from './subscriptions/tools';
+import { RunFullSyncTool, SyncProgressTool } from './sync/full-sync';
+import { FullSyncModule } from './sync/full-sync/full-sync.module';
+import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
+import { StuckSyncRecoveryModule } from './sync/stuck-sync-recovery.module';
 
 const TOOLS = [
   ListFoldersTool,
@@ -33,6 +35,7 @@ const TOOLS = [
   OpenEmailTool,
   ListCategoriesTool,
   CreateDraftEmailTool,
+  LookupContactsTool,
 ];
 
 // We declare all tools / controllers into one module for simplicity, we could declare each tool
@@ -48,12 +51,14 @@ const TOOLS = [
     CategoriesModule,
     EmailManagementModule,
     FullSyncModule,
+    LiveCatchUpModule,
     MailIngestionModule,
     DirectoriesSyncModule,
     SearchModule,
     UniqueApiFeatureModule,
+    StuckSyncRecoveryModule,
   ],
-  providers: [MailSubscriptionController, IngestionListener, FullSyncRecoveryListener, ...TOOLS],
+  providers: [MailSubscriptionController, IngestionListener, ...TOOLS],
   controllers: [MailSubscriptionController],
 })
 export class OutlookMcpToolsModule {}

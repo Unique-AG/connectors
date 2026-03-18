@@ -1,0 +1,1 @@
+ALTER TABLE "inbox_configuration" ADD COLUMN "live_catch_up_heartbeat_at" timestamp;

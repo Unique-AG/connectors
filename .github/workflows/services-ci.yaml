@@ -23,12 +23,12 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
+  actions: write # required for pnpm cache writes in _template-ci.yaml (reusable workflows cannot exceed caller permissions)
 
 jobs:
   detect-changes:
     name: Detect changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     outputs:
       services: ${{ steps.build-matrix.outputs.services }}
       packages-changed: ${{ steps.filter.outputs.packages }}

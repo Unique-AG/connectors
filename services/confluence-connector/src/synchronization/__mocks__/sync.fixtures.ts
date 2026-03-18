@@ -1,7 +1,7 @@
 import { Smeared } from '@unique-ag/utils';
 import { ContentType } from '../../confluence-api';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
-import type { DiscoveredPage, FetchedPage } from '../sync.types';
+import type { DiscoveredPage, DiscoveryResult, FetchedPage } from '../sync.types';
 
 export const CONFLUENCE_BASE_URL = 'https://confluence.example.com';
 
@@ -18,6 +18,11 @@ export const discoveredPagesFixture: DiscoveredPage[] = [
     labels: ['ai-ingest'],
   },
 ];
+
+export const discoveryResultFixture: DiscoveryResult = {
+  pages: discoveredPagesFixture,
+  attachments: [],
+};
 
 export const fetchedPagesFixture: FetchedPage[] = [
   {
