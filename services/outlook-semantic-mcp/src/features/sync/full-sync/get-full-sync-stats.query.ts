@@ -44,6 +44,15 @@ export const GetFullSyncStatsResponse = z.object({
         ignoredSenders: z.array(z.string()),
         ignoredContents: z.array(z.string()),
       }),
+      expectedTotal: z
+        .number()
+        .nullable()
+        .describe('Total message count from $count API call at sync start.'),
+      skippedMessages: z.number().describe('Messages filtered out by sender/content/date rules.'),
+      scheduledForIngestion: z.number().describe('Messages successfully submitted for ingestion.'),
+      failedToUploadForIngestion: z
+        .number()
+        .describe('Messages that failed upload after 3 retries.'),
       dateWindow: z.object({
         newestCreatedDateTime: z.string().nullable(),
         oldestCreatedDateTime: z.string().nullable(),
@@ -128,6 +137,10 @@ export class GetFullSyncStatsQuery {
       liveCatchUpState: inboxConfig.liveCatchUpState,
       runAt: inboxConfig.fullSyncLastRunAt?.toISOString() ?? null,
       startedAt: inboxConfig.fullSyncLastStartedAt?.toISOString() ?? null,
+      expectedTotal: inboxConfig.fullSyncExpectedTotal ?? null,
+      skippedMessages: inboxConfig.fullSyncSkipped,
+      scheduledForIngestion: inboxConfig.fullSyncScheduledForIngestion,
+      failedToUploadForIngestion: inboxConfig.fullSyncFailedToUploadForIngestion,
       filters: {
         ignoredBefore: filters.ignoredBefore.toISOString() ?? null,
         ignoredSenders: filters.ignoredSenders.map((r) => r.toString()),
