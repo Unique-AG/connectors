@@ -175,7 +175,8 @@ export class LookupContactsQuery {
         .api('/me/messages')
         .query({
           $select: 'from',
-          $top: 100,
+          // We take 999 messages because it seems to be fast if we select just 'from'
+          $top: 999,
           $orderby: 'receivedDateTime desc',
         })
         .get();
