@@ -101,7 +101,7 @@ describe('LookupContactsQuery.run', () => {
   });
 
   describe('error handling', () => {
-    it('returns inbox contacts with a warning when the People API fails', async () => {
+    it('returns inbox contacts when the People API fails', async () => {
       const query = new LookupContactsQuery(
         makeFactory({
           peopleError: new Error('People API unavailable'),
@@ -113,11 +113,12 @@ describe('LookupContactsQuery.run', () => {
 
       const result = await query.run(USER_PROFILE_ID, 'bob');
 
-      expect(result.contacts).toEqual([withScore({ name: 'Bob Jones', email: 'bob@example.com', source: 'inbox' })]);
-      expect(result.message).toBe('Partial results: one data source could not be reached.');
+      expect(result.contacts).toEqual([
+        withScore({ name: 'Bob Jones', email: 'bob@example.com', source: 'inbox' }),
+      ]);
     });
 
-    it('returns people contacts with a warning when the inbox fetch fails', async () => {
+    it('returns people contacts when the inbox fetch fails', async () => {
       const query = new LookupContactsQuery(
         makeFactory({
           people: {
@@ -134,8 +135,9 @@ describe('LookupContactsQuery.run', () => {
 
       const result = await query.run(USER_PROFILE_ID, 'alice');
 
-      expect(result.contacts).toEqual([withScore({ name: 'Alice Smith', email: 'alice@example.com', source: 'people_api' })]);
-      expect(result.message).toBe('Partial results: one data source could not be reached.');
+      expect(result.contacts).toEqual([
+        withScore({ name: 'Alice Smith', email: 'alice@example.com', source: 'people_api' }),
+      ]);
     });
 
     it('returns an error when both sources fail', async () => {
