@@ -50,18 +50,19 @@ const CreateDraftEmailInputSchema = z.object({
 });
 
 const CreateDraftEmailOutputSchema = z.object({
-  success: z.boolean(),
-  draftId: z.string().optional(),
+  success: z.boolean().describe('Whether the operation succeeded.'),
+  draftId: z.string().optional().describe('The ID of the created draft message.'),
   webLink: z.string().optional().describe('Outlook Web App URL to open the draft.'),
-  message: z.string(),
+  message: z.string().describe('A human-readable status or error message.'),
   attachmentsFailed: z
     .array(
       z.object({
-        uri: z.string(),
-        reason: z.string(),
+        uri: z.string().describe('The URI of the attachment that failed.'),
+        reason: z.string().describe('A description of why the attachment failed.'),
       }),
     )
-    .optional(),
+    .optional()
+    .describe('Attachments that could not be added, absent when no attachments were attempted.'),
 });
 
 @Injectable()
