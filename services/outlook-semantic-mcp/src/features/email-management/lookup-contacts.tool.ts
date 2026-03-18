@@ -5,7 +5,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
-import { LookupContactsQuery } from './lookup-contacts.query';
+import { LookupContactsQuery, LookupContactsResultSchema } from './lookup-contacts.query';
 import { META } from './lookup-contacts-tool.meta';
 
 const LookupContactsInputSchema = z.object({
@@ -13,13 +13,7 @@ const LookupContactsInputSchema = z.object({
 });
 
 const LookupContactsOutputSchema = z.object({
-  contacts: z.array(
-    z.object({
-      name: z.string(),
-      email: z.string(),
-      source: z.enum(['people_api', 'inbox']),
-    }),
-  ),
+  contacts: z.array(LookupContactsResultSchema),
   message: z.string().optional(),
 });
 
@@ -42,7 +36,7 @@ export class LookupContactsTool {
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: true,
-      openWorldHint: false,
+      openWorldHint: true,
     },
     _meta: META,
   })

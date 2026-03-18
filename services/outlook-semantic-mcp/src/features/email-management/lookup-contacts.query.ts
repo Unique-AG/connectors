@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { filter, flatMap, isNonNullish, map, pipe, uniqueBy } from 'remeda';
+import { filter, flatMap, isNonNullish, map, pipe, sortBy, uniqueBy } from 'remeda';
 import { z } from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { jaroWinkler } from '~/utils/jaro-winkler';
 
-const PeopleResponseSchema = z.object({
+const MsGraphPeopleResponseSchema = z.object({
   value: z
     .array(
       z.object({
@@ -16,15 +17,21 @@ const PeopleResponseSchema = z.object({
     .optional(),
 });
 
-const InboxEmailAddressSchema = z.object({
-  name: z.string().optional(),
-  address: z.string().optional(),
-});
-
-const InboxMessagesResponseSchema = z.object({
+const MsGraphInboxMessagesResponseSchema = z.object({
   value: z
     .array(
-      z.object({ from: z.object({ emailAddress: InboxEmailAddressSchema.optional() }).optional() }),
+      z.object({
+        from: z
+          .object({
+            emailAddress: z
+              .object({
+                name: z.string().optional(),
+                address: z.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+      }),
     )
     .optional(),
 });
@@ -35,9 +42,45 @@ export interface Contact {
   source: 'people_api' | 'inbox';
 }
 
-export interface LookupContactsResult {
-  contacts: Contact[];
-  message?: string;
+export const LookupContactsResultSchema = z.object({
+  contacts: z
+    .array(
+      z.object({
+        name: z.string().describe('Display name of the contact.'),
+        email: z.string().describe('Email address of the contact.'),
+        source: z
+          .enum(['people_api', 'inbox'])
+          .describe(
+            'Where the contact was found: "people_api" means the Microsoft People API returned it ' +
+              '(typically colleagues and frequent contacts); "inbox" means it was extracted from recent incoming mail.',
+          ),
+        similarityScore: z
+          .number()
+          .describe(
+            "Jaro-Winkler similarity between the search query and this contact's display name. " +
+              'Ranges from 0 (no similarity) to 1 (exact match). ' +
+              'The list is sorted by this score descending — prefer contacts with a higher score when the query is ambiguous.',
+          ),
+      }),
+    )
+    .describe(
+      'Matched contacts sorted by name similarity descending, deduplicated by email address.',
+    ),
+  message: z.string().optional().describe('Present when a data source could not be reached.'),
+});
+
+export type LookupContactsResult = z.infer<typeof LookupContactsResultSchema>;
+
+// Scores a contact name against the query using Jaro-Winkler.
+// Compares the query against the full name and each individual token, taking the maximum.
+// This handles partial queries (e.g. "Smith" matching "John Smith").
+export function nameSimilarity(query: string, contactName: string): number {
+  query = query.toLowerCase();
+  contactName = contactName.toLowerCase();
+  return Math.max(
+    jaroWinkler(query, contactName),
+    ...contactName.split(/\s+/).map((token) => jaroWinkler(query, token)),
+  );
 }
 
 @Injectable()
@@ -51,20 +94,40 @@ export class LookupContactsQuery {
     const userProfileIdString = userProfileId.toString();
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
-    let [peopleContacts, inboxContacts] = await Promise.all([
-      this.fetchFromPeopleApi(userProfileIdString, client, name),
-      this.fetchFromInbox(userProfileIdString, client, name),
-    ]);
-
-    if (peopleContacts === null && inboxContacts === null) {
+    const peopleContacts = await this.fetchFromPeopleApi(userProfileIdString, client, name);
+    if (!peopleContacts) {
       return { contacts: [], message: 'Could not reach Microsoft Graph' };
     }
-    peopleContacts ??= [];
-    inboxContacts ??= [];
+    const inboxContacts = await this.fetchFromInbox(userProfileIdString, client);
+    if (!inboxContacts) {
+      return { contacts: [], message: 'Could not reach Microsoft Graph' };
+    }
 
-    return {
-      contacts: uniqueBy([...peopleContacts, ...inboxContacts], (item) => item.email.toLowerCase()),
-    };
+    // Contacts scoring below this threshold are excluded from results.
+    // 0.75 reliably passes partial name queries (e.g. "Smith" → "John Smith" ≈ 0.76)
+    // while rejecting unrelated names (e.g. "Alice" → "John Smith" ≈ 0.40).
+    const similarityThreshold = 0.75;
+
+    // We return the full ranked list to the LLM so it can choose the best match
+    // rather than guessing on the caller's behalf.
+    const contacts = pipe(
+      [...peopleContacts, ...inboxContacts],
+      map(({ email, ...contact }) => ({
+        ...contact,
+        email: email.toLocaleLowerCase(),
+        similarityScore: nameSimilarity(name, contact.name),
+      })),
+      // peopleContacts are already filtered server-side by the People API $search.
+      // inboxContacts are unfiltered — apply the similarity threshold to remove unrelated senders.
+      filter(
+        ({ source, similarityScore }) =>
+          source === 'people_api' || similarityScore >= similarityThreshold,
+      ),
+      uniqueBy(({ email }) => email),
+      sortBy([({ similarityScore }) => similarityScore, 'desc']),
+    );
+
+    return { contacts };
   }
 
   private async fetchFromPeopleApi(
@@ -77,6 +140,8 @@ export class LookupContactsQuery {
       raw = await client
         .api('/me/people')
         .query({
+          // The People API requires the $search value to be wrapped in double quotes.
+          // Any literal quotes in the input are stripped to prevent query injection.
           $search: `"${name.replace(/"/g, '')}"`,
           $top: 25,
           $select: 'displayName,scoredEmailAddresses',
@@ -91,33 +156,28 @@ export class LookupContactsQuery {
       return null;
     }
 
-    const { value: items = [] } = PeopleResponseSchema.parse(raw);
+    const { value: items = [] } = MsGraphPeopleResponseSchema.parse(raw);
     return pipe(
       items,
-      flatMap((person) => {
-        const { displayName } = person;
-        if (!displayName) {
-          return [];
-        }
-
-        return pipe(
-          person.scoredEmailAddresses ?? [],
+      filter(({ displayName }) => isNonNullish(displayName)),
+      flatMap(({ displayName, scoredEmailAddresses }) =>
+        pipe(
+          scoredEmailAddresses ?? [],
           map(({ address }) => address),
           filter(isNonNullish),
           map((address) => ({
-            name: displayName,
+            name: displayName as string,
             email: address,
             source: 'people_api' as const,
           })),
-        );
-      }),
+        ),
+      ),
     );
   }
 
   private async fetchFromInbox(
     userProfileIdString: string,
     client: ReturnType<GraphClientFactory['createClientForUser']>,
-    name: string,
   ): Promise<Contact[] | null> {
     let raw: unknown;
     try {
@@ -138,23 +198,14 @@ export class LookupContactsQuery {
       return null;
     }
 
-    const { value: items = [] } = InboxMessagesResponseSchema.parse(raw);
-    const queryWords = name.toLowerCase().split(/\s+/);
+    const { value: items = [] } = MsGraphInboxMessagesResponseSchema.parse(raw);
     return pipe(
       items,
-      filter((message) => {
-        const fromName = message.from?.emailAddress?.name;
-        if (!fromName) {
-          return false;
-        }
-        const nameWords = fromName.toLowerCase().split(/\s+/);
-        return queryWords.every((qw) => nameWords.some((nw) => nw.startsWith(qw)));
-      }),
       flatMap((message) => {
-        const fromName = message.from?.emailAddress?.name;
-        const fromEmail = message.from?.emailAddress?.address;
-        return fromName && fromEmail
-          ? [{ name: fromName, email: fromEmail, source: 'inbox' as const }]
+        const senderName = message.from?.emailAddress?.name;
+        const senderEmail = message.from?.emailAddress?.address;
+        return senderName && senderEmail
+          ? [{ name: senderName, email: senderEmail, source: 'inbox' as const }]
           : [];
       }),
     );
