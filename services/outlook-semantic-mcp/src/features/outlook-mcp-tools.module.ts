@@ -9,6 +9,7 @@ import { DirectoriesSyncModule } from './directories-sync/directories-sync.modul
 import { ListFoldersTool } from './directories-sync/tools';
 import { CreateDraftEmailTool } from './email-management/create-draft-email.tool';
 import { EmailManagementModule } from './email-management/email-management.module';
+import { LookupContactsTool } from './email-management/lookup-contacts.tool';
 import { IngestionListener } from './mail-ingestion/ingestion.listener';
 import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
 import { MailSubscriptionController } from './mail-subscription.controller';
@@ -34,6 +35,7 @@ const TOOLS = [
   OpenEmailTool,
   ListCategoriesTool,
   CreateDraftEmailTool,
+  LookupContactsTool,
 ];
 
 // We declare all tools / controllers into one module for simplicity, we could declare each tool
