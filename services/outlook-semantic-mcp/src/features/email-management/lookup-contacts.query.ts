@@ -4,7 +4,7 @@ import { filter, flatMap, isNonNullish, map, pipe, sortBy, uniqueBy } from 'reme
 import { z } from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { jaroWinkler } from '~/utils/jaro-winkler';
+import { nameSimilarity } from '~/utils/name-similarity-score';
 
 const MsGraphPeopleResponseSchema = z.object({
   value: z
@@ -71,18 +71,6 @@ export const LookupContactsResultSchema = z.object({
 
 export type LookupContactsResult = z.infer<typeof LookupContactsResultSchema>;
 
-// Scores a contact name against the query using Jaro-Winkler.
-// Compares the query against the full name and each individual token, taking the maximum.
-// This handles partial queries (e.g. "Smith" matching "John Smith").
-export function nameSimilarity(query: string, contactName: string): number {
-  query = query.toLowerCase();
-  contactName = contactName.toLowerCase();
-  return Math.max(
-    jaroWinkler(query, contactName),
-    ...contactName.split(/\s+/).map((token) => jaroWinkler(query, token)),
-  );
-}
-
 @Injectable()
 export class LookupContactsQuery {
   private readonly logger = new Logger(this.constructor.name);
@@ -106,7 +94,7 @@ export class LookupContactsQuery {
     // Contacts scoring below this threshold are excluded from results.
     // 0.75 reliably passes partial name queries (e.g. "Smith" → "John Smith" ≈ 0.76)
     // while rejecting unrelated names (e.g. "Alice" → "John Smith" ≈ 0.40).
-    const similarityThreshold = 0.75;
+    const SimilarityThreshold = 0.75;
 
     // We return the full ranked list to the LLM so it can choose the best match
     // rather than guessing on the caller's behalf.
@@ -121,13 +109,14 @@ export class LookupContactsQuery {
       // inboxContacts are unfiltered — apply the similarity threshold to remove unrelated senders.
       filter(
         ({ source, similarityScore }) =>
-          source === 'people_api' || similarityScore >= similarityThreshold,
+          source === 'people_api' || similarityScore >= SimilarityThreshold,
       ),
       uniqueBy(({ email }) => email),
       sortBy([({ similarityScore }) => similarityScore, 'desc']),
     );
+    console.log(contacts);
 
-    return { contacts };
+    return { contacts, message: `Contacts fetch succesfully` };
   }
 
   private async fetchFromPeopleApi(

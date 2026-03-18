@@ -12,11 +12,6 @@ const LookupContactsInputSchema = z.object({
   name: z.string().min(2).describe('The name (or partial name) to search for among contacts.'),
 });
 
-const LookupContactsOutputSchema = z.object({
-  contacts: z.array(LookupContactsResultSchema),
-  message: z.string().optional(),
-});
-
 @Injectable()
 export class LookupContactsTool {
   public constructor(
@@ -30,7 +25,7 @@ export class LookupContactsTool {
     description:
       'Searches for contacts by name across the Microsoft People API and the connected Outlook inbox. Returns matching contacts with their name, email address, and source.',
     parameters: LookupContactsInputSchema,
-    outputSchema: LookupContactsOutputSchema,
+    outputSchema: LookupContactsResultSchema,
     annotations: {
       title: 'Lookup Contacts',
       readOnlyHint: true,
@@ -51,6 +46,6 @@ export class LookupContactsTool {
     if (!subscriptionStatus.success) {
       return subscriptionStatus;
     }
-    return this.lookupContactsQuery.run(userProfileTypeId, input.name);
+    return await this.lookupContactsQuery.run(userProfileTypeId, input.name);
   }
 }
