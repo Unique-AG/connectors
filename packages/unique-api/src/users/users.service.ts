@@ -69,7 +69,7 @@ export class UsersService implements UniqueUsersFacade {
         },
         active: {
           equals: true,
-        }
+        },
       },
     });
 

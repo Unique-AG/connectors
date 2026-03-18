@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Span } from 'nestjs-otel';
 import { z } from 'zod';
-import { UniqueConfig, type UniqueConfigNamespaced } from '~/config';
+import { type UniqueConfigNamespaced } from '~/config';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
@@ -57,8 +57,7 @@ export class AddAttachmentsToDraftEmailCommand {
     const attachmentsFailed: AttachmentFailure[] = [];
     const profile = await this.getUserProfileQuery.run(userProfileId);
 
-    const uniqueConfig = this.configService.get('unique', { infer: true });
-    const uniqueIdentity = await this.resolveUniqueIdentity(profile.email, uniqueConfig);
+    const uniqueIdentity = await this.resolveUniqueIdentity(profile.email);
 
     for (const uri of input.attachments) {
       try {
@@ -70,7 +69,6 @@ export class AddAttachmentsToDraftEmailCommand {
             attachment = await this.resolveUniqueAttachment({
               parsed,
               uri,
-              uniqueConfig,
               uniqueIdentity,
               fallbackChatId: input.chatId,
             });
@@ -114,12 +112,10 @@ export class AddAttachmentsToDraftEmailCommand {
     parsed,
     uri,
     uniqueIdentity,
-    uniqueConfig,
     fallbackChatId,
   }: {
     parsed: Extract<ParsedUri, { type: 'unique' }>;
     uri: string;
-    uniqueConfig: UniqueConfig;
     uniqueIdentity: ResolvedUniqueIdentity;
     fallbackChatId?: string;
   }): Promise<AttachmentContent> {
@@ -128,6 +124,10 @@ export class AddAttachmentsToDraftEmailCommand {
       return { failure: { uri, reason: 'Missing chatId for unique:// attachment' } };
     }
 
+    const uniqueConfig = this.configService.get('unique', { infer: true });
+    if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
+      return { failure: { uri, reason: 'App is not running in cluster local' } };
+    }
     if (!uniqueIdentity) {
       return { failure: { uri, reason: 'Could not resolve unique identity' } };
     }
@@ -181,10 +181,8 @@ export class AddAttachmentsToDraftEmailCommand {
     return { data, filename, size: data.length };
   }
 
-  private async resolveUniqueIdentity(
-    email: string,
-    uniqueConfig: UniqueConfig,
-  ): Promise<ResolvedUniqueIdentity> {
+  private async resolveUniqueIdentity(email: string): Promise<ResolvedUniqueIdentity> {
+    const uniqueConfig = this.configService.get('unique', { infer: true });
     if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
       this.logger.error({
         msg: 'Failed to resolve unique user identity. App is not in cluster local',

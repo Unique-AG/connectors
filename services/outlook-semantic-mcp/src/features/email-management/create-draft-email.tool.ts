@@ -6,7 +6,6 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
-import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
 import { CreateDraftEmailCommand } from './create-draft-email.command';
 import { META } from './create-draft-email-tool.meta';
 
@@ -70,7 +69,6 @@ export class CreateDraftEmailTool {
   public constructor(
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     private readonly createDraftEmailCommand: CreateDraftEmailCommand,
-    private readonly addAttachmentsToDraftEmailCommand: AddAttachmentsToDraftEmailCommand,
   ) {}
 
   @Tool({
@@ -101,32 +99,11 @@ export class CreateDraftEmailTool {
       return subscriptionStatus;
     }
 
-    const draftResult = await this.createDraftEmailCommand.run(userProfileId, input);
-    if (!draftResult.success) {
-      return draftResult;
-    }
+    const mcpMeta = (context.mcpRequest as CallToolRequest).params?._meta as
+      | Record<string, unknown>
+      | undefined;
+    const chatId = typeof mcpMeta?.chatId === 'string' ? mcpMeta.chatId : undefined;
 
-    if (input.attachments && input.attachments.length > 0) {
-      const mcpMeta = (context.mcpRequest as CallToolRequest).params?._meta as
-        | Record<string, unknown>
-        | undefined;
-      const chatId = typeof mcpMeta?.chatId === 'string' ? mcpMeta.chatId : undefined;
-
-      const attachmentResult = await this.addAttachmentsToDraftEmailCommand.run(userProfileId, {
-        draftId: draftResult.draftId,
-        attachments: input.attachments,
-        chatId,
-      });
-
-      return {
-        ...draftResult,
-        attachmentsFailed:
-          attachmentResult.attachmentsFailed.length > 0
-            ? attachmentResult.attachmentsFailed
-            : undefined,
-      };
-    }
-
-    return draftResult;
+    return this.createDraftEmailCommand.run(userProfileId, { ...input, chatId });
   }
 }
