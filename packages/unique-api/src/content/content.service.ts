@@ -1,9 +1,9 @@
 import assert from 'node:assert';
 import { sanitizePath } from '@unique-ag/utils';
-import { first, isNullish, isString } from 'remeda';
+import { first, isNullish } from 'remeda';
 import { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueHttpClient } from '../clients/unique-http.client';
-import { Content, ContentSchema, DownloadedContent, StreamedContent } from './content.dto';
+import { Content, ContentSchema } from './content.dto';
 import {
   GET_CONTENT_BY_ID_QUERY,
   GetContentByIdQueryInput,

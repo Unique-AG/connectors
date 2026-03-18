@@ -1,4 +1,3 @@
-import { Readable } from 'node:stream';
 import { z } from 'zod/v4';
 
 export const ChunkSchema = z.object({

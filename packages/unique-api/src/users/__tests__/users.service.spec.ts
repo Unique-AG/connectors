@@ -25,7 +25,9 @@ describe('UsersService', () => {
       vi.mocked(graphqlClient.request).mockResolvedValue({
         listUsers: {
           totalCount: 1,
-          nodes: [{ id: 'user-123', email: 'john@example.com', companyId: 'comp-456', active: true }],
+          nodes: [
+            { id: 'user-123', email: 'john@example.com', companyId: 'comp-456', active: true },
+          ],
         },
       });
 
