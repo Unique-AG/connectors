@@ -80,7 +80,9 @@ export class AddAttachmentsToDraftEmailCommand {
               uniqueIdentity.identity = await this.resolveUniqueIdentity(profile.email);
               uniqueIdentity.wasResolved = true;
               this.logger.log({
-                msg: uniqueIdentity.identity ? 'Unique identity resolved' : 'Unique identity could not be resolved',
+                msg: uniqueIdentity.identity
+                  ? 'Unique identity resolved'
+                  : 'Unique identity could not be resolved',
                 userProfileId: userProfileIdString,
               });
             }
