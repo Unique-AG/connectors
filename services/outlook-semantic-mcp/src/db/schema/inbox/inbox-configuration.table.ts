@@ -1,10 +1,16 @@
 import { relations, sql } from 'drizzle-orm';
-import { jsonb, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { integer, jsonb, pgEnum, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 
-export const inboxSyncState = pgEnum('inbox_sync_state', ['ready', 'failed', 'running']);
+export const inboxSyncState = pgEnum('inbox_sync_state', [
+  'ready',
+  'failed',
+  'running',
+  'paused',
+  'waiting-for-ingestion',
+]);
 
 export const liveCatchUpState = pgEnum('live_catch_up_state', ['ready', 'running', 'failed']);
 
@@ -28,6 +34,12 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   fullSyncHeartbeatAt: timestamp(`full_sync_heartbeat_at`),
   fullSyncVersion: uuid(`full_sync_version`),
   fullSyncNextLink: text(`full_sync_next_link`),
+
+  fullSyncBatchIndex: integer(`full_sync_batch_index`).notNull().default(0),
+  fullSyncExpectedTotal: integer(`full_sync_expected_total`),
+  fullSyncSkipped: integer(`full_sync_skipped`).notNull().default(0),
+  fullSyncScheduledForIngestion: integer(`full_sync_scheduled_for_ingestion`).notNull().default(0),
+  fullSyncFailedToUploadForIngestion: integer(`full_sync_failed_to_upload_for_ingestion`).notNull().default(0),
 
   fullSyncLastRunAt: timestamp(`full_sync_last_run_at`),
   fullSyncLastStartedAt: timestamp(`full_sync_last_started_at`),
