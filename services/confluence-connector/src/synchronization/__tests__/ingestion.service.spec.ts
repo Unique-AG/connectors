@@ -264,44 +264,35 @@ describe('IngestionService', () => {
   });
 
   describe('cleanup after failed page ingestion', () => {
-    it('cleans up registered content when page upload fails', async () => {
+    it('deletes registered content when page upload fails', async () => {
       const { service, uniqueApiClient } = makeService();
       mockRequest.mockResolvedValueOnce({ statusCode: 500 });
-      vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([{ id: 'content-1' }] as never);
-      vi.mocked(uniqueApiClient.files.deleteByIds).mockResolvedValue(1);
 
       await service.ingestPage(pageFixture, 'space-scope-1');
 
-      expect(uniqueApiClient.files.getByKeys).toHaveBeenCalledWith([
-        `${TENANT_NAME}/space-1_SP/42`,
-      ]);
-      expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['content-1']);
+      expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
-          key: `${TENANT_NAME}/space-1_SP/42`,
-          msg: 'Cleaned up orphaned content after failed ingestion',
+          contentId: 'id-1',
+          msg: 'Deleted orphaned content after failed ingestion',
         }),
       );
     });
 
-    it('cleans up registered content when page finalization fails', async () => {
+    it('deletes registered content when page finalization fails', async () => {
       const { service, uniqueApiClient } = makeService();
       mockRequest.mockResolvedValueOnce({ statusCode: 201 });
       vi.mocked(uniqueApiClient.ingestion.finalizeIngestion).mockRejectedValue(
         new Error('finalize failed'),
       );
-      vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([{ id: 'content-1' }] as never);
-      vi.mocked(uniqueApiClient.files.deleteByIds).mockResolvedValue(1);
 
       await service.ingestPage(pageFixture, 'space-scope-1');
 
-      expect(uniqueApiClient.files.getByKeys).toHaveBeenCalledWith([
-        `${TENANT_NAME}/space-1_SP/42`,
-      ]);
+      expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
-          key: `${TENANT_NAME}/space-1_SP/42`,
-          msg: 'Cleaned up orphaned content after failed ingestion',
+          contentId: 'id-1',
+          msg: 'Deleted orphaned content after failed ingestion',
         }),
       );
     });
@@ -314,42 +305,20 @@ describe('IngestionService', () => {
 
       await service.ingestPage(pageFixture, 'space-scope-1');
 
-      expect(uniqueApiClient.files.getByKeys).not.toHaveBeenCalled();
+      expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
     });
 
-    it('logs warning when cleanup cannot find registered content', async () => {
+    it('continues pipeline when cleanup delete fails', async () => {
       const { service, uniqueApiClient } = makeService();
       mockRequest.mockResolvedValueOnce({ statusCode: 500 });
-
-      await service.ingestPage(pageFixture, 'space-scope-1');
-
-      expect(uniqueApiClient.files.getByKeys).toHaveBeenCalledWith([
-        `${TENANT_NAME}/space-1_SP/42`,
-      ]);
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          key: `${TENANT_NAME}/space-1_SP/42`,
-          msg: 'Cleanup after failed ingestion may not have succeeded: content may not have been found or delete failed',
-        }),
-      );
-    });
-
-    it('continues pipeline when cleanup delete fails internally', async () => {
-      const { service, uniqueApiClient } = makeService();
-      mockRequest.mockResolvedValueOnce({ statusCode: 500 });
-      vi.mocked(uniqueApiClient.files.getByKeys).mockRejectedValue(new Error('network error'));
+      vi.mocked(uniqueApiClient.files.deleteByIds).mockRejectedValue(new Error('network error'));
 
       await service.ingestPage(pageFixture, 'space-scope-1');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
-          msg: 'Failed to delete content, skipping',
-        }),
-      );
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          key: `${TENANT_NAME}/space-1_SP/42`,
-          msg: 'Cleanup after failed ingestion may not have succeeded: content may not have been found or delete failed',
+          contentId: 'id-1',
+          msg: 'Failed to clean up orphaned content after failed ingestion',
         }),
       );
     });
@@ -538,48 +507,35 @@ describe('IngestionService', () => {
     });
 
     describe('cleanup after failed attachment ingestion', () => {
-      it('cleans up registered content when attachment upload fails', async () => {
+      it('deletes registered content when attachment upload fails', async () => {
         const { service, uniqueApiClient } = makeService();
         mockRequest.mockResolvedValueOnce({ statusCode: 500 });
-        vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([
-          { id: 'content-1' },
-        ] as never);
-        vi.mocked(uniqueApiClient.files.deleteByIds).mockResolvedValue(1);
 
         await service.ingestAttachment(attachmentFixture, 'space-scope-1');
 
-        expect(uniqueApiClient.files.getByKeys).toHaveBeenCalledWith([
-          `${TENANT_NAME}/space-1_SP/42::att-100`,
-        ]);
-        expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['content-1']);
+        expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
         expect(mockLogger.warn).toHaveBeenCalledWith(
           expect.objectContaining({
-            key: `${TENANT_NAME}/space-1_SP/42::att-100`,
-            msg: 'Cleaned up orphaned content after failed ingestion',
+            contentId: 'id-1',
+            msg: 'Deleted orphaned content after failed ingestion',
           }),
         );
       });
 
-      it('cleans up registered content when attachment finalization fails', async () => {
+      it('deletes registered content when attachment finalization fails', async () => {
         const { service, uniqueApiClient } = makeService();
         mockRequest.mockResolvedValueOnce({ statusCode: 201 });
         vi.mocked(uniqueApiClient.ingestion.finalizeIngestion).mockRejectedValue(
           new Error('finalize failed'),
         );
-        vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([
-          { id: 'content-1' },
-        ] as never);
-        vi.mocked(uniqueApiClient.files.deleteByIds).mockResolvedValue(1);
 
         await service.ingestAttachment(attachmentFixture, 'space-scope-1');
 
-        expect(uniqueApiClient.files.getByKeys).toHaveBeenCalledWith([
-          `${TENANT_NAME}/space-1_SP/42::att-100`,
-        ]);
+        expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
         expect(mockLogger.warn).toHaveBeenCalledWith(
           expect.objectContaining({
-            key: `${TENANT_NAME}/space-1_SP/42::att-100`,
-            msg: 'Cleaned up orphaned content after failed ingestion',
+            contentId: 'id-1',
+            msg: 'Deleted orphaned content after failed ingestion',
           }),
         );
       });
@@ -592,7 +548,7 @@ describe('IngestionService', () => {
 
         await service.ingestAttachment(attachmentFixture, 'space-scope-1');
 
-        expect(uniqueApiClient.files.getByKeys).not.toHaveBeenCalled();
+        expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
       });
     });
 
