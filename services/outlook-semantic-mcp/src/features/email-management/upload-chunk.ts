@@ -14,7 +14,9 @@ export async function uploadChunk(
     },
     body: chunk as BodyInit,
   });
-  if (!response.ok) {
+  // 308 (Resume Incomplete) is the expected response for intermediate chunks;
+  // only the final chunk returns 200/201.
+  if (!response.ok && response.status !== 308) {
     const text = await response.text();
     throw new Error(`Upload session chunk failed (${response.status}): ${text}`);
   }
