@@ -2,11 +2,11 @@ import { ConfigService } from '@nestjs/config';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { UniqueConfigNamespaced } from '../../config';
 import {
   type AddAttachmentsInput,
   AddAttachmentsToDraftEmailCommand,
 } from './add-attachments-to-draft-email.command';
-import { UniqueConfigNamespaced } from '../../config';
 
 const USER_PROFILE_ID = { toString: () => 'user_profile_test123' } as unknown as UserProfileTypeID;
 const DRAFT_ID = 'draft-abc-123';
