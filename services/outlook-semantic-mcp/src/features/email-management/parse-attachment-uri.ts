@@ -11,9 +11,7 @@ export function parseAttachmentUri(uri: string): ParsedUri {
   if (uniqueMatch) {
     const chatId = uniqueMatch[1];
     const contentId = uniqueMatch[2];
-    if (chatId && contentId) {
-      return { type: 'unique', chatId, contentId };
-    }
+    return { type: 'unique', chatId: chatId ?? '', contentId: contentId ?? '' };
   }
 
   const dataMatch = uri.match(DATA_URI_PATTERN);

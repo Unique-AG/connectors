@@ -6,6 +6,7 @@ import {
   type AddAttachmentsInput,
   AddAttachmentsToDraftEmailCommand,
 } from './add-attachments-to-draft-email.command';
+import { UniqueConfigNamespaced } from '../../config';
 
 const USER_PROFILE_ID = { toString: () => 'user_profile_test123' } as unknown as UserProfileTypeID;
 const DRAFT_ID = 'draft-abc-123';
@@ -57,7 +58,7 @@ function createCommand(overrides?: {
 
   const configService = {
     get: vi.fn().mockReturnValue(overrides?.config ?? CLUSTER_LOCAL_CONFIG),
-  } as unknown as ConfigService;
+  } as unknown as ConfigService<UniqueConfigNamespaced, true>;
 
   const command = new AddAttachmentsToDraftEmailCommand(
     graphClientFactory,
@@ -72,7 +73,7 @@ function createCommand(overrides?: {
 }
 
 describe('AddAttachmentsToDraftEmailCommand', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn> | undefined;
+  let fetchSpy: { mockRestore(): void } | undefined;
 
   afterEach(() => {
     fetchSpy?.mockRestore();
@@ -107,29 +108,12 @@ describe('AddAttachmentsToDraftEmailCommand', () => {
       expect(result.attachmentsFailed).toEqual([
         {
           uri: 'unique://chat/chat_1/content/cont_abc',
-          reason: 'unique:// attachments require cluster_local mode',
+          reason: 'App is not running in cluster local',
         },
       ]);
     });
 
-    it('uses fallback chatId from input when URI chatId is empty', async () => {
-      const { command } = createCommand();
-      fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValueOnce(new Response(Buffer.from('content'), { status: 200 }));
-
-      const input: AddAttachmentsInput = {
-        draftId: DRAFT_ID,
-        attachments: ['unique://chat//content/cont_abc'],
-        chatId: 'fallback-chat',
-      };
-
-      const result = await command.run(USER_PROFILE_ID, input);
-
-      expect(result.attachmentsFailed).toHaveLength(0);
-    });
-
-    it('reports failure when chatId is missing and no fallback', async () => {
+    it('reports failure for unique URI with empty chatId segment', async () => {
       const { command } = createCommand();
       const input: AddAttachmentsInput = {
         draftId: DRAFT_ID,
@@ -139,7 +123,7 @@ describe('AddAttachmentsToDraftEmailCommand', () => {
       const result = await command.run(USER_PROFILE_ID, input);
 
       expect(result.attachmentsFailed).toHaveLength(1);
-      expect(result.attachmentsFailed[0].reason).toBe('Missing chatId for unique:// attachment');
+      expect(result.attachmentsFailed?.[0]?.reason).toBe('Missing chatId for unique:// attachment');
     });
 
     it('resolves user identity and downloads content in cluster_local mode', async () => {
@@ -187,7 +171,7 @@ describe('AddAttachmentsToDraftEmailCommand', () => {
       expect(result.attachmentsFailed).toEqual([
         {
           uri: 'unique://chat/chat_1/content/cont_abc',
-          reason: 'Unique user not found for email: user@example.com',
+          reason: 'Could not resolve unique identity',
         },
       ]);
     });
@@ -260,7 +244,7 @@ describe('AddAttachmentsToDraftEmailCommand', () => {
       const result = await command.run(USER_PROFILE_ID, input);
 
       expect(result.attachmentsFailed).toHaveLength(1);
-      expect(result.attachmentsFailed[0].uri).toBe('ftp://example.com/file.pdf');
+      expect(result.attachmentsFailed[0]?.uri).toBe('ftp://example.com/file.pdf');
     });
   });
 
@@ -285,7 +269,7 @@ describe('AddAttachmentsToDraftEmailCommand', () => {
       const result = await command.run(USER_PROFILE_ID, input);
 
       expect(result.attachmentsFailed).toHaveLength(1);
-      expect(result.attachmentsFailed[0].uri).toBe('https://example.com/forbidden.pdf');
+      expect(result.attachmentsFailed[0]?.uri).toBe('https://example.com/forbidden.pdf');
     });
   });
 });

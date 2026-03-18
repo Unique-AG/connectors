@@ -15,7 +15,7 @@ describe('parseAttachmentUri', () => {
       });
     });
 
-    it('parses unique URI with empty chatId', () => {
+    it('parses unique URI with empty chatId as empty string', () => {
       const result = parseAttachmentUri('unique://chat//content/cont_abc');
 
       expect(result).toEqual({
