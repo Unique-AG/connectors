@@ -8,12 +8,13 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { assertExternalUrl } from './assert-external-url';
 import { type ParsedUri, parseAttachmentUri } from './parse-attachment-uri';
 import { uploadChunk } from './upload-chunk';
 
 const UploadSessionSchema = z.object({ uploadUrl: z.string() });
 
-const UPLOAD_CHUNK_SIZE = 5 * 1024 * 1024;
+const UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024;
 
 export interface AddAttachmentsInput {
   draftId: string;
@@ -167,6 +168,7 @@ export class AddAttachmentsToDraftEmailCommand {
     parsed: Extract<ParsedUri, { type: 'url' }>,
     uri: string,
   ): Promise<AttachmentContent> {
+    assertExternalUrl(parsed.url);
     const response = await fetch(parsed.url);
     if (!response.ok) {
       return { failure: { uri, reason: `URL download failed (${response.status})` } };

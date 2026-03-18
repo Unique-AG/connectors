@@ -18,4 +18,5 @@ export async function uploadChunk(
     const text = await response.text();
     throw new Error(`Upload session chunk failed (${response.status}): ${text}`);
   }
+  await response.body?.cancel();
 }
