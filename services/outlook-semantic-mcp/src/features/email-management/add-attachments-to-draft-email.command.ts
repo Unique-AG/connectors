@@ -13,7 +13,7 @@ import { uploadChunk } from './upload-chunk';
 
 const UploadSessionSchema = z.object({ uploadUrl: z.string() });
 
-const UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024;
+const UPLOAD_CHUNK_SIZE = 13 * 327680; // 4,259,840 bytes — must be a multiple of 320 KiB (327,680) per MS Graph API requirement
 
 export interface AddAttachmentsInput {
   draftId: string;
@@ -57,7 +57,10 @@ export class AddAttachmentsToDraftEmailCommand {
     const attachmentsFailed: AttachmentFailure[] = [];
     const profile = await this.getUserProfileQuery.run(userProfileId);
 
-    const uniqueIdentity = await this.resolveUniqueIdentity(profile.email);
+    const uniqueIdentity: { identity: ResolvedUniqueIdentity; wasResolved: boolean } = {
+      identity: null,
+      wasResolved: false,
+    };
 
     for (const uri of input.attachments) {
       try {
@@ -66,10 +69,14 @@ export class AddAttachmentsToDraftEmailCommand {
 
         switch (parsed.type) {
           case 'unique':
+            if (!uniqueIdentity.wasResolved) {
+              uniqueIdentity.identity = await this.resolveUniqueIdentity(profile.email);
+              uniqueIdentity.wasResolved = true;
+            }
             attachment = await this.resolveUniqueAttachment({
               parsed,
               uri,
-              uniqueIdentity,
+              uniqueIdentity: uniqueIdentity.identity,
               fallbackChatId: input.chatId,
             });
             break;
