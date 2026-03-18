@@ -57,6 +57,13 @@ export class AddAttachmentsToDraftEmailCommand {
     const attachmentsFailed: AttachmentFailure[] = [];
     const profile = await this.getUserProfileQuery.run(userProfileId);
 
+    this.logger.log({
+      msg: 'Starting attachment upload',
+      userProfileId: userProfileIdString,
+      draftId: input.draftId,
+      attachmentCount: input.attachments.length,
+    });
+
     const uniqueIdentity: { identity: ResolvedUniqueIdentity; wasResolved: boolean } = {
       identity: null,
       wasResolved: false,
@@ -72,6 +79,10 @@ export class AddAttachmentsToDraftEmailCommand {
             if (!uniqueIdentity.wasResolved) {
               uniqueIdentity.identity = await this.resolveUniqueIdentity(profile.email);
               uniqueIdentity.wasResolved = true;
+              this.logger.log({
+                msg: uniqueIdentity.identity ? 'Unique identity resolved' : 'Unique identity could not be resolved',
+                userProfileId: userProfileIdString,
+              });
             }
             attachment = await this.resolveUniqueAttachment({
               parsed,
@@ -86,6 +97,13 @@ export class AddAttachmentsToDraftEmailCommand {
         }
 
         if ('failure' in attachment) {
+          this.logger.warn({
+            msg: 'Attachment resolution failed',
+            userProfileId: userProfileIdString,
+            draftId: input.draftId,
+            uri,
+            reason: attachment.failure.reason,
+          });
           attachmentsFailed.push(attachment.failure);
           continue;
         }
@@ -96,18 +114,38 @@ export class AddAttachmentsToDraftEmailCommand {
           attachment.data,
           attachment.filename,
           attachment.size,
+          userProfileIdString,
         );
+
+        this.logger.log({
+          msg: 'Attachment uploaded successfully',
+          userProfileId: userProfileIdString,
+          draftId: input.draftId,
+          uri,
+          filename: attachment.filename,
+          sizeBytes: attachment.size,
+        });
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         this.logger.warn({
           err,
           userProfileId: userProfileIdString,
+          draftId: input.draftId,
           uri,
           msg: 'Attachment failed',
         });
         attachmentsFailed.push({ uri, reason });
       }
     }
+
+    this.logger.log({
+      msg: 'Attachment upload run complete',
+      userProfileId: userProfileIdString,
+      draftId: input.draftId,
+      total: input.attachments.length,
+      succeeded: input.attachments.length - attachmentsFailed.length,
+      failed: attachmentsFailed.length,
+    });
 
     return { attachmentsFailed };
   }
@@ -189,8 +227,16 @@ export class AddAttachmentsToDraftEmailCommand {
     data: Buffer,
     filename: string,
     totalSize: number,
+    userProfileId: string,
   ): Promise<void> {
     if (totalSize <= 3 * 1024 * 1024) {
+      this.logger.log({
+        msg: 'Uploading attachment via simple POST',
+        userProfileId,
+        draftId,
+        filename,
+        sizeBytes: totalSize,
+      });
       await client.api(`/me/messages/${draftId}/attachments`).post({
         '@odata.type': '#microsoft.graph.fileAttachment',
         name: filename,
@@ -199,6 +245,16 @@ export class AddAttachmentsToDraftEmailCommand {
       return;
     }
 
+    const totalChunks = Math.ceil(totalSize / UPLOAD_CHUNK_SIZE);
+    this.logger.log({
+      msg: 'Uploading attachment via upload session',
+      userProfileId,
+      draftId,
+      filename,
+      sizeBytes: totalSize,
+      totalChunks,
+    });
+
     const { uploadUrl } = UploadSessionSchema.parse(
       await client.api(`/me/messages/${draftId}/attachments/createUploadSession`).post({
         AttachmentItem: { attachmentType: 'file', name: filename, size: totalSize },
@@ -206,10 +262,22 @@ export class AddAttachmentsToDraftEmailCommand {
     );
 
     let offset = 0;
+    let chunkIndex = 0;
     while (offset < totalSize) {
       const end = Math.min(offset + UPLOAD_CHUNK_SIZE, totalSize);
       const chunk = data.subarray(offset, end);
       await uploadChunk(uploadUrl, chunk, offset, totalSize);
+      chunkIndex++;
+      this.logger.log({
+        msg: 'Chunk uploaded',
+        userProfileId,
+        draftId,
+        filename,
+        chunkIndex,
+        totalChunks,
+        bytesUploaded: end,
+        totalBytes: totalSize,
+      });
       offset = end;
     }
   }
