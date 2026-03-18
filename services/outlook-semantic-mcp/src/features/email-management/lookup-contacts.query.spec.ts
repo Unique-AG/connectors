@@ -96,7 +96,7 @@ describe('LookupContactsQuery.run', () => {
 
       const result = await query.run(USER_PROFILE_ID, 'alice');
 
-      expect(result.contacts[0].email).toBe('Alice@Example.com');
+      expect(result.contacts[0]?.email).toBe('Alice@Example.com');
     });
   });
 
@@ -309,9 +309,9 @@ describe('LookupContactsQuery.run', () => {
 
       const result = await query.run(USER_PROFILE_ID, 'john smith');
 
-      expect(result.contacts[0].name).toBe('John Smith');
-      expect(result.contacts[0].similarityScore).toBeGreaterThanOrEqual(
-        result.contacts[1].similarityScore,
+      expect(result.contacts[0]?.name).toBe('John Smith');
+      expect(result.contacts[0]?.similarityScore).toBeGreaterThanOrEqual(
+        result.contacts[1]?.similarityScore ?? 0,
       );
     });
   });
