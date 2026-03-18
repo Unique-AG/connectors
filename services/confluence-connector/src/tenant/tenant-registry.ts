@@ -117,8 +117,8 @@ export class TenantRegistry implements OnModuleInit {
       });
     }
 
-    const deletedConfigs = getDeletedTenantConfigs();
-    for (const { name: tenantName, config } of deletedConfigs) {
+    const deletedTenantConfigs = getDeletedTenantConfigs();
+    for (const { name: tenantName, config } of deletedTenantConfigs) {
       const tenant: TenantContext = { name: tenantName, config, isScanning: false };
       this.deletedTenants.set(tenantName, tenant);
 

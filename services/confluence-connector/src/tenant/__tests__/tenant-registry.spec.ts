@@ -88,14 +88,14 @@ function createMockUniqueApiClient() {
 
 function createRegistry(
   configs: NamedTenantConfig[],
-  deletedConfigs: NamedTenantConfig[] = [],
+  deletedTenants: NamedTenantConfig[] = [],
 ): {
   registry: TenantRegistry;
   serviceRegistry: ServiceRegistry;
   mockUniqueApiFactory: { create: ReturnType<typeof vi.fn> };
 } {
   vi.mocked(getTenantConfigs).mockReturnValue(configs);
-  vi.mocked(getDeletedTenantConfigs).mockReturnValue(deletedConfigs);
+  vi.mocked(getDeletedTenantConfigs).mockReturnValue(deletedTenants);
 
   const mockFactory = new ConfluenceAuthFactory();
   vi.mocked(mockFactory.createAuthStrategy).mockImplementation(() => createMockAuth());
@@ -317,18 +317,18 @@ describe('TenantRegistry', () => {
 
   describe('onModuleInit with deleted tenants', () => {
     it('registers deleted tenants with only UniqueApiClient', () => {
-      const deletedConfigs: NamedTenantConfig[] = [
+      const deletedTenants: NamedTenantConfig[] = [
         { name: 'deleted-tenant', config: createMockTenantConfig() },
       ];
 
       const { serviceRegistry, mockUniqueApiFactory } = createRegistry(
         [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        deletedConfigs,
+        deletedTenants,
       );
 
       const deletedTenant = {
         name: 'deleted-tenant',
-        config: deletedConfigs[0].config,
+        config: deletedTenants[0].config,
         isScanning: false,
       };
       tenantStorage.run(deletedTenant, () => {
