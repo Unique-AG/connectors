@@ -1,9 +1,9 @@
 import assert from 'node:assert';
 import { sanitizePath } from '@unique-ag/utils';
-import { first, isNullish } from 'remeda';
+import { first, isNullish, isString } from 'remeda';
 import { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueHttpClient } from '../clients/unique-http.client';
-import { Content, ContentSchema } from './content.dto';
+import { Content, ContentSchema, DownloadedContent, StreamedContent } from './content.dto';
 import {
   GET_CONTENT_BY_ID_QUERY,
   GetContentByIdQueryInput,
@@ -40,6 +40,65 @@ export class ContentService implements UniqueContentFacade {
 
     const responseData = await body.json();
     return SearchResultSchema.parse(responseData);
+  }
+
+  public async downloadContentById(contentId: string): Promise<DownloadedContent> {
+    const baseUrl = new URL(this.baseUrl);
+
+    const result = await this.httpClient.request({
+      method: 'GET',
+      path: sanitizePath({
+        path: `${baseUrl.pathname}/v1/content/${encodeURIComponent(contentId)}/file`,
+        prefixWithSlash: true,
+      }),
+    });
+
+    const data = Buffer.from(await result.body.arrayBuffer());
+
+    const contentDisposition = result.headers['content-disposition'];
+    const filenameMatch =
+      typeof contentDisposition === 'string'
+        ? contentDisposition.match(/filename="?([^";]+)"?/)
+        : null;
+    const filename = filenameMatch && isString(filenameMatch[1]) ? filenameMatch[1] : contentId;
+
+    const contentType = result.headers['content-type'];
+    const mimeType = isString(contentType) ? contentType.split(';')[0]?.trim() : null;
+
+    return { data, filename, mimeType: mimeType ?? 'application/octet-stream' };
+  }
+
+  public async streamContentById(contentId: string): Promise<StreamedContent> {
+    const baseUrl = new URL(this.baseUrl);
+
+    const result = await this.httpClient.request({
+      method: 'GET',
+      path: sanitizePath({
+        path: `${baseUrl.pathname}/v1/content/${encodeURIComponent(contentId)}/file`,
+        prefixWithSlash: true,
+      }),
+    });
+
+    const contentDisposition = result.headers['content-disposition'];
+    const filenameMatch =
+      typeof contentDisposition === 'string'
+        ? contentDisposition.match(/filename="?([^";]+)"?/)
+        : null;
+    const filename = filenameMatch && isString(filenameMatch[1]) ? filenameMatch[1] : contentId;
+
+    const contentType = result.headers['content-type'];
+    const mimeType = isString(contentType) ? contentType.split(';')[0]?.trim() : null;
+
+    const contentLength = result.headers['content-length'];
+    const parsedSize = isString(contentLength) ? parseInt(contentLength, 10) : NaN;
+    const size = Number.isNaN(parsedSize) ? undefined : parsedSize;
+
+    return {
+      stream: result.body,
+      filename,
+      mimeType: mimeType ?? 'application/octet-stream',
+      size,
+    };
   }
 
   public async getContentById(request: GetContentByIdRequest): Promise<Content> {
