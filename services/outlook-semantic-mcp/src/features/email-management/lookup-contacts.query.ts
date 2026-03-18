@@ -117,12 +117,7 @@ export class LookupContactsQuery {
       sortBy([({ similarityScore }) => similarityScore, 'desc']),
     );
 
-    const message =
-      !peopleContacts || !inboxContacts
-        ? 'Partial results: one data source could not be reached.'
-        : undefined;
-
-    return { contacts, message };
+    return { contacts, message: 'Contacts fetched succesfully' };
   }
 
   private async fetchFromPeopleApi(

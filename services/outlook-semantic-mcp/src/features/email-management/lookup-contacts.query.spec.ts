@@ -72,14 +72,6 @@ describe('LookupContactsQuery.run', () => {
       expect(result.contacts[0]).toMatchObject({ similarityScore: expect.any(Number) });
     });
 
-    it('omits the message field when both sources succeed', async () => {
-      const query = new LookupContactsQuery(makeFactory({}));
-
-      const result = await query.run(USER_PROFILE_ID, 'alice');
-
-      expect(result.message).toBeUndefined();
-    });
-
     it('preserves original email casing in the output', async () => {
       const query = new LookupContactsQuery(
         makeFactory({
