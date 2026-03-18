@@ -2,8 +2,8 @@ import { type Scope, UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
 
-export class TenantCleanupService {
-  private readonly logger = new Logger(TenantCleanupService.name);
+export class TenantDeleteService {
+  private readonly logger = new Logger(TenantDeleteService.name);
 
   public constructor(
     private readonly tenantName: string,
@@ -11,7 +11,7 @@ export class TenantCleanupService {
     private readonly uniqueClient: UniqueApiClient,
   ) {}
 
-  public async cleanup(): Promise<void> {
+  public async deleteTenantContent(): Promise<void> {
     const { scopeId, useV1KeyFormat } = this.ingestionConfig;
 
     const rootScope = await this.uniqueClient.scopes.getById(scopeId);
@@ -41,14 +41,37 @@ export class TenantCleanupService {
     if (useV1KeyFormat) {
       await this.deleteContentByScopes(childScopes);
     } else {
-      const deletedCount = await this.uniqueClient.files.deleteByKeyPrefix(this.tenantName);
-      this.logger.log({
-        tenantName: this.tenantName,
-        deletedCount,
-        msg: 'Content deleted by key prefix',
-      });
+      await this.deleteContentByKeyPrefix();
     }
 
+    await this.deleteChildScopes(childScopes);
+  }
+
+  private async deleteContentByKeyPrefix(): Promise<void> {
+    const deletedCount = await this.uniqueClient.files.deleteByKeyPrefix(this.tenantName);
+    this.logger.log({
+      tenantName: this.tenantName,
+      deletedCount,
+      msg: 'Content deleted by key prefix',
+    });
+  }
+
+  private async deleteContentByScopes(scopes: Scope[]): Promise<void> {
+    for (const scope of scopes) {
+      const contentIds = await this.uniqueClient.files.getContentIdsByScope(scope.id);
+      if (contentIds.length > 0) {
+        await this.uniqueClient.files.deleteByIds(contentIds);
+        this.logger.log({
+          tenantName: this.tenantName,
+          scopeName: scope.name,
+          deletedCount: contentIds.length,
+          msg: 'Content deleted by scope ownership',
+        });
+      }
+    }
+  }
+
+  private async deleteChildScopes(childScopes: Scope[]): Promise<void> {
     let hasFailedScopes = false;
     for (const child of childScopes) {
       const result = await this.uniqueClient.scopes.delete(child.id, { recursive: true });
@@ -78,21 +101,6 @@ export class TenantCleanupService {
       });
     } else {
       this.logger.log({ tenantName: this.tenantName, msg: 'Tenant cleanup completed' });
-    }
-  }
-
-  private async deleteContentByScopes(scopes: Scope[]): Promise<void> {
-    for (const scope of scopes) {
-      const contentIds = await this.uniqueClient.files.getContentIdsByScope(scope.id);
-      if (contentIds.length > 0) {
-        await this.uniqueClient.files.deleteByIds(contentIds);
-        this.logger.log({
-          tenantName: this.tenantName,
-          scopeName: scope.name,
-          deletedCount: contentIds.length,
-          msg: 'Content deleted by scope ownership',
-        });
-      }
     }
   }
 }

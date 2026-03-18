@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { TenantCleanupService } from '../tenant-cleanup.service';
+import { TenantDeleteService } from '../tenant-delete.service';
 
 const mockLogger = vi.hoisted(() => ({
   log: vi.fn(),
@@ -41,13 +41,13 @@ function createIngestionConfig(useV1KeyFormat = false) {
   };
 }
 
-describe('TenantCleanupService', () => {
+describe('TenantDeleteService', () => {
   it('skips cleanup when root scope is not found', async () => {
     const client = createMockUniqueApiClient();
     client.scopes.getById.mockResolvedValue(null);
 
-    const service = new TenantCleanupService('my-tenant', createIngestionConfig(), client as never);
-    await service.cleanup();
+    const service = new TenantDeleteService('my-tenant', createIngestionConfig(), client as never);
+    await service.deleteTenantContent();
 
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -64,8 +64,8 @@ describe('TenantCleanupService', () => {
     client.scopes.listChildren.mockResolvedValue([]);
     client.files.getCountByKeyPrefix.mockResolvedValue(0);
 
-    const service = new TenantCleanupService('my-tenant', createIngestionConfig(), client as never);
-    await service.cleanup();
+    const service = new TenantDeleteService('my-tenant', createIngestionConfig(), client as never);
+    await service.deleteTenantContent();
 
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({ tenantName: 'my-tenant', msg: 'Already cleaned up, skipping' }),
@@ -78,12 +78,12 @@ describe('TenantCleanupService', () => {
     client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
     client.scopes.listChildren.mockResolvedValue([]);
 
-    const service = new TenantCleanupService(
+    const service = new TenantDeleteService(
       'my-tenant',
       createIngestionConfig(true),
       client as never,
     );
-    await service.cleanup();
+    await service.deleteTenantContent();
 
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({ tenantName: 'my-tenant', msg: 'Already cleaned up, skipping' }),
@@ -108,8 +108,8 @@ describe('TenantCleanupService', () => {
       failedFolders: [],
     });
 
-    const service = new TenantCleanupService('my-tenant', createIngestionConfig(), client as never);
-    await service.cleanup();
+    const service = new TenantDeleteService('my-tenant', createIngestionConfig(), client as never);
+    await service.deleteTenantContent();
 
     expect(client.files.deleteByKeyPrefix).toHaveBeenCalledWith('my-tenant');
     expect(client.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
@@ -132,12 +132,12 @@ describe('TenantCleanupService', () => {
       failedFolders: [],
     });
 
-    const service = new TenantCleanupService(
+    const service = new TenantDeleteService(
       'my-tenant',
       createIngestionConfig(true),
       client as never,
     );
-    await service.cleanup();
+    await service.deleteTenantContent();
 
     expect(client.files.getContentIdsByScope).toHaveBeenCalledWith('child-1');
     expect(client.files.deleteByIds).toHaveBeenCalledWith(['file-1', 'file-2']);
@@ -160,12 +160,12 @@ describe('TenantCleanupService', () => {
       failedFolders: [],
     });
 
-    const service = new TenantCleanupService(
+    const service = new TenantDeleteService(
       'my-tenant',
       createIngestionConfig(true),
       client as never,
     );
-    await service.cleanup();
+    await service.deleteTenantContent();
 
     expect(client.files.deleteByIds).not.toHaveBeenCalled();
     expect(client.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
@@ -191,12 +191,12 @@ describe('TenantCleanupService', () => {
       failedFolders: [],
     });
 
-    const service = new TenantCleanupService(
+    const service = new TenantDeleteService(
       'my-tenant',
       createIngestionConfig(true),
       client as never,
     );
-    await service.cleanup();
+    await service.deleteTenantContent();
 
     expect(client.files.getContentIdsByScope).toHaveBeenCalledTimes(3);
     expect(client.files.getContentIdsByScope).toHaveBeenCalledWith('child-1');
@@ -221,8 +221,8 @@ describe('TenantCleanupService', () => {
       failedFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
     });
 
-    const service = new TenantCleanupService('my-tenant', createIngestionConfig(), client as never);
-    await service.cleanup();
+    const service = new TenantDeleteService('my-tenant', createIngestionConfig(), client as never);
+    await service.deleteTenantContent();
 
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -252,8 +252,8 @@ describe('TenantCleanupService', () => {
       failedFolders: [],
     });
 
-    const service = new TenantCleanupService('my-tenant', createIngestionConfig(), client as never);
-    await service.cleanup();
+    const service = new TenantDeleteService('my-tenant', createIngestionConfig(), client as never);
+    await service.deleteTenantContent();
 
     expect(client.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
     expect(mockLogger.log).toHaveBeenCalledWith(

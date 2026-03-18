@@ -5,8 +5,8 @@ import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config
 import { getDeletedTenantConfigs, getTenantConfigs } from '../../config/tenant-config-loader';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../../confluence-api';
 import { ServiceRegistry } from '../service-registry';
-import { TenantCleanupService } from '../tenant-cleanup.service';
 import { tenantStorage } from '../tenant-context.storage';
+import { TenantDeleteService } from '../tenant-delete.service';
 import { TenantRegistry } from '../tenant-registry';
 
 const mockLogger = vi.hoisted(() => ({
@@ -373,7 +373,7 @@ describe('TenantRegistry', () => {
       expect(mockLogger.error).not.toHaveBeenCalled();
     });
 
-    it('delegates cleanup to TenantCleanupService for each deleted tenant', async () => {
+    it('delegates cleanup to TenantDeleteService for each deleted tenant', async () => {
       const deletedConfig = createMockTenantConfig();
       const { registry, serviceRegistry } = createRegistry(
         [{ name: 'active-tenant', config: createMockTenantConfig() }],
@@ -382,9 +382,11 @@ describe('TenantRegistry', () => {
 
       const deletedTenant = { name: 'deleted-tenant', config: deletedConfig, isScanning: false };
       const cleanupService = tenantStorage.run(deletedTenant, () =>
-        serviceRegistry.getService(TenantCleanupService),
+        serviceRegistry.getService(TenantDeleteService),
       );
-      const cleanupSpy = vi.spyOn(cleanupService, 'cleanup').mockResolvedValue(undefined);
+      const cleanupSpy = vi
+        .spyOn(cleanupService, 'deleteTenantContent')
+        .mockResolvedValue(undefined);
 
       await registry.processDeletedTenants();
 
@@ -404,15 +406,15 @@ describe('TenantRegistry', () => {
 
       const failTenant = { name: 'fail-tenant', config: configA, isScanning: false };
       const failCleanup = tenantStorage.run(failTenant, () =>
-        serviceRegistry.getService(TenantCleanupService),
+        serviceRegistry.getService(TenantDeleteService),
       );
-      vi.spyOn(failCleanup, 'cleanup').mockRejectedValue(new Error('API error'));
+      vi.spyOn(failCleanup, 'deleteTenantContent').mockRejectedValue(new Error('API error'));
 
       const okTenant = { name: 'ok-tenant', config: configB, isScanning: false };
       const okCleanup = tenantStorage.run(okTenant, () =>
-        serviceRegistry.getService(TenantCleanupService),
+        serviceRegistry.getService(TenantDeleteService),
       );
-      const okSpy = vi.spyOn(okCleanup, 'cleanup').mockResolvedValue(undefined);
+      const okSpy = vi.spyOn(okCleanup, 'deleteTenantContent').mockResolvedValue(undefined);
 
       await registry.processDeletedTenants();
 
@@ -425,7 +427,7 @@ describe('TenantRegistry', () => {
       expect(okSpy).toHaveBeenCalledOnce();
     });
 
-    it('registers TenantCleanupService for deleted tenants', () => {
+    it('registers TenantDeleteService for deleted tenants', () => {
       const deletedConfig = createMockTenantConfig();
       const { serviceRegistry } = createRegistry(
         [{ name: 'active-tenant', config: createMockTenantConfig() }],
@@ -434,10 +436,10 @@ describe('TenantRegistry', () => {
 
       const deletedTenant = { name: 'deleted-tenant', config: deletedConfig, isScanning: false };
       const cleanupService = tenantStorage.run(deletedTenant, () =>
-        serviceRegistry.getService(TenantCleanupService),
+        serviceRegistry.getService(TenantDeleteService),
       );
 
-      expect(cleanupService).toBeInstanceOf(TenantCleanupService);
+      expect(cleanupService).toBeInstanceOf(TenantDeleteService);
     });
   });
 });

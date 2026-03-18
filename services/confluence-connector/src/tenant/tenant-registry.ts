@@ -21,9 +21,9 @@ import { FileDiffService } from '../synchronization/file-diff.service';
 import { IngestionService } from '../synchronization/ingestion.service';
 import { ScopeManagementService } from '../synchronization/scope-management.service';
 import { ServiceRegistry } from './service-registry';
-import { TenantCleanupService } from './tenant-cleanup.service';
 import type { TenantContext } from './tenant-context.interface';
 import { tenantStorage } from './tenant-context.storage';
+import { TenantDeleteService } from './tenant-delete.service';
 
 @Injectable()
 export class TenantRegistry implements OnModuleInit {
@@ -140,8 +140,8 @@ export class TenantRegistry implements OnModuleInit {
         });
         this.serviceRegistry.register(tenantName, UniqueApiClient, uniqueClient);
 
-        const cleanupService = new TenantCleanupService(tenantName, config.ingestion, uniqueClient);
-        this.serviceRegistry.register(tenantName, TenantCleanupService, cleanupService);
+        const cleanupService = new TenantDeleteService(tenantName, config.ingestion, uniqueClient);
+        this.serviceRegistry.register(tenantName, TenantDeleteService, cleanupService);
 
         this.logger.log({ tenantName, msg: 'Deleted tenant registered for cleanup' });
       });
@@ -170,8 +170,8 @@ export class TenantRegistry implements OnModuleInit {
     for (const tenant of this.deletedTenants.values()) {
       try {
         await this.run(tenant, async () => {
-          const cleanupService = this.serviceRegistry.getService(TenantCleanupService);
-          await cleanupService.cleanup();
+          const cleanupService = this.serviceRegistry.getService(TenantDeleteService);
+          await cleanupService.deleteTenantContent();
         });
       } catch (error) {
         this.logger.error({ tenantName: tenant.name, err: error, msg: 'Tenant cleanup failed' });
