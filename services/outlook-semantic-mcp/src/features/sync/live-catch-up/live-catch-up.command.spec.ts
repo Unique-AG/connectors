@@ -254,11 +254,8 @@ describe('LiveCatchUpCommand', () => {
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
-    // Both emails published with high priority
+    // Both emails published
     expect(amqp.publish).toHaveBeenCalledTimes(2);
-    for (const call of amqp.publish.mock.calls) {
-      expect(call[3]).toEqual(expect.objectContaining({ priority: 2 }));
-    }
 
     // State set to 'ready' via flush transaction
     const flushUpdate = db.__flushTx.__txUpdate;

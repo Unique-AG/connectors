@@ -212,28 +212,38 @@ export class IngestEmailCommand {
     logContext.uniqueContentId = content.id;
     this.logger.debug({ ...logContext, msg: `Register content: Finished` });
 
-    const contentLength = await this.getContentLength({ messageId, client });
-    const contentStream = await this.getEmlFileStream({ messageId, client });
-    this.logger.debug({ ...logContext, msg: `File Upload: Started` });
-    await this.uploadFileForIngestionCommand.run({
-      uploadUrl: content.writeUrl,
-      // We read the content length consuming the stream because our upload email
-      // fails without it and it expects it up front.
-      contentLength,
-      content: contentStream,
-      mimeType: createContentRequest.mimeType,
-    });
-    this.logger.debug({ ...logContext, msg: `File Upload: Finished` });
+    try {
+      const contentLength = await this.getContentLength({ messageId, client });
+      const contentStream = await this.getEmlFileStream({ messageId, client });
+      this.logger.debug({ ...logContext, msg: `File Upload: Started` });
+      await this.uploadFileForIngestionCommand.run({
+        uploadUrl: content.writeUrl,
+        // We read the content length consuming the stream because our upload email
+        // fails without it and it expects it up front.
+        contentLength,
+        content: contentStream,
+        mimeType: createContentRequest.mimeType,
+      });
+      this.logger.debug({ ...logContext, msg: `File Upload: Finished` });
 
-    this.logger.debug({ ...logContext, msg: `Finalize Ingestion: Started` });
-    await this.uniqueApi.ingestion.finalizeIngestion({
-      ...omit(createContentRequest, ['byteSize']),
-      fileUrl: content.readUrl,
-      url: content.readUrl,
-      baseUrl: graphMessage.webLink,
-    });
-    traceEvent(`File Ingestion Finished`);
-    this.logger.debug({ ...logContext, msg: `Finalize Ingestion: Finished` });
+      this.logger.debug({ ...logContext, msg: `Finalize Ingestion: Started` });
+      await this.uniqueApi.ingestion.finalizeIngestion({
+        ...omit(createContentRequest, ['byteSize']),
+        fileUrl: content.readUrl,
+        url: content.readUrl,
+        baseUrl: graphMessage.webLink,
+      });
+      traceEvent(`File Ingestion Finished`);
+      this.logger.debug({ ...logContext, msg: `Finalize Ingestion: Finished` });
+    } catch (error) {
+      this.logger.warn({ ...logContext, msg: `Cleaning up registered content after ingestion failure` });
+      try {
+        await this.uniqueApi.files.delete(content.id);
+      } catch (cleanupError) {
+        this.logger.error({ ...logContext, err: cleanupError, msg: `Failed to clean up registered content` });
+      }
+      throw error;
+    }
   }
 
   private async getContentLength({
