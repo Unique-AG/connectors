@@ -92,7 +92,7 @@ export class AddAttachmentsToDraftEmailCommand {
             });
             break;
           case 'data':
-            attachment = this.resolveDataAttachment(parsed);
+            attachment = { data: parsed.data, filename: parsed.filename, size: parsed.data.length };
             break;
         }
 
@@ -199,10 +199,6 @@ export class AddAttachmentsToDraftEmailCommand {
 
     const data = Buffer.from(await response.arrayBuffer());
     return { data, filename, size: data.length };
-  }
-
-  private resolveDataAttachment(parsed: Extract<ParsedUri, { type: 'data' }>): AttachmentContent {
-    return { data: parsed.data, filename: parsed.filename, size: parsed.data.length };
   }
 
   private async resolveUniqueIdentity(email: string): Promise<ResolvedUniqueIdentity> {
