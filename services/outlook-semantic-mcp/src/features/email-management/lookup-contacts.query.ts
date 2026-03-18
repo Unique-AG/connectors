@@ -132,7 +132,7 @@ export class LookupContactsQuery {
           // The People API requires the $search value to be wrapped in double quotes.
           // Any literal quotes in the input are stripped to prevent query injection.
           $search: `"${name.replace(/"/g, '')}"`,
-          $top: 25,
+          $top: 50,
           $select: 'displayName,scoredEmailAddresses',
         })
         .get();
@@ -190,13 +190,15 @@ export class LookupContactsQuery {
     const { value: items = [] } = MsGraphInboxMessagesResponseSchema.parse(raw);
     return pipe(
       items,
-      flatMap((message) => {
+      map((message) => {
         const senderName = message.from?.emailAddress?.name;
         const senderEmail = message.from?.emailAddress?.address;
-        return senderName && senderEmail
-          ? [{ name: senderName, email: senderEmail, source: 'inbox' as const }]
-          : [];
+        if (!senderName || !senderEmail) {
+          return null;
+        }
+        return { name: senderName, email: senderEmail, source: 'inbox' as const };
       }),
+      filter(isNonNullish),
     );
   }
 }
