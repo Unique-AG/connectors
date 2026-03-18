@@ -30,6 +30,19 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       });
   }
 
+  public onModuleDestroy(): void {
+    this.logger.log({ msg: 'Shutting down tenant sync scheduler' });
+    this.isShuttingDown = true;
+    try {
+      for (const [name, job] of this.schedulerRegistry.getCronJobs()) {
+        this.logger.log({ msg: `Stopping cron job: ${name}` });
+        job.stop();
+      }
+    } catch (error) {
+      this.logger.error({ err: error, msg: 'Error stopping cron jobs' });
+    }
+  }
+
   private scheduleActiveTenantSyncs(): void {
     if (this.isShuttingDown) {
       this.logger.log({ msg: 'Shutdown in progress, skipping sync scheduling' });
@@ -45,19 +58,6 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       this.logger.log({ tenantName: tenant.name, msg: 'Triggering initial sync' });
       void this.syncTenant(tenant);
       this.registerCronJob(tenant);
-    }
-  }
-
-  public onModuleDestroy(): void {
-    this.logger.log({ msg: 'Shutting down tenant sync scheduler' });
-    this.isShuttingDown = true;
-    try {
-      for (const [name, job] of this.schedulerRegistry.getCronJobs()) {
-        this.logger.log({ msg: `Stopping cron job: ${name}` });
-        job.stop();
-      }
-    } catch (error) {
-      this.logger.error({ err: error, msg: 'Error stopping cron jobs' });
     }
   }
 
