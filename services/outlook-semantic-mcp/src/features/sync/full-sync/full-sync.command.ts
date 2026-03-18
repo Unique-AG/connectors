@@ -6,7 +6,7 @@ import { isNullish } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { FullSyncBatchService } from './process-full-sync-batch.command';
+import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
 
@@ -30,7 +30,7 @@ export class FullSyncCommand {
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
-    private readonly batchService: FullSyncBatchService,
+    private readonly processFullSyncBatchCommand: ProcessFullSyncBatchCommand,
     private readonly getScopeIngestionStatsQuery: GetScopeIngestionStatsQuery,
     private readonly updateByVersionCommand: UpdateInboxConfigByVersionCommand,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
@@ -75,7 +75,10 @@ export class FullSyncCommand {
         await this.fetchAndSaveExpectedTotal(userProfileId, version);
       }
 
-      const batchResult = await this.batchService.processBatch({ userProfileId, version });
+      const batchResult = await this.processFullSyncBatchCommand.processBatch({
+        userProfileId,
+        version,
+      });
 
       switch (batchResult.outcome) {
         case 'version-mismatch':

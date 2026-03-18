@@ -163,6 +163,30 @@ export const FullSyncGraphMessageFields = asAllOptions<keyof FullSyncGraphMessag
   `uniqueBody`,
 ]);
 
+const fullSyncBatchGraphMessage = graphMessageSchema.pick({
+  id: true,
+  createdDateTime: true,
+  from: true,
+  subject: true,
+  uniqueBody: true,
+});
+
+export type FullSyncBatchGraphMessage = z.infer<typeof fullSyncBatchGraphMessage>;
+
+export const FullSyncBatchGraphMessageFields = asAllOptions<keyof FullSyncBatchGraphMessage>()([
+  `id`,
+  `createdDateTime`,
+  `from`,
+  `subject`,
+  `uniqueBody`,
+]);
+
+export const fullSyncBatchGraphMessageResponseSchema = z.object({
+  '@odata.context': z.string().optional(),
+  value: z.array(fullSyncBatchGraphMessage),
+  '@odata.nextLink': z.string().optional(),
+});
+
 export const fullSyncGraphMessageResponseSchema = z.object({
   '@odata.context': z.string().optional(),
   value: z.array(fullSyncGraphMessage),
