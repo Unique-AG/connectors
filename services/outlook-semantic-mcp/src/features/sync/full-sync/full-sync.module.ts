@@ -8,6 +8,7 @@ import { SubscriptionUtilsModule } from '../../user-utils/subscription-utils.mod
 import { ExecuteFullSyncCommand } from './execute-full-sync.command';
 import { FindInboxConfigByVersionQuery } from './find-inbox-config-by-version.query';
 import { FullSyncResetCommand } from './full-sync-reset.command';
+import { FullSyncCommand } from './full-sync.command';
 import { FullSyncListener } from './full-sync.listener';
 import { GetFullSyncStatsQuery } from './get-full-sync-stats.query';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
@@ -29,6 +30,7 @@ import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-vers
     StartFullSyncCommand,
     ExecuteFullSyncCommand,
     RecoverFullSyncCommand,
+    FullSyncCommand,
     FullSyncResetCommand,
     FullSyncListener,
     GetFullSyncStatsQuery,

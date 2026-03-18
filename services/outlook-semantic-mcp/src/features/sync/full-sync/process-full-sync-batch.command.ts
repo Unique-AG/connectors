@@ -57,7 +57,7 @@ export class ProcessFullSyncBatchCommand {
   }
 
   @Span()
-  public async processBatch({
+  public async run({
     userProfileId,
     version,
   }: {
@@ -98,7 +98,9 @@ export class ProcessFullSyncBatchCommand {
       const pageStart = Date.now();
       const pageData = await this.fetchPage(client, nextLink, filters, userProfileId, version);
       const pageDurationMs = Date.now() - pageStart;
-      this.graphPageDuration.record(pageDurationMs / 1000, { page_type: nextLink === START_FULL_SYNC_LINK ? 'first' : 'next' });
+      this.graphPageDuration.record(pageDurationMs / 1000, {
+        page_type: nextLink === START_FULL_SYNC_LINK ? 'first' : 'next',
+      });
       const page = pageData.messages;
 
       this.logger.log({
@@ -231,7 +233,10 @@ export class ProcessFullSyncBatchCommand {
         if (!isExpiredNextLink) {
           throw error;
         }
-        this.logger.warn({ userProfileId, msg: 'Graph API nextLink expired (410), falling back to first page' });
+        this.logger.warn({
+          userProfileId,
+          msg: 'Graph API nextLink expired (410), falling back to first page',
+        });
         const freshConfig = await this.findConfigByVersion.run(userProfileId, version);
         if (freshConfig?.oldestCreatedDateTime) {
           conditions.push(`createdDateTime le ${freshConfig.oldestCreatedDateTime.toISOString()}`);
@@ -299,7 +304,11 @@ export class ProcessFullSyncBatchCommand {
     }
 
     this.messagesProcessed.add(1, { outcome: 'failed' });
-    this.logger.warn({ userProfileId, messageId: message.id, msg: 'Message ingestion failed after retries' });
+    this.logger.warn({
+      userProfileId,
+      messageId: message.id,
+      msg: 'Message ingestion failed after retries',
+    });
     const saved = await this.updateByVersionCommand.run(userProfileId, version, {
       fullSyncFailedToUploadForIngestion: sql`${inboxConfiguration.fullSyncFailedToUploadForIngestion} + 1`,
       fullSyncHeartbeatAt: sql`NOW()`,

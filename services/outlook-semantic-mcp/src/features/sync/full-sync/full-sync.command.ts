@@ -75,7 +75,7 @@ export class FullSyncCommand {
         await this.fetchAndSaveExpectedTotal(userProfileId, version);
       }
 
-      const batchResult = await this.processFullSyncBatchCommand.processBatch({
+      const batchResult = await this.processFullSyncBatchCommand.run({
         userProfileId,
         version,
       });
