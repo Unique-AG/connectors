@@ -27,9 +27,11 @@ export class TenantCleanupService {
 
     // For V1 tenants, content is owned by child scopes (flat hierarchy), so no child scopes = no content.
     // For V2 tenants, content is keyed by tenant name prefix, so we check the count directly.
-    const hasContent = useV1KeyFormat
-      ? childScopes.length > 0
-      : (await this.uniqueClient.files.getCountByKeyPrefix(this.tenantName)) > 0;
+    let hasContent = childScopes.length > 0;
+    if (!useV1KeyFormat && !hasContent) {
+      const contentCount = await this.uniqueClient.files.getCountByKeyPrefix(this.tenantName);
+      hasContent = contentCount > 0;
+    }
 
     if (childScopes.length === 0 && !hasContent) {
       this.logger.log({ tenantName: this.tenantName, msg: 'Already cleaned up, skipping' });
