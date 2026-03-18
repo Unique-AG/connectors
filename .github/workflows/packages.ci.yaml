@@ -20,8 +20,8 @@ concurrency:
 jobs:
   validate:
     permissions:
-      packages: write # cache needs write access
-    runs-on: ubuntu-latest
+      actions: write # cache needs write access
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1

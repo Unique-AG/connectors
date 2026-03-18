@@ -19,7 +19,7 @@ concurrency:
 jobs:
   validate:
     permissions:
-      packages: write # cache needs write access
+      actions: write # cache needs write access
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -176,7 +176,7 @@ jobs:
   validate-terraform:
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       SERVICE_PATH: ${{ inputs.service-path }}
