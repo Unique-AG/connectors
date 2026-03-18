@@ -35,7 +35,15 @@ export const META = createMeta({
     The **only** exception: if after searching with \`search_emails\` and \`lookup_contacts\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
 
     ### What \`create_draft_email\` Does
-    Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and attachments from the Unique knowledge base by providing their content IDs (e.g. cont_j23i0ifr44sdn7cz97ubleb7). The tool resolves content IDs automatically — do not base64-encode files manually. The draft is saved and can be reviewed or sent later.`,
+    Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and attachments. The draft is saved and can be reviewed or sent later.
+
+    ### Attachments
+    To attach files, pass an array of URIs in the \`attachments\` field. Supported URI schemes:
+    - **Unique content**: Use \`unique://chat/{chatId}/content/{contentId}\` to attach files from the Unique knowledge base. Construct this URI using the chat ID and content ID. Example: \`unique://chat/chat_abc123/content/cont_j23i0ifr44sdn7cz97ubleb7\`.
+    - **Data URIs**: Use \`data:[mediatype];base64,<base64data>\` for inline content.
+    - **External URLs**: Use \`https://...\` to attach files from external URLs.
+
+    Do not pass raw content IDs — always use the \`unique://\` URI scheme for Unique knowledge base files. If an attachment fails, the draft is still created and the failure reason is reported in the response.`,
   toolFormatInformation: `## Format for Draft Emails
   When presenting a draft email, always use the following format exactly:
   📩 **{Subject}** [open](https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem)

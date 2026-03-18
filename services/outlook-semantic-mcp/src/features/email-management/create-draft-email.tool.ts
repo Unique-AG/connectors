@@ -1,10 +1,12 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
+import { CallToolRequest } from '@modelcontextprotocol/sdk/types.js';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
+import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
 import { CreateDraftEmailCommand } from './create-draft-email.command';
 import { META } from './create-draft-email-tool.meta';
 
@@ -37,13 +39,14 @@ const CreateDraftEmailInputSchema = z.object({
     )
     .optional()
     .describe('The list of CC (carbon copy) recipients for the email.'),
-  attachmentIds: z
+  attachments: z
     .array(z.string())
     .optional()
     .describe(
-      'IDs of files from the Unique knowledge base to attach to this email. ' +
-        'These are content IDs, not file paths. ' +
-        'Examples: cont_j23i0ifr44sdn7cz97ubleb7, cont_h346inqws1s3686luftk96yt, cont_tl4uzdijj93r98lcxtk8js9k',
+      'URIs of files to attach to this email. Supported schemes:\n' +
+        '- unique://chat/{chatId}/content/{contentId} for Unique knowledge base files\n' +
+        '- data:[mediatype][;base64],<data> for inline base64-encoded content\n' +
+        '- https://... for external file URLs',
     ),
 });
 
@@ -55,7 +58,7 @@ const CreateDraftEmailOutputSchema = z.object({
   attachmentsFailed: z
     .array(
       z.object({
-        contentId: z.string(),
+        uri: z.string(),
         reason: z.string(),
       }),
     )
@@ -67,6 +70,7 @@ export class CreateDraftEmailTool {
   public constructor(
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     private readonly createDraftEmailCommand: CreateDraftEmailCommand,
+    private readonly addAttachmentsToDraftEmailCommand: AddAttachmentsToDraftEmailCommand,
   ) {}
 
   @Tool({
@@ -88,14 +92,41 @@ export class CreateDraftEmailTool {
   @Span()
   public async createDraftEmail(
     input: z.infer<typeof CreateDraftEmailInputSchema>,
-    _context: Context,
+    context: Context,
     request: McpAuthenticatedRequest,
   ) {
-    const userProfileTypeId = extractUserProfileId(request);
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
+    const userProfileId = extractUserProfileId(request);
+    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileId);
     if (!subscriptionStatus.success) {
       return subscriptionStatus;
     }
-    return this.createDraftEmailCommand.run(userProfileTypeId, input);
+
+    const draftResult = await this.createDraftEmailCommand.run(userProfileId, input);
+    if (!draftResult.success) {
+      return draftResult;
+    }
+
+    if (input.attachments && input.attachments.length > 0) {
+      const mcpMeta = (context.mcpRequest as CallToolRequest).params?._meta as
+        | Record<string, unknown>
+        | undefined;
+      const chatId = typeof mcpMeta?.chatId === 'string' ? mcpMeta.chatId : undefined;
+
+      const attachmentResult = await this.addAttachmentsToDraftEmailCommand.run(userProfileId, {
+        draftId: draftResult.draftId,
+        attachments: input.attachments,
+        chatId,
+      });
+
+      return {
+        ...draftResult,
+        attachmentsFailed:
+          attachmentResult.attachmentsFailed.length > 0
+            ? attachmentResult.attachmentsFailed
+            : undefined,
+      };
+    }
+
+    return draftResult;
   }
 }

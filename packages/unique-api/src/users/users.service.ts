@@ -9,7 +9,7 @@ import {
   type ListUsersQueryInput,
   type ListUsersQueryResult,
 } from './users.queries';
-import type { SimpleUser } from './users.types';
+import type { SimpleUser, UserWithCompany } from './users.types';
 
 const BATCH_SIZE = 100;
 
@@ -54,5 +54,27 @@ export class UsersService implements UniqueUsersFacade {
       await this.scopeManagementClient.request<GetCurrentUserQueryResult>(GET_CURRENT_USER_QUERY);
 
     return result.me.user.id;
+  }
+
+  public async findByEmail(email: string): Promise<UserWithCompany | null> {
+    const batchResult = await this.scopeManagementClient.request<
+      ListUsersQueryResult,
+      ListUsersQueryInput
+    >(LIST_USERS_QUERY, {
+      skip: 0,
+      take: 1,
+      where: {
+        email: {
+          equals: email,
+        },
+      },
+    });
+
+    const user = batchResult.listUsers.nodes.at(0);
+    if (user) {
+      return { id: user.id, email: user.email, companyId: user.companyId };
+    }
+
+    return null;
   }
 }

@@ -1,0 +1,235 @@
+import { UniqueApiClient } from '@unique-ag/unique-api';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Span } from 'nestjs-otel';
+import { z } from 'zod';
+import { UniqueConfig, type UniqueConfigNamespaced } from '~/config';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { type ParsedUri, parseAttachmentUri } from './parse-attachment-uri';
+import { uploadChunk } from './upload-chunk';
+
+const UploadSessionSchema = z.object({ uploadUrl: z.string() });
+
+const UPLOAD_CHUNK_SIZE = 5 * 1024 * 1024;
+
+export interface AddAttachmentsInput {
+  draftId: string;
+  attachments: string[];
+  chatId?: string;
+}
+
+export interface AttachmentFailure {
+  uri: string;
+  reason: string;
+}
+
+export interface AddAttachmentsResult {
+  attachmentsFailed: AttachmentFailure[];
+}
+
+type AttachmentContent =
+  | { data: Buffer; filename: string; size: number }
+  | { failure: AttachmentFailure };
+
+type ResolvedUniqueIdentity = { userId: string; companyId: string } | null;
+
+@Injectable()
+export class AddAttachmentsToDraftEmailCommand {
+  private readonly logger = new Logger(this.constructor.name);
+
+  public constructor(
+    private readonly graphClientFactory: GraphClientFactory,
+    private readonly getUserProfileQuery: GetUserProfileQuery,
+    @InjectUniqueApi() private readonly uniqueApiClient: UniqueApiClient,
+    private readonly configService: ConfigService<UniqueConfigNamespaced, true>,
+  ) {}
+
+  @Span()
+  public async run(
+    userProfileId: UserProfileTypeID,
+    input: AddAttachmentsInput,
+  ): Promise<AddAttachmentsResult> {
+    const userProfileIdString = userProfileId.toString();
+    const client = this.graphClientFactory.createClientForUser(userProfileIdString);
+    const attachmentsFailed: AttachmentFailure[] = [];
+    const profile = await this.getUserProfileQuery.run(userProfileId);
+
+    const uniqueConfig = this.configService.get('unique', { infer: true });
+    const uniqueIdentity = await this.resolveUniqueIdentity(profile.email, uniqueConfig);
+
+    for (const uri of input.attachments) {
+      try {
+        const parsed = parseAttachmentUri(uri);
+        let attachment: AttachmentContent;
+
+        switch (parsed.type) {
+          case 'unique':
+            attachment = await this.resolveUniqueAttachment({
+              parsed,
+              uri,
+              uniqueConfig,
+              uniqueIdentity,
+              fallbackChatId: input.chatId,
+            });
+            break;
+          case 'data':
+            attachment = this.resolveDataAttachment(parsed);
+            break;
+          case 'url':
+            attachment = await this.resolveUrlAttachment(parsed, uri);
+            break;
+        }
+
+        if ('failure' in attachment) {
+          attachmentsFailed.push(attachment.failure);
+          continue;
+        }
+
+        await this.uploadToGraph(
+          client,
+          input.draftId,
+          attachment.data,
+          attachment.filename,
+          attachment.size,
+        );
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        this.logger.warn({
+          err,
+          userProfileId: userProfileIdString,
+          uri,
+          msg: 'Attachment failed',
+        });
+        attachmentsFailed.push({ uri, reason });
+      }
+    }
+
+    return { attachmentsFailed };
+  }
+
+  private async resolveUniqueAttachment({
+    parsed,
+    uri,
+    uniqueIdentity,
+    uniqueConfig,
+    fallbackChatId,
+  }: {
+    parsed: Extract<ParsedUri, { type: 'unique' }>;
+    uri: string;
+    uniqueConfig: UniqueConfig;
+    uniqueIdentity: ResolvedUniqueIdentity;
+    fallbackChatId?: string;
+  }): Promise<AttachmentContent> {
+    const chatId = parsed.chatId || fallbackChatId;
+    if (!chatId) {
+      return { failure: { uri, reason: 'Missing chatId for unique:// attachment' } };
+    }
+
+    if (!uniqueIdentity) {
+      return { failure: { uri, reason: 'Could not resolve unique identity' } };
+    }
+
+    // We impersonate the Unique user so the content API authorizes
+    // the download as if the user themselves initiated it.
+    const contentUrl = `${uniqueConfig.ingestionServiceBaseUrl}/v1/content/${encodeURIComponent(parsed.contentId)}/file`;
+
+    const response = await fetch(contentUrl, {
+      headers: {
+        'x-user-id': uniqueIdentity.userId,
+        'x-company-id': uniqueIdentity.companyId,
+        'x-service-id': 'outlook-semantic-mcp',
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      return {
+        failure: { uri, reason: `Unique content download failed (${response.status}): ${text}` },
+      };
+    }
+
+    const contentDisposition = response.headers.get('content-disposition');
+    const filenameMatch = contentDisposition?.match(/filename="?([^";]+)"?/);
+    const filename = filenameMatch?.[1] ?? parsed.contentId;
+
+    const data = Buffer.from(await response.arrayBuffer());
+    return { data, filename, size: data.length };
+  }
+
+  private resolveDataAttachment(parsed: Extract<ParsedUri, { type: 'data' }>): AttachmentContent {
+    return { data: parsed.data, filename: parsed.filename, size: parsed.data.length };
+  }
+
+  private async resolveUrlAttachment(
+    parsed: Extract<ParsedUri, { type: 'url' }>,
+    uri: string,
+  ): Promise<AttachmentContent> {
+    const response = await fetch(parsed.url);
+    if (!response.ok) {
+      return { failure: { uri, reason: `URL download failed (${response.status})` } };
+    }
+
+    const contentDisposition = response.headers.get('content-disposition');
+    const filenameMatch = contentDisposition?.match(/filename="?([^";]+)"?/);
+    const urlPath = new URL(parsed.url).pathname;
+    const filename = filenameMatch?.[1] ?? urlPath.split('/').pop() ?? 'attachment';
+
+    const data = Buffer.from(await response.arrayBuffer());
+    return { data, filename, size: data.length };
+  }
+
+  private async resolveUniqueIdentity(
+    email: string,
+    uniqueConfig: UniqueConfig,
+  ): Promise<ResolvedUniqueIdentity> {
+    if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
+      this.logger.error({
+        msg: 'Failed to resolve unique user identity. App is not in cluster local',
+      });
+      return null;
+    }
+    try {
+      const uniqueUser = await this.uniqueApiClient.users.findByEmail(email);
+      if (uniqueUser) {
+        return { userId: uniqueUser.id, companyId: uniqueUser.companyId };
+      }
+    } catch (err) {
+      this.logger.error({ msg: 'Failed to resolve unique user identity', err });
+    }
+    return null;
+  }
+
+  private async uploadToGraph(
+    client: ReturnType<GraphClientFactory['createClientForUser']>,
+    draftId: string,
+    data: Buffer,
+    filename: string,
+    totalSize: number,
+  ): Promise<void> {
+    if (totalSize <= 3 * 1024 * 1024) {
+      await client.api(`/me/messages/${draftId}/attachments`).post({
+        '@odata.type': '#microsoft.graph.fileAttachment',
+        name: filename,
+        contentBytes: data.toString('base64'),
+      });
+      return;
+    }
+
+    const { uploadUrl } = UploadSessionSchema.parse(
+      await client.api(`/me/messages/${draftId}/attachments/createUploadSession`).post({
+        AttachmentItem: { attachmentType: 'file', name: filename, size: totalSize },
+      }),
+    );
+
+    let offset = 0;
+    while (offset < totalSize) {
+      const end = Math.min(offset + UPLOAD_CHUNK_SIZE, totalSize);
+      const chunk = data.subarray(offset, end);
+      await uploadChunk(uploadUrl, chunk, offset, totalSize);
+      offset = end;
+    }
+  }
+}
