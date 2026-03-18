@@ -196,13 +196,9 @@ describe('AddAttachmentsToDraftEmailCommand', () => {
     });
   });
 
-  describe('https:// URL attachments', () => {
-    it('downloads and uploads external URL content', async () => {
+  describe('unsupported URIs', () => {
+    it('reports failure for https:// URLs (SSRF risk — not supported)', async () => {
       const { command } = createCommand();
-      fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValueOnce(new Response(Buffer.from('external-file'), { status: 200 }));
-
       const input: AddAttachmentsInput = {
         draftId: DRAFT_ID,
         attachments: ['https://example.com/files/document.pdf'],
@@ -210,30 +206,10 @@ describe('AddAttachmentsToDraftEmailCommand', () => {
 
       const result = await command.run(USER_PROFILE_ID, input);
 
-      expect(result.attachmentsFailed).toHaveLength(0);
-      expect(fetchSpy).toHaveBeenCalledWith('https://example.com/files/document.pdf');
+      expect(result.attachmentsFailed).toHaveLength(1);
+      expect(result.attachmentsFailed[0]?.uri).toBe('https://example.com/files/document.pdf');
     });
 
-    it('reports failure when external URL returns non-200', async () => {
-      const { command } = createCommand();
-      fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValueOnce(new Response('Not Found', { status: 404 }));
-
-      const input: AddAttachmentsInput = {
-        draftId: DRAFT_ID,
-        attachments: ['https://example.com/missing.pdf'],
-      };
-
-      const result = await command.run(USER_PROFILE_ID, input);
-
-      expect(result.attachmentsFailed).toEqual([
-        { uri: 'https://example.com/missing.pdf', reason: 'URL download failed (404)' },
-      ]);
-    });
-  });
-
-  describe('unsupported URIs', () => {
     it('reports failure for unsupported URI schemes', async () => {
       const { command } = createCommand();
       const input: AddAttachmentsInput = {
@@ -254,22 +230,21 @@ describe('AddAttachmentsToDraftEmailCommand', () => {
       const base64Content = Buffer.from('inline-data').toString('base64');
       fetchSpy = vi
         .spyOn(globalThis, 'fetch')
-        .mockResolvedValueOnce(new Response(Buffer.from('unique-content'), { status: 200 }))
-        .mockResolvedValueOnce(new Response('Forbidden', { status: 403 }));
+        .mockResolvedValueOnce(new Response(Buffer.from('unique-content'), { status: 200 }));
 
       const input: AddAttachmentsInput = {
         draftId: DRAFT_ID,
         attachments: [
           `data:text/plain;base64,${base64Content}`,
           'unique://chat/chat_1/content/cont_ok',
-          'https://example.com/forbidden.pdf',
+          'ftp://example.com/unsupported.pdf',
         ],
       };
 
       const result = await command.run(USER_PROFILE_ID, input);
 
       expect(result.attachmentsFailed).toHaveLength(1);
-      expect(result.attachmentsFailed[0]?.uri).toBe('https://example.com/forbidden.pdf');
+      expect(result.attachmentsFailed[0]?.uri).toBe('ftp://example.com/unsupported.pdf');
     });
   });
 });

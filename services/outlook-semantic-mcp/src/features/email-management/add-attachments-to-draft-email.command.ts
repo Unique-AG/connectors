@@ -8,7 +8,6 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { assertExternalUrl } from './assert-external-url';
 import { type ParsedUri, parseAttachmentUri } from './parse-attachment-uri';
 import { uploadChunk } from './upload-chunk';
 
@@ -76,9 +75,6 @@ export class AddAttachmentsToDraftEmailCommand {
             break;
           case 'data':
             attachment = this.resolveDataAttachment(parsed);
-            break;
-          case 'url':
-            attachment = await this.resolveUrlAttachment(parsed, uri);
             break;
         }
 
@@ -164,31 +160,9 @@ export class AddAttachmentsToDraftEmailCommand {
     return { data: parsed.data, filename: parsed.filename, size: parsed.data.length };
   }
 
-  private async resolveUrlAttachment(
-    parsed: Extract<ParsedUri, { type: 'url' }>,
-    uri: string,
-  ): Promise<AttachmentContent> {
-    assertExternalUrl(parsed.url);
-    const response = await fetch(parsed.url);
-    if (!response.ok) {
-      return { failure: { uri, reason: `URL download failed (${response.status})` } };
-    }
-
-    const contentDisposition = response.headers.get('content-disposition');
-    const filenameMatch = contentDisposition?.match(/filename="?([^";]+)"?/);
-    const urlPath = new URL(parsed.url).pathname;
-    const filename = filenameMatch?.[1] ?? urlPath.split('/').pop() ?? 'attachment';
-
-    const data = Buffer.from(await response.arrayBuffer());
-    return { data, filename, size: data.length };
-  }
-
   private async resolveUniqueIdentity(email: string): Promise<ResolvedUniqueIdentity> {
     const uniqueConfig = this.configService.get('unique', { infer: true });
     if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
-      this.logger.error({
-        msg: 'Failed to resolve unique user identity. App is not in cluster local',
-      });
       return null;
     }
     try {

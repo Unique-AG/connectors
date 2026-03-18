@@ -45,7 +45,7 @@ const CreateDraftEmailInputSchema = z.object({
       'URIs of files to attach to this email. Supported schemes:\n' +
         '- unique://chat/{chatId}/content/{contentId} for Unique knowledge base files\n' +
         '- data:[mediatype][;base64],<data> for inline base64-encoded content\n' +
-        '- https://... for external file URLs',
+        'External URLs (https://) are not supported — fetching arbitrary URLs server-side creates an SSRF risk.',
     ),
 });
 

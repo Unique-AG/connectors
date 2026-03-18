@@ -44,8 +44,6 @@ export class CreateDraftEmailCommand {
     userProfileId: UserProfileTypeID,
     input: CreateDraftEmailInput,
   ): Promise<CreateDraftEmailResult> {
-    const _userProfileIdString = userProfileId.toString();
-
     const createDraftResult = await this.createDraft(userProfileId, input);
     if (!createDraftResult.success) {
       return createDraftResult;

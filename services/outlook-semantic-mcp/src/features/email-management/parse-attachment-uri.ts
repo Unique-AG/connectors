@@ -1,7 +1,11 @@
+// Arbitrary external URLs are intentionally not supported.
+// Fetching user-supplied URLs server-side would expose the service to SSRF attacks:
+// an attacker (or a prompt-injected LLM) could target internal infrastructure
+// (metadata servers, cluster-internal services, etc.) by supplying a crafted URL.
+// Use `unique://` for Unique knowledge-base files or `data:` for inline content instead.
 export type ParsedUri =
-  | { type: 'unique'; chatId: string; contentId: string }
-  | { type: 'data'; mimeType: string; data: Buffer; filename: string }
-  | { type: 'url'; url: string };
+  | { type: 'unique'; chatId: string | null; contentId: string }
+  | { type: 'data'; mimeType: string; data: Buffer; filename: string };
 
 const UNIQUE_URI_PATTERN = /^unique:\/\/chat\/([^/]*)\/content\/([^/]+)$/;
 const DATA_URI_PATTERN = /^data:([^;,]*)(;base64)?,(.*)$/s;
@@ -11,7 +15,7 @@ export function parseAttachmentUri(uri: string): ParsedUri {
   if (uniqueMatch) {
     const chatId = uniqueMatch[1];
     const contentId = uniqueMatch[2];
-    return { type: 'unique', chatId: chatId ?? '', contentId: contentId ?? '' };
+    return { type: 'unique', chatId: chatId || null, contentId: contentId ?? '' };
   }
 
   const dataMatch = uri.match(DATA_URI_PATTERN);
@@ -27,10 +31,6 @@ export function parseAttachmentUri(uri: string): ParsedUri {
     const filename = `attachment.${ext}`;
 
     return { type: 'data', mimeType, data, filename };
-  }
-
-  if (uri.startsWith('https://') || uri.startsWith('http://')) {
-    return { type: 'url', url: uri };
   }
 
   throw new Error(`Unsupported attachment URI scheme: ${uri.slice(0, 30)}`);

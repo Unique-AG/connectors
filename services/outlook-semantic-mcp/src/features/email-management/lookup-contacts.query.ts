@@ -117,7 +117,7 @@ export class LookupContactsQuery {
       sortBy([({ similarityScore }) => similarityScore, 'desc']),
     );
 
-    return { contacts, message: 'Contacts fetched succesfully' };
+    return { contacts, message: 'Contacts fetched successfully' };
   }
 
   private async fetchFromPeopleApi(

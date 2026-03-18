@@ -15,12 +15,12 @@ describe('parseAttachmentUri', () => {
       });
     });
 
-    it('parses unique URI with empty chatId as empty string', () => {
+    it('parses unique URI with empty chatId as null', () => {
       const result = parseAttachmentUri('unique://chat//content/cont_abc');
 
       expect(result).toEqual({
         type: 'unique',
-        chatId: '',
+        chatId: null,
         contentId: 'cont_abc',
       });
     });
@@ -80,21 +80,19 @@ describe('parseAttachmentUri', () => {
     });
   });
 
-  describe('http(s) URL', () => {
-    it('parses an HTTPS URL', () => {
-      const result = parseAttachmentUri('https://example.com/file.pdf');
-
-      expect(result).toEqual({ type: 'url', url: 'https://example.com/file.pdf' });
-    });
-
-    it('parses an HTTP URL', () => {
-      const result = parseAttachmentUri('http://example.com/file.pdf');
-
-      expect(result).toEqual({ type: 'url', url: 'http://example.com/file.pdf' });
-    });
-  });
-
   describe('unsupported schemes', () => {
+    it('throws for https:// URLs (SSRF risk)', () => {
+      expect(() => parseAttachmentUri('https://example.com/file.pdf')).toThrow(
+        'Unsupported attachment URI scheme',
+      );
+    });
+
+    it('throws for http:// URLs (SSRF risk)', () => {
+      expect(() => parseAttachmentUri('http://example.com/file.pdf')).toThrow(
+        'Unsupported attachment URI scheme',
+      );
+    });
+
     it('throws for ftp:// scheme', () => {
       expect(() => parseAttachmentUri('ftp://example.com/file')).toThrow(
         'Unsupported attachment URI scheme',

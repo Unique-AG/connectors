@@ -41,9 +41,8 @@ export const META = createMeta({
     To attach files, pass an array of URIs in the \`attachments\` field. Supported URI schemes:
     - **Unique content**: Use \`unique://chat/{chatId}/content/{contentId}\` to attach files from the Unique knowledge base. Construct this URI using the chat ID and content ID. Example: \`unique://chat/chat_abc123/content/cont_j23i0ifr44sdn7cz97ubleb7\`.
     - **Data URIs**: Use \`data:[mediatype];base64,<base64data>\` for inline content.
-    - **External URLs**: Use \`https://...\` to attach files from external URLs.
 
-    Do not pass raw content IDs — always use the \`unique://\` URI scheme for Unique knowledge base files. If an attachment fails, the draft is still created and the failure reason is reported in the response.`,
+    External URLs (\`https://\`) are **not supported**. Fetching arbitrary user-supplied URLs server-side would expose the service to SSRF attacks (e.g. targeting internal infrastructure or cloud metadata endpoints). Do not pass raw content IDs — always use the \`unique://\` URI scheme for Unique knowledge base files. If an attachment fails, the draft is still created and the failure reason is reported in the response.`,
   toolFormatInformation: `## Format for Draft Emails
   When presenting a draft email, always use the following format exactly:
   📩 **{Subject}** [open](https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem)
