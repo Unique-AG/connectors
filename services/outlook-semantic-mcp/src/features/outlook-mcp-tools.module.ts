@@ -19,7 +19,13 @@ import {
   RemoveInboxConnectionTool,
   VerifyInboxConnectionTool,
 } from './subscriptions/tools';
-import { RunFullSyncTool, SyncProgressTool } from './sync/full-sync';
+import {
+  PauseFullSyncTool,
+  RestartFullSyncTool,
+  ResumeFullSyncTool,
+  RunFullSyncTool,
+  SyncProgressTool,
+} from './sync/full-sync';
 import { FullSyncModule } from './sync/full-sync/full-sync.module';
 import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { StuckSyncRecoveryModule } from './sync/stuck-sync-recovery.module';
@@ -27,6 +33,9 @@ import { StuckSyncRecoveryModule } from './sync/stuck-sync-recovery.module';
 const TOOLS = [
   ListFoldersTool,
   RunFullSyncTool,
+  PauseFullSyncTool,
+  ResumeFullSyncTool,
+  RestartFullSyncTool,
   SyncProgressTool,
   VerifyInboxConnectionTool,
   ReconnectInboxTool,

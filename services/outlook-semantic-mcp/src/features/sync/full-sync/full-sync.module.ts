@@ -9,6 +9,8 @@ import { ExecuteFullSyncCommand } from './execute-full-sync.command';
 import { FindInboxConfigByVersionQuery } from './find-inbox-config-by-version.query';
 import { FullSyncResetCommand } from './full-sync-reset.command';
 import { FullSyncCommand } from './full-sync.command';
+import { PauseFullSyncCommand } from './pause-full-sync.command';
+import { ResumeFullSyncCommand } from './resume-full-sync.command';
 import { FullSyncListener } from './full-sync.listener';
 import { GetFullSyncStatsQuery } from './get-full-sync-stats.query';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
@@ -32,6 +34,8 @@ import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-vers
     RecoverFullSyncCommand,
     FullSyncCommand,
     FullSyncResetCommand,
+    PauseFullSyncCommand,
+    ResumeFullSyncCommand,
     FullSyncListener,
     GetFullSyncStatsQuery,
     GetScopeIngestionStatsQuery,
@@ -42,6 +46,8 @@ import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-vers
   exports: [
     StartFullSyncCommand,
     FullSyncResetCommand,
+    PauseFullSyncCommand,
+    ResumeFullSyncCommand,
     GetFullSyncStatsQuery,
     GetScopeIngestionStatsQuery,
     UpdateInboxConfigByVersionCommand,
