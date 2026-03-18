@@ -5,6 +5,7 @@ import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config
 import { getDeletedTenantConfigs, getTenantConfigs } from '../../config/tenant-config-loader';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../../confluence-api';
 import { ServiceRegistry } from '../service-registry';
+import { TenantCleanupService } from '../tenant-cleanup.service';
 import { tenantStorage } from '../tenant-context.storage';
 import { TenantRegistry } from '../tenant-registry';
 
@@ -83,17 +84,6 @@ function createMockUniqueApiClient() {
     ingestion: { performFileDiff: vi.fn(), registerContent: vi.fn(), finalizeIngestion: vi.fn() },
     close: vi.fn(),
   };
-}
-
-function createMockTenantConfigWithV1(): TenantConfig {
-  const config = createMockTenantConfig();
-  return {
-    ...config,
-    ingestion: {
-      ...config.ingestion,
-      useV1KeyFormat: true,
-    },
-  } as unknown as TenantConfig;
 }
 
 function createRegistry(
@@ -373,19 +363,6 @@ describe('TenantRegistry', () => {
   });
 
   describe('processDeletedTenants', () => {
-    function getUniqueClientForTenant(
-      serviceRegistry: ServiceRegistry,
-      tenantName: string,
-      config: TenantConfig,
-    ): ReturnType<typeof createMockUniqueApiClient> {
-      const tenant = { name: tenantName, config, isScanning: false };
-      return tenantStorage.run(tenant, () => {
-        return serviceRegistry.getService(UniqueApiClient) as unknown as ReturnType<
-          typeof createMockUniqueApiClient
-        >;
-      });
-    }
-
     it('completes without errors when no deleted tenants exist', async () => {
       const { registry } = createRegistry([
         { name: 'active-tenant', config: createMockTenantConfig() },
@@ -396,295 +373,22 @@ describe('TenantRegistry', () => {
       expect(mockLogger.error).not.toHaveBeenCalled();
     });
 
-    it('skips cleanup when root scope is not found', async () => {
+    it('delegates cleanup to TenantCleanupService for each deleted tenant', async () => {
       const deletedConfig = createMockTenantConfig();
       const { registry, serviceRegistry } = createRegistry(
         [{ name: 'active-tenant', config: createMockTenantConfig() }],
         [{ name: 'deleted-tenant', config: deletedConfig }],
       );
 
-      const uniqueClient = getUniqueClientForTenant(
-        serviceRegistry,
-        'deleted-tenant',
-        deletedConfig,
+      const deletedTenant = { name: 'deleted-tenant', config: deletedConfig, isScanning: false };
+      const cleanupService = tenantStorage.run(deletedTenant, () =>
+        serviceRegistry.getService(TenantCleanupService),
       );
-      uniqueClient.scopes.getById.mockResolvedValue(null);
+      const cleanupSpy = vi.spyOn(cleanupService, 'cleanup').mockResolvedValue(undefined);
 
       await registry.processDeletedTenants();
 
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'deleted-tenant',
-          msg: expect.stringContaining('not found, skipping'),
-        }),
-      );
-      expect(uniqueClient.scopes.listChildren).not.toHaveBeenCalled();
-    });
-
-    it('skips cleanup when already cleaned up for V2 (no children, no files)', async () => {
-      const deletedConfig = createMockTenantConfig();
-      const { registry, serviceRegistry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: deletedConfig }],
-      );
-
-      const uniqueClient = getUniqueClientForTenant(
-        serviceRegistry,
-        'deleted-tenant',
-        deletedConfig,
-      );
-      uniqueClient.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
-      uniqueClient.scopes.listChildren.mockResolvedValue([]);
-      uniqueClient.files.getCountByKeyPrefix.mockResolvedValue(0);
-
-      await registry.processDeletedTenants();
-
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'deleted-tenant',
-          msg: 'Already cleaned up, skipping',
-        }),
-      );
-      expect(uniqueClient.files.deleteByKeyPrefix).not.toHaveBeenCalled();
-    });
-
-    it('skips cleanup when already cleaned up for V1 (no children)', async () => {
-      const deletedConfig = createMockTenantConfigWithV1();
-      const { registry, serviceRegistry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-v1', config: deletedConfig }],
-      );
-
-      const uniqueClient = getUniqueClientForTenant(serviceRegistry, 'deleted-v1', deletedConfig);
-      uniqueClient.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
-      uniqueClient.scopes.listChildren.mockResolvedValue([]);
-
-      await registry.processDeletedTenants();
-
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'deleted-v1',
-          msg: 'Already cleaned up, skipping',
-        }),
-      );
-      expect(uniqueClient.files.getCountByKeyPrefix).not.toHaveBeenCalled();
-      expect(uniqueClient.files.getFileIdsByScope).not.toHaveBeenCalled();
-    });
-
-    it('deletes files by key prefix and child scopes for V2 tenants', async () => {
-      const deletedConfig = createMockTenantConfig();
-      const { registry, serviceRegistry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: deletedConfig }],
-      );
-
-      const childScopes = [
-        { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
-        { id: 'child-2', name: 'space-b', parentId: 'scope-1', externalId: null },
-      ];
-
-      const uniqueClient = getUniqueClientForTenant(
-        serviceRegistry,
-        'deleted-tenant',
-        deletedConfig,
-      );
-      uniqueClient.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
-      uniqueClient.scopes.listChildren.mockResolvedValue(childScopes);
-      uniqueClient.files.getCountByKeyPrefix.mockResolvedValue(5);
-      uniqueClient.files.deleteByKeyPrefix.mockResolvedValue(5);
-      uniqueClient.scopes.delete.mockResolvedValue({
-        successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
-        failedFolders: [],
-      });
-
-      await registry.processDeletedTenants();
-
-      expect(uniqueClient.files.deleteByKeyPrefix).toHaveBeenCalledWith('deleted-tenant');
-      expect(uniqueClient.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
-      expect(uniqueClient.scopes.delete).toHaveBeenCalledWith('child-2', { recursive: true });
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'deleted-tenant',
-          msg: 'Tenant cleanup completed',
-        }),
-      );
-    });
-
-    it('deletes files by scope ownership for V1 tenants', async () => {
-      const deletedConfig = createMockTenantConfigWithV1();
-      const { registry, serviceRegistry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-v1', config: deletedConfig }],
-      );
-
-      const childScopes = [
-        { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
-      ];
-
-      const uniqueClient = getUniqueClientForTenant(serviceRegistry, 'deleted-v1', deletedConfig);
-      uniqueClient.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
-      uniqueClient.scopes.listChildren.mockResolvedValue(childScopes);
-      uniqueClient.files.getFileIdsByScope.mockResolvedValue(['file-1', 'file-2']);
-      uniqueClient.files.deleteByIds.mockResolvedValue(2);
-      uniqueClient.scopes.delete.mockResolvedValue({
-        successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
-        failedFolders: [],
-      });
-
-      await registry.processDeletedTenants();
-
-      expect(uniqueClient.files.getFileIdsByScope).toHaveBeenCalledWith('child-1');
-      expect(uniqueClient.files.deleteByIds).toHaveBeenCalledWith(['file-1', 'file-2']);
-      expect(uniqueClient.files.deleteByKeyPrefix).not.toHaveBeenCalled();
-      expect(uniqueClient.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'deleted-v1',
-          msg: 'Tenant cleanup completed',
-        }),
-      );
-    });
-
-    it('skips file deletion for V1 scopes with no files', async () => {
-      const deletedConfig = createMockTenantConfigWithV1();
-      const { registry, serviceRegistry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-v1', config: deletedConfig }],
-      );
-
-      const childScopes = [
-        { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
-      ];
-
-      const uniqueClient = getUniqueClientForTenant(serviceRegistry, 'deleted-v1', deletedConfig);
-      uniqueClient.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
-      uniqueClient.scopes.listChildren.mockResolvedValue(childScopes);
-      uniqueClient.files.getFileIdsByScope.mockResolvedValue([]);
-      uniqueClient.scopes.delete.mockResolvedValue({
-        successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
-        failedFolders: [],
-      });
-
-      await registry.processDeletedTenants();
-
-      expect(uniqueClient.files.deleteByIds).not.toHaveBeenCalled();
-      expect(uniqueClient.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
-    });
-
-    it('deletes files by scope ownership for V1 tenants with multiple child scopes', async () => {
-      const deletedConfig = createMockTenantConfigWithV1();
-      const { registry, serviceRegistry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-v1', config: deletedConfig }],
-      );
-
-      const childScopes = [
-        { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
-        { id: 'child-2', name: 'space-b', parentId: 'scope-1', externalId: null },
-        { id: 'child-3', name: 'space-c', parentId: 'scope-1', externalId: null },
-      ];
-
-      const uniqueClient = getUniqueClientForTenant(serviceRegistry, 'deleted-v1', deletedConfig);
-      uniqueClient.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
-      uniqueClient.scopes.listChildren.mockResolvedValue(childScopes);
-      uniqueClient.files.getFileIdsByScope
-        .mockResolvedValueOnce(['file-1', 'file-2'])
-        .mockResolvedValueOnce(['file-3'])
-        .mockResolvedValueOnce([]);
-      uniqueClient.files.deleteByIds.mockResolvedValue(2);
-      uniqueClient.scopes.delete.mockResolvedValue({
-        successFolders: [{ id: 'id', name: 'name', path: '/path' }],
-        failedFolders: [],
-      });
-
-      await registry.processDeletedTenants();
-
-      expect(uniqueClient.files.getFileIdsByScope).toHaveBeenCalledTimes(3);
-      expect(uniqueClient.files.getFileIdsByScope).toHaveBeenCalledWith('child-1');
-      expect(uniqueClient.files.getFileIdsByScope).toHaveBeenCalledWith('child-2');
-      expect(uniqueClient.files.getFileIdsByScope).toHaveBeenCalledWith('child-3');
-      expect(uniqueClient.files.deleteByIds).toHaveBeenCalledTimes(2);
-      expect(uniqueClient.files.deleteByIds).toHaveBeenCalledWith(['file-1', 'file-2']);
-      expect(uniqueClient.files.deleteByIds).toHaveBeenCalledWith(['file-3']);
-      expect(uniqueClient.scopes.delete).toHaveBeenCalledTimes(3);
-    });
-
-    it('logs warning when scope deletion has failures', async () => {
-      const deletedConfig = createMockTenantConfig();
-      const { registry, serviceRegistry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: deletedConfig }],
-      );
-
-      const childScopes = [
-        { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
-      ];
-
-      const uniqueClient = getUniqueClientForTenant(
-        serviceRegistry,
-        'deleted-tenant',
-        deletedConfig,
-      );
-      uniqueClient.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
-      uniqueClient.scopes.listChildren.mockResolvedValue(childScopes);
-      uniqueClient.files.getCountByKeyPrefix.mockResolvedValue(5);
-      uniqueClient.files.deleteByKeyPrefix.mockResolvedValue(5);
-      uniqueClient.scopes.delete.mockResolvedValue({
-        successFolders: [],
-        failedFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
-      });
-
-      await registry.processDeletedTenants();
-
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'deleted-tenant',
-          scopeName: 'space-a',
-          msg: 'Partial scope deletion failure',
-        }),
-      );
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'deleted-tenant',
-          msg: 'Tenant cleanup completed with scope deletion failures',
-        }),
-      );
-    });
-
-    it('still proceeds with scope deletion when V2 has children but zero files', async () => {
-      const deletedConfig = createMockTenantConfig();
-      const { registry, serviceRegistry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: deletedConfig }],
-      );
-
-      const childScopes = [
-        { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
-      ];
-
-      const uniqueClient = getUniqueClientForTenant(
-        serviceRegistry,
-        'deleted-tenant',
-        deletedConfig,
-      );
-      uniqueClient.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
-      uniqueClient.scopes.listChildren.mockResolvedValue(childScopes);
-      uniqueClient.files.getCountByKeyPrefix.mockResolvedValue(0);
-      uniqueClient.files.deleteByKeyPrefix.mockResolvedValue(0);
-      uniqueClient.scopes.delete.mockResolvedValue({
-        successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
-        failedFolders: [],
-      });
-
-      await registry.processDeletedTenants();
-
-      expect(uniqueClient.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'deleted-tenant',
-          msg: 'Tenant cleanup completed',
-        }),
-      );
+      expect(cleanupSpy).toHaveBeenCalledOnce();
     });
 
     it('continues processing remaining tenants when one fails', async () => {
@@ -698,13 +402,17 @@ describe('TenantRegistry', () => {
         ],
       );
 
-      const failClient = getUniqueClientForTenant(serviceRegistry, 'fail-tenant', configA);
-      failClient.scopes.getById.mockRejectedValue(new Error('API error'));
+      const failTenant = { name: 'fail-tenant', config: configA, isScanning: false };
+      const failCleanup = tenantStorage.run(failTenant, () =>
+        serviceRegistry.getService(TenantCleanupService),
+      );
+      vi.spyOn(failCleanup, 'cleanup').mockRejectedValue(new Error('API error'));
 
-      const okClient = getUniqueClientForTenant(serviceRegistry, 'ok-tenant', configB);
-      okClient.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
-      okClient.scopes.listChildren.mockResolvedValue([]);
-      okClient.files.getCountByKeyPrefix.mockResolvedValue(0);
+      const okTenant = { name: 'ok-tenant', config: configB, isScanning: false };
+      const okCleanup = tenantStorage.run(okTenant, () =>
+        serviceRegistry.getService(TenantCleanupService),
+      );
+      const okSpy = vi.spyOn(okCleanup, 'cleanup').mockResolvedValue(undefined);
 
       await registry.processDeletedTenants();
 
@@ -714,7 +422,22 @@ describe('TenantRegistry', () => {
           msg: 'Tenant cleanup failed',
         }),
       );
-      expect(okClient.scopes.getById).toHaveBeenCalled();
+      expect(okSpy).toHaveBeenCalledOnce();
+    });
+
+    it('registers TenantCleanupService for deleted tenants', () => {
+      const deletedConfig = createMockTenantConfig();
+      const { serviceRegistry } = createRegistry(
+        [{ name: 'active-tenant', config: createMockTenantConfig() }],
+        [{ name: 'deleted-tenant', config: deletedConfig }],
+      );
+
+      const deletedTenant = { name: 'deleted-tenant', config: deletedConfig, isScanning: false };
+      const cleanupService = tenantStorage.run(deletedTenant, () =>
+        serviceRegistry.getService(TenantCleanupService),
+      );
+
+      expect(cleanupService).toBeInstanceOf(TenantCleanupService);
     });
   });
 });

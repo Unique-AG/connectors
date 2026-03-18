@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import {
-  type Scope,
   UNIQUE_API_CLIENT_FACTORY,
   UniqueApiClient,
   type UniqueApiClientFactory,
@@ -22,6 +21,7 @@ import { FileDiffService } from '../synchronization/file-diff.service';
 import { IngestionService } from '../synchronization/ingestion.service';
 import { ScopeManagementService } from '../synchronization/scope-management.service';
 import { ServiceRegistry } from './service-registry';
+import { TenantCleanupService } from './tenant-cleanup.service';
 import type { TenantContext } from './tenant-context.interface';
 import { tenantStorage } from './tenant-context.storage';
 
@@ -139,6 +139,10 @@ export class TenantRegistry implements OnModuleInit {
           },
         });
         this.serviceRegistry.register(tenantName, UniqueApiClient, uniqueClient);
+
+        const cleanupService = new TenantCleanupService(tenantName, config.ingestion, uniqueClient);
+        this.serviceRegistry.register(tenantName, TenantCleanupService, cleanupService);
+
         this.logger.log({ tenantName, msg: 'Deleted tenant registered for cleanup' });
       });
     }
@@ -166,98 +170,11 @@ export class TenantRegistry implements OnModuleInit {
     for (const tenant of this.deletedTenants.values()) {
       try {
         await this.run(tenant, async () => {
-          const uniqueClient = this.serviceRegistry.getService(UniqueApiClient);
-          await this.cleanupTenant(tenant, uniqueClient);
+          const cleanupService = this.serviceRegistry.getService(TenantCleanupService);
+          await cleanupService.cleanup();
         });
       } catch (error) {
         this.logger.error({ tenantName: tenant.name, err: error, msg: 'Tenant cleanup failed' });
-      }
-    }
-  }
-
-  private async cleanupTenant(tenant: TenantContext, uniqueClient: UniqueApiClient): Promise<void> {
-    const { scopeId, useV1KeyFormat } = tenant.config.ingestion;
-
-    const rootScope = await uniqueClient.scopes.getById(scopeId);
-    if (!rootScope) {
-      this.logger.log({
-        tenantName: tenant.name,
-        msg: `Root scope ${scopeId} not found, skipping`,
-      });
-      return;
-    }
-
-    const childScopes = await uniqueClient.scopes.listChildren(scopeId);
-
-    // For V1 tenants, files are owned by child scopes (flat hierarchy), so no child scopes = no files.
-    // For V2 tenants, files are keyed by tenant name prefix, so we check the file count directly.
-    const hasFiles = useV1KeyFormat
-      ? childScopes.length > 0
-      : (await uniqueClient.files.getCountByKeyPrefix(tenant.name)) > 0;
-
-    if (childScopes.length === 0 && !hasFiles) {
-      this.logger.log({ tenantName: tenant.name, msg: 'Already cleaned up, skipping' });
-      return;
-    }
-
-    if (useV1KeyFormat) {
-      await this.deleteFilesByScopes(tenant.name, childScopes, uniqueClient);
-    } else {
-      const deletedCount = await uniqueClient.files.deleteByKeyPrefix(tenant.name);
-      this.logger.log({
-        tenantName: tenant.name,
-        deletedCount,
-        msg: 'Files deleted by key prefix',
-      });
-    }
-
-    let hasFailedScopes = false;
-    for (const child of childScopes) {
-      const result = await uniqueClient.scopes.delete(child.id, { recursive: true });
-      if (result.failedFolders.length > 0) {
-        hasFailedScopes = true;
-        this.logger.warn({
-          tenantName: tenant.name,
-          scopeName: child.name,
-          succeeded: result.successFolders.length,
-          failedFolders: result.failedFolders,
-          msg: 'Partial scope deletion failure',
-        });
-      } else {
-        this.logger.log({
-          tenantName: tenant.name,
-          scopeName: child.name,
-          succeeded: result.successFolders.length,
-          msg: 'Child scope deleted',
-        });
-      }
-    }
-
-    if (hasFailedScopes) {
-      this.logger.warn({
-        tenantName: tenant.name,
-        msg: 'Tenant cleanup completed with scope deletion failures',
-      });
-    } else {
-      this.logger.log({ tenantName: tenant.name, msg: 'Tenant cleanup completed' });
-    }
-  }
-
-  private async deleteFilesByScopes(
-    tenantName: string,
-    scopes: Scope[],
-    uniqueClient: UniqueApiClient,
-  ): Promise<void> {
-    for (const scope of scopes) {
-      const fileIds = await uniqueClient.files.getFileIdsByScope(scope.id);
-      if (fileIds.length > 0) {
-        await uniqueClient.files.deleteByIds(fileIds);
-        this.logger.log({
-          tenantName,
-          scopeName: scope.name,
-          deletedCount: fileIds.length,
-          msg: 'Files deleted by scope ownership',
-        });
       }
     }
   }
