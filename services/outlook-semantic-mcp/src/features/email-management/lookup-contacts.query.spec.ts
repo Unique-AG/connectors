@@ -72,15 +72,15 @@ describe('LookupContactsQuery.run', () => {
       expect(result.contacts[0]).toMatchObject({ similarityScore: expect.any(Number) });
     });
 
-    it('always includes a message field on success', async () => {
+    it('omits the message field when both sources succeed', async () => {
       const query = new LookupContactsQuery(makeFactory({}));
 
       const result = await query.run(USER_PROFILE_ID, 'alice');
 
-      expect(result.message).toBeDefined();
+      expect(result.message).toBeUndefined();
     });
 
-    it('lowercases email addresses in the output', async () => {
+    it('preserves original email casing in the output', async () => {
       const query = new LookupContactsQuery(
         makeFactory({
           people: {
@@ -96,12 +96,12 @@ describe('LookupContactsQuery.run', () => {
 
       const result = await query.run(USER_PROFILE_ID, 'alice');
 
-      expect(result.contacts[0].email).toBe('alice@example.com');
+      expect(result.contacts[0].email).toBe('Alice@Example.com');
     });
   });
 
   describe('error handling', () => {
-    it('returns an error and no contacts when the People API fails — no fallback to inbox', async () => {
+    it('returns inbox contacts with a warning when the People API fails', async () => {
       const query = new LookupContactsQuery(
         makeFactory({
           peopleError: new Error('People API unavailable'),
@@ -113,10 +113,11 @@ describe('LookupContactsQuery.run', () => {
 
       const result = await query.run(USER_PROFILE_ID, 'bob');
 
-      expect(result).toEqual({ contacts: [], message: 'Could not reach Microsoft Graph' });
+      expect(result.contacts).toEqual([withScore({ name: 'Bob Jones', email: 'bob@example.com', source: 'inbox' })]);
+      expect(result.message).toBe('Partial results: one data source could not be reached.');
     });
 
-    it('returns an error and no contacts when the inbox fetch fails — no fallback to People API', async () => {
+    it('returns people contacts with a warning when the inbox fetch fails', async () => {
       const query = new LookupContactsQuery(
         makeFactory({
           people: {
@@ -133,7 +134,8 @@ describe('LookupContactsQuery.run', () => {
 
       const result = await query.run(USER_PROFILE_ID, 'alice');
 
-      expect(result).toEqual({ contacts: [], message: 'Could not reach Microsoft Graph' });
+      expect(result.contacts).toEqual([withScore({ name: 'Alice Smith', email: 'alice@example.com', source: 'people_api' })]);
+      expect(result.message).toBe('Partial results: one data source could not be reached.');
     });
 
     it('returns an error when both sources fail', async () => {

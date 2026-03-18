@@ -82,12 +82,12 @@ export class LookupContactsQuery {
     const userProfileIdString = userProfileId.toString();
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
-    const peopleContacts = await this.fetchFromPeopleApi(userProfileIdString, client, name);
-    if (!peopleContacts) {
-      return { contacts: [], message: 'Could not reach Microsoft Graph' };
-    }
-    const inboxContacts = await this.fetchFromInbox(userProfileIdString, client);
-    if (!inboxContacts) {
+    let [peopleContacts, inboxContacts] = await Promise.all([
+      this.fetchFromPeopleApi(userProfileIdString, client, name),
+      this.fetchFromInbox(userProfileIdString, client),
+    ]);
+
+    if (!peopleContacts && !inboxContacts) {
       return { contacts: [], message: 'Could not reach Microsoft Graph' };
     }
 
@@ -96,11 +96,14 @@ export class LookupContactsQuery {
     // while rejecting unrelated names (e.g. "Alice" → "John Smith" ≈ 0.40).
     const SimilarityThreshold = 0.75;
 
+    peopleContacts ??= [];
+    inboxContacts ??= [];
+
     // We return the full ranked list to the LLM so it can choose the best match
     // rather than guessing on the caller's behalf.
     const contacts = pipe(
       [...peopleContacts, ...inboxContacts],
-      map(({ ...contact }) => ({
+      map((contact) => ({
         ...contact,
         similarityScore: nameSimilarity(name, contact.name),
       })),
@@ -110,12 +113,16 @@ export class LookupContactsQuery {
         ({ source, similarityScore }) =>
           source === 'people_api' || similarityScore >= SimilarityThreshold,
       ),
-      uniqueBy(({ email }) => email),
+      uniqueBy(({ email }) => email.toLowerCase()),
       sortBy([({ similarityScore }) => similarityScore, 'desc']),
     );
-    console.log(contacts);
 
-    return { contacts, message: `Contacts fetch succesfully` };
+    const message =
+      !peopleContacts || !inboxContacts
+        ? 'Partial results: one data source could not be reached.'
+        : undefined;
+
+    return { contacts, message };
   }
 
   private async fetchFromPeopleApi(
