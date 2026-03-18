@@ -161,6 +161,23 @@ describe('TenantSyncScheduler', () => {
       expect(emptyRegistry.getAllTenants).not.toHaveBeenCalled();
       expect(schedulerRegistry.addCronJob).not.toHaveBeenCalled();
     });
+
+    it('still schedules active syncs when processDeletedTenants rejects', async () => {
+      vi.mocked(tenantRegistry.processDeletedTenants).mockRejectedValue(
+        new Error('cleanup exploded'),
+      );
+
+      scheduler.onModuleInit();
+
+      await vi.waitFor(() => {
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(2);
+      });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: 'Failed to process deleted tenants, proceeding with sync scheduling',
+        }),
+      );
+    });
   });
 
   describe('onModuleDestroy', () => {

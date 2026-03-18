@@ -188,17 +188,20 @@ export class TenantRegistry implements OnModuleInit {
     }
 
     const childScopes = await uniqueClient.scopes.listChildren(scopeId);
-    const fileCount = useV1KeyFormat
-      ? childScopes.length
-      : await uniqueClient.files.getCountByKeyPrefix(tenant.name);
 
-    if (childScopes.length === 0 && fileCount === 0) {
+    // For V1 tenants, files are owned by child scopes (flat hierarchy), so no child scopes = no files.
+    // For V2 tenants, files are keyed by tenant name prefix, so we check the file count directly.
+    const hasFiles = useV1KeyFormat
+      ? childScopes.length > 0
+      : (await uniqueClient.files.getCountByKeyPrefix(tenant.name)) > 0;
+
+    if (childScopes.length === 0 && !hasFiles) {
       this.logger.log({ tenantName: tenant.name, msg: 'Already cleaned up, skipping' });
       return;
     }
 
     if (useV1KeyFormat) {
-      await this.deleteFilesByScopes(childScopes, uniqueClient);
+      await this.deleteFilesByScopes(tenant.name, childScopes, uniqueClient);
     } else {
       const deletedCount = await uniqueClient.files.deleteByKeyPrefix(tenant.name);
       this.logger.log({
@@ -208,26 +211,49 @@ export class TenantRegistry implements OnModuleInit {
       });
     }
 
+    let hasFailedScopes = false;
     for (const child of childScopes) {
       const result = await uniqueClient.scopes.delete(child.id, { recursive: true });
-      this.logger.log({
-        tenantName: tenant.name,
-        scopeName: child.name,
-        succeeded: result.successFolders.length,
-        failed: result.failedFolders.length,
-        msg: 'Child scope deleted',
-      });
+      if (result.failedFolders.length > 0) {
+        hasFailedScopes = true;
+        this.logger.warn({
+          tenantName: tenant.name,
+          scopeName: child.name,
+          succeeded: result.successFolders.length,
+          failedFolders: result.failedFolders,
+          msg: 'Partial scope deletion failure',
+        });
+      } else {
+        this.logger.log({
+          tenantName: tenant.name,
+          scopeName: child.name,
+          succeeded: result.successFolders.length,
+          msg: 'Child scope deleted',
+        });
+      }
     }
 
-    this.logger.log({ tenantName: tenant.name, msg: 'Tenant cleanup completed' });
+    if (hasFailedScopes) {
+      this.logger.warn({
+        tenantName: tenant.name,
+        msg: 'Tenant cleanup completed with scope deletion failures',
+      });
+    } else {
+      this.logger.log({ tenantName: tenant.name, msg: 'Tenant cleanup completed' });
+    }
   }
 
-  private async deleteFilesByScopes(scopes: Scope[], uniqueClient: UniqueApiClient): Promise<void> {
+  private async deleteFilesByScopes(
+    tenantName: string,
+    scopes: Scope[],
+    uniqueClient: UniqueApiClient,
+  ): Promise<void> {
     for (const scope of scopes) {
       const fileIds = await uniqueClient.files.getFileIdsByScope(scope.id);
       if (fileIds.length > 0) {
         await uniqueClient.files.deleteByIds(fileIds);
         this.logger.log({
+          tenantName,
           scopeName: scope.name,
           deletedCount: fileIds.length,
           msg: 'Files deleted by scope ownership',

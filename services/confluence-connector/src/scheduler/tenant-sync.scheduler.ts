@@ -17,18 +17,35 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   public onModuleInit(): void {
-    void this.tenantRegistry.processDeletedTenants().then(() => {
-      if (this.tenantRegistry.tenantCount === 0) {
-        this.logger.warn({ msg: 'No tenants registered — no sync jobs will be scheduled' });
-        return;
-      }
+    void this.tenantRegistry
+      .processDeletedTenants()
+      .catch((error: unknown) => {
+        this.logger.error({
+          err: error,
+          msg: 'Failed to process deleted tenants, proceeding with sync scheduling',
+        });
+      })
+      .then(() => {
+        this.scheduleActiveTenantSyncs();
+      });
+  }
 
-      for (const tenant of this.tenantRegistry.getAllTenants()) {
-        this.logger.log({ tenantName: tenant.name, msg: 'Triggering initial sync' });
-        void this.syncTenant(tenant);
-        this.registerCronJob(tenant);
-      }
-    });
+  private scheduleActiveTenantSyncs(): void {
+    if (this.isShuttingDown) {
+      this.logger.log({ msg: 'Shutdown in progress, skipping sync scheduling' });
+      return;
+    }
+
+    if (this.tenantRegistry.tenantCount === 0) {
+      this.logger.warn({ msg: 'No tenants registered — no sync jobs will be scheduled' });
+      return;
+    }
+
+    for (const tenant of this.tenantRegistry.getAllTenants()) {
+      this.logger.log({ tenantName: tenant.name, msg: 'Triggering initial sync' });
+      void this.syncTenant(tenant);
+      this.registerCronJob(tenant);
+    }
   }
 
   public onModuleDestroy(): void {
