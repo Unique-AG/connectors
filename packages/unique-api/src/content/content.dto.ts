@@ -1,4 +1,3 @@
-import { Readable } from 'node:stream';
 import { z } from 'zod/v4';
 
 export const ChunkSchema = z.object({
@@ -17,17 +16,3 @@ export const ContentSchema = z.object({
 });
 
 export type Content = z.infer<typeof ContentSchema>;
-
-export interface DownloadedContent {
-  data: Buffer;
-  filename: string;
-  mimeType: string;
-}
-
-export interface StreamedContent {
-  stream: Readable;
-  filename: string;
-  mimeType: string;
-  /** Total byte size from Content-Length header; undefined if the server did not provide it. */
-  size: number | undefined;
-}

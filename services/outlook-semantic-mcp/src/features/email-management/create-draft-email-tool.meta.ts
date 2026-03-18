@@ -35,7 +35,7 @@ export const META = createMeta({
     The **only** exception: if after searching with \`search_emails\` and \`lookup_contacts\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
 
     ### What \`create_draft_email\` Does
-    Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and attachments from the Unique knowledge base by providing their content IDs (e.g. cont_j23i0ifr44sdn7cz97ubleb7). The tool resolves content IDs automatically — do not base64-encode files manually. The draft is saved and can be reviewed or sent later.`,
+    Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and base64-encoded file attachments. The draft is saved and can be reviewed or sent later.`,
   toolFormatInformation: `## Format for Draft Emails
   When presenting a draft email, always use the following format exactly:
   📩 **{Subject}** [open](https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem)

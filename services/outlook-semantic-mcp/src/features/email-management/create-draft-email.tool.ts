@@ -37,29 +37,25 @@ const CreateDraftEmailInputSchema = z.object({
     )
     .optional()
     .describe('The list of CC (carbon copy) recipients for the email.'),
-  attachmentIds: z
-    .array(z.string())
+  attachments: z
+    .array(
+      z.object({
+        filename: z.string().describe('The name of the file to attach, including its extension.'),
+        contentBytes: z.string().describe('The base64-encoded content of the attachment.'),
+        contentType: z
+          .string()
+          .describe('The MIME type of the attachment (e.g. "application/pdf", "image/png").'),
+      }),
+    )
     .optional()
-    .describe(
-      'IDs of files from the Unique knowledge base to attach to this email. ' +
-        'These are content IDs, not file paths. ' +
-        'Examples: cont_j23i0ifr44sdn7cz97ubleb7, cont_h346inqws1s3686luftk96yt, cont_tl4uzdijj93r98lcxtk8js9k',
-    ),
+    .describe('Optional list of file attachments to include in the draft email.'),
 });
 
 const CreateDraftEmailOutputSchema = z.object({
   success: z.boolean(),
   draftId: z.string().optional(),
-  webLink: z.string().optional().describe('Outlook Web App URL to open the draft.'),
+  status: z.string().optional(),
   message: z.string(),
-  attachmentsFailed: z
-    .array(
-      z.object({
-        contentId: z.string(),
-        reason: z.string(),
-      }),
-    )
-    .optional(),
 });
 
 @Injectable()
