@@ -67,6 +67,9 @@ export class UsersService implements UniqueUsersFacade {
         email: {
           equals: email,
         },
+        active: {
+          equals: true,
+        }
       },
     });
 
