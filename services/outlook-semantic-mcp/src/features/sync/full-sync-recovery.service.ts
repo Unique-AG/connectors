@@ -2,7 +2,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, lt, or, SQL, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import { FullSyncEventDto } from './full-sync/full-sync-event.dto';
@@ -54,7 +54,8 @@ export class FullSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
     try {
       this.logger.log({ msg: 'Full sync recovery scan triggered' });
 
-      const staleThreshold = sql`NOW() - INTERVAL '${sql.raw(String(STALE_HEARTBEAT_MINUTES))} minutes'`;
+      const staleThreshold = getThreshold(STALE_HEARTBEAT_MINUTES);
+      const waitingForIngestionThreshold = getThreshold(5);
 
       const configs = await this.db
         .select({ userProfileId: inboxConfiguration.userProfileId })
@@ -68,7 +69,13 @@ export class FullSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
         )
         .where(
           or(
-            eq(inboxConfiguration.fullSyncState, 'waiting-for-ingestion'),
+            and(
+              eq(inboxConfiguration.fullSyncState, 'waiting-for-ingestion'),
+              or(
+                isNull(inboxConfiguration.fullSyncHeartbeatAt),
+                lt(inboxConfiguration.fullSyncHeartbeatAt, waitingForIngestionThreshold),
+              ),
+            ),
             eq(inboxConfiguration.fullSyncState, 'failed'),
             and(
               eq(inboxConfiguration.fullSyncState, 'running'),
@@ -104,3 +111,7 @@ export class FullSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
     }
   }
 }
+
+const getThreshold = (thresholdInMinutes: number): SQL<unknown> => {
+  return sql`NOW() - (${thresholdInMinutes} * INTERVAL '1 minute')`;
+};
