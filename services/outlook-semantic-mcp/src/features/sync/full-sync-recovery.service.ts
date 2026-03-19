@@ -7,6 +7,7 @@ import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import {
   STALE_HEARTBEAT_MINUTES,
+  WAITING_FOR_FAILED_HEARTBEAT_MINUTES,
   WAITING_FOR_INGESTION_HEARTBEAT_MINUTES,
 } from './full-sync/full-sync.command';
 import { FullSyncEventDto } from './full-sync/full-sync-event.dto';
@@ -65,6 +66,7 @@ export class FullSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
 
     const staleThreshold = getThreshold(STALE_HEARTBEAT_MINUTES);
     const waitingForIngestionThreshold = getThreshold(WAITING_FOR_INGESTION_HEARTBEAT_MINUTES);
+    const waitingForFailedThreshold = getThreshold(WAITING_FOR_FAILED_HEARTBEAT_MINUTES);
 
     const configs = await this.db
       .select({ userProfileId: inboxConfiguration.userProfileId })
@@ -82,7 +84,10 @@ export class FullSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
             eq(inboxConfiguration.fullSyncState, 'waiting-for-ingestion'),
             lt(inboxConfiguration.fullSyncHeartbeatAt, waitingForIngestionThreshold),
           ),
-          eq(inboxConfiguration.fullSyncState, 'failed'),
+          and(
+            eq(inboxConfiguration.fullSyncState, 'failed'),
+            lt(inboxConfiguration.fullSyncHeartbeatAt, waitingForFailedThreshold),
+          ),
           and(
             eq(inboxConfiguration.fullSyncState, 'running'),
             lt(inboxConfiguration.fullSyncHeartbeatAt, staleThreshold),

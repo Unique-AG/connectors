@@ -19,6 +19,7 @@ export const START_FULL_SYNC_LINK = 'SYNC_STARTED:__EMPTY_DELTA__';
 const READY_COOLDOWN_MINUTES = 5;
 export const STALE_HEARTBEAT_MINUTES = 20;
 export const WAITING_FOR_INGESTION_HEARTBEAT_MINUTES = 5;
+export const WAITING_FOR_FAILED_HEARTBEAT_MINUTES = 20;
 const MAX_ON_GOING_INGESTION_IN_PROGRESS = 10;
 
 export type FullSyncResult =
@@ -219,24 +220,19 @@ export class FullSyncCommand {
       case 'waiting-for-ingestion':
         return { action: 'proceed' };
       case 'running':
-        return this.decideFromRunning(row);
+        if (this.isWithinCooldown(row.fullSyncHeartbeatAt, STALE_HEARTBEAT_MINUTES)) {
+          return { action: 'skip', reason: 'already-running' };
+        }
+        this.logger.warn({ msg: 'Recovering stale running sync (heartbeat too old)' });
+        return { action: 'proceed' };
       case 'failed':
+        if (this.isWithinCooldown(row.fullSyncHeartbeatAt, WAITING_FOR_FAILED_HEARTBEAT_MINUTES)) {
+          return { action: 'skip', reason: 'already-running' };
+        }
         return { action: 'proceed' };
       case 'paused':
         return { action: 'skip', reason: 'paused' };
     }
-  }
-
-  // Safety check to recover stale syncs whose heartbeat has expired. The cron job also checks heartbeats,
-  // but this ensures recovery can happen at lock-acquisition time as well.
-  private decideFromRunning(
-    row: Pick<InboxConfig, 'fullSyncHeartbeatAt'>,
-  ): { action: 'skip'; reason: string } | { action: 'proceed' } {
-    if (this.isWithinCooldown(row.fullSyncHeartbeatAt, STALE_HEARTBEAT_MINUTES)) {
-      return { action: 'skip', reason: 'already-running' };
-    }
-    this.logger.warn({ msg: 'Recovering stale running sync (heartbeat too old)' });
-    return { action: 'proceed' };
   }
 
   private isWithinCooldown(timestamp: Date | null, cooldownMinutes: number): boolean {
