@@ -1,20 +1,27 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './consts';
+import { UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
 import { smear } from '@unique-ag/utils/src/smeared';
 
 @Injectable()
 export class UploadInMemoryAttachmentCommand {
   public logger = new Logger(this.constructor.name);
 
-  public async run(
-    client: ReturnType<GraphClientFactory['createClientForUser']>,
-    draftId: string,
-    data: Buffer,
-    filename: string,
-    totalSize: number,
-    userProfileId: string,
-  ): Promise<void> {
+  public async run({
+    client,
+    draftId,
+    data,
+    filename,
+    totalSize,
+    userProfileId,
+  }: {
+    client: ReturnType<GraphClientFactory['createClientForUser']>;
+    draftId: string;
+    data: Buffer;
+    filename: string;
+    totalSize: number;
+    userProfileId: string;
+  }): Promise<void> {
     if (totalSize <= 3 * 1024 * 1024) {
       this.logger.log({
         msg: 'Uploading attachment via simple POST',
@@ -52,8 +59,6 @@ export class UploadInMemoryAttachmentCommand {
     while (offset < totalSize) {
       const end = Math.min(offset + UPLOAD_CHUNK_SIZE, totalSize);
       const chunk = data.subarray(offset, end);
-      // await uploadChunk(uploadUrl, chunk, offset, totalSize);
-      const end = offset + chunk.length - 1;
       const response = await fetch(uploadUrl, {
         method: 'PUT',
         headers: {
@@ -71,17 +76,30 @@ export class UploadInMemoryAttachmentCommand {
       }
       await response.body?.cancel();
       chunkIndex++;
-      this.logger.log({
-        msg: 'Chunk uploaded',
-        userProfileId,
-        draftId,
-        filename,
-        chunkIndex,
-        totalChunks,
-        bytesUploaded: end,
-        totalBytes: totalSize,
-      });
+      if (chunkIndex % 20 === 0) {
+        this.logger.log({
+          msg: 'Chunks uploaded',
+          userProfileId,
+          draftId,
+          filename,
+          chunkIndex,
+          totalChunks,
+          bytesUploaded: end,
+          totalBytes: totalSize,
+        });
+      }
       offset = end;
     }
+
+    this.logger.log({
+      msg: 'Chunks uploaded',
+      userProfileId,
+      draftId,
+      filename,
+      chunkIndex,
+      totalChunks,
+      bytesUploaded: offset,
+      totalBytes: totalSize,
+    });
   }
 }

@@ -3,10 +3,8 @@ import { Span } from 'nestjs-otel';
 import { z } from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import {
-  AddAttachmentsToDraftEmailCommand,
-  type AttachmentFailure,
-} from './add-attachments-to-draft-email.command';
+import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
+import { AttachmentFailure } from './email-attachments/utils';
 
 const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string().optional() });
 
