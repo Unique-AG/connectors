@@ -39,14 +39,25 @@ const CreateDraftEmailInputSchema = z.object({
     .optional()
     .describe('The list of CC (carbon copy) recipients for the email.'),
   attachments: z
-    .array(z.string())
+    .array(
+      z.object({
+        fileName: z
+          .string()
+          .describe(
+            `The file name which will appear in the draft email. Example {{name}}.{{extension}}`,
+          ),
+        data: z
+          .string()
+          .describe(
+            'URIs of files to attach to this email. Supported schemes:\n' +
+              '- unique://chat/{chatId}/content/{contentId} for Unique knowledge base files\n' +
+              '- data:[mediatype][;base64],<data> for inline base64-encoded content\n' +
+              'External URLs (https://) are not supported — fetching arbitrary URLs server-side creates an SSRF risk.',
+          ),
+      }),
+    )
     .optional()
-    .describe(
-      'URIs of files to attach to this email. Supported schemes:\n' +
-        '- unique://chat/{chatId}/content/{contentId} for Unique knowledge base files\n' +
-        '- data:[mediatype][;base64],<data> for inline base64-encoded content\n' +
-        'External URLs (https://) are not supported — fetching arbitrary URLs server-side creates an SSRF risk.',
-    ),
+    .describe('A list of attachments'),
 });
 
 const CreateDraftEmailOutputSchema = z.object({

@@ -5,7 +5,7 @@
 // Use `unique://` for Unique knowledge-base files or `data:` for inline content instead.
 export type ParsedUri =
   | { type: 'unique'; chatId: string | null; contentId: string }
-  | { type: 'data'; mimeType: string; data: Buffer; filename: string };
+  | { type: 'data'; mimeType: string; data: Buffer };
 
 const UNIQUE_URI_PATTERN = /^unique:\/\/chat\/([^/]*)\/content\/([^/]+)$/;
 const DATA_URI_PATTERN = /^data:([^;,]*)(;base64)?,(.*)$/s;
@@ -27,10 +27,7 @@ export function parseAttachmentUri(uri: string): ParsedUri {
       ? Buffer.from(rawData, 'base64')
       : Buffer.from(decodeURIComponent(rawData));
 
-    const ext = mimeType.split('/')[1]?.split('+')[0] ?? 'bin';
-    const filename = `attachment.${ext}`;
-
-    return { type: 'data', mimeType, data, filename };
+    return { type: 'data', mimeType, data };
   }
 
   throw new Error(`Unsupported attachment URI scheme: ${uri.slice(0, 30)}`);

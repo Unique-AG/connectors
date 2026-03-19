@@ -16,7 +16,10 @@ export interface CreateDraftEmailInput {
   contentType: 'html' | 'text';
   toRecipients: Array<{ name?: string; email: string }>;
   ccRecipients?: Array<{ name?: string; email: string }>;
-  attachments?: string[];
+  attachments?: {
+    fileName: string;
+    data: string;
+  }[];
   chatId?: string;
 }
 

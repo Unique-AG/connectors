@@ -17,7 +17,7 @@ const UPLOAD_CHUNK_SIZE = 13 * 327680; // 4,259,840 bytes — must be a multiple
 
 export interface AddAttachmentsInput {
   draftId: string;
-  attachments: string[];
+  attachments: { fileName: string; data: string }[];
   chatId?: string;
 }
 
@@ -69,9 +69,9 @@ export class AddAttachmentsToDraftEmailCommand {
       wasResolved: false,
     };
 
-    for (const uri of input.attachments) {
+    for (const { data, fileName } of input.attachments) {
       try {
-        const parsed = parseAttachmentUri(uri);
+        const parsed = parseAttachmentUri(data);
         let attachment: AttachmentContent;
 
         switch (parsed.type) {
@@ -88,13 +88,13 @@ export class AddAttachmentsToDraftEmailCommand {
             }
             attachment = await this.resolveUniqueAttachment({
               parsed,
-              uri,
+              uri: data,
               uniqueIdentity: uniqueIdentity.identity,
               fallbackChatId: input.chatId,
             });
             break;
           case 'data':
-            attachment = { data: parsed.data, filename: parsed.filename, size: parsed.data.length };
+            attachment = { data: parsed.data, filename: fileName, size: parsed.data.length };
             break;
         }
 
@@ -217,66 +217,5 @@ export class AddAttachmentsToDraftEmailCommand {
       this.logger.error({ msg: 'Failed to resolve unique user identity', err });
     }
     return null;
-  }
-
-  private async uploadToGraph(
-    client: ReturnType<GraphClientFactory['createClientForUser']>,
-    draftId: string,
-    data: Buffer,
-    filename: string,
-    totalSize: number,
-    userProfileId: string,
-  ): Promise<void> {
-    if (totalSize <= 3 * 1024 * 1024) {
-      this.logger.log({
-        msg: 'Uploading attachment via simple POST',
-        userProfileId,
-        draftId,
-        filename,
-        sizeBytes: totalSize,
-      });
-      await client.api(`/me/messages/${draftId}/attachments`).post({
-        '@odata.type': '#microsoft.graph.fileAttachment',
-        name: filename,
-        contentBytes: data.toString('base64'),
-      });
-      return;
-    }
-
-    const totalChunks = Math.ceil(totalSize / UPLOAD_CHUNK_SIZE);
-    this.logger.log({
-      msg: 'Uploading attachment via upload session',
-      userProfileId,
-      draftId,
-      filename,
-      sizeBytes: totalSize,
-      totalChunks,
-    });
-
-    const { uploadUrl } = UploadSessionSchema.parse(
-      await client.api(`/me/messages/${draftId}/attachments/createUploadSession`).post({
-        AttachmentItem: { attachmentType: 'file', name: filename, size: totalSize },
-      }),
-    );
-
-    let offset = 0;
-    let chunkIndex = 0;
-    while (offset < totalSize) {
-      const end = Math.min(offset + UPLOAD_CHUNK_SIZE, totalSize);
-      const chunk = data.subarray(offset, end);
-      await uploadChunk(uploadUrl, chunk, offset, totalSize);
-      chunkIndex++;
-      this.logger.log({
-        msg: 'Chunk uploaded',
-        userProfileId,
-        draftId,
-        filename,
-        chunkIndex,
-        totalChunks,
-        bytesUploaded: end,
-        totalBytes: totalSize,
-      });
-      offset = end;
-    }
   }
 }
