@@ -428,7 +428,7 @@ describe('FullSyncCommand', () => {
       );
     });
 
-    it('does not fetch $count on resume (non-null nextLink)', async () => {
+    it('does fetch $count on resume if count is nullish (non-null nextLink)', async () => {
       const graphApi = createMockGraphApi();
       const batchCommand = createMockProcessFullSyncBatchCommand('completed');
       const updateByVersionCommand = createMockUpdateByVersionCommand(true);
@@ -437,6 +437,7 @@ describe('FullSyncCommand', () => {
           fullSyncState: 'ready',
           fullSyncNextLink: 'https://graph.microsoft.com/next',
           fullSyncLastRunAt: null,
+          fullSyncExpectedTotal: null,
         }),
       });
       const command = createCommand({ graphApi, batchCommand, updateByVersionCommand, db });
@@ -448,7 +449,7 @@ describe('FullSyncCommand', () => {
       const countCalls = updateByVersionCommand.run.mock.calls.filter(
         (call: any[]) => call[2] && 'fullSyncExpectedTotal' in call[2],
       );
-      expect(countCalls).toHaveLength(0);
+      expect(countCalls).toHaveLength(1);
     });
   });
 
