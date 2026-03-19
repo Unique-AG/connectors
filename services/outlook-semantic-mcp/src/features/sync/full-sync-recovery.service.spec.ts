@@ -27,7 +27,9 @@ function createMockAmqp() {
 function createMockDb({ rows = [] as Array<{ userProfileId: string }> } = {}) {
   const makeSelectChain = (data: unknown[]) => ({
     from: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(data),
+      innerJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(data),
+      }),
     }),
   });
 
@@ -159,12 +161,15 @@ describe('FullSyncRecoveryService', () => {
       // Verify select was called (the query was made)
       expect(db.select).toHaveBeenCalledOnce();
 
-      // The chain: select({...}).from(...).where(...)
+      // The chain: select({...}).from(...).innerJoin(...).where(...)
       const selectResult = db.select.mock.results?.[0]?.value;
       expect(selectResult?.from).toHaveBeenCalledOnce();
 
       const fromResult = selectResult.from.mock.results[0]?.value;
-      expect(fromResult?.where).toHaveBeenCalledOnce();
+      expect(fromResult?.innerJoin).toHaveBeenCalledOnce();
+
+      const innerJoinResult = fromResult.innerJoin.mock.results[0]?.value;
+      expect(innerJoinResult?.where).toHaveBeenCalledOnce();
     });
   });
 

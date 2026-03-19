@@ -21,4 +21,4 @@ import { SyncOnFilterChangeService } from './sync-on-filter-change.service';
     FullSyncRecoveryService,
   ],
 })
-export class StuckSyncRecoveryModule {}
+export class SyncRecoveryModule {}

@@ -2,9 +2,9 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, eq, lt, notInArray, or, sql } from 'drizzle-orm';
+import { and, eq, gt, lt, notInArray, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import { traceEvent } from '~/features/tracing.utils';
 import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 
@@ -68,6 +68,13 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
     const stuckConfigs = await this.db
       .select({ userProfileId: inboxConfiguration.userProfileId })
       .from(inboxConfiguration)
+      .innerJoin(
+        subscriptions,
+        and(
+          eq(subscriptions.userProfileId, inboxConfiguration.userProfileId),
+          gt(subscriptions.expiresAt, sql`NOW()`),
+        ),
+      )
       .where(
         or(
           eq(inboxConfiguration.liveCatchUpState, 'failed'),

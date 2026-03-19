@@ -14,9 +14,9 @@ type InboxConfig = typeof inboxConfiguration.$inferSelect;
 
 export const START_FULL_SYNC_LINK = 'SYNC_STARTED:__EMPTY_DELTA__';
 
-const COOLDOWN_MINUTES = 5;
-const MAX_IN_PROGRESS = 20;
+const READY_COOLDOWN_MINUTES = 5;
 const STALE_HEARTBEAT_MINUTES = 20;
+const MAX_ON_GOING_INGESTION_IN_PROGRESS = 20;
 
 export type FullSyncResult =
   | { status: 'skipped'; reason: string }
@@ -51,10 +51,13 @@ export class FullSyncCommand {
 
     const { version, previousState } = lockResult;
 
-    if (previousState === 'waiting-for-ingestion') {
+    // If the previousState was 'running' we should also check the scope to see if ingestion queue
+    // is still in progress because we try to recover syncs which are stalling in 'running' status
+    // and we will push them through the queue then here we should check what happens in our scope.
+    if (['waiting-for-ingestion', 'running'].includes(previousState)) {
       const result = await this.getScopeIngestionStatsQuery.run(userProfileId);
       // Proceed optimistically when stats are unavailable rather than blocking the sync
-      const canProceed = !result.ok || result.inProgress < MAX_IN_PROGRESS;
+      const canProceed = !result.ok || result.inProgress < MAX_ON_GOING_INGESTION_IN_PROGRESS;
       if (!canProceed) {
         const parked = await this.transitionState(userProfileId, version, 'waiting-for-ingestion');
         if (!parked) {
@@ -212,9 +215,12 @@ export class FullSyncCommand {
   ): { action: 'skip'; reason: string } | { action: 'proceed' } {
     switch (row.fullSyncState) {
       case 'ready':
-        return this.decideFromReady(row);
+        if (this.isWithinCooldown(row.fullSyncLastRunAt, READY_COOLDOWN_MINUTES)) {
+          return { action: 'skip', reason: 'ran-recently' };
+        }
+        return { action: 'proceed' };
       case 'waiting-for-ingestion':
-        return this.decideFromWaitingForIngestion();
+        return { action: 'proceed' };
       case 'running':
         return this.decideFromRunning(row);
       case 'failed':
@@ -224,28 +230,15 @@ export class FullSyncCommand {
     }
   }
 
-  private decideFromReady(
-    row: Pick<InboxConfig, 'fullSyncLastRunAt'>,
-  ): { action: 'skip'; reason: string } | { action: 'proceed' } {
-    if (this.isWithinCooldown(row.fullSyncLastRunAt)) {
-      return { action: 'skip', reason: 'ran-recently' };
-    }
-    return { action: 'proceed' };
-  }
-
-  private decideFromWaitingForIngestion(): { action: 'proceed' } {
-    return { action: 'proceed' };
-  }
-
   // Safety check to recover stale syncs whose heartbeat has expired. The cron job also checks heartbeats,
   // but this ensures recovery can happen at lock-acquisition time as well.
   private decideFromRunning(
     row: Pick<InboxConfig, 'fullSyncHeartbeatAt'>,
   ): { action: 'skip'; reason: string } | { action: 'proceed' } {
-    const heartbeatThreshold = new Date();
-    heartbeatThreshold.setMinutes(heartbeatThreshold.getMinutes() - STALE_HEARTBEAT_MINUTES);
-
-    if (isNullish(row.fullSyncHeartbeatAt) || row.fullSyncHeartbeatAt < heartbeatThreshold) {
+    if (
+      isNullish(row.fullSyncHeartbeatAt) ||
+      !this.isWithinCooldown(row.fullSyncHeartbeatAt, STALE_HEARTBEAT_MINUTES)
+    ) {
       this.logger.warn({ msg: 'Recovering stale running sync (heartbeat too old)' });
       return { action: 'proceed' };
     }
@@ -253,12 +246,12 @@ export class FullSyncCommand {
     return { action: 'skip', reason: 'already-running' };
   }
 
-  private isWithinCooldown(timestamp: Date | null): boolean {
+  private isWithinCooldown(timestamp: Date | null, cooldownMinutes: number): boolean {
     if (isNullish(timestamp)) {
       return false;
     }
     const cooldownThreshold = new Date();
-    cooldownThreshold.setMinutes(cooldownThreshold.getMinutes() - COOLDOWN_MINUTES);
+    cooldownThreshold.setMinutes(cooldownThreshold.getMinutes() - cooldownMinutes);
     return timestamp > cooldownThreshold;
   }
 

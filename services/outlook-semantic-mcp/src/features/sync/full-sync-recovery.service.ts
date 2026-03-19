@@ -2,9 +2,9 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, eq, gt, isNull, lt, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import { FullSyncEventDto } from './full-sync/full-sync-event.dto';
 
 const FULL_SYNC_RECOVERY_CRON_SCHEDULE = '*/2 * * * *';
@@ -59,6 +59,13 @@ export class FullSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
       const configs = await this.db
         .select({ userProfileId: inboxConfiguration.userProfileId })
         .from(inboxConfiguration)
+        .innerJoin(
+          subscriptions,
+          and(
+            eq(subscriptions.userProfileId, inboxConfiguration.userProfileId),
+            gt(subscriptions.expiresAt, sql`NOW()`),
+          ),
+        )
         .where(
           or(
             eq(inboxConfiguration.fullSyncState, 'waiting-for-ingestion'),

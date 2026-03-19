@@ -31,7 +31,9 @@ function createMockAmqp() {
 function createMockDb({ liveCatchUpRows = [] as Array<{ userProfileId: string }> } = {}) {
   const makeSelectChain = (rows: unknown[]) => ({
     from: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(rows),
+      innerJoin: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(rows),
+      }),
     }),
   });
 

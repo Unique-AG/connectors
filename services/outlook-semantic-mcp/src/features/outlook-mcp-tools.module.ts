@@ -28,7 +28,7 @@ import {
 } from './sync/full-sync';
 import { FullSyncModule } from './sync/full-sync/full-sync.module';
 import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
-import { StuckSyncRecoveryModule } from './sync/stuck-sync-recovery.module';
+import { SyncRecoveryModule } from './sync/sync-recovery.module';
 
 const TOOLS = [
   ListFoldersTool,
@@ -65,7 +65,7 @@ const TOOLS = [
     DirectoriesSyncModule,
     SearchModule,
     UniqueApiFeatureModule,
-    StuckSyncRecoveryModule,
+    SyncRecoveryModule,
   ],
   providers: [MailSubscriptionController, IngestionListener, ...TOOLS],
   controllers: [MailSubscriptionController],
