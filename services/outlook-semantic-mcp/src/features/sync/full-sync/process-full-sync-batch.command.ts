@@ -26,7 +26,7 @@ export type BatchResult =
   | { outcome: 'completed' }
   | { outcome: 'version-mismatch' };
 
-const BURST_LIMIT = 100;
+const PAGE_LIMIT = 100;
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 500;
 
@@ -153,20 +153,26 @@ export class ProcessFullSyncBatchCommand {
           failed++;
         }
 
-        if (uploaded >= BURST_LIMIT) {
+        if (uploaded >= PAGE_LIMIT) {
+          const isLastOnPage = i + 1 >= page.length;
           const saved = await this.updateByVersionCommand.run(userProfileId, version, {
-            fullSyncBatchIndex: i + 1,
+            ...(isLastOnPage
+              ? { fullSyncNextLink: pageData.nextLink, fullSyncBatchIndex: 0 }
+              : { fullSyncBatchIndex: i + 1 }),
             fullSyncHeartbeatAt: sql`NOW()`,
           });
           if (!saved) {
             return { outcome: 'version-mismatch' };
+          }
+          if (isLastOnPage) {
+            await this.updateWatermarks(page, userProfileId, version);
           }
           traceEvent('batch-uploaded', { uploaded, skipped, failed });
           this.logger.log({
             userProfileId,
             version,
             pageNumber,
-            messageIndex: i + 1,
+            messageIndex: isLastOnPage ? 0 : i + 1,
             uploaded,
             skipped,
             failed,
@@ -255,6 +261,11 @@ export class ProcessFullSyncBatchCommand {
     }
 
     const parsed = fullSyncBatchGraphMessageResponseSchema.parse(raw);
+    if (parsed['@odata.context']) {
+      await this.updateByVersionCommand.run(userProfileId, version, {
+        fullSyncNextLink: parsed['@odata.context'],
+      });
+    }
     return {
       messages: parsed.value,
       nextLink: parsed['@odata.nextLink'] ?? null,
@@ -271,7 +282,7 @@ export class ProcessFullSyncBatchCommand {
       .select(FullSyncBatchGraphMessageFields)
       .filter(conditions.join(' and '))
       .orderby('createdDateTime desc')
-      .top(200)
+      .top(PAGE_LIMIT)
       .get();
   }
 

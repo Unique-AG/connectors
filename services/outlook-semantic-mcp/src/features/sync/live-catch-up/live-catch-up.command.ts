@@ -4,8 +4,10 @@ import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
+import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { sqlArray } from '~/utils/sql-array';
 import { MessageEventDto } from '../../mail-ingestion/dtos/message-event.dto';
 import {
@@ -13,8 +15,6 @@ import {
   FullSyncGraphMessageFields,
   fullSyncGraphMessageResponseSchema,
 } from '../../mail-ingestion/dtos/microsoft-graph.dtos';
-import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
-import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 
 @Injectable()
 export class LiveCatchUpCommand {

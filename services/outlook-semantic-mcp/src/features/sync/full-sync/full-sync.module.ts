@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DrizzleModule } from '~/db/drizzle.module';
+import { DirectoriesSyncModule } from '~/features/directories-sync/directories-sync.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { MailIngestionModule } from '../../mail-ingestion/mail-ingestion.module';
@@ -14,7 +15,6 @@ import { PauseFullSyncCommand } from './pause-full-sync.command';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { ResumeFullSyncCommand } from './resume-full-sync.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
-import { DirectoriesSyncModule } from '~/features/directories-sync/directories-sync.module';
 
 @Module({
   imports: [
