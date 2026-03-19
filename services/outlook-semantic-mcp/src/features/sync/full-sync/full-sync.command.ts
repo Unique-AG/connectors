@@ -194,7 +194,7 @@ export class FullSyncCommand {
         action: 'proceed' as const,
         version,
         previousState,
-        shouldFetchCount: isFreshStart || isNullish(inboxConfiguration.fullSyncExpectedTotal),
+        shouldFetchCount: isFreshStart || isNullish(row.fullSyncExpectedTotal),
       };
     });
   }
