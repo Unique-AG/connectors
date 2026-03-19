@@ -303,9 +303,9 @@ describe('FullSyncCommand', () => {
   // -------------------------------------------------------------------------
 
   describe('waiting-for-ingestion scope stats gating', () => {
-    it('parks again when scope has >= 20 items in progress', async () => {
+    it('parks again when scope has >= 10 items in progress', async () => {
       const batchCommand = createMockProcessFullSyncBatchCommand();
-      const statsQuery = createMockGetScopeIngestionStatsQuery({ ok: true, inProgress: 25 });
+      const statsQuery = createMockGetScopeIngestionStatsQuery({ ok: true, inProgress: 15 });
       const updateByVersionCommand = createMockUpdateByVersionCommand(true);
       const db = createMockDb({
         row: makeRow({
@@ -326,9 +326,9 @@ describe('FullSyncCommand', () => {
       );
     });
 
-    it('proceeds to batch when scope has < 20 items in progress', async () => {
+    it('proceeds to batch when scope has < 10 items in progress', async () => {
       const batchCommand = createMockProcessFullSyncBatchCommand('completed');
-      const statsQuery = createMockGetScopeIngestionStatsQuery({ ok: true, inProgress: 15 });
+      const statsQuery = createMockGetScopeIngestionStatsQuery({ ok: true, inProgress: 5 });
       const updateByVersionCommand = createMockUpdateByVersionCommand(true);
       const db = createMockDb({
         row: makeRow({

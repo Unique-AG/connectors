@@ -18,7 +18,7 @@ export const START_FULL_SYNC_LINK = 'SYNC_STARTED:__EMPTY_DELTA__';
 
 const READY_COOLDOWN_MINUTES = 5;
 const STALE_HEARTBEAT_MINUTES = 20;
-const MAX_ON_GOING_INGESTION_IN_PROGRESS = 20;
+const MAX_ON_GOING_INGESTION_IN_PROGRESS = 10;
 
 export type FullSyncResult =
   | { status: 'skipped'; reason: string }

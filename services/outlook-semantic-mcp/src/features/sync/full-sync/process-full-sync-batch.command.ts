@@ -118,6 +118,8 @@ export class ProcessFullSyncBatchCommand {
         break;
       }
 
+      let burstLimitHit = false;
+
       for (let i = batchIndex; i < page.length; i++) {
         const message = page[i];
         if (!message) {
@@ -154,36 +156,41 @@ export class ProcessFullSyncBatchCommand {
         }
 
         if (uploaded >= PAGE_LIMIT) {
-          const isLastOnPage = i + 1 >= page.length;
-          const saved = await this.updateByVersionCommand.run(userProfileId, version, {
-            ...(isLastOnPage
-              ? { fullSyncNextLink: pageData.nextLink, fullSyncBatchIndex: 0 }
-              : { fullSyncBatchIndex: i + 1 }),
-            fullSyncHeartbeatAt: sql`NOW()`,
-          });
-          if (!saved) {
-            return { outcome: 'version-mismatch' };
+          // Mid-page burst: save resume index and park immediately
+          if (i + 1 < page.length) {
+            const saved = await this.updateByVersionCommand.run(userProfileId, version, {
+              fullSyncBatchIndex: i + 1,
+              fullSyncHeartbeatAt: sql`NOW()`,
+            });
+            if (!saved) {
+              return { outcome: 'version-mismatch' };
+            }
+            traceEvent('batch-uploaded', { uploaded, skipped, failed });
+            this.logger.log({
+              userProfileId,
+              version,
+              pageNumber,
+              messageIndex: i + 1,
+              uploaded,
+              skipped,
+              failed,
+              msg: 'Burst limit reached mid-page, parking',
+            });
+            return { outcome: 'batch-uploaded' };
           }
-          if (isLastOnPage) {
-            await this.updateWatermarks(page, userProfileId, version);
-          }
-          traceEvent('batch-uploaded', { uploaded, skipped, failed });
-          this.logger.log({
-            userProfileId,
-            version,
-            pageNumber,
-            messageIndex: isLastOnPage ? 0 : i + 1,
-            uploaded,
-            skipped,
-            failed,
-            msg: 'Burst limit reached, parking',
-          });
-          return { outcome: 'batch-uploaded' };
+          burstLimitHit = true;
+          break;
         }
       }
 
+      // -- Page fully consumed --
+      await this.updateWatermarks(page, userProfileId, version);
       batchIndex = 0;
       nextLink = pageData.nextLink;
+
+      if (!nextLink) {
+        break;
+      }
 
       const saved = await this.updateByVersionCommand.run(userProfileId, version, {
         fullSyncNextLink: nextLink,
@@ -194,18 +201,29 @@ export class ProcessFullSyncBatchCommand {
         return { outcome: 'version-mismatch' };
       }
 
-      await this.updateWatermarks(page, userProfileId, version);
-
       this.logger.log({
         userProfileId,
         version,
         pageNumber,
-        hasNextPage: nextLink !== null,
         uploaded,
         skipped,
         failed,
         msg: 'Page processing complete',
       });
+
+      if (burstLimitHit) {
+        traceEvent('batch-uploaded', { uploaded, skipped, failed });
+        this.logger.log({
+          userProfileId,
+          version,
+          pageNumber,
+          uploaded,
+          skipped,
+          failed,
+          msg: 'Burst limit reached at page boundary, parking',
+        });
+        return { outcome: 'batch-uploaded' };
+      }
     }
 
     traceEvent('full-sync-completed', { uploaded, skipped, failed, pageNumber });

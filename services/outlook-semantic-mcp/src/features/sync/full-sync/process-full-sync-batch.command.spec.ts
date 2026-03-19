@@ -268,6 +268,23 @@ describe('ProcessFullSyncBatchCommand', () => {
       );
     });
 
+    it('returns completed when burst limit is hit on last message of last page', async () => {
+      // Exactly 100 messages on a single page with no nextLink — this is the last page
+      const messages = Array.from({ length: 100 }, (_, i) => makeMessage(`msg-${i}`));
+      const graphApi = createMockGraphApi();
+      graphApi.get.mockResolvedValue(makeGraphResponse(messages));
+
+      const updateCommand = createMockUpdateByVersionCommand();
+      const command = createCommand({ graphApi, updateCommand });
+
+      const result = await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+      // Must be 'completed', NOT 'batch-uploaded'.
+      // Previously this returned 'batch-uploaded' and saved fullSyncNextLink=null,
+      // which acquireLockAndDecide treated as a fresh start → infinite restart loop.
+      expect(result).toEqual({ outcome: 'completed' });
+    });
+
     it('does not count skipped messages toward burst limit', async () => {
       const messages = Array.from({ length: 5 }, (_, i) => makeMessage(`msg-${i}`));
       const graphApi = createMockGraphApi();

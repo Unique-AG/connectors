@@ -16,8 +16,6 @@ import { AMQPService } from './amqp.service';
           exchanges: [MAIN_EXCHANGE, DEAD_EXCHANGE],
           queues: [DEAD_QUEUE],
           enableControllerDiscovery: true,
-          // We use prefetchCount: 10 because anyway the bottlenack is the ingestion and we wait for that.
-          prefetchCount: 10,
           // NOTE: (de)serialisation for empty messages doesn't work well with OTEL & json parsing
         };
       },
