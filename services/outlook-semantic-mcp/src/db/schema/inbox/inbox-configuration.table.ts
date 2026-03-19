@@ -40,7 +40,7 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   filters: jsonb(`filters`).$type<Record<string, unknown>>().notNull(),
   // Full sync specific columns
   fullSyncState: inboxSyncState(`full_sync_state`).notNull().default('ready'),
-  fullSyncHeartbeatAt: timestamp(`full_sync_heartbeat_at`),
+  fullSyncHeartbeatAt: timestamp(`full_sync_heartbeat_at`).notNull().defaultNow(),
   fullSyncVersion: uuid(`full_sync_version`),
   fullSyncNextLink: text(`full_sync_next_link`),
 
@@ -56,7 +56,7 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   fullSyncLastStartedAt: timestamp(`full_sync_last_started_at`),
   // Live catchup specific columns
   liveCatchUpState: liveCatchUpState(`live_catch_up_state`).notNull().default('ready'),
-  liveCatchUpHeartbeatAt: timestamp(`live_catch_up_heartbeat_at`),
+  liveCatchUpHeartbeatAt: timestamp(`live_catch_up_heartbeat_at`).notNull().defaultNow(),
   pendingLiveMessageIds: text(`pending_live_message_ids`).array().notNull().default(sql`'{}'`),
 
   // Date watermarks for sync coordination

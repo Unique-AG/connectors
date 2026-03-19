@@ -232,15 +232,11 @@ export class FullSyncCommand {
   private decideFromRunning(
     row: Pick<InboxConfig, 'fullSyncHeartbeatAt'>,
   ): { action: 'skip'; reason: string } | { action: 'proceed' } {
-    if (
-      isNullish(row.fullSyncHeartbeatAt) ||
-      !this.isWithinCooldown(row.fullSyncHeartbeatAt, STALE_HEARTBEAT_MINUTES)
-    ) {
-      this.logger.warn({ msg: 'Recovering stale running sync (heartbeat too old)' });
-      return { action: 'proceed' };
+    if (this.isWithinCooldown(row.fullSyncHeartbeatAt, STALE_HEARTBEAT_MINUTES)) {
+      return { action: 'skip', reason: 'already-running' };
     }
-
-    return { action: 'skip', reason: 'already-running' };
+    this.logger.warn({ msg: 'Recovering stale running sync (heartbeat too old)' });
+    return { action: 'proceed' };
   }
 
   private isWithinCooldown(timestamp: Date | null, cooldownMinutes: number): boolean {

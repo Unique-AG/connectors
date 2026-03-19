@@ -2,7 +2,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, eq, gt, isNull, lt, or, SQL, sql } from 'drizzle-orm';
+import { and, eq, gt, lt, or, SQL, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
 import {
@@ -80,18 +80,12 @@ export class FullSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
         or(
           and(
             eq(inboxConfiguration.fullSyncState, 'waiting-for-ingestion'),
-            or(
-              isNull(inboxConfiguration.fullSyncHeartbeatAt),
-              lt(inboxConfiguration.fullSyncHeartbeatAt, waitingForIngestionThreshold),
-            ),
+            lt(inboxConfiguration.fullSyncHeartbeatAt, waitingForIngestionThreshold),
           ),
           eq(inboxConfiguration.fullSyncState, 'failed'),
           and(
             eq(inboxConfiguration.fullSyncState, 'running'),
-            or(
-              isNull(inboxConfiguration.fullSyncHeartbeatAt),
-              lt(inboxConfiguration.fullSyncHeartbeatAt, staleThreshold),
-            ),
+            lt(inboxConfiguration.fullSyncHeartbeatAt, staleThreshold),
           ),
         ),
       );
