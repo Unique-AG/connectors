@@ -54,6 +54,9 @@ function createMockGetScopeIngestionStatsQuery(stats?: { ok: boolean; inProgress
 function createMockUpdateByVersionCommand(success = true) {
   return { run: vi.fn().mockResolvedValue(success) };
 }
+function createSyncDirectoriesVersionCommand() {
+  return { run: vi.fn() };
+}
 
 function createMockDb({
   row,
@@ -100,18 +103,21 @@ function createCommand({
   statsQuery = createMockGetScopeIngestionStatsQuery(),
   updateByVersionCommand = createMockUpdateByVersionCommand(),
   db = createMockDb({ row: undefined }),
+  syncDirectories = createSyncDirectoriesVersionCommand(),
 }: {
   graphApi?: ReturnType<typeof createMockGraphApi>;
   batchCommand?: ReturnType<typeof createMockProcessFullSyncBatchCommand>;
   statsQuery?: ReturnType<typeof createMockGetScopeIngestionStatsQuery>;
   updateByVersionCommand?: ReturnType<typeof createMockUpdateByVersionCommand>;
   db?: ReturnType<typeof createMockDb>;
+  syncDirectories?: ReturnType<typeof createSyncDirectoriesVersionCommand>;
 } = {}): FullSyncCommand {
   return new FullSyncCommand(
     createMockGraphClientFactory(graphApi) as any,
     batchCommand as any,
     statsQuery as any,
     updateByVersionCommand as any,
+    syncDirectories as any,
     db as any,
   );
 }

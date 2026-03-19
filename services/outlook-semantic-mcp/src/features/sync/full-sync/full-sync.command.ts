@@ -9,6 +9,8 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 
 type InboxConfig = typeof inboxConfiguration.$inferSelect;
 
@@ -33,11 +35,13 @@ export class FullSyncCommand {
     private readonly processFullSyncBatchCommand: ProcessFullSyncBatchCommand,
     private readonly getScopeIngestionStatsQuery: GetScopeIngestionStatsQuery,
     private readonly updateByVersionCommand: UpdateInboxConfigByVersionCommand,
+    private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
   @Span()
   public async run(userProfileId: string): Promise<FullSyncResult> {
+    await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfileId));
     traceAttrs({ userProfileId });
     this.logger.log({ userProfileId, msg: 'Full sync triggered' });
 

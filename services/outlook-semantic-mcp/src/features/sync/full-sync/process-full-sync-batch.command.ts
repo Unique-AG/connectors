@@ -96,7 +96,7 @@ export class ProcessFullSyncBatchCommand {
     while (nextLink) {
       pageNumber++;
       const pageStart = Date.now();
-      const pageData = await this.fetchPage(client, nextLink, filters, userProfileId, version);
+      const pageData = await this.fetchPage({ client, nextLink, filters, userProfileId, version });
       const pageDurationMs = Date.now() - pageStart;
       this.graphPageDuration.record(pageDurationMs / 1000, {
         page_type: nextLink === START_FULL_SYNC_LINK ? 'first' : 'next',
@@ -215,13 +215,20 @@ export class ProcessFullSyncBatchCommand {
     return { outcome: 'completed' };
   }
 
-  private async fetchPage(
-    client: ReturnType<GraphClientFactory['createClientForUser']>,
-    nextLink: string,
-    filters: InboxConfigurationMailFilters,
-    userProfileId: string,
-    version: string,
-  ): Promise<{ messages: FullSyncBatchGraphMessage[]; nextLink: string | null }> {
+  @Span()
+  private async fetchPage({
+    client,
+    nextLink,
+    filters,
+    userProfileId,
+    version,
+  }: {
+    client: ReturnType<GraphClientFactory['createClientForUser']>;
+    nextLink: string;
+    filters: InboxConfigurationMailFilters;
+    userProfileId: string;
+    version: string;
+  }): Promise<{ messages: FullSyncBatchGraphMessage[]; nextLink: string | null }> {
     const conditions = [`createdDateTime gt ${filters.ignoredBefore.toISOString()}`];
 
     let raw: unknown;
@@ -268,6 +275,7 @@ export class ProcessFullSyncBatchCommand {
       .get();
   }
 
+  @Span()
   private async processMessage({
     message,
     filters,

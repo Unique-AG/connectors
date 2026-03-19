@@ -14,6 +14,7 @@ import { PauseFullSyncCommand } from './pause-full-sync.command';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { ResumeFullSyncCommand } from './resume-full-sync.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
+import { DirectoriesSyncModule } from '~/features/directories-sync/directories-sync.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-vers
     SubscriptionUtilsModule,
     UniqueApiFeatureModule,
     MailIngestionModule,
+    DirectoriesSyncModule,
   ],
   providers: [
     FullSyncCommand,

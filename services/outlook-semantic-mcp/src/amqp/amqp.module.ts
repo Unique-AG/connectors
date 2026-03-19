@@ -16,6 +16,7 @@ import { AMQPService } from './amqp.service';
           exchanges: [MAIN_EXCHANGE, DEAD_EXCHANGE],
           queues: [DEAD_QUEUE],
           enableControllerDiscovery: true,
+          prefetchCount: 20,
           // NOTE: (de)serialisation for empty messages doesn't work well with OTEL & json parsing
         };
       },

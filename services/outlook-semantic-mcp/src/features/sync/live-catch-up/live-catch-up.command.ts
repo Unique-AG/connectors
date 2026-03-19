@@ -13,6 +13,8 @@ import {
   FullSyncGraphMessageFields,
   fullSyncGraphMessageResponseSchema,
 } from '../../mail-ingestion/dtos/microsoft-graph.dtos';
+import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 
 @Injectable()
 export class LiveCatchUpCommand {
@@ -21,6 +23,7 @@ export class LiveCatchUpCommand {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly amqp: AmqpConnection,
+    private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -60,6 +63,8 @@ export class LiveCatchUpCommand {
     const { watermark } = lockResult;
 
     try {
+      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfileId));
+
       const { totalScheduled, scheduledIds } = await this.fetchAndScheduleBatches({
         userProfileId,
         subscriptionId,
