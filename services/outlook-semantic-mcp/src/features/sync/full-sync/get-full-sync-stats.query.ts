@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
+import { omit } from 'remeda';
 import z from 'zod';
 import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
@@ -8,7 +9,6 @@ import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configura
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../../user-utils/get-user-profile.query';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
-import { omit } from 'remeda';
 
 const ingestionStatsError = z.object({
   state: z
