@@ -652,6 +652,28 @@ describe('ProcessFullSyncBatchCommand', () => {
         expect.objectContaining({ fullSyncScheduledForIngestion: expect.anything() }),
       );
     });
+
+    it('throws immediately on BottleneckError without retrying', async () => {
+      const Bottleneck = await import('bottleneck');
+      const graphApi = createMockGraphApi();
+      graphApi.get.mockResolvedValue(makeGraphResponse([makeMessage('msg-1')]));
+
+      const ingestCommand = {
+        run: vi
+          .fn()
+          .mockRejectedValue(
+            new Bottleneck.default.BottleneckError('This job has been dropped by Bottleneck'),
+          ),
+      };
+      const command = createCommand({ graphApi, ingestCommand });
+
+      await expect(
+        command.run({ userProfileId: USER_PROFILE_ID, version: VERSION }),
+      ).rejects.toThrow(Bottleneck.default.BottleneckError);
+
+      // Should NOT retry — only one call
+      expect(ingestCommand.run).toHaveBeenCalledTimes(1);
+    });
   });
 
   // -------------------------------------------------------------------------

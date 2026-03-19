@@ -772,7 +772,7 @@ importers:
         version: 2.40.0
       '@nestjs/cli':
         specifier: ^11.0.10
-        version: 11.0.10(@swc/cli@0.7.8(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)(esbuild@0.25.9)
+        version: 11.0.10(@swc/cli@0.7.8(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
       '@nestjs/schematics':
         specifier: ^11.0.7
         version: 11.0.7(chokidar@4.0.3)(typescript@5.9.2)
@@ -917,6 +917,9 @@ importers:
       amqplib:
         specifier: ^0.10.9
         version: 0.10.9
+      bottleneck:
+        specifier: ^2.19.5
+        version: 2.19.5
       cache-manager:
         specifier: ^7.2.0
         version: 7.2.0
@@ -989,7 +992,7 @@ importers:
         version: 2.43.1
       '@nestjs/cli':
         specifier: ^11.0.10
-        version: 11.0.10(@swc/cli@0.7.8(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
+        version: 11.0.10(@swc/cli@0.7.8(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)(esbuild@0.25.9)
       '@nestjs/schematics':
         specifier: ^11.0.7
         version: 11.0.7(chokidar@4.0.3)(typescript@5.9.2)
@@ -9577,6 +9580,14 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
+  '@vitest/mocker@3.2.4(vite@7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))':
+    dependencies:
+      '@vitest/spy': 3.2.4
+      estree-walker: 3.0.3
+      magic-string: 0.30.17
+    optionalDependencies:
+      vite: 7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1)
+
   '@vitest/mocker@3.2.4(vite@7.1.4(@types/node@24.4.0)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))':
     dependencies:
       '@vitest/spy': 3.2.4
@@ -13117,7 +13128,7 @@ snapshots:
     dependencies:
       '@types/chai': 5.2.2
       '@vitest/expect': 3.2.4
-      '@vitest/mocker': 3.2.4(vite@7.1.4(@types/node@24.4.0)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))
+      '@vitest/mocker': 3.2.4(vite@7.1.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1))
       '@vitest/pretty-format': 3.2.4
       '@vitest/runner': 3.2.4
       '@vitest/snapshot': 3.2.4

@@ -1,6 +1,7 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
+import Bottleneck from 'bottleneck';
 import { sql } from 'drizzle-orm';
 import { MetricService, Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
@@ -408,6 +409,13 @@ export class ProcessFullSyncBatchCommand {
         await this.ingestEmailCommand.run({ userProfileId, messageId });
         return true;
       } catch (error) {
+        // Bottleneck errors mean the rate limiter is overwhelmed or stopped.
+        // Retrying is pointless — re-throw so the sync transitions to failed
+        // state and the scheduler can pick it up later.
+        if (error instanceof Bottleneck.BottleneckError) {
+          throw error;
+        }
+
         this.logger.warn({
           err: error,
           userProfileId,

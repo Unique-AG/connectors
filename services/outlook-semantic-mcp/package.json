@@ -50,6 +50,7 @@
     "@unique-ag/probe": "workspace:*",
     "@unique-ag/unique-api": "workspace:*",
     "@unique-ag/utils": "workspace:*",
+    "bottleneck": "^2.19.5",
     "amqplib": "^0.10.9",
     "cache-manager": "^7.2.0",
     "cron": "^4.3.0",
