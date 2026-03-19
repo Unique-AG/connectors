@@ -17,7 +17,8 @@ type InboxConfig = typeof inboxConfiguration.$inferSelect;
 export const START_FULL_SYNC_LINK = 'SYNC_STARTED:__EMPTY_DELTA__';
 
 const READY_COOLDOWN_MINUTES = 5;
-const STALE_HEARTBEAT_MINUTES = 20;
+export const STALE_HEARTBEAT_MINUTES = 20;
+export const WAITING_FOR_INGESTION_HEARTBEAT_MINUTES = 5;
 const MAX_ON_GOING_INGESTION_IN_PROGRESS = 10;
 
 export type FullSyncResult =
@@ -58,21 +59,13 @@ export class FullSyncCommand {
     // is still in progress because we try to recover syncs which are stalling in 'running' status
     // and we will push them through the queue then here we should check what happens in our scope.
     if (['waiting-for-ingestion', 'running'].includes(previousState)) {
-      const result = await this.getScopeIngestionStatsQuery.run(userProfileId);
-      // Proceed optimistically when stats are unavailable rather than blocking the sync
-      const canProceed = !result.ok || result.inProgress < MAX_ON_GOING_INGESTION_IN_PROGRESS;
-      if (!canProceed) {
-        const parked = await this.transitionState(userProfileId, version, 'waiting-for-ingestion');
-        if (!parked) {
-          this.logger.warn({
-            userProfileId,
-            version,
-            msg: 'Version mismatch while parking for ingestion',
-          });
-          return { status: 'skipped', reason: 'version-mismatch' };
-        }
-        this.logger.log({ userProfileId, version, msg: 'Scope still draining, parking again' });
-        return { status: 'waiting-for-ingestion' };
+      const ingestionVerificationResult = await this.verifyIngestionStatus({
+        userProfileId,
+        version,
+      });
+
+      if (ingestionVerificationResult.status !== 'proceed') {
+        return ingestionVerificationResult;
       }
     }
 
@@ -89,16 +82,17 @@ export class FullSyncCommand {
 
       switch (batchResult.outcome) {
         case 'version-mismatch':
-          this.logger.log({ userProfileId, version, msg: 'Exiting: version mismatch' });
+        case 'missing-full-sync-next-link':
+          this.logger.log({ userProfileId, version, msg: `Exiting: ${batchResult.outcome}` });
           return { status: 'skipped', reason: 'version-mismatch' };
 
         case 'batch-uploaded': {
-          const parked = await this.transitionState(
+          const newStateSaved = await this.transitionState(
             userProfileId,
             version,
             'waiting-for-ingestion',
           );
-          if (!parked) {
+          if (!newStateSaved) {
             this.logger.warn({
               userProfileId,
               version,
@@ -106,7 +100,7 @@ export class FullSyncCommand {
             });
             return { status: 'skipped', reason: 'version-mismatch' };
           }
-          this.logger.log({ userProfileId, version, msg: 'Batch uploaded, parking' });
+          this.logger.log({ userProfileId, version, msg: 'Batch uploaded, waiting for ingestion' });
           return { status: 'waiting-for-ingestion' };
         }
 
@@ -131,8 +125,7 @@ export class FullSyncCommand {
         }
 
         default: {
-          const _exhaustive: never = batchResult;
-          throw new Error(`Unhandled batch result: ${JSON.stringify(_exhaustive)}`);
+          throw new Error(`Unhandled batch result: ${JSON.stringify(batchResult)}`);
         }
       }
     } catch (error) {
@@ -201,7 +194,7 @@ export class FullSyncCommand {
         action: 'proceed' as const,
         version,
         previousState,
-        shouldFetchCount: isFreshStart,
+        shouldFetchCount: isFreshStart || isNullish(inboxConfiguration.fullSyncExpectedTotal),
       };
     });
   }
@@ -224,16 +217,6 @@ export class FullSyncCommand {
         }
         return { action: 'proceed' };
       case 'waiting-for-ingestion':
-        // If we literally processed a message for this 1 minute ago then we should Skip it
-        // This is a safeguard in case following case:
-        // -> Queue 10 times the same inbox
-        // First comes it schedules 100 and moves to waiting for ingestion
-        // Second one comes it has to check the stats.
-        // Next ones do the same, but if we queued 100 things and ingestion was not ready a minute ago
-        // we can wait a bit more
-        if (this.isWithinCooldown(row.fullSyncHeartbeatAt, 1)) {
-          return { action: 'skip', reason: 'ran-recently' };
-        }
         return { action: 'proceed' };
       case 'running':
         return this.decideFromRunning(row);
@@ -291,6 +274,36 @@ export class FullSyncCommand {
         msg: 'Failed to fetch $count, proceeding without expectedTotal',
       });
     }
+  }
+
+  private async verifyIngestionStatus({
+    userProfileId,
+    version,
+  }: {
+    userProfileId: string;
+    version: string;
+  }): Promise<
+    | { status: 'proceed' }
+    | { status: 'skipped'; reason: 'version-mismatch' }
+    | { status: 'waiting-for-ingestion' }
+  > {
+    const result = await this.getScopeIngestionStatsQuery.run(userProfileId);
+    if (result.ok && result.inProgress < MAX_ON_GOING_INGESTION_IN_PROGRESS) {
+      return { status: 'proceed' };
+    }
+
+    if (!result.ok) {
+      this.logger.log({ userProfileId, version, msg: 'Ingestion is not reachable, waiting again' });
+    } else {
+      this.logger.log({ userProfileId, version, msg: 'Scope still draining, waiting again' });
+    }
+    const isSaved = await this.transitionState(userProfileId, version, 'waiting-for-ingestion');
+    if (!isSaved) {
+      this.logger.log({ userProfileId, version, msg: 'Skipping state transition failed' });
+      return { status: 'skipped', reason: 'version-mismatch' };
+    }
+
+    return { status: 'waiting-for-ingestion' };
   }
 
   private async transitionState(

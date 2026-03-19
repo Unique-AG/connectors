@@ -344,7 +344,7 @@ describe('FullSyncCommand', () => {
       expect(batchCommand.run).toHaveBeenCalledOnce();
     });
 
-    it('proceeds optimistically when scope stats are unavailable', async () => {
+    it('waits for ingestion optimistically when scope stats are unavailable', async () => {
       const batchCommand = createMockProcessFullSyncBatchCommand('completed');
       const statsQuery = createMockGetScopeIngestionStatsQuery({ ok: false, inProgress: 0 });
       const updateByVersionCommand = createMockUpdateByVersionCommand(true);
@@ -358,11 +358,11 @@ describe('FullSyncCommand', () => {
 
       const result = await command.run(USER_PROFILE_ID);
 
-      expect(result.status).toBe('completed');
-      expect(batchCommand.run).toHaveBeenCalledOnce();
+      expect(result.status).toBe('waiting-for-ingestion');
+      expect(batchCommand.run).not.toHaveBeenCalled();
     });
 
-    it('returns skipped on version mismatch while parking for ingestion', async () => {
+    it('returns skipped on version mismatch while waiting for ingestion', async () => {
       const batchCommand = createMockProcessFullSyncBatchCommand();
       const statsQuery = createMockGetScopeIngestionStatsQuery({ ok: true, inProgress: 25 });
       const updateByVersionCommand = createMockUpdateByVersionCommand(false);

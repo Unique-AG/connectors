@@ -182,9 +182,9 @@ export const FullSyncBatchGraphMessageFields = asAllOptions<keyof FullSyncBatchG
 ]);
 
 export const fullSyncBatchGraphMessageResponseSchema = z.object({
-  '@odata.context': z.string().optional(),
+  '@odata.context': z.string().optional().nullable(),
   value: z.array(fullSyncBatchGraphMessage),
-  '@odata.nextLink': z.string().optional(),
+  '@odata.nextLink': z.string().optional().nullable(),
 });
 
 export const fullSyncGraphMessageResponseSchema = z.object({

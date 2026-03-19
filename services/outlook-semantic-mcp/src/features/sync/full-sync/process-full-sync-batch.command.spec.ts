@@ -156,7 +156,7 @@ describe('ProcessFullSyncBatchCommand', () => {
       expect(result).toEqual({ outcome: 'version-mismatch' });
     });
 
-    it('returns version-mismatch when nextLink is null', async () => {
+    it('returns missing-full-sync-next-link when nextLink is null', async () => {
       const findConfig = createMockFindConfigByVersion({
         fullSyncNextLink: null,
         fullSyncBatchIndex: 0,
@@ -170,7 +170,7 @@ describe('ProcessFullSyncBatchCommand', () => {
 
       const result = await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
 
-      expect(result).toEqual({ outcome: 'version-mismatch' });
+      expect(result).toEqual({ outcome: 'missing-full-sync-next-link' });
     });
   });
 

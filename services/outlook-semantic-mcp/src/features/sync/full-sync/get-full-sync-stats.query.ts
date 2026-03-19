@@ -15,14 +15,8 @@ const ingestionStatsError = z.object({
     .describe(
       '"error" means all eighter your inbox connection is somehow broken we cannot find your root scope. Or calling ingestion failed see "errorMessage" property for details',
     ),
-  message: z.string(),
 });
 const ingestionStateSuccess = z.object({
-  state: z
-    .enum(['finished', 'running'])
-    .describe(
-      '"finished" means all queued emails have been ingested, "running" means ingestion is still in progress.',
-    ),
   failed: z.number().describe('Number of emails that failed ingestion.'),
   finished: z.number().describe('Number of emails successfully ingested into the vector store.'),
   inProgress: z.number().describe('Number of emails currently being ingested.'),
@@ -116,13 +110,20 @@ export class GetFullSyncStatsQuery {
         message: `Live catch-up failed. Use \`run_full_sync\` tool to sync your inbox`,
       };
     }
-    const ingestionResult = await this.getIngestionStats(userProfile.id);
-    if (ingestionResult.state === 'error') {
+    const ingestionResult = await this.getScopeIngestionStats.run(userProfile.id);
+    if (!ingestionResult.ok) {
+      const message =
+        ingestionResult.reason === 'no-root-scope'
+          ? 'Could not find root scope, please reconnect your inbox'
+          : 'Ingestion service is not reachable';
+
+      this.logger.warn({ userProfileId: userProfile.id, msg: message });
+
       return {
         state: 'error',
         syncStats: null,
         ingestionStats: null,
-        message: ingestionResult.message,
+        message: message,
       };
     }
     const filters = inboxConfigurationMailFilters.parse(inboxConfig.filters);
@@ -164,32 +165,6 @@ export class GetFullSyncStatsQuery {
       syncStats,
       debugData: this.config.mcpDebugMode ? debugData : undefined,
       state: isRunning ? 'running' : 'finished',
-    };
-  }
-
-  private async getIngestionStats(userProfileId: string): Promise<z.infer<typeof ingestionStats>> {
-    const result = await this.getScopeIngestionStats.run(userProfileId);
-
-    if (!result.ok) {
-      const message =
-        result.reason === 'no-root-scope'
-          ? 'Could not find root scope, please reconnect your inbox'
-          : 'Ingestion service is not reachable';
-      this.logger.debug({
-        userProfileId,
-        reason: result.reason,
-        msg: 'Ingestion stats unavailable',
-      });
-      return { state: 'error', message };
-    }
-
-    this.logger.debug({ userProfileId, msg: 'Full sync progress retrieved' });
-
-    return {
-      failed: result.failed,
-      finished: result.finished,
-      inProgress: result.inProgress,
-      state: result.inProgress > 0 ? 'running' : 'finished',
     };
   }
 }
