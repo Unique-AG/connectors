@@ -8,6 +8,7 @@ import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configura
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../../user-utils/get-user-profile.query';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
+import { omit } from 'remeda';
 
 const ingestionStatsError = z.object({
   state: z
@@ -22,7 +23,7 @@ const ingestionStateSuccess = z.object({
   inProgress: z.number().describe('Number of emails currently being ingested.'),
 });
 
-const ingestionStats = z.discriminatedUnion('state', [ingestionStateSuccess, ingestionStatsError]);
+const ingestionStats = ingestionStateSuccess.or(ingestionStatsError);
 
 export const GetFullSyncStatsResponse = z.object({
   state: z.enum(['error', 'running', 'finished']),
@@ -161,7 +162,7 @@ export class GetFullSyncStatsQuery {
 
     return {
       message: `Stats retrieved succesfully`,
-      ingestionStats: ingestionResult,
+      ingestionStats: omit(ingestionResult, ['ok', 'rootScopeId']),
       syncStats,
       debugData: this.config.mcpDebugMode ? debugData : undefined,
       state: isRunning ? 'running' : 'finished',
