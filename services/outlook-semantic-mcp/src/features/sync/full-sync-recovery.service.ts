@@ -40,9 +40,9 @@ export class FullSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
   }
 
   private setupCronJob(): void {
-    const job = new CronJob(FULL_SYNC_RECOVERY_CRON_SCHEDULE, () => {
+    const job = new CronJob(FULL_SYNC_RECOVERY_CRON_SCHEDULE, async () => {
       try {
-        void this.checkAndRetriggerStuckFullSyncs();
+        await this.checkAndRetriggerStuckFullSyncs();
       } catch (err) {
         this.logger.error({
           msg: 'An unexpected error occurred during full sync recovery scan',
