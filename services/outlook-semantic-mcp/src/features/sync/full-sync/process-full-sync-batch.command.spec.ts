@@ -245,6 +245,252 @@ describe('ProcessFullSyncBatchCommand', () => {
   });
 
   // -------------------------------------------------------------------------
+  // batchIndex vs page size edge cases
+  // -------------------------------------------------------------------------
+
+  describe('batchIndex vs page size edge cases', () => {
+    it('does not infinite-loop when batchIndex exceeds shrunken page (advances to next page)', async () => {
+      // Core regression test: batchIndex=5 but re-fetched page only has 3 items.
+      // Without the fix the while-loop would re-fetch the same page forever.
+      const page1 = [makeMessage('msg-0'), makeMessage('msg-1'), makeMessage('msg-2')];
+      const page2 = [makeMessage('msg-3')];
+      const graphApi = createMockGraphApi();
+      graphApi.get
+        .mockResolvedValueOnce(makeGraphResponse(page1, 'https://graph.microsoft.com/page2'))
+        .mockResolvedValueOnce(makeGraphResponse(page2));
+
+      const findConfig = createMockFindConfigByVersion({
+        fullSyncNextLink: START_FULL_SYNC_LINK,
+        fullSyncBatchIndex: 5,
+        filters: {
+          ignoredBefore: '2020-01-01T00:00:00.000Z',
+          ignoredSenders: [],
+          ignoredContents: [],
+        },
+      });
+      const ingestCommand = createMockIngestEmailCommand();
+      const command = createCommand({ graphApi, findConfig, ingestCommand });
+
+      const result = await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+      expect(result).toEqual({ outcome: 'completed' });
+      // Page 1 fetched once then advanced — not fetched repeatedly
+      expect(graphApi.get).toHaveBeenCalledTimes(2);
+      // Only page 2 message ingested (page 1 was fully skipped)
+      expect(ingestCommand.run).toHaveBeenCalledTimes(1);
+      expect(ingestCommand.run).toHaveBeenCalledWith({
+        userProfileId: USER_PROFILE_ID,
+        messageId: 'msg-3',
+      });
+    });
+
+    it('advances when batchIndex equals page size exactly (off-by-one boundary)', async () => {
+      // batchIndex=3 === page.length=3 → for-loop condition `i < 3` is immediately false
+      const page1 = [makeMessage('msg-0'), makeMessage('msg-1'), makeMessage('msg-2')];
+      const page2 = [makeMessage('msg-3')];
+      const graphApi = createMockGraphApi();
+      graphApi.get
+        .mockResolvedValueOnce(makeGraphResponse(page1, 'https://graph.microsoft.com/page2'))
+        .mockResolvedValueOnce(makeGraphResponse(page2));
+
+      const findConfig = createMockFindConfigByVersion({
+        fullSyncNextLink: START_FULL_SYNC_LINK,
+        fullSyncBatchIndex: 3,
+        filters: {
+          ignoredBefore: '2020-01-01T00:00:00.000Z',
+          ignoredSenders: [],
+          ignoredContents: [],
+        },
+      });
+      const ingestCommand = createMockIngestEmailCommand();
+      const command = createCommand({ graphApi, findConfig, ingestCommand });
+
+      const result = await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+      expect(result).toEqual({ outcome: 'completed' });
+      expect(ingestCommand.run).toHaveBeenCalledTimes(1);
+      expect(ingestCommand.run).toHaveBeenCalledWith({
+        userProfileId: USER_PROFILE_ID,
+        messageId: 'msg-3',
+      });
+    });
+
+    it('completes without processing when batchIndex exceeds last page (no nextLink)', async () => {
+      // batchIndex=5, page has 3 items, no nextLink → should complete, not hang
+      const graphApi = createMockGraphApi();
+      graphApi.get.mockResolvedValue(
+        makeGraphResponse([makeMessage('msg-0'), makeMessage('msg-1'), makeMessage('msg-2')]),
+      );
+
+      const findConfig = createMockFindConfigByVersion({
+        fullSyncNextLink: START_FULL_SYNC_LINK,
+        fullSyncBatchIndex: 5,
+        filters: {
+          ignoredBefore: '2020-01-01T00:00:00.000Z',
+          ignoredSenders: [],
+          ignoredContents: [],
+        },
+      });
+      const ingestCommand = createMockIngestEmailCommand();
+      const command = createCommand({ graphApi, findConfig, ingestCommand });
+
+      const result = await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+      expect(result).toEqual({ outcome: 'completed' });
+      expect(ingestCommand.run).not.toHaveBeenCalled();
+    });
+
+    it('saves batchIndex as 0 and advances nextLink when page is treated as fully consumed', async () => {
+      const graphApi = createMockGraphApi();
+      graphApi.get
+        .mockResolvedValueOnce(
+          makeGraphResponse(
+            [makeMessage('msg-0'), makeMessage('msg-1')],
+            'https://graph.microsoft.com/page2',
+          ),
+        )
+        .mockResolvedValueOnce(makeGraphResponse([]));
+
+      const findConfig = createMockFindConfigByVersion({
+        fullSyncNextLink: START_FULL_SYNC_LINK,
+        fullSyncBatchIndex: 5,
+        filters: {
+          ignoredBefore: '2020-01-01T00:00:00.000Z',
+          ignoredSenders: [],
+          ignoredContents: [],
+        },
+      });
+      const updateCommand = createMockUpdateByVersionCommand();
+      const command = createCommand({ graphApi, findConfig, updateCommand });
+
+      await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+      // Watermark update should save batchIndex=0 and advance nextLink
+      expect(updateCommand.run).toHaveBeenCalledWith(
+        USER_PROFILE_ID,
+        VERSION,
+        expect.objectContaining({
+          fullSyncBatchIndex: 0,
+          fullSyncNextLink: 'https://graph.microsoft.com/page2',
+        }),
+      );
+    });
+
+    it('handles batchIndex=1 on single-item page (equals page.length boundary)', async () => {
+      // batchIndex=1, page.length=1 → for-loop skipped, treated as consumed
+      const page1 = [makeMessage('msg-0')];
+      const page2 = [makeMessage('msg-1')];
+      const graphApi = createMockGraphApi();
+      graphApi.get
+        .mockResolvedValueOnce(makeGraphResponse(page1, 'https://graph.microsoft.com/page2'))
+        .mockResolvedValueOnce(makeGraphResponse(page2));
+
+      const findConfig = createMockFindConfigByVersion({
+        fullSyncNextLink: START_FULL_SYNC_LINK,
+        fullSyncBatchIndex: 1,
+        filters: {
+          ignoredBefore: '2020-01-01T00:00:00.000Z',
+          ignoredSenders: [],
+          ignoredContents: [],
+        },
+      });
+      const ingestCommand = createMockIngestEmailCommand();
+      const command = createCommand({ graphApi, findConfig, ingestCommand });
+
+      const result = await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+      expect(result).toEqual({ outcome: 'completed' });
+      expect(ingestCommand.run).toHaveBeenCalledTimes(1);
+      expect(ingestCommand.run).toHaveBeenCalledWith({
+        userProfileId: USER_PROFILE_ID,
+        messageId: 'msg-1',
+      });
+    });
+
+    it('completes when batchIndex > 0 and page is empty', async () => {
+      const graphApi = createMockGraphApi();
+      graphApi.get.mockResolvedValue(makeGraphResponse([]));
+
+      const findConfig = createMockFindConfigByVersion({
+        fullSyncNextLink: START_FULL_SYNC_LINK,
+        fullSyncBatchIndex: 3,
+        filters: {
+          ignoredBefore: '2020-01-01T00:00:00.000Z',
+          ignoredSenders: [],
+          ignoredContents: [],
+        },
+      });
+      const ingestCommand = createMockIngestEmailCommand();
+      const command = createCommand({ graphApi, findConfig, ingestCommand });
+
+      const result = await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+      expect(result).toEqual({ outcome: 'completed' });
+      expect(ingestCommand.run).not.toHaveBeenCalled();
+    });
+
+    it('processes remaining messages when batchIndex is within range of a shrunken page', async () => {
+      // batchIndex=1, page shrank from 5 to 3 → still processes indices 1 and 2
+      const messages = [makeMessage('msg-0'), makeMessage('msg-1'), makeMessage('msg-2')];
+      const graphApi = createMockGraphApi();
+      graphApi.get.mockResolvedValue(makeGraphResponse(messages));
+
+      const findConfig = createMockFindConfigByVersion({
+        fullSyncNextLink: START_FULL_SYNC_LINK,
+        fullSyncBatchIndex: 1,
+        filters: {
+          ignoredBefore: '2020-01-01T00:00:00.000Z',
+          ignoredSenders: [],
+          ignoredContents: [],
+        },
+      });
+      const ingestCommand = createMockIngestEmailCommand();
+      const command = createCommand({ graphApi, findConfig, ingestCommand });
+
+      const result = await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+      expect(result).toEqual({ outcome: 'completed' });
+      expect(ingestCommand.run).toHaveBeenCalledTimes(2);
+      expect(ingestCommand.run).toHaveBeenCalledWith({
+        userProfileId: USER_PROFILE_ID,
+        messageId: 'msg-1',
+      });
+      expect(ingestCommand.run).toHaveBeenCalledWith({
+        userProfileId: USER_PROFILE_ID,
+        messageId: 'msg-2',
+      });
+    });
+
+    it('returns batch-uploaded (not infinite-loop) when batchIndex exceeds page and more pages remain', async () => {
+      // batchIndex=50, page has 3 items, nextLink exists. After skipping page 1,
+      // page 2 has 100+ items triggering burst limit.
+      const page1 = [makeMessage('msg-0'), makeMessage('msg-1'), makeMessage('msg-2')];
+      const page2Messages = Array.from({ length: 110 }, (_, i) => makeMessage(`msg-p2-${i}`));
+      const graphApi = createMockGraphApi();
+      graphApi.get
+        .mockResolvedValueOnce(makeGraphResponse(page1, 'https://graph.microsoft.com/page2'))
+        .mockResolvedValueOnce(
+          makeGraphResponse(page2Messages, 'https://graph.microsoft.com/page3'),
+        );
+
+      const findConfig = createMockFindConfigByVersion({
+        fullSyncNextLink: START_FULL_SYNC_LINK,
+        fullSyncBatchIndex: 50,
+        filters: {
+          ignoredBefore: '2020-01-01T00:00:00.000Z',
+          ignoredSenders: [],
+          ignoredContents: [],
+        },
+      });
+      const command = createCommand({ graphApi, findConfig });
+
+      const result = await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
+
+      expect(result).toEqual({ outcome: 'batch-uploaded' });
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Burst limit
   // -------------------------------------------------------------------------
 
