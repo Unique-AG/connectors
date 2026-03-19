@@ -24,6 +24,7 @@ export class FullSyncResetCommand {
         fullSyncScheduledForIngestion: 0,
         fullSyncFailedToUploadForIngestion: 0,
         fullSyncExpectedTotal: null,
+        fullSyncLastRunAt: null,
         fullSyncState: 'ready',
       })
       .where(eq(inboxConfiguration.userProfileId, userProfileId))

@@ -41,7 +41,6 @@ export class FullSyncCommand {
 
   @Span()
   public async run(userProfileId: string): Promise<FullSyncResult> {
-    await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfileId));
     traceAttrs({ userProfileId });
     this.logger.log({ userProfileId, msg: 'Full sync triggered' });
 
@@ -81,6 +80,7 @@ export class FullSyncCommand {
       if (lockResult.shouldFetchCount) {
         await this.fetchAndSaveExpectedTotal(userProfileId, version);
       }
+      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfileId));
 
       const batchResult = await this.processFullSyncBatchCommand.run({
         userProfileId,
@@ -224,6 +224,16 @@ export class FullSyncCommand {
         }
         return { action: 'proceed' };
       case 'waiting-for-ingestion':
+        // If we literally processed a message for this 1 minute ago then we should Skip it
+        // This is a safeguard in case following case:
+        // -> Queue 10 times the same inbox
+        // First comes it schedules 100 and moves to waiting for ingestion
+        // Second one comes it has to check the stats.
+        // Next ones do the same, but if we queued 100 things and ingestion was not ready a minute ago
+        // we can wait a bit more
+        if (this.isWithinCooldown(row.fullSyncHeartbeatAt, 1)) {
+          return { action: 'skip', reason: 'ran-recently' };
+        }
         return { action: 'proceed' };
       case 'running':
         return this.decideFromRunning(row);

@@ -30,12 +30,14 @@ import { FullSyncModule } from './sync/full-sync/full-sync.module';
 import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
 
+const DEBUG_MODE_TOOLS =
+  process.env.MCP_DEBUG_MODE === 'enabled'
+    ? [RunFullSyncTool, RestartFullSyncTool, PauseFullSyncTool, ResumeFullSyncTool]
+    : [];
+
 const TOOLS = [
+  ...DEBUG_MODE_TOOLS,
   ListFoldersTool,
-  RunFullSyncTool,
-  PauseFullSyncTool,
-  ResumeFullSyncTool,
-  RestartFullSyncTool,
   SyncProgressTool,
   VerifyInboxConnectionTool,
   ReconnectInboxTool,
