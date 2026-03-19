@@ -207,7 +207,7 @@ export class ProcessFullSyncBatchCommand {
         return { outcome: 'version-mismatch' };
       }
 
-      if (!pageWasFullyProcessed && iterationInfo.uploaded >= PAGE_LIMIT) {
+      if (iterationInfo.uploaded >= PAGE_LIMIT) {
         traceEvent('batch-uploaded');
         return { outcome: 'batch-uploaded' };
       }
