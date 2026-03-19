@@ -219,6 +219,17 @@ export class ProcessFullSyncBatchCommand {
         }
       }
 
+      // If the page shrank (e.g. messages deleted between fetches) and our
+      // saved batchIndex now exceeds the page size, the for-loop above never
+      // ran. Treat the page as fully consumed to avoid an infinite loop.
+      if (iterationInfo.batchIndex >= page.length) {
+        this.logger.warn({
+          ...iterationInfo,
+          msg: 'batchIndex exceeds page size (page shrank), treating page as fully consumed',
+        });
+        iterationInfo.batchIndex = 0;
+      }
+
       const pageWasFullyProcessed = iterationInfo.batchIndex === 0;
 
       if (pageWasFullyProcessed) {
