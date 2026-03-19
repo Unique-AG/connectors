@@ -261,11 +261,6 @@ export class ProcessFullSyncBatchCommand {
     }
 
     const parsed = fullSyncBatchGraphMessageResponseSchema.parse(raw);
-    if (parsed['@odata.context']) {
-      await this.updateByVersionCommand.run(userProfileId, version, {
-        fullSyncNextLink: parsed['@odata.context'],
-      });
-    }
     return {
       messages: parsed.value,
       nextLink: parsed['@odata.nextLink'] ?? null,
