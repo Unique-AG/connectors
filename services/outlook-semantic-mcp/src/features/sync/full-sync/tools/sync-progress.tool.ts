@@ -5,7 +5,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetFullSyncStatsQuery, GetFullSyncStatsResponse } from '../get-full-sync-stats.query';
-import { META } from './sync-progress-tool.meta';
+import { META } from './sync-progress.meta';
 
 const InputSchema = z.object({});
 

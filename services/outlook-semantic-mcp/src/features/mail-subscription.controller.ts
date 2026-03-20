@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import {
   AmqpConnection,
   defaultNackErrorHandler,
@@ -9,14 +10,17 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
+  Inject,
   InternalServerErrorException,
   Logger,
   Post,
   UseInterceptors,
 } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { partition } from 'remeda';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
+import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { traceAttrs, traceError, traceEvent } from '~/features/tracing.utils';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
 import {
@@ -27,7 +31,7 @@ import {
 import { SubscriptionReauthorizeService } from './subscriptions/subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscriptions/subscription-remove.service';
 import { MailSubscriptionUtilsService } from './subscriptions/subscription-utils.service';
-import { StartFullSyncCommand } from './sync/full-sync/start-full-sync.command';
+import { FullSyncCommand } from './sync/full-sync/full-sync.command';
 import { LiveCatchUpEventDto } from './sync/live-catch-up/live-catch-up-event.dto';
 
 @Controller('mail-subscription')
@@ -39,7 +43,8 @@ export class MailSubscriptionController {
     private readonly subscriptionRemove: SubscriptionRemoveService,
     private readonly utils: MailSubscriptionUtilsService,
     private readonly amqpConnection: AmqpConnection,
-    private readonly startFullSyncCommand: StartFullSyncCommand,
+    private readonly fullSyncCommand: FullSyncCommand,
+    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
   @Post('lifecycle')
@@ -194,7 +199,12 @@ export class MailSubscriptionController {
 
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created': {
-        return await this.startFullSyncCommand.run(event.subscriptionId);
+        const subscription = await this.db.query.subscriptions.findFirst({
+          columns: { userProfileId: true },
+          where: eq(subscriptions.subscriptionId, event.subscriptionId),
+        });
+        assert.ok(subscription, `Subscription missing for: ${event.subscriptionId}`);
+        return await this.fullSyncCommand.run(subscription.userProfileId);
       }
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-removed': {
         return this.subscriptionRemove.remove(event.subscriptionId);
