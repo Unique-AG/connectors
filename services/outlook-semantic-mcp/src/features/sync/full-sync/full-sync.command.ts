@@ -4,6 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -54,7 +55,7 @@ export class FullSyncCommand {
       return { status: 'skipped', reason: lockResult.reason };
     }
 
-    const { version, previousState } = lockResult;
+    const { version, previousState, filters } = lockResult;
 
     // If the previousState was 'running' we should also check the scope to see if ingestion queue
     // is still in progress because we try to recover syncs which are stalling in 'running' status
@@ -72,7 +73,7 @@ export class FullSyncCommand {
 
     try {
       if (lockResult.shouldFetchCount) {
-        await this.fetchAndSaveExpectedTotal(userProfileId, version);
+        await this.fetchAndSaveExpectedTotal(userProfileId, version, filters);
       }
       await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfileId));
 
@@ -137,7 +138,7 @@ export class FullSyncCommand {
   }
 
   private async acquireLockAndDecide(userProfileId: string): Promise<LockDecision> {
-    return this.db.transaction(async (tx) => {
+    return this.db.transaction(async (tx): Promise<LockDecision> => {
       const row = await tx
         .select({
           fullSyncState: inboxConfiguration.fullSyncState,
@@ -147,6 +148,7 @@ export class FullSyncCommand {
           fullSyncLastRunAt: inboxConfiguration.fullSyncLastRunAt,
           fullSyncExpectedTotal: inboxConfiguration.fullSyncExpectedTotal,
           newestLastModifiedDateTime: inboxConfiguration.newestLastModifiedDateTime,
+          filters: inboxConfiguration.filters,
         })
         .from(inboxConfiguration)
         .where(eq(inboxConfiguration.userProfileId, userProfileId))
@@ -195,6 +197,7 @@ export class FullSyncCommand {
         action: 'proceed' as const,
         version,
         previousState,
+        filters: row.filters,
         shouldFetchCount: isFreshStart || isNullish(row.fullSyncExpectedTotal),
       };
     });
@@ -244,11 +247,17 @@ export class FullSyncCommand {
     return timestamp > cooldownThreshold;
   }
 
-  private async fetchAndSaveExpectedTotal(userProfileId: string, version: string): Promise<void> {
+  private async fetchAndSaveExpectedTotal(
+    userProfileId: string,
+    version: string,
+    filtersRaw: Record<string, unknown>,
+  ): Promise<void> {
     try {
       const client = this.graphClientFactory.createClientForUser(userProfileId);
+      const filters = inboxConfigurationMailFilters.parse(filtersRaw);
       const count = (await client
         .api('me/messages/$count')
+        .filter(`createdDateTime gt ${filters.ignoredBefore.toISOString()}`)
         .header('Prefer', 'IdType="ImmutableId"')
         .header('ConsistencyLevel', 'eventual')
         .get()) as number;
@@ -317,4 +326,5 @@ type LockDecision =
       version: string;
       previousState: InboxConfig['fullSyncState'];
       shouldFetchCount: boolean;
+      filters: Record<string, unknown>;
     };
