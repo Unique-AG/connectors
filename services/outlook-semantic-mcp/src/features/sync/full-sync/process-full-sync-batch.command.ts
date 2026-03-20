@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
@@ -23,8 +24,10 @@ import { IngestEmailCommand } from '../../mail-ingestion/ingest-email.command';
 import { shouldSkipEmail } from '../../mail-ingestion/utils/should-skip-email';
 import { FindInboxConfigByVersionQuery } from './find-inbox-config-by-version.query';
 import { START_FULL_SYNC_LINK } from './full-sync.command';
-import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
-import assert from 'node:assert';
+import {
+  InboxConfigVersionedUpdate,
+  UpdateInboxConfigByVersionCommand,
+} from './update-inbox-config-by-version.command';
 
 export type BatchResult =
   | { outcome: 'batch-uploaded' }
@@ -32,7 +35,9 @@ export type BatchResult =
   | { outcome: 'version-mismatch' }
   | { outcome: 'missing-full-sync-next-link' };
 
-const PAGE_LIMIT = 100;
+const GRAPH_PAGE_LIMIT = 100;
+// We aim to upload 100 messages and we do not want to upload twice as much when a couple failed.
+const MAX_MESSAGES_PROCESSED_PAGE_LIMIT = GRAPH_PAGE_LIMIT - 50;
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 500;
 
@@ -174,71 +179,40 @@ export class ProcessFullSyncBatchCommand {
         msg: 'Graph API page fetched',
       });
 
-      let i = iterationInfo.batchIndex;
-      for (; i < page.length && iterationInfo.uploaded < PAGE_LIMIT; i++) {
-        const message = page[i];
-        if (!message) {
-          continue;
-        }
-
+      for (const message of page.slice(iterationInfo.batchIndex)) {
         const processMessageResult = await this.processMessage({
           message,
           filters,
           userProfileId,
-          version,
         });
 
-        if (processMessageResult === 'version-mismatch') {
-          this.logger.log({
-            ...iterationInfo,
-            messageIndex: i,
-            msg: 'Version mismatch during message processing',
-          });
-          return { outcome: 'version-mismatch' };
-        } else if (processMessageResult === 'ingested') {
+        const updateObject: InboxConfigVersionedUpdate = {};
+        if (processMessageResult === 'ingested') {
           iterationInfo.uploaded++;
+          updateObject.fullSyncScheduledForIngestion = sql`${inboxConfiguration.fullSyncScheduledForIngestion} + 1`;
         } else if (processMessageResult === 'skipped') {
           iterationInfo.skipped++;
+          updateObject.fullSyncSkipped = sql`${inboxConfiguration.fullSyncSkipped} + 1`;
         } else {
           iterationInfo.failed++;
+          updateObject.fullSyncFailedToUploadForIngestion = sql`${inboxConfiguration.fullSyncFailedToUploadForIngestion} + 1`;
         }
 
-        iterationInfo.batchIndex = i + 1;
-        if (iterationInfo.batchIndex === page.length) {
-          iterationInfo.batchIndex = 0;
-        }
-        const timestamps = !message.createdDateTime
-          ? {}
-          : {
-              newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestCreatedDateTime}, '-infinity'::timestamptz), ${new Date(message.createdDateTime)})`,
-              oldestCreatedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestCreatedDateTime}, 'infinity'::timestamptz), ${new Date(message.createdDateTime)})`,
-            };
+        iterationInfo.batchIndex++;
+        updateObject.newestCreatedDateTime = sql`GREATEST(${inboxConfiguration.newestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
+        updateObject.oldestCreatedDateTime = sql`LEAST(${inboxConfiguration.newestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
         const isIndexSaved = await this.updateByVersionCommand.run(userProfileId, version, {
-          ...timestamps,
+          ...updateObject,
           fullSyncBatchIndex: iterationInfo.batchIndex,
+          fullSyncHeartbeatAt: sql`NOW()`,
         });
         if (!isIndexSaved) {
           return { outcome: 'version-mismatch' };
         }
       }
 
-      // If the page shrank (e.g. messages deleted between fetches) and our
-      // saved batchIndex now exceeds the page size, the for-loop above never
-      // ran. Treat the page as fully consumed to avoid an infinite loop.
-      if (iterationInfo.batchIndex >= page.length) {
-        this.logger.warn({
-          ...iterationInfo,
-          msg: 'batchIndex exceeds page size (page shrank), treating page as fully consumed',
-        });
-        iterationInfo.batchIndex = 0;
-      }
-
-      const pageWasFullyProcessed = iterationInfo.batchIndex === 0;
-
-      if (pageWasFullyProcessed) {
-        // Batch is completed we move to next page.
-        iterationInfo.nextLink = nextPageLink ?? null;
-      }
+      iterationInfo.batchIndex = 0;
+      iterationInfo.nextLink = nextPageLink ?? null;
 
       const indexesSaved = await this.updateByVersionCommand.run(userProfileId, version, {
         fullSyncBatchIndex: iterationInfo.batchIndex,
@@ -248,7 +222,12 @@ export class ProcessFullSyncBatchCommand {
         return { outcome: 'version-mismatch' };
       }
 
-      if (iterationInfo.nextLink && iterationInfo.uploaded >= PAGE_LIMIT) {
+      if (
+        iterationInfo.nextLink &&
+        // We consider both uploaded and failed because if ingestion is down we do not want to run through
+        // all pages at once, skipped is not important cause we will skip them anyway.
+        iterationInfo.uploaded + iterationInfo.failed >= MAX_MESSAGES_PROCESSED_PAGE_LIMIT
+      ) {
         traceEvent('batch-uploaded');
         return { outcome: 'batch-uploaded' };
       }
@@ -348,7 +327,7 @@ export class ProcessFullSyncBatchCommand {
       .select(FullSyncBatchGraphMessageFields)
       .filter(conditions.join(' and '))
       .orderby('createdDateTime desc')
-      .top(PAGE_LIMIT)
+      .top(GRAPH_PAGE_LIMIT)
       .get();
   }
 
@@ -357,21 +336,15 @@ export class ProcessFullSyncBatchCommand {
     message,
     filters,
     userProfileId,
-    version,
   }: {
     message: FullSyncBatchGraphMessage;
     filters: InboxConfigurationMailFilters;
     userProfileId: string;
-    version: string;
-  }): Promise<'ingested' | 'skipped' | 'failed' | 'version-mismatch'> {
+  }): Promise<'ingested' | 'skipped' | 'failed'> {
     const skipResult = shouldSkipEmail(message, filters, { userProfileId });
     if (skipResult.skip) {
       this.messagesProcessed.add(1, { outcome: 'skipped' });
-      const saved = await this.updateByVersionCommand.run(userProfileId, version, {
-        fullSyncSkipped: sql`${inboxConfiguration.fullSyncSkipped} + 1`,
-        fullSyncHeartbeatAt: sql`NOW()`,
-      });
-      return saved ? 'skipped' : 'version-mismatch';
+      return 'skipped';
     }
 
     const ingested = await recordInHistogram({
@@ -382,11 +355,7 @@ export class ProcessFullSyncBatchCommand {
 
     if (ingested) {
       this.messagesProcessed.add(1, { outcome: 'ingested' });
-      const saved = await this.updateByVersionCommand.run(userProfileId, version, {
-        fullSyncScheduledForIngestion: sql`${inboxConfiguration.fullSyncScheduledForIngestion} + 1`,
-        fullSyncHeartbeatAt: sql`NOW()`,
-      });
-      return saved ? 'ingested' : 'version-mismatch';
+      return 'ingested';
     }
 
     this.messagesProcessed.add(1, { outcome: 'failed' });
@@ -395,11 +364,7 @@ export class ProcessFullSyncBatchCommand {
       messageId: message.id,
       msg: 'Message ingestion failed after retries',
     });
-    const saved = await this.updateByVersionCommand.run(userProfileId, version, {
-      fullSyncFailedToUploadForIngestion: sql`${inboxConfiguration.fullSyncFailedToUploadForIngestion} + 1`,
-      fullSyncHeartbeatAt: sql`NOW()`,
-    });
-    return saved ? 'failed' : 'version-mismatch';
+    return 'failed';
   }
 
   private async ingestWithRetries(userProfileId: string, messageId: string): Promise<boolean> {

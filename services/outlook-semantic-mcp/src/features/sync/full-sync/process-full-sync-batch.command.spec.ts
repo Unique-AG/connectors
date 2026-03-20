@@ -495,10 +495,10 @@ describe('ProcessFullSyncBatchCommand', () => {
   // -------------------------------------------------------------------------
 
   describe('burst limit', () => {
-    it('returns batch-uploaded after 100 successful ingestions', async () => {
+    it('returns batch-uploaded after at least 110 successful ingestions', async () => {
       const messages = Array.from({ length: 110 }, (_, i) => makeMessage(`msg-${i}`));
       const graphApi = createMockGraphApi();
-      graphApi.get.mockResolvedValue(makeGraphResponse(messages));
+      graphApi.get.mockResolvedValue(makeGraphResponse(messages, `NEXT_LINK`));
 
       const updateCommand = createMockUpdateByVersionCommand();
       const command = createCommand({ graphApi, updateCommand });
@@ -510,7 +510,7 @@ describe('ProcessFullSyncBatchCommand', () => {
       expect(updateCommand.run).toHaveBeenCalledWith(
         USER_PROFILE_ID,
         VERSION,
-        expect.objectContaining({ fullSyncBatchIndex: 100 }),
+        expect.objectContaining({ fullSyncBatchIndex: 110 }),
       );
     });
 
