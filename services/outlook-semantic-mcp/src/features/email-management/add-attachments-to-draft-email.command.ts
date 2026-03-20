@@ -1,4 +1,5 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
+import { createSmeared, Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -66,7 +67,7 @@ export class AddAttachmentsToDraftEmailCommand {
       try {
         const processResult = await this.processAttachment({
           data,
-          fileName,
+          fileName: createSmeared(fileName),
           userProfileId: userProfileIdString,
           client,
           draftId,
@@ -110,7 +111,7 @@ export class AddAttachmentsToDraftEmailCommand {
     fileName,
   }: {
     client: Client;
-    fileName: string;
+    fileName: Smeared;
     data: string;
     resolveUniqueIdentity: IdentityResolver;
     draftId: string;
@@ -141,13 +142,16 @@ export class AddAttachmentsToDraftEmailCommand {
           userProfileId,
           draftId,
           data: parsed.data,
-          filename: fileName,
+          fileName,
           mimeType: parsed.mimeType,
           totalSize: parsed.data.length,
         });
         return { status: 'success' };
       default:
-        return { status: 'failed', reason: { fileName, reason: 'Unrecognised attachment type' } };
+        return {
+          status: 'failed',
+          reason: { fileName: fileName.value, reason: 'Unrecognised attachment type' },
+        };
     }
   }
 

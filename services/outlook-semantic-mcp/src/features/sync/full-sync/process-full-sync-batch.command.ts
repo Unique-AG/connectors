@@ -346,7 +346,7 @@ export class ProcessFullSyncBatchCommand {
 
     const ingestionResult = await recordInHistogram({
       histogram: this.ingestionDuration,
-      attributes: (ingested) => ({ outcome: ingested ? 'success' : 'failure' }),
+      attributes: (result) => ({ outcome: result === 'failed' ? 'failure' : 'success' }),
       fn: () => this.ingestWithRetries(userProfileId, message.id),
     });
     this.messagesProcessed.add(1, { outcome: ingestionResult });

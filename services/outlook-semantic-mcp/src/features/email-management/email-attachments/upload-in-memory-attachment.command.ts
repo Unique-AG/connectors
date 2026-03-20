@@ -1,4 +1,4 @@
-import { createSmeared } from '@unique-ag/utils';
+import { Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
@@ -11,7 +11,7 @@ export class UploadInMemoryAttachmentCommand {
     client,
     draftId,
     data,
-    filename,
+    fileName,
     totalSize,
     mimeType,
     userProfileId,
@@ -19,7 +19,7 @@ export class UploadInMemoryAttachmentCommand {
     client: Client;
     draftId: string;
     data: Buffer;
-    filename: string;
+    fileName: Smeared;
     totalSize: number;
     mimeType: string;
     userProfileId: string;
@@ -29,12 +29,12 @@ export class UploadInMemoryAttachmentCommand {
         msg: 'Uploading attachment via simple POST',
         userProfileId,
         draftId,
-        filename: createSmeared(filename),
+        fileName,
         sizeBytes: totalSize,
       });
       await client.api(`/me/messages/${draftId}/attachments`).post({
         '@odata.type': '#microsoft.graph.fileAttachment',
-        name: filename,
+        name: fileName.value,
         contentBytes: data.toString('base64'),
         contentType: mimeType,
       });
@@ -46,7 +46,7 @@ export class UploadInMemoryAttachmentCommand {
       msg: 'Uploading attachment via upload session',
       userProfileId,
       draftId,
-      filename: createSmeared(filename),
+      fileName,
       sizeBytes: totalSize,
       totalChunks,
     });
@@ -55,7 +55,7 @@ export class UploadInMemoryAttachmentCommand {
       await client.api(`/me/messages/${draftId}/attachments/createUploadSession`).post({
         AttachmentItem: {
           attachmentType: 'file',
-          name: filename,
+          name: fileName.value,
           size: totalSize,
           ...(mimeType ? { contentType: mimeType } : {}),
         },
@@ -90,7 +90,7 @@ export class UploadInMemoryAttachmentCommand {
           msg: 'Chunks uploaded',
           userProfileId,
           draftId,
-          filename: createSmeared(filename),
+          fileName,
           chunkIndex,
           totalChunks,
           bytesUploaded: end,
@@ -104,7 +104,7 @@ export class UploadInMemoryAttachmentCommand {
       msg: 'Chunks uploaded',
       userProfileId,
       draftId,
-      filename: createSmeared(filename),
+      fileName,
       chunkIndex,
       totalChunks,
       bytesUploaded: offset,

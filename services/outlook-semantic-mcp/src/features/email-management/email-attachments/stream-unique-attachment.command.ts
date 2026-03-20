@@ -1,4 +1,4 @@
-import { createSmeared } from '@unique-ag/utils';
+import { Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -28,7 +28,7 @@ export class StreamUniqueAttachmentCommand {
     fileInfo: {
       chatId: string | null | undefined;
       contentId: string;
-      fileName: string;
+      fileName: Smeared;
     };
     uniqueIdentity: ResolvedUniqueIdentity;
     userProfileId: string;
@@ -36,7 +36,7 @@ export class StreamUniqueAttachmentCommand {
     if (!chatId) {
       return {
         status: 'failed',
-        reason: { fileName, reason: 'Missing chatId for unique:// attachment' },
+        reason: { fileName: fileName.value, reason: 'Missing chatId for unique:// attachment' },
       };
     }
 
@@ -44,13 +44,13 @@ export class StreamUniqueAttachmentCommand {
     if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
       return {
         status: 'failed',
-        reason: { fileName, reason: 'App is not running in cluster local' },
+        reason: { fileName: fileName.value, reason: 'App is not running in cluster local' },
       };
     }
     if (!uniqueIdentity) {
       return {
         status: 'failed',
-        reason: { fileName, reason: 'Could not resolve unique identity' },
+        reason: { fileName: fileName.value, reason: 'Could not resolve unique identity' },
       };
     }
 
@@ -74,7 +74,7 @@ export class StreamUniqueAttachmentCommand {
       return {
         status: 'failed',
         reason: {
-          fileName,
+          fileName: fileName.value,
           reason: `Unique content download failed (${response.status}): ${text}`,
         },
       };
@@ -85,7 +85,7 @@ export class StreamUniqueAttachmentCommand {
       return {
         status: 'failed',
         reason: {
-          fileName,
+          fileName: fileName.value,
           reason: 'Missing content-length header or empty body from content service',
         },
       };
@@ -98,7 +98,7 @@ export class StreamUniqueAttachmentCommand {
       msg: 'Uploading unique attachment via streamed upload session',
       userProfileId,
       draftId,
-      filename: createSmeared(fileName),
+      fileName,
       sizeBytes: totalSize,
       totalChunks,
     });
@@ -135,10 +135,10 @@ export class StreamUniqueAttachmentCommand {
 
         if (chunkIndex % 20 === 0) {
           this.logger.log({
-            msg: 'Chunk uploaded',
+            msg: `${chunkIndex}/${totalChunks} chunks uploaded`,
             userProfileId,
             draftId,
-            filename: createSmeared(fileName),
+            fileName,
             chunkIndex,
             totalChunks,
             bytesUploaded: end,
@@ -159,7 +159,7 @@ export class StreamUniqueAttachmentCommand {
           msg: 'Upload finished',
           userProfileId,
           draftId,
-          filename: createSmeared(fileName),
+          fileName,
           chunkIndex,
           totalChunks,
           bytesUploaded: offset,

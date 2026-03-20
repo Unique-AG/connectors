@@ -74,6 +74,6 @@ export class UsersService implements UniqueUsersFacade {
     });
 
     const user = batchResult.listUsers.nodes.at(0);
-    return user ? { id: user.id, email: user.email, companyId: user.companyId } : null;
+    return user ? pick(user, ['id', 'email', 'companyId']) : null;
   }
 }
