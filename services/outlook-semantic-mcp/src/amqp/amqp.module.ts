@@ -16,6 +16,17 @@ import { AMQPService } from './amqp.service';
           exchanges: [MAIN_EXCHANGE, DEAD_EXCHANGE],
           queues: [DEAD_QUEUE],
           enableControllerDiscovery: true,
+          // Default prefetch count is 15 because usually have bulky messages so for full sync if
+          // we process 15 messages asyncronosly it can result in: 15 * 100 * 4 = 4000 calls to
+          // unique in async mode we should limit the prefetching to not overhelm ourselves
+          // and also to not overhelm unique.
+          prefetchCount: 15,
+          channels: {
+            'live-catchup-ingestion': {
+              // Live catchup is allowed to deliver more messages than the default.
+              prefetchCount: 30,
+            },
+          },
           // NOTE: (de)serialisation for empty messages doesn't work well with OTEL & json parsing
         };
       },

@@ -24,6 +24,7 @@ export class IngestionListener {
     createQueueIfNotExists: true,
     queueOptions: {
       deadLetterExchange: DEAD_EXCHANGE.name,
+      channel: 'live-catchup-ingestion',
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
