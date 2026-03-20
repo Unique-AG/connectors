@@ -70,7 +70,7 @@ function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGrap
 function createMockIngestEmailCommand(shouldFail = false) {
   const run = shouldFail
     ? vi.fn().mockRejectedValue(new Error('Ingestion failed'))
-    : vi.fn().mockResolvedValue(undefined);
+    : vi.fn().mockResolvedValue('ingested');
   return { run };
 }
 
@@ -636,7 +636,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         run: vi
           .fn()
           .mockRejectedValueOnce(new Error('Attempt 1 failed'))
-          .mockResolvedValueOnce(undefined),
+          .mockResolvedValueOnce('ingested'),
       };
       const updateCommand = createMockUpdateByVersionCommand();
       const command = createCommand({ graphApi, ingestCommand, updateCommand });

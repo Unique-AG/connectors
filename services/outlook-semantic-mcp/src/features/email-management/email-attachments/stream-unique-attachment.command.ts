@@ -91,6 +91,8 @@ export class StreamUniqueAttachmentCommand {
       };
     }
 
+    const mimeType = response.headers.get('content-type');
+
     const totalChunks = Math.ceil(totalSize / UPLOAD_CHUNK_SIZE);
     this.logger.log({
       msg: 'Uploading unique attachment via streamed upload session',
@@ -103,7 +105,12 @@ export class StreamUniqueAttachmentCommand {
 
     const { uploadUrl } = UploadSessionSchema.parse(
       await client.api(`/me/messages/${draftId}/attachments/createUploadSession`).post({
-        AttachmentItem: { attachmentType: 'file', name: fileName, size: totalSize },
+        AttachmentItem: {
+          attachmentType: 'file',
+          name: fileName,
+          size: totalSize,
+          ...(mimeType ? { contentType: mimeType } : {}),
+        },
       }),
     );
 
@@ -182,6 +189,8 @@ export class StreamUniqueAttachmentCommand {
       },
       body: chunk as BodyInit,
     });
+    // 308 (Resume Incomplete) is the expected response for intermediate chunks;
+    // only the final chunk returns 200/201.
     if (!response.ok && response.status !== 308) {
       const text = await response.text();
       throw new Error(`Upload session chunk failed (${response.status}): ${text}`);

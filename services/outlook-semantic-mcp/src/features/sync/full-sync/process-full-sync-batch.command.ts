@@ -20,7 +20,10 @@ import {
   FullSyncBatchGraphMessageFields,
   fullSyncBatchGraphMessageResponseSchema,
 } from '../../mail-ingestion/dtos/microsoft-graph.dtos';
-import { IngestEmailCommand } from '../../mail-ingestion/ingest-email.command';
+import {
+  IngestEmailCommand,
+  MessageIngestionResult,
+} from '../../mail-ingestion/ingest-email.command';
 import { shouldSkipEmail } from '../../mail-ingestion/utils/should-skip-email';
 import { FindInboxConfigByVersionQuery } from './find-inbox-config-by-version.query';
 import { START_FULL_SYNC_LINK } from './full-sync.command';
@@ -40,6 +43,8 @@ const GRAPH_PAGE_LIMIT = 100;
 const MAX_MESSAGES_PROCESSED_PAGE_LIMIT = GRAPH_PAGE_LIMIT - 50;
 const MAX_RETRIES = 3;
 const BASE_BACKOFF_MS = 500;
+
+type PossibleIngestionResults = MessageIngestionResult | 'failed';
 
 @Injectable()
 export class ProcessFullSyncBatchCommand {
@@ -339,31 +344,39 @@ export class ProcessFullSyncBatchCommand {
       return 'skipped';
     }
 
-    const ingested = await recordInHistogram({
+    const ingestionResult = await recordInHistogram({
       histogram: this.ingestionDuration,
       attributes: (ingested) => ({ outcome: ingested ? 'success' : 'failure' }),
       fn: () => this.ingestWithRetries(userProfileId, message.id),
     });
+    this.messagesProcessed.add(1, { outcome: ingestionResult });
 
-    if (ingested) {
-      this.messagesProcessed.add(1, { outcome: 'ingested' });
-      return 'ingested';
+    const mapToOurResult: Record<PossibleIngestionResults, 'ingested' | 'skipped' | 'failed'> = {
+      ingested: `ingested`,
+      skipped: `skipped`,
+      'skipped-content-unchanged-already-ingested': `ingested`,
+      'metadata-updated': `ingested`,
+      failed: `failed`,
+    };
+
+    if (ingestionResult === 'failed') {
+      this.logger.warn({
+        userProfileId,
+        messageId: message.id,
+        msg: 'Message ingestion failed after retries',
+      });
     }
 
-    this.messagesProcessed.add(1, { outcome: 'failed' });
-    this.logger.warn({
-      userProfileId,
-      messageId: message.id,
-      msg: 'Message ingestion failed after retries',
-    });
-    return 'failed';
+    return mapToOurResult[ingestionResult];
   }
 
-  private async ingestWithRetries(userProfileId: string, messageId: string): Promise<boolean> {
+  private async ingestWithRetries(
+    userProfileId: string,
+    messageId: string,
+  ): Promise<MessageIngestionResult | 'failed'> {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        await this.ingestEmailCommand.run({ userProfileId, messageId });
-        return true;
+        return await this.ingestEmailCommand.run({ userProfileId, messageId });
       } catch (error) {
         // Bottleneck errors mean the rate limiter is overwhelmed or stopped.
         // Retrying is pointless — re-throw so the sync transitions to failed
@@ -391,7 +404,7 @@ export class ProcessFullSyncBatchCommand {
       messageId,
       msg: `Ingestion failed after ${MAX_RETRIES} retries`,
     });
-    return false;
+    return 'failed';
   }
 
   private sleep(ms: number): Promise<void> {

@@ -142,6 +142,7 @@ export class AddAttachmentsToDraftEmailCommand {
           draftId,
           data: parsed.data,
           filename: fileName,
+          mimeType: parsed.mimeType,
           totalSize: parsed.data.length,
         });
         return { status: 'success' };

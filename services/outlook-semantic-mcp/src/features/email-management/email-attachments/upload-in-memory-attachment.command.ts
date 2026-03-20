@@ -1,7 +1,7 @@
 import { createSmeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
-import { AttachmentUploadResult, UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
+import { UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
 
 @Injectable()
 export class UploadInMemoryAttachmentCommand {
@@ -13,6 +13,7 @@ export class UploadInMemoryAttachmentCommand {
     data,
     filename,
     totalSize,
+    mimeType,
     userProfileId,
   }: {
     client: Client;
@@ -20,8 +21,9 @@ export class UploadInMemoryAttachmentCommand {
     data: Buffer;
     filename: string;
     totalSize: number;
+    mimeType: string;
     userProfileId: string;
-  }): Promise<AttachmentUploadResult> {
+  }): Promise<{ status: 'success' }> {
     if (totalSize <= 3 * 1024 * 1024) {
       this.logger.log({
         msg: 'Uploading attachment via simple POST',
@@ -34,6 +36,7 @@ export class UploadInMemoryAttachmentCommand {
         '@odata.type': '#microsoft.graph.fileAttachment',
         name: filename,
         contentBytes: data.toString('base64'),
+        contentType: mimeType,
       });
       return { status: 'success' };
     }
@@ -50,7 +53,12 @@ export class UploadInMemoryAttachmentCommand {
 
     const { uploadUrl } = UploadSessionSchema.parse(
       await client.api(`/me/messages/${draftId}/attachments/createUploadSession`).post({
-        AttachmentItem: { attachmentType: 'file', name: filename, size: totalSize },
+        AttachmentItem: {
+          attachmentType: 'file',
+          name: filename,
+          size: totalSize,
+          ...(mimeType ? { contentType: mimeType } : {}),
+        },
       }),
     );
 
