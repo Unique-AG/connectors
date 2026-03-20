@@ -149,7 +149,7 @@ export class StreamUniqueAttachmentCommand {
           chunkIndex++;
         }
         this.logger.log({
-          msg: 'Upload finished uploaded',
+          msg: 'Upload finished',
           userProfileId,
           draftId,
           filename: createSmeared(fileName),

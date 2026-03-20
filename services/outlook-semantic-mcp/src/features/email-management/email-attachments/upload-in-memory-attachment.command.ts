@@ -5,7 +5,7 @@ import { AttachmentUploadResult, UPLOAD_CHUNK_SIZE, UploadSessionSchema } from '
 
 @Injectable()
 export class UploadInMemoryAttachmentCommand {
-  public logger = new Logger(this.constructor.name);
+  private readonly logger = new Logger(this.constructor.name);
 
   public async run({
     client,

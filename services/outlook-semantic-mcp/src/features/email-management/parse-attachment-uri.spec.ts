@@ -41,7 +41,6 @@ describe('parseAttachmentUri', () => {
         type: 'data',
         mimeType: 'text/plain',
         data: Buffer.from('hello world'),
-        filename: 'attachment.plain',
       });
     });
 
@@ -52,7 +51,6 @@ describe('parseAttachmentUri', () => {
         type: 'data',
         mimeType: 'text/plain',
         data: Buffer.from('Hello World'),
-        filename: 'attachment.plain',
       });
     });
 
@@ -64,17 +62,15 @@ describe('parseAttachmentUri', () => {
         type: 'data',
         mimeType: 'application/octet-stream',
         data: Buffer.from('binary data'),
-        filename: 'attachment.octet-stream',
       });
     });
 
-    it('parses application/pdf mime type for filename extension', () => {
+    it('parses application/pdf mime type', () => {
       const base64Content = Buffer.from('%PDF-1.4').toString('base64');
       const result = parseAttachmentUri(`data:application/pdf;base64,${base64Content}`);
 
       expect(result.type).toBe('data');
       if (result.type === 'data') {
-        expect(result.filename).toBe('attachment.pdf');
         expect(result.mimeType).toBe('application/pdf');
       }
     });

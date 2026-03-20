@@ -149,10 +149,6 @@ export class AddAttachmentsToDraftEmailCommand {
 
   private createUniqueIdentityResolver(email: string): IdentityResolver {
     const getIdentity = async (): Promise<ResolvedUniqueIdentity> => {
-      if (cachedIdentity) {
-        return cachedIdentity;
-      }
-
       const uniqueConfig = this.configService.get('unique', { infer: true });
       if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
         return null;
