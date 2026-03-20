@@ -10,3 +10,7 @@ export interface AttachmentFailure {
   fileName: string;
   reason: string;
 }
+
+export type AttachmentUploadResult =
+  | { status: 'failed'; reason: AttachmentFailure }
+  | { status: 'success' };

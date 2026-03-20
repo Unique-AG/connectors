@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import {
-  AttachmentFailure,
+  AttachmentUploadResult,
   ResolvedUniqueIdentity,
   UPLOAD_CHUNK_SIZE,
   UploadSessionSchema,
 } from './utils';
 import { UniqueConfigNamespaced } from '~/config';
 import { ConfigService } from '@nestjs/config';
-import { smear } from '@unique-ag/utils/src/smeared';
+import { createSmeared } from '@unique-ag/utils/src/smeared';
+import { Client } from '@microsoft/microsoft-graph-client';
 
 @Injectable()
 export class StreamUniqueAttachmentCommand {
@@ -23,7 +23,7 @@ export class StreamUniqueAttachmentCommand {
     uniqueIdentity,
     userProfileId,
   }: {
-    client: ReturnType<GraphClientFactory['createClientForUser']>;
+    client: Client;
     draftId: string;
     fileInfo: {
       chatId: string | null | undefined;
@@ -32,7 +32,7 @@ export class StreamUniqueAttachmentCommand {
     };
     uniqueIdentity: ResolvedUniqueIdentity;
     userProfileId: string;
-  }): Promise<{ status: 'failed'; reason: AttachmentFailure } | { status: 'success' }> {
+  }): Promise<AttachmentUploadResult> {
     if (!chatId) {
       return {
         status: 'failed',
@@ -96,7 +96,7 @@ export class StreamUniqueAttachmentCommand {
       msg: 'Uploading unique attachment via streamed upload session',
       userProfileId,
       draftId,
-      filename: smear(fileName),
+      filename: createSmeared(fileName),
       sizeBytes: totalSize,
       totalChunks,
     });
@@ -131,7 +131,7 @@ export class StreamUniqueAttachmentCommand {
             msg: 'Chunk uploaded',
             userProfileId,
             draftId,
-            filename: smear(fileName),
+            filename: createSmeared(fileName),
             chunkIndex,
             totalChunks,
             bytesUploaded: end,
@@ -152,7 +152,7 @@ export class StreamUniqueAttachmentCommand {
           msg: 'Upload finished uploaded',
           userProfileId,
           draftId,
-          filename: smear(fileName),
+          filename: createSmeared(fileName),
           chunkIndex,
           totalChunks,
           bytesUploaded: offset,

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
-import { smear } from '@unique-ag/utils/src/smeared';
+import { AttachmentUploadResult, UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
+import { createSmeared } from '@unique-ag/utils';
+import { Client } from '@microsoft/microsoft-graph-client';
 
 @Injectable()
 export class UploadInMemoryAttachmentCommand {
@@ -15,19 +15,19 @@ export class UploadInMemoryAttachmentCommand {
     totalSize,
     userProfileId,
   }: {
-    client: ReturnType<GraphClientFactory['createClientForUser']>;
+    client: Client;
     draftId: string;
     data: Buffer;
     filename: string;
     totalSize: number;
     userProfileId: string;
-  }): Promise<void> {
+  }): Promise<AttachmentUploadResult> {
     if (totalSize <= 3 * 1024 * 1024) {
       this.logger.log({
         msg: 'Uploading attachment via simple POST',
         userProfileId,
         draftId,
-        filename: smear(filename),
+        filename: createSmeared(filename),
         sizeBytes: totalSize,
       });
       await client.api(`/me/messages/${draftId}/attachments`).post({
@@ -35,7 +35,7 @@ export class UploadInMemoryAttachmentCommand {
         name: filename,
         contentBytes: data.toString('base64'),
       });
-      return;
+      return { status: 'success' };
     }
 
     const totalChunks = Math.ceil(totalSize / UPLOAD_CHUNK_SIZE);
@@ -43,7 +43,7 @@ export class UploadInMemoryAttachmentCommand {
       msg: 'Uploading attachment via upload session',
       userProfileId,
       draftId,
-      filename: smear(filename),
+      filename: createSmeared(filename),
       sizeBytes: totalSize,
       totalChunks,
     });
@@ -101,5 +101,6 @@ export class UploadInMemoryAttachmentCommand {
       bytesUploaded: offset,
       totalBytes: totalSize,
     });
+    return { status: 'success' };
   }
 }

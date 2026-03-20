@@ -1,6 +1,5 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { CallToolRequest } from '@modelcontextprotocol/sdk/types.js';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
@@ -8,6 +7,7 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
 import { CreateDraftEmailCommand } from './create-draft-email.command';
 import { META } from './create-draft-email-tool.meta';
+import { isString } from 'remeda';
 
 const CreateDraftEmailInputSchema = z.object({
   subject: z.string().describe('The subject line of the draft email.'),
@@ -110,12 +110,10 @@ export class CreateDraftEmailTool {
     if (!subscriptionStatus.success) {
       return subscriptionStatus;
     }
-
-    const mcpMeta = (context.mcpRequest as CallToolRequest).params?._meta as
-      | Record<string, unknown>
-      | undefined;
-    const chatId = typeof mcpMeta?.chatId === 'string' ? mcpMeta.chatId : undefined;
-
-    return this.createDraftEmailCommand.run(userProfileId, { ...input, chatId });
+    const fallbackChatId = context.mcpRequest.params?._meta?.chatId ?? undefined;
+    return this.createDraftEmailCommand.run(userProfileId, {
+      ...input,
+      fallbackChatId: isString(fallbackChatId) ? fallbackChatId : undefined,
+    });
   }
 }

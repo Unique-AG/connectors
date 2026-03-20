@@ -10,12 +10,17 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { parseAttachmentUri } from './parse-attachment-uri';
 import { UploadInMemoryAttachmentCommand } from './email-attachments/upload-in-memory-attachment.command';
 import { StreamUniqueAttachmentCommand } from './email-attachments/stream-unique-attachment.command';
-import { AttachmentFailure, ResolvedUniqueIdentity } from './email-attachments/utils';
+import {
+  AttachmentFailure,
+  AttachmentUploadResult,
+  ResolvedUniqueIdentity,
+} from './email-attachments/utils';
+import { Client } from '@microsoft/microsoft-graph-client';
 
 export interface AddAttachmentsInput {
   draftId: string;
   attachments: { fileName: string; data: string }[];
-  chatId?: string;
+  fallbackChatId?: string;
 }
 
 export interface AddAttachmentsResult {
@@ -40,7 +45,7 @@ export class AddAttachmentsToDraftEmailCommand {
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
-    input: AddAttachmentsInput,
+    { draftId, attachments, fallbackChatId }: AddAttachmentsInput,
   ): Promise<AddAttachmentsResult> {
     const userProfileIdString = userProfileId.toString();
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
@@ -50,59 +55,30 @@ export class AddAttachmentsToDraftEmailCommand {
     this.logger.log({
       msg: 'Starting attachment upload',
       userProfileId: userProfileIdString,
-      draftId: input.draftId,
-      attachmentCount: input.attachments.length,
+      draftId,
+      attachmentCount: attachments.length,
     });
 
     // This function is here because we cache the result.
     const resolveUniqueIdentity = this.createUniqueIdentityResolver(profile.email);
 
-    for (const { data, fileName } of input.attachments) {
+    for (const { data, fileName } of attachments) {
       try {
-        const parsed = parseAttachmentUri(data);
-        const logProps: Record<string, string | number> = {
+        await this.processAttachment({
+          data,
+          fileName,
           userProfileId: userProfileIdString,
-          draftId: input.draftId,
-          filename: fileName,
-        };
-
-        switch (parsed.type) {
-          case 'unique': {
-            const uniqueIdentity = await resolveUniqueIdentity();
-            const result = await this.streamUniqueAttachmentCommand.run({
-              client,
-              draftId: input.draftId,
-              fileInfo: {
-                fileName,
-                chatId: parsed.chatId || input.chatId,
-                contentId: parsed.contentId,
-              },
-              uniqueIdentity,
-              userProfileId: userProfileIdString,
-            });
-            if (result.status === 'failed') {
-              attachmentsFailed.push(result.reason);
-            }
-            break;
-          }
-          case 'data':
-            await this.uploadInMemoryAttachmentCommand.run({
-              client,
-              draftId: input.draftId,
-              data: parsed.data,
-              filename: fileName,
-              totalSize: parsed.data.length,
-              userProfileId: userProfileIdString,
-            });
-            logProps.fileSize = parsed.data.length;
-            break;
-        }
+          client,
+          draftId,
+          fallbackChatId,
+          resolveUniqueIdentity,
+        });
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         this.logger.warn({
           err,
           userProfileId: userProfileIdString,
-          draftId: input.draftId,
+          draftId,
           msg: 'Attachment failed',
         });
         attachmentsFailed.push({ fileName, reason });
@@ -112,13 +88,69 @@ export class AddAttachmentsToDraftEmailCommand {
     this.logger.log({
       msg: 'Attachment upload run complete',
       userProfileId: userProfileIdString,
-      draftId: input.draftId,
-      total: input.attachments.length,
-      succeeded: input.attachments.length - attachmentsFailed.length,
+      draftId,
+      total: attachments.length,
+      succeeded: attachments.length - attachmentsFailed.length,
       failed: attachmentsFailed.length,
     });
 
     return { attachmentsFailed };
+  }
+
+  private async processAttachment({
+    userProfileId,
+    client,
+    draftId,
+    data,
+    fallbackChatId,
+    resolveUniqueIdentity,
+    fileName,
+  }: {
+    client: Client;
+    fileName: string;
+    data: string;
+    resolveUniqueIdentity: IdentityResolver;
+    draftId: string;
+    fallbackChatId: string | undefined;
+    userProfileId: string;
+  }): Promise<AttachmentUploadResult> {
+    const parsed = parseAttachmentUri(data);
+    const logProps: Record<string, string | number> = {
+      userProfileId,
+      draftId,
+      filename: fileName,
+    };
+
+    switch (parsed.type) {
+      case 'unique': {
+        const uniqueIdentity = await resolveUniqueIdentity();
+        const result = await this.streamUniqueAttachmentCommand.run({
+          client,
+          draftId,
+          fileInfo: {
+            fileName,
+            chatId: parsed.chatId || fallbackChatId,
+            contentId: parsed.contentId,
+          },
+          uniqueIdentity,
+          userProfileId,
+        });
+        return result;
+      }
+      case 'data':
+        await this.uploadInMemoryAttachmentCommand.run({
+          client,
+          userProfileId,
+          draftId,
+          data: parsed.data,
+          filename: fileName,
+          totalSize: parsed.data.length,
+        });
+        logProps.fileSize = parsed.data.length;
+        return { status: 'success' };
+      default:
+        return { status: 'failed', reason: { fileName, reason: 'Unrecognised attachment type' } };
+    }
   }
 
   private createUniqueIdentityResolver(email: string): IdentityResolver {
