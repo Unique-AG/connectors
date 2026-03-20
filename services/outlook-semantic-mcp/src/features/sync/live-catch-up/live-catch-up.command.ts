@@ -4,8 +4,10 @@ import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
+import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { sqlArray } from '~/utils/sql-array';
 import { MessageEventDto } from '../../mail-ingestion/dtos/message-event.dto';
 import {
@@ -13,7 +15,6 @@ import {
   FullSyncGraphMessageFields,
   fullSyncGraphMessageResponseSchema,
 } from '../../mail-ingestion/dtos/microsoft-graph.dtos';
-import { IngestionPriority } from '../../mail-ingestion/utils/ingestion-queue.utils';
 
 @Injectable()
 export class LiveCatchUpCommand {
@@ -22,6 +23,7 @@ export class LiveCatchUpCommand {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly amqp: AmqpConnection,
+    private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -61,6 +63,8 @@ export class LiveCatchUpCommand {
     const { watermark } = lockResult;
 
     try {
+      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfileId));
+
       const { totalScheduled, scheduledIds } = await this.fetchAndScheduleBatches({
         userProfileId,
         subscriptionId,
@@ -266,9 +270,7 @@ export class LiveCatchUpCommand {
         type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
         payload: { subscriptionId, messageId: email.id },
       });
-      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
-        priority: IngestionPriority.High,
-      });
+      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
       publishedIds.push(email.id);
     }
 
@@ -292,9 +294,7 @@ export class LiveCatchUpCommand {
         type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
         payload: { subscriptionId, messageId },
       });
-      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event, {
-        priority: IngestionPriority.High,
-      });
+      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
     }
 
     return messageIds.length;

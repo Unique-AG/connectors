@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { DrizzleModule } from '~/db/drizzle.module';
+import { DirectoriesSyncModule } from '~/features/directories-sync/directories-sync.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { LiveCatchUpCommand } from './live-catch-up.command';
 import { LiveCatchUpListener } from './live-catch-up.listener';
 import { RecoverLiveCatchupCommand } from './recover-live-catchup.command';
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule],
+  imports: [DrizzleModule, MsGraphModule, DirectoriesSyncModule],
   providers: [LiveCatchUpCommand, LiveCatchUpListener, RecoverLiveCatchupCommand],
   exports: [LiveCatchUpCommand],
 })

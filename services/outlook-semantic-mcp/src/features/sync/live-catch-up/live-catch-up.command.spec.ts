@@ -140,18 +140,25 @@ function createMockDb({
   return db;
 }
 
+function createMockSyncDirectoriesCommand() {
+  return { run: vi.fn() };
+}
+
 function createCommand({
   graphApi,
   amqp,
   db,
+  syncDirectories,
 }: {
   graphApi: ReturnType<typeof createMockGraphApi>;
   amqp: ReturnType<typeof createMockAmqp>;
+  syncDirectories: ReturnType<typeof createMockSyncDirectoriesCommand>;
   db: ReturnType<typeof createMockDb>;
 }): LiveCatchUpCommand {
   return new LiveCatchUpCommand(
     createMockGraphClientFactory(graphApi) as any,
     amqp as any,
+    syncDirectories as any,
     db as any,
   );
 }
@@ -163,16 +170,18 @@ function createCommand({
 describe('LiveCatchUpCommand', () => {
   let graphApi: ReturnType<typeof createMockGraphApi>;
   let amqp: ReturnType<typeof createMockAmqp>;
+  let syncDirectories: ReturnType<typeof createMockSyncDirectoriesCommand>;
 
   beforeEach(() => {
     graphApi = createMockGraphApi();
     amqp = createMockAmqp();
+    syncDirectories = createMockSyncDirectoriesCommand();
     vi.clearAllMocks();
   });
 
   it('skips when subscription is not found', async () => {
     const db = createMockDb({ subscription: undefined, lockResult: undefined });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
@@ -191,7 +200,7 @@ describe('LiveCatchUpCommand', () => {
         pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
@@ -211,7 +220,7 @@ describe('LiveCatchUpCommand', () => {
         pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
@@ -225,7 +234,7 @@ describe('LiveCatchUpCommand', () => {
       subscription: { userProfileId: USER_PROFILE_ID },
       lockResult: undefined, // no rows returned from FOR UPDATE
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
@@ -250,15 +259,12 @@ describe('LiveCatchUpCommand', () => {
         pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
-    // Both emails published with high priority
+    // Both emails published
     expect(amqp.publish).toHaveBeenCalledTimes(2);
-    for (const call of amqp.publish.mock.calls) {
-      expect(call[3]).toEqual(expect.objectContaining({ priority: 2 }));
-    }
 
     // State set to 'ready' via flush transaction
     const flushUpdate = db.__flushTx.__txUpdate;
@@ -284,7 +290,7 @@ describe('LiveCatchUpCommand', () => {
         pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
@@ -311,7 +317,7 @@ describe('LiveCatchUpCommand', () => {
       // flush reads them back and publishes only msg-3 (msg-1 & msg-2 are in scheduledIds)
       flushResult: { pendingLiveMessageIds: ['msg-1', 'msg-2', 'msg-3'] },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     // msg-1 and msg-2 are in the batch, msg-3 is webhook-only
     await command.run({
@@ -346,7 +352,7 @@ describe('LiveCatchUpCommand', () => {
       // flush publishes both since the batch scheduled nothing
       flushResult: { pendingLiveMessageIds: ['webhook-1', 'webhook-2'] },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({
       subscriptionId: SUBSCRIPTION_ID,
@@ -375,7 +381,7 @@ describe('LiveCatchUpCommand', () => {
         pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({
       subscriptionId: SUBSCRIPTION_ID,
@@ -398,7 +404,7 @@ describe('LiveCatchUpCommand', () => {
         pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     // Should NOT throw
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
@@ -422,7 +428,7 @@ describe('LiveCatchUpCommand', () => {
         pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
@@ -445,7 +451,7 @@ describe('LiveCatchUpCommand', () => {
         pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({
       subscriptionId: SUBSCRIPTION_ID,
@@ -480,7 +486,7 @@ describe('LiveCatchUpCommand', () => {
       // so flush deduplicates it (alreadyScheduledIds contains msg-1 and msg-2)
       flushResult: { pendingLiveMessageIds: ['msg-1'] },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
@@ -510,7 +516,7 @@ describe('LiveCatchUpCommand', () => {
       },
       flushResult: { pendingLiveMessageIds: ['flush-1', 'flush-2'] },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
@@ -542,7 +548,7 @@ describe('LiveCatchUpCommand', () => {
       },
       flushResult: { pendingLiveMessageIds: ['msg-1', 'flush-1'] },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
@@ -568,7 +574,7 @@ describe('LiveCatchUpCommand', () => {
       },
       flushResult: { pendingLiveMessageIds: [] },
     });
-    const command = createCommand({ graphApi, amqp, db });
+    const command = createCommand({ graphApi, amqp, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
