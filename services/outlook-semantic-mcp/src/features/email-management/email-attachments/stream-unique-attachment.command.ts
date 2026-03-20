@@ -176,7 +176,7 @@ export class StreamUniqueAttachmentCommand {
       method: 'PUT',
       headers: {
         'Content-Length': String(chunk.length),
-        'Content-Range': `bytes ${offset}-${end}/${totalSize}`,
+        'Content-Range': `bytes ${offset}-${end - 1}/${totalSize}`,
         // The content type on each chunk is octet-stream the mime type of the file was already declared.
         'Content-Type': 'application/octet-stream',
       },

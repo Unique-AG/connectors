@@ -115,11 +115,6 @@ export class AddAttachmentsToDraftEmailCommand {
     userProfileId: string;
   }): Promise<AttachmentUploadResult> {
     const parsed = parseAttachmentUri(data);
-    const logProps: Record<string, string | number> = {
-      userProfileId,
-      draftId,
-      filename: fileName,
-    };
 
     switch (parsed.type) {
       case 'unique': {
@@ -146,7 +141,6 @@ export class AddAttachmentsToDraftEmailCommand {
           filename: fileName,
           totalSize: parsed.data.length,
         });
-        logProps.fileSize = parsed.data.length;
         return { status: 'success' };
       default:
         return { status: 'failed', reason: { fileName, reason: 'Unrecognised attachment type' } };
