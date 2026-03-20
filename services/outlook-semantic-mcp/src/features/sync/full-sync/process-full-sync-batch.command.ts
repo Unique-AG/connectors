@@ -1,4 +1,4 @@
-import { GraphError } from '@microsoft/microsoft-graph-client';
+import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import Bottleneck from 'bottleneck';
@@ -24,6 +24,7 @@ import { shouldSkipEmail } from '../../mail-ingestion/utils/should-skip-email';
 import { FindInboxConfigByVersionQuery } from './find-inbox-config-by-version.query';
 import { START_FULL_SYNC_LINK } from './full-sync.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
+import assert from 'node:assert';
 
 export type BatchResult =
   | { outcome: 'batch-uploaded' }
@@ -126,7 +127,7 @@ export class ProcessFullSyncBatchCommand {
     // ─────────────────────────────────────────────────────────────────────
 
     // We need this intermediate object so that typescript does not complain because { nextLink: string | null }.
-    const _initialInfo = {
+    const iterationInfo = {
       userProfileId,
       version,
       batchIndex: config.fullSyncBatchIndex,
@@ -135,10 +136,8 @@ export class ProcessFullSyncBatchCommand {
       failed: 0,
       pageNumber: 0,
       pageSize: 0,
-    };
-    const iterationInfo: typeof _initialInfo & { nextLink: string | null } = {
-      ..._initialInfo,
-      nextLink: fullSyncNextLink ?? null,
+      // We do type casting because during while it will become null.
+      nextLink: fullSyncNextLink as string | null,
     };
 
     while (iterationInfo.nextLink) {
@@ -175,11 +174,8 @@ export class ProcessFullSyncBatchCommand {
         msg: 'Graph API page fetched',
       });
 
-      for (
-        let i = iterationInfo.batchIndex;
-        i < page.length && iterationInfo.uploaded < PAGE_LIMIT;
-        i++
-      ) {
+      let i = iterationInfo.batchIndex;
+      for (; i < page.length && iterationInfo.uploaded < PAGE_LIMIT; i++) {
         const message = page[i];
         if (!message) {
           continue;
@@ -211,9 +207,15 @@ export class ProcessFullSyncBatchCommand {
         if (iterationInfo.batchIndex === page.length) {
           iterationInfo.batchIndex = 0;
         }
+        const timestamps = !message.createdDateTime
+          ? {}
+          : {
+              newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestCreatedDateTime}, '-infinity'::timestamptz), ${new Date(message.createdDateTime)})`,
+              oldestCreatedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestCreatedDateTime}, 'infinity'::timestamptz), ${new Date(message.createdDateTime)})`,
+            };
         const isIndexSaved = await this.updateByVersionCommand.run(userProfileId, version, {
+          ...timestamps,
           fullSyncBatchIndex: iterationInfo.batchIndex,
-          fullSyncHeartbeatAt: sql`NOW()`,
         });
         if (!isIndexSaved) {
           return { outcome: 'version-mismatch' };
@@ -238,14 +240,11 @@ export class ProcessFullSyncBatchCommand {
         iterationInfo.nextLink = nextPageLink ?? null;
       }
 
-      const watermarksSaved = await this.updateWatermarks({
-        userProfileId,
-        version,
-        batchData: page,
-        batchIndex: iterationInfo.batchIndex,
-        nextLink: iterationInfo.nextLink,
+      const indexesSaved = await this.updateByVersionCommand.run(userProfileId, version, {
+        fullSyncBatchIndex: iterationInfo.batchIndex,
+        fullSyncNextLink: iterationInfo.nextLink,
       });
-      if (!watermarksSaved) {
+      if (!indexesSaved) {
         return { outcome: 'version-mismatch' };
       }
 
@@ -267,7 +266,7 @@ export class ProcessFullSyncBatchCommand {
     userProfileId,
     version,
   }: {
-    client: ReturnType<GraphClientFactory['createClientForUser']>;
+    client: Client;
     nextLink: string;
     filters: InboxConfigurationMailFilters;
     userProfileId: string;
@@ -315,18 +314,21 @@ export class ProcessFullSyncBatchCommand {
       }
       this.logger.warn({
         userProfileId,
-        msg: 'Graph API nextLink expired (410), falling back to first page',
+        msg: 'Graph API nextLink expired (410), falling back to first page applying the filters',
         err: error,
       });
     }
 
+    // This is the case where next link is expired => Happy path ended in the try { } catch {} block.
     const freshConfig = await this.findConfigByVersion.run(userProfileId, version);
     if (isNullish(freshConfig)) {
       return { status: 'version-mismatch' };
     }
-    if (freshConfig.oldestCreatedDateTime) {
-      conditions.push(`createdDateTime le ${freshConfig.oldestCreatedDateTime.toISOString()}`);
-    }
+    assert.ok(
+      freshConfig.oldestCreatedDateTime,
+      `Created date time is null durring expired next link`,
+    );
+    conditions.push(`createdDateTime le ${freshConfig.oldestCreatedDateTime.toISOString()}`);
     const raw = await recordInHistogram({
       histogram: this.graphPageDuration,
       attributes: { page_type: 'next' },
@@ -339,10 +341,7 @@ export class ProcessFullSyncBatchCommand {
     };
   }
 
-  private async fetchFirstPage(
-    client: ReturnType<GraphClientFactory['createClientForUser']>,
-    conditions: string[],
-  ): Promise<unknown> {
+  private async fetchFirstPage(client: Client, conditions: string[]): Promise<unknown> {
     return client
       .api('me/messages')
       .header('Prefer', 'IdType="ImmutableId"')
@@ -436,37 +435,6 @@ export class ProcessFullSyncBatchCommand {
       msg: `Ingestion failed after ${MAX_RETRIES} retries`,
     });
     return false;
-  }
-
-  private async updateWatermarks({
-    userProfileId,
-    version,
-    batchIndex,
-    nextLink,
-    batchData,
-  }: {
-    nextLink: string | null;
-    batchIndex: number;
-    batchData: FullSyncBatchGraphMessage[];
-    userProfileId: string;
-    version: string;
-  }): Promise<boolean> {
-    const createdDateTimeStamps = batchData.map((e) => new Date(e.createdDateTime).getTime());
-
-    const updatedWattermarks =
-      createdDateTimeStamps.length === 0
-        ? {}
-        : {
-            newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestCreatedDateTime}, '-infinity'::timestamptz), ${new Date(Math.max(...createdDateTimeStamps))})`,
-            oldestCreatedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestCreatedDateTime}, 'infinity'::timestamptz), ${new Date(Math.min(...createdDateTimeStamps))})`,
-          };
-
-    return await this.updateByVersionCommand.run(userProfileId, version, {
-      ...updatedWattermarks,
-      fullSyncHeartbeatAt: sql`NOW()`,
-      fullSyncBatchIndex: batchIndex,
-      fullSyncNextLink: nextLink,
-    });
   }
 
   private sleep(ms: number): Promise<void> {
