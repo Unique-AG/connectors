@@ -107,7 +107,7 @@ export class StreamUniqueAttachmentCommand {
       await client.api(`/me/messages/${draftId}/attachments/createUploadSession`).post({
         AttachmentItem: {
           attachmentType: 'file',
-          name: fileName,
+          name: fileName.value,
           size: totalSize,
           ...(mimeType ? { contentType: mimeType } : {}),
         },

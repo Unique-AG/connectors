@@ -349,7 +349,6 @@ export class ProcessFullSyncBatchCommand {
       attributes: (result) => ({ outcome: result === 'failed' ? 'failure' : 'success' }),
       fn: () => this.ingestWithRetries(userProfileId, message.id),
     });
-    this.messagesProcessed.add(1, { outcome: ingestionResult });
 
     const mapToOurResult: Record<PossibleIngestionResults, 'ingested' | 'skipped' | 'failed'> = {
       ingested: `ingested`,
@@ -366,8 +365,10 @@ export class ProcessFullSyncBatchCommand {
         msg: 'Message ingestion failed after retries',
       });
     }
+    const outcome = mapToOurResult[ingestionResult];
+    this.messagesProcessed.add(1, { outcome });
 
-    return mapToOurResult[ingestionResult];
+    return outcome;
   }
 
   private async ingestWithRetries(
