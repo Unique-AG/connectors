@@ -1,14 +1,14 @@
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createSmeared } from '@unique-ag/utils/src/smeared';
+import { UniqueConfigNamespaced } from '~/config';
 import {
   AttachmentUploadResult,
   ResolvedUniqueIdentity,
   UPLOAD_CHUNK_SIZE,
   UploadSessionSchema,
 } from './utils';
-import { UniqueConfigNamespaced } from '~/config';
-import { ConfigService } from '@nestjs/config';
-import { createSmeared } from '@unique-ag/utils/src/smeared';
-import { Client } from '@microsoft/microsoft-graph-client';
 
 @Injectable()
 export class StreamUniqueAttachmentCommand {

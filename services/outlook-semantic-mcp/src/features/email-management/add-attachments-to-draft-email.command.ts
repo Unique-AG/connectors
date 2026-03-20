@@ -1,4 +1,5 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Span } from 'nestjs-otel';
@@ -7,15 +8,14 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { parseAttachmentUri } from './parse-attachment-uri';
-import { UploadInMemoryAttachmentCommand } from './email-attachments/upload-in-memory-attachment.command';
 import { StreamUniqueAttachmentCommand } from './email-attachments/stream-unique-attachment.command';
+import { UploadInMemoryAttachmentCommand } from './email-attachments/upload-in-memory-attachment.command';
 import {
   AttachmentFailure,
   AttachmentUploadResult,
   ResolvedUniqueIdentity,
 } from './email-attachments/utils';
-import { Client } from '@microsoft/microsoft-graph-client';
+import { parseAttachmentUri } from './parse-attachment-uri';
 
 export interface AddAttachmentsInput {
   draftId: string;

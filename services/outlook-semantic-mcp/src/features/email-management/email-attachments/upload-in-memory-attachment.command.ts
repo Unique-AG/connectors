@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { AttachmentUploadResult, UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
 import { createSmeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
+import { Injectable, Logger } from '@nestjs/common';
+import { AttachmentUploadResult, UPLOAD_CHUNK_SIZE, UploadSessionSchema } from './utils';
 
 @Injectable()
 export class UploadInMemoryAttachmentCommand {

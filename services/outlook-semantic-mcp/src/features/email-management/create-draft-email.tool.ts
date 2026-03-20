@@ -2,12 +2,12 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import { isString } from 'remeda';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
 import { CreateDraftEmailCommand } from './create-draft-email.command';
 import { META } from './create-draft-email-tool.meta';
-import { isString } from 'remeda';
 
 const CreateDraftEmailInputSchema = z.object({
   subject: z.string().describe('The subject line of the draft email.'),
