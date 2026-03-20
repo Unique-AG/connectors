@@ -287,7 +287,7 @@ export class ProcessFullSyncBatchCommand {
     if (nextLink === START_FULL_SYNC_LINK) {
       const raw = await recordInHistogram({
         histogram: this.graphPageDuration,
-        attributs: { page_type: 'first' },
+        attributes: { page_type: 'first' },
         fn: () => this.fetchFirstPage(client, conditions),
       });
       return {
@@ -300,7 +300,7 @@ export class ProcessFullSyncBatchCommand {
     try {
       const raw = await recordInHistogram({
         histogram: this.graphPageDuration,
-        attributs: { page_type: 'next' },
+        attributes: { page_type: 'next' },
         fn: () => client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get(),
       });
       return {
@@ -329,7 +329,7 @@ export class ProcessFullSyncBatchCommand {
     }
     const raw = await recordInHistogram({
       histogram: this.graphPageDuration,
-      attributs: { page_type: 'next' },
+      attributes: { page_type: 'next' },
       fn: () => this.fetchFirstPage(client, conditions),
     });
     return {
@@ -377,7 +377,7 @@ export class ProcessFullSyncBatchCommand {
 
     const ingested = await recordInHistogram({
       histogram: this.ingestionDuration,
-      attributs: (ingested) => ({ outcome: ingested ? 'success' : 'failure' }),
+      attributes: (ingested) => ({ outcome: ingested ? 'success' : 'failure' }),
       fn: () => this.ingestWithRetries(userProfileId, message.id),
     });
 
@@ -453,16 +453,19 @@ export class ProcessFullSyncBatchCommand {
   }): Promise<boolean> {
     const createdDateTimeStamps = batchData.map((e) => new Date(e.createdDateTime).getTime());
 
-    return await this.updateByVersionCommand.run(userProfileId, version, {
-      fullSyncHeartbeatAt: sql`NOW()`,
-      fullSyncBatchIndex: batchIndex,
-      fullSyncNextLink: nextLink,
-      ...(createdDateTimeStamps.length === 0
+    const updatedWattermarks =
+      createdDateTimeStamps.length === 0
         ? {}
         : {
             newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestCreatedDateTime}, '-infinity'::timestamptz), ${new Date(Math.max(...createdDateTimeStamps))})`,
             oldestCreatedDateTime: sql`LEAST(COALESCE(${inboxConfiguration.oldestCreatedDateTime}, 'infinity'::timestamptz), ${new Date(Math.min(...createdDateTimeStamps))})`,
-          }),
+          };
+
+    return await this.updateByVersionCommand.run(userProfileId, version, {
+      ...updatedWattermarks,
+      fullSyncHeartbeatAt: sql`NOW()`,
+      fullSyncBatchIndex: batchIndex,
+      fullSyncNextLink: nextLink,
     });
   }
 

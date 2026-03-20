@@ -25,11 +25,8 @@ const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANT
         uniqueConfig.serviceAuthMode === 'cluster_local'
           ? { ...uniqueConfig, serviceId: 'outlook-semantic-mcp' }
           : uniqueConfig,
-      ingestion: { baseUrl: uniqueConfig.ingestionServiceBaseUrl, rateLimitPerMinute: 200_000 },
-      scopeManagement: {
-        baseUrl: uniqueConfig.scopeManagementServiceBaseUrl,
-        rateLimitPerMinute: 200_000,
-      },
+      ingestion: { baseUrl: uniqueConfig.ingestionServiceBaseUrl },
+      scopeManagement: { baseUrl: uniqueConfig.scopeManagementServiceBaseUrl },
     };
   },
 });

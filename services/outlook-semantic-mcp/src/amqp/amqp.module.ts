@@ -16,7 +16,7 @@ import { AMQPService } from './amqp.service';
           exchanges: [MAIN_EXCHANGE, DEAD_EXCHANGE],
           queues: [DEAD_QUEUE],
           enableControllerDiscovery: true,
-          // Default prefetch count is 15 because usually have bulky messages so for full sync if
+          // We set the default prefetch count is 10 because usually have bulky messages so for full sync if
           // we process 10 messages asyncronosly it can result in: 10 * 100 * 4 = 4000 calls to
           // unique in async mode we should limit the prefetching to not overhelm ourselves
           // and also to not overhelm unique.

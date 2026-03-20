@@ -6,11 +6,11 @@ type ArgumentsFn<T> = (params: T) => Attributes;
 
 export const recordInHistogram = async <T>({
   histogram,
-  attributs,
+  attributes: attributs,
   fn,
 }: {
   histogram: Histogram;
-  attributs: Attributes | ArgumentsFn<T>;
+  attributes: Attributes | ArgumentsFn<T>;
   fn: Callback<T>;
 }): Promise<T> => {
   let result: { type: 'success'; data: T } | { type: 'error'; err: unknown };
