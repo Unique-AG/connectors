@@ -64,7 +64,7 @@ export class AddAttachmentsToDraftEmailCommand {
 
     for (const { data, fileName } of attachments) {
       try {
-        await this.processAttachment({
+        const processResult = await this.processAttachment({
           data,
           fileName,
           userProfileId: userProfileIdString,
@@ -73,6 +73,9 @@ export class AddAttachmentsToDraftEmailCommand {
           fallbackChatId,
           resolveUniqueIdentity,
         });
+        if (processResult.status === 'failed') {
+          attachmentsFailed.push(processResult.reason);
+        }
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         this.logger.warn({
