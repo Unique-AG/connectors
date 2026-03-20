@@ -125,7 +125,7 @@ describe('FullSyncRecoveryService', () => {
       expect(db.select).not.toHaveBeenCalled();
     });
 
-    it('does not throw on publish error', async () => {
+    it('does throw on publish error', async () => {
       const amqp = createMockAmqp();
       amqp.publish.mockRejectedValue(new Error('AMQP error'));
       const db = createMockDb({
@@ -133,10 +133,10 @@ describe('FullSyncRecoveryService', () => {
       });
       const service = createService({ amqp, db });
 
-      await expect(service.checkAndRetriggerStuckFullSyncs()).resolves.not.toThrow();
+      await expect(service.checkAndRetriggerStuckFullSyncs()).rejects.toThrow();
     });
 
-    it('does not throw on db query error', async () => {
+    it('does throw on db query error', async () => {
       const amqp = createMockAmqp();
       const db = createMockDb();
       // Override select to throw
@@ -145,7 +145,7 @@ describe('FullSyncRecoveryService', () => {
       });
       const service = createService({ amqp, db });
 
-      await expect(service.checkAndRetriggerStuckFullSyncs()).resolves.not.toThrow();
+      await expect(service.checkAndRetriggerStuckFullSyncs()).rejects.toThrow();
       expect(amqp.publish).not.toHaveBeenCalled();
     });
   });
