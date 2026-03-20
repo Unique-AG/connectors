@@ -119,54 +119,58 @@ export class StreamUniqueAttachmentCommand {
     let chunkIndex = 0;
     let pending = Buffer.alloc(0);
 
-    while (true) {
-      const { done, value } = await reader.read();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
 
-      if (value) {
-        pending = Buffer.concat([pending, Buffer.from(value)]);
-      }
+        if (value) {
+          pending = Buffer.concat([pending, Buffer.from(value)]);
+        }
 
-      while (pending.length >= UPLOAD_CHUNK_SIZE) {
-        const chunk = pending.subarray(0, UPLOAD_CHUNK_SIZE);
-        pending = pending.subarray(UPLOAD_CHUNK_SIZE);
-        const end = Math.min(offset + UPLOAD_CHUNK_SIZE, totalSize);
-        await this.uploadChunk(uploadUrl, chunk, offset, end, totalSize);
-        chunkIndex++;
+        while (pending.length >= UPLOAD_CHUNK_SIZE) {
+          const chunk = pending.subarray(0, UPLOAD_CHUNK_SIZE);
+          pending = pending.subarray(UPLOAD_CHUNK_SIZE);
+          const end = Math.min(offset + UPLOAD_CHUNK_SIZE, totalSize);
+          await this.uploadChunk(uploadUrl, chunk, offset, end, totalSize);
+          chunkIndex++;
 
-        if (chunkIndex % 20 === 0) {
+          if (chunkIndex % 20 === 0) {
+            this.logger.log({
+              msg: `${chunkIndex}/${totalChunks} chunks uploaded`,
+              userProfileId,
+              draftId,
+              fileName,
+              chunkIndex,
+              totalChunks,
+              bytesUploaded: end,
+              totalBytes: totalSize,
+            });
+          }
+          offset = end;
+        }
+
+        if (done) {
+          if (pending.length > 0) {
+            const end = offset + pending.length;
+            await this.uploadChunk(uploadUrl, pending, offset, end, totalSize);
+            offset += pending.length;
+            chunkIndex++;
+          }
           this.logger.log({
-            msg: `${chunkIndex}/${totalChunks} chunks uploaded`,
+            msg: 'Upload finished',
             userProfileId,
             draftId,
             fileName,
             chunkIndex,
             totalChunks,
-            bytesUploaded: end,
+            bytesUploaded: offset,
             totalBytes: totalSize,
           });
+          break;
         }
-        offset = end;
       }
-
-      if (done) {
-        if (pending.length > 0) {
-          const end = offset + pending.length;
-          await this.uploadChunk(uploadUrl, pending, offset, end, totalSize);
-          offset += pending.length;
-          chunkIndex++;
-        }
-        this.logger.log({
-          msg: 'Upload finished',
-          userProfileId,
-          draftId,
-          fileName,
-          chunkIndex,
-          totalChunks,
-          bytesUploaded: offset,
-          totalBytes: totalSize,
-        });
-        break;
-      }
+    } finally {
+      reader.cancel();
     }
 
     return { status: 'success' };
