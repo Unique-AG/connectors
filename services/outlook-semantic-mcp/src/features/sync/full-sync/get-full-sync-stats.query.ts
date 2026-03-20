@@ -28,6 +28,7 @@ const ingestionStats = ingestionStateSuccess.or(ingestionStatsError);
 export const GetFullSyncStatsResponse = z.object({
   state: z.enum(['error', 'running', 'finished']),
   message: z.string(),
+  userEmail: z.string(),
   syncStats: z
     .object({
       fullSyncState: z.enum(['ready', 'failed', 'running', 'paused', 'waiting-for-ingestion']),
@@ -89,6 +90,7 @@ export class GetFullSyncStatsQuery {
     });
     if (!inboxConfig) {
       return {
+        userEmail: userProfile.email,
         state: 'error',
         syncStats: null,
         ingestionStats: null,
@@ -97,6 +99,7 @@ export class GetFullSyncStatsQuery {
     }
     if (inboxConfig.fullSyncState === 'failed') {
       return {
+        userEmail: userProfile.email,
         state: 'error',
         syncStats: null,
         ingestionStats: null,
@@ -105,6 +108,7 @@ export class GetFullSyncStatsQuery {
     }
     if (inboxConfig.liveCatchUpState === 'failed') {
       return {
+        userEmail: userProfile.email,
         state: 'error',
         syncStats: null,
         ingestionStats: null,
@@ -121,6 +125,7 @@ export class GetFullSyncStatsQuery {
       this.logger.warn({ userProfileId: userProfile.id, msg: message });
 
       return {
+        userEmail: userProfile.email,
         state: 'error',
         syncStats: null,
         ingestionStats: null,
@@ -164,6 +169,7 @@ export class GetFullSyncStatsQuery {
       message: `Stats retrieved succesfully`,
       ingestionStats: omit(ingestionResult, ['ok', 'rootScopeId']),
       syncStats,
+      userEmail: userProfile.email,
       debugData: this.config.mcpDebugMode ? debugData : undefined,
       state: isRunning ? 'running' : 'finished',
     };
