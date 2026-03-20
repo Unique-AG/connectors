@@ -192,7 +192,7 @@ export class ProcessFullSyncBatchCommand {
 
         iterationInfo.batchIndex++;
         updateObject.newestCreatedDateTime = sql`GREATEST(${inboxConfiguration.newestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
-        updateObject.oldestCreatedDateTime = sql`LEAST(${inboxConfiguration.newestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
+        updateObject.oldestCreatedDateTime = sql`LEAST(${inboxConfiguration.oldestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
         const isIndexSaved = await this.updateByVersionCommand.run(userProfileId, version, {
           ...updateObject,
           fullSyncBatchIndex: iterationInfo.batchIndex,
