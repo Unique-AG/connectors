@@ -15,7 +15,7 @@ import { FullSyncEventDto } from './full-sync/full-sync-event.dto';
 const FULL_SYNC_RECOVERY_CRON_SCHEDULE = '*/2 * * * *';
 
 @Injectable()
-export class FullSyncRecoveryService implements OnModuleInit, OnModuleDestroy {
+export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
   private isShuttingDown = false;
 
