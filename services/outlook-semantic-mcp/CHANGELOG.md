@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.14](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.13...outlook-semantic-mcp@0.2.14) (2026-03-20)
+
+
+### Features
+
+* **outlook-semantic-mcp,unique-api:** replace base64 attachments with content ID-based attachments ([#380](https://github.com/Unique-AG/connectors/issues/380)) ([329cea1](https://github.com/Unique-AG/connectors/commit/329cea13ceb23e6fd428f9be8bbf743d9e6c2a0b))
+
 ## [0.2.13](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.12...outlook-semantic-mcp@0.2.13) (2026-03-20)
 
 
