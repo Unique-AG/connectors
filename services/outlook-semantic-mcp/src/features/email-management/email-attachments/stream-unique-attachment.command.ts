@@ -1,7 +1,7 @@
+import { createSmeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createSmeared } from '@unique-ag/utils/src/smeared';
 import { UniqueConfigNamespaced } from '~/config';
 import {
   AttachmentUploadResult,

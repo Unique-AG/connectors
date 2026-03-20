@@ -14,7 +14,7 @@ const CreateDraftEmailInputSchema = z.object({
   content: z
     .string()
     .describe(
-      'The body content of the draft email. It can be html / text but contentType has to be specied correctly',
+      'The body content of the draft email. Must match the format declared in contentType: raw HTML markup when "html", plain text when "text".',
     ),
   contentType: z
     .enum(['html', 'text'])
@@ -44,36 +44,54 @@ const CreateDraftEmailInputSchema = z.object({
         fileName: z
           .string()
           .describe(
-            `The file name which will appear in the draft email. Example {{name}}.{{extension}}`,
+            'The file name that will appear on the attachment in the email, including extension (e.g. "report.pdf").',
           ),
         data: z
           .string()
           .describe(
-            'URIs of files to attach to this email. Supported schemes:\n' +
-              '- unique://chat/{chatId}/content/{contentId} for Unique knowledge base files\n' +
-              '- data:[mediatype][;base64],<data> for inline base64-encoded content\n' +
-              'External URLs (https://) are not supported — fetching arbitrary URLs server-side creates an SSRF risk.',
+            'URI identifying the file content. Two schemes are supported:\n' +
+              '- unique://chat/{chatId}/content/{contentId} — file from the Unique knowledge base; construct from the chat ID and content ID.\n' +
+              '- data:[mediatype];base64,<base64data> — inline base64-encoded content with an explicit MIME type.\n' +
+              'External URLs (https://) are not supported.',
           ),
       }),
     )
     .optional()
-    .describe('A list of attachments'),
+    .describe(
+      'Files to attach to the draft. Each entry pairs a display file name with a URI pointing to the file content. Omit entirely when no attachments are needed.',
+    ),
 });
 
 const CreateDraftEmailOutputSchema = z.object({
-  success: z.boolean().describe('Whether the operation succeeded.'),
-  draftId: z.string().optional().describe('The ID of the created draft message.'),
-  webLink: z.string().optional().describe('Outlook Web App URL to open the draft.'),
-  message: z.string().describe('A human-readable status or error message.'),
+  success: z
+    .boolean()
+    .describe(
+      'True when the draft was created in Outlook, even if some attachments failed. False only when the draft itself could not be created.',
+    ),
+  draftId: z
+    .string()
+    .optional()
+    .describe(
+      'Microsoft Graph message ID of the created draft. Present only when success is true.',
+    ),
+  webLink: z
+    .string()
+    .optional()
+    .describe(
+      'Outlook Web App URL to open the draft directly. Present only when success is true and Graph returned a webLink.',
+    ),
+  message: z.string().describe('Human-readable summary of the outcome, success or failure.'),
   attachmentsFailed: z
     .array(
       z.object({
-        fileName: z.string().describe('The fileName of the attachment that failed.'),
-        reason: z.string().describe('A description of why the attachment failed.'),
+        fileName: z.string().describe('The file name of the attachment that could not be added.'),
+        reason: z.string().describe('Why the attachment failed.'),
       }),
     )
     .optional()
-    .describe('Attachments that could not be added, absent when no attachments were attempted.'),
+    .describe(
+      'Attachments that could not be added to the draft. Present only when success is true and at least one attachment failed; absent otherwise.',
+    ),
 });
 
 @Injectable()

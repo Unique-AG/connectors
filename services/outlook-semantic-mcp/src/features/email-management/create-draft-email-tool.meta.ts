@@ -38,11 +38,18 @@ export const META = createMeta({
     Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and attachments. The draft is saved and can be reviewed or sent later.
 
     ### Attachments
-    To attach files, pass an array of URIs in the \`attachments\` field. Supported URI schemes:
-    - **Unique content**: Use \`unique://chat/{chatId}/content/{contentId}\` to attach files from the Unique knowledge base. Construct this URI using the chat ID and content ID. Example: \`unique://chat/chat_abc123/content/cont_j23i0ifr44sdn7cz97ubleb7\`.
-    - **Data URIs**: Use \`data:[mediatype];base64,<base64data>\` for inline content.
+    To attach files, pass an array of objects in the \`attachments\` field. Each object must have:
+    - \`fileName\`: the name that will appear on the attachment (e.g. \`report.pdf\`)
+    - \`data\`: a URI identifying the file content. Supported URI schemes:
+      - **Unique content**: \`unique://chat/{chatId}/content/{contentId}\` — attach a file from the Unique knowledge base using its chat ID and content ID. Example: \`unique://chat/chat_abc123/content/cont_j23i0ifr44sdn7cz97ubleb7\`.
+      - **Data URIs**: \`data:[mediatype];base64,<base64data>\` — inline base64-encoded content.
 
-    External URLs (\`https://\`) are **not supported**. Fetching arbitrary user-supplied URLs server-side would expose the service to SSRF attacks (e.g. targeting internal infrastructure or cloud metadata endpoints). Do not pass raw content IDs — always use the \`unique://\` URI scheme for Unique knowledge base files. If an attachment fails, the draft is still created and the failure reason is reported in the response.`,
+    External URLs (\`https://\`) are **not supported**. Do not pass raw content IDs — always use the \`unique://\` URI scheme for Unique knowledge base files.
+
+    ### Failed Attachments
+    The response may include an \`attachmentsFailed\` array when one or more attachments could not be added. The draft is still created in that case. Each entry has a \`fileName\` and a \`reason\`. When \`attachmentsFailed\` is non-empty, inform the user which files failed and why, for example:
+    > ⚠️ The following attachments could not be added:
+    > - **report.pdf**: File not found in the knowledge base.`,
   toolFormatInformation: `## Format for Draft Emails
   When presenting a draft email, always use the following format exactly:
   📩 **{Subject}** [open](https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem)
