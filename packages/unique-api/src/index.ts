@@ -58,4 +58,4 @@ export {
   UniqueApiClient,
   UniqueOwnerType,
 } from './types';
-export type { SimpleUser } from './users/users.types';
+export type { SimpleUser, UserWithCompany } from './users/users.types';

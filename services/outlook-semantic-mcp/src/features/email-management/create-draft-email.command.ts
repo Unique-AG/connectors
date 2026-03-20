@@ -1,7 +1,12 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import { z } from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
+import { AttachmentFailure } from './email-attachments/utils';
+
+const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string().optional() });
 
 export interface CreateDraftEmailInput {
   subject: string;
@@ -9,21 +14,66 @@ export interface CreateDraftEmailInput {
   contentType: 'html' | 'text';
   toRecipients: Array<{ name?: string; email: string }>;
   ccRecipients?: Array<{ name?: string; email: string }>;
-  attachments?: Array<{ filename: string; contentBytes: string; contentType: string }>;
+  attachments?: {
+    fileName: string;
+    data: string;
+  }[];
+  fallbackChatId?: string;
 }
 
 export type CreateDraftEmailResult =
   | { success: false; message: string }
-  | { success: true; draftId: string; message: string };
+  | {
+      success: true;
+      draftId: string;
+      webLink?: string;
+      message: string;
+      attachmentsFailed?: AttachmentFailure[];
+    };
 
 @Injectable()
 export class CreateDraftEmailCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly graphClientFactory: GraphClientFactory) {}
+  public constructor(
+    private readonly graphClientFactory: GraphClientFactory,
+    private readonly addAttachmentsToDraftEmailCommand: AddAttachmentsToDraftEmailCommand,
+  ) {}
 
   @Span()
   public async run(
+    userProfileId: UserProfileTypeID,
+    input: CreateDraftEmailInput,
+  ): Promise<CreateDraftEmailResult> {
+    const createDraftResult = await this.createDraft(userProfileId, input);
+    if (!createDraftResult.success) {
+      return createDraftResult;
+    }
+
+    const attachments = input.attachments;
+
+    if (!attachments || !attachments.length) {
+      return createDraftResult;
+    }
+
+    const attachmentResult = await this.addAttachmentsToDraftEmailCommand.run(userProfileId, {
+      draftId: createDraftResult.draftId,
+      attachments,
+      fallbackChatId: input.fallbackChatId,
+    });
+
+    if (!attachmentResult.attachmentsFailed.length) {
+      return createDraftResult;
+    }
+
+    return {
+      ...createDraftResult,
+      attachmentsFailed: attachmentResult.attachmentsFailed,
+    };
+  }
+
+  @Span()
+  public async createDraft(
     userProfileId: UserProfileTypeID,
     input: CreateDraftEmailInput,
   ): Promise<CreateDraftEmailResult> {
@@ -46,21 +96,17 @@ export class CreateDraftEmailCommand {
       }));
     }
 
-    if (input.attachments && input.attachments.length > 0) {
-      body.attachments = input.attachments.map((a) => ({
-        '@odata.type': '#microsoft.graph.fileAttachment',
-        name: a.filename,
-        contentType: a.contentType,
-        contentBytes: a.contentBytes,
-      }));
-    }
+    const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
     try {
-      const client = this.graphClientFactory.createClientForUser(userProfileIdString);
-      const message = await client.api('/me/messages').post(body);
+      const message = CreateMessageResponseSchema.parse(
+        await client.api('/me/messages').post(body),
+      );
+
       return {
         success: true,
         draftId: message.id,
+        ...(message.webLink && { webLink: message.webLink }),
         message: 'Draft email created successfully.',
       };
     } catch (err) {
@@ -69,7 +115,10 @@ export class CreateDraftEmailCommand {
         msg: 'Failed to create draft email via Microsoft Graph',
         err,
       });
-      throw new InternalServerErrorException('Failed to create draft email via Microsoft Graph');
+      return {
+        success: false,
+        message: 'Failed to create draft email via Microsoft Graph',
+      };
     }
   }
 }
