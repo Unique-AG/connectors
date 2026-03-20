@@ -101,35 +101,27 @@ export class ProcessFullSyncBatchCommand {
       msg: 'Batch config loaded',
     });
 
-    // ── Batch processing algorithm ──────────────────────────────────────
-    // This loop pages through the user's mailbox via Graph API and ingests
-    // messages one by one. It is designed to be **pausable**, **resumable**,
-    // and **fair across users**:
+    // ── Batch processing algorithm ───────────────────────────────────────────────────────────
+    // Pages through the user's mailbox via Graph API and ingests messages one by one. Designed
+    // to be pausable, resumable, and fair across users:
     //
-    //  1. Fetch a page of messages using `nextLink` (or the initial query).
-    //     If the nextLink has expired (410), fall back to a fresh first-page
-    //     query filtered by `oldestCreatedDateTime` and reset `batchIndex`
-    //     to 0 so the page is reprocessed from the start.
+    //  1. Fetch a page using `nextLink` (or initial query). On 410 (expired link): fall back
+    //     to a fresh query filtered by `oldestCreatedDateTime`, reset `batchIndex`.
     //
-    //  2. Iterate over the page starting at `batchIndex` (the resume point).
-    //     For each message: skip, ingest, or record failure. After every
-    //     single message the current `batchIndex` is persisted so a crash
-    //     or restart resumes exactly where we left off.
+    //  2. Iterate from `batchIndex` (resume point). For each message: skip, ingest, or record
+    //     failure. Persist `batchIndex`, watermarks, and counters after every message for crash
+    //     recovery.
     //
-    //  3. Once `PAGE_LIMIT` messages have been uploaded, return
-    //     `batch-uploaded` so the scheduler can give other users a turn
-    //     (fairness). The caller will re-enqueue this user for the next batch.
+    //  3. After processing a full page, if (uploaded + failed) reached the batch limit and more
+    //     pages remain, return `batch-uploaded` so the scheduler can give other users a turn.
     //
-    //  4. When `batchIndex` reaches the end of a page (reset to 0), advance
-    //     to the next page via `nextPageLink`. Watermarks (oldest/newest
-    //     `createdDateTime`) are saved after every page for progress tracking.
+    //  4. At page end (batchIndex reset to 0), save `nextLink` to advance to the next page.
     //
-    //  5. If there are no more pages, return `completed`.
+    //  5. No more pages (or empty page) → return `completed`.
     //
-    // Every DB write is version-guarded: if the version has changed (e.g.
-    // the user triggered a fresh sync), we bail out with `version-mismatch`
-    // immediately so we don't overwrite newer state.
-    // ─────────────────────────────────────────────────────────────────────
+    // All DB writes are version-guarded: bail with `version-mismatch` if the version changed
+    // (e.g. user triggered a fresh sync) to avoid overwriting newer state.
+    // ─────────────────────────────────────────────────────────────────────────────────────────
 
     // We need this intermediate object so that typescript does not complain because { nextLink: string | null }.
     const iterationInfo = {

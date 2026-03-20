@@ -227,7 +227,7 @@ export class FullSyncCommand {
         return { action: 'proceed' };
       case 'failed':
         if (this.isWithinCooldown(row.fullSyncHeartbeatAt, WAITING_FOR_FAILED_HEARTBEAT_MINUTES)) {
-          return { action: 'skip', reason: 'already-running' };
+          return { action: 'skip', reason: 'recovery-retried-to-early' };
         }
         return { action: 'proceed' };
       case 'paused':
