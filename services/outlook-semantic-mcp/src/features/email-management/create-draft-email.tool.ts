@@ -68,7 +68,7 @@ const CreateDraftEmailOutputSchema = z.object({
   attachmentsFailed: z
     .array(
       z.object({
-        uri: z.string().describe('The URI of the attachment that failed.'),
+        fileName: z.string().describe('The fileName of the attachment that failed.'),
         reason: z.string().describe('A description of why the attachment failed.'),
       }),
     )
