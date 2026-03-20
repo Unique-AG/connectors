@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.12](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.11...outlook-semantic-mcp@0.2.12) (2026-03-20)
+
+
+### Features
+
+* **outlook-semantic-mcp,deps:** improve full sync to not overwhelm ingestion, to allow users to sync in parallel ([#382](https://github.com/Unique-AG/connectors/issues/382)) ([2f2466e](https://github.com/Unique-AG/connectors/commit/2f2466ec7b665e21cc91470576daa62e2af32f6d))
+
 ## [0.2.11](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.10...outlook-semantic-mcp@0.2.11) (2026-03-18)
 
 
