@@ -230,7 +230,7 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
     }
 
     for (const entry of this.getTemplateResources()) {
-      const params = matchUriTemplate(entry.metadata.uri, uri, entry.metadata.templateParams, entry.metadata.queryParams);
+      const params = matchUriTemplate(entry.metadata.uri, uri, entry.metadata.queryParams);
       if (params !== undefined) {
         return { entry, params };
       }

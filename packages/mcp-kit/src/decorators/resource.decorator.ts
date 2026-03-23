@@ -1,4 +1,4 @@
-import { flatMap, map, pipe } from 'remeda';
+import { filter, flatMap, map, pipe } from 'remeda';
 import { MCP_RESOURCE_METADATA } from '../constants';
 import type { Icon } from '@modelcontextprotocol/sdk/types.js';
 import { invariant } from '../errors/defect.js';
@@ -90,19 +90,22 @@ export function Resource(options: ResourceOptions): MethodDecorator {
 /**
  * Parses an RFC 6570 URI template and returns the extracted path and query parameter names.
  * Handles simple (`{param}`), exploded (`{param*}`), and query (`{?a,b}`) expressions.
+ * Splits on `{` to extract template expressions without regex.
  */
 function parseUriTemplate(uri: string): { templateParams: string[]; queryParams: string[] } {
-  const queryParams = pipe(
-    [...uri.matchAll(/\{\?([^}]+)\}/g)],
-    flatMap((m) => pipe(m[1].split(','), map((p) => p.trim()))),
+  const expressions = pipe(
+    uri.split('{').slice(1),
+    map((s) => s.slice(0, s.indexOf('}'))),
   );
 
-  const uriWithoutQuery = uri.replace(/\{\?[^}]+\}/g, '');
+  const queryParams = pipe(
+    expressions,
+    filter((e) => e.startsWith('?')),
+    flatMap((e) => e.slice(1).split(',')),
+    map((p) => p.trim()),
+  );
 
-  const templateParams = [
-    ...pipe([...uriWithoutQuery.matchAll(/\{(\w+)\*\}/g)], map((m) => `${m[1]}*`)),
-    ...pipe([...uriWithoutQuery.matchAll(/\{(\w+)\}/g)], map((m) => m[1])),
-  ];
+  const templateParams = filter(expressions, (e) => !e.startsWith('?'));
 
   return { templateParams, queryParams };
 }
