@@ -35,6 +35,10 @@ export class ProxyService implements OnModuleDestroy {
     const proxyConfig = configService.get('proxy', { infer: true });
     const tenantConfigs = getTenantConfigs();
 
+    // Proxy is an infrastructure-level concern, not per-tenant. Each deployment has a single proxy
+    // config for a single customer. Confluence API and OAuth token calls are always proxied.
+    // Unique API and blob upload calls are only proxied when serviceAuthMode is external
+    // (cluster_local targets are in-cluster and don't need a proxy).
     this.isExternalMode = tenantConfigs.some(
       ({ config }) => config.unique.serviceAuthMode === UniqueAuthMode.External,
     );
