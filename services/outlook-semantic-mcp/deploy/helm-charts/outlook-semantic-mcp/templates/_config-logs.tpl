@@ -1,5 +1,7 @@
 {{- define "chart.config.logs" -}}
-{{- if .Values.mcpConfig.logs.diagnosticsDataPolicy }}
-LOGS_DIAGNOSTICS_DATA_POLICY: {{ .Values.mcpConfig.logs.diagnosticsDataPolicy | quote }}
+{{- with .Values.mcpConfig.logs }}
+{{- if .diagnosticsDataPolicy }}
+LOGS_DIAGNOSTICS_DATA_POLICY: {{ .diagnosticsDataPolicy | quote }}
+{{- end }}
 {{- end }}
 {{- end }}

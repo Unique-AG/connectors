@@ -1,8 +1,10 @@
 {{- define "chart.config.auth" -}}
-{{- if .Values.mcpConfig.auth.accessTokenExpiresInSeconds }}
-AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.accessTokenExpiresInSeconds | quote }}
+{{- with .Values.mcpConfig.auth }}
+{{- if .accessTokenExpiresInSeconds }}
+AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS: {{ .accessTokenExpiresInSeconds | quote }}
 {{- end }}
-{{- if .Values.mcpConfig.auth.refreshTokenExpiresInSeconds }}
-AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS: {{ .Values.mcpConfig.auth.refreshTokenExpiresInSeconds | quote }}
+{{- if .refreshTokenExpiresInSeconds }}
+AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS: {{ .refreshTokenExpiresInSeconds | quote }}
+{{- end }}
 {{- end }}
 {{- end }}
