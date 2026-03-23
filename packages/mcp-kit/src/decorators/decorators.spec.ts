@@ -179,9 +179,9 @@ describe('@Resource()', () => {
     expect(metadata.templateParams).toContain('user_id');
   });
 
-  it('URI with {path*} produces wildcard templateParam', () => {
+  it('URI with {+path} produces wildcard templateParam', () => {
     class TestService {
-      @Resource({ uri: 'files://{path*}' })
+      @Resource({ uri: 'files://{+path}' })
       getFile() {}
     }
     const metadata: ResourceMetadata = Reflect.getMetadata(
@@ -189,7 +189,7 @@ describe('@Resource()', () => {
       TestService.prototype.getFile,
     );
     expect(metadata.kind).toBe('template');
-    expect(metadata.templateParams).toContain('path*');
+    expect(metadata.templateParams).toContain('path');
   });
 
   it('URI with {?format,limit} produces queryParams', () => {
@@ -207,7 +207,7 @@ describe('@Resource()', () => {
 
   it('mixed URI parses templateParams and queryParams correctly', () => {
     class TestService {
-      @Resource({ uri: 'repo://{owner}/{repo}/files/{path*}{?ref,format}' })
+      @Resource({ uri: 'repo://{owner}/{repo}/files/{+path}{?ref,format}' })
       getRepoFile() {}
     }
     const metadata: ResourceMetadata = Reflect.getMetadata(
@@ -215,7 +215,7 @@ describe('@Resource()', () => {
       TestService.prototype.getRepoFile,
     );
     expect(metadata.kind).toBe('template');
-    expect(metadata.templateParams).toContain('path*');
+    expect(metadata.templateParams).toContain('path');
     expect(metadata.templateParams).toContain('owner');
     expect(metadata.templateParams).toContain('repo');
     expect(metadata.queryParams).toEqual(['ref', 'format']);

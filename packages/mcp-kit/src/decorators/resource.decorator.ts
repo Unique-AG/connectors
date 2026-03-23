@@ -6,7 +6,7 @@ import { invariant } from '../errors/defect.js';
 /** Options passed to the `@Resource()` decorator. */
 export interface ResourceOptions {
   /**
-   * RFC 6570 URI or URI template (e.g. `"files://{path*}"`, `"search://{?q,limit}"`).
+   * RFC 6570 URI or URI template (e.g. `"files://{+path}"`, `"search://{?q,limit}"`).
    * The presence of template or query-parameter expressions determines whether the
    * resource is registered as static or as a URI template.
    */
@@ -39,7 +39,7 @@ export interface ResourceMetadata {
   mimeType?: string;
   /** `'static'` when the URI contains no variables; `'template'` otherwise. */
   kind: 'static' | 'template';
-  /** Path variable names extracted from `{param}` / `{param*}` segments of the URI template. */
+  /** Path variable names extracted from `{param}` / `{+param}` segments of the URI template (operator prefixes and `*` suffixes stripped). */
   templateParams: string[];
   /** Query variable names extracted from `{?param,…}` segments of the URI template. */
   queryParams: string[];
@@ -87,10 +87,14 @@ export function Resource(options: ResourceOptions): MethodDecorator {
   };
 }
 
+/** RFC 6570 single-character operator prefixes on path expressions. */
+const RFC6570_OPERATORS = new Set(['+', '#', '.', '/', ';']);
+
 /**
  * Parses an RFC 6570 URI template and returns the extracted path and query parameter names.
- * Handles simple (`{param}`), exploded (`{param*}`), and query (`{?a,b}`) expressions.
- * Splits on `{` to extract template expressions without regex.
+ * Handles all standard operators: `{param}`, `{+param}` (reserved/path), `{?a,b}` (query), etc.
+ * Splits on `{` to extract expressions without regex; strips operator prefixes and `*` suffixes
+ * so `templateParams` always contains clean variable names.
  */
 function parseUriTemplate(uri: string): { templateParams: string[]; queryParams: string[] } {
   const expressions = pipe(
@@ -105,7 +109,11 @@ function parseUriTemplate(uri: string): { templateParams: string[]; queryParams:
     map((p) => p.trim()),
   );
 
-  const templateParams = filter(expressions, (e) => !e.startsWith('?'));
+  const templateParams = pipe(
+    expressions,
+    filter((e) => !e.startsWith('?')),
+    map((e) => (RFC6570_OPERATORS.has(e[0]) ? e.slice(1) : e).replace(/\*$/, '')),
+  );
 
   return { templateParams, queryParams };
 }
