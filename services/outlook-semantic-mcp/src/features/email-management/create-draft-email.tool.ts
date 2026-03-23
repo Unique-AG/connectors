@@ -1,8 +1,7 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
-import { type Context, Tool } from '@unique-ag/mcp-server-module';
+import { Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { isString } from 'remeda';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
@@ -50,7 +49,7 @@ const CreateDraftEmailInputSchema = z.object({
           .string()
           .describe(
             'URI identifying the file content. Two schemes are supported:\n' +
-              '- unique://chat/{chatId}/content/{contentId} — file from the Unique knowledge base; construct from the chat ID and content ID.\n' +
+              '- unique://content/{contentId} — file from the Unique knowledge base; use the content ID (e.g. unique://content/cont_a2vgv63szfwudzstjx7ihf3n).\n' +
               '- data:[mediatype];base64,<base64data> — inline base64-encoded content with an explicit MIME type.\n' +
               'External URLs (https://) are not supported.',
           ),
@@ -120,7 +119,6 @@ export class CreateDraftEmailTool {
   @Span()
   public async createDraftEmail(
     input: z.infer<typeof CreateDraftEmailInputSchema>,
-    context: Context,
     request: McpAuthenticatedRequest,
   ) {
     const userProfileId = extractUserProfileId(request);
@@ -128,10 +126,6 @@ export class CreateDraftEmailTool {
     if (!subscriptionStatus.success) {
       return subscriptionStatus;
     }
-    const fallbackChatId = context.mcpRequest.params?._meta?.chatId ?? undefined;
-    return this.createDraftEmailCommand.run(userProfileId, {
-      ...input,
-      fallbackChatId: isString(fallbackChatId) ? fallbackChatId : undefined,
-    });
+    return this.createDraftEmailCommand.run(userProfileId, input);
   }
 }
