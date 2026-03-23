@@ -1,2 +1,3 @@
-// CORE-006: McpIdentity + McpIdentityResolver
-// See: docs/tickets/CORE-006-mcp-identity.md
+export type { McpIdentity } from './mcp-identity.interface';
+export { McpIdentityResolver } from './mcp-identity-resolver.service';
+export { getMcpIdentity } from './get-mcp-identity';

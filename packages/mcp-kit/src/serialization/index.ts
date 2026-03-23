@@ -1,2 +1,8 @@
-// CORE-008: Output auto-serialization
-// See: docs/tickets/CORE-008-output-auto-serialization.md
+export { McpContent } from './mcp-content';
+export type { AudioContent, EmbeddedResourceContent } from './mcp-content';
+export { McpToolResult } from './mcp-tool-result';
+export { McpResourceResult } from './mcp-resource-result';
+export type { ResourceContent } from './mcp-resource-result';
+export { ToolError, ResourceError, PromptError } from './tool-errors';
+export { formatToolResult } from './format-tool-result';
+export type { ToolWireResult } from './format-tool-result';

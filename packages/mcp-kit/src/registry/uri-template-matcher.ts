@@ -1,0 +1,47 @@
+export function matchUriTemplate(
+  template: string,
+  uri: string,
+  templateParams: string[],
+  queryParams: string[],
+): Record<string, string> | undefined {
+  const [uriPath, uriQuery = ''] = uri.split('?');
+  const templateWithoutQuery = template.replace(/\{\?[^}]+\}/g, '');
+
+  let regexStr = escapeRegex(templateWithoutQuery);
+
+  // Replace {param*} (wildcard - captures everything including /)
+  regexStr = regexStr.replace(/\\\{(\w+)\\\*\\\}/g, '(?<$1>.+)');
+
+  // Replace {param} (simple - captures up to next / or end)
+  regexStr = regexStr.replace(/\\\{(\w+)\\\}/g, '(?<$1>[^/]+)');
+
+  const regex = new RegExp(`^${regexStr}$`);
+  const match = regex.exec(uriPath);
+  if (!match) return undefined;
+
+  const params: Record<string, string> = {};
+
+  for (const param of templateParams) {
+    const paramName = param.endsWith('*') ? param.slice(0, -1) : param;
+    const value = match.groups?.[paramName];
+    if (value !== undefined) {
+      params[paramName] = value;
+    }
+  }
+
+  if (queryParams.length > 0 && uriQuery) {
+    const searchParams = new URLSearchParams(uriQuery);
+    for (const qParam of queryParams) {
+      const value = searchParams.get(qParam);
+      if (value !== null) {
+        params[qParam] = value;
+      }
+    }
+  }
+
+  return params;
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

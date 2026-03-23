@@ -3,8 +3,51 @@
   "description": "NestJS framework for building MCP servers with full FastMCP feature parity",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "main": "dist/index.js",
   "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./errors": {
+      "types": "./src/errors/index.ts",
+      "import": "./dist/errors/index.js",
+      "require": "./dist/errors/index.js"
+    },
+    "./types": {
+      "types": "./src/types/index.ts",
+      "import": "./dist/types/index.js",
+      "require": "./dist/types/index.js"
+    },
+    "./brands": {
+      "types": "./src/types/brands.ts",
+      "import": "./dist/types/brands.js",
+      "require": "./dist/types/brands.js"
+    },
+    "./session": {
+      "types": "./src/session/index.ts",
+      "import": "./dist/session/index.js",
+      "require": "./dist/session/index.js"
+    },
+    "./auth": {
+      "types": "./src/auth/index.ts",
+      "import": "./dist/auth/index.js",
+      "require": "./dist/auth/index.js"
+    },
+    "./connection": {
+      "types": "./src/connection/index.ts",
+      "import": "./dist/connection/index.js",
+      "require": "./dist/connection/index.js"
+    },
+    "./filters": {
+      "types": "./src/filters/index.ts",
+      "import": "./dist/filters/index.js",
+      "require": "./dist/filters/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",

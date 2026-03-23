@@ -52,6 +52,19 @@
       },
       "suspicious": {
         "noExplicitAny": "error"
+      },
+      "nursery": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": [
+              {
+                "name": "@nestjs/common",
+                "message": "NestJS imports are only allowed in non-extractable modules (decorators/, filters/, guards/, module/). Leaf subpath modules (errors/, types/, session/) must remain NestJS-free."
+              }
+            ]
+          }
+        }
       }
     }
   },

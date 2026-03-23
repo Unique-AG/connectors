@@ -1,2 +1,7 @@
-// CORE-004: @Ctx() parameter decorator
-// See: docs/tickets/CORE-004-ctx-parameter-decorator.md
+import { MCP_CTX_PARAM_INDEX } from '../constants';
+
+export function Ctx(): ParameterDecorator {
+  return (target, propertyKey, parameterIndex) => {
+    Reflect.defineMetadata(MCP_CTX_PARAM_INDEX, parameterIndex, target, propertyKey!);
+  };
+}
