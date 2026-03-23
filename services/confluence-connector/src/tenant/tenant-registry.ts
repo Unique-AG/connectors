@@ -67,10 +67,8 @@ export class TenantRegistry implements OnModuleInit {
         const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient);
         this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
 
-        const isExternal = config.unique.serviceAuthMode === UniqueAuthMode.External;
         const uniqueApiDispatcher = this.proxyService.getDispatcher({
           mode: 'for-external-only',
-          isExternal,
         });
         const uniqueClient = this.uniqueApiFactory.create({
           auth: this.buildUniqueAuthConfig(config.unique),
@@ -107,7 +105,6 @@ export class TenantRegistry implements OnModuleInit {
 
         const blobUploadDispatcher = this.proxyService.getDispatcher({
           mode: 'for-external-only',
-          isExternal,
         });
         const ingestionService = new IngestionService(
           config,

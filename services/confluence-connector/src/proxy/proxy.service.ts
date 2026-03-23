@@ -4,23 +4,26 @@ import { ConfigService } from '@nestjs/config';
 import { Agent, Dispatcher, ProxyAgent } from 'undici';
 import {
   type BasicProxyConfig,
+  getTenantConfigs,
   type NoAuthProxyConfig,
   type ProxyConfig,
   type ProxyConfigNamespaced,
   type TlsProxyConfig,
+  UniqueAuthMode,
 } from '../config';
 
 export type ProxyMode = 'always' | 'for-external-only';
 
-export type GetDispatcherOptions =
-  | { mode: 'always' }
-  | { mode: 'for-external-only'; isExternal: boolean };
+export interface GetDispatcherOptions {
+  mode: ProxyMode;
+}
 
 @Injectable()
 export class ProxyService implements OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
   private readonly dispatcher: Dispatcher;
   private readonly noProxyDispatcher: Dispatcher;
+  private readonly isExternalMode: boolean;
 
   private static readonly sharedTimeoutOptions = {
     bodyTimeout: 60_000,
@@ -30,18 +33,23 @@ export class ProxyService implements OnModuleDestroy {
 
   public constructor(configService: ConfigService<ProxyConfigNamespaced, true>) {
     const proxyConfig = configService.get('proxy', { infer: true });
+    const tenantConfigs = getTenantConfigs();
 
+    this.isExternalMode = tenantConfigs.some(
+      ({ config }) => config.unique.serviceAuthMode === UniqueAuthMode.External,
+    );
     this.noProxyDispatcher = new Agent(ProxyService.sharedTimeoutOptions);
     this.dispatcher = this.createDispatcher(proxyConfig);
 
     this.logger.log({
       msg: 'ProxyService initialized',
       authMode: proxyConfig.authMode,
+      isExternalMode: this.isExternalMode,
     });
   }
 
-  public getDispatcher(options: GetDispatcherOptions): Dispatcher {
-    if (options.mode === 'for-external-only' && !options.isExternal) {
+  public getDispatcher({ mode }: GetDispatcherOptions): Dispatcher {
+    if (mode === 'for-external-only' && !this.isExternalMode) {
       return this.noProxyDispatcher;
     }
     return this.dispatcher;
