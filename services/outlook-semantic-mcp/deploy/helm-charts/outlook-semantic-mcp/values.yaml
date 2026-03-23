@@ -138,12 +138,11 @@ mcpConfig:
     # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
     # example: https://outlook.mcp.unique.app
     selfUrl: unset_default_value
-    # -- Optional. Debug mode for the MCP server. To override:
-    # mcpDebugMode: disabled
-    # Or set env var directly: MCP_DEBUG_MODE=disabled
+    # -- Debug mode for the MCP server. Set to "enabled" to expose extra debugging data in tool responses.
+    mcpDebugMode: disabled
     # -- Optional. Whether to buffer logs before writing. To override:
     # bufferLogs: enabled
-    # Or set env var directly: BUFFER_LOGS=enabled
+    # Or set env var directly: APP_BUFFER_LOGS=enabled
 
   # -- Optional log settings. To override:
   # logs:
