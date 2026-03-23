@@ -138,11 +138,17 @@ mcpConfig:
     # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
     # example: https://outlook.mcp.unique.app
     selfUrl: unset_default_value
-    # Debug mode for the mcp server
-    mcpDebugMode: disabled
+    # -- Optional. Debug mode for the MCP server. To override:
+    # mcpDebugMode: disabled
+    # Or set env var directly: MCP_DEBUG_MODE=disabled
+    # -- Optional. Whether to buffer logs before writing. To override:
+    # bufferLogs: true
+    # Or set env var directly: BUFFER_LOGS=true
 
-  logs:
-    diagnosticsDataPolicy: conceal
+  # -- Optional log settings. To override:
+  # logs:
+  #   diagnosticsDataPolicy: conceal
+  # Or set env var directly: LOGS_DIAGNOSTICS_DATA_POLICY=conceal
 
   # -- Microsoft Graph API configuration
   microsoft:
@@ -153,6 +159,9 @@ mcpConfig:
     # Optional - defaults to SELF_URL if not provided.
     # example: https://outlook.mcp.unique.app
     # publicWebhookUrl: ""
+    # -- Optional. Hour of day in UTC when scheduled subscription expirations should occur (0-23). To override:
+    # subscriptionExpirationTimeHoursUTC: 3
+    # Or set env var directly: MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC=3
     # clientSecret is loaded from a secret, see server.envVars
     # webhookSecret is loaded from a secret, see server.envVars
 
@@ -181,6 +190,10 @@ mcpConfig:
     # example: http://node-ingestion.finance-gpt:8091
     scopeManagementServiceBaseUrl: unset_default_value
 
+    # -- Optional. Whether to store emails internally in the Unique knowledge base. To override:
+    # storeInternally: true
+    # Or set env var directly: UNIQUE_STORE_INTERNALLY=true
+
     # Zitadel config
     zitadel:
         clientId: unset_default_value
@@ -191,12 +204,15 @@ mcpConfig:
   defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
 
   # -- Authentication configuration for the MCP server
-  auth:
-    # -- Access token expiration time in seconds
-    accessTokenExpiresInSeconds: 60
-    # -- Refresh token expiration time in seconds (default: 30 days)
-    refreshTokenExpiresInSeconds: 2592000
-    # hmacSecret is loaded from a secret, see server.envVars
+  # Optional. Access token expiration time in seconds (zod default: 60). To override:
+  # auth:
+  #   accessTokenExpiresInSeconds: 60
+  # Or set env var directly: AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS=60
+  # Optional. Refresh token expiration time in seconds (zod default: 2592000 = 30 days). To override:
+  # auth:
+  #   refreshTokenExpiresInSeconds: 2592000
+  # Or set env var directly: AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS=2592000
+  # hmacSecret is loaded from a secret, see server.envVars
 
   # Note: The following secrets must be provided via server.envVars:
   # - DATABASE_URL: PostgreSQL connection string
