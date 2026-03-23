@@ -4,29 +4,16 @@ import { parseAttachmentUri } from './parse-attachment-uri';
 describe('parseAttachmentUri', () => {
   describe('unique:// scheme', () => {
     it('parses a valid unique URI', () => {
-      const result = parseAttachmentUri(
-        'unique://chat/chat_abc123/content/cont_j23i0ifr44sdn7cz97ubleb7',
-      );
+      const result = parseAttachmentUri('unique://content/cont_j23i0ifr44sdn7cz97ubleb7');
 
       expect(result).toEqual({
         type: 'unique',
-        chatId: 'chat_abc123',
         contentId: 'cont_j23i0ifr44sdn7cz97ubleb7',
       });
     });
 
-    it('parses unique URI with empty chatId as null', () => {
-      const result = parseAttachmentUri('unique://chat//content/cont_abc');
-
-      expect(result).toEqual({
-        type: 'unique',
-        chatId: null,
-        contentId: 'cont_abc',
-      });
-    });
-
-    it('rejects unique URI without content segment', () => {
-      expect(() => parseAttachmentUri('unique://chat/chat_abc123')).toThrow(
+    it('rejects old-style unique URI with chatId in path', () => {
+      expect(() => parseAttachmentUri('unique://chat/chat_abc123/content/cont_abc')).toThrow(
         'Unsupported attachment URI scheme',
       );
     });
