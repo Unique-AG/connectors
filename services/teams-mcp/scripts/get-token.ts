@@ -82,7 +82,7 @@ async function main() {
 
       if (error) {
         res.writeHead(400);
-        res.end(`Auth error: ${url.searchParams.get('error_description')}`);
+        res.end('Auth error. Check the terminal for details.');
         server.close();
         return reject(new Error(error));
       }
@@ -102,7 +102,7 @@ async function main() {
         resolve(token);
       } catch (err) {
         res.writeHead(500);
-        res.end(String(err));
+        res.end('Token exchange failed. Check the terminal for details.');
         server.close();
         reject(err);
       }
