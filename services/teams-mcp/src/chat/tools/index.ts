@@ -1,3 +1,4 @@
+export { GetChannelMessagesTool } from './get-channel-messages.tool';
 export { GetChatMessagesTool } from './get-chat-messages.tool';
 export { ListChannelsTool } from './list-channels.tool';
 export { ListChatsTool } from './list-chats.tool';
