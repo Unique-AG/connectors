@@ -1,5 +1,5 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
-import { Tool } from '@unique-ag/mcp-server-module';
+import { Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
@@ -119,6 +119,7 @@ export class CreateDraftEmailTool {
   @Span()
   public async createDraftEmail(
     input: z.infer<typeof CreateDraftEmailInputSchema>,
+    _context: Context,
     request: McpAuthenticatedRequest,
   ) {
     const userProfileId = extractUserProfileId(request);
