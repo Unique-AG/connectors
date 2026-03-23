@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfluenceAuth } from '../../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../../config';
+import type { ProxyService } from '../../proxy';
 import { ServiceRegistry } from '../../tenant/service-registry';
 import { RateLimitedHttpClient } from '../../utils/rate-limited-http-client';
 import { CloudConfluenceApiClient } from '../cloud-api-client';
@@ -23,6 +24,10 @@ const mockServiceRegistry = {
   getService: vi.fn().mockReturnValue(mockAuth),
 } as unknown as ServiceRegistry;
 
+const mockProxyService = {
+  getDispatcher: vi.fn().mockReturnValue({}),
+} as unknown as ProxyService;
+
 const baseFields = {
   baseUrl: 'https://confluence.example.com',
   apiRateLimitPerMinute: 100,
@@ -32,7 +37,7 @@ const baseFields = {
 
 describe('ConfluenceApiClientFactory', () => {
   it('creates CloudConfluenceApiClient for cloud config', () => {
-    const factory = new ConfluenceApiClientFactory(mockServiceRegistry);
+    const factory = new ConfluenceApiClientFactory(mockServiceRegistry, mockProxyService);
     const config = {
       ...baseFields,
       instanceType: 'cloud',
@@ -41,7 +46,7 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100);
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, expect.anything());
     expect(CloudConfluenceApiClient).toHaveBeenCalledWith(
       config,
       mockAuth,
@@ -51,7 +56,7 @@ describe('ConfluenceApiClientFactory', () => {
   });
 
   it('creates DataCenterConfluenceApiClient for data-center config', () => {
-    const factory = new ConfluenceApiClientFactory(mockServiceRegistry);
+    const factory = new ConfluenceApiClientFactory(mockServiceRegistry, mockProxyService);
     const config = {
       ...baseFields,
       instanceType: 'data-center',
@@ -60,7 +65,7 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100);
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, expect.anything());
     expect(DataCenterConfluenceApiClient).toHaveBeenCalledWith(
       config,
       mockAuth,
@@ -74,7 +79,7 @@ describe('ConfluenceApiClientFactory', () => {
     vi.mocked(CloudConfluenceApiClient).mockImplementation(
       () => mockClient as unknown as CloudConfluenceApiClient,
     );
-    const factory = new ConfluenceApiClientFactory(mockServiceRegistry);
+    const factory = new ConfluenceApiClientFactory(mockServiceRegistry, mockProxyService);
     const config = {
       ...baseFields,
       instanceType: 'cloud',

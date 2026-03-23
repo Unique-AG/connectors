@@ -32,7 +32,8 @@ connector:
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
   # -- List of ConfigMaps to load as environment variables
-  extraEnvCM: []
+  extraEnvCM:
+    - confluence-connector-proxy-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/confluence-connector
     tag: 2.0.0-alpha.4 # x-release-please-version
@@ -201,3 +202,34 @@ connectorConfig:
         #     - html
         #   # -- Maximum file size in megabytes (default: 200, or MAX_FILE_SIZE_MB env)
         #   maxFileSizeMb: 200
+
+# -- HTTP proxy configuration for external API calls
+# Required for environments where internet access is only available through a proxy.
+# Users preferring setting all variables by hand disable the enabled flag and remove
+# confluence-connector-proxy-config from connector.extraEnvCM.
+proxyConfig:
+  # -- if disabled, confluence-connector-proxy-config must be removed from connector.extraEnvCM.
+  enabled: true
+  # -- Proxy authentication mode
+  # none: proxy disabled
+  # no_auth: proxy enabled, no authentication
+  # username_password: username/password authentication
+  # ssl_tls: TLS client certificate authentication
+  authMode: none
+  # -- Proxy server hostname (required for no_auth/username_password/ssl_tls modes)
+  # host: proxy.example.com
+  # -- Proxy server port (required for no_auth/username_password/ssl_tls modes)
+  # port: 8080
+  # -- Proxy protocol: http or https (required for no_auth/username_password/ssl_tls modes)
+  # protocol: http
+  # -- Basic auth username (required for username_password mode)
+  # username: proxy-user
+  # password is loaded from a secret, see connector.envVars example for PROXY_PASSWORD
+  # -- Path to SSL/TLS client certificate (required for ssl_tls mode)
+  # sslCertPath: /app/proxy-certs/client.crt
+  # -- Path to SSL/TLS client key (required for ssl_tls mode)
+  # sslKeyPath: /app/proxy-certs/client.key
+  # -- Path to CA bundle for verifying proxy server certificate (optional)
+  # sslCaBundlePath: /app/proxy-certs/ca.crt
+  # -- Optional JSON string of headers for CONNECT request
+  # headers: '{"X-Proxy-Header":"value"}'

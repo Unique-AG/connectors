@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { request } from 'undici';
+import { type Dispatcher, request } from 'undici';
 import { z } from 'zod';
 import { AuthMode, ConfluenceConfig } from '../../../config';
 import { handleErrorStatus } from '../../../utils/http-util';
@@ -31,8 +31,13 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
   private readonly clientSecret: string;
   private readonly tokenEndpoint: string;
   private readonly instanceType: 'cloud' | 'data-center';
+  private readonly dispatcher: Dispatcher | undefined;
 
-  public constructor(authConfig: OAuth2LoAuthConfig, connectionConfig: OAuth2LoConnectionConfig) {
+  public constructor(
+    authConfig: OAuth2LoAuthConfig,
+    connectionConfig: OAuth2LoConnectionConfig,
+    dispatcher?: Dispatcher,
+  ) {
     super();
     this.clientId = authConfig.clientId;
     this.clientSecret = authConfig.clientSecret.value;
@@ -41,6 +46,7 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
       connectionConfig.instanceType === 'cloud'
         ? CLOUD_TOKEN_ENDPOINT
         : `${connectionConfig.baseUrl}/rest/oauth2/latest/token`;
+    this.dispatcher = dispatcher;
   }
 
   public async acquireToken(): Promise<string> {
@@ -65,7 +71,12 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
   private async requestToken(): Promise<TokenResult> {
     const { headers, body } = this.buildRequest();
 
-    const response = await request(this.tokenEndpoint, { method: 'POST', headers, body });
+    const response = await request(this.tokenEndpoint, {
+      method: 'POST',
+      headers,
+      body,
+      dispatcher: this.dispatcher,
+    });
 
     await handleErrorStatus(response.statusCode, response.body, this.tokenEndpoint);
 

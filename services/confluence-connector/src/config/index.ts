@@ -3,6 +3,14 @@ export type { ConfluenceConfig } from './confluence.schema';
 export { AuthMode } from './confluence.schema';
 export type { ProcessingConfig } from './processing.schema';
 export {
+  type BasicProxyConfig,
+  type NoAuthProxyConfig,
+  type ProxyConfig,
+  type ProxyConfigNamespaced,
+  proxyConfig,
+  type TlsProxyConfig,
+} from './proxy.config';
+export {
   getTenantConfigs,
   type NamedTenantConfig,
   type TenantConfig,

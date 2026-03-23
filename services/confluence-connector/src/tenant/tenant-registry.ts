@@ -9,6 +9,7 @@ import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
 import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
+import { ProxyService } from '../proxy';
 import { ConfluenceContentFetcher } from '../synchronization/confluence-content-fetcher';
 import { ConfluencePageScanner } from '../synchronization/confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
@@ -29,6 +30,7 @@ export class TenantRegistry implements OnModuleInit {
     private readonly confluenceApiClientFactory: ConfluenceApiClientFactory,
     @Inject(UNIQUE_API_CLIENT_FACTORY) private readonly uniqueApiFactory: UniqueApiClientFactory,
     private readonly serviceRegistry: ServiceRegistry,
+    private readonly proxyService: ProxyService,
   ) {}
 
   public onModuleInit(): void {
@@ -65,8 +67,14 @@ export class TenantRegistry implements OnModuleInit {
         const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient);
         this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
 
+        const isExternal = config.unique.serviceAuthMode === UniqueAuthMode.External;
+        const uniqueApiDispatcher = this.proxyService.getDispatcher({
+          mode: 'for-external-only',
+          isExternal,
+        });
         const uniqueClient = this.uniqueApiFactory.create({
           auth: this.buildUniqueAuthConfig(config.unique),
+          dispatcher: uniqueApiDispatcher,
           ingestion: {
             baseUrl: config.unique.ingestionServiceBaseUrl,
             rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
@@ -97,7 +105,17 @@ export class TenantRegistry implements OnModuleInit {
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
 
-        const ingestionService = new IngestionService(config, tenantName, uniqueClient, apiClient);
+        const blobUploadDispatcher = this.proxyService.getDispatcher({
+          mode: 'for-external-only',
+          isExternal,
+        });
+        const ingestionService = new IngestionService(
+          config,
+          tenantName,
+          uniqueClient,
+          apiClient,
+          blobUploadDispatcher,
+        );
         this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
 
         const confluenceSynchronizationService = new ConfluenceSynchronizationService(
