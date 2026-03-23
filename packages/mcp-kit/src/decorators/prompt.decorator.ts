@@ -28,7 +28,7 @@ export interface PromptMetadata {
 export function Prompt(options: PromptOptions): MethodDecorator {
   return (target, propertyKey, descriptor) => {
     const methodName = String(propertyKey);
-    const name = options.name !== undefined ? options.name : toKebabCase(methodName);
+    const name = options.name ?? toKebabCase(methodName);
 
     let parameters: z.ZodObject<z.ZodRawShape> | undefined;
     if (options.parameters) {

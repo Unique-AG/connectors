@@ -61,6 +61,6 @@ export class UpstreamConnectionLostError extends McpBaseError {
     message?: string,
     options?: ErrorOptions,
   ) {
-    super(message !== undefined ? message : `Upstream connection lost: ${upstreamName}`, { retryable: true }, options);
+    super(message ?? `Upstream connection lost: ${upstreamName}`, { retryable: true }, options);
   }
 }

@@ -32,15 +32,14 @@ export function handleMcpToolError(error: unknown, logger: McpLogger): McpToolEr
   }
 
   if (error instanceof DefectError) {
-    const stack = error.stack !== undefined ? error.stack : error.message;
-    logger.error('[MCP] Defect encountered:', stack);
+    logger.error('[MCP] Defect encountered:', error.stack ?? error.message);
     return {
       isError: true,
       content: [{ type: 'text', text: 'Internal server error. This is a bug.' }],
     };
   }
 
-  const detail = isError(error) ? (error.stack !== undefined ? error.stack : error.message) : String(error);
+  const detail = isError(error) ? (error.stack ?? error.message) : String(error);
   logger.error('[MCP] Unexpected error:', detail);
   return {
     isError: true,

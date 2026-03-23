@@ -43,7 +43,7 @@ export function Resource(options: ResourceOptions): MethodDecorator {
 
     const metadata: ResourceMetadata = {
       uri: options.uri,
-      name: options.name !== undefined ? options.name : methodName,
+      name: options.name ?? methodName,
       description: options.description,
       mimeType: options.mimeType,
       kind,

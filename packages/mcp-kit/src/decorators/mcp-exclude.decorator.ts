@@ -9,8 +9,8 @@ export interface ExcludedParamEntry {
 export function McpExclude(): ParameterDecorator {
   return (target, propertyKey, parameterIndex) => {
     invariant(propertyKey !== undefined, '@McpExclude() must be applied to a method parameter, not a constructor parameter');
-    const raw = Reflect.getMetadata(MCP_EXCLUDED_PARAMS, target, propertyKey) as ExcludedParamEntry[] | undefined;
-    const existing: ExcludedParamEntry[] = raw !== undefined ? raw : [];
+    const existing: ExcludedParamEntry[] =
+      (Reflect.getMetadata(MCP_EXCLUDED_PARAMS, target, propertyKey) as ExcludedParamEntry[] | undefined) ?? [];
     Reflect.defineMetadata(
       MCP_EXCLUDED_PARAMS,
       [...existing, { index: parameterIndex, reason: 'mcp-exclude' }],

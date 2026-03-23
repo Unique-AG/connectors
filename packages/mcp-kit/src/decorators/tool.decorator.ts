@@ -37,7 +37,7 @@ export interface ToolMetadata {
 export function Tool(options: ToolOptions): MethodDecorator {
   return (target, propertyKey, descriptor) => {
     const methodName = String(propertyKey);
-    const name = options.name !== undefined ? options.name : toSnakeCase(methodName);
+    const name = options.name ?? toSnakeCase(methodName);
 
     let parameters: z.ZodObject<z.ZodRawShape>;
     if (!options.parameters) {
@@ -50,7 +50,7 @@ export function Tool(options: ToolOptions): MethodDecorator {
 
     const annotations: ToolAnnotations = {
       ...options.annotations,
-      title: options.annotations !== undefined && options.annotations.title !== undefined ? options.annotations.title : options.title,
+      title: options.annotations?.title ?? options.title,
     };
 
     const metadata: ToolMetadata = {

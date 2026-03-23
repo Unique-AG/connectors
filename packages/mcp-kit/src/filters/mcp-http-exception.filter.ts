@@ -31,7 +31,7 @@ export class McpHttpExceptionFilter implements ExceptionFilter {
     if (error instanceof McpBaseError) {
       this.logger.warn(`[${error.errorCode}] ${error.message}`);
       response.status(400).json({
-        code: error.metadata.mcpErrorCode !== undefined ? error.metadata.mcpErrorCode : -32000,
+        code: error.metadata.mcpErrorCode ?? -32000,
         message: error.message,
       });
       return;
