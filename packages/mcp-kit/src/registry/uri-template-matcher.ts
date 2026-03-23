@@ -1,3 +1,5 @@
+import { invariant } from '../errors/defect.js';
+
 export function matchUriTemplate(
   template: string,
   uri: string,
@@ -21,11 +23,15 @@ export function matchUriTemplate(
 
   const params: Record<string, string> = {};
 
-  for (const param of templateParams) {
-    const paramName = param.endsWith('*') ? param.slice(0, -1) : param;
-    const value = match.groups?.[paramName];
-    if (value !== undefined) {
-      params[paramName] = value;
+  if (templateParams.length > 0) {
+    invariant(match.groups !== undefined, 'Compiled URI template regex must have named capture groups');
+
+    for (const param of templateParams) {
+      const paramName = param.endsWith('*') ? param.slice(0, -1) : param;
+      const value = match.groups[paramName];
+      if (value !== undefined) {
+        params[paramName] = value;
+      }
     }
   }
 

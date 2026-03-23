@@ -1,5 +1,6 @@
 import { MCP_RESOURCE_METADATA } from '../constants';
 import type { McpIcon } from '../types';
+import { invariant } from '../errors/defect.js';
 
 export interface ResourceOptions {
   uri: string;
@@ -42,7 +43,7 @@ export function Resource(options: ResourceOptions): MethodDecorator {
 
     const metadata: ResourceMetadata = {
       uri: options.uri,
-      name: options.name ?? methodName,
+      name: options.name !== undefined ? options.name : methodName,
       description: options.description,
       mimeType: options.mimeType,
       kind,
@@ -55,7 +56,9 @@ export function Resource(options: ResourceOptions): MethodDecorator {
       methodName,
     };
 
-    Reflect.defineMetadata(MCP_RESOURCE_METADATA, metadata, descriptor.value!);
+    const method = descriptor.value;
+    invariant(method !== undefined, '@Resource() must be applied to a method');
+    Reflect.defineMetadata(MCP_RESOURCE_METADATA, metadata, method);
   };
 }
 

@@ -11,7 +11,9 @@ import {
   UpstreamConnectionRequiredError,
   UpstreamConnectionLostError,
 } from './failures.js';
-import { handleMcpToolError } from './mcp-exception-handler.js';
+import { handleMcpToolError, type McpLogger } from './mcp-exception-handler.js';
+
+const noopLogger: McpLogger = { warn: () => undefined, error: () => undefined };
 
 describe('invariant', () => {
   it('throws on falsy condition', () => {
@@ -154,17 +156,17 @@ describe('UpstreamConnectionLostError', () => {
 describe('handleMcpToolError', () => {
   it('rethrows McpError', () => {
     const mcpError = new McpError(ErrorCode.InvalidRequest, 'bad request');
-    expect(() => handleMcpToolError(mcpError)).toThrow(mcpError);
+    expect(() => handleMcpToolError(mcpError, noopLogger)).toThrow(mcpError);
   });
 
   it('rethrows UpstreamConnectionRequiredError', () => {
     const err = new UpstreamConnectionRequiredError('github', 'https://example.com/connect');
-    expect(() => handleMcpToolError(err)).toThrow(err);
+    expect(() => handleMcpToolError(err, noopLogger)).toThrow(err);
   });
 
   it('returns graceful error for McpBaseError', () => {
     const err = new McpAuthorizationError('not allowed');
-    const result = handleMcpToolError(err);
+    const result = handleMcpToolError(err, noopLogger);
     expect(result).toEqual({
       isError: true,
       content: [{ type: 'text', text: 'not allowed' }],
@@ -173,7 +175,7 @@ describe('handleMcpToolError', () => {
 
   it('returns graceful error for McpValidationError', () => {
     const err = new McpValidationError('field required');
-    const result = handleMcpToolError(err);
+    const result = handleMcpToolError(err, noopLogger);
     expect(result).toEqual({
       isError: true,
       content: [{ type: 'text', text: 'field required' }],
@@ -182,7 +184,7 @@ describe('handleMcpToolError', () => {
 
   it('returns internal error message for DefectError', () => {
     const err = new DefectError('invariant violated');
-    const result = handleMcpToolError(err);
+    const result = handleMcpToolError(err, noopLogger);
     expect(result).toEqual({
       isError: true,
       content: [{ type: 'text', text: 'Internal server error. This is a bug.' }],
@@ -190,7 +192,7 @@ describe('handleMcpToolError', () => {
   });
 
   it('returns unexpected error message for unknown errors', () => {
-    const result = handleMcpToolError(new Error('something went wrong'));
+    const result = handleMcpToolError(new Error('something went wrong'), noopLogger);
     expect(result).toEqual({
       isError: true,
       content: [{ type: 'text', text: 'An unexpected error occurred.' }],
@@ -198,7 +200,7 @@ describe('handleMcpToolError', () => {
   });
 
   it('returns unexpected error message for non-Error unknowns', () => {
-    const result = handleMcpToolError('a raw string error');
+    const result = handleMcpToolError('a raw string error', noopLogger);
     expect(result).toEqual({
       isError: true,
       content: [{ type: 'text', text: 'An unexpected error occurred.' }],
@@ -206,29 +208,28 @@ describe('handleMcpToolError', () => {
   });
 
   it('logs warn for McpBaseError', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const logger: McpLogger = { warn: vi.fn(), error: vi.fn() };
     const err = new McpAuthorizationError('denied');
-    handleMcpToolError(err);
-    expect(warnSpy).toHaveBeenCalledWith(
+    handleMcpToolError(err, logger);
+    expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('MCP_AUTHORIZATION_FAILED'),
       undefined,
     );
-    warnSpy.mockRestore();
   });
 
   it('logs error for DefectError', () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const logger: McpLogger = { warn: vi.fn(), error: vi.fn() };
     const err = new DefectError('bug');
-    handleMcpToolError(err);
-    expect(errorSpy).toHaveBeenCalledWith('[MCP] Defect encountered:', err.stack);
-    errorSpy.mockRestore();
+    handleMcpToolError(err, logger);
+    const expectedStack = err.stack !== undefined ? err.stack : err.message;
+    expect(logger.error).toHaveBeenCalledWith('[MCP] Defect encountered:', expectedStack);
   });
 
   it('logs error for unknown error', () => {
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const logger: McpLogger = { warn: vi.fn(), error: vi.fn() };
     const err = new Error('unknown');
-    handleMcpToolError(err);
-    expect(errorSpy).toHaveBeenCalledWith('[MCP] Unexpected error:', err.stack);
-    errorSpy.mockRestore();
+    handleMcpToolError(err, logger);
+    const expectedDetail = err.stack !== undefined ? err.stack : err.message;
+    expect(logger.error).toHaveBeenCalledWith('[MCP] Unexpected error:', expectedDetail);
   });
 });

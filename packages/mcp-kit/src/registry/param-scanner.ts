@@ -20,14 +20,14 @@ export function scanMethodParams(
     methodName,
   );
 
-  const mcpExcludedParams: ExcludedParamEntry[] =
-    Reflect.getMetadata(MCP_EXCLUDED_PARAMS, target, methodName) ?? [];
+  const rawExcluded = Reflect.getMetadata(MCP_EXCLUDED_PARAMS, target, methodName) as ExcludedParamEntry[] | undefined;
+  const mcpExcludedParams: ExcludedParamEntry[] = rawExcluded !== undefined ? rawExcluded : [];
 
-  const selfDeclaredDeps: Array<{ index: number; param: unknown }> =
-    Reflect.getMetadata(SELF_DECLARED_DEPS_METADATA, (target as { constructor: unknown }).constructor) ?? [];
+  const rawSelfDeps = Reflect.getMetadata(SELF_DECLARED_DEPS_METADATA, (target as { constructor: unknown }).constructor) as Array<{ index: number; param: unknown }> | undefined;
+  const selfDeclaredDeps: Array<{ index: number; param: unknown }> = rawSelfDeps !== undefined ? rawSelfDeps : [];
 
-  const paramTypes: unknown[] =
-    Reflect.getMetadata(PARAMTYPES_METADATA, target, methodName) ?? [];
+  const rawParamTypes = Reflect.getMetadata(PARAMTYPES_METADATA, target, methodName) as unknown[] | undefined;
+  const paramTypes: unknown[] = rawParamTypes !== undefined ? rawParamTypes : [];
 
   const injectExcluded: ExcludedParamEntry[] = selfDeclaredDeps
     .filter(

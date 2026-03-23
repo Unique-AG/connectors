@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { toKebabCase } from 'remeda';
 import { MCP_PROMPT_METADATA } from '../constants';
 import type { McpIcon } from '../types';
+import { invariant } from '../errors/defect.js';
 
 export interface PromptOptions {
   name?: string;
@@ -27,7 +28,7 @@ export interface PromptMetadata {
 export function Prompt(options: PromptOptions): MethodDecorator {
   return (target, propertyKey, descriptor) => {
     const methodName = String(propertyKey);
-    const name = options.name ?? toKebabCase(methodName);
+    const name = options.name !== undefined ? options.name : toKebabCase(methodName);
 
     let parameters: z.ZodObject<z.ZodRawShape> | undefined;
     if (options.parameters) {
@@ -49,7 +50,9 @@ export function Prompt(options: PromptOptions): MethodDecorator {
       methodName,
     };
 
-    Reflect.defineMetadata(MCP_PROMPT_METADATA, metadata, descriptor.value!);
+    const method = descriptor.value;
+    invariant(method !== undefined, '@Prompt() must be applied to a method');
+    Reflect.defineMetadata(MCP_PROMPT_METADATA, metadata, method);
   };
 }
 

@@ -29,18 +29,21 @@ export class McpIdentityResolver {
       return null;
     }
 
-    const userId = user.userId ?? user.sub ?? '';
-    const profileId = user.userProfileId ?? '';
-    const clientId = user.clientId ?? '';
-    const scopes = filter(user.scope?.split(' ') ?? [], isTruthy);
-    const resource = user.resource ?? '';
+    const userId = user.userId !== undefined ? user.userId : (user.sub !== undefined ? user.sub : '');
+    const profileId = user.userProfileId !== undefined ? user.userProfileId : '';
+    const clientId = user.clientId !== undefined ? user.clientId : '';
+    const scopeString = user.scope !== undefined ? user.scope : '';
+    const scopes = filter(scopeString.split(' '), isTruthy);
+    const resource = user.resource !== undefined ? user.resource : '';
+    const email = user.userData !== undefined ? user.userData.email : undefined;
+    const displayName = user.userData !== undefined ? user.userData.displayName : undefined;
 
     return {
       userId,
       profileId,
       clientId,
-      email: user.userData?.email,
-      displayName: user.userData?.displayName,
+      email,
+      displayName,
       scopes,
       resource,
       raw: user,

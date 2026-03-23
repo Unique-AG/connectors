@@ -1,7 +1,8 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner } from '@nestjs/core';
-import { filter, isFunction, isObjectType, pipe } from 'remeda';
+import { filter, isFunction, isObjectType, isString, pipe } from 'remeda';
 import { MCP_PROMPT_METADATA, MCP_RESOURCE_METADATA, MCP_TOOL_METADATA } from '../constants';
+import { invariant } from '../errors/defect.js';
 import type { PromptMetadata } from '../decorators/prompt.decorator';
 import type { ResourceMetadata } from '../decorators/resource.decorator';
 import type { ToolMetadata } from '../decorators/tool.decorator';
@@ -28,6 +29,13 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
     private readonly discoveryService: DiscoveryService,
     private readonly metadataScanner: MetadataScanner,
   ) {}
+
+  private getTypeName(metatype: unknown): string {
+    if (isObjectType(metatype) && isString((metatype as { name?: unknown }).name)) {
+      return (metatype as { name: string }).name;
+    }
+    return 'unknown';
+  }
 
   public onApplicationBootstrap(): void {
     const providers = this.discoveryService.getProviders();
@@ -71,9 +79,10 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
 
     const key = `tool:${metadata.name}`;
     if (this.entries.has(key)) {
-      const existing = this.entries.get(key)!;
+      const existing = this.entries.get(key);
+      invariant(existing !== undefined, `Registry entry for key "${key}" must exist after has() check`);
       throw new Error(
-        `Duplicate tool name "${metadata.name}" registered in ${metatype?.name ?? 'unknown'} and ${existing.classRef?.name ?? 'unknown'}. Tool names must be unique.`,
+        `Duplicate tool name "${metadata.name}" registered in ${this.getTypeName(metatype)} and ${existing.classRef.name}. Tool names must be unique.`,
       );
     }
 
@@ -104,9 +113,10 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
 
     const key = `resource:${metadata.uri}`;
     if (this.entries.has(key)) {
-      const existing = this.entries.get(key)!;
+      const existing = this.entries.get(key);
+      invariant(existing !== undefined, `Registry entry for key "${key}" must exist after has() check`);
       throw new Error(
-        `Duplicate resource URI "${metadata.uri}" registered in ${metatype?.name ?? 'unknown'} and ${existing.classRef?.name ?? 'unknown'}. Resource URIs must be unique.`,
+        `Duplicate resource URI "${metadata.uri}" registered in ${this.getTypeName(metatype)} and ${existing.classRef.name}. Resource URIs must be unique.`,
       );
     }
 
@@ -137,9 +147,10 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
 
     const key = `prompt:${metadata.name}`;
     if (this.entries.has(key)) {
-      const existing = this.entries.get(key)!;
+      const existing = this.entries.get(key);
+      invariant(existing !== undefined, `Registry entry for key "${key}" must exist after has() check`);
       throw new Error(
-        `Duplicate prompt name "${metadata.name}" registered in ${metatype?.name ?? 'unknown'} and ${existing.classRef?.name ?? 'unknown'}. Prompt names must be unique.`,
+        `Duplicate prompt name "${metadata.name}" registered in ${this.getTypeName(metatype)} and ${existing.classRef.name}. Prompt names must be unique.`,
       );
     }
 
