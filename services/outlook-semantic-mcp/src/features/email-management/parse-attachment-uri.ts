@@ -15,18 +15,17 @@
 //
 // Use `unique://` for Unique knowledge-base files or `data:` for inline content instead.
 export type ParsedUri =
-  | { type: 'unique'; chatId: string | null; contentId: string }
+  | { type: 'unique'; contentId: string }
   | { type: 'data'; mimeType: string; data: Buffer };
 
-const UNIQUE_URI_PATTERN = /^unique:\/\/chat\/([^/]*)\/content\/([^/]+)$/;
+const UNIQUE_URI_PATTERN = /^unique:\/\/content\/([^/]+)$/;
 const DATA_URI_PATTERN = /^data:([^;,]*)(;base64)?,(.*)$/s;
 
 export function parseAttachmentUri(uri: string): ParsedUri {
   const uniqueMatch = uri.match(UNIQUE_URI_PATTERN);
   if (uniqueMatch) {
-    const chatId = uniqueMatch[1];
-    const contentId = uniqueMatch[2];
-    return { type: 'unique', chatId: chatId || null, contentId: contentId ?? '' };
+    const contentId = uniqueMatch[1];
+    return { type: 'unique', contentId: contentId ?? '' };
   }
 
   const dataMatch = uri.match(DATA_URI_PATTERN);
