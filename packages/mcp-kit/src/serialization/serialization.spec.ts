@@ -1,91 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { of, lastValueFrom } from 'rxjs';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { CallHandler, ExecutionContext } from '@nestjs/common';
 import { McpContent } from './mcp-content';
 import { McpToolResult } from './mcp-tool-result';
 import { ToolError, ResourceError, PromptError } from './tool-errors';
-import { formatToolResult } from './format-tool-result';
 import { McpZodValidationPipe } from '../pipes/mcp-zod-validation.pipe';
 import { McpSerializationInterceptor } from '../interceptors/mcp-serialization.interceptor';
 import { McpValidationError } from '../errors/failures';
-
-describe('formatToolResult', () => {
-  it('converts string return to text content', () => {
-    const result = formatToolResult('hello');
-    expect(result).toEqual({ content: [{ type: 'text', text: 'hello' }] });
-  });
-
-  it('converts number return to text content', () => {
-    const result = formatToolResult(42);
-    expect(result).toEqual({ content: [{ type: 'text', text: '42' }] });
-  });
-
-  it('converts boolean return to text content', () => {
-    const result = formatToolResult(true);
-    expect(result).toEqual({ content: [{ type: 'text', text: 'true' }] });
-  });
-
-  it('converts null to empty text content', () => {
-    const result = formatToolResult(null);
-    expect(result).toEqual({ content: [{ type: 'text', text: '' }] });
-  });
-
-  it('converts undefined to empty text content', () => {
-    const result = formatToolResult(undefined);
-    expect(result).toEqual({ content: [{ type: 'text', text: '' }] });
-  });
-
-  it('converts plain object (no schema) to JSON text', () => {
-    const result = formatToolResult({ foo: 'bar', num: 1 });
-    expect(result).toEqual({
-      content: [{ type: 'text', text: JSON.stringify({ foo: 'bar', num: 1 }, null, 2) }],
-    });
-  });
-
-  it('includes structuredContent when object matches outputSchema', () => {
-    const schema = z.object({ name: z.string(), age: z.number() });
-    const value = { name: 'Alice', age: 30 };
-    const result = formatToolResult(value, schema);
-    expect(result.structuredContent).toEqual(value);
-    expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(value, null, 2) }]);
-  });
-
-  it('throws McpError when object does not match outputSchema', () => {
-    const schema = z.object({ name: z.string() });
-    expect(() => formatToolResult({ name: 123 }, schema)).toThrow(McpError);
-    expect(() => formatToolResult({ name: 123 }, schema)).toThrow(
-      expect.objectContaining({ code: ErrorCode.InternalError }),
-    );
-  });
-
-  it('passes through pre-formatted content array unchanged', () => {
-    const preFormatted = { content: [{ type: 'text', text: 'already formatted' }], isError: false };
-    const result = formatToolResult(preFormatted);
-    expect(result).toBe(preFormatted);
-  });
-
-  it('passes through McpToolResult content and maps meta to _meta', () => {
-    const toolResult = new McpToolResult({
-      content: [{ type: 'text', text: 'from tool result' }],
-      isError: false,
-      meta: { requestId: 'abc123' },
-    });
-    const result = formatToolResult(toolResult);
-    expect(result.content).toEqual([{ type: 'text', text: 'from tool result' }]);
-    expect(result._meta).toEqual({ requestId: 'abc123' });
-    expect(result.isError).toBe(false);
-  });
-
-  it('omits _meta when McpToolResult has no meta', () => {
-    const toolResult = new McpToolResult({
-      content: [{ type: 'text', text: 'no meta' }],
-    });
-    const result = formatToolResult(toolResult);
-    expect('_meta' in result).toBe(false);
-  });
-});
 
 describe('McpContent', () => {
   it('.text produces correct content structure', () => {

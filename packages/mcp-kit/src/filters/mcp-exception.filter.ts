@@ -4,7 +4,7 @@ import { isError } from 'remeda';
 import { DefectError } from '../errors/defect.js';
 import { McpBaseError } from '../errors/base.js';
 import { UpstreamConnectionRequiredError } from '../errors/failures.js';
-import type { ToolWireResult } from '../serialization/format-tool-result.js';
+import type { ToolWireResult } from '../interceptors/mcp-serialization.interceptor.js';
 
 @Catch()
 @Injectable()
