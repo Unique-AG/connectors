@@ -36,6 +36,12 @@ type LogContext = Partial<{
   uniqueWriteUrl: string;
 }>;
 
+export type MessageIngestionResult =
+  | 'ingested'
+  | 'skipped'
+  | 'skipped-content-unchanged-already-ingested'
+  | 'metadata-updated';
+
 @Injectable()
 export class IngestEmailCommand {
   private readonly logger = new Logger(this.constructor.name);
@@ -59,7 +65,7 @@ export class IngestEmailCommand {
     userProfileId: string;
     messageId: string;
     filters?: InboxConfigurationMailFilters;
-  }): Promise<void> {
+  }): Promise<MessageIngestionResult> {
     traceAttrs({ userProfileId: userProfileId, messageId: messageId });
     const userProfile = await this.db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
@@ -83,7 +89,7 @@ export class IngestEmailCommand {
           matchedPattern,
           msg: 'Email skipped by filter',
         });
-        return;
+        return 'skipped';
       }
     }
 
@@ -131,7 +137,7 @@ export class IngestEmailCommand {
         this.logger.debug({ ...logContext, msg: `Delete file from unique` });
         await this.uniqueApi.files.delete(file.id);
       }
-      return;
+      return 'skipped';
     }
 
     const rootScope = await this.uniqueApi.scopes.getByExternalId(
@@ -147,7 +153,7 @@ export class IngestEmailCommand {
           ...logContext,
           msg: `Skip Update reason: Last modified date not changed`,
         });
-        return;
+        return 'skipped-content-unchanged-already-ingested';
       }
       this.logger.log({ ...logContext, msg: `Update file metadata` });
       await this.uniqueApi.ingestion.updateMetadata({
@@ -156,7 +162,7 @@ export class IngestEmailCommand {
         // here because you cannot assign an interface to a record.
         metadata: metadata as unknown as ContentMetadata,
       });
-      return;
+      return 'metadata-updated';
     }
 
     await this.ingestEmail({
@@ -168,6 +174,7 @@ export class IngestEmailCommand {
       client,
       logContext,
     });
+    return 'ingested';
   }
 
   @Span()
@@ -212,28 +219,45 @@ export class IngestEmailCommand {
     logContext.uniqueContentId = content.id;
     this.logger.debug({ ...logContext, msg: `Register content: Finished` });
 
-    const contentLength = await this.getContentLength({ messageId, client });
-    const contentStream = await this.getEmlFileStream({ messageId, client });
-    this.logger.debug({ ...logContext, msg: `File Upload: Started` });
-    await this.uploadFileForIngestionCommand.run({
-      uploadUrl: content.writeUrl,
-      // We read the content length consuming the stream because our upload email
-      // fails without it and it expects it up front.
-      contentLength,
-      content: contentStream,
-      mimeType: createContentRequest.mimeType,
-    });
-    this.logger.debug({ ...logContext, msg: `File Upload: Finished` });
+    try {
+      const contentLength = await this.getContentLength({ messageId, client });
+      const contentStream = await this.getEmlFileStream({ messageId, client });
+      this.logger.debug({ ...logContext, msg: `File Upload: Started` });
+      await this.uploadFileForIngestionCommand.run({
+        uploadUrl: content.writeUrl,
+        // We read the content length consuming the stream because our upload email
+        // fails without it and it expects it up front.
+        contentLength,
+        content: contentStream,
+        mimeType: createContentRequest.mimeType,
+      });
+      this.logger.debug({ ...logContext, msg: `File Upload: Finished` });
 
-    this.logger.debug({ ...logContext, msg: `Finalize Ingestion: Started` });
-    await this.uniqueApi.ingestion.finalizeIngestion({
-      ...omit(createContentRequest, ['byteSize']),
-      fileUrl: content.readUrl,
-      url: content.readUrl,
-      baseUrl: graphMessage.webLink,
-    });
-    traceEvent(`File Ingestion Finished`);
-    this.logger.debug({ ...logContext, msg: `Finalize Ingestion: Finished` });
+      this.logger.debug({ ...logContext, msg: `Finalize Ingestion: Started` });
+      await this.uniqueApi.ingestion.finalizeIngestion({
+        ...omit(createContentRequest, ['byteSize']),
+        fileUrl: content.readUrl,
+        url: content.readUrl,
+        baseUrl: graphMessage.webLink,
+      });
+      traceEvent(`File Ingestion Finished`);
+      this.logger.debug({ ...logContext, msg: `Finalize Ingestion: Finished` });
+    } catch (error) {
+      this.logger.warn({
+        ...logContext,
+        msg: `Cleaning up registered content after ingestion failure`,
+      });
+      try {
+        await this.uniqueApi.files.delete(content.id);
+      } catch (cleanupError) {
+        this.logger.error({
+          ...logContext,
+          err: cleanupError,
+          msg: `Failed to clean up registered content`,
+        });
+      }
+      throw error;
+    }
   }
 
   private async getContentLength({

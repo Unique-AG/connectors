@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.2.15](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.14...outlook-semantic-mcp@0.2.15) (2026-03-23)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,unique-api:** change expected attachment uri ([#392](https://github.com/Unique-AG/connectors/issues/392)) ([83a8db7](https://github.com/Unique-AG/connectors/commit/83a8db78c857bb351c76bd9b1348f304a2c43667))
+
+## [0.2.14](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.13...outlook-semantic-mcp@0.2.14) (2026-03-20)
+
+
+### Features
+
+* **outlook-semantic-mcp,unique-api:** replace base64 attachments with content ID-based attachments ([#380](https://github.com/Unique-AG/connectors/issues/380)) ([329cea1](https://github.com/Unique-AG/connectors/commit/329cea13ceb23e6fd428f9be8bbf743d9e6c2a0b))
+
+## [0.2.13](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.12...outlook-semantic-mcp@0.2.13) (2026-03-20)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** email sync total + add user email to sync progress ([#384](https://github.com/Unique-AG/connectors/issues/384)) ([b418066](https://github.com/Unique-AG/connectors/commit/b418066f43584020d25a6df6f6ece259901ec3ed))
+
+## [0.2.12](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.11...outlook-semantic-mcp@0.2.12) (2026-03-20)
+
+
+### Features
+
+* **outlook-semantic-mcp,deps:** improve full sync to not overwhelm ingestion, to allow users to sync in parallel ([#382](https://github.com/Unique-AG/connectors/issues/382)) ([2f2466e](https://github.com/Unique-AG/connectors/commit/2f2466ec7b665e21cc91470576daa62e2af32f6d))
+
 ## [0.2.11](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.10...outlook-semantic-mcp@0.2.11) (2026-03-18)
 
 

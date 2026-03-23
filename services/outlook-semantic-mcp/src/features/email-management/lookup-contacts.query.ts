@@ -1,3 +1,4 @@
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { filter, flatMap, isNonNullish, map, pipe, sortBy, uniqueBy } from 'remeda';
@@ -117,12 +118,12 @@ export class LookupContactsQuery {
       sortBy([({ similarityScore }) => similarityScore, 'desc']),
     );
 
-    return { contacts, message: 'Contacts fetched succesfully' };
+    return { contacts, message: 'Contacts fetched successfully' };
   }
 
   private async fetchFromPeopleApi(
     userProfileIdString: string,
-    client: ReturnType<GraphClientFactory['createClientForUser']>,
+    client: Client,
     name: string,
   ): Promise<Contact[] | null> {
     let raw: unknown;
@@ -167,7 +168,7 @@ export class LookupContactsQuery {
 
   private async fetchFromInbox(
     userProfileIdString: string,
-    client: ReturnType<GraphClientFactory['createClientForUser']>,
+    client: Client,
   ): Promise<Contact[] | null> {
     let raw: unknown;
     try {

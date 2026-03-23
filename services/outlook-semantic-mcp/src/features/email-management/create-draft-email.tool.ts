@@ -1,5 +1,5 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
-import { type Context, Tool } from '@unique-ag/mcp-server-module';
+import { Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
@@ -13,7 +13,7 @@ const CreateDraftEmailInputSchema = z.object({
   content: z
     .string()
     .describe(
-      'The body content of the draft email. It can be html / text but contentType has to be specied correctly',
+      'The body content of the draft email. Must match the format declared in contentType: raw HTML markup when "html", plain text when "text".',
     ),
   contentType: z
     .enum(['html', 'text'])
@@ -40,22 +40,57 @@ const CreateDraftEmailInputSchema = z.object({
   attachments: z
     .array(
       z.object({
-        filename: z.string().describe('The name of the file to attach, including its extension.'),
-        contentBytes: z.string().describe('The base64-encoded content of the attachment.'),
-        contentType: z
+        fileName: z
           .string()
-          .describe('The MIME type of the attachment (e.g. "application/pdf", "image/png").'),
+          .describe(
+            'The file name that will appear on the attachment in the email, including extension (e.g. "report.pdf").',
+          ),
+        data: z
+          .string()
+          .describe(
+            'URI identifying the file content. Two schemes are supported:\n' +
+              '- unique://content/{contentId} — file from the Unique knowledge base; use the content ID (e.g. unique://content/cont_a2vgv63szfwudzstjx7ihf3n).\n' +
+              '- data:[mediatype];base64,<base64data> — inline base64-encoded content with an explicit MIME type.\n' +
+              'External URLs (https://) are not supported.',
+          ),
       }),
     )
     .optional()
-    .describe('Optional list of file attachments to include in the draft email.'),
+    .describe(
+      'Files to attach to the draft. Each entry pairs a display file name with a URI pointing to the file content. Omit entirely when no attachments are needed.',
+    ),
 });
 
 const CreateDraftEmailOutputSchema = z.object({
-  success: z.boolean(),
-  draftId: z.string().optional(),
-  status: z.string().optional(),
-  message: z.string(),
+  success: z
+    .boolean()
+    .describe(
+      'True when the draft was created in Outlook, even if some attachments failed. False only when the draft itself could not be created.',
+    ),
+  draftId: z
+    .string()
+    .optional()
+    .describe(
+      'Microsoft Graph message ID of the created draft. Present only when success is true.',
+    ),
+  webLink: z
+    .string()
+    .optional()
+    .describe(
+      'Outlook Web App URL to open the draft directly. Present only when success is true and Graph returned a webLink.',
+    ),
+  message: z.string().describe('Human-readable summary of the outcome, success or failure.'),
+  attachmentsFailed: z
+    .array(
+      z.object({
+        fileName: z.string().describe('The file name of the attachment that could not be added.'),
+        reason: z.string().describe('Why the attachment failed.'),
+      }),
+    )
+    .optional()
+    .describe(
+      'Attachments that could not be added to the draft. Present only when success is true and at least one attachment failed; absent otherwise.',
+    ),
 });
 
 @Injectable()
@@ -87,11 +122,11 @@ export class CreateDraftEmailTool {
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {
-    const userProfileTypeId = extractUserProfileId(request);
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
+    const userProfileId = extractUserProfileId(request);
+    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileId);
     if (!subscriptionStatus.success) {
       return subscriptionStatus;
     }
-    return this.createDraftEmailCommand.run(userProfileTypeId, input);
+    return this.createDraftEmailCommand.run(userProfileId, input);
   }
 }

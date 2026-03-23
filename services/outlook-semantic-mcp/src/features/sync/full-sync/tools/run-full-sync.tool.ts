@@ -1,17 +1,16 @@
-import assert from 'node:assert';
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
-import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { type Context, createMeta, Tool } from '@unique-ag/mcp-server-module';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
-import {
-  FullSyncRunStatus,
-  StartFullSyncCommand,
-} from '~/features/sync/full-sync/start-full-sync.command';
+import { FullSyncCommand } from '~/features/sync/full-sync/full-sync.command';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { META } from './run-full-sync-tool.meta';
+
+const META = createMeta({
+  icon: 'play',
+  systemPrompt:
+    "Triggers a full re-sync of the user's Outlook inbox. Use this when the user reports missing emails, stale search results, or after a long period of inactivity. After triggering, call `sync_progress` to monitor ingestion status.",
+});
 
 const InputSchema = z.object({});
 
@@ -24,10 +23,7 @@ const OutputSchema = z.object({
 export class RunFullSyncTool {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(
-    @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
-    private readonly startFullSyncCommand: StartFullSyncCommand,
-  ) {}
+  public constructor(private readonly fullSyncCommand: FullSyncCommand) {}
 
   @Tool({
     name: 'run_full_sync',
@@ -54,19 +50,13 @@ export class RunFullSyncTool {
     const userProfileTypeid = extractUserProfileId(request);
     const userProfileId = userProfileTypeid.toString();
 
-    this.logger.log({ userProfileId, msg: 'Starting directory sync' });
-    const subscription = await this.drizzle.query.subscriptions.findFirst({
-      where: eq(subscriptions.userProfileId, userProfileId),
-    });
-    assert.ok(subscription, `Missing subscription for userProfile: ${userProfileId}`);
+    this.logger.log({ userProfileId, msg: 'Starting full sync' });
+    const result = await this.fullSyncCommand.run(userProfileId);
 
-    const { status } = await this.startFullSyncCommand.run(subscription.subscriptionId);
+    if (result.status === 'skipped') {
+      return { success: false, message: `Skipped running full sync: ${result.reason}` };
+    }
 
-    const responseByStatus: Record<FullSyncRunStatus, { success: boolean; message: string }> = {
-      skipped: { success: false, message: `Skipped running full sync, it was run recently` },
-      started: { success: true, message: `Full sync started` },
-    };
-
-    return responseByStatus[status];
+    return { success: true, message: `Full sync ${result.status}` };
   }
 }

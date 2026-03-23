@@ -3,7 +3,7 @@ import { createMeta } from '@unique-ag/mcp-server-module';
 export const META = createMeta({
   icon: 'status',
   systemPrompt:
-    'Returns the current sync progress including inbox configuration, date windows, and ingestion statistics. Use this to monitor sync state and ingestion progress.',
+    'Returns the current sync progress including inbox configuration, date windows, counters (expectedTotal, skippedMessages, scheduledForIngestion, failedToUploadForIngestion), and ingestion statistics. Use this to monitor sync state and ingestion progress.',
   toolFormatInformation: `## Sync Progress Display Rules
 
   Open with a status line, then show the sync state and ingestion as compact sections. Omit any field that is \`null\`.
@@ -16,8 +16,14 @@ export const META = createMeta({
   If \`message\` is present and non-empty, show it as a blockquote below the status line.
 
   **Sync State** — Full sync: {syncStats.fullSyncState}, Live catch-up: {syncStats.liveCatchUpState}
-  - \`fullSyncState\` values: \`ready\` (initial fetch done), \`running\` (in progress), \`failed\` (error)
+  - \`fullSyncState\` values: \`ready\` (initial fetch done), \`running\` (in progress), \`failed\` (error), \`paused\` (user paused), \`waiting-for-ingestion\` (draining ingestion queue)
   - \`liveCatchUpState\` values: \`ready\` (up to date), \`running\` (processing new emails), \`failed\` (error)
+
+  **Counters** — show as a compact table or list:
+  - Expected total: {syncStats.expectedTotal} (omit if null — count was unavailable)
+  - Skipped: {syncStats.skippedMessages} (filtered out by rules)
+  - Scheduled for ingestion: {syncStats.scheduledForIngestion} (uploaded successfully)
+  - Failed to upload: {syncStats.failedToUploadForIngestion} (failed after retries)
 
   **Date Window** — Newest created: {syncStats.dateWindow.newestCreatedDateTime}, Newest modified: {syncStats.dateWindow.newestLastModifiedDateTime}
 

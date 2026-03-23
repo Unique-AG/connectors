@@ -6,14 +6,9 @@ import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';
 import { GetMessageDetailsQuery } from './get-message-details.query';
 import { IngestEmailCommand } from './ingest-email.command';
-import { IngestFullSyncMessageCommand } from './ingest-full-sync-message.command';
 import { IngestEmailLiveCatchupMessageCommand } from './ingest-live-catchup-message.command';
 
-const COMMANDS: Provider[] = [
-  IngestEmailCommand,
-  IngestFullSyncMessageCommand,
-  IngestEmailLiveCatchupMessageCommand,
-];
+const COMMANDS: Provider[] = [IngestEmailCommand, IngestEmailLiveCatchupMessageCommand];
 
 const QUERIES: Provider[] = [GetMessageDetailsQuery];
 

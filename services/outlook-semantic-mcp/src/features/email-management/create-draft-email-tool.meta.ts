@@ -35,7 +35,21 @@ export const META = createMeta({
     The **only** exception: if after searching with \`search_emails\` and \`lookup_contacts\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
 
     ### What \`create_draft_email\` Does
-    Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and base64-encoded file attachments. The draft is saved and can be reviewed or sent later.`,
+    Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and attachments. The draft is saved and can be reviewed or sent later.
+
+    ### Attachments
+    To attach files, pass an array of objects in the \`attachments\` field. Each object must have:
+    - \`fileName\`: the name that will appear on the attachment (e.g. \`report.pdf\`)
+    - \`data\`: a URI identifying the file content. Supported URI schemes:
+      - **Unique content**: \`unique://chat/{chatId}/content/{contentId}\` — attach a file from the Unique knowledge base using its chat ID and content ID. Example: \`unique://chat/chat_abc123/content/cont_j23i0ifr44sdn7cz97ubleb7\`.
+      - **Data URIs**: \`data:[mediatype];base64,<base64data>\` — inline base64-encoded content.
+
+    External URLs (\`https://\`) are **not supported**. Do not pass raw content IDs — always use the \`unique://\` URI scheme for Unique knowledge base files.
+
+    ### Failed Attachments
+    The response may include an \`attachmentsFailed\` array when one or more attachments could not be added. The draft is still created in that case. Each entry has a \`fileName\` and a \`reason\`. When \`attachmentsFailed\` is non-empty, inform the user which files failed and why, for example:
+    > ⚠️ The following attachments could not be added:
+    > - **report.pdf**: File not found in the knowledge base.`,
   toolFormatInformation: `## Format for Draft Emails
   When presenting a draft email, always use the following format exactly:
   📩 **{Subject}** [open](https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem)

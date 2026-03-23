@@ -19,14 +19,25 @@ import {
   RemoveInboxConnectionTool,
   VerifyInboxConnectionTool,
 } from './subscriptions/tools';
-import { RunFullSyncTool, SyncProgressTool } from './sync/full-sync';
+import {
+  PauseFullSyncTool,
+  RestartFullSyncTool,
+  ResumeFullSyncTool,
+  RunFullSyncTool,
+  SyncProgressTool,
+} from './sync/full-sync';
 import { FullSyncModule } from './sync/full-sync/full-sync.module';
 import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
-import { StuckSyncRecoveryModule } from './sync/stuck-sync-recovery.module';
+import { SyncRecoveryModule } from './sync/sync-recovery.module';
+
+const DEBUG_MODE_TOOLS =
+  process.env.MCP_DEBUG_MODE === 'enabled'
+    ? [RunFullSyncTool, RestartFullSyncTool, PauseFullSyncTool, ResumeFullSyncTool]
+    : [];
 
 const TOOLS = [
+  ...DEBUG_MODE_TOOLS,
   ListFoldersTool,
-  RunFullSyncTool,
   SyncProgressTool,
   VerifyInboxConnectionTool,
   ReconnectInboxTool,
@@ -56,7 +67,7 @@ const TOOLS = [
     DirectoriesSyncModule,
     SearchModule,
     UniqueApiFeatureModule,
-    StuckSyncRecoveryModule,
+    SyncRecoveryModule,
   ],
   providers: [MailSubscriptionController, IngestionListener, ...TOOLS],
   controllers: [MailSubscriptionController],

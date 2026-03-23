@@ -148,6 +148,20 @@
       "when": 1773749704728,
       "tag": "0020_quiet_unicorn",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1773850858463,
+      "tag": "0021_full_sync_pausable_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1773956438192,
+      "tag": "0022_medical_tenebrous",
+      "breakpoints": true
     }
   ]
 }

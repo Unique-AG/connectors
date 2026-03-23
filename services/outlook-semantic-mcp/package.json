@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/outlook-semantic-mcp",
   "description": "",
-  "version": "0.2.11",
+  "version": "0.2.15",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -51,6 +51,7 @@
     "@unique-ag/unique-api": "workspace:*",
     "@unique-ag/utils": "workspace:*",
     "amqplib": "^0.10.9",
+    "bottleneck": "^2.19.5",
     "cache-manager": "^7.2.0",
     "cron": "^4.3.0",
     "drizzle-orm": "^0.44.5",

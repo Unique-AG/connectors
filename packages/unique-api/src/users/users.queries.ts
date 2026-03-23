@@ -4,6 +4,9 @@ export interface ListUsersQueryInput {
   skip: number;
   take: number;
   where?: {
+    email?: {
+      equals: string;
+    };
     active?: {
       equals: boolean;
     };
@@ -16,6 +19,7 @@ export interface ListUsersQueryResult {
     nodes: {
       id: string;
       active: boolean;
+      companyId: string;
       email: string;
     }[];
   };
@@ -28,6 +32,7 @@ export const LIST_USERS_QUERY = gql`
       nodes {
         id
         active
+        companyId
         email
       }
     }
