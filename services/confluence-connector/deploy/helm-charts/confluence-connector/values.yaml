@@ -29,6 +29,12 @@ connector:
   #         secretKeyRef:
   #           name: confluence-connector-secret
   #           key: CONFLUENCE_CLIENT_SECRET
+  #     # For proxy basic auth password (required when proxy.authMode is 'username_password')
+  #     - name: PROXY_PASSWORD
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: confluence-connector-secret
+  #           key: PROXY_PASSWORD
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
   # -- List of ConfigMaps to load as environment variables
