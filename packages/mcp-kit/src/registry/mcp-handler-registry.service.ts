@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner } from '@nestjs/core';
+import { filter, pipe } from 'remeda';
 import { MCP_PROMPT_METADATA, MCP_RESOURCE_METADATA, MCP_TOOL_METADATA } from '../constants';
 import type { PromptMetadata } from '../decorators/prompt.decorator';
 import type { ResourceMetadata } from '../decorators/resource.decorator';
@@ -156,7 +157,7 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
   }
 
   public getTools(): RegistryEntry[] {
-    return Array.from(this.entries.values()).filter((e) => e.type === 'tool');
+    return pipe(Array.from(this.entries.values()), filter((e) => e.type === 'tool'));
   }
 
   public findTool(name: string): RegistryEntry | undefined {
@@ -164,15 +165,15 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
   }
 
   public getResources(): RegistryEntry[] {
-    return Array.from(this.entries.values()).filter((e) => e.type === 'resource');
+    return pipe(Array.from(this.entries.values()), filter((e) => e.type === 'resource'));
   }
 
   public getStaticResources(): RegistryEntry[] {
-    return this.getResources().filter((e) => (e.metadata as ResourceMetadata).kind === 'static');
+    return pipe(this.getResources(), filter((e) => (e.metadata as ResourceMetadata).kind === 'static'));
   }
 
   public getTemplateResources(): RegistryEntry[] {
-    return this.getResources().filter((e) => (e.metadata as ResourceMetadata).kind === 'template');
+    return pipe(this.getResources(), filter((e) => (e.metadata as ResourceMetadata).kind === 'template'));
   }
 
   public findResourceByUri(uri: string): { entry: RegistryEntry; params: Record<string, string> } | undefined {
@@ -194,7 +195,7 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
   }
 
   public getPrompts(): RegistryEntry[] {
-    return Array.from(this.entries.values()).filter((e) => e.type === 'prompt');
+    return pipe(Array.from(this.entries.values()), filter((e) => e.type === 'prompt'));
   }
 
   public findPrompt(name: string): RegistryEntry | undefined {

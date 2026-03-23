@@ -1,6 +1,7 @@
 import { Inject, Injectable, Scope } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import type { Request } from 'express';
+import { filter, isTruthy } from 'remeda';
 import type { McpIdentity } from './mcp-identity.interface';
 
 // Provisional shape — refined in AUTH-002
@@ -31,7 +32,7 @@ export class McpIdentityResolver {
     const userId = user.userId ?? user.sub ?? '';
     const profileId = user.userProfileId ?? '';
     const clientId = user.clientId ?? '';
-    const scopes = user.scope ? user.scope.split(' ').filter(Boolean) : [];
+    const scopes = filter(user.scope?.split(' ') ?? [], isTruthy);
     const resource = user.resource ?? '';
 
     return {

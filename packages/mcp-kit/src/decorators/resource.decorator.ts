@@ -60,29 +60,16 @@ export function Resource(options: ResourceOptions): MethodDecorator {
 }
 
 function parseUriTemplate(uri: string): { templateParams: string[]; queryParams: string[] } {
-  const queryParams: string[] = [];
-  const templateParams: string[] = [];
-
-  const queryMatch = /\{\?([^}]+)\}/g;
-  let match: RegExpExecArray | null;
-  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex loop pattern
-  while ((match = queryMatch.exec(uri)) !== null) {
-    queryParams.push(...match[1].split(',').map((p) => p.trim()));
-  }
+  const queryParams = [...uri.matchAll(/\{\?([^}]+)\}/g)].flatMap((m) =>
+    m[1].split(',').map((p) => p.trim()),
+  );
 
   const uriWithoutQuery = uri.replace(/\{\?[^}]+\}/g, '');
 
-  const wildcardMatch = /\{(\w+)\*\}/g;
-  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex loop pattern
-  while ((match = wildcardMatch.exec(uriWithoutQuery)) !== null) {
-    templateParams.push(`${match[1]}*`);
-  }
-
-  const simpleMatch = /\{(\w+)\}/g;
-  // biome-ignore lint/suspicious/noAssignInExpressions: standard regex loop pattern
-  while ((match = simpleMatch.exec(uriWithoutQuery)) !== null) {
-    templateParams.push(match[1]);
-  }
+  const templateParams = [
+    ...[...uriWithoutQuery.matchAll(/\{(\w+)\*\}/g)].map((m) => `${m[1]}*`),
+    ...[...uriWithoutQuery.matchAll(/\{(\w+)\}/g)].map((m) => m[1]),
+  ];
 
   return { templateParams, queryParams };
 }

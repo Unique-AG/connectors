@@ -61,6 +61,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.25.2",
+    "remeda": "^2.32.0",
     "zod": "^4.1.5"
   },
   "devDependencies": {

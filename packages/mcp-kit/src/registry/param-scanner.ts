@@ -1,3 +1,4 @@
+import { range } from 'remeda';
 import { MCP_CTX_PARAM_INDEX, MCP_EXCLUDED_PARAMS } from '../constants';
 import type { ExcludedParamEntry } from '../decorators/mcp-exclude.decorator';
 
@@ -53,7 +54,5 @@ export function getMcpInputParamIndices(
   if (ctxParamIndex !== undefined) {
     excluded.add(ctxParamIndex);
   }
-  return Array.from({ length: paramCount }, (_, i) => i).filter(
-    (i) => !excluded.has(i),
-  );
+  return range(0, paramCount).filter((i) => !excluded.has(i));
 }
