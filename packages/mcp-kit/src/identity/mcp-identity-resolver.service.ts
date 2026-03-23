@@ -3,7 +3,10 @@ import { REQUEST } from '@nestjs/core';
 import { filter, isTruthy } from 'remeda';
 import type { McpIdentity } from './mcp-identity.interface';
 
-// Provisional shape — refined in AUTH-002
+/**
+ * Provisional shape of the validated token payload attached to the request as `req.user`.
+ * Refined in AUTH-002.
+ */
 interface TokenValidationResult {
   sub?: string;
   userId?: string;
@@ -17,16 +20,23 @@ interface TokenValidationResult {
   };
 }
 
-// Narrow interface for the parts of the request we actually use.
-// Avoids importing all of express.Request and casting .user.
+/**
+ * Narrow interface covering only the request fields this service reads.
+ * Avoids importing the full `express.Request` type and casting `req.user`.
+ */
 interface McpRequest {
   user?: TokenValidationResult;
 }
 
+/**
+ * REQUEST-scoped service that extracts a normalised `McpIdentity` from the current HTTP request.
+ * Returns `null` when no authenticated user is present on the request.
+ */
 @Injectable({ scope: Scope.REQUEST })
 export class McpIdentityResolver {
   public constructor(@Inject(REQUEST) private readonly request: McpRequest) {}
 
+  /** Maps `request.user` to a `McpIdentity`, or returns `null` if unauthenticated. */
   public resolve(): McpIdentity | null {
     const user = this.request.user;  // now typed as TokenValidationResult | undefined — no cast!
 

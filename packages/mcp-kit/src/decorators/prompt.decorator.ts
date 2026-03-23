@@ -4,16 +4,26 @@ import { MCP_PROMPT_METADATA } from '../constants';
 import type { McpIcon } from '../types';
 import { invariant } from '../errors/defect.js';
 
+/** Options passed to the `@Prompt()` decorator. */
 export interface PromptOptions {
+  /** MCP prompt name; defaults to the method name converted to kebab-case. */
   name?: string;
+  /** Human-readable display title exposed to clients. */
   title?: string;
+  /** Required description shown to the LLM when selecting the prompt. */
   description: string;
+  /** Zod schema for the prompt's input arguments; accepts a `ZodObject` or a plain shape record. */
   parameters?: z.ZodObject<z.ZodRawShape> | Record<string, z.ZodType>;
   icons?: McpIcon[];
+  /** Arbitrary key/value metadata passed through to the registered prompt record. */
   meta?: Record<string, unknown>;
   version?: string | number;
 }
 
+/**
+ * Resolved metadata stored on the method via `Reflect.defineMetadata` after `@Prompt()` is applied.
+ * `parameters` is always a `ZodObject` when present (coerced from the options shape if necessary).
+ */
 export interface PromptMetadata {
   name: string;
   title?: string;
@@ -22,9 +32,15 @@ export interface PromptMetadata {
   icons?: McpIcon[];
   meta?: Record<string, unknown>;
   version?: string | number;
+  /** Name of the decorated class method, used to locate and invoke the handler at runtime. */
   methodName: string;
 }
 
+/**
+ * Marks a class method as an MCP prompt handler and stores its resolved {@link PromptMetadata}
+ * on the method via `Reflect.defineMetadata` (key: `MCP_PROMPT_METADATA`).
+ * The method name is auto-converted to kebab-case when no explicit `name` is provided.
+ */
 export function Prompt(options: PromptOptions): MethodDecorator {
   return (target, propertyKey, descriptor) => {
     const methodName = String(propertyKey);

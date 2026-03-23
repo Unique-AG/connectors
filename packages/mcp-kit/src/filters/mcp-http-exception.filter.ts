@@ -5,6 +5,13 @@ import { DefectError } from '../errors/defect.js';
 import { McpBaseError } from '../errors/base.js';
 import { UpstreamConnectionRequiredError } from '../errors/failures.js';
 
+/**
+ * HTTP-layer exception filter applied to MCP server endpoints. Maps error types to HTTP responses:
+ * - `HttpException` → its own status code and body
+ * - `UpstreamConnectionRequiredError` → 401 with reconnect URL
+ * - `McpBaseError` → 400 with MCP error code
+ * - `DefectError` / unexpected → 500 with JSON-RPC internal error code (-32603)
+ */
 @Catch()
 export class McpHttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(McpHttpExceptionFilter.name);

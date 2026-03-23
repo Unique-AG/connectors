@@ -9,34 +9,47 @@ import type { ToolMetadata } from '../decorators/tool.decorator';
 import { scanMethodParams } from './param-scanner';
 import { matchUriTemplate } from './uri-template-matcher';
 
+/** Shared fields present on every registry entry regardless of MCP handler type. */
 interface BaseRegistryEntry {
+  /** Constructor of the NestJS provider class that owns the decorated method. */
   // biome-ignore lint/suspicious/noExplicitAny: NestJS class constructor reference
   classRef: new (...args: any[]) => unknown;
+  /** Live provider instance resolved from the NestJS DI container. */
   instance: object;
+  /** Name of the decorated method on the provider class. */
   methodName: string;
+  /** Parameter index decorated with `@McpCtx()`, or `undefined` if absent. */
   ctxParamIndex: number | undefined;
 }
 
+/** Registry entry for a method decorated with `@Tool()`. */
 export interface ToolRegistryEntry extends BaseRegistryEntry {
   type: 'tool';
   name: string;
   metadata: ToolMetadata;
 }
 
+/** Registry entry for a method decorated with `@Resource()`. */
 export interface ResourceRegistryEntry extends BaseRegistryEntry {
   type: 'resource';
   name: string;
   metadata: ResourceMetadata;
 }
 
+/** Registry entry for a method decorated with `@Prompt()`. */
 export interface PromptRegistryEntry extends BaseRegistryEntry {
   type: 'prompt';
   name: string;
   metadata: PromptMetadata;
 }
 
+/** Discriminated union of all MCP handler registry entries. */
 export type RegistryEntry = ToolRegistryEntry | ResourceRegistryEntry | PromptRegistryEntry;
 
+/**
+ * Discovers and indexes every MCP-decorated method (`@Tool`, `@Resource`, `@Prompt`) across all
+ * NestJS providers at application bootstrap, making them available for dispatch at runtime.
+ */
 @Injectable()
 export class McpHandlerRegistry implements OnApplicationBootstrap {
   private readonly logger = new Logger(McpHandlerRegistry.name);
@@ -178,27 +191,37 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
     });
   }
 
+  /** Returns all registered tool entries. */
   public getTools(): ToolRegistryEntry[] {
     return pipe(Array.from(this.entries.values()), filter((e): e is ToolRegistryEntry => e.type === 'tool'));
   }
 
+  /** Looks up a tool by its registered name. */
   public findTool(name: string): ToolRegistryEntry | undefined {
     const entry = this.entries.get(`tool:${name}`);
     return entry?.type === 'tool' ? entry : undefined;
   }
 
+  /** Returns all registered resource entries (both static and template). */
   public getResources(): ResourceRegistryEntry[] {
     return pipe(Array.from(this.entries.values()), filter((e): e is ResourceRegistryEntry => e.type === 'resource'));
   }
 
+  /** Returns only resource entries with a fixed URI (no template variables). */
   public getStaticResources(): ResourceRegistryEntry[] {
     return pipe(this.getResources(), filter((e) => e.metadata.kind === 'static'));
   }
 
+  /** Returns only resource entries whose URI contains template variables. */
   public getTemplateResources(): ResourceRegistryEntry[] {
     return pipe(this.getResources(), filter((e) => e.metadata.kind === 'template'));
   }
 
+  /**
+   * Resolves a concrete request URI to a resource entry and extracted path/query parameters.
+   * Tries an exact key lookup first; if that misses, iterates template resources and applies
+   * URI template matching (supports `{param}`, `{param*}` wildcard, and `{?query,params}`).
+   */
   public findResourceByUri(uri: string): { entry: ResourceRegistryEntry; params: Record<string, string> } | undefined {
     const exactKey = `resource:${uri}`;
     const exact = this.entries.get(exactKey);
@@ -216,15 +239,18 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
     return undefined;
   }
 
+  /** Returns all registered prompt entries. */
   public getPrompts(): PromptRegistryEntry[] {
     return pipe(Array.from(this.entries.values()), filter((e): e is PromptRegistryEntry => e.type === 'prompt'));
   }
 
+  /** Looks up a prompt by its registered name. */
   public findPrompt(name: string): PromptRegistryEntry | undefined {
     const entry = this.entries.get(`prompt:${name}`);
     return entry?.type === 'prompt' ? entry : undefined;
   }
 
+  /** Returns every registered entry across all handler types. */
   public getAll(): RegistryEntry[] {
     return Array.from(this.entries.values());
   }

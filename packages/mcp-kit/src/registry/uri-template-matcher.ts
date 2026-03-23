@@ -1,5 +1,16 @@
 import { invariant } from '../errors/defect.js';
 
+/**
+ * Matches a concrete `uri` against a URI template and extracts captured values.
+ *
+ * Supported template syntax:
+ * - `{param}` — simple segment, captures everything up to the next `/`
+ * - `{param*}` — wildcard segment, captures across `/` boundaries
+ * - `{?query,params}` — query-string parameters extracted from `uri`'s search string
+ *
+ * Returns a map of extracted parameter names to their decoded string values, or `undefined`
+ * if the URI does not match the template's path.
+ */
 export function matchUriTemplate(
   template: string,
   uri: string,
