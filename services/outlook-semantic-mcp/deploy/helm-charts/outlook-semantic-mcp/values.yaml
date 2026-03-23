@@ -142,8 +142,8 @@ mcpConfig:
     # mcpDebugMode: disabled
     # Or set env var directly: MCP_DEBUG_MODE=disabled
     # -- Optional. Whether to buffer logs before writing. To override:
-    # bufferLogs: true
-    # Or set env var directly: BUFFER_LOGS=true
+    # bufferLogs: enabled
+    # Or set env var directly: BUFFER_LOGS=enabled
 
   # -- Optional log settings. To override:
   # logs:
@@ -191,8 +191,8 @@ mcpConfig:
     scopeManagementServiceBaseUrl: unset_default_value
 
     # -- Optional. Whether to store emails internally in the Unique knowledge base. To override:
-    # storeInternally: true
-    # Or set env var directly: UNIQUE_STORE_INTERNALLY=true
+    # storeInternally: enabled
+    # Or set env var directly: UNIQUE_STORE_INTERNALLY=enabled
 
     # Zitadel config
     zitadel:
