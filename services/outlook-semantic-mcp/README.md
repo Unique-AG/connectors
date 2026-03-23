@@ -52,15 +52,19 @@ For complete configuration reference, see [Configuration Guide](./docs/operator/
 **External Mode** (for external deployments):
 ```env
 UNIQUE_SERVICE_AUTH_MODE=external
-UNIQUE_API_BASE_URL=http://localhost:8092/public/
 UNIQUE_SERVICE_EXTRA_HEADERS={"authorization":"Bearer <app-key>","x-app-id":"<app-id>","x-user-id":"<user-id>","x-company-id":"<company-id>"}
+UNIQUE_STORE_INTERNALLY=disabled
+UNIQUE_ZITADEL_CLIENT_ID=<zitadel-client-id>
+UNIQUE_ZITADEL_CLIENT_SECRET=<zitadel-client-secret>
+UNIQUE_ZITADEL_OAUTH_TOKEN_URL=https://your-zitadel-instance.zitadel.cloud/oauth/v2/token
+UNIQUE_ZITADEL_PROJECT_ID=<zitadel-project-id>
 ```
 
 **Cluster Local Mode** (for in-cluster deployments):
 ```env
 UNIQUE_SERVICE_AUTH_MODE=cluster_local
-UNIQUE_API_BASE_URL=http://chat.namespace.svc:PORT/public/chat/
 UNIQUE_INGESTION_SERVICE_BASE_URL=http://ingestions.namespace.svc:PORT
+UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL=http://scope-management.namespace.svc:PORT
 UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-id>"}
 ```
 
@@ -71,8 +75,9 @@ UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-i
 | `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `60` | Access token TTL |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `2592000` | Refresh token TTL (30 days) |
-| `UNIQUE_ROOT_SCOPE_PATH` | `outlook-semantic-mcp` | Root folder path in Unique |
-| `UNIQUE_USER_FETCH_CONCURRENCY` | `5` | Concurrent user resolution limit |
+| `MCP_DEBUG_MODE` | `disabled` | Debug mode for the MCP server (enabled/disabled) |
+| `BUFFER_LOGS` | `disabled` | Buffer logs before writing to reduce I/O (enabled/disabled) |
+| `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | Controls what diagnostic data is logged (conceal/expose) |
 
 For complete configuration reference, see [Configuration Guide](./docs/operator/configuration.md).
 

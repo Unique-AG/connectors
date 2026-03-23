@@ -204,14 +204,13 @@ mcpConfig:
   defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
 
   # -- Authentication configuration for the MCP server
-  # Optional. Access token expiration time in seconds (zod default: 60). To override:
+  # Optional. Access and refresh token expiration times. To override:
   # auth:
-  #   accessTokenExpiresInSeconds: 60
-  # Or set env var directly: AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS=60
-  # Optional. Refresh token expiration time in seconds (zod default: 2592000 = 30 days). To override:
-  # auth:
-  #   refreshTokenExpiresInSeconds: 2592000
-  # Or set env var directly: AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS=2592000
+  #   accessTokenExpiresInSeconds: 60          # zod default: 60
+  #   refreshTokenExpiresInSeconds: 2592000    # zod default: 2592000 (30 days)
+  # Or set env vars directly:
+  #   AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS=60
+  #   AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS=2592000
   # hmacSecret is loaded from a secret, see server.envVars
 
   # Note: The following secrets must be provided via server.envVars:
