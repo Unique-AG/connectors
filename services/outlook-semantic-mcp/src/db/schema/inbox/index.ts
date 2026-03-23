@@ -1,1 +1,1 @@
-export * from './inbox-configuration.table';
+export * from './inbox-configurations.table';
