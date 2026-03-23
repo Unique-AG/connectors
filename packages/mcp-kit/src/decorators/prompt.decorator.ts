@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { toKebabCase } from 'remeda';
 import { MCP_PROMPT_METADATA } from '../constants';
 import type { McpIcon } from '../types';
 
@@ -26,7 +27,7 @@ export interface PromptMetadata {
 export function Prompt(options: PromptOptions): MethodDecorator {
   return (target, propertyKey, descriptor) => {
     const methodName = String(propertyKey);
-    const name = options.name ?? camelToKebabCase(methodName);
+    const name = options.name ?? toKebabCase(methodName);
 
     let parameters: z.ZodObject<z.ZodRawShape> | undefined;
     if (options.parameters) {
@@ -52,9 +53,3 @@ export function Prompt(options: PromptOptions): MethodDecorator {
   };
 }
 
-function camelToKebabCase(str: string): string {
-  return str
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
-    .replace(/([a-z\d])([A-Z])/g, '$1-$2')
-    .toLowerCase();
-}

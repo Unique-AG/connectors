@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import { toSnakeCase } from 'remeda';
 import { MCP_TOOL_METADATA } from '../constants';
 import type { McpIcon } from '../types';
 
@@ -35,7 +36,7 @@ export interface ToolMetadata {
 export function Tool(options: ToolOptions): MethodDecorator {
   return (target, propertyKey, descriptor) => {
     const methodName = String(propertyKey);
-    const name = options.name ?? camelToSnakeCase(methodName);
+    const name = options.name ?? toSnakeCase(methodName);
 
     let parameters: z.ZodObject<z.ZodRawShape>;
     if (!options.parameters) {
@@ -70,9 +71,3 @@ export function Tool(options: ToolOptions): MethodDecorator {
   };
 }
 
-function camelToSnakeCase(str: string): string {
-  return str
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
-    .replace(/([a-z\d])([A-Z])/g, '$1_$2')
-    .toLowerCase();
-}
