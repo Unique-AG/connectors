@@ -1,4 +1,4 @@
-import { range } from 'remeda';
+import { filter, map, pipe, range } from 'remeda';
 import { MCP_CTX_PARAM_INDEX, MCP_EXCLUDED_PARAMS } from '../constants';
 import type { ExcludedParamEntry } from '../decorators/mcp-exclude.decorator';
 
@@ -29,13 +29,11 @@ export function scanMethodParams(
   const paramTypes: unknown[] =
     (Reflect.getMetadata(PARAMTYPES_METADATA, target, methodName) as unknown[] | undefined) ?? [];
 
-  const injectExcluded: ExcludedParamEntry[] = selfDeclaredDeps
-    .filter(
-      (dep) =>
-        dep.index < paramTypes.length &&
-        !mcpExcludedParams.some((e) => e.index === dep.index),
-    )
-    .map((dep) => ({ index: dep.index, reason: 'inject' as const }));
+  const injectExcluded: ExcludedParamEntry[] = pipe(
+    selfDeclaredDeps,
+    filter((dep) => dep.index < paramTypes.length && !mcpExcludedParams.some((e) => e.index === dep.index)),
+    map((dep) => ({ index: dep.index, reason: 'inject' as const })),
+  );
 
   const allExcluded = [...mcpExcludedParams, ...injectExcluded];
 
@@ -50,9 +48,9 @@ export function getMcpInputParamIndices(
   ctxParamIndex: number | undefined,
   excludedParams: ExcludedParamEntry[],
 ): number[] {
-  const excluded = new Set<number>(excludedParams.map((e) => e.index));
-  if (ctxParamIndex !== undefined) {
-    excluded.add(ctxParamIndex);
-  }
-  return range(0, paramCount).filter((i) => !excluded.has(i));
+  const excludedIndices = new Set([
+    ...map(excludedParams, (e) => e.index),
+    ...(ctxParamIndex !== undefined ? [ctxParamIndex] : []),
+  ]);
+  return filter(range(0, paramCount), (i) => !excludedIndices.has(i));
 }

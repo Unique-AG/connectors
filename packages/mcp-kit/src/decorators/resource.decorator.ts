@@ -1,3 +1,4 @@
+import { flatMap, map, pipe } from 'remeda';
 import { MCP_RESOURCE_METADATA } from '../constants';
 import type { McpIcon } from '../types';
 import { invariant } from '../errors/defect.js';
@@ -63,15 +64,16 @@ export function Resource(options: ResourceOptions): MethodDecorator {
 }
 
 function parseUriTemplate(uri: string): { templateParams: string[]; queryParams: string[] } {
-  const queryParams = [...uri.matchAll(/\{\?([^}]+)\}/g)].flatMap((m) =>
-    m[1].split(',').map((p) => p.trim()),
+  const queryParams = pipe(
+    [...uri.matchAll(/\{\?([^}]+)\}/g)],
+    flatMap((m) => pipe(m[1].split(','), map((p) => p.trim()))),
   );
 
   const uriWithoutQuery = uri.replace(/\{\?[^}]+\}/g, '');
 
   const templateParams = [
-    ...[...uriWithoutQuery.matchAll(/\{(\w+)\*\}/g)].map((m) => `${m[1]}*`),
-    ...[...uriWithoutQuery.matchAll(/\{(\w+)\}/g)].map((m) => m[1]),
+    ...pipe([...uriWithoutQuery.matchAll(/\{(\w+)\*\}/g)], map((m) => `${m[1]}*`)),
+    ...pipe([...uriWithoutQuery.matchAll(/\{(\w+)\}/g)], map((m) => m[1])),
   ];
 
   return { templateParams, queryParams };

@@ -1,6 +1,7 @@
 import { Injectable, type NestInterceptor, type ExecutionContext, type CallHandler } from '@nestjs/common';
 import { type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { isBoolean, isNullish, isNumber, isObjectType, isString } from 'remeda';
 import { z } from 'zod';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { AudioContent, EmbeddedResource, ImageContent, ResourceLink, TextContent } from '@modelcontextprotocol/sdk/types.js';
@@ -15,8 +16,7 @@ export interface ToolWireResult {
 
 function isPreFormatted(value: unknown): value is ToolWireResult {
   return (
-    value !== null &&
-    typeof value === 'object' &&
+    isObjectType(value) &&
     'content' in value &&
     Array.isArray((value as { content: unknown }).content)
   );
@@ -49,19 +49,19 @@ export class McpSerializationInterceptor implements NestInterceptor<unknown, Too
       return value;
     }
 
-    if (value === null || value === undefined) {
+    if (isNullish(value)) {
       return { content: [{ type: 'text', text: '' }] };
     }
 
-    if (typeof value === 'string') {
+    if (isString(value)) {
       return { content: [{ type: 'text', text: value }] };
     }
 
-    if (typeof value === 'number' || typeof value === 'boolean') {
+    if (isNumber(value) || isBoolean(value)) {
       return { content: [{ type: 'text', text: String(value) }] };
     }
 
-    if (typeof value === 'object' && this.outputSchema) {
+    if (isObjectType(value) && this.outputSchema) {
       const result = this.outputSchema.safeParse(value);
       if (!result.success) {
         throw new McpError(
