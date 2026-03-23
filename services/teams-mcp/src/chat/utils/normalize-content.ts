@@ -40,8 +40,8 @@ export function normalizeContent(
   result = result.replace(/<\/li>/gi, '\n');
   result = result.replace(/<li[^>]*>/gi, '- ');
 
-  // Mentions: <at id="0">Alice</at> → @Alice
-  result = result.replace(/<at[^>]*>(.*?)<\/at>/gi, '@$1');
+  // Mentions: <at id="0">Alice</at> → @Alice (inner text sanitized before substitution)
+  result = result.replace(/<at[^>]*>(.*?)<\/at>/gi, (_, name: string) => `@${striptags(name)}`);
 
   // Attachments: <attachment id="uuid"/> → [attachment: name] or [attachment]
   result = result.replace(/<attachment[^>]*\bid="([^"]+)"[^>]*\/?>/gi, (_, id) => {
