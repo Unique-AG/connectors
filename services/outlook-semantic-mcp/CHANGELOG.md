@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.15](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.14...outlook-semantic-mcp@0.2.15) (2026-03-23)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,unique-api:** change expected attachment uri ([#392](https://github.com/Unique-AG/connectors/issues/392)) ([83a8db7](https://github.com/Unique-AG/connectors/commit/83a8db78c857bb351c76bd9b1348f304a2c43667))
+
 ## [0.2.14](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.13...outlook-semantic-mcp@0.2.14) (2026-03-20)
 
 
