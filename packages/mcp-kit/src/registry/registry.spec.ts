@@ -29,27 +29,6 @@ describe('matchUriTemplate', () => {
     expect(result).toEqual({ path: 'a/b/c.txt' });
   });
 
-  it('extracts query params', () => {
-    const result = matchUriTemplate(
-      'data://{id}{?format,limit}',
-      'data://123?format=json&limit=10',
-    );
-    expect(result).toEqual({ id: '123', format: 'json', limit: '10' });
-  });
-
-  it('handles omitted optional query params', () => {
-    const result = matchUriTemplate('data://{id}{?format}', 'data://123');
-    expect(result).toEqual({ id: '123' });
-  });
-
-  it('handles partially supplied query params', () => {
-    const result = matchUriTemplate(
-      'data://{id}{?format,limit}',
-      'data://456?limit=5',
-    );
-    expect(result).toEqual({ id: '456', limit: '5' });
-  });
-
   it('does not match when a required path segment is missing', () => {
     const result = matchUriTemplate('users://{id}', 'users://');
     expect(result).toBeUndefined();

@@ -163,7 +163,6 @@ describe('@Resource()', () => {
     );
     expect(metadata.kind).toBe('static');
     expect(metadata.templateParams).toHaveLength(0);
-    expect(metadata.queryParams).toHaveLength(0);
   });
 
   it('URI with {user_id} produces kind template with templateParams', () => {
@@ -192,22 +191,9 @@ describe('@Resource()', () => {
     expect(metadata.templateParams).toContain('path');
   });
 
-  it('URI with {?format,limit} produces queryParams', () => {
+  it('mixed URI parses templateParams correctly', () => {
     class TestService {
-      @Resource({ uri: 'search://results{?format,limit}' })
-      getResults() {}
-    }
-    const metadata: ResourceMetadata = Reflect.getMetadata(
-      MCP_RESOURCE_METADATA,
-      TestService.prototype.getResults,
-    );
-    expect(metadata.kind).toBe('template');
-    expect(metadata.queryParams).toEqual(['format', 'limit']);
-  });
-
-  it('mixed URI parses templateParams and queryParams correctly', () => {
-    class TestService {
-      @Resource({ uri: 'repo://{owner}/{repo}/files/{+path}{?ref,format}' })
+      @Resource({ uri: 'repo://{owner}/{repo}/files/{+path}' })
       getRepoFile() {}
     }
     const metadata: ResourceMetadata = Reflect.getMetadata(
@@ -218,7 +204,6 @@ describe('@Resource()', () => {
     expect(metadata.templateParams).toContain('path');
     expect(metadata.templateParams).toContain('owner');
     expect(metadata.templateParams).toContain('repo');
-    expect(metadata.queryParams).toEqual(['ref', 'format']);
   });
 
   it('name defaults to method name with camelCase preserved', () => {
