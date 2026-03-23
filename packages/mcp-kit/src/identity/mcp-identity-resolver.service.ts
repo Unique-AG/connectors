@@ -1,6 +1,5 @@
 import { Inject, Injectable, Scope } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
-import type { Request } from 'express';
 import { filter, isTruthy } from 'remeda';
 import type { McpIdentity } from './mcp-identity.interface';
 
@@ -18,14 +17,20 @@ interface TokenValidationResult {
   };
 }
 
+// Narrow interface for the parts of the request we actually use.
+// Avoids importing all of express.Request and casting .user.
+interface McpRequest {
+  user?: TokenValidationResult;
+}
+
 @Injectable({ scope: Scope.REQUEST })
 export class McpIdentityResolver {
-  public constructor(@Inject(REQUEST) private readonly request: Request) {}
+  public constructor(@Inject(REQUEST) private readonly request: McpRequest) {}
 
   public resolve(): McpIdentity | null {
-    const user = this.request.user as TokenValidationResult | undefined;
+    const user = this.request.user;  // now typed as TokenValidationResult | undefined — no cast!
 
-    if (!user) {
+    if (user === undefined) {
       return null;
     }
 

@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner } from '@nestjs/core';
-import { filter, isFunction, isObjectType, isString, pipe } from 'remeda';
+import { filter, isFunction, isObjectType, pipe } from 'remeda';
 import { MCP_PROMPT_METADATA, MCP_RESOURCE_METADATA, MCP_TOOL_METADATA } from '../constants';
 import { invariant } from '../errors/defect.js';
 import type { PromptMetadata } from '../decorators/prompt.decorator';
@@ -9,16 +9,33 @@ import type { ToolMetadata } from '../decorators/tool.decorator';
 import { scanMethodParams } from './param-scanner';
 import { matchUriTemplate } from './uri-template-matcher';
 
-export interface RegistryEntry {
-  type: 'tool' | 'resource' | 'prompt';
-  name: string;
-  metadata: ToolMetadata | ResourceMetadata | PromptMetadata;
+interface BaseRegistryEntry {
   // biome-ignore lint/suspicious/noExplicitAny: NestJS class constructor reference
   classRef: new (...args: any[]) => unknown;
   instance: object;
   methodName: string;
   ctxParamIndex: number | undefined;
 }
+
+export interface ToolRegistryEntry extends BaseRegistryEntry {
+  type: 'tool';
+  name: string;
+  metadata: ToolMetadata;
+}
+
+export interface ResourceRegistryEntry extends BaseRegistryEntry {
+  type: 'resource';
+  name: string;
+  metadata: ResourceMetadata;
+}
+
+export interface PromptRegistryEntry extends BaseRegistryEntry {
+  type: 'prompt';
+  name: string;
+  metadata: PromptMetadata;
+}
+
+export type RegistryEntry = ToolRegistryEntry | ResourceRegistryEntry | PromptRegistryEntry;
 
 @Injectable()
 export class McpHandlerRegistry implements OnApplicationBootstrap {
@@ -30,11 +47,8 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
     private readonly metadataScanner: MetadataScanner,
   ) {}
 
-  private getTypeName(metatype: unknown): string {
-    if (isObjectType(metatype) && isString((metatype as { name?: unknown }).name)) {
-      return (metatype as { name: string }).name;
-    }
-    return 'unknown';
+  private getTypeName(metatype: Function | undefined): string {
+    return metatype !== undefined ? metatype.name : 'unknown';
   }
 
   public onApplicationBootstrap(): void {
@@ -71,8 +85,7 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
     methodName: string,
     // biome-ignore lint/suspicious/noExplicitAny: method reference from prototype scan
     methodRef: (...args: any[]) => unknown,
-    // biome-ignore lint/suspicious/noExplicitAny: NestJS metatype
-    metatype: any,
+    metatype: Function | undefined,
   ): void {
     const metadata: ToolMetadata | undefined = Reflect.getMetadata(MCP_TOOL_METADATA, methodRef);
     if (!metadata) return;
@@ -92,7 +105,7 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
       type: 'tool',
       name: metadata.name,
       metadata,
-      classRef: metatype,
+      classRef: metatype as new (...args: any[]) => unknown,
       instance,
       methodName,
       ctxParamIndex,
@@ -105,8 +118,7 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
     methodName: string,
     // biome-ignore lint/suspicious/noExplicitAny: method reference from prototype scan
     methodRef: (...args: any[]) => unknown,
-    // biome-ignore lint/suspicious/noExplicitAny: NestJS metatype
-    metatype: any,
+    metatype: Function | undefined,
   ): void {
     const metadata: ResourceMetadata | undefined = Reflect.getMetadata(MCP_RESOURCE_METADATA, methodRef);
     if (!metadata) return;
@@ -126,7 +138,7 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
       type: 'resource',
       name: metadata.name,
       metadata,
-      classRef: metatype,
+      classRef: metatype as new (...args: any[]) => unknown,
       instance,
       methodName,
       ctxParamIndex,
@@ -139,8 +151,7 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
     methodName: string,
     // biome-ignore lint/suspicious/noExplicitAny: method reference from prototype scan
     methodRef: (...args: any[]) => unknown,
-    // biome-ignore lint/suspicious/noExplicitAny: NestJS metatype
-    metatype: any,
+    metatype: Function | undefined,
   ): void {
     const metadata: PromptMetadata | undefined = Reflect.getMetadata(MCP_PROMPT_METADATA, methodRef);
     if (!metadata) return;
@@ -160,43 +171,43 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
       type: 'prompt',
       name: metadata.name,
       metadata,
-      classRef: metatype,
+      classRef: metatype as new (...args: any[]) => unknown,
       instance,
       methodName,
       ctxParamIndex,
     });
   }
 
-  public getTools(): RegistryEntry[] {
-    return pipe(Array.from(this.entries.values()), filter((e) => e.type === 'tool'));
+  public getTools(): ToolRegistryEntry[] {
+    return pipe(Array.from(this.entries.values()), filter((e): e is ToolRegistryEntry => e.type === 'tool'));
   }
 
-  public findTool(name: string): RegistryEntry | undefined {
-    return this.entries.get(`tool:${name}`);
+  public findTool(name: string): ToolRegistryEntry | undefined {
+    const entry = this.entries.get(`tool:${name}`);
+    return entry?.type === 'tool' ? entry : undefined;
   }
 
-  public getResources(): RegistryEntry[] {
-    return pipe(Array.from(this.entries.values()), filter((e) => e.type === 'resource'));
+  public getResources(): ResourceRegistryEntry[] {
+    return pipe(Array.from(this.entries.values()), filter((e): e is ResourceRegistryEntry => e.type === 'resource'));
   }
 
-  public getStaticResources(): RegistryEntry[] {
-    return pipe(this.getResources(), filter((e) => (e.metadata as ResourceMetadata).kind === 'static'));
+  public getStaticResources(): ResourceRegistryEntry[] {
+    return pipe(this.getResources(), filter((e) => e.metadata.kind === 'static'));
   }
 
-  public getTemplateResources(): RegistryEntry[] {
-    return pipe(this.getResources(), filter((e) => (e.metadata as ResourceMetadata).kind === 'template'));
+  public getTemplateResources(): ResourceRegistryEntry[] {
+    return pipe(this.getResources(), filter((e) => e.metadata.kind === 'template'));
   }
 
-  public findResourceByUri(uri: string): { entry: RegistryEntry; params: Record<string, string> } | undefined {
+  public findResourceByUri(uri: string): { entry: ResourceRegistryEntry; params: Record<string, string> } | undefined {
     const exactKey = `resource:${uri}`;
     const exact = this.entries.get(exactKey);
-    if (exact) {
+    if (exact?.type === 'resource') {
       return { entry: exact, params: {} };
     }
 
     for (const entry of this.getTemplateResources()) {
-      const metadata = entry.metadata as ResourceMetadata;
-      const params = matchUriTemplate(metadata.uri, uri, metadata.templateParams, metadata.queryParams);
+      const params = matchUriTemplate(entry.metadata.uri, uri, entry.metadata.templateParams, entry.metadata.queryParams);
       if (params !== undefined) {
         return { entry, params };
       }
@@ -205,12 +216,13 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
     return undefined;
   }
 
-  public getPrompts(): RegistryEntry[] {
-    return pipe(Array.from(this.entries.values()), filter((e) => e.type === 'prompt'));
+  public getPrompts(): PromptRegistryEntry[] {
+    return pipe(Array.from(this.entries.values()), filter((e): e is PromptRegistryEntry => e.type === 'prompt'));
   }
 
-  public findPrompt(name: string): RegistryEntry | undefined {
-    return this.entries.get(`prompt:${name}`);
+  public findPrompt(name: string): PromptRegistryEntry | undefined {
+    const entry = this.entries.get(`prompt:${name}`);
+    return entry?.type === 'prompt' ? entry : undefined;
   }
 
   public getAll(): RegistryEntry[] {

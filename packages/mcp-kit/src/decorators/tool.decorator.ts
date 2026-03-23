@@ -42,10 +42,10 @@ export function Tool(options: ToolOptions): MethodDecorator {
     let parameters: z.ZodObject<z.ZodRawShape>;
     if (!options.parameters) {
       parameters = z.object({});
-    } else if (options.parameters instanceof z.ZodType) {
-      parameters = options.parameters as z.ZodObject<z.ZodRawShape>;
+    } else if (options.parameters instanceof z.ZodObject) {
+      parameters = options.parameters;
     } else {
-      parameters = z.object(options.parameters as z.ZodRawShape);
+      parameters = z.object(options.parameters);
     }
 
     const annotations: ToolAnnotations = {

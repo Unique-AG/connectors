@@ -32,10 +32,10 @@ export function Prompt(options: PromptOptions): MethodDecorator {
 
     let parameters: z.ZodObject<z.ZodRawShape> | undefined;
     if (options.parameters) {
-      if (options.parameters instanceof z.ZodType) {
-        parameters = options.parameters as z.ZodObject<z.ZodRawShape>;
+      if (options.parameters instanceof z.ZodObject) {
+        parameters = options.parameters;
       } else {
-        parameters = z.object(options.parameters as z.ZodRawShape);
+        parameters = z.object(options.parameters);
       }
     }
 

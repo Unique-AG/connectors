@@ -28,7 +28,7 @@ export function formatToolResult(
   }
 
   if (isPreFormatted(value)) {
-    return value as ToolWireResult;
+    return value;
   }
 
   if (value === null || value === undefined) {
@@ -51,21 +51,20 @@ export function formatToolResult(
         `Tool output does not match declared output schema: ${result.error.message}`,
       );
     }
-    const json = JSON.stringify(value, null, 2);
     return {
-      content: [{ type: 'text', text: json }],
-      structuredContent: value as Record<string, unknown>,
+      content: [{ type: 'text', text: JSON.stringify(result.data, null, 2) }],
+      structuredContent: result.data,
     };
   }
 
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
 }
 
-function isPreFormatted(value: unknown): boolean {
+function isPreFormatted(value: unknown): value is ToolWireResult {
   return (
     value !== null &&
     typeof value === 'object' &&
     'content' in value &&
-    Array.isArray((value as Record<string, unknown>).content)
+    Array.isArray((value as { content: unknown }).content)
   );
 }
