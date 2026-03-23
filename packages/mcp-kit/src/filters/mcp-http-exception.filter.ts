@@ -1,5 +1,6 @@
 import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, Logger } from '@nestjs/common';
 import type { Response } from 'express';
+import { isError } from 'remeda';
 import { DefectError } from '../errors/defect.js';
 import { McpBaseError } from '../errors/base.js';
 import { UpstreamConnectionRequiredError } from '../errors/failures.js';
@@ -42,7 +43,7 @@ export class McpHttpExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    const stack = error instanceof Error ? error.stack : String(error);
+    const stack = isError(error) ? error.stack : String(error);
     this.logger.error('Unexpected error', stack);
     response.status(500).json({ code: -32603, message: 'Internal server error' });
   }

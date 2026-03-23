@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { DiscoveryService, MetadataScanner } from '@nestjs/core';
-import { filter, pipe } from 'remeda';
+import { filter, isFunction, isObjectType, pipe } from 'remeda';
 import { MCP_PROMPT_METADATA, MCP_RESOURCE_METADATA, MCP_TOOL_METADATA } from '../constants';
 import type { PromptMetadata } from '../decorators/prompt.decorator';
 import type { ResourceMetadata } from '../decorators/resource.decorator';
@@ -34,7 +34,7 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
 
     for (const wrapper of providers) {
       const { instance } = wrapper;
-      if (!instance || typeof instance !== 'object') continue;
+      if (!isObjectType(instance)) continue;
 
       const prototype = Object.getPrototypeOf(instance) as object;
 
@@ -43,7 +43,7 @@ export class McpHandlerRegistry implements OnApplicationBootstrap {
         prototype,
         (methodName: string) => {
           const methodRef = (instance as Record<string, unknown>)[methodName];
-          if (typeof methodRef !== 'function') return;
+          if (!isFunction(methodRef)) return;
 
           this.tryRegisterTool(instance as object, prototype, methodName, methodRef, wrapper.metatype);
           this.tryRegisterResource(instance as object, prototype, methodName, methodRef, wrapper.metatype);

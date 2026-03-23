@@ -1,4 +1,5 @@
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
+import { isError } from 'remeda';
 import { DefectError } from './defect.js';
 import { McpBaseError } from './base.js';
 import { UpstreamConnectionRequiredError } from './failures.js';
@@ -33,7 +34,7 @@ export function handleMcpToolError(error: unknown): McpToolErrorResponse {
     };
   }
 
-  console.error('[MCP] Unexpected error:', error instanceof Error ? error.stack : error);
+  console.error('[MCP] Unexpected error:', isError(error) ? error.stack : error);
   return {
     isError: true,
     content: [{ type: 'text', text: 'An unexpected error occurred.' }],
