@@ -21,7 +21,6 @@ import { parseAttachmentUri } from './parse-attachment-uri';
 export interface AddAttachmentsInput {
   draftId: string;
   attachments: { fileName: string; data: string }[];
-  fallbackChatId?: string;
 }
 
 export interface AddAttachmentsResult {
@@ -46,7 +45,7 @@ export class AddAttachmentsToDraftEmailCommand {
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
-    { draftId, attachments, fallbackChatId }: AddAttachmentsInput,
+    { draftId, attachments }: AddAttachmentsInput,
   ): Promise<AddAttachmentsResult> {
     const userProfileIdString = userProfileId.toString();
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
@@ -71,7 +70,6 @@ export class AddAttachmentsToDraftEmailCommand {
           userProfileId: userProfileIdString,
           client,
           draftId,
-          fallbackChatId,
           resolveUniqueIdentity,
         });
         if (processResult.status === 'failed') {
@@ -106,7 +104,6 @@ export class AddAttachmentsToDraftEmailCommand {
     client,
     draftId,
     data,
-    fallbackChatId,
     resolveUniqueIdentity,
     fileName,
   }: {
@@ -115,7 +112,6 @@ export class AddAttachmentsToDraftEmailCommand {
     data: string;
     resolveUniqueIdentity: IdentityResolver;
     draftId: string;
-    fallbackChatId: string | undefined;
     userProfileId: string;
   }): Promise<AttachmentUploadResult> {
     const parsed = parseAttachmentUri(data);
@@ -128,7 +124,6 @@ export class AddAttachmentsToDraftEmailCommand {
           draftId,
           fileInfo: {
             fileName,
-            chatId: parsed.chatId || fallbackChatId,
             contentId: parsed.contentId,
           },
           uniqueIdentity,
