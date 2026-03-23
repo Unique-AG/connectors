@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { toKebabCase } from 'remeda';
 import { MCP_PROMPT_METADATA } from '../constants';
-import type { McpIcon } from '../types';
+import type { Icon } from '@modelcontextprotocol/sdk/types.js';
 import { invariant } from '../errors/defect.js';
 
 /** Options passed to the `@Prompt()` decorator. */
@@ -14,7 +14,7 @@ export interface PromptOptions {
   description: string;
   /** Zod schema for the prompt's input arguments; accepts a `ZodObject` or a plain shape record. */
   parameters?: z.ZodObject<z.ZodRawShape> | Record<string, z.ZodType>;
-  icons?: McpIcon[];
+  icons?: Icon[];
   /** Arbitrary key/value metadata passed through to the registered prompt record. */
   meta?: Record<string, unknown>;
   version?: string | number;
@@ -29,7 +29,7 @@ export interface PromptMetadata {
   title?: string;
   description: string;
   parameters?: z.ZodObject<z.ZodRawShape>;
-  icons?: McpIcon[];
+  icons?: Icon[];
   meta?: Record<string, unknown>;
   version?: string | number;
   /** Name of the decorated class method, used to locate and invoke the handler at runtime. */

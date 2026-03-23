@@ -1,6 +1,6 @@
 import { flatMap, map, pipe } from 'remeda';
 import { MCP_RESOURCE_METADATA } from '../constants';
-import type { McpIcon } from '../types';
+import type { Icon } from '@modelcontextprotocol/sdk/types.js';
 import { invariant } from '../errors/defect.js';
 
 /** Options passed to the `@Resource()` decorator. */
@@ -16,7 +16,7 @@ export interface ResourceOptions {
   description?: string;
   /** MIME type of the content returned by the handler (e.g. `"application/json"`). */
   mimeType?: string;
-  icons?: McpIcon[];
+  icons?: Icon[];
   /** Arbitrary key/value metadata passed through to the registered resource record. */
   meta?: Record<string, unknown>;
   version?: string | number;
@@ -43,7 +43,7 @@ export interface ResourceMetadata {
   templateParams: string[];
   /** Query variable names extracted from `{?param,…}` segments of the URI template. */
   queryParams: string[];
-  icons?: McpIcon[];
+  icons?: Icon[];
   meta?: Record<string, unknown>;
   version?: string | number;
   annotations?: {

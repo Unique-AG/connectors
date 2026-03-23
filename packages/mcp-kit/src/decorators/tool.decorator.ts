@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
 import { toSnakeCase } from 'remeda';
 import { MCP_TOOL_METADATA } from '../constants';
-import type { McpIcon } from '../types';
+import type { Icon } from '@modelcontextprotocol/sdk/types.js';
 import { invariant } from '../errors/defect.js';
 
 /** Options passed to the `@Tool()` decorator. */
@@ -28,7 +28,7 @@ export interface ToolOptions {
    * Use for tools that return sensitive data such as credentials or PII.
    */
   mask?: boolean;
-  icons?: McpIcon[];
+  icons?: Icon[];
   version?: string | number;
 }
 
@@ -45,7 +45,7 @@ export interface ToolMetadata {
   outputSchema?: z.ZodObject<z.ZodRawShape>;
   annotations: ToolAnnotations;
   meta?: Record<string, unknown>;
-  icons?: McpIcon[];
+  icons?: Icon[];
   version?: string | number;
   timeout?: number;
   /** When `true`, tool outputs must be redacted in logs and traces. */
