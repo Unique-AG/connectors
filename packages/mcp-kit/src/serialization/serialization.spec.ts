@@ -42,6 +42,32 @@ describe('McpContent', () => {
     const result = McpContent.audio(buffer, 'audio/wav');
     expect(result.content[0].mimeType).toBe('audio/wav');
   });
+
+  it('.file encodes buffer to base64 with uri and mimeType', () => {
+    const buffer = Buffer.from('fake-data');
+    const result = McpContent.file('data://doc', buffer, 'application/pdf');
+    expect(result.content[0].type).toBe('resource');
+    expect(result.content[0].resource.uri).toBe('data://doc');
+    expect((result.content[0].resource as { blob: string }).blob).toBe(buffer.toString('base64'));
+    expect(result.content[0].resource.mimeType).toBe('application/pdf');
+  });
+
+  it('.resourceLink produces correct resource_link content', () => {
+    const result = McpContent.resourceLink('file://doc.pdf', 'My Doc', { title: 'My Title', mimeType: 'application/pdf' });
+    expect(result.content[0].type).toBe('resource_link');
+    expect(result.content[0].uri).toBe('file://doc.pdf');
+    expect(result.content[0].name).toBe('My Doc');
+    expect(result.content[0].title).toBe('My Title');
+    expect(result.content[0].mimeType).toBe('application/pdf');
+  });
+
+  it('.resourceLink works with uri and name only', () => {
+    const result = McpContent.resourceLink('https://example.com', 'Example');
+    expect(result.content[0].type).toBe('resource_link');
+    expect(result.content[0].uri).toBe('https://example.com');
+    expect(result.content[0].name).toBe('Example');
+    expect(result.content[0].title).toBeUndefined();
+  });
 });
 
 describe('ToolError', () => {

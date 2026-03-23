@@ -3,12 +3,11 @@ import { type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { z } from 'zod';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import type { ImageContent, TextContent } from '@modelcontextprotocol/sdk/types.js';
-import type { AudioContent } from '../serialization/mcp-content.js';
+import type { AudioContent, EmbeddedResource, ImageContent, ResourceLink, TextContent } from '@modelcontextprotocol/sdk/types.js';
 import { McpToolResult } from '../serialization/mcp-tool-result.js';
 
 export interface ToolWireResult {
-  content: Array<TextContent | ImageContent | AudioContent>;
+  content: Array<TextContent | ImageContent | AudioContent | ResourceLink | EmbeddedResource>;
   structuredContent?: Record<string, unknown>;
   isError?: boolean;
   _meta?: Record<string, unknown>;

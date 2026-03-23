@@ -1,19 +1,6 @@
-import type { ImageContent, TextContent } from '@modelcontextprotocol/sdk/types.js';
+import type { AudioContent, EmbeddedResource, ImageContent, ResourceLink, TextContent } from '@modelcontextprotocol/sdk/types.js';
 
-export interface AudioContent {
-  type: 'audio';
-  data: string;
-  mimeType: string;
-}
-
-export interface EmbeddedResourceContent {
-  type: 'resource';
-  resource: {
-    uri: string;
-    blob: string;
-    mimeType?: string;
-  };
-}
+export type { AudioContent, EmbeddedResource, ResourceLink };
 
 export class McpContent {
   public static text(text: string): { content: [TextContent] } {
@@ -29,15 +16,23 @@ export class McpContent {
     return { content: [{ type: 'audio', data: base64, mimeType }] };
   }
 
-  public static file(pathOrData: Buffer, mimeType?: string): { content: [EmbeddedResourceContent] } {
-    const blob = pathOrData.toString('base64');
-    return { content: [{ type: 'resource', resource: { uri: '', blob, mimeType } }] };
+  public static file(uri: string, data: Buffer, mimeType?: string): { content: [EmbeddedResource] } {
+    return {
+      content: [{ type: 'resource', resource: { uri, blob: data.toString('base64'), mimeType } }],
+    };
+  }
+
+  public static resourceLink(
+    uri: string,
+    name: string,
+    options?: { title?: string; description?: string; mimeType?: string },
+  ): { content: [ResourceLink] } {
+    return {
+      content: [{ type: 'resource_link', uri, name, ...options }],
+    };
   }
 
   public static error(msg: string): { content: [TextContent]; isError: true } {
     return { content: [{ type: 'text', text: msg }], isError: true };
   }
-
-  public static readonly Audio = McpContent.audio;
-  public static readonly File = McpContent.file;
 }
