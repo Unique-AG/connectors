@@ -3,30 +3,18 @@ import { type Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { isBoolean, isNullish, isNumber, isObjectType, isString } from 'remeda';
 import { z } from 'zod';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { McpToolResult } from '../serialization/mcp-tool-result.js';
-
-/**
- * Returns `true` when `value` is already in `CallToolResult` shape (has a `content` array),
- * allowing pre-formatted responses to pass through without re-serialization.
- */
-function isPreFormatted(value: unknown): value is CallToolResult {
-  return (
-    isObjectType(value) &&
-    'content' in value &&
-    Array.isArray((value as { content: unknown }).content)
-  );
-}
 
 /**
  * NestJS interceptor that converts tool handler return values into the `CallToolResult`
  * shape expected by the MCP protocol layer.
  *
- * Handles `McpToolResult` instances, pre-formatted wire results, primitives (string,
- * number, boolean, null), and plain objects. Plain objects are JSON-serialized into a
- * text content item; when `outputSchema` is provided they are also validated and included
- * as `structuredContent`.
+ * Handles `McpToolResult` instances, values already matching `CallToolResult` (passed
+ * through after schema validation), primitives (string, number, boolean, null), and plain
+ * objects. Plain objects are JSON-serialized into a text content item; when `outputSchema`
+ * is provided they are also validated and included as `structuredContent`.
  */
 @Injectable()
 export class McpSerializationInterceptor implements NestInterceptor<unknown, CallToolResult> {
@@ -56,8 +44,11 @@ export class McpSerializationInterceptor implements NestInterceptor<unknown, Cal
       return result;
     }
 
-    if (isPreFormatted(value)) {
-      return value;
+    if (isObjectType(value) && 'content' in value) {
+      const preFormatted = CallToolResultSchema.safeParse(value);
+      if (preFormatted.success) {
+        return preFormatted.data;
+      }
     }
 
     if (isNullish(value)) {

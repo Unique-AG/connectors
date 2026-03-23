@@ -1,31 +1,42 @@
 import { Inject, Injectable, Scope } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { filter, isTruthy } from 'remeda';
-import type { McpIdentity } from './mcp-identity.interface';
+import { z } from 'zod';
+import type { McpIdentity } from './mcp-identity.interface.js';
 
-/**
- * Provisional shape of the validated token payload attached to the request as `req.user`.
- * Refined in AUTH-002.
- */
-interface TokenValidationResult {
-  sub?: string;
-  userId?: string;
-  clientId?: string;
-  scope?: string;
-  resource?: string;
-  userProfileId?: string;
-  userData?: {
-    email?: string;
-    displayName?: string;
-  };
-}
+const TokenSchema = z
+  .object({
+    sub: z.string().optional(),
+    userId: z.string().optional(),
+    clientId: z.string().optional(),
+    scope: z.string().optional(),
+    resource: z.string().optional(),
+    userProfileId: z.string().optional(),
+    userData: z
+      .object({
+        email: z.string().optional(),
+        displayName: z.string().optional(),
+      })
+      .optional(),
+  })
+  .passthrough()
+  .transform((token): McpIdentity => ({
+    userId: token.userId ?? token.sub ?? '',
+    profileId: token.userProfileId ?? '',
+    clientId: token.clientId ?? '',
+    scopes: filter((token.scope ?? '').split(' '), isTruthy),
+    resource: token.resource ?? '',
+    email: token.userData?.email,
+    displayName: token.userData?.displayName,
+    raw: token,
+  }));
 
 /**
  * Narrow interface covering only the request fields this service reads.
  * Avoids importing the full `express.Request` type and casting `req.user`.
  */
 interface McpRequest {
-  user?: TokenValidationResult;
+  user?: unknown;
 }
 
 /**
@@ -38,21 +49,12 @@ export class McpIdentityResolver {
 
   /** Maps `request.user` to a `McpIdentity`, or returns `null` if unauthenticated. */
   public resolve(): McpIdentity | null {
-    const user = this.request.user;  // now typed as TokenValidationResult | undefined — no cast!
-
+    const user = this.request.user;
     if (user === undefined) {
       return null;
     }
-
-    return {
-      userId: user.userId ?? user.sub ?? '',
-      profileId: user.userProfileId ?? '',
-      clientId: user.clientId ?? '',
-      scopes: filter((user.scope ?? '').split(' '), isTruthy),
-      resource: user.resource ?? '',
-      email: user.userData?.email,
-      displayName: user.userData?.displayName,
-      raw: user,
-    };
+    const result = TokenSchema.safeParse(user);
+    if (!result.success) return null;
+    return { ...result.data, raw: user };
   }
 }
