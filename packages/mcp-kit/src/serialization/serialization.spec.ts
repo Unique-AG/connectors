@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { of, lastValueFrom } from 'rxjs';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { CallHandler, ExecutionContext } from '@nestjs/common';
 import { McpContent } from './mcp-content';
 import { McpToolResult } from './mcp-tool-result';
 import { ToolError, ResourceError, PromptError } from './tool-errors';
 import { formatToolResult } from './format-tool-result';
+import { McpZodValidationPipe } from '../pipes/mcp-zod-validation.pipe';
+import { McpSerializationInterceptor } from '../interceptors/mcp-serialization.interceptor';
+import { McpValidationError } from '../errors/failures';
 
 describe('formatToolResult', () => {
   it('converts string return to text content', () => {
@@ -162,5 +167,54 @@ describe('PromptError', () => {
 
   it('is an instance of Error', () => {
     expect(new PromptError('x')).toBeInstanceOf(Error);
+  });
+});
+
+describe('McpZodValidationPipe', () => {
+  it('passes valid input through', () => {
+    const schema = z.object({ name: z.string() });
+    const pipe = new McpZodValidationPipe(schema);
+    expect(pipe.transform({ name: 'Alice' })).toEqual({ name: 'Alice' });
+  });
+
+  it('throws McpValidationError for invalid input', () => {
+    const schema = z.object({ name: z.string() });
+    const pipe = new McpZodValidationPipe(schema);
+    expect(() => pipe.transform({ name: 123 })).toThrow(McpValidationError);
+  });
+
+  it('strips unknown fields (Zod default behavior)', () => {
+    const schema = z.object({ name: z.string() });
+    const pipe = new McpZodValidationPipe(schema);
+    const result = pipe.transform({ name: 'Bob', extra: 'ignored' });
+    expect(result).toEqual({ name: 'Bob' });
+  });
+});
+
+describe('McpSerializationInterceptor', () => {
+  const mockContext = {} as ExecutionContext;
+
+  function makeCallHandler(value: unknown): CallHandler {
+    return { handle: () => of(value) };
+  }
+
+  it('formats string return value', async () => {
+    const interceptor = new McpSerializationInterceptor();
+    const result = await lastValueFrom(interceptor.intercept(mockContext, makeCallHandler('hello')));
+    expect(result).toEqual({ content: [{ type: 'text', text: 'hello' }] });
+  });
+
+  it('formats McpToolResult', async () => {
+    const interceptor = new McpSerializationInterceptor();
+    const toolResult = new McpToolResult({ content: [{ type: 'text', text: 'ok' }] });
+    const result = await lastValueFrom(interceptor.intercept(mockContext, makeCallHandler(toolResult)));
+    expect(result?.content).toEqual([{ type: 'text', text: 'ok' }]);
+  });
+
+  it('validates output against schema when provided', async () => {
+    const schema = z.object({ name: z.string() });
+    const interceptor = new McpSerializationInterceptor(schema);
+    const result = await lastValueFrom(interceptor.intercept(mockContext, makeCallHandler({ name: 'Alice' })));
+    expect(result?.structuredContent).toEqual({ name: 'Alice' });
   });
 });

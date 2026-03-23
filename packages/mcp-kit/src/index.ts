@@ -10,3 +10,5 @@ export * from './serialization';
 export * from './identity';
 export * from './registry';
 export * from './mcp.module';
+export * from './pipes';
+export * from './interceptors';

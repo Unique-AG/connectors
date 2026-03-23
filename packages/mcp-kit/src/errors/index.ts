@@ -9,4 +9,3 @@ export {
   UpstreamConnectionRequiredError,
   UpstreamConnectionLostError,
 } from './failures.js';
-export { type McpToolErrorResponse, handleMcpToolError } from './mcp-exception-handler.js';
