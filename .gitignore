@@ -52,7 +52,9 @@ lerna-debug.log*
 .vscode/
 .idea/
 .cursor/
+# We do not use .zed/ because we want to ignore symlinks
 .zed
+# We do not use .claude/ because we want to ignore symlinks
 .claude
 *.code-workspace
 
