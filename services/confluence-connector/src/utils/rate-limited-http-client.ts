@@ -12,6 +12,7 @@ const API_PATH_START = /\/(rest\/api|api\/v2)\//;
  * Extracts a short, normalized endpoint from a full Confluence URL.
  * Keeps only the path starting from `/rest/api/` or `/api/v2/`, strips query params,
  * and replaces numeric/UUID segments with `{id}`.
+ * With this we try to reduce entropy for metrics
  *
  * `/ex/confluence/{uuid}/wiki/rest/api/content/12345` → `/rest/api/content/{id}`
  * `/rest/api/content/search?cql=...` → `/rest/api/content/search`

@@ -146,7 +146,7 @@ export class ConfluenceSynchronizationService {
       this.metrics.pagesProcessed.add(failed, { tenant: tenant.name, result: 'failure' });
     }
 
-    this.logSettledResults(results, failed, 'Page ingestion summary');
+    this.logger.log({ total: pages.length, ingested, failed, msg: 'Page ingestion summary' });
   }
 
   private async ingestAttachments(
@@ -188,15 +188,11 @@ export class ConfluenceSynchronizationService {
       this.metrics.attachmentsProcessed.add(failed, { tenant: tenant.name, result: 'failure' });
     }
 
-    this.logSettledResults(results, failed, 'Attachment ingestion summary');
-  }
-
-  private logSettledResults(
-    results: PromiseSettledResult<void>[],
-    failed: number,
-    msg: string,
-  ): void {
-    const succeeded = results.length - failed;
-    this.logger.log({ total: results.length, succeeded, failed, msg });
+    this.logger.log({
+      total: attachments.length,
+      ingested,
+      failed,
+      msg: 'Attachment ingestion summary',
+    });
   }
 }
