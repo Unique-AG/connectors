@@ -41,6 +41,7 @@ const SCOPES = [
   'email',
   'offline_access',
   'User.Read',
+  'Calendars.Read',
   'OnlineMeetings.Read',
   'OnlineMeetingRecording.Read.All',
   'OnlineMeetingTranscript.Read.All',
