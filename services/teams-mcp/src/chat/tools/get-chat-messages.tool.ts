@@ -114,7 +114,7 @@ export class GetChatMessagesTool {
 
     const filtered = input.includeSystemMessages
       ? messages
-      : messages.filter((m) => m.senderDisplayName !== undefined);
+      : messages.filter((m) => m.messageType === 'message');
 
     return {
       chatId: chat.id,
