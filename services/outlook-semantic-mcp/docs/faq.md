@@ -136,8 +136,8 @@ To rotate: update the `MICROSOFT_WEBHOOK_SECRET` environment variable, then have
 | Filter | Effect |
 |--------|--------|
 | `ignoredBefore` | Skips emails created before this ISO 8601 date |
-| `ignoredSenders` | Skips emails whose sender matches any RegExp pattern |
-| `ignoredContents` | Skips emails whose subject or body matches any RegExp pattern |
+| `ignoredSenders` | Skips emails whose sender matches any RegExp pattern. Values must use `/pattern/flags` format (e.g. `/^noreply@/i`). |
+| `ignoredContents` | Skips emails whose subject or body matches any RegExp pattern. Values must use `/pattern/flags` format (e.g. `/unsubscribe/i`). |
 
 When the filters are updated and the service is redeployed, all user inbox configurations are updated. The next full sync uses the new filters. Previously ingested emails that would now be filtered are not automatically removed.
 
@@ -309,10 +309,10 @@ The Unique knowledge base organizes each user's emails into a dedicated root sco
 
 **Via the Unique platform (platform layer):** Email content stored in the Unique knowledge base is subject to Unique's own access control model. This includes:
 
-- Unique platform administrators, depending on their organization's access control configuration
 - The MCP server's service account, which has write access to the ingestion and scope management APIs used during sync
+- Unique platform administrators with API access — email scopes are not surfaced in the Unique Knowledge Base UI, but can be enumerated via the Unique API (e.g. `scopesByCompany`) or accessed directly via the database.
 
-Organizations with strict email privacy requirements should review Unique platform access control policies alongside this documentation.
+Organizations with strict email privacy requirements should control who has API and database access to the Unique platform.
 
 **See also:** [Knowledge Base Data Isolation](./technical/security.md#knowledge-base-data-isolation)
 

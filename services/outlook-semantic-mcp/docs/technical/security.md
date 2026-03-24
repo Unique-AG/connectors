@@ -1,5 +1,6 @@
-<!-- confluence-page-id:  -->
-<!-- confluence-space-key: PUBDOC -->
+
+
+
 
 # Security
 
@@ -11,14 +12,16 @@ This document describes the security architecture, cryptographic decisions, and 
 
 The Outlook Semantic MCP Server stores **no email content** in its own database. It acts as a secure pass-through: emails are fetched from Microsoft Graph into memory and uploaded directly to the Unique knowledge base. Nothing from the email body, subject, or attachments is written to the MCP server's PostgreSQL database.
 
-| Data | Stored In | Protection | Contains Email Content? |
-|------|-----------|------------|------------------------|
-| Microsoft OAuth tokens (access + refresh) | PostgreSQL `user_profiles` | AES-256-GCM encrypted | No |
-| MCP bearer tokens | PostgreSQL `tokens` | Opaque 512-bit random values | No |
-| Sync state and progress counters | PostgreSQL `inbox_configurations` | Plaintext metadata | No |
-| Outlook folder structure (names + IDs) | PostgreSQL `directories` | Plaintext metadata | No |
-| Microsoft Graph subscription IDs | PostgreSQL `subscriptions` | Plaintext metadata | No |
-| Email subject, body, sender, recipients | Unique Knowledge Base | Indexed for semantic search | **Yes** |
+
+| Data                                      | Stored In                         | Protection                   | Contains Email Content? |
+| ----------------------------------------- | --------------------------------- | ---------------------------- | ----------------------- |
+| Microsoft OAuth tokens (access + refresh) | PostgreSQL `user_profiles`        | AES-256-GCM encrypted        | No                      |
+| MCP bearer tokens                         | PostgreSQL `tokens`               | Opaque 512-bit random values | No                      |
+| Sync state and progress counters          | PostgreSQL `inbox_configurations` | Plaintext metadata           | No                      |
+| Outlook folder structure (names + IDs)    | PostgreSQL `directories`          | Plaintext metadata           | No                      |
+| Microsoft Graph subscription IDs          | PostgreSQL `subscriptions`        | Plaintext metadata           | No                      |
+| Email subject, body, sender, recipients   | Unique Knowledge Base             | Indexed for semantic search  | **Yes**                 |
+
 
 ### Data Flow
 
@@ -58,6 +61,8 @@ flowchart TD
     MCPClient -->|"6  search_emails tool call\nauthenticated MCP request"| KB
 ```
 
+
+
 **Key data flow properties:**
 
 - Steps 1–2 (auth): only credentials and tokens are exchanged — no email content involved
@@ -66,11 +71,13 @@ flowchart TD
 
 ### Data Removal
 
-| Action | What Is Removed |
-|--------|----------------|
+
+| Action                               | What Is Removed                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | User calls `remove_inbox_connection` | Microsoft Graph subscription, per-user root scopes in Unique KB, inbox configuration, folder sync data |
-| MCP tokens | Expire naturally (access: 60 seconds, refresh: 30 days); not automatically removed from KB |
-| Ingested email content | Remains in the Unique knowledge base until explicitly deleted via the Unique platform |
+| MCP tokens                           | Expire naturally (access: 60 seconds, refresh: 30 days); not automatically removed from KB             |
+| Ingested email content               | Remains in the Unique knowledge base until explicitly deleted via the Unique platform                  |
+
 
 There is no automatic expiry or purge of ingested email content. Operators who need to remove a user's data from the knowledge base must do so via the Unique platform after calling `remove_inbox_connection`.
 
@@ -88,14 +95,14 @@ Each connected user's emails are stored in a **dedicated root scope** within the
 
 Access to email data at the Unique platform layer is governed by Unique's own access control model, not by the MCP server. Relevant access principals are:
 
-| Principal | Access Level |
-|-----------|-------------|
-| Authenticated MCP user | Can search their own emails via `search_emails` tool |
-| MCP server service account | Write access to ingestion and scope management APIs (used during sync) |
-| Unique platform administrators | Subject to Unique platform access control policies |
-| Direct PostgreSQL access (MCP DB) | Encrypted tokens and sync state only — no email content |
+| Principal                         | Access Level                                                           |
+| --------------------------------- | ---------------------------------------------------------------------- |
+| Authenticated MCP user            | Can search their own emails via `search_emails` tool                   |
+| MCP server service account        | Write access to ingestion and scope management APIs (used during sync) |
+| Unique platform administrators    | Can access email scopes via the Unique API (e.g. `scopesByCompany`) — scopes are not surfaced in the Unique UI and require direct API or database access |
+| Direct PostgreSQL access (MCP DB) | Encrypted tokens and sync state only — no email content                |
 
-Organizations with strict email privacy requirements should review Unique platform access control policies in conjunction with this document.
+Email scopes created by the MCP server are not visible in the Unique Knowledge Base UI. Accessing them requires direct Unique API calls or database access. Organizations with strict email privacy requirements should control who has API and database access to the Unique platform.
 
 ## Security Layers
 
@@ -137,19 +144,23 @@ flowchart TB
     TokenRefresh --> Encryption
 ```
 
+
+
 ## Token Security
 
 ### Microsoft Tokens (Encrypted at Rest)
 
 Microsoft access and refresh tokens are stored encrypted using **AES-256-GCM**:
 
-| Aspect | Implementation |
-|--------|----------------|
-| Algorithm | AES-256-GCM (authenticated encryption) |
-| Key Size | 256 bits (32 bytes, provided as 64 hex characters) |
-| IV | Random 12 bytes generated per encryption operation |
+
+| Aspect        | Implementation                                         |
+| ------------- | ------------------------------------------------------ |
+| Algorithm     | AES-256-GCM (authenticated encryption)                 |
+| Key Size      | 256 bits (32 bytes, provided as 64 hex characters)     |
+| IV            | Random 12 bytes generated per encryption operation     |
 | Stored Format | `{iv}.{tag}.{data}` — all components base64url encoded |
-| Key Storage | `ENCRYPTION_KEY` environment variable |
+| Key Storage   | `ENCRYPTION_KEY` environment variable                  |
+
 
 **Why AES-GCM:**
 
@@ -168,21 +179,25 @@ Microsoft access and refresh tokens are stored encrypted using **AES-256-GCM**:
 
 MCP access and refresh tokens are cryptographically random opaque values:
 
-| Aspect | Implementation |
-|--------|----------------|
-| Generation | `randomBytes(64)` encoded as base64url (512-bit) |
-| Storage | Stored directly in `tokens` table with TTL-based expiration |
-| Validation | Cache-first lookup, then database check |
-| Security property | Unguessability (512-bit random) — not hashing |
+
+| Aspect            | Implementation                                              |
+| ----------------- | ----------------------------------------------------------- |
+| Generation        | `randomBytes(64)` encoded as base64url (512-bit)            |
+| Storage           | Stored directly in `tokens` table with TTL-based expiration |
+| Validation        | Cache-first lookup, then database check                     |
+| Security property | Unguessability (512-bit random) — not hashing               |
+
 
 **Token TTLs:**
 
-| Token Type | Default TTL | Configurable Via |
-|------------|-------------|------------------|
-| MCP Access Token | 60 seconds | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` |
-| MCP Refresh Token | 30 days | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` |
-| Microsoft Access Token | ~1 hour | Issued by Microsoft |
-| Microsoft Refresh Token | ~90 days | Issued by Microsoft |
+
+| Token Type              | Default TTL | Configurable Via                        |
+| ----------------------- | ----------- | --------------------------------------- |
+| MCP Access Token        | 60 seconds  | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS`  |
+| MCP Refresh Token       | 30 days     | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` |
+| Microsoft Access Token  | ~1 hour     | Issued by Microsoft                     |
+| Microsoft Refresh Token | ~90 days    | Issued by Microsoft                     |
+
 
 ### Session State Integrity (AUTH_HMAC_SECRET)
 
@@ -222,6 +237,8 @@ sequenceDiagram
     Server->>Client: MCP access token + refresh token
 ```
 
+
+
 **PKCE protection:**
 
 - Prevents authorization code interception attacks
@@ -231,12 +248,14 @@ sequenceDiagram
 
 **Token separation:**
 
-| Token | Stays On | Used For |
-|-------|----------|----------|
-| Microsoft access token | Server only | Graph API calls |
-| Microsoft refresh token | Server only | Renewing Graph access |
-| MCP access token | Client | Authenticating tool calls |
-| MCP refresh token | Client | Renewing MCP access |
+
+| Token                   | Stays On    | Used For                  |
+| ----------------------- | ----------- | ------------------------- |
+| Microsoft access token  | Server only | Graph API calls           |
+| Microsoft refresh token | Server only | Renewing Graph access     |
+| MCP access token        | Client      | Authenticating tool calls |
+| MCP refresh token       | Client      | Renewing MCP access       |
+
 
 ## Refresh Token Rotation
 
@@ -258,6 +277,8 @@ stateDiagram-v2
         User must re-authenticate
     end note
 ```
+
+
 
 **How family revocation works:**
 
@@ -293,6 +314,8 @@ sequenceDiagram
     end
 ```
 
+
+
 **Validation details:**
 
 - `MICROSOFT_WEBHOOK_SECRET` is a 128-character random string (`openssl rand -hex 64`)
@@ -304,25 +327,29 @@ sequenceDiagram
 
 The server applies IP-based rate limiting to all endpoints:
 
-| Scope | Limit | Purpose |
-|-------|-------|---------|
-| Global (all endpoints) | 10 requests / 60 seconds | General brute-force protection |
-| Authorization endpoint | 3 requests / 60 seconds | Tighter protection for auth initiation |
+
+| Scope                  | Limit                    | Purpose                                |
+| ---------------------- | ------------------------ | -------------------------------------- |
+| Global (all endpoints) | 10 requests / 60 seconds | General brute-force protection         |
+| Authorization endpoint | 3 requests / 60 seconds  | Tighter protection for auth initiation |
+
 
 ## Secret Management
 
 ### Required Secrets
 
-| Secret | Purpose | Format | Rotation Impact |
-|--------|---------|--------|-----------------|
-| `ENCRYPTION_KEY` | AES-256-GCM key for Microsoft tokens | 64-char hex | All users must reconnect |
-| `AUTH_HMAC_SECRET` | HMAC-SHA256 for OAuth session state | 64-char hex | All active sessions invalidated |
-| `MICROSOFT_CLIENT_SECRET` | Authenticate server with Entra ID | Azure-generated | Update + restart only |
-| `MICROSOFT_WEBHOOK_SECRET` | Validate Graph webhook payloads | 128-char hex | All subscriptions must be recreated |
+
+| Secret                     | Purpose                              | Format          | Rotation Impact                     |
+| -------------------------- | ------------------------------------ | --------------- | ----------------------------------- |
+| `ENCRYPTION_KEY`           | AES-256-GCM key for Microsoft tokens | 64-char hex     | All users must reconnect            |
+| `AUTH_HMAC_SECRET`         | HMAC-SHA256 for OAuth session state  | 64-char hex     | All active sessions invalidated     |
+| `MICROSOFT_CLIENT_SECRET`  | Authenticate server with Entra ID    | Azure-generated | Update + restart only               |
+| `MICROSOFT_WEBHOOK_SECRET` | Validate Graph webhook payloads      | 128-char hex    | All subscriptions must be recreated |
+
 
 ### Rotation Procedures
 
-**`ENCRYPTION_KEY` rotation:**
+`**ENCRYPTION_KEY` rotation:**
 
 There is no zero-downtime rotation — changing the key renders all stored Microsoft tokens unreadable.
 
@@ -331,21 +358,21 @@ There is no zero-downtime rotation — changing the key renders all stored Micro
 3. All users must reconnect — their stored tokens are no longer decryptable
 4. Notify users before rotating — treat this as a maintenance window
 
-**`AUTH_HMAC_SECRET` rotation:**
+`**AUTH_HMAC_SECRET` rotation:**
 
 1. Generate new secret: `openssl rand -hex 32`
 2. Update Kubernetes secret and redeploy
 3. All active MCP sessions are immediately invalidated
 4. MCP clients will re-authenticate automatically on their next request
 
-**`MICROSOFT_CLIENT_SECRET` rotation:**
+`**MICROSOFT_CLIENT_SECRET` rotation:**
 
 1. Create a new client secret in Microsoft Entra ID (keep the old one active during transition)
 2. Update the Kubernetes secret with the new value
 3. Restart pods
 4. Delete the old secret from Entra ID
 
-**`MICROSOFT_WEBHOOK_SECRET` rotation:**
+`**MICROSOFT_WEBHOOK_SECRET` rotation:**
 
 Rotating this secret requires recreating all active subscriptions, as existing ones hold the old `clientState`:
 
@@ -356,14 +383,14 @@ Rotating this secret requires recreating all active subscriptions, as existing o
 
 ## Security Checklist for Operators
 
-- [ ] `ENCRYPTION_KEY` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
-- [ ] `AUTH_HMAC_SECRET` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
-- [ ] `MICROSOFT_WEBHOOK_SECRET` is a cryptographically random 128-character string (`openssl rand -hex 64`)
-- [ ] All secrets stored in Kubernetes Secrets (not ConfigMaps)
-- [ ] TLS termination configured at Kong ingress
-- [ ] Network policies restrict pod-to-pod communication
-- [ ] Log aggregation in place (tokens are not logged)
-- [ ] Monitoring alerts configured for authentication failures
+- `ENCRYPTION_KEY` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
+- `AUTH_HMAC_SECRET` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
+- `MICROSOFT_WEBHOOK_SECRET` is a cryptographically random 128-character string (`openssl rand -hex 64`)
+- All secrets stored in Kubernetes Secrets (not ConfigMaps)
+- TLS termination configured at Kong ingress
+- Network policies restrict pod-to-pod communication
+- Log aggregation in place (tokens are not logged)
+- Monitoring alerts configured for authentication failures
 
 ## Related Documentation
 
@@ -378,3 +405,4 @@ Rotating this secret requires recreating all active subscriptions, as existing o
 - [RFC 6749 - OAuth 2.0](https://datatracker.ietf.org/doc/html/rfc6749) - OAuth 2.0 Authorization Framework
 - [OAuth 2.1](https://oauth.net/2.1/) - OAuth 2.1 specification
 - [NIST SP 800-38D](https://csrc.nist.gov/publications/detail/sp/800-38d/final) - AES-GCM specification
+

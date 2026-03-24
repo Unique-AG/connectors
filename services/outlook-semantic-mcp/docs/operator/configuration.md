@@ -136,12 +136,12 @@ mcpConfig:
   enabled: true
 
   app:
-    selfUrl: https://outlook.mcp.example.com
+    selfUrl: https://outlook.semantic.mcp.example.com
     mcpDebugMode: disabled
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
-    # publicWebhookUrl: https://outlook.mcp.example.com  # optional, defaults to selfUrl
+    # publicWebhookUrl: https://outlook.semantic.mcp.example.com  # optional, defaults to selfUrl
 
   unique:
     serviceAuthMode: cluster_local
@@ -157,14 +157,14 @@ ingress:
   enabled: true
   ingressClassName: kong
   hosts:
-    - host: outlook.mcp.example.com
+    - host: outlook.semantic.mcp.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
     - secretName: outlook-semantic-mcp-tls
       hosts:
-        - outlook.mcp.example.com
+        - outlook.semantic.mcp.example.com
 
 grafana:
   dashboard:
@@ -288,14 +288,16 @@ The `DEFAULT_MAIL_FILTERS` value controls which emails are synced during the ini
 | Field | Type | Description |
 |-------|------|-------------|
 | `ignoredBefore` | ISO date string | Skip emails received before this date. Useful to limit the scope of the initial sync. |
-| `ignoredSenders` | Array of strings | Email addresses whose messages are excluded from sync. |
-| `ignoredContents` | Array of strings | String patterns — emails with a body containing any of these strings are excluded from sync. |
+| `ignoredSenders` | Array of regex patterns | Regex patterns in `/pattern/flags` format tested against the sender's email address. Emails matching any pattern are excluded from sync. |
+| `ignoredContents` | Array of regex patterns | Regex patterns in `/pattern/flags` format tested against both the email subject and body. Emails matching any pattern are excluded from sync. |
+
+Patterns for `ignoredSenders` and `ignoredContents` must be in `/pattern/flags` format (e.g. `/^noreply@example\.com$/i`, `/unsubscribe/i`). Patterns are validated against ReDoS attacks on ingestion — invalid or unsafe patterns are rejected.
 
 ### Example
 
 ```yaml
 mcpConfig:
-  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":["unsubscribe"],"ignoredSenders":["noreply@example.com"]}'
+  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":["/unsubscribe/i"],"ignoredSenders":["/^noreply@example\\.com$/i"]}'
 ```
 
 The default value (`ignoredBefore: 2025-06-06`, empty arrays for the rest) limits the initial sync to emails received after June 6, 2025 with no sender or content exclusions.

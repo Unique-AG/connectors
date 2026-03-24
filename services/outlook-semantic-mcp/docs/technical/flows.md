@@ -200,7 +200,6 @@ sequenceDiagram
     FullSync->>DB: Set state=waiting-for-ingestion
     Note over FullSync: Waits for Unique KB to confirm ingestion
     FullSync->>DB: Set state=ready (sync complete)
-    FullSync->>AMQP: Flush buffered live catch-up messages
 ```
 
 **Full sync states:**

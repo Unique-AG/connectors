@@ -105,16 +105,16 @@ Filters control which emails are ingested. They are set globally via the `DEFAUL
 | Filter | Type | Description |
 |--------|------|-------------|
 | `ignoredBefore` | ISO 8601 date | Emails created before this date are skipped |
-| `ignoredSenders` | RegExp[] | Emails whose sender address matches any pattern are skipped |
-| `ignoredContents` | RegExp[] | Emails whose subject or body matches any pattern are skipped |
+| `ignoredSenders` | RegExp[] | Emails whose sender address matches any pattern are skipped. Patterns must use `/pattern/flags` format. |
+| `ignoredContents` | RegExp[] | Emails whose subject or body matches any pattern are skipped. Patterns must use `/pattern/flags` format. |
 
 **Example `DEFAULT_MAIL_FILTERS` value:**
 
 ```json
 {
   "ignoredBefore": "2023-01-01",
-  "ignoredSenders": ["noreply@.*", "no-reply@.*"],
-  "ignoredContents": ["unsubscribe", "out of office"]
+  "ignoredSenders": ["/^noreply@/i", "/^no-reply@/i"],
+  "ignoredContents": ["/unsubscribe/i", "/out of office/i"]
 }
 ```
 

@@ -28,7 +28,7 @@ module "outlook_semantic_mcp_app" {
   notes            = "MCP server for Outlook email access"
 
   redirect_uris = [
-    "https://outlook.mcp.example.com/auth/callback"
+    "https://outlook.semantic.mcp.example.com/auth/callback"
   ]
 
   confidential_clients = {
@@ -59,7 +59,7 @@ module "outlook_semantic_mcp_app" {
 
    - **Name**: Outlook Semantic MCP Server
    - **Supported account types**: Accounts in this organizational directory only
-   - **Redirect URI**: Web - `https://outlook.mcp.example.com/auth/callback`
+   - **Redirect URI**: Web - `https://outlook.semantic.mcp.example.com/auth/callback`
 
 3. **Add API Permissions**
 
@@ -149,7 +149,7 @@ https://<your-domain>/auth/callback
 
 Examples:
 
-- Production: `https://outlook.mcp.example.com/auth/callback`
+- Production: `https://outlook.semantic.mcp.example.com/auth/callback`
 - Local development: `http://localhost:9542/auth/callback`
 
 **Multiple redirect URIs** can be configured for different environments.

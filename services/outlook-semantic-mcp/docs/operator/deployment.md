@@ -119,7 +119,7 @@ server:
 
 mcpConfig:
   app:
-    selfUrl: https://outlook.mcp.example.com
+    selfUrl: https://outlook.semantic.mcp.example.com
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"

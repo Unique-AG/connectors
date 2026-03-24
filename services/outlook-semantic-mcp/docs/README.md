@@ -68,7 +68,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 
 **Email Search**
 
-- Full-text and structured search across the user's mailbox via the `search_emails` tool
+- Unique semantic search across the user's mailbox via the `search_emails` tool
 - Open individual emails by message ID via `open_email_by_id`
 - Searches are executed against the Unique knowledge base, where emails are indexed during sync — no live Microsoft Graph API call is made per query
 
