@@ -142,6 +142,7 @@ sequenceDiagram
     participant UniqueKB as Unique Knowledge Base
 
     MSGraph->>OutlookMCP: POST /mail-subscription/notification
+    OutlookMCP->>OutlookMCP: Validate clientState secret
     OutlookMCP->>OutlookMCP: Filter out deleted notifications
     OutlookMCP->>OutlookMCP: Group message IDs by subscriptionId
     OutlookMCP->>AMQP: Publish live-catch-up.execute (subscriptionId, messageIds)

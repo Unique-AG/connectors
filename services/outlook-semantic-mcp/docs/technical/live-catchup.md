@@ -23,6 +23,7 @@ sequenceDiagram
 
     Note over MSGraph,Controller: Stage 1 — Notification (must respond in < 10s)
     MSGraph->>Controller: POST /mail-subscription/notification
+    Controller->>Controller: Validate clientState secret
     Controller->>Controller: Filter out deleted notifications
     Controller->>Controller: Group message IDs by subscriptionId
     Controller->>AMQP: Publish live-catch-up.execute (subscriptionId, messageIds[])
@@ -49,7 +50,7 @@ sequenceDiagram
 
 **Stage 1 — Notification (synchronous):**
 
-- The controller receives the change notification payload from Microsoft Graph
+- The controller validates the `clientState` secret against `MICROSOFT_WEBHOOK_SECRET`
 - `deleted` change notifications are discarded. Deletions are handled in two ways: when an entire folder is deleted, the [Directory Sync](./directory-sync.md) detects this via delta sync; when an individual email is deleted, the user first moves it to a folder marked `ignoreForSync` (e.g. Deleted Items), which generates a `created` event for that folder — the server detects the email is in an ignored folder and removes it from the knowledge base.
 - Remaining message IDs are grouped by `subscriptionId` and published to RabbitMQ as a single batch
 - `202 Accepted` is returned immediately — no email fetching happens in this stage

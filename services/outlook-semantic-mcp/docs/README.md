@@ -225,7 +225,7 @@ sequenceDiagram
 
     Note over OutlookMCP,MSGraph: Live Catch-Up (webhook-driven)
     MSGraph->>OutlookMCP: POST /webhook/notifications
-    OutlookMCP->>OutlookMCP: Filter out deleted notifications
+    OutlookMCP->>OutlookMCP: Validate clientState
     OutlookMCP->>RabbitMQ: Enqueue notification
     OutlookMCP->>MSGraph: 202 Accepted
     RabbitMQ->>SyncEngine: Deliver notification

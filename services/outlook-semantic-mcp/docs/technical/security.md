@@ -321,8 +321,7 @@ sequenceDiagram
 - `MICROSOFT_WEBHOOK_SECRET` is a 128-character random string (`openssl rand -hex 64`)
 - Set as `clientState` when creating Graph subscriptions
 - Returned unchanged in every webhook payload from Microsoft
-- Lifecycle notifications (`/mail-subscription/lifecycle`) validate `clientState` and reject invalid payloads before processing
-- Change notifications (`/mail-subscription/notification`) do not validate `clientState` — they are accepted and enqueued to RabbitMQ directly
+- Notifications with an invalid `clientState` are rejected before any processing
 
 ## Rate Limiting
 
