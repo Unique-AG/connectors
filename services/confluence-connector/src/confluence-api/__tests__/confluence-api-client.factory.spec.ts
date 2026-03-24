@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfluenceAuth } from '../../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../../config';
-import { createNoopConfConMetrics } from '../../metrics/__mocks__/noop-metrics';
+import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
 import { ServiceRegistry } from '../../tenant/service-registry';
 import { RateLimitedHttpClient } from '../../utils/rate-limited-http-client';
 import { CloudConfluenceApiClient } from '../cloud-api-client';
@@ -31,7 +31,7 @@ const baseFields = {
   ingestAllLabel: 'sync-all',
 };
 
-const noopMetrics = createNoopConfConMetrics();
+const noopMetrics = createNoopMetrics();
 
 describe('ConfluenceApiClientFactory', () => {
   it('creates CloudConfluenceApiClient for cloud config', () => {

@@ -1,5 +1,5 @@
 import type { Counter, Histogram } from '@opentelemetry/api';
-import type { ConfConMetrics } from '../conf-con-metrics';
+import type { Metrics } from '../metrics.service';
 
 export function createNoopCounter(): Counter {
   return { add: () => {} } as unknown as Counter;
@@ -9,7 +9,7 @@ export function createNoopHistogram(): Histogram {
   return { record: () => {} } as unknown as Histogram;
 }
 
-export function createNoopConfConMetrics(): ConfConMetrics {
+export function createNoopMetrics(): Metrics {
   return {
     syncDuration: createNoopHistogram(),
     scanDuration: createNoopHistogram(),
@@ -22,5 +22,5 @@ export function createNoopConfConMetrics(): ConfConMetrics {
     confluenceApiThrottleEvents: createNoopCounter(),
     confluenceApiErrors: createNoopCounter(),
     initializeCountersForTenant: () => {},
-  } as unknown as ConfConMetrics;
+  } as unknown as Metrics;
 }

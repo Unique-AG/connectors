@@ -13,7 +13,7 @@ vi.mock('@unique-ag/utils', async (importOriginal) => {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantConfig } from '../../config';
 import type { ConfluenceApiClient } from '../../confluence-api';
-import { createNoopConfConMetrics } from '../../metrics/__mocks__/noop-metrics';
+import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { IngestionService } from '../ingestion.service';
 import type { DiscoveredAttachment, FetchedPage } from '../sync.types';
@@ -127,7 +127,7 @@ function makeService(): {
       TENANT_NAME,
       uniqueApiClient,
       confluenceApiClient,
-      createNoopConfConMetrics(),
+      createNoopMetrics(),
     ),
     uniqueApiClient,
     confluenceApiClient,
@@ -301,7 +301,7 @@ describe('IngestionService', () => {
       TENANT_NAME,
       uniqueApiClient,
       confluenceApiClient,
-      createNoopConfConMetrics(),
+      createNoopMetrics(),
     );
     mockRequest.mockResolvedValueOnce({ statusCode: 201 });
 
@@ -484,7 +484,7 @@ describe('IngestionService', () => {
         TENANT_NAME,
         uniqueApiClient,
         confluenceApiClient,
-        createNoopConfConMetrics(),
+        createNoopMetrics(),
       );
       mockRequest.mockResolvedValueOnce({ statusCode: 201 });
 

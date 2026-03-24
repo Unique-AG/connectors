@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ConfConMetrics } from './conf-con-metrics';
+import { Metrics } from './metrics.service';
 
 @Module({
-  providers: [ConfConMetrics],
-  exports: [ConfConMetrics],
+  providers: [Metrics],
+  exports: [Metrics],
 })
 export class MetricsModule {}

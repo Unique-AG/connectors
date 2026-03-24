@@ -16,7 +16,7 @@ import {
   OWNER_TYPE,
   SOURCE_OWNER_TYPE,
 } from '../constants/ingestion.constants';
-import type { ConfConMetrics } from '../metrics';
+import type { Metrics } from '../metrics';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 export class IngestionService {
@@ -29,7 +29,7 @@ export class IngestionService {
     private readonly tenantName: string,
     private readonly uniqueApiClient: UniqueApiClient,
     private readonly confluenceApiClient: ConfluenceApiClient,
-    private readonly metrics: ConfConMetrics,
+    private readonly metrics: Metrics,
   ) {
     this.sourceKind = getSourceKind(this.config.confluence.instanceType);
     this.sourceName = this.config.confluence.baseUrl;

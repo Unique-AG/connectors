@@ -3,7 +3,7 @@ import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 
 @Injectable()
-export class ConfConMetrics {
+export class Metrics {
   public readonly syncDuration: Histogram;
   public readonly scanDuration: Histogram;
   public readonly pagesProcessed: Counter;

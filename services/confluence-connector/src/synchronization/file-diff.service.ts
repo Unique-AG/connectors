@@ -4,7 +4,7 @@ import { Logger } from '@nestjs/common';
 import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind } from '../constants/ingestion.constants';
-import type { ConfConMetrics } from '../metrics';
+import type { Metrics } from '../metrics';
 import type { DiscoveredAttachment, DiscoveredPage, FileDiffResult } from './sync.types';
 
 export class FileDiffService {
@@ -15,7 +15,7 @@ export class FileDiffService {
     private readonly tenantName: string,
     private readonly useV1KeyFormat: boolean,
     private readonly uniqueApiClient: UniqueApiClient,
-    private readonly metrics: ConfConMetrics,
+    private readonly metrics: Metrics,
   ) {}
 
   public async computeDiff(

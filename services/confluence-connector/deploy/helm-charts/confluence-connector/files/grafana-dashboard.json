@@ -80,9 +80,7 @@
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null }
-            ]
+            "steps": [{ "color": "green", "value": null }]
           },
           "noValue": "0"
         }
@@ -655,7 +653,10 @@
         "includeAll": false,
         "label": "Job",
         "name": "job",
-        "query": { "query": "label_values(cfc_sync_duration_seconds_count, job)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "query": {
+          "query": "label_values(cfc_sync_duration_seconds_count, job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
         "refresh": 2,
         "sort": 1,
         "type": "query"
@@ -666,7 +667,10 @@
         "includeAll": true,
         "label": "Tenant",
         "name": "tenant",
-        "query": { "query": "label_values(cfc_sync_duration_seconds_count, tenant)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "query": {
+          "query": "label_values(cfc_sync_duration_seconds_count, tenant)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
         "refresh": 2,
         "sort": 1,
         "type": "query"

@@ -4,7 +4,7 @@ import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-aut
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
 import { getTenantConfigs } from '../../config/tenant-config-loader';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../../confluence-api';
-import { createNoopConfConMetrics } from '../../metrics/__mocks__/noop-metrics';
+import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
 import { ServiceRegistry } from '../service-registry';
 import { tenantStorage } from '../tenant-context.storage';
 import { TenantRegistry } from '../tenant-registry';
@@ -97,7 +97,7 @@ function createRegistry(configs: NamedTenantConfig[]): {
     mockApiClientFactory,
     mockUniqueApiFactory,
     serviceRegistry,
-    createNoopConfConMetrics(),
+    createNoopMetrics(),
   );
   registry.onModuleInit();
   return { registry, serviceRegistry, mockUniqueApiFactory };
@@ -147,7 +147,7 @@ describe('TenantRegistry', () => {
         mockApiClientFactory,
         mockUniqueApiFactory,
         serviceRegistry,
-        createNoopConfConMetrics(),
+        createNoopMetrics(),
       );
       registry.onModuleInit();
 
@@ -205,7 +205,7 @@ describe('TenantRegistry', () => {
         mockApiClientFactory,
         mockUniqueApiFactory,
         serviceRegistry,
-        createNoopConfConMetrics(),
+        createNoopMetrics(),
       );
       registry.onModuleInit();
 

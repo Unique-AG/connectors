@@ -23,7 +23,7 @@ vi.mock('bottleneck', () => ({
 }));
 
 import { request } from 'undici';
-import { createNoopConfConMetrics } from '../../metrics/__mocks__/noop-metrics';
+import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
 import { RateLimitedHttpClient } from '../rate-limited-http-client';
 
 const mockedRequest = request as Mock;
@@ -48,7 +48,7 @@ describe('RateLimitedHttpClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new RateLimitedHttpClient(100, createNoopConfConMetrics(), 'test-tenant');
+    client = new RateLimitedHttpClient(100, createNoopMetrics(), 'test-tenant');
   });
 
   describe('rateLimitedRequest', () => {

@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
-import type { ConfConMetrics } from '../metrics';
+import type { Metrics } from '../metrics';
 import { getCurrentTenant } from '../tenant';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
@@ -21,7 +21,7 @@ export class ConfluenceSynchronizationService {
     private readonly fileDiffService: FileDiffService,
     private readonly ingestionService: IngestionService,
     private readonly scopeManagementService: ScopeManagementService,
-    private readonly metrics: ConfConMetrics,
+    private readonly metrics: Metrics,
   ) {}
 
   public async synchronize(): Promise<void> {

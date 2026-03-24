@@ -2,7 +2,7 @@ import type { Readable } from 'node:stream';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
-import type { ConfConMetrics } from '../metrics';
+import type { Metrics } from '../metrics';
 import { getHttpStatusCodeClass } from '../metrics';
 import { handleErrorStatus } from './http-util';
 
@@ -38,7 +38,7 @@ export class RateLimitedHttpClient {
 
   public constructor(
     ratePerMinute: number,
-    private readonly metrics: ConfConMetrics,
+    private readonly metrics: Metrics,
     private readonly tenantName: string,
   ) {
     this.dispatcher = new Agent().compose([
