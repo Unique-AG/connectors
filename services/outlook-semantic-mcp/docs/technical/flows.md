@@ -166,7 +166,7 @@ sequenceDiagram
 - Microsoft requires a response within 10 seconds. The server enqueues the notification immediately and returns `202 Accepted` — actual email processing happens asynchronously.
 - Buffering applies when another live catch-up consumer is already processing, or when the watermark has not been set yet (full sync has not started). Messages are flushed once the blocker clears.
 - The watermark (`newestLastModifiedDateTime`) is **initialized by full sync** the first time it runs and **maintained by live catch-up** on every subsequent notification.
-- Deleted email notifications do not require explicit handling: when a user moves an email to a folder that is not synced (e.g. Deleted Items), the directory sync detects this. When emails are permanently deleted, they are already removed from the Unique knowledge base.
+- `deleted` change notifications are discarded. Deletions are handled in two ways: when an entire folder is deleted, directory sync detects it via delta sync; when an individual email is deleted, the user first moves it to a folder marked `ignoreForSync` (e.g. Deleted Items), which generates a `created` event for that folder — the server detects the email is in an ignored folder on that `created` event and removes it from the knowledge base.
 
 ## Full Sync: Historical Email Ingestion
 
@@ -219,8 +219,8 @@ sequenceDiagram
 - The sync is resumable: `fullSyncNextLink` stores the Graph pagination cursor so a crash or restart picks up where it left off.
 - Stale syncs (no heartbeat for 20+ minutes) are automatically restarted by the sync recovery module.
 - Inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredContents`) are applied server-side before ingestion.
-- Full sync **initializes** the watermark (`newestLastModifiedDateTime`) on its first batch. From that point live catch-up can process notifications in parallel — both pipelines ingest concurrently. Live catch-up ingestion activity can extend the time full sync spends in `waiting-for-ingestion`.
-- Once full sync initializes `newestLastModifiedDateTime` on its first batch, live catch-up takes ownership of that watermark and updates it on every subsequent notification.
+- Full sync **initializes** the watermarks (`newestLastModifiedDateTime`). Once initialized, live catch-up can process notifications in parallel — both pipelines ingest concurrently. Live catch-up ingestion activity can extend the time full sync spends in `waiting-for-ingestion`.
+- Once full sync has initialized the watermarks, live catch-up takes ownership of `newestLastModifiedDateTime` and updates it on every subsequent notification.
 
 ## Directory Sync Flow
 
