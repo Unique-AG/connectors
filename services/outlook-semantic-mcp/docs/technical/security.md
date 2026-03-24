@@ -5,6 +5,98 @@
 
 This document describes the security architecture, cryptographic decisions, and threat model for the Outlook Semantic MCP Server.
 
+## Data Classification and Flow
+
+### What Is Stored Where
+
+The Outlook Semantic MCP Server stores **no email content** in its own database. It acts as a secure pass-through: emails are fetched from Microsoft Graph into memory and uploaded directly to the Unique knowledge base. Nothing from the email body, subject, or attachments is written to the MCP server's PostgreSQL database.
+
+| Data | Stored In | Protection | Contains Email Content? |
+|------|-----------|------------|------------------------|
+| Microsoft OAuth tokens (access + refresh) | PostgreSQL `user_profiles` | AES-256-GCM encrypted | No |
+| MCP bearer tokens | PostgreSQL `tokens` | Opaque 512-bit random values | No |
+| Sync state and progress counters | PostgreSQL `inbox_configurations` | Plaintext metadata | No |
+| Outlook folder structure (names + IDs) | PostgreSQL `directories` | Plaintext metadata | No |
+| Microsoft Graph subscription IDs | PostgreSQL `subscriptions` | Plaintext metadata | No |
+| Email subject, body, sender, recipients | Unique Knowledge Base | Indexed for semantic search | **Yes** |
+
+### Data Flow
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+flowchart TD
+    subgraph User["User Device"]
+        MCPClient["MCP Client\n(AI Agent)"]
+    end
+
+    subgraph Microsoft["Microsoft Cloud"]
+        EntraID["Entra ID\nAuthentication"]
+        MSGraph["Microsoft Graph API\nEmail · Folders · Contacts"]
+    end
+
+    subgraph MCPServer["Outlook Semantic MCP Server"]
+        Auth["MCP OAuth Layer\nIssues opaque bearer tokens"]
+        SyncPipeline["Sync Pipeline\nEmail content in memory only\nnever persisted here"]
+        DB[("PostgreSQL\nCredentials · Tokens · Sync state\nNO email content")]
+    end
+
+    subgraph Unique["Unique Platform"]
+        ScopeMgmt["Scope Management\nPer-user root scopes"]
+        KB["Knowledge Base\nEmail content indexed\nfor semantic search"]
+    end
+
+    MCPClient -->|"1  MCP OAuth 2.1 + PKCE"| Auth
+    Auth <-->|"2  Token exchange"| EntraID
+    Auth -->|"Encrypted Microsoft tokens\nOpaque MCP tokens"| DB
+
+    SyncPipeline -->|"3  Fetch email pages\nDelegated Graph calls"| MSGraph
+    MSGraph -->|"4  Email content\nin memory only"| SyncPipeline
+    SyncPipeline -->|"5  Upload for indexing\nvia Unique ingestion API"| KB
+    SyncPipeline <-->|"Sync state only"| DB
+
+    ScopeMgmt -->|"Per-user scope boundary"| KB
+    MCPClient -->|"6  search_emails tool call\nauthenticated MCP request"| KB
+```
+
+**Key data flow properties:**
+
+- Steps 1–2 (auth): only credentials and tokens are exchanged — no email content involved
+- Steps 3–5 (sync): email content passes through the MCP server's memory only; it is never written to PostgreSQL
+- Step 6 (search): the authenticated user's MCP token is used to scope the search to their own data
+
+### Data Removal
+
+| Action | What Is Removed |
+|--------|----------------|
+| User calls `remove_inbox_connection` | Microsoft Graph subscription, per-user root scopes in Unique KB, inbox configuration, folder sync data |
+| MCP tokens | Expire naturally (access: 60 seconds, refresh: 30 days); not automatically removed from KB |
+| Ingested email content | Remains in the Unique knowledge base until explicitly deleted via the Unique platform |
+
+There is no automatic expiry or purge of ingested email content. Operators who need to remove a user's data from the knowledge base must do so via the Unique platform after calling `remove_inbox_connection`.
+
+## Knowledge Base Data Isolation
+
+Each connected user's emails are stored in a **dedicated root scope** within the Unique knowledge base. Scopes are created automatically when the user connects (by `DirectoriesSyncModule`) and are removed when `remove_inbox_connection` is called.
+
+**Logical isolation:**
+
+- All emails from a connected mailbox are stored under that user's root scope
+- `search_emails` only queries the scope belonging to the authenticated user — the MCP server prevents one user's session from searching another user's emails
+- Scope boundaries are enforced by the Unique scope management service
+
+**Unique platform-level access:**
+
+Access to email data at the Unique platform layer is governed by Unique's own access control model, not by the MCP server. Relevant access principals are:
+
+| Principal | Access Level |
+|-----------|-------------|
+| Authenticated MCP user | Can search their own emails via `search_emails` tool |
+| MCP server service account | Write access to ingestion and scope management APIs (used during sync) |
+| Unique platform administrators | Subject to Unique platform access control policies |
+| Direct PostgreSQL access (MCP DB) | Encrypted tokens and sync state only — no email content |
+
+Organizations with strict email privacy requirements should review Unique platform access control policies in conjunction with this document.
+
 ## Security Layers
 
 ```mermaid
