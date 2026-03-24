@@ -3,7 +3,7 @@ import { Smeared } from '@unique-ag/utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import { ContentType } from '../../confluence-api/types/confluence-api.types';
-import { createNoopCounter } from '../../metrics/__mocks__/noop-metrics';
+import { createNoopConfConMetrics } from '../../metrics/__mocks__/noop-metrics';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { FileDiffService } from '../file-diff.service';
 import type { DiscoveredAttachment, DiscoveredPage } from '../sync.types';
@@ -73,7 +73,7 @@ function makeService(
       TENANT_NAME,
       options?.useV1KeyFormat ?? false,
       uniqueApiClient,
-      createNoopCounter(),
+      createNoopConfConMetrics(),
     ),
     performFileDiff,
     getCountByKeyPrefix,

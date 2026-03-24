@@ -7,7 +7,6 @@ import type {
 } from '@unique-ag/unique-api';
 import { createSmeared } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
-import type { Counter, Histogram } from '@opentelemetry/api';
 import { request } from 'undici';
 import type { TenantConfig } from '../config';
 import type { ConfluenceApiClient } from '../confluence-api';
@@ -17,6 +16,7 @@ import {
   OWNER_TYPE,
   SOURCE_OWNER_TYPE,
 } from '../constants/ingestion.constants';
+import type { ConfConMetrics } from '../metrics';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 export class IngestionService {
@@ -29,8 +29,7 @@ export class IngestionService {
     private readonly tenantName: string,
     private readonly uniqueApiClient: UniqueApiClient,
     private readonly confluenceApiClient: ConfluenceApiClient,
-    private readonly contentDeletedCounter: Counter,
-    private readonly attachmentUploadDuration: Histogram,
+    private readonly metrics: ConfConMetrics,
   ) {
     this.sourceKind = getSourceKind(this.config.confluence.instanceType);
     this.sourceName = this.config.confluence.baseUrl;
@@ -106,7 +105,9 @@ export class IngestionService {
       const uploadStartTime = performance.now();
       await this.uploadStream(uploadUrl, stream, attachment.mediaType, attachment.fileSize);
       const uploadDurationSeconds = (performance.now() - uploadStartTime) / 1000;
-      this.attachmentUploadDuration.record(uploadDurationSeconds, { tenant: this.tenantName });
+      this.metrics.attachmentUploadDuration.record(uploadDurationSeconds, {
+        tenant: this.tenantName,
+      });
 
       const finalizationRequest = this.buildFinalizationRequest(
         registrationRequest,
@@ -148,11 +149,11 @@ export class IngestionService {
         msg: 'Content deleted',
       });
 
-      this.contentDeletedCounter.add(deletedCount, { tenant: this.tenantName, result: 'success' });
+      this.metrics.contentDeleted.add(deletedCount, { tenant: this.tenantName, result: 'success' });
       return deletedCount;
     } catch (error) {
       this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
-      this.contentDeletedCounter.add(contentKeys.length, {
+      this.metrics.contentDeleted.add(contentKeys.length, {
         tenant: this.tenantName,
         result: 'failure',
       });

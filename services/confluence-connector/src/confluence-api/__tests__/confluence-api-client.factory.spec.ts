@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ConfluenceAuth } from '../../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../../config';
+import { createNoopConfConMetrics } from '../../metrics/__mocks__/noop-metrics';
 import { ServiceRegistry } from '../../tenant/service-registry';
 import { RateLimitedHttpClient } from '../../utils/rate-limited-http-client';
 import { CloudConfluenceApiClient } from '../cloud-api-client';
@@ -30,6 +31,8 @@ const baseFields = {
   ingestAllLabel: 'sync-all',
 };
 
+const noopMetrics = createNoopConfConMetrics();
+
 describe('ConfluenceApiClientFactory', () => {
   it('creates CloudConfluenceApiClient for cloud config', () => {
     const factory = new ConfluenceApiClientFactory(mockServiceRegistry);
@@ -39,9 +42,9 @@ describe('ConfluenceApiClientFactory', () => {
       auth: { mode: 'oauth_2lo', clientId: 'id', clientSecret: { expose: () => 's' } },
     } as unknown as ConfluenceConfig;
 
-    factory.create(config);
+    factory.create(config, { attachmentsEnabled: false }, noopMetrics, 'test-tenant');
 
-    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, undefined);
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, noopMetrics, 'test-tenant');
     expect(CloudConfluenceApiClient).toHaveBeenCalledWith(
       config,
       mockAuth,
@@ -58,9 +61,9 @@ describe('ConfluenceApiClientFactory', () => {
       auth: { mode: 'pat', token: { expose: () => 'tok' } },
     } as unknown as ConfluenceConfig;
 
-    factory.create(config);
+    factory.create(config, { attachmentsEnabled: false }, noopMetrics, 'test-tenant');
 
-    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, undefined);
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, noopMetrics, 'test-tenant');
     expect(DataCenterConfluenceApiClient).toHaveBeenCalledWith(
       config,
       mockAuth,
@@ -81,7 +84,12 @@ describe('ConfluenceApiClientFactory', () => {
       auth: { mode: 'oauth_2lo', clientId: 'id', clientSecret: { expose: () => 's' } },
     } as unknown as ConfluenceConfig;
 
-    const result = factory.create(config);
+    const result = factory.create(
+      config,
+      { attachmentsEnabled: false },
+      noopMetrics,
+      'test-tenant',
+    );
 
     expect(result).toBe(mockClient);
   });

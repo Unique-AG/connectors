@@ -209,14 +209,18 @@ describe('TenantRegistry', () => {
       );
       registry.onModuleInit();
 
-      expect(mockApiClientFactory.create).toHaveBeenCalledWith(configA.confluence, {
-        attachmentsEnabled: false,
-        metrics: expect.objectContaining({ tenantName: 'tenant-a' }),
-      });
-      expect(mockApiClientFactory.create).toHaveBeenCalledWith(configB.confluence, {
-        attachmentsEnabled: false,
-        metrics: expect.objectContaining({ tenantName: 'tenant-b' }),
-      });
+      expect(mockApiClientFactory.create).toHaveBeenCalledWith(
+        configA.confluence,
+        { attachmentsEnabled: false },
+        expect.anything(),
+        'tenant-a',
+      );
+      expect(mockApiClientFactory.create).toHaveBeenCalledWith(
+        configB.confluence,
+        { attachmentsEnabled: false },
+        expect.anything(),
+        'tenant-b',
+      );
     });
 
     it('registers ConfluenceAuth, UniqueApiClient, and ConfluenceApiClient in ServiceRegistry for each tenant', () => {

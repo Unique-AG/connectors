@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfluenceAuth } from '../auth/confluence-auth';
 import type { ConfluenceConfig } from '../config';
+import type { ConfConMetrics } from '../metrics';
 import { ServiceRegistry } from '../tenant/service-registry';
 import { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import { CloudConfluenceApiClient } from './cloud-api-client';
@@ -13,10 +14,12 @@ export class ConfluenceApiClientFactory {
 
   public create(
     config: ConfluenceConfig,
-    options: ApiClientOptions = { attachmentsEnabled: false },
+    options: ApiClientOptions,
+    metrics: ConfConMetrics,
+    tenantName: string,
   ): ConfluenceApiClient {
     const confluenceAuth = this.serviceRegistry.getService(ConfluenceAuth);
-    const httpClient = new RateLimitedHttpClient(config.apiRateLimitPerMinute, options.metrics);
+    const httpClient = new RateLimitedHttpClient(config.apiRateLimitPerMinute, metrics, tenantName);
 
     return config.instanceType === 'cloud'
       ? new CloudConfluenceApiClient(config, confluenceAuth, httpClient, options)

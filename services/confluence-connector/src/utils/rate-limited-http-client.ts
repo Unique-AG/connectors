@@ -2,7 +2,7 @@ import type { Readable } from 'node:stream';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
-import type { HttpClientMetrics } from '../confluence-api/confluence-api-client';
+import type { ConfConMetrics } from '../metrics';
 import { getHttpStatusCodeClass } from '../metrics';
 import { handleErrorStatus } from './http-util';
 
@@ -38,7 +38,8 @@ export class RateLimitedHttpClient {
 
   public constructor(
     ratePerMinute: number,
-    private readonly metrics?: HttpClientMetrics,
+    private readonly metrics: ConfConMetrics,
+    private readonly tenantName: string,
   ) {
     this.dispatcher = new Agent().compose([
       interceptors.redirect({ maxRedirections: 10 }),
@@ -100,25 +101,17 @@ export class RateLimitedHttpClient {
     endpoint: string,
     result: 'success' | 'error',
   ): void {
-    if (!this.metrics) {
-      return;
-    }
-
     const durationSeconds = (performance.now() - startTime) / 1000;
-    this.metrics.requestDuration.record(durationSeconds, {
-      tenant: this.metrics.tenantName,
+    this.metrics.confluenceApiRequestDuration.record(durationSeconds, {
+      tenant: this.tenantName,
       endpoint,
       result,
     });
   }
 
   private recordError(statusCode?: number): void {
-    if (!this.metrics) {
-      return;
-    }
-
-    this.metrics.errors.add(1, {
-      tenant: this.metrics.tenantName,
+    this.metrics.confluenceApiErrors.add(1, {
+      tenant: this.tenantName,
       http_status_class: statusCode ? getHttpStatusCodeClass(statusCode) : 'unknown',
     });
   }
@@ -126,7 +119,7 @@ export class RateLimitedHttpClient {
   private setupThrottlingMonitoring(): void {
     this.limiter.on('depleted', () => {
       this.logger.log({ msg: 'Rate limit reservoir depleted - queuing requests' });
-      this.metrics?.throttleEvents.add(1, { tenant: this.metrics.tenantName });
+      this.metrics.confluenceApiThrottleEvents.add(1, { tenant: this.tenantName });
     });
 
     this.limiter.on('dropped', () => {

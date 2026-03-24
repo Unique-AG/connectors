@@ -23,7 +23,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     private readonly config: ConfluenceConfig,
     private readonly confluenceAuth: ConfluenceAuth,
     private readonly httpClient: RateLimitedHttpClient,
-    private readonly options: ApiClientOptions = { attachmentsEnabled: false },
+    private readonly options: ApiClientOptions,
   ) {
     super();
     this.attachmentExpand = options.attachmentsEnabled ? ATTACHMENT_EXPAND : '';
