@@ -4,10 +4,12 @@ import { z } from 'zod';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
 import { clampToValidDate } from '~/utils/clamp-to-valid-date';
 
+export const CONTAINS_ANY_OPERATOR = 'containsAny' as const;
+
 const ArrayConditionFieldSchema = <T extends z.ZodArray>(itemSchema: T) =>
   z.object({
     value: itemSchema,
-    operator: z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN]),
+    operator: z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN, CONTAINS_ANY_OPERATOR]),
   });
 
 const SingularConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
