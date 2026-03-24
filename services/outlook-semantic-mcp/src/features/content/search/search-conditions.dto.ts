@@ -39,14 +39,14 @@ const EXAMPLE_FOLDER_IDS = {
 const emailConditionsSchema = (label: string) =>
   SingularConditionFieldSchema(
     z
-      .email()
+      .string()
       .describe(
-        `${label} email address to filter by, e.g. "alice@example.com". Must be a valid email address. Recommended operators: equals, contains`,
+        `${label} email address to filter by, e.g. "alice@example.com". Must be look like an email address. Recommended operators: equals, contains`,
       ),
   )
     .or(
-      ArrayConditionFieldSchema(z.array(z.email())).describe(
-        `${label} email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Must be a valid email addresses. Recommended operators: in, notIn.`,
+      ArrayConditionFieldSchema(z.array(z.string())).describe(
+        `${label} email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Must be look like an email address. Recommended operators: in, notIn.`,
       ),
     )
     .optional();
