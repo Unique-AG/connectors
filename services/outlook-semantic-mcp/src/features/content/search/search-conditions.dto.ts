@@ -53,7 +53,7 @@ const emailConditionsSchema = (label: string) =>
   )
     .or(
       ArrayConditionFieldSchema(z.array(z.string())).describe(
-        `${label} email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Must be look like an email address. Recommended operators: in, notIn.`,
+        `${label} email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Must be look like an email address. Prefer containsAny when matching a list of emails (expands to partial contains checks). Use in/notIn only for exact equality matching.`,
       ),
     )
     .optional();
@@ -182,6 +182,7 @@ function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
     const operator = field.operator as UniqueQLOperator | typeof CONTAINS_ANY_OPERATOR;
     const { value } = field;
     if (operator === CONTAINS_ANY_OPERATOR) {
+      // We do not assert because it's not worth breaking the response to the agent.
       if (Array.isArray(value)) {
         leaves.push(
           wrapConditions(
