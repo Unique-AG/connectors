@@ -183,7 +183,7 @@ export class MailSubscriptionController {
     }
 
     const publishResult = await Promise.allSettled(
-      Object.entries(bySubscription).map(([subscriptionId, messageIds]) => {
+      Array.from(bySubscription).map(([subscriptionId, messageIds]) => {
         const payload = LiveCatchUpEventDto.parse({
           type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
           payload: { subscriptionId, messageIds },

@@ -156,8 +156,16 @@ describe('buildSearchFilter', () => {
 
     expect(result).toEqual({
       or: [
-        { path: ['fromEmailAddress'], operator: UniqueQLOperator.CONTAINS, value: 'alice@example.com' },
-        { path: ['fromEmailAddress'], operator: UniqueQLOperator.CONTAINS, value: 'bob@example.com' },
+        {
+          path: ['fromEmailAddress'],
+          operator: UniqueQLOperator.CONTAINS,
+          value: 'alice@example.com',
+        },
+        {
+          path: ['fromEmailAddress'],
+          operator: UniqueQLOperator.CONTAINS,
+          value: 'bob@example.com',
+        },
       ],
     });
   });
@@ -199,8 +207,16 @@ describe('buildSearchFilter', () => {
         },
         {
           or: [
-            { path: ['fromEmailAddress'], operator: UniqueQLOperator.CONTAINS, value: 'alice@example.com' },
-            { path: ['fromEmailAddress'], operator: UniqueQLOperator.CONTAINS, value: 'bob@example.com' },
+            {
+              path: ['fromEmailAddress'],
+              operator: UniqueQLOperator.CONTAINS,
+              value: 'alice@example.com',
+            },
+            {
+              path: ['fromEmailAddress'],
+              operator: UniqueQLOperator.CONTAINS,
+              value: 'bob@example.com',
+            },
           ],
         },
       ],

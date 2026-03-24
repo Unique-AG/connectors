@@ -4,8 +4,8 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
-import { LookupContactsQuery, LookupContactsResultSchema } from './lookup-contacts.query';
+import { GetSubscriptionStatusQuery } from '../../subscriptions/get-subscription-status.query';
+import { LookupContactsQuery, LookupContactsResultSchema } from '../lookup-contacts.query';
 import { META } from './lookup-contacts-tool.meta';
 
 const LookupContactsInputSchema = z.object({

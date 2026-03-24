@@ -6,15 +6,22 @@ import { clampToValidDate } from '~/utils/clamp-to-valid-date';
 
 export const CONTAINS_ANY_OPERATOR = 'containsAny' as const;
 
-const ArrayConditionFieldSchema = <T extends z.ZodArray>(
-  itemSchema: T,
-  { isStrict = false } = {},
-) =>
+// Note: We have 2 array functions because if we use an options parameter it seems typescript
+// does not infer the types correctly.
+
+// Used for fields where containsAny partial matching is meaningful (e.g. email addresses).
+const ArrayConditionFieldSchema = <T extends z.ZodArray>(itemSchema: T) =>
   z.object({
     value: itemSchema,
-    operator: isStrict
-      ? z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN])
-      : z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN, CONTAINS_ANY_OPERATOR]),
+    operator: z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN, CONTAINS_ANY_OPERATOR]),
+  });
+
+// Used for fields where only exact equality makes sense (e.g. folder IDs / directory names),
+// so containsAny is excluded to avoid misleading the LLM into substring-matching opaque IDs.
+const StrictArrayConditionFieldSchema = <T extends z.ZodArray>(itemSchema: T) =>
+  z.object({
+    value: itemSchema,
+    operator: z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN]),
   });
 
 const SingularConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
@@ -43,17 +50,19 @@ const EXAMPLE_FOLDER_IDS = {
     'AQMkADllMDJjNDk0LWNiNmEtNDhlOC04YjA4LWMzNDZlOTkANzlhMmMALgAAA8XAUl8fmjpEkM39lOfyshYBAMjQHeJoK_1Bt2gTZjb69YQAAAIBWQAAAA==',
 };
 
+// z.string() instead of z.email() to allow partial inputs like domains ("@example.com")
+// that are valid for contains/containsAny matching but not strict email addresses.
 const emailConditionsSchema = (label: string) =>
   SingularConditionFieldSchema(
     z
       .string()
       .describe(
-        `${label} email address to filter by, e.g. "alice@example.com". Must be look like an email address. Recommended operators: equals, contains`,
+        `${label} email address to filter by, e.g. "alice@example.com". Must look like an email address. Recommended operators: equals, contains`,
       ),
   )
     .or(
       ArrayConditionFieldSchema(z.array(z.string())).describe(
-        `${label} email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Must be look like an email address. Prefer containsAny when matching a list of emails (expands to partial contains checks). Use in/notIn only for exact equality matching.`,
+        `${label} email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Must look like an email address. Prefer containsAny when matching a list of emails (expands to partial contains checks). Use in/notIn only for exact equality matching.`,
       ),
     )
     .optional();
@@ -79,7 +88,7 @@ export const SearchConditionSchema = z
     fromSenders: emailConditionsSchema('Sender'),
     toRecipients: emailConditionsSchema('To recipient'),
     ccRecipients: emailConditionsSchema('CC recipient'),
-    directories: ArrayConditionFieldSchema(
+    directories: StrictArrayConditionFieldSchema(
       z
         .array(z.string())
         .describe(
@@ -90,7 +99,6 @@ export const SearchConditionSchema = z
             `For custom user-defined folders, pass the folder ID obtained from \`list_folders\`. ` +
             `Example IDs: ["${EXAMPLE_FOLDER_IDS.first}", "${EXAMPLE_FOLDER_IDS.second}"]. Recommended operators: in or notIn.`,
         ),
-      { isStrict: true },
     ).optional(),
     hasAttachments: SingularConditionFieldSchema(
       z
