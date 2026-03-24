@@ -5,7 +5,7 @@ import * as z from 'zod';
 export const MsTeamSchema = z.object({
   id: z.string(),
   displayName: z.string(),
-  description: z.string().optional(),
+  description: z.string().nullish(),
 });
 
 export type MsTeam = z.infer<typeof MsTeamSchema>;
@@ -15,7 +15,7 @@ export type MsTeam = z.infer<typeof MsTeamSchema>;
 export const MsChannelSchema = z.object({
   id: z.string(),
   displayName: z.string(),
-  description: z.string().optional(),
+  description: z.string().nullish(),
 });
 
 export type MsChannel = z.infer<typeof MsChannelSchema>;
@@ -23,14 +23,14 @@ export type MsChannel = z.infer<typeof MsChannelSchema>;
 // ─── Chats ────────────────────────────────────────────────────────────────────
 
 export const MsChatMemberSchema = z.object({
-  displayName: z.string().optional(),
-  email: z.string().optional(),
+  displayName: z.string().nullish(),
+  email: z.string().nullish(),
 });
 
 export const MsChatSchema = z.object({
   id: z.string(),
   chatType: z.string(),
-  topic: z.string().optional(),
+  topic: z.string().nullish(),
   members: z.array(MsChatMemberSchema),
 });
 
