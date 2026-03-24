@@ -23,7 +23,6 @@ sequenceDiagram
 
     Note over MSGraph,Controller: Stage 1 — Notification (must respond in < 10s)
     MSGraph->>Controller: POST /mail-subscription/notification
-    Controller->>Controller: Validate clientState secret
     Controller->>Controller: Filter out deleted notifications
     Controller->>Controller: Group message IDs by subscriptionId
     Controller->>AMQP: Publish live-catch-up.execute (subscriptionId, messageIds[])
@@ -50,7 +49,7 @@ sequenceDiagram
 
 **Stage 1 — Notification (synchronous):**
 
-- The controller validates the `clientState` secret against `MICROSOFT_WEBHOOK_SECRET`
+- The controller receives the change notification payload from Microsoft Graph
 - `deleted` change notifications are discarded. Deletions are handled in two ways: when an entire folder is deleted, the [Directory Sync](./directory-sync.md) detects this via delta sync; when an individual email is deleted, the user first moves it to a folder marked `ignoreForSync` (e.g. Deleted Items), which generates a `created` event for that folder — the server detects the email is in an ignored folder and removes it from the knowledge base.
 - Remaining message IDs are grouped by `subscriptionId` and published to RabbitMQ as a single batch
 - `202 Accepted` is returned immediately — no email fetching happens in this stage
@@ -79,11 +78,15 @@ sequenceDiagram
 
 **Pending message buffer:**
 
-When `liveCatchUpState = running`, new incoming notifications are appended to `pendingLiveMessageIds` instead of being dropped. After the active consumer finishes, it flushes the buffer in the same database transaction before releasing the lock. This ensures no notifications are lost during high-frequency mail delivery.
+When `liveCatchUpState = running`, new incoming notifications are appended to `pendingLiveMessageIds` instead of being dropped. After the active consumer finishes, it flushes the buffer in a separate database transaction. This ensures no notifications are lost during high-frequency mail delivery.
 
 **Watermark not yet set:**
 
 If `newestLastModifiedDateTime` is `null` (full sync has not initialized the watermarks yet), incoming notifications are also buffered. They are flushed once the watermarks are initialized.
+
+## Periodic Catch-Up Cron
+
+In addition to webhook-driven notifications, a background cron job runs every **15 minutes** and publishes `live-catch-up.execute` events for all users with valid subscriptions. This ensures that any notifications missed due to transient webhook failures or RabbitMQ unavailability are eventually processed.
 
 ## Relation to Full Sync
 
@@ -98,6 +101,7 @@ Live catch-up and full sync run **concurrently** after a user connects:
 | Condition | Recovery |
 |-----------|---------|
 | `liveCatchUpState = failed` | Recovery scheduler resets to `ready` and retriggers every 5 minutes |
+| `liveCatchUpState = running` with stale heartbeat (5+ minutes) | Recovery scheduler resets to `ready` and retriggers |
 
 For subscription-level failures (e.g. `subscriptionRemoved`), see [Subscription Management](./subscription-management.md#recovery).
 

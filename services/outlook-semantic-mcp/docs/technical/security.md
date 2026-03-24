@@ -158,7 +158,7 @@ Microsoft access and refresh tokens are stored encrypted using **AES-256-GCM**:
 | Algorithm     | AES-256-GCM (authenticated encryption)                 |
 | Key Size      | 256 bits (32 bytes, provided as 64 hex characters)     |
 | IV            | Random 12 bytes generated per encryption operation     |
-| Stored Format | `{iv}.{tag}.{data}` — all components base64url encoded |
+| Stored Format | `{iv}.{tag}.{data}` — all components base64 encoded |
 | Key Storage   | `ENCRYPTION_KEY` environment variable                  |
 
 
@@ -321,7 +321,8 @@ sequenceDiagram
 - `MICROSOFT_WEBHOOK_SECRET` is a 128-character random string (`openssl rand -hex 64`)
 - Set as `clientState` when creating Graph subscriptions
 - Returned unchanged in every webhook payload from Microsoft
-- Notifications with an invalid `clientState` are rejected before any processing
+- Lifecycle notifications (`/mail-subscription/lifecycle`) validate `clientState` and reject invalid payloads before processing
+- Change notifications (`/mail-subscription/notification`) do not validate `clientState` — they are accepted and enqueued to RabbitMQ directly
 
 ## Rate Limiting
 

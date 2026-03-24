@@ -11,7 +11,7 @@ Full sync is the process of ingesting a user's complete email history from Micro
 2. Applies inbox filters to skip unwanted messages
 3. Uploads each email to the Unique knowledge base for indexing
 4. Tracks progress so it can resume from the last processed page if interrupted
-5. Initializes the watermark (`newestLastModifiedDateTime`) used by live catch-up once complete
+5. Initializes the watermark (`newestLastModifiedDateTime`) used by live catch-up at the start of the first sync run (set to the current time if not already set)
 
 Full sync and live catch-up run concurrently after connection. Live catch-up buffers notifications only until full sync has initialized the watermarks — after that, both pipelines ingest independently.
 
@@ -77,9 +77,9 @@ sequenceDiagram
     FullSync->>DB: Store fullSyncExpectedTotal
 
     loop Until no more pages
-        FullSync->>MSGraph: GET /me/messages?$top=100&$orderby=createdDateTime desc (nextLink)
+        FullSync->>MSGraph: GET /me/messages?$top=100&$filter=createdDateTime gt {ignoredBefore}&$orderby=createdDateTime desc (nextLink)
         MSGraph->>FullSync: Page of messages
-        FullSync->>FullSync: Apply inbox filters (ignoredBefore, ignoredSenders, ignoredContents)
+        FullSync->>FullSync: Apply in-memory filters (ignoredSenders, ignoredContents)
         FullSync->>UniqueKB: Upload passing messages for ingestion
         FullSync->>DB: Update counters + fullSyncNextLink + watermarks + heartbeat
     end
@@ -102,11 +102,11 @@ Each sync attempt generates a new `fullSyncVersion` UUID. All state-modifying da
 
 Filters control which emails are ingested. They are set globally via the `DEFAULT_MAIL_FILTERS` environment variable and applied to all users at deployment time.
 
-| Filter | Type | Description |
-|--------|------|-------------|
-| `ignoredBefore` | ISO 8601 date | Emails created before this date are skipped |
-| `ignoredSenders` | RegExp[] | Emails whose sender address matches any pattern are skipped. Patterns must use `/pattern/flags` format. |
-| `ignoredContents` | RegExp[] | Emails whose subject or body matches any pattern are skipped. Patterns must use `/pattern/flags` format. |
+| Filter | Type | Applied Where | Description |
+|--------|------|--------------|-------------|
+| `ignoredBefore` | ISO 8601 date | Graph API query filter | Emails created before this date are excluded from the Graph API response |
+| `ignoredSenders` | RegExp[] | In-memory after fetch | Emails whose sender address matches any pattern are skipped. Patterns must use `/pattern/flags` format. |
+| `ignoredContents` | RegExp[] | In-memory after fetch | Emails whose subject or body matches any pattern are skipped. Patterns must use `/pattern/flags` format. |
 
 **Example `DEFAULT_MAIL_FILTERS` value:**
 
@@ -155,7 +155,7 @@ The scheduler publishes a `full-sync.retrigger` event which the full sync consum
 
 Full sync and live catch-up run **concurrently** after a user connects. They are independent pipelines that both contribute to the Unique knowledge base ingestion queue.
 
-- **Watermark initialisation**: Full sync initializes `newestLastModifiedDateTime` (the watermarks). Once initialized, live catch-up can use them for delta queries and both pipelines ingest in parallel.
+- **Watermark initialisation**: Full sync initializes `newestLastModifiedDateTime` (the watermark) at the start of the first sync run. Once initialized, live catch-up can use it for delta queries and both pipelines ingest in parallel.
 - **Impact on `waiting-for-ingestion`**: When full sync finishes uploading all its batches, it enters `waiting-for-ingestion` and waits for the Unique KB to confirm all queued messages are processed. Because live catch-up is uploading its own batches to the same ingestion queue, full sync may remain in `waiting-for-ingestion` longer when live catch-up activity is high.
 - **Watermark ownership**: Once full sync has initialized the watermarks, live catch-up takes ownership of `newestLastModifiedDateTime` and updates it on every notification going forward.
 

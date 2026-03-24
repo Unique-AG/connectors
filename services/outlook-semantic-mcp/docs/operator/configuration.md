@@ -33,8 +33,9 @@ Set via `mcpConfig.app` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `SELF_URL` | `mcpConfig.app.selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
-| `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Set to `enabled` to expose extra debugging data in tool responses |
-| `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `disabled` | Buffer logs before writing to reduce I/O (`enabled`/`disabled`) |
+| `PORT` | — | `9542` | Local HTTP port the server binds to |
+| `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Set to `enabled` to expose debug tools and extra debugging data in tool responses |
+| `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `disabled` | Buffer logs before writing to reduce I/O (`enabled`/`disabled`). When unset, defaults to buffering enabled. |
 | `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | `{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}` | JSON string controlling which emails are synced |
 
 ### Microsoft Configuration
@@ -45,7 +46,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | same as `SELF_URL` | Public webhook URL if different from `SELF_URL` |
-| `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC` | (optional) | Hour of day in UTC (0–23) when scheduled subscription renewals occur |
+| `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC` | `3` | Hour of day in UTC (0–23) when scheduled subscription renewals occur |
 
 ### Unique API Configuration
 
@@ -56,7 +57,7 @@ Set via `mcpConfig.unique` in Helm values:
 | `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
 | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
 | `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `mcpConfig.unique.scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
-| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `disabled` | Whether to store emails internally in Unique knowledge base (`enabled`/`disabled`) |
+| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | Whether to store emails internally in Unique knowledge base (`enabled`/`disabled`). Helm default is not set; the application default is `enabled`. |
 | `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | JSON: `{"x-company-id":"...","x-user-id":"..."}` |
 | `UNIQUE_ZITADEL_CLIENT_ID` | `mcpConfig.unique.zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
 | `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `mcpConfig.unique.zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
@@ -68,7 +69,7 @@ Set via `mcpConfig.logs` in Helm values:
 
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
-| `LOGS_DIAGNOSTICS_DATA_POLICY` | `mcpConfig.logs.diagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `expose` shows full data |
+| `LOGS_DIAGNOSTICS_DATA_POLICY` | `mcpConfig.logs.diagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
 
 ### Authentication Token Configuration
 
@@ -85,7 +86,7 @@ Set via `server.env` in Helm values for plain config, or via `server.envVars` (w
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `LOG_LEVEL` | `info` | Log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` |
 | `MAX_HEAP_MB` | `1920` | Node.js max heap size in MB |
 | `NODE_ENV` | `production` | Node environment |
 

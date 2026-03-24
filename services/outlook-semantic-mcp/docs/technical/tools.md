@@ -3,10 +3,10 @@
 
 # Tools
 
-The Outlook Semantic MCP Server exposes 14 MCP tools. 10 are available to all users; 4 are only exposed when `MCP_DEBUG_MODE=true` is set on the server.
+The Outlook Semantic MCP Server exposes 10 MCP tools available to all users, plus 4 debug-mode tools only exposed when `MCP_DEBUG_MODE=enabled` is set on the server.
 
 !!! warning "Debug-Mode Tools"
-    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_DEBUG_MODE=true`** is configured. They are intended for operators diagnosing sync issues — they do not appear in the tool list for standard deployments.
+    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_DEBUG_MODE=enabled`** is configured. They are intended for operators diagnosing sync issues — they do not appear in the tool list for standard deployments.
 
 ## Tool Overview
 
@@ -17,7 +17,7 @@ The Outlook Semantic MCP Server exposes 14 MCP tools. 10 are available to all us
 | [`create_draft_email`](#create_draft_email) | Draft Creation | Yes | No |
 | [`lookup_contacts`](#lookup_contacts) | Contact Lookup | No | No |
 | [`list_categories`](#list_categories) | Mailbox Utilities | No | No |
-| [`list_folders`](#list_folders) | Mailbox Utilities | No | No |
+| [`list_folders`](#list_folders) | Mailbox Utilities | Yes | No |
 | [`verify_inbox_connection`](#verify_inbox_connection) | Subscription Management | No | No |
 | [`reconnect_inbox`](#reconnect_inbox) | Subscription Management | Yes | No |
 | [`remove_inbox_connection`](#remove_inbox_connection) | Subscription Management | Yes | No |
@@ -41,26 +41,32 @@ Search emails semantically with optional structured filters. Results are returne
 |-----------|------|----------|-------------|
 | `search` | string | Yes | Search query |
 | `limit` | number (40–100) | No | Maximum results to return. Default: 40 |
-| `conditions` | array | No | Filter conditions. Multiple conditions are combined with OR |
+| `conditions` | array | No | Filter conditions. Multiple condition objects are combined with OR; fields within a single condition are combined with AND. Each condition must have at least one field. |
 
-Each object in `conditions` may include:
+Each object in `conditions` may include the following fields. All condition fields use an operator-wrapped format:
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `dateFrom` | `{ value: string, operator }` | ISO 8601 date — emails received on or after this date |
 | `dateTo` | `{ value: string, operator }` | ISO 8601 date — emails received on or before this date |
-| `fromSenders` | string[] | Filter by sender — email addresses or display names |
-| `toRecipients` | string[] | Filter by To recipient — email addresses or display names |
-| `ccRecipients` | string[] | Filter by CC recipient — email addresses or display names |
-| `directories` | string[] | Folder IDs (from `list_folders`) or system names: `"Inbox"`, `"Sent Items"`, `"Drafts"`, `"Archive"`, `"Outbox"`, `"Clutter"`, `"Conversation History"` |
-| `hasAttachments` | boolean | Filter to emails with or without attachments |
-| `categories` | string \| string[] | Category labels (from `list_categories`) |
+| `fromSenders` | `{ value: string (email), operator }` or `{ value: string[] (emails), operator: "in" \| "notIn" }` | Filter by sender email address |
+| `toRecipients` | `{ value: string (email), operator }` or `{ value: string[] (emails), operator: "in" \| "notIn" }` | Filter by To recipient email address |
+| `ccRecipients` | `{ value: string (email), operator }` or `{ value: string[] (emails), operator: "in" \| "notIn" }` | Filter by CC recipient email address |
+| `directories` | `{ value: string[], operator: "in" \| "notIn" }` | Folder IDs (from `list_folders`) or system names: `"Inbox"`, `"Sent Items"`, `"Drafts"`, `"Archive"`, `"Outbox"`, `"Clutter"`, `"Conversation History"` |
+| `hasAttachments` | `{ value: boolean, operator }` | Filter to emails with or without attachments |
+| `categories` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" }` | Category labels (from `list_categories`) |
+
+**Available operators:**
+
+- Singular operators: `equals`, `notEquals`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual`, `contains`, `notContains`, `isNull`, `isNotNull`, `isEmpty`, `isNotEmpty`
+- Array operators: `in`, `notIn`
 
 **Return shape:**
 
 ```typescript
 {
   success: boolean;
+  status?: string;
   message?: string;
   syncWarning?: string;         // present if sync is incomplete
   searchSummary?: string;
@@ -282,7 +288,7 @@ Check the status of the inbox connection and Microsoft Graph webhook subscriptio
 {
   status: "active" | "expiring_soon" | "expired" | "not_configured";
   message: string;
-  subscription?: {
+  subscription: {
     id: string;
     expiresAt: string;
     minutesUntilExpiration: number;
@@ -313,7 +319,7 @@ Re-establish the Microsoft Outlook inbox subscription when expired or not config
 {
   success: boolean;
   message: string;
-  subscription?: {
+  subscription: {
     id: string;
     expiresAt: string;
     minutesUntilExpiration: number;
@@ -341,7 +347,7 @@ Remove the inbox connection and cease ingesting emails. Deletes the Microsoft Gr
 {
   success: boolean;
   message: string;
-  subscription?: {
+  subscription: {
     id: string;
     status: "removed" | "not_found";
   } | null;
@@ -391,10 +397,10 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
     };
   } | null;
   ingestionStats?: {
-    failed?: number;
-    finished?: number;
-    inProgress?: number;
-  } | null;
+    failed: number;
+    finished: number;
+    inProgress: number;
+  } | { state: "error" } | null;
 }
 ```
 
@@ -408,7 +414,7 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
 
 ## Debug-Mode Tools
 
-The following four tools are only available when `MCP_DEBUG_MODE=true` is set in the server configuration. They are intended for operators diagnosing sync issues, not for end users.
+The following four tools are only available when `MCP_DEBUG_MODE=enabled` is set in the server configuration. They are intended for operators diagnosing sync issues, not for end users.
 
 ### `run_full_sync`
 

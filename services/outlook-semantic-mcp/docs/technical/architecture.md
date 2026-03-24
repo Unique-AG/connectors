@@ -3,7 +3,7 @@
 
 # Architecture
 
-The Outlook Semantic MCP Server is a NestJS-based microservice that integrates Microsoft Outlook email with the Unique platform through the Model Context Protocol (MCP). It syncs emails from connected mailboxes into the Unique knowledge base and exposes 14 MCP tools for AI-assisted email search, draft creation, and contact lookup.
+The Outlook Semantic MCP Server is a NestJS-based microservice that integrates Microsoft Outlook email with the Unique platform through the Model Context Protocol (MCP). It syncs emails from connected mailboxes into the Unique knowledge base and exposes 10 MCP tools (plus 4 debug-mode tools) for AI-assisted email search, draft creation, and contact lookup.
 
 **Core Capabilities:**
 
@@ -12,7 +12,7 @@ The Outlook Semantic MCP Server is a NestJS-based microservice that integrates M
 - Handles OAuth 2.1 + PKCE authentication for MCP clients (MCP OAuth layer)
 - Handles delegated Microsoft OAuth for Graph API access
 - Ingests email content into the Unique platform with folder-based scope management
-- Provides 14 MCP tools: email search, draft creation, contact lookup, folder listing, inbox management, and sync monitoring
+- Provides 10 MCP tools (plus 4 debug-mode tools): email search, draft creation, contact lookup, folder listing, inbox management, and sync monitoring
 
 ## High-Level Architecture
 
@@ -161,107 +161,141 @@ erDiagram
     user_profiles ||--o{ directories : "has"
     user_profiles ||--o| directories_sync : "has"
     oauth_clients ||--o{ oauth_sessions : "owns"
-    oauth_sessions ||--o{ tokens : "issues"
-    oauth_sessions ||--o{ authorization_codes : "generates"
 
     user_profiles {
-        uuid id PK
+        varchar id PK "typeid"
         string provider
-        string providerUserId UK
+        string providerUserId "unique with provider"
         string username
         string email
         string displayName
-        text accessToken "encrypted"
-        text refreshToken "encrypted"
+        jsonb raw
+        varchar accessToken "encrypted"
+        varchar refreshToken "encrypted"
+        string avatarUrl
         timestamp createdAt
         timestamp updatedAt
     }
 
     subscriptions {
-        uuid id PK
-        uuid userProfileId FK
+        varchar id PK "typeid"
+        varchar userProfileId FK
         string subscriptionId UK
-        string internalType
+        enum internalType "mail_monitoring"
         timestamp expiresAt
         timestamp createdAt
         timestamp updatedAt
     }
 
     oauth_clients {
-        uuid id PK
+        varchar id PK "typeid"
         string clientId UK
-        string redirectUris
-        string grantTypes
+        string clientSecret
+        string clientName
+        string clientDescription
+        string logoUri
+        string clientUri
+        string developerName
+        string developerEmail
+        string[] redirectUris
+        string[] grantTypes
+        string[] responseTypes
+        string tokenEndpointAuthMethod
         timestamp createdAt
         timestamp updatedAt
     }
 
     oauth_sessions {
-        uuid id PK
+        varchar id PK "typeid"
         string sessionId UK
-        uuid clientId FK
+        string clientId
         string state
         string codeChallenge
         string codeChallengeMethod
+        string redirectUri
+        string oauthState
+        string scope
+        string resource
         timestamp expiresAt
         timestamp createdAt
+        timestamp updatedAt
     }
 
     tokens {
-        uuid id PK
+        varchar id PK "typeid"
         string token UK
         enum type "ACCESS|REFRESH"
-        uuid userProfileId FK
-        uuid sessionId FK
+        varchar userProfileId FK
+        string userId
+        string clientId
+        string scope
+        string resource
         string familyId
         int generation
+        timestamp usedAt
         timestamp expiresAt
         timestamp createdAt
     }
 
     authorization_codes {
-        uuid id PK
+        varchar id PK "typeid"
         string code UK
-        uuid userProfileId FK
-        uuid sessionId FK
+        varchar userProfileId FK
+        string userId
+        string clientId
+        string redirectUri
         string codeChallenge
         string codeChallengeMethod
+        string resource
+        string scope
+        timestamp usedAt
         timestamp expiresAt
         timestamp createdAt
     }
 
     inbox_configurations {
-        uuid id PK
-        uuid userProfileId FK UK
+        varchar id PK "typeid"
+        varchar userProfileId FK UK
         jsonb filters
-        enum fullSyncState
+        enum fullSyncState "ready|running|paused|waiting-for-ingestion|failed"
+        uuid fullSyncVersion
         timestamp fullSyncHeartbeatAt
         string fullSyncNextLink
         int fullSyncBatchIndex
         int fullSyncExpectedTotal
-        enum liveCatchUpState
+        int fullSyncSkipped
+        int fullSyncScheduledForIngestion
+        int fullSyncFailedToUploadForIngestion
+        timestamp fullSyncLastRunAt
+        timestamp fullSyncLastStartedAt
+        enum liveCatchUpState "ready|running|failed"
         timestamp liveCatchUpHeartbeatAt
+        text[] pendingLiveMessageIds
+        timestamp newestCreatedDateTime
+        timestamp oldestCreatedDateTime
+        timestamp newestLastModifiedDateTime
         timestamp createdAt
         timestamp updatedAt
     }
 
     directories {
-        uuid id PK
-        uuid userProfileId FK
+        varchar id PK "typeid"
+        varchar userProfileId FK
+        enum internalType "Archive|Deleted Items|Drafts|..."
         string providerDirectoryId
         string displayName
-        string internalType
-        uuid parentId FK
+        varchar parentId FK
         boolean ignoreForSync
         timestamp createdAt
         timestamp updatedAt
     }
 
     directories_sync {
-        uuid id PK
-        uuid userProfileId FK UK
+        varchar id PK "typeid"
+        varchar userProfileId FK UK
         string deltaLink
         timestamp lastDeltaSyncRanAt
+        timestamp lastDeltaChangeDetectedAt
         timestamp lastDirectorySyncRanAt
         timestamp createdAt
         timestamp updatedAt
@@ -274,7 +308,7 @@ erDiagram
 | `subscriptions` | Active Microsoft Graph webhook subscriptions per user |
 | `oauth_clients` | Registered MCP OAuth clients (dynamically registered) |
 | `oauth_sessions` | Active OAuth sessions tracking PKCE state |
-| `tokens` | MCP access and refresh tokens (hashed), with token-family revocation |
+| `tokens` | MCP access and refresh tokens (opaque random values), with token-family revocation |
 | `authorization_codes` | Temporary PKCE authorization codes |
 | `inbox_configurations` | Per-user sync state: full sync progress, live catch-up state, mail filters |
 | `directories` | Outlook folder structure synced from Graph API |

@@ -3,7 +3,7 @@
 
 # Directory Sync
 
-Directory sync keeps the server's local copy of the user's Outlook folder structure in sync with Microsoft Graph. It runs on a 5-minute schedule using Graph delta queries.
+Directory sync keeps the server's local copy of the user's Outlook folder structure in sync with Microsoft Graph. It runs on a 5-minute schedule (processing up to 10 users per run) using Graph delta queries. Directory sync is also triggered at the start of each full sync and live catch-up execution.
 
 It serves two purposes: enabling folder-based email search filtering, and tracking email movement between folders to handle soft and hard email deletion without relying on Graph delete notifications.
 
@@ -56,7 +56,9 @@ sequenceDiagram
 | Event | Trigger |
 |-------|---------|
 | Initial scan | On module init after user connects |
-| Ongoing delta sync | Every 5 minutes (cron) |
+| Ongoing delta sync | Every 5 minutes (cron), limited to 10 users per run |
+| On full sync start | Triggered at the beginning of each full sync execution |
+| On live catch-up start | Triggered at the beginning of each live catch-up execution |
 
 The `deltaLink` from each Graph delta response is stored in the `directories_sync` table and used on the next run to fetch only changed folders, keeping the sync efficient.
 

@@ -22,7 +22,7 @@ Subscriptions are renewed via Microsoft Graph lifecycle notifications:
 - The server responds by PATCHing the subscription with a new `expirationDateTime`
 - Subscriptions renew to the next configured UTC expiration hour (set by `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC`)
 
-If a `subscriptionRemoved` notification arrives (Microsoft removed the subscription), the subscription record is marked expired and must be recreated via `reconnect_inbox`.
+If a `subscriptionRemoved` notification arrives (Microsoft removed the subscription), the subscription and inbox_configurations records are deleted. The user must reconnect via `reconnect_inbox`.
 
 ## Subscription Status
 
@@ -39,19 +39,20 @@ The `verify_inbox_connection` tool reports one of four statuses:
 
 Safe to call at any time — it is idempotent:
 
-- If a valid subscription exists: returns `already_active`, no changes made
-- If subscription is expired: deletes the old record and creates a new subscription
+- If a valid subscription exists with more than 15 minutes until expiry: returns `already_active`, no changes made
+- If a valid subscription exists but expires within 15 minutes: returns `expiring_soon`, no changes made (renewal is automatic)
+- If subscription is expired: deletes the old subscription and inbox_configurations records and creates a new subscription
 - If no subscription exists: creates a new subscription
 
-Calling `reconnect_inbox` also re-triggers the full sync if one has not been completed.
+Calling `reconnect_inbox` triggers a full sync when a new subscription is created. If the subscription is `already_active` or `expiring_soon`, no full sync is triggered.
 
 ## `remove_inbox_connection`
 
 Removes the mailbox connection entirely:
 
+- Removes directory sync data and the root scope from the Unique knowledge base
 - Deletes the Graph webhook subscription
 - Deletes the `inbox_configurations` record (stops full sync and live catch-up)
-- Removes directory sync data and the root scope from the Unique knowledge base
 
 Previously ingested emails remain in the Unique knowledge base. To resume ingestion, call `reconnect_inbox`.
 
@@ -59,7 +60,7 @@ Previously ingested emails remain in the Unique knowledge base. To resume ingest
 
 | Condition | Recovery |
 |-----------|---------|
-| `subscriptionRemoved` lifecycle event | Subscription marked expired; user must call `reconnect_inbox` |
+| `subscriptionRemoved` lifecycle event | Subscription and inbox_configurations deleted; user must call `reconnect_inbox` |
 | `reauthorizationRequired` lifecycle event | Server automatically renews the subscription |
 
 ## Related Documentation

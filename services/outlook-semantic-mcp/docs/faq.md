@@ -7,26 +7,26 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Outlook Semantic MCP Server is a **traditional MCP server** — it exposes 14 user-facing MCP tools that AI clients invoke on demand, plus 4 additional tools available only in debug mode. This contrasts with connector-style servers (such as Teams MCP) which ingest data silently in the background without exposing tools.
+**Answer:** The Outlook Semantic MCP Server is a **hybrid MCP server** — it exposes 10 user-facing MCP tools that AI clients invoke on demand (plus 4 additional tools available only in debug mode), and it also automatically ingests the user's email history and live mail into the Unique knowledge base in the background.
 
 **What it does:**
 
 - Automatically ingests the user's complete email history into the Unique knowledge base after connection
-- Exposes 14 tools for searching emails, managing drafts, listing folders, and monitoring sync status
+- Exposes 10 tools (plus 4 debug-mode tools) for searching emails, managing drafts, listing folders, and monitoring sync status
 - Keeps the knowledge base up to date in real time via webhook-driven live catch-up
 - Requires no manual setup beyond the initial connection
 
 **What the user sees:**
 
 - An initial OAuth consent screen to connect their Outlook account
-- 14 MCP tools available in their AI client immediately after connection
+- 10 MCP tools available in their AI client immediately after connection (14 with debug mode enabled)
 - Search results that may be incomplete while the initial full sync is running (a `syncWarning` is returned by `search_emails`)
 
 **See also:** [Architecture](./technical/architecture.md) — [Tools](./technical/tools.md)
 
 ### What tools are available?
 
-**Answer:** The server exposes 14 user-facing tools:
+**Answer:** The server exposes 10 user-facing tools:
 
 | Category | Tools |
 |----------|-------|
@@ -37,13 +37,13 @@
 | Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `remove_inbox_connection` |
 | Sync Monitoring | `sync_progress` |
 
-An additional 4 tools are available only when the server is running in debug mode (`MCP_DEBUG_MODE=true`): `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`. These are intended for development and troubleshooting and are not exposed in production deployments.
+An additional 4 tools are available only when the server is running in debug mode (`MCP_DEBUG_MODE=enabled`): `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`. These are intended for development and troubleshooting and are not exposed in production deployments.
 
 **See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#debug-mode-tools)
 
 ### Do I need to do anything after connecting?
 
-**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting your complete email history. The 14 tools become available immediately. Search results may be incomplete while the initial full sync is running.
+**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting your complete email history. The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
 
 ## Authentication & Permissions
 
@@ -412,7 +412,7 @@ Full sync is not affected by RabbitMQ availability — it pulls directly from Mi
 - [Flows](./technical/flows.md) — Sequence diagrams for all major flows
 - [Permissions](./technical/permissions.md) — Required scopes and least-privilege justification
 - [Security](./technical/security.md) — Encryption, PKCE, token rotation, and threat model
-- [Tools](./technical/tools.md) — Full reference for all 14 MCP tools
+- [Tools](./technical/tools.md) — Full reference for all MCP tools
 - [Full Sync](./technical/full-sync.md) — Historical batch ingestion mechanics
 - [Live Catch-Up](./technical/live-catchup.md) — Webhook-driven real-time ingestion
 - [Subscription Management](./technical/subscription-management.md) — Subscription lifecycle

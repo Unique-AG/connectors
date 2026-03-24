@@ -15,15 +15,15 @@
 
 ## Overview
 
-The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server performs a full historical email sync and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and manage folders through 14 structured MCP tools.
+The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server performs a full historical email sync and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and manage folders through 10 MCP tools (plus 4 additional debug-mode tools).
 
-**Note:** This is a traditional MCP server. It exposes tools, and users interact with it by invoking those tools through an MCP client (such as Claude Desktop or a custom agent). Unlike connector-style servers, it does not ingest data silently in the background — it responds to explicit tool calls.
+**Note:** This is a hybrid MCP server. It exposes tools for AI clients to invoke on demand, and it also automatically ingests the user's email history and live mail into the Unique knowledge base in the background after connection.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
 ## Quick Summary
 
-**What it does:** Provides AI clients with 14 MCP tools for searching emails, composing drafts, looking up contacts, managing folders, and monitoring sync status against a user's Microsoft Outlook mailbox
+**What it does:** Provides AI clients with 10 MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, managing folders, and monitoring sync status against a user's Microsoft Outlook mailbox
 
 **Deployment:** Kubernetes-based NestJS microservice
 
@@ -98,7 +98,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 
 - After connecting, the server automatically begins a full sync to ingest your complete email history
 - Sync progress can be monitored via the `sync_progress` tool, which reports the current state, counters, and date range being processed
-- `sync_progress` returns the current sync state (`running`, `paused`, `finished`, `error`), the number of emails ingested, the date window being processed, and a warning if results may be incomplete
+- `sync_progress` returns the current sync state (`ready`, `running`, `paused`, `waiting-for-ingestion`, `failed`), the number of emails ingested, the date window being processed, and a warning if results may be incomplete
 
 **Live Catch-Up (Real-Time Webhook-Driven)**
 
@@ -188,7 +188,7 @@ sequenceDiagram
     OutlookMCP->>EntraID: Exchange code for tokens
     EntraID->>OutlookMCP: Access + Refresh tokens
     OutlookMCP->>DB: Store encrypted tokens
-    OutlookMCP->>MCPClient: Opaque JWT for MCP auth
+    OutlookMCP->>MCPClient: Opaque MCP bearer token
 
     Note over User,MCPClient: User invokes inbox connection tool
     User->>MCPClient: Call verify_inbox_connection tool
@@ -225,7 +225,7 @@ sequenceDiagram
 
     Note over OutlookMCP,MSGraph: Live Catch-Up (webhook-driven)
     MSGraph->>OutlookMCP: POST /webhook/notifications
-    OutlookMCP->>OutlookMCP: Validate clientState
+    OutlookMCP->>OutlookMCP: Filter out deleted notifications
     OutlookMCP->>RabbitMQ: Enqueue notification
     OutlookMCP->>MSGraph: 202 Accepted
     RabbitMQ->>SyncEngine: Deliver notification

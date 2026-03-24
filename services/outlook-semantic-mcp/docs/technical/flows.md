@@ -101,14 +101,14 @@ sequenceDiagram
     Note over AMQP,DB: Before expiry — lifecycle notification from Microsoft
     MSGraph->>OutlookMCP: POST /mail-subscription/lifecycle (reauthorizationRequired)
     OutlookMCP->>OutlookMCP: Validate clientState secret
-    OutlookMCP->>MSGraph: POST /subscriptions (new subscription)
-    MSGraph->>OutlookMCP: New subscription ID + expiration
-    OutlookMCP->>DB: Replace subscription record
+    OutlookMCP->>MSGraph: PATCH /subscriptions/{id} (new expirationDateTime)
+    MSGraph->>OutlookMCP: Updated subscription
+    OutlookMCP->>DB: Update subscription expiresAt
 
     Note over AMQP,DB: Subscription removed by Microsoft
     MSGraph->>OutlookMCP: POST /mail-subscription/lifecycle (subscriptionRemoved)
     OutlookMCP->>OutlookMCP: Validate clientState secret
-    OutlookMCP->>DB: Mark subscription as expired
+    OutlookMCP->>DB: Delete subscription and inbox_configurations records
 ```
 
 **Subscription states** (as returned by `verify_inbox_connection`):
@@ -142,7 +142,8 @@ sequenceDiagram
     participant UniqueKB as Unique Knowledge Base
 
     MSGraph->>OutlookMCP: POST /mail-subscription/notification
-    OutlookMCP->>OutlookMCP: Validate clientState secret
+    OutlookMCP->>OutlookMCP: Filter out deleted notifications
+    OutlookMCP->>OutlookMCP: Group message IDs by subscriptionId
     OutlookMCP->>AMQP: Publish live-catch-up.execute (subscriptionId, messageIds)
     OutlookMCP->>MSGraph: 202 Accepted
 
@@ -190,7 +191,7 @@ sequenceDiagram
     MSGraph->>FullSync: Total message count
     FullSync->>DB: Store fullSyncExpectedTotal
 
-    loop For each batch (200 messages)
+    loop For each batch (100 messages)
         FullSync->>MSGraph: GET /me/messages (paginated, newest first)
         MSGraph->>FullSync: Batch of messages
         FullSync->>UniqueKB: Ingest email content
@@ -217,7 +218,7 @@ sequenceDiagram
 - Full sync is triggered automatically when a subscription is created — users do not need to invoke it manually.
 - The sync is resumable: `fullSyncNextLink` stores the Graph pagination cursor so a crash or restart picks up where it left off.
 - Stale syncs (no heartbeat for 20+ minutes) are automatically restarted by the sync recovery module.
-- Inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredContents`) are applied server-side before ingestion.
+- `ignoredBefore` is applied as a Graph API query filter. `ignoredSenders` and `ignoredContents` are applied in-memory after each batch is fetched.
 - Full sync **initializes** the watermarks (`newestLastModifiedDateTime`). Once initialized, live catch-up can process notifications in parallel — both pipelines ingest concurrently. Live catch-up ingestion activity can extend the time full sync spends in `waiting-for-ingestion`.
 - Once full sync has initialized the watermarks, live catch-up takes ownership of `newestLastModifiedDateTime` and updates it on every subsequent notification.
 
