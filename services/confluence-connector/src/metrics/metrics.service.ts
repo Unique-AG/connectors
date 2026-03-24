@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
-import { getCurrentTenant } from '../tenant';
+import { getCurrentTenant, tenantStorage } from '../tenant';
 import { getHttpStatusCodeClass } from './utils';
 
 @Injectable()
@@ -129,7 +129,10 @@ export class Metrics {
   }
 
   public recordApiThrottleEvent(): void {
-    this.confluenceApiThrottleEvents.add(1, { tenant: this.tenantName });
+    // Usually fires inside a tenant context, but after a reservoir refresh
+    // Bottleneck may drain queued jobs from a timer with no tenant context - as indicated by bugbot
+    const tenant = tenantStorage.getStore()?.name ?? 'unknown';
+    this.confluenceApiThrottleEvents.add(1, { tenant });
   }
 
   /**
