@@ -15,7 +15,9 @@ The SharePoint Connector requires specific permissions to access Microsoft Graph
 | Microsoft Graph | `Sites.Selected` | Application | Access to specifically granted sites |
 | Microsoft Graph | `Lists.SelectedOperations.Selected` | Application | Access to specifically granted document libraries |
 
-**Note:** Use `Sites.Selected` for site-level access or `Lists.SelectedOperations.Selected` for more granular library-level access.
+**Note:** Use `Sites.Selected` for site-level access or `Lists.SelectedOperations.Selected` for more granular library-level access. Both can be enabled simultaneously for mixed access scenarios.
+
+**Important:** These two permissions are **not interchangeable**. If library-level grants were issued (via `Grant-PnPAzureADAppSitePermission -List`) but the app registration only has `Sites.Selected`, requests to those libraries will return **403 Forbidden**. The app registration must include `Lists.SelectedOperations.Selected` to honour library-level grants.
 
 ### Permission Sync (Optional)
 
