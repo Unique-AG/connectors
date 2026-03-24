@@ -49,15 +49,15 @@ An additional 4 tools are available only when the server is running in debug mod
 
 ### Do any permissions require admin consent?
 
-**Answer:** No. All seven permissions used by the server are **delegated permissions that do not require admin consent**. Users can connect and grant consent themselves without IT involvement.
+**Answer:** No. All five permissions used by the server are **delegated permissions that do not require admin consent**. Users can connect and grant consent themselves without IT involvement.
 
-The permissions are: `User.Read`, `Mail.Read`, `Mail.ReadBasic`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`.
+The permissions are: `User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`.
 
 **See also:** [Permissions](./technical/permissions.md)
 
 ### Why does the server need `Mail.ReadWrite` if it mostly reads emails?
 
-**Answer:** `Mail.ReadWrite` is required by the `create_draft_email` tool, which creates and modifies email messages in the user's mailbox via `POST /me/messages`. The read-only `Mail.Read` permission is insufficient for this operation.
+**Answer:** `Mail.ReadWrite` serves dual purposes: it provides read access for email sync and search (full sync, live catch-up), and write access for the `create_draft_email` tool which creates email messages in the user's mailbox via `POST /me/messages`. Since `Mail.ReadWrite` already includes full read access, the narrower `Mail.Read` and `Mail.ReadBasic` scopes are not needed.
 
 Delete detection does not require write access — it works by observing `created` change notifications on ignored folders (such as Deleted Items), not by moving emails.
 
@@ -230,7 +230,7 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 **Answer:** `search_emails` performs semantic search against the Unique knowledge base — not a keyword search against a local index. It supports natural language queries and returns semantically relevant results even when exact words do not match.
 
-Optional filters: `folderId` (from `list_folders`), `fromSenders`, `toRecipients`, `ccRecipients` (email addresses or display names), `startDate`, `endDate`, `limit`.
+Optional filters: `folderId` (from `list_folders`), `fromSenders`, `toRecipients`, `ccRecipients` (full or partial email addresses), `startDate`, `endDate`, `limit`.
 
 Search results may be incomplete while full sync is in progress. A `syncWarning` field is returned in that case.
 

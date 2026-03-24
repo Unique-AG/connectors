@@ -10,9 +10,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | Permission | Type | Admin Consent | Required | Purpose |
 |------------|------|---------------|----------|---------|
 | `User.Read` | Delegated | No | Yes | Resolve user identity and profile |
-| `Mail.Read` | Delegated | No | Yes | Read emails for sync and search |
-| `Mail.ReadBasic` | Delegated | No | Yes | Read basic email metadata |
-| `Mail.ReadWrite` | Delegated | No | Yes | Create draft emails in the user's mailbox |
+| `Mail.ReadWrite` | Delegated | No | Yes | Read emails for sync and search; create draft emails in the user's mailbox |
 | `MailboxSettings.Read` | Delegated | No | Yes | Read mailbox settings and folder structure |
 | `People.Read` | Delegated | No | Yes | Look up contacts and people for address resolution |
 | `offline_access` | Delegated | No | Yes | Obtain refresh tokens for background sync |
@@ -55,31 +53,13 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Why Not Less** | This is the minimum permission to read any user data |
 | **Why Not `User.ReadBasic.All`** | That permission reads other users; we only need the signed-in user |
 
-### `Mail.Read`
-
-| Aspect | Detail |
-|--------|--------|
-| **Purpose** | Read the full content of the user's email messages |
-| **Used For** | Fetching email bodies, headers, and metadata during full sync and live catch-up |
-| **Why Not Less** | `Mail.ReadBasic` does not include message body content |
-| **Why Not `Mail.ReadWrite`** | `Mail.Read` is sufficient for reading; `Mail.ReadWrite` is requested separately only for draft creation |
-
-### `Mail.ReadBasic`
-
-| Aspect | Detail |
-|--------|--------|
-| **Purpose** | Read basic email metadata (subject, sender, date, recipients) without body content |
-| **Used For** | Lightweight metadata queries such as folder listing and message counts |
-| **Why Not Less** | This is already a reduced-scope subset of `Mail.Read` |
-| **Why Both `Mail.Read` and `Mail.ReadBasic`** | Some Graph API operations accept `Mail.ReadBasic` as sufficient; requesting both ensures compatibility across all endpoints |
-
 ### `Mail.ReadWrite`
 
 | Aspect | Detail |
 |--------|--------|
-| **Purpose** | Create and modify email messages in the user's mailbox |
-| **Used For** | Creating draft emails via the `create_draft_email` tool (POST `/me/messages`) |
-| **Why Not Less** | `Mail.Read` does not allow creating messages; `Mail.ReadWrite` is the minimum for draft creation |
+| **Purpose** | Read and create email messages in the user's mailbox |
+| **Used For** | Fetching email bodies, headers, and metadata during full sync and live catch-up; creating draft emails via the `create_draft_email` tool (POST `/me/messages`) |
+| **Why Not `Mail.Read` + `Mail.ReadWrite`** | `Mail.ReadWrite` already includes full read access, making `Mail.Read` and `Mail.ReadBasic` redundant |
 | **Why Not `Mail.Send`** | The server only creates drafts — sending is a deliberate user action in Outlook. `Mail.Send` is not requested. |
 
 ### `MailboxSettings.Read`
@@ -158,7 +138,6 @@ In addition to the Graph permissions above, the OAuth flow also requests the sta
 ## Permission Reference Links
 
 - [Microsoft Graph Permissions Reference](https://learn.microsoft.com/en-us/graph/permissions-reference) - Official permission documentation
-- [Mail.Read](https://graphpermissions.merill.net/permission/Mail.Read) - Third-party permission explorer
 - [Mail.ReadWrite](https://graphpermissions.merill.net/permission/Mail.ReadWrite) - Third-party permission explorer
 - [People.Read](https://graphpermissions.merill.net/permission/People.Read) - Third-party permission explorer
 

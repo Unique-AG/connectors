@@ -49,9 +49,9 @@ Each object in `conditions` may include the following fields. All condition fiel
 |-------|------|-------------|
 | `dateFrom` | `{ value: string, operator }` | ISO 8601 date — emails received on or after this date |
 | `dateTo` | `{ value: string, operator }` | ISO 8601 date — emails received on or before this date |
-| `fromSenders` | `{ value: string (email), operator }` or `{ value: string[] (emails), operator: "in" \| "notIn" }` | Filter by sender email address |
-| `toRecipients` | `{ value: string (email), operator }` or `{ value: string[] (emails), operator: "in" \| "notIn" }` | Filter by To recipient email address |
-| `ccRecipients` | `{ value: string (email), operator }` or `{ value: string[] (emails), operator: "in" \| "notIn" }` | Filter by CC recipient email address |
+| `fromSenders` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" \| "containsAny" }` | Filter by sender — accepts full email addresses or partial strings (e.g. `"@example.com"`). Prefer `containsAny` when matching a list of emails. |
+| `toRecipients` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" \| "containsAny" }` | Filter by To recipient — accepts full email addresses or partial strings. Prefer `containsAny` when matching a list of emails. |
+| `ccRecipients` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" \| "containsAny" }` | Filter by CC recipient — accepts full email addresses or partial strings. Prefer `containsAny` when matching a list of emails. |
 | `directories` | `{ value: string[], operator: "in" \| "notIn" }` | Folder IDs (from `list_folders`) or system names: `"Inbox"`, `"Sent Items"`, `"Drafts"`, `"Archive"`, `"Outbox"`, `"Clutter"`, `"Conversation History"` |
 | `hasAttachments` | `{ value: boolean, operator }` | Filter to emails with or without attachments |
 | `categories` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" }` | Category labels (from `list_categories`) |
@@ -59,7 +59,7 @@ Each object in `conditions` may include the following fields. All condition fiel
 **Available operators:**
 
 - Singular operators: `equals`, `notEquals`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual`, `contains`, `notContains`, `isNull`, `isNotNull`, `isEmpty`, `isNotEmpty`
-- Array operators: `in`, `notIn`
+- Array operators: `in`, `notIn`, `containsAny` (email fields only — expands to OR of `contains` filters)
 
 **Return shape:**
 

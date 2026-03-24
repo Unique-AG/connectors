@@ -53,9 +53,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | Permission | Type | Admin Consent | Required | Purpose |
 |------------|------|---------------|----------|---------|
 | `User.Read` | Delegated | No | Yes | Resolve user identity and profile |
-| `Mail.Read` | Delegated | No | Yes | Read emails for sync and search |
-| `Mail.ReadBasic` | Delegated | No | Yes | Read basic email metadata |
-| `Mail.ReadWrite` | Delegated | No | Yes | Create draft emails in the user's mailbox |
+| `Mail.ReadWrite` | Delegated | No | Yes | Read emails for sync and search; create draft emails |
 | `MailboxSettings.Read` | Delegated | No | Yes | Read mailbox settings and folder structure |
 | `People.Read` | Delegated | No | Yes | Look up contacts and people for address resolution |
 | `offline_access` | Delegated | No | Yes | Obtain refresh tokens for background sync |
