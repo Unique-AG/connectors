@@ -6,10 +6,15 @@ import { clampToValidDate } from '~/utils/clamp-to-valid-date';
 
 export const CONTAINS_ANY_OPERATOR = 'containsAny' as const;
 
-const ArrayConditionFieldSchema = <T extends z.ZodArray>(itemSchema: T) =>
+const ArrayConditionFieldSchema = <T extends z.ZodArray>(
+  itemSchema: T,
+  { isStrict = false } = {},
+) =>
   z.object({
     value: itemSchema,
-    operator: z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN, CONTAINS_ANY_OPERATOR]),
+    operator: isStrict
+      ? z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN])
+      : z.enum([UniqueQLOperator.IN, UniqueQLOperator.NOT_IN, CONTAINS_ANY_OPERATOR]),
   });
 
 const SingularConditionFieldSchema = <T extends z.ZodTypeAny>(valueSchema: T) =>
@@ -85,6 +90,7 @@ export const SearchConditionSchema = z
             `For custom user-defined folders, pass the folder ID obtained from \`list_folders\`. ` +
             `Example IDs: ["${EXAMPLE_FOLDER_IDS.first}", "${EXAMPLE_FOLDER_IDS.second}"]. Recommended operators: in or notIn.`,
         ),
+      { isStrict: true },
     ).optional(),
     hasAttachments: SingularConditionFieldSchema(
       z
