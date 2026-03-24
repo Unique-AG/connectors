@@ -35,14 +35,16 @@ These APIs are used for fetching SharePoint content:
 
 | API Endpoint | Method | Use Case | Permission |
 |--------------|--------|----------|------------|
-| `/sites/{siteId}` | GET | Fetch site metadata | `Sites.Selected` |
-| `/sites/{siteId}/drives` | GET | Fetch document libraries | `Sites.Selected` |
-| `/drives/{driveId}/items/{itemId}/children` | GET | Fetch folder children | `Sites.Selected` |
-| `/drives/{driveId}/items/{itemId}/content` | GET | Download file content | `Sites.Selected` |
+| `/sites/{siteId}` | GET | Fetch site metadata | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/drives` | GET | Fetch document libraries | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/drives/{driveId}/items/{itemId}/children` | GET | Fetch folder children | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/drives/{driveId}/items/{itemId}/content` | GET | Download file content | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
 | `/sites/{siteId}/lists` | GET | Find SitePages list | `Sites.Selected` |
-| `/sites/{siteId}/lists/{listId}/items` | GET | List ASPX pages | `Sites.Selected` |
-| `/sites/{siteId}/lists/{listId}/items/{itemId}` | GET | Get ASPX page content | `Sites.Selected` |
+| `/sites/{siteId}/lists/{listId}/items` | GET | List ASPX pages | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/lists/{listId}/items/{itemId}` | GET | Get ASPX page content | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
 | `/sites/{siteId}/sites` | GET | Discover child subsites | `Sites.Selected` |
+
+Either permission covers the endpoints above. A library-level grant via `Lists.SelectedOperations.Selected` also provides access to basic site information (metadata, drives listing) for the site that hosts the granted library.
 
 ### Permission Mode
 
@@ -50,8 +52,8 @@ These APIs are used when permission sync is enabled:
 
 | API Endpoint | Method | Use Case | Permission |
 |--------------|--------|----------|------------|
-| `/drives/{driveId}/items/{itemId}/permissions` | GET | Fetch file/folder permissions | `Sites.Selected` |
-| `/sites/{siteId}/lists/{listId}/items/{itemId}/permissions` | GET | Fetch ASPX page permissions (beta) | `Sites.Selected` |
+| `/drives/{driveId}/items/{itemId}/permissions` | GET | Fetch file/folder permissions | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/lists/{listId}/items/{itemId}/permissions` | GET | Fetch ASPX page permissions (beta) | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
 | `/groups/{groupId}/members` | GET | Read Entra ID group members | `GroupMember.Read.All`, `User.ReadBasic.All` |
 | `/groups/{groupId}/owners` | GET | Read Entra ID group owners | `GroupMember.Read.All`, `User.ReadBasic.All` |
 
