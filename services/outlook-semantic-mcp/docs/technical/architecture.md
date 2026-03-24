@@ -284,7 +284,7 @@ erDiagram
 
 - **Token Family Tracking**: `tokens.familyId` + `tokens.generation` — if a refresh token is reused (possible theft), the entire family is revoked.
 - **Encrypted Microsoft Tokens**: Microsoft access/refresh tokens are AES-256-GCM encrypted at rest in `user_profiles`.
-- **Hashed MCP Tokens**: MCP tokens are stored as hashes, not plaintext, for cache-based validation.
+- **Opaque MCP Tokens**: MCP tokens are 512-bit cryptographically random values stored directly in the `tokens` table with TTL-based expiration. Their unguessability (not hashing) is the security property.
 
 ### RabbitMQ
 

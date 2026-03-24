@@ -1,1 +1,288 @@
+<!-- confluence-page-id:  -->
+<!-- confluence-space-key: PUBDOC -->
+
 # Security
+
+This document describes the security architecture, cryptographic decisions, and threat model for the Outlook Semantic MCP Server.
+
+## Security Layers
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+flowchart TB
+    subgraph External["External Boundaries"]
+        Client["MCP Client"]
+        Graph["Microsoft Graph"]
+        Webhook["Incoming Webhooks"]
+    end
+
+    subgraph Transport["Transport Security"]
+        TLS["TLS 1.2+"]
+        Kong["Kong Gateway"]
+    end
+
+    subgraph App["Application Security"]
+        OAuth["OAuth 2.1 + PKCE"]
+        Validation["Webhook Validation"]
+        TokenRefresh["Token Refresh Middleware"]
+        RateLimit["Rate Limiting"]
+    end
+
+    subgraph Data["Data Security"]
+        Encryption["AES-256-GCM Encryption"]
+        OpaqueTokens["Opaque Random Tokens"]
+        SessionHmac["Session HMAC"]
+    end
+
+    Client --> TLS --> Kong --> OAuth
+    Graph --> TLS --> Kong --> Validation
+    Webhook --> TLS --> Kong --> Validation
+    OAuth --> RateLimit
+    OAuth --> Encryption
+    OAuth --> OpaqueTokens
+    OAuth --> SessionHmac
+    Validation --> TokenRefresh
+    TokenRefresh --> Encryption
+```
+
+## Token Security
+
+### Microsoft Tokens (Encrypted at Rest)
+
+Microsoft access and refresh tokens are stored encrypted using **AES-256-GCM**:
+
+| Aspect | Implementation |
+|--------|----------------|
+| Algorithm | AES-256-GCM (authenticated encryption) |
+| Key Size | 256 bits (32 bytes, provided as 64 hex characters) |
+| IV | Random 12 bytes generated per encryption operation |
+| Stored Format | `{iv}.{tag}.{data}` — all components base64url encoded |
+| Key Storage | `ENCRYPTION_KEY` environment variable |
+
+**Why AES-GCM:**
+
+- Provides both confidentiality and integrity — ciphertext tampering is detected before decryption
+- Industry standard for symmetric token encryption
+- GCM authentication tag prevents oracle attacks
+
+**Token lifecycle:**
+
+1. Microsoft issues tokens during OAuth flow
+2. Tokens encrypted immediately before database write into `user_profiles`
+3. Tokens decrypted only when needed for Graph API calls
+4. Re-encrypted after a successful refresh
+
+### MCP Tokens (Opaque Random Values)
+
+MCP access and refresh tokens are cryptographically random opaque values:
+
+| Aspect | Implementation |
+|--------|----------------|
+| Generation | `randomBytes(64)` encoded as base64url (512-bit) |
+| Storage | Stored directly in `tokens` table with TTL-based expiration |
+| Validation | Cache-first lookup, then database check |
+| Security property | Unguessability (512-bit random) — not hashing |
+
+**Token TTLs:**
+
+| Token Type | Default TTL | Configurable Via |
+|------------|-------------|------------------|
+| MCP Access Token | 60 seconds | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` |
+| MCP Refresh Token | 30 days | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` |
+| Microsoft Access Token | ~1 hour | Issued by Microsoft |
+| Microsoft Refresh Token | ~90 days | Issued by Microsoft |
+
+### Session State Integrity (AUTH_HMAC_SECRET)
+
+During the OAuth callback, the server validates session state using HMAC-SHA256:
+
+```
+HMAC-SHA256(AUTH_HMAC_SECRET, "{sessionId}:{sessionNonce}") → base64url
+```
+
+This prevents an attacker from injecting a forged OAuth callback that could hijack another user's session.
+
+## OAuth 2.1 with PKCE
+
+The MCP OAuth implementation follows [OAuth 2.1](https://oauth.net/2.1/) with mandatory PKCE. The tokens issued to the client are **opaque MCP tokens** — Microsoft tokens remain on the server and are never sent to any client.
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as Outlook Semantic MCP
+    participant Entra as Microsoft Entra ID
+
+    Note over Client: Generate code_verifier (random)
+    Note over Client: code_challenge = SHA256(code_verifier)
+
+    Client->>Server: Authorization request + code_challenge
+    Server->>Entra: Redirect with Microsoft OAuth params
+    Entra->>Client: User authenticates + consents
+    Entra->>Server: Authorization code (Microsoft)
+    Note over Server: Exchange Microsoft auth code for<br/>Microsoft tokens (server-side only)
+    Note over Server: Microsoft tokens encrypted + stored<br/>NEVER sent to client
+    Server->>Client: Redirect with MCP auth code
+
+    Client->>Server: Token request + code_verifier
+    Note over Server: Verify SHA256(code_verifier) == stored code_challenge
+    Note over Server: Issue opaque MCP access + refresh tokens
+    Server->>Client: MCP access token + refresh token
+```
+
+**PKCE protection:**
+
+- Prevents authorization code interception attacks
+- Mandatory for all clients
+- `S256` method: `SHA256(code_verifier)` encoded as base64url
+- Authorization codes are single-use — consumed immediately after exchange
+
+**Token separation:**
+
+| Token | Stays On | Used For |
+|-------|----------|----------|
+| Microsoft access token | Server only | Graph API calls |
+| Microsoft refresh token | Server only | Renewing Graph access |
+| MCP access token | Client | Authenticating tool calls |
+| MCP refresh token | Client | Renewing MCP access |
+
+## Refresh Token Rotation
+
+MCP refresh tokens are rotated on every use with family-based revocation:
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+stateDiagram-v2
+    [*] --> Active: Token issued (familyId assigned)
+
+    Active --> Rotated: Token used — new token issued
+    Rotated --> Active: Next refresh cycle
+
+    Active --> FamilyRevoked: Reuse detected
+    Rotated --> FamilyRevoked: Reuse detected
+
+    note right of FamilyRevoked
+        All tokens in family deleted
+        User must re-authenticate
+    end note
+```
+
+**How family revocation works:**
+
+Each token pair shares a `familyId` (format: `tkfam_...`) and a `generation` counter. On every refresh:
+
+1. Server checks `usedAt` — if already set, the token was reused
+2. If **reused** → entire family revoked immediately (all tokens with same `familyId` deleted)
+3. If **valid** → token marked used, new token issued with incremented `generation`
+
+This detects scenarios where an attacker obtains a refresh token and uses it while the legitimate client still holds the original. Whichever uses it second triggers the revocation.
+
+## Webhook Validation
+
+Microsoft Graph webhook notifications are validated using the `clientState` field:
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+sequenceDiagram
+    participant Graph as Microsoft Graph
+    participant Server as Outlook Semantic MCP
+
+    Note over Server: On subscription creation
+    Server->>Graph: POST /subscriptions<br/>clientState = MICROSOFT_WEBHOOK_SECRET
+
+    Note over Graph: New email arrives
+    Graph->>Server: POST /mail-subscription/notification<br/>clientState in payload
+
+    Server->>Server: Compare clientState to stored secret
+    alt Valid
+        Server->>Graph: 202 Accepted
+    else Invalid
+        Server->>Graph: 401 Unauthorized
+    end
+```
+
+**Validation details:**
+
+- `MICROSOFT_WEBHOOK_SECRET` is a 128-character random string (`openssl rand -hex 64`)
+- Set as `clientState` when creating Graph subscriptions
+- Returned unchanged in every webhook payload from Microsoft
+- Notifications with an invalid `clientState` are rejected before any processing
+
+## Rate Limiting
+
+The server applies IP-based rate limiting to all endpoints:
+
+| Scope | Limit | Purpose |
+|-------|-------|---------|
+| Global (all endpoints) | 10 requests / 60 seconds | General brute-force protection |
+| Authorization endpoint | 3 requests / 60 seconds | Tighter protection for auth initiation |
+
+## Secret Management
+
+### Required Secrets
+
+| Secret | Purpose | Format | Rotation Impact |
+|--------|---------|--------|-----------------|
+| `ENCRYPTION_KEY` | AES-256-GCM key for Microsoft tokens | 64-char hex | All users must reconnect |
+| `AUTH_HMAC_SECRET` | HMAC-SHA256 for OAuth session state | 64-char hex | All active sessions invalidated |
+| `MICROSOFT_CLIENT_SECRET` | Authenticate server with Entra ID | Azure-generated | Update + restart only |
+| `MICROSOFT_WEBHOOK_SECRET` | Validate Graph webhook payloads | 128-char hex | All subscriptions must be recreated |
+
+### Rotation Procedures
+
+**`ENCRYPTION_KEY` rotation:**
+
+There is no zero-downtime rotation — changing the key renders all stored Microsoft tokens unreadable.
+
+1. Generate new key: `openssl rand -hex 32`
+2. Update Kubernetes secret and redeploy
+3. All users must reconnect — their stored tokens are no longer decryptable
+4. Notify users before rotating — treat this as a maintenance window
+
+**`AUTH_HMAC_SECRET` rotation:**
+
+1. Generate new secret: `openssl rand -hex 32`
+2. Update Kubernetes secret and redeploy
+3. All active MCP sessions are immediately invalidated
+4. MCP clients will re-authenticate automatically on their next request
+
+**`MICROSOFT_CLIENT_SECRET` rotation:**
+
+1. Create a new client secret in Microsoft Entra ID (keep the old one active during transition)
+2. Update the Kubernetes secret with the new value
+3. Restart pods
+4. Delete the old secret from Entra ID
+
+**`MICROSOFT_WEBHOOK_SECRET` rotation:**
+
+Rotating this secret requires recreating all active subscriptions, as existing ones hold the old `clientState`:
+
+1. Generate new secret: `openssl rand -hex 64`
+2. Update Kubernetes secret and redeploy
+3. All users must call `reconnect_inbox` to recreate their subscriptions with the new secret
+4. Emails arriving during the gap between old subscription expiry and new subscription creation will be missed for live catch-up (full sync is unaffected)
+
+## Security Checklist for Operators
+
+- [ ] `ENCRYPTION_KEY` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
+- [ ] `AUTH_HMAC_SECRET` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
+- [ ] `MICROSOFT_WEBHOOK_SECRET` is a cryptographically random 128-character string (`openssl rand -hex 64`)
+- [ ] All secrets stored in Kubernetes Secrets (not ConfigMaps)
+- [ ] TLS termination configured at Kong ingress
+- [ ] Network policies restrict pod-to-pod communication
+- [ ] Log aggregation in place (tokens are not logged)
+- [ ] Monitoring alerts configured for authentication failures
+
+## Related Documentation
+
+- [Architecture](./architecture.md) - Token isolation, storage, and authentication layers
+- [Flows](./flows.md) - OAuth connection and token refresh flows
+- [Permissions](./permissions.md) - Microsoft Graph permissions and consent
+- [Configuration](../operator/configuration.md) - Secret configuration reference
+
+## Standard References
+
+- [RFC 7636 - PKCE](https://datatracker.ietf.org/doc/html/rfc7636) - Proof Key for Code Exchange
+- [RFC 6749 - OAuth 2.0](https://datatracker.ietf.org/doc/html/rfc6749) - OAuth 2.0 Authorization Framework
+- [OAuth 2.1](https://oauth.net/2.1/) - OAuth 2.1 specification
+- [NIST SP 800-38D](https://csrc.nist.gov/publications/detail/sp/800-38d/final) - AES-GCM specification
