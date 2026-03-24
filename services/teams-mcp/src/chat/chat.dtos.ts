@@ -23,6 +23,7 @@ export type MsChannel = z.infer<typeof MsChannelSchema>;
 // ─── Chats ────────────────────────────────────────────────────────────────────
 
 export const MsChatMemberSchema = z.object({
+  userId: z.string().nullish(),
   displayName: z.string().nullish(),
   email: z.string().nullish(),
 });
@@ -56,7 +57,7 @@ export const MsChatMessageSchema = z
         }),
       )
       .nullish(),
-    messageType: z.string().optional(),
+    messageType: z.string().default('message'),
   })
   .transform((msg) => ({
     id: msg.id,
