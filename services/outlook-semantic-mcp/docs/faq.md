@@ -30,14 +30,12 @@
 
 | Category | Tools |
 |----------|-------|
-| Connection | `verify_inbox_connection`, `reconnect_inbox`, `remove_inbox_connection` |
-| Search | `search_emails` |
-| Email actions | `get_email`, `create_draft_email` |
-| Folders | `list_folders` |
-| Sync | `sync_progress` |
-| Contacts | `search_contacts` |
-| Calendar | `get_upcoming_meetings`, `search_past_meetings`, `get_meeting_details` |
-| User info | `get_user_profile` |
+| Email Search | `search_emails`, `open_email_by_id` |
+| Draft Creation | `create_draft_email` |
+| Contact Lookup | `lookup_contacts` |
+| Mailbox Utilities | `list_categories`, `list_folders` |
+| Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `remove_inbox_connection` |
+| Sync Monitoring | `sync_progress` |
 
 An additional 4 tools are available only when the server is running in debug mode (`MCP_DEBUG_MODE=true`): `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`. These are intended for development and troubleshooting and are not exposed in production deployments.
 
@@ -257,7 +255,7 @@ Search results may be incomplete while full sync is in progress. A `syncWarning`
 **Answer:** Yes. The `create_draft_email` tool accepts attachments as an array of objects with `filename`, `contentType`, and `content` fields. The `content` field accepts:
 
 - A **base64-encoded data URI** (`data:[mediatype];base64,<data>`) — works in all deployment modes
-- A **Unique content URI** (`unique://content/{contentId}`) — only works when `UNIQUE_STORE_INTERNALLY=true` (cluster-local mode). In external mode this URI is unresolvable and the attachment will fail.
+- A **Unique content URI** (`unique://content/{contentId}`) — only in cluster-local mode we expect the attachment to be in the chat or in knowledge base. In external mode this URI is unresolvable and the attachment will fail.
 
 If one or more attachments fail to upload, the draft is still created and the failed attachments are listed in the response.
 

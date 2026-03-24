@@ -1,6 +1,8 @@
 <!-- confluence-page-id: -->
 <!-- confluence-space-key: PUBDOC -->
 
+# Operator Manual
+
 ## Overview
 
 This guide provides IT operators with the technical information needed to deploy, configure, and maintain the Outlook Semantic MCP Server.

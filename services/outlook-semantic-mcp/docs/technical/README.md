@@ -1,7 +1,3 @@
-
-
-
-
 # Technical Reference
 
 ## Overview
@@ -25,5 +21,3 @@ This section contains detailed technical documentation for developers and archit
 | [Subscription Management](./subscription-management.md) | Graph subscription lifecycle, reconnect, and remove                            |
 | [Directory Sync](./directory-sync.md)                   | Folder sync, delete detection, and search filtering                            |
 | [FAQ](../faq.md)                                        | Frequently asked questions                                                     |
-
-
