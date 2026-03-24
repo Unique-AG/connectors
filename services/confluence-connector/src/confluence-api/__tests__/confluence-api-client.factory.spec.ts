@@ -41,7 +41,7 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100);
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, undefined);
     expect(CloudConfluenceApiClient).toHaveBeenCalledWith(
       config,
       mockAuth,
@@ -60,7 +60,7 @@ describe('ConfluenceApiClientFactory', () => {
 
     factory.create(config);
 
-    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100);
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, undefined);
     expect(DataCenterConfluenceApiClient).toHaveBeenCalledWith(
       config,
       mockAuth,

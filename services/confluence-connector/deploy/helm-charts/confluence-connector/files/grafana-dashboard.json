@@ -1,354 +1,682 @@
 {
-  "annotations": {
-    "list": [
-      {
-        "builtIn": 1,
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${datasource}"
-        },
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "target": {
-          "limit": 100,
-          "matchAny": false,
-          "tags": [],
-          "type": "dashboard"
-        },
-        "type": "dashboard"
-      }
-    ]
-  },
-  "description": "Dashboard for Confluence Connector",
+  "description": "Monitors the Confluence Connector sync pipeline. Summary counters at the top for a quick health check. Below: sync durations, content throughput, attachment uploads, API performance, and Node.js runtime.",
   "editable": true,
-  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "links": [],
   "panels": [
     {
       "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 100,
-      "panels": [],
-      "title": "Overview",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 40,
+      "title": "Summary",
       "type": "row"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Total pages successfully fetched and ingested in the selected time range. Survives restarts — queries Prometheus history.",
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
+          "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
+            "steps": [{ "color": "green", "value": null }]
           },
-          "unit": "short"
-        },
-        "overrides": []
+          "noValue": "0"
+        }
       },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 0,
-        "y": 1
-      },
-      "id": 1,
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "id": 41,
       "options": {
-        "colorMode": "value",
+        "colorMode": "background_solid",
         "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "text": {},
-        "textMode": "auto",
-        "wideLayout": true
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
       },
-      "pluginVersion": "12.2.1",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(increase(cfc_sync_duration_seconds_count{job=~\"$job\", result=\"success\"}[$__range]))",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_pages_processed_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[$__range]))) or vector(0)",
           "refId": "A"
         }
       ],
-      "title": "Successful Syncs",
+      "title": "Pages ingested (over time range)",
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Total attachments successfully fetched and ingested in the selected time range. Survives restarts — queries Prometheus history.",
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
           },
-          "mappings": [],
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "id": 42,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_attachments_processed_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[$__range]))) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "Attachments ingested (over time range)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Total content items deleted in the selected time range. Survives restarts — queries Prometheus history.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 }
             ]
           },
-          "unit": "short"
-        },
-        "overrides": []
+          "noValue": "0"
+        }
       },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 1
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "id": 43,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
       },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_content_deleted_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[$__range]))) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "Content deleted (over time range)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Total Confluence API errors in the selected time range. Survives restarts — queries Prometheus history.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "id": 44,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_confluence_api_errors_total{job=~\"$job\", tenant=~\"$tenant\"}[$__range]))) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "API errors (over time range)",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 1,
+      "title": "Sync pipeline",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Duration of recent sync cycles per tenant. Use this to spot tenants whose syncs are getting slower over time.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "spanNulls": true
+          },
+          "unit": "s",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 7 },
       "id": 2,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "text": {},
-        "textMode": "auto",
-        "wideLayout": true
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
       },
-      "pluginVersion": "12.2.1",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(increase(cfc_sync_duration_seconds_count{job=~\"$job\", result=\"failure\"}[$__range]))",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "(rate(cfc_sync_duration_seconds_sum{job=~\"$job\", tenant=~\"$tenant\"}[1m]) / rate(cfc_sync_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m])) and increase(cfc_sync_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m]) > 0",
+          "legendFormat": "{{tenant}}",
           "refId": "A"
         }
       ],
-      "title": "Failed Syncs",
-      "type": "stat"
+      "title": "Sync duration per tenant",
+      "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Time spent discovering pages from Confluence before ingestion begins. A growing scan duration may indicate an increasing number of labeled pages or Confluence API slowness.",
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "spanNulls": true
           },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
+          "unit": "s",
+          "min": 0
+        }
       },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 1
-      },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 7 },
       "id": 3,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "text": {},
-        "textMode": "auto",
-        "wideLayout": true
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
       },
-      "pluginVersion": "12.2.1",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(increase(cfc_pages_processed_total{job=~\"$job\", result=\"success\"}[$__range]))",
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "(rate(cfc_scan_duration_seconds_sum{job=~\"$job\", tenant=~\"$tenant\"}[1m]) / rate(cfc_scan_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m])) and increase(cfc_scan_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m]) > 0",
+          "legendFormat": "{{tenant}}",
           "refId": "A"
         }
       ],
-      "title": "Pages Processed",
-      "type": "stat"
+      "title": "Confluence scan duration per tenant",
+      "type": "timeseries"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 10,
+      "title": "Content throughput",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Number of pages and attachments ingested per interval. A flat line at zero during active syncs means content is unchanged, which is normal for stable spaces.",
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5
           },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "yellow",
-                "value": 500
-              },
-              {
-                "color": "red",
-                "value": 1000
-              }
-            ]
-          },
-          "unit": "ms"
-        },
-        "overrides": []
+          "min": 0
+        }
       },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 18,
-        "y": 1
-      },
-      "id": 4,
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 17 },
+      "id": 11,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "text": {},
-        "textMode": "auto",
-        "wideLayout": true
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
       },
-      "pluginVersion": "12.2.1",
       "targets": [
         {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_pages_processed_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — pages",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_attachments_processed_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — attachments",
+          "refId": "B"
+        }
+      ],
+      "title": "Content ingested per tenant (in 1 minute)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Breakdown of changes detected by the file-diff algorithm. A spike in deletions without corresponding new items may indicate a labeling or configuration change.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5
           },
-          "expr": "histogram_quantile(0.95, sum(rate(cfc_unique_rest_api_request_duration_seconds_bucket{job=~\"$job\"}[5m])) by (le)) * 1000",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 17 },
+      "id": 12,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_file_diff_events_total{job=~\"$job\", tenant=~\"$tenant\", diff_result_type=\"new\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — new",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_file_diff_events_total{job=~\"$job\", tenant=~\"$tenant\", diff_result_type=\"updated\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — updated",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_file_diff_events_total{job=~\"$job\", tenant=~\"$tenant\", diff_result_type=\"deleted\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — deleted",
+          "refId": "C"
+        }
+      ],
+      "title": "Content changes detected per tenant (in 1 minute)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "id": 20,
+      "title": "Attachment uploads",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "How long attachment uploads take, shown as percentile lines. The 'max' line is the slowest upload. The 'median' (p50) is the typical upload. Lines between them show the distribution — if max is far from p90, a few uploads are much slower than the rest.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "spanNulls": true
+          },
+          "unit": "s",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 27 },
+      "id": 21,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(1.0, sum(rate(cfc_attachment_upload_duration_seconds_bucket{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (le, tenant))",
+          "legendFormat": "{{tenant}} — max",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.99, sum(rate(cfc_attachment_upload_duration_seconds_bucket{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (le, tenant))",
+          "legendFormat": "{{tenant}} — p99",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.90, sum(rate(cfc_attachment_upload_duration_seconds_bucket{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (le, tenant))",
+          "legendFormat": "{{tenant}} — p90",
+          "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.75, sum(rate(cfc_attachment_upload_duration_seconds_bucket{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (le, tenant))",
+          "legendFormat": "{{tenant}} — p75",
+          "refId": "D"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.50, sum(rate(cfc_attachment_upload_duration_seconds_bucket{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (le, tenant))",
+          "legendFormat": "{{tenant}} — p50 (median)",
+          "refId": "E"
+        }
+      ],
+      "title": "Attachment upload duration per tenant (max, p99, p90, p75, median)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "id": 30,
+      "title": "Confluence API performance",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Average response time per Confluence API endpoint. Shows which endpoints are slow and how they trend over time.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "spanNulls": false
+          },
+          "unit": "s",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 37 },
+      "id": 31,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "rate(cfc_confluence_api_request_duration_seconds_sum{job=~\"$job\", tenant=~\"$tenant\"}[1m]) / rate(cfc_confluence_api_request_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m])",
+          "legendFormat": "{{tenant}} — {{endpoint}}",
           "refId": "A"
         }
       ],
-      "title": "Unique API P95 Latency",
-      "type": "stat"
+      "title": "API response time by endpoint",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Confluence API errors by HTTP status class and rate-limiter throttle events. 401/403 indicate credential issues. 429 or throttle events mean rate limits are being hit. 5xx errors indicate Confluence server problems.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "stacking": { "mode": "normal" }
+          },
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 37 },
+      "id": 32,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_confluence_api_errors_total{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (tenant, http_status_class))",
+          "legendFormat": "{{tenant}} — HTTP {{http_status_class}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_confluence_api_throttle_events_total{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — throttled",
+          "refId": "B"
+        }
+      ],
+      "title": "API errors and throttling",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+      "id": 35,
+      "title": "Unique API performance",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Average response time per Unique API operation. Shows which operations are slow and how they trend over time.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "spanNulls": false
+          },
+          "unit": "ms",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 47 },
+      "id": 36,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "rate(confluence_connector_unique_api_request_duration_ms_sum{job=~\"$job\"}[1m]) / rate(confluence_connector_unique_api_request_duration_ms_count{job=~\"$job\"}[1m])",
+          "legendFormat": "{{operation}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Unique API response time by operation",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Total Unique API requests per operation over time. Shows which operations are called most frequently.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "stacking": { "mode": "normal" }
+          },
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 47 },
+      "id": 37,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(confluence_connector_unique_api_requests_total{job=~\"$job\"}[1m])) by (operation))",
+          "legendFormat": "{{operation}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Unique API requests by operation (in 1 minute)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
+      "id": 50,
+      "panels": [],
+      "title": "Node.js runtime",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Heap and RSS memory usage of the Node.js process.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5
+          },
+          "unit": "bytes",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 57 },
+      "id": 51,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "process_memory_usage{job=~\"$job\"}",
+          "legendFormat": "{{type}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Process memory usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "CPU utilization of the Node.js process.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5
+          },
+          "unit": "percentunit",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 57 },
+      "id": 52,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "process_cpu_utilization{job=~\"$job\"}",
+          "legendFormat": "{{state}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Process CPU utilization",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Event loop delay mean and p99. High values indicate the event loop is being blocked.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5
+          },
+          "unit": "s",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 57 },
+      "id": 53,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "nodejs_eventloop_delay_mean{job=~\"$job\"}",
+          "legendFormat": "mean",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "nodejs_eventloop_delay_p99{job=~\"$job\"}",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
+      ],
+      "title": "Event loop delay",
+      "type": "timeseries"
     }
   ],
-  "preload": false,
   "refresh": "1m",
   "schemaVersion": 42,
   "tags": ["confluence", "connector"],
   "templating": {
     "list": [
       {
-        "current": {
-          "text": "Prometheus",
-          "value": "prometheus"
-        },
+        "current": { "text": "Prometheus", "value": "prometheus" },
         "includeAll": false,
         "label": "Datasource",
         "name": "datasource",
-        "options": [],
         "query": "prometheus",
         "refresh": 1,
-        "regex": "",
         "type": "datasource"
       },
       {
-        "current": {
-          "text": "finance-gpt/confluence-connector",
-          "value": "finance-gpt/confluence-connector"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${datasource}"
-        },
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
         "definition": "label_values(cfc_sync_duration_seconds_count, job)",
         "includeAll": false,
         "label": "Job",
         "name": "job",
-        "options": [],
-        "query": {
-          "query": "label_values(cfc_sync_duration_seconds_count, job)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
+        "query": { "query": "label_values(cfc_sync_duration_seconds_count, job)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
         "refresh": 2,
-        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "definition": "label_values(cfc_sync_duration_seconds_count, tenant)",
+        "includeAll": true,
+        "label": "Tenant",
+        "name": "tenant",
+        "query": { "query": "label_values(cfc_sync_duration_seconds_count, tenant)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "refresh": 2,
         "sort": 1,
         "type": "query"
       }
     ]
   },
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
-  "timepicker": {},
+  "time": { "from": "now-6h", "to": "now" },
   "timezone": "",
   "title": "Confluence Connector",
   "uid": "confluence-connector",
-  "version": 1
+  "version": 5
 }

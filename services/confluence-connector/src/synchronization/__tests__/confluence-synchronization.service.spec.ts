@@ -1,5 +1,6 @@
 import { Smeared } from '@unique-ag/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createNoopConfConMetrics } from '../../metrics/__mocks__/noop-metrics';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
 import {
@@ -52,6 +53,7 @@ function createService(
     fileDiffService as FileDiffService,
     ingestionService as IngestionService,
     mockScopeManagementService,
+    createNoopConfConMetrics(),
   );
 }
 

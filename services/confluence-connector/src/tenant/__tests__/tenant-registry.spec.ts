@@ -4,6 +4,7 @@ import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-aut
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
 import { getTenantConfigs } from '../../config/tenant-config-loader';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../../confluence-api';
+import { createNoopConfConMetrics } from '../../metrics/__mocks__/noop-metrics';
 import { ServiceRegistry } from '../service-registry';
 import { tenantStorage } from '../tenant-context.storage';
 import { TenantRegistry } from '../tenant-registry';
@@ -96,6 +97,7 @@ function createRegistry(configs: NamedTenantConfig[]): {
     mockApiClientFactory,
     mockUniqueApiFactory,
     serviceRegistry,
+    createNoopConfConMetrics(),
   );
   registry.onModuleInit();
   return { registry, serviceRegistry, mockUniqueApiFactory };
@@ -145,6 +147,7 @@ describe('TenantRegistry', () => {
         mockApiClientFactory,
         mockUniqueApiFactory,
         serviceRegistry,
+        createNoopConfConMetrics(),
       );
       registry.onModuleInit();
 
@@ -202,14 +205,17 @@ describe('TenantRegistry', () => {
         mockApiClientFactory,
         mockUniqueApiFactory,
         serviceRegistry,
+        createNoopConfConMetrics(),
       );
       registry.onModuleInit();
 
       expect(mockApiClientFactory.create).toHaveBeenCalledWith(configA.confluence, {
         attachmentsEnabled: false,
+        metrics: expect.objectContaining({ tenantName: 'tenant-a' }),
       });
       expect(mockApiClientFactory.create).toHaveBeenCalledWith(configB.confluence, {
         attachmentsEnabled: false,
+        metrics: expect.objectContaining({ tenantName: 'tenant-b' }),
       });
     });
 

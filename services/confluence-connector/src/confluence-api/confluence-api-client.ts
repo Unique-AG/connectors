@@ -1,8 +1,17 @@
 import type { Readable } from 'node:stream';
+import type { Counter, Histogram } from '@opentelemetry/api';
 import type { ConfluencePage } from './types/confluence-api.types';
+
+export interface HttpClientMetrics {
+  requestDuration: Histogram;
+  throttleEvents: Counter;
+  errors: Counter;
+  tenantName: string;
+}
 
 export interface ApiClientOptions {
   attachmentsEnabled: boolean;
+  metrics?: HttpClientMetrics;
 }
 
 export abstract class ConfluenceApiClient {

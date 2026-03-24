@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import type { FileDiffItem, FileDiffResponse, UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
+import type { Counter } from '@opentelemetry/api';
 import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind } from '../constants/ingestion.constants';
@@ -14,6 +15,7 @@ export class FileDiffService {
     private readonly tenantName: string,
     private readonly useV1KeyFormat: boolean,
     private readonly uniqueApiClient: UniqueApiClient,
+    private readonly fileDiffEvents: Counter,
   ) {}
 
   public async computeDiff(
@@ -81,7 +83,32 @@ export class FileDiffService {
       msg: 'File diff completed',
     });
 
+    this.recordDiffMetrics(result);
+
     return result;
+  }
+
+  private recordDiffMetrics(result: FileDiffResult): void {
+    const attrs = { tenant: this.tenantName };
+
+    if (result.newItemIds.length > 0) {
+      this.fileDiffEvents.add(result.newItemIds.length, { ...attrs, diff_result_type: 'new' });
+    }
+    if (result.updatedItemIds.length > 0) {
+      this.fileDiffEvents.add(result.updatedItemIds.length, {
+        ...attrs,
+        diff_result_type: 'updated',
+      });
+    }
+    if (result.deletedItems.length > 0) {
+      this.fileDiffEvents.add(result.deletedItems.length, {
+        ...attrs,
+        diff_result_type: 'deleted',
+      });
+    }
+    if (result.movedItemIds.length > 0) {
+      this.fileDiffEvents.add(result.movedItemIds.length, { ...attrs, diff_result_type: 'moved' });
+    }
   }
 
   private buildPageDiffItems(pages: DiscoveredPage[]): FileDiffItem[] {

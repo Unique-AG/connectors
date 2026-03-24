@@ -13,6 +13,7 @@ vi.mock('@unique-ag/utils', async (importOriginal) => {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantConfig } from '../../config';
 import type { ConfluenceApiClient } from '../../confluence-api';
+import { createNoopCounter, createNoopHistogram } from '../../metrics/__mocks__/noop-metrics';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { IngestionService } from '../ingestion.service';
 import type { DiscoveredAttachment, FetchedPage } from '../sync.types';
@@ -121,7 +122,14 @@ function makeService(): {
   } as unknown as TenantConfig;
 
   return {
-    service: new IngestionService(tenantConfig, TENANT_NAME, uniqueApiClient, confluenceApiClient),
+    service: new IngestionService(
+      tenantConfig,
+      TENANT_NAME,
+      uniqueApiClient,
+      confluenceApiClient,
+      createNoopCounter(),
+      createNoopHistogram(),
+    ),
     uniqueApiClient,
     confluenceApiClient,
   };
@@ -294,6 +302,8 @@ describe('IngestionService', () => {
       TENANT_NAME,
       uniqueApiClient,
       confluenceApiClient,
+      createNoopCounter(),
+      createNoopHistogram(),
     );
     mockRequest.mockResolvedValueOnce({ statusCode: 201 });
 
@@ -476,6 +486,8 @@ describe('IngestionService', () => {
         TENANT_NAME,
         uniqueApiClient,
         confluenceApiClient,
+        createNoopCounter(),
+        createNoopHistogram(),
       );
       mockRequest.mockResolvedValueOnce({ statusCode: 201 });
 
