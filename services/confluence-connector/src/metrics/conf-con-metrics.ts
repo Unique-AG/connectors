@@ -55,7 +55,7 @@ export class ConfConMetrics {
       {
         description: 'Request latency for Confluence API calls',
         advice: {
-          explicitBucketBoundaries: [0.1, 0.5, 1, 2, 5, 10, 20],
+          explicitBucketBoundaries: [0.1, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20],
         },
       },
     );
@@ -90,6 +90,5 @@ export class ConfConMetrics {
     this.fileDiffEvents.add(0, { ...tenant, diff_result_type: 'deleted' });
     this.fileDiffEvents.add(0, { ...tenant, diff_result_type: 'moved' });
     this.confluenceApiThrottleEvents.add(0, tenant);
-    this.confluenceApiErrors.add(0, { ...tenant, http_status_class: '2xx' });
   }
 }

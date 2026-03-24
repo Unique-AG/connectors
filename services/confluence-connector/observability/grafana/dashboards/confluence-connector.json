@@ -33,8 +33,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_pages_processed_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[$__range]))) or vector(0)",
+          "expr": "round(sum(increase(cfc_pages_processed_total{result=\"success\"}[$__range]))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -64,8 +63,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_attachments_processed_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[$__range]))) or vector(0)",
+          "expr": "round(sum(increase(cfc_attachments_processed_total{result=\"success\"}[$__range]))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -97,8 +95,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_content_deleted_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[$__range]))) or vector(0)",
+          "expr": "round(sum(increase(cfc_content_deleted_total{result=\"success\"}[$__range]))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -132,8 +129,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_confluence_api_errors_total{job=~\"$job\", tenant=~\"$tenant\"}[$__range]))) or vector(0)",
+          "expr": "round(sum(increase(cfc_confluence_api_errors_total[$__range]))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -172,8 +168,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "(rate(cfc_sync_duration_seconds_sum{job=~\"$job\", tenant=~\"$tenant\"}[1m]) / rate(cfc_sync_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m])) and increase(cfc_sync_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m]) > 0",
+          "expr": "(rate(cfc_sync_duration_seconds_sum[1m]) / rate(cfc_sync_duration_seconds_count[1m])) and increase(cfc_sync_duration_seconds_count[1m]) > 0",
           "legendFormat": "{{tenant}}",
           "refId": "A"
         }
@@ -206,8 +201,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "(rate(cfc_scan_duration_seconds_sum{job=~\"$job\", tenant=~\"$tenant\"}[1m]) / rate(cfc_scan_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m])) and increase(cfc_scan_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m]) > 0",
+          "expr": "(rate(cfc_scan_duration_seconds_sum[1m]) / rate(cfc_scan_duration_seconds_count[1m])) and increase(cfc_scan_duration_seconds_count[1m]) > 0",
           "legendFormat": "{{tenant}}",
           "refId": "A"
         }
@@ -245,14 +239,12 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_pages_processed_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[1m])) by (tenant))",
+          "expr": "round(sum(increase(cfc_pages_processed_total{result=\"success\"}[1m])) by (tenant))",
           "legendFormat": "{{tenant}} — pages",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_attachments_processed_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[1m])) by (tenant))",
+          "expr": "round(sum(increase(cfc_attachments_processed_total{result=\"success\"}[1m])) by (tenant))",
           "legendFormat": "{{tenant}} — attachments",
           "refId": "B"
         }
@@ -283,20 +275,17 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_file_diff_events_total{job=~\"$job\", tenant=~\"$tenant\", diff_result_type=\"new\"}[1m])) by (tenant))",
+          "expr": "round(sum(increase(cfc_file_diff_events_total{diff_result_type=\"new\"}[1m])) by (tenant))",
           "legendFormat": "{{tenant}} — new",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_file_diff_events_total{job=~\"$job\", tenant=~\"$tenant\", diff_result_type=\"updated\"}[1m])) by (tenant))",
+          "expr": "round(sum(increase(cfc_file_diff_events_total{diff_result_type=\"updated\"}[1m])) by (tenant))",
           "legendFormat": "{{tenant}} — updated",
           "refId": "B"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_file_diff_events_total{job=~\"$job\", tenant=~\"$tenant\", diff_result_type=\"deleted\"}[1m])) by (tenant))",
+          "expr": "round(sum(increase(cfc_file_diff_events_total{diff_result_type=\"deleted\"}[1m])) by (tenant))",
           "legendFormat": "{{tenant}} — deleted",
           "refId": "C"
         }
@@ -336,32 +325,27 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(1.0, sum(rate(cfc_attachment_upload_duration_seconds_bucket{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (le, tenant))",
+          "expr": "histogram_quantile(1.0, sum(rate(cfc_attachment_upload_duration_seconds_bucket[1m])) by (le, tenant))",
           "legendFormat": "{{tenant}} — max",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.99, sum(rate(cfc_attachment_upload_duration_seconds_bucket{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (le, tenant))",
+          "expr": "histogram_quantile(0.99, sum(rate(cfc_attachment_upload_duration_seconds_bucket[1m])) by (le, tenant))",
           "legendFormat": "{{tenant}} — p99",
           "refId": "B"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.90, sum(rate(cfc_attachment_upload_duration_seconds_bucket{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (le, tenant))",
+          "expr": "histogram_quantile(0.90, sum(rate(cfc_attachment_upload_duration_seconds_bucket[1m])) by (le, tenant))",
           "legendFormat": "{{tenant}} — p90",
           "refId": "C"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.75, sum(rate(cfc_attachment_upload_duration_seconds_bucket{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (le, tenant))",
+          "expr": "histogram_quantile(0.75, sum(rate(cfc_attachment_upload_duration_seconds_bucket[1m])) by (le, tenant))",
           "legendFormat": "{{tenant}} — p75",
           "refId": "D"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.50, sum(rate(cfc_attachment_upload_duration_seconds_bucket{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (le, tenant))",
+          "expr": "histogram_quantile(0.50, sum(rate(cfc_attachment_upload_duration_seconds_bucket[1m])) by (le, tenant))",
           "legendFormat": "{{tenant}} — p50 (median)",
           "refId": "E"
         }
@@ -401,8 +385,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "rate(cfc_confluence_api_request_duration_seconds_sum{job=~\"$job\", tenant=~\"$tenant\"}[1m]) / rate(cfc_confluence_api_request_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m])",
+          "expr": "rate(cfc_confluence_api_request_duration_seconds_sum[1m]) / rate(cfc_confluence_api_request_duration_seconds_count[1m])",
           "legendFormat": "{{tenant}} — {{endpoint}}",
           "refId": "A"
         }
@@ -433,14 +416,12 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_confluence_api_errors_total{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (tenant, http_status_class))",
+          "expr": "round(sum(increase(cfc_confluence_api_errors_total[1m])) by (tenant, http_status_class))",
           "legendFormat": "{{tenant}} — HTTP {{http_status_class}}",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(cfc_confluence_api_throttle_events_total{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (tenant))",
+          "expr": "round(sum(increase(cfc_confluence_api_throttle_events_total[1m])) by (tenant))",
           "legendFormat": "{{tenant}} — throttled",
           "refId": "B"
         }
@@ -480,8 +461,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "rate(confluence_connector_unique_api_request_duration_ms_sum{job=~\"$job\"}[1m]) / rate(confluence_connector_unique_api_request_duration_ms_count{job=~\"$job\"}[1m])",
+          "expr": "rate(confluence_connector_unique_api_request_duration_ms_sum[1m]) / rate(confluence_connector_unique_api_request_duration_ms_count[1m])",
           "legendFormat": "{{operation}}",
           "refId": "A"
         }
@@ -512,8 +492,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(confluence_connector_unique_api_requests_total{job=~\"$job\"}[1m])) by (operation))",
+          "expr": "round(sum(increase(confluence_connector_unique_api_requests_total[1m])) by (operation))",
           "legendFormat": "{{operation}}",
           "refId": "A"
         }
@@ -531,15 +510,14 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "Heap and RSS memory usage of the Node.js process.",
+      "description": "Process memory usage (RSS). Sustained growth over time may indicate a memory leak.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 8,
-            "lineWidth": 2,
-            "pointSize": 5
+            "fillOpacity": 20,
+            "lineWidth": 2
           },
           "unit": "bytes",
           "min": 0
@@ -553,26 +531,24 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "process_memory_usage{job=~\"$job\"}",
-          "legendFormat": "{{type}}",
+          "expr": "process_memory_usage",
+          "legendFormat": "__auto",
           "refId": "A"
         }
       ],
-      "title": "Process memory usage",
+      "title": "Memory usage",
       "type": "timeseries"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "CPU utilization of the Node.js process.",
+      "description": "Process CPU utilization as a fraction of one core. Values consistently above 0.8 may indicate CPU-bound bottlenecks.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
-            "fillOpacity": 8,
-            "lineWidth": 2,
-            "pointSize": 5
+            "fillOpacity": 20,
+            "lineWidth": 2
           },
           "unit": "percentunit",
           "min": 0
@@ -586,26 +562,24 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "process_cpu_utilization{job=~\"$job\"}",
-          "legendFormat": "{{state}}",
+          "expr": "process_cpu_utilization",
+          "legendFormat": "__auto",
           "refId": "A"
         }
       ],
-      "title": "Process CPU utilization",
+      "title": "CPU utilization",
       "type": "timeseries"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "Event loop delay mean and p99. High values indicate the event loop is being blocked.",
+      "description": "Node.js event loop delay. High values indicate the event loop is blocked by synchronous work. p99 above 100ms warrants investigation.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 8,
-            "lineWidth": 2,
-            "pointSize": 5
+            "lineWidth": 2
           },
           "unit": "s",
           "min": 0
@@ -619,14 +593,12 @@
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "nodejs_eventloop_delay_mean{job=~\"$job\"}",
+          "expr": "nodejs_eventloop_delay_mean",
           "legendFormat": "mean",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "nodejs_eventloop_delay_p99{job=~\"$job\"}",
+          "expr": "nodejs_eventloop_delay_p99",
           "legendFormat": "p99",
           "refId": "B"
         }
@@ -635,47 +607,21 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "1m",
-  "schemaVersion": 42,
-  "tags": ["confluence", "connector"],
+  "schemaVersion": 39,
+  "tags": ["confluence-connector", "local"],
   "templating": {
     "list": [
       {
-        "current": { "text": "Prometheus", "value": "prometheus" },
+        "current": { "selected": true, "text": "Prometheus", "value": "Prometheus" },
         "includeAll": false,
         "label": "Datasource",
         "name": "datasource",
         "query": "prometheus",
-        "refresh": 1,
         "type": "datasource"
-      },
-      {
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(cfc_sync_duration_seconds_count, job)",
-        "includeAll": false,
-        "label": "Job",
-        "name": "job",
-        "query": { "query": "label_values(cfc_sync_duration_seconds_count, job)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
-        "refresh": 2,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(cfc_sync_duration_seconds_count, tenant)",
-        "includeAll": true,
-        "label": "Tenant",
-        "name": "tenant",
-        "query": { "query": "label_values(cfc_sync_duration_seconds_count, tenant)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
-        "refresh": 2,
-        "sort": 1,
-        "type": "query"
       }
     ]
   },
   "time": { "from": "now-6h", "to": "now" },
-  "timezone": "",
-  "title": "Confluence Connector",
-  "uid": "confluence-connector",
-  "version": 1
+  "title": "Confluence Connector (local)",
+  "uid": "confluence-connector-local"
 }
