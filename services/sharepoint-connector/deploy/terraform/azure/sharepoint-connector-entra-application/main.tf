@@ -18,7 +18,7 @@ locals {
       sharepoint_roles = []
     }
     content_and_permissions = {
-      graph_roles      = ["GroupMember.Read.All", "User.ReadBasic.All"]
+      graph_roles      = ["Sites.Selected", "GroupMember.Read.All", "User.ReadBasic.All"]
       sharepoint_roles = ["Sites.Selected"]
     }
   }
