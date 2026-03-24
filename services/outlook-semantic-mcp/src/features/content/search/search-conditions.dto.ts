@@ -179,9 +179,20 @@ function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
     }
 
     const path = METADATA_PATH[key];
-    const { operator } = field;
+    const operator = field.operator as UniqueQLOperator | typeof CONTAINS_ANY_OPERATOR;
     const { value } = field;
-    leaves.push({ path, operator, value });
+    if (operator === CONTAINS_ANY_OPERATOR) {
+      if (Array.isArray(value)) {
+        leaves.push(
+          wrapConditions(
+            value.map((v) => ({ path, operator: UniqueQLOperator.CONTAINS, value: v })),
+            'or',
+          ),
+        );
+      }
+    } else {
+      leaves.push({ path, operator, value });
+    }
   }
 
   return leaves;
