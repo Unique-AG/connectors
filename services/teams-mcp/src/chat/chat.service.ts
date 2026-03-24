@@ -80,17 +80,26 @@ export class ChatService {
 
     this.logger.debug({ userProfileId, identifier }, 'Resolving chat by topic or member name');
 
-    const chats = await this.listChats(userProfileId);
+    const client = this.graphClientFactory.createClientForUser(userProfileId);
+    const [chats, me] = await Promise.all([
+      this.listChats(userProfileId),
+      client.api('/me').select('id').get() as Promise<{ id: string }>,
+    ]);
+    const currentUserId = me.id;
     const lowerIdentifier = identifier.toLowerCase();
 
     // NOTE: exact case-insensitive match — topic first, then member display name for 1:1 chats.
     // Group chats without a topic are only matchable by topic; oneOnOne chats fall back to member name.
+    // For oneOnOne chats, the current user is excluded from member matching to avoid every 1:1 chat
+    // matching when the user searches for their own name.
     const matches = chats.filter((c) => {
       if (c.topic?.toLowerCase() === lowerIdentifier) {
         return true;
       }
       if (c.chatType === 'oneOnOne') {
-        return c.members.some((m) => m.displayName?.toLowerCase() === lowerIdentifier);
+        return c.members.some(
+          (m) => m.userId !== currentUserId && m.displayName?.toLowerCase() === lowerIdentifier,
+        );
       }
       return false;
     });
