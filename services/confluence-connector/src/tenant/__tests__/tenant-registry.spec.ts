@@ -213,13 +213,11 @@ describe('TenantRegistry', () => {
         configA.confluence,
         { attachmentsEnabled: false },
         expect.anything(),
-        'tenant-a',
       );
       expect(mockApiClientFactory.create).toHaveBeenCalledWith(
         configB.confluence,
         { attachmentsEnabled: false },
         expect.anything(),
-        'tenant-b',
       );
     });
 

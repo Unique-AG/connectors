@@ -42,9 +42,9 @@ describe('ConfluenceApiClientFactory', () => {
       auth: { mode: 'oauth_2lo', clientId: 'id', clientSecret: { expose: () => 's' } },
     } as unknown as ConfluenceConfig;
 
-    factory.create(config, { attachmentsEnabled: false }, noopMetrics, 'test-tenant');
+    factory.create(config, { attachmentsEnabled: false }, noopMetrics);
 
-    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, noopMetrics, 'test-tenant');
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, noopMetrics);
     expect(CloudConfluenceApiClient).toHaveBeenCalledWith(
       config,
       mockAuth,
@@ -61,9 +61,9 @@ describe('ConfluenceApiClientFactory', () => {
       auth: { mode: 'pat', token: { expose: () => 'tok' } },
     } as unknown as ConfluenceConfig;
 
-    factory.create(config, { attachmentsEnabled: false }, noopMetrics, 'test-tenant');
+    factory.create(config, { attachmentsEnabled: false }, noopMetrics);
 
-    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, noopMetrics, 'test-tenant');
+    expect(RateLimitedHttpClient).toHaveBeenCalledWith(100, noopMetrics);
     expect(DataCenterConfluenceApiClient).toHaveBeenCalledWith(
       config,
       mockAuth,
@@ -84,12 +84,7 @@ describe('ConfluenceApiClientFactory', () => {
       auth: { mode: 'oauth_2lo', clientId: 'id', clientSecret: { expose: () => 's' } },
     } as unknown as ConfluenceConfig;
 
-    const result = factory.create(
-      config,
-      { attachmentsEnabled: false },
-      noopMetrics,
-      'test-tenant',
-    );
+    const result = factory.create(config, { attachmentsEnabled: false }, noopMetrics);
 
     expect(result).toBe(mockClient);
   });

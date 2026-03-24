@@ -168,7 +168,7 @@ describe('ConfluenceSynchronizationService', () => {
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.log).toHaveBeenCalledWith({
         total: 1,
-        succeeded: 0,
+        ingested: 0,
         failed: 1,
         msg: 'Page ingestion summary',
       });
@@ -412,7 +412,7 @@ describe('ConfluenceSynchronizationService', () => {
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.log).toHaveBeenCalledWith({
         total: 1,
-        succeeded: 0,
+        ingested: 0,
         failed: 1,
         msg: 'Attachment ingestion summary',
       });

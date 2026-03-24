@@ -1,19 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
+import { getCurrentTenant } from '../tenant';
+import { getHttpStatusCodeClass } from './utils';
 
 @Injectable()
 export class Metrics {
-  public readonly syncDuration: Histogram;
-  public readonly scanDuration: Histogram;
-  public readonly pagesProcessed: Counter;
-  public readonly attachmentsProcessed: Counter;
-  public readonly contentDeleted: Counter;
-  public readonly fileDiffEvents: Counter;
-  public readonly attachmentUploadDuration: Histogram;
-  public readonly confluenceApiRequestDuration: Histogram;
-  public readonly confluenceApiThrottleEvents: Counter;
-  public readonly confluenceApiErrors: Counter;
+  private readonly syncDuration: Histogram;
+  private readonly scanDuration: Histogram;
+  private readonly pagesProcessed: Counter;
+  private readonly attachmentsProcessed: Counter;
+  private readonly contentDeleted: Counter;
+  private readonly fileDiffEvents: Counter;
+  private readonly attachmentUploadDuration: Histogram;
+  private readonly confluenceApiRequestDuration: Histogram;
+  private readonly confluenceApiThrottleEvents: Counter;
+  private readonly confluenceApiErrors: Counter;
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
@@ -72,13 +74,71 @@ export class Metrics {
     });
   }
 
+  private get tenantName(): string {
+    return getCurrentTenant().name;
+  }
+
+  public recordSyncDuration(durationSeconds: number, result: 'success' | 'failure'): void {
+    this.syncDuration.record(durationSeconds, { tenant: this.tenantName, result });
+  }
+
+  public recordScanDuration(durationSeconds: number): void {
+    this.scanDuration.record(durationSeconds, { tenant: this.tenantName });
+  }
+
+  public recordPagesProcessed(count: number, result: 'success' | 'failure'): void {
+    this.pagesProcessed.add(count, { tenant: this.tenantName, result });
+  }
+
+  public recordAttachmentsProcessed(count: number, result: 'success' | 'failure'): void {
+    this.attachmentsProcessed.add(count, { tenant: this.tenantName, result });
+  }
+
+  public recordContentDeleted(count: number, result: 'success' | 'failure'): void {
+    this.contentDeleted.add(count, { tenant: this.tenantName, result });
+  }
+
+  public recordFileDiffEvents(
+    count: number,
+    diffResultType: 'new' | 'updated' | 'deleted' | 'moved',
+  ): void {
+    this.fileDiffEvents.add(count, { tenant: this.tenantName, diff_result_type: diffResultType });
+  }
+
+  public recordAttachmentUploadDuration(durationSeconds: number): void {
+    this.attachmentUploadDuration.record(durationSeconds, { tenant: this.tenantName });
+  }
+
+  public recordApiRequestDuration(
+    durationSeconds: number,
+    endpoint: string,
+    result: 'success' | 'error',
+  ): void {
+    this.confluenceApiRequestDuration.record(durationSeconds, {
+      tenant: this.tenantName,
+      endpoint,
+      result,
+    });
+  }
+
+  public recordApiError(statusCode?: number): void {
+    this.confluenceApiErrors.add(1, {
+      tenant: this.tenantName,
+      http_status_class: statusCode ? getHttpStatusCodeClass(statusCode) : 'unknown',
+    });
+  }
+
+  public recordApiThrottleEvent(): void {
+    this.confluenceApiThrottleEvents.add(1, { tenant: this.tenantName });
+  }
+
   /**
-   * Initializes all counters for a tenant by recording a zero value. This ensures Prometheus
-   * scrapes a baseline before the first sync, so that `increase()` can compute a correct
-   * delta from 0 → N on the first sync cycle after startup.
+   * Initializes all counters for the current tenant by recording a zero value. This ensures
+   * Prometheus scrapes a baseline before the first sync, so that `increase()` can compute a
+   * correct delta from 0 -> N on the first sync cycle after startup.
    */
-  public initializeCountersForTenant(tenantName: string): void {
-    const tenant = { tenant: tenantName };
+  public initializeCounters(): void {
+    const tenant = { tenant: this.tenantName };
     this.pagesProcessed.add(0, { ...tenant, result: 'success' });
     this.pagesProcessed.add(0, { ...tenant, result: 'failure' });
     this.attachmentsProcessed.add(0, { ...tenant, result: 'success' });

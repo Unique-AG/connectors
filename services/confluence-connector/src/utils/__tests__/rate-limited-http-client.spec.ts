@@ -48,7 +48,7 @@ describe('RateLimitedHttpClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new RateLimitedHttpClient(100, createNoopMetrics(), 'test-tenant');
+    client = new RateLimitedHttpClient(100, createNoopMetrics());
   });
 
   describe('rateLimitedRequest', () => {

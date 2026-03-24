@@ -45,7 +45,7 @@ export class ConfluenceSynchronizationService {
       const { pages: discoveredPages, attachments: discoveredAttachments } =
         await this.scanner.discoverPages();
       const scanDurationSeconds = (performance.now() - scanStartTime) / 1000;
-      this.metrics.scanDuration.record(scanDurationSeconds, { tenant: tenant.name });
+      this.metrics.recordScanDuration(scanDurationSeconds);
       this.logger.log({ count: discoveredPages.length, msg: 'Discovery completed' });
 
       const diffResult = await this.fileDiffService.computeDiff(
@@ -94,10 +94,7 @@ export class ConfluenceSynchronizationService {
     } finally {
       tenant.isScanning = false;
       const durationSeconds = (performance.now() - startTime) / 1000;
-      this.metrics.syncDuration.record(durationSeconds, {
-        tenant: tenant.name,
-        result: syncResult,
-      });
+      this.metrics.recordSyncDuration(durationSeconds, syncResult);
     }
   }
 
@@ -107,7 +104,6 @@ export class ConfluenceSynchronizationService {
     concurrency: number,
   ): Promise<void> {
     const limit = pLimit(concurrency);
-    const tenant = getCurrentTenant();
 
     if (pages.length === 0) {
       this.logger.log({ msg: 'No pages to ingest' });
@@ -141,9 +137,9 @@ export class ConfluenceSynchronizationService {
 
     const failed = results.filter((r) => r.status === 'rejected').length;
 
-    this.metrics.pagesProcessed.add(ingested, { tenant: tenant.name, result: 'success' });
+    this.metrics.recordPagesProcessed(ingested, 'success');
     if (failed > 0) {
-      this.metrics.pagesProcessed.add(failed, { tenant: tenant.name, result: 'failure' });
+      this.metrics.recordPagesProcessed(failed, 'failure');
     }
 
     this.logger.log({ total: pages.length, ingested, failed, msg: 'Page ingestion summary' });
@@ -159,7 +155,6 @@ export class ConfluenceSynchronizationService {
     }
 
     const limit = pLimit(concurrency);
-    const tenant = getCurrentTenant();
     let processed = 0;
     const total = attachments.length;
 
@@ -183,9 +178,9 @@ export class ConfluenceSynchronizationService {
 
     const failed = results.filter((r) => r.status === 'rejected').length;
 
-    this.metrics.attachmentsProcessed.add(ingested, { tenant: tenant.name, result: 'success' });
+    this.metrics.recordAttachmentsProcessed(ingested, 'success');
     if (failed > 0) {
-      this.metrics.attachmentsProcessed.add(failed, { tenant: tenant.name, result: 'failure' });
+      this.metrics.recordAttachmentsProcessed(failed, 'failure');
     }
 
     this.logger.log({

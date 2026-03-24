@@ -55,7 +55,6 @@ export class TenantRegistry implements OnModuleInit {
           config.confluence,
           { attachmentsEnabled: config.ingestion.attachments.enabled },
           this.metrics,
-          tenantName,
         );
         this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
 
@@ -126,7 +125,7 @@ export class TenantRegistry implements OnModuleInit {
           confluenceSynchronizationService,
         );
 
-        this.metrics.initializeCountersForTenant(tenantName);
+        this.metrics.initializeCounters();
         this.logger.log({ tenantName, msg: 'Tenant registered' });
       });
     }

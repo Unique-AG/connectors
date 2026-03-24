@@ -89,31 +89,17 @@ export class FileDiffService {
   }
 
   private recordDiffMetrics(result: FileDiffResult): void {
-    const attrs = { tenant: this.tenantName };
-
     if (result.newItemIds.length > 0) {
-      this.metrics.fileDiffEvents.add(result.newItemIds.length, {
-        ...attrs,
-        diff_result_type: 'new',
-      });
+      this.metrics.recordFileDiffEvents(result.newItemIds.length, 'new');
     }
     if (result.updatedItemIds.length > 0) {
-      this.metrics.fileDiffEvents.add(result.updatedItemIds.length, {
-        ...attrs,
-        diff_result_type: 'updated',
-      });
+      this.metrics.recordFileDiffEvents(result.updatedItemIds.length, 'updated');
     }
     if (result.deletedItems.length > 0) {
-      this.metrics.fileDiffEvents.add(result.deletedItems.length, {
-        ...attrs,
-        diff_result_type: 'deleted',
-      });
+      this.metrics.recordFileDiffEvents(result.deletedItems.length, 'deleted');
     }
     if (result.movedItemIds.length > 0) {
-      this.metrics.fileDiffEvents.add(result.movedItemIds.length, {
-        ...attrs,
-        diff_result_type: 'moved',
-      });
+      this.metrics.recordFileDiffEvents(result.movedItemIds.length, 'moved');
     }
   }
 

@@ -105,9 +105,7 @@ export class IngestionService {
       const uploadStartTime = performance.now();
       await this.uploadStream(uploadUrl, stream, attachment.mediaType, attachment.fileSize);
       const uploadDurationSeconds = (performance.now() - uploadStartTime) / 1000;
-      this.metrics.attachmentUploadDuration.record(uploadDurationSeconds, {
-        tenant: this.tenantName,
-      });
+      this.metrics.recordAttachmentUploadDuration(uploadDurationSeconds);
 
       const finalizationRequest = this.buildFinalizationRequest(
         registrationRequest,
@@ -149,14 +147,11 @@ export class IngestionService {
         msg: 'Content deleted',
       });
 
-      this.metrics.contentDeleted.add(deletedCount, { tenant: this.tenantName, result: 'success' });
+      this.metrics.recordContentDeleted(deletedCount, 'success');
       return deletedCount;
     } catch (error) {
       this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
-      this.metrics.contentDeleted.add(contentKeys.length, {
-        tenant: this.tenantName,
-        result: 'failure',
-      });
+      this.metrics.recordContentDeleted(contentKeys.length, 'failure');
       return 0;
     }
   }

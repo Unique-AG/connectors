@@ -3,7 +3,6 @@ import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
 import type { Metrics } from '../metrics';
-import { getHttpStatusCodeClass } from '../metrics';
 import { handleErrorStatus } from './http-util';
 
 const API_PATH_START = /\/(rest\/api|api\/v2)\//;
@@ -40,7 +39,6 @@ export class RateLimitedHttpClient {
   public constructor(
     ratePerMinute: number,
     private readonly metrics: Metrics,
-    private readonly tenantName: string,
   ) {
     this.dispatcher = new Agent().compose([
       interceptors.redirect({ maxRedirections: 10 }),
@@ -91,7 +89,7 @@ export class RateLimitedHttpClient {
         return response.body;
       } catch (error) {
         this.recordRequestDuration(startTime, endpoint, 'error');
-        this.recordError(statusCode);
+        this.metrics.recordApiError(statusCode);
         throw error;
       }
     });
@@ -103,24 +101,13 @@ export class RateLimitedHttpClient {
     result: 'success' | 'error',
   ): void {
     const durationSeconds = (performance.now() - startTime) / 1000;
-    this.metrics.confluenceApiRequestDuration.record(durationSeconds, {
-      tenant: this.tenantName,
-      endpoint,
-      result,
-    });
-  }
-
-  private recordError(statusCode?: number): void {
-    this.metrics.confluenceApiErrors.add(1, {
-      tenant: this.tenantName,
-      http_status_class: statusCode ? getHttpStatusCodeClass(statusCode) : 'unknown',
-    });
+    this.metrics.recordApiRequestDuration(durationSeconds, endpoint, result);
   }
 
   private setupThrottlingMonitoring(): void {
     this.limiter.on('depleted', () => {
       this.logger.log({ msg: 'Rate limit reservoir depleted - queuing requests' });
-      this.metrics.confluenceApiThrottleEvents.add(1, { tenant: this.tenantName });
+      this.metrics.recordApiThrottleEvent();
     });
 
     this.limiter.on('dropped', () => {
