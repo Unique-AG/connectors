@@ -19,6 +19,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `Chat.Read` | Delegated | `f501c180-9344-439a-bca0-6cbf209fd270` | No | Yes |
 | `Team.ReadBasic.All` | Delegated | `2280dda6-0bfd-44ee-a2f4-cb867cfc4c1e` | No | Yes |
 | `Channel.ReadBasic.All` | Delegated | `3aeca27b-ee3a-4c2b-8ded-80376e2134a4` | No | Yes |
+| `ChannelMessage.Read.All` | Delegated | `767156cb-16ae-4d10-8f8b-41b657c8c8c8` | Yes | Yes |
 
 ## Understanding Consent Requirements
 
@@ -30,7 +31,8 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 
    - Organization-wide OR per-user
    - For Teams MCP: `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` require admin consent
-   - The 6 chat messaging permissions (`ChannelMessage.Send`, `ChatMessage.Send`, `Chat.ReadBasic`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`) do **not** require admin consent and can be approved by individual users.
+   - These chat messaging permissions do **not** require admin consent and can be approved by individual users: `ChannelMessage.Send`, `ChatMessage.Send`, `Chat.ReadBasic`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`.
+   - `ChannelMessage.Read.All` **does** require admin consent (required for `get_channel_messages` to read channel message content).
 
 2. **Admin approval workflow (if tenant has it enabled)**
 
@@ -161,6 +163,16 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Used For** | `list_channels` tool and resolving channels by display name |
 | **Why Not Less** | No narrower permission exists for listing channels |
 | **Why Not `Channel.Read.All`** | `Channel.ReadBasic.All` is sufficient for listing channels with display names |
+
+### `ChannelMessage.Read.All`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Read message content from Teams channels |
+| **Used For** | `get_channel_messages` tool to retrieve channel message history |
+| **Why Not Less** | `Channel.ReadBasic.All` only covers listing channels, not reading message content |
+| **Why Not `ChannelMessage.ReadWrite`** | We do not modify or delete channel messages |
+| **Admin Consent** | Required because channel messages may contain sensitive organisational content |
 
 ## Why Delegated (Not Application) Permissions
 

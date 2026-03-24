@@ -17,6 +17,7 @@ export const SCOPES = [
   'Chat.Read', // (delegated): read chat messages
   'Team.ReadBasic.All', // (delegated): list joined teams
   'Channel.ReadBasic.All', // (delegated): list channels in a team
+  'ChannelMessage.Read.All', // (delegated): read channel messages
 ];
 
 export const MicrosoftOAuthProvider: OAuthProviderConfig = {
