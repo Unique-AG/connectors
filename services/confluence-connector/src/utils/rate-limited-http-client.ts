@@ -24,7 +24,7 @@ function normalizeEndpoint(url: string): string {
       return path;
     }
     const apiPath = path.slice(match.index);
-    return apiPath.replaceAll(/\/[0-9a-f-]{8,}/gi, '/{id}').replaceAll(/\/(att)?\d+/g, '/{id}');
+    return apiPath.replaceAll(/\/[0-9a-f-]{8,}/gi, '/{id}').replaceAll(/\/(att)?\d{2,}/g, '/{id}');
   } catch {
     return 'unknown';
   }
@@ -85,10 +85,10 @@ export class RateLimitedHttpClient {
         statusCode = response.statusCode;
         await handleErrorStatus(response.statusCode, response.body, url);
 
-        this.recordRequestDuration(startTime, endpoint, 'success', statusCode);
+        this.recordRequestDuration(startTime, endpoint, 'success');
         return response.body;
       } catch (error) {
-        this.recordRequestDuration(startTime, endpoint, 'error', statusCode);
+        this.recordRequestDuration(startTime, endpoint, 'error');
         this.recordError(statusCode);
         throw error;
       }
@@ -99,7 +99,6 @@ export class RateLimitedHttpClient {
     startTime: number,
     endpoint: string,
     result: 'success' | 'error',
-    statusCode?: number,
   ): void {
     if (!this.metrics) {
       return;
@@ -110,7 +109,6 @@ export class RateLimitedHttpClient {
       tenant: this.metrics.tenantName,
       endpoint,
       result,
-      http_status_class: statusCode ? getHttpStatusCodeClass(statusCode) : 'unknown',
     });
   }
 
@@ -126,11 +124,9 @@ export class RateLimitedHttpClient {
   }
 
   private setupThrottlingMonitoring(): void {
-    this.limiter.on('depleted', (empty) => {
-      if (empty) {
-        this.logger.log({ msg: 'Rate limit reservoir depleted - queuing requests' });
-        this.metrics?.throttleEvents.add(1, { tenant: this.metrics.tenantName });
-      }
+    this.limiter.on('depleted', () => {
+      this.logger.log({ msg: 'Rate limit reservoir depleted - queuing requests' });
+      this.metrics?.throttleEvents.add(1, { tenant: this.metrics.tenantName });
     });
 
     this.limiter.on('dropped', () => {

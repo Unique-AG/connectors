@@ -115,6 +115,7 @@ export class ConfluenceSynchronizationService {
     }
 
     let processed = 0;
+    let ingested = 0;
     const total = pages.length;
 
     const results = await Promise.allSettled(
@@ -128,6 +129,7 @@ export class ConfluenceSynchronizationService {
           const scopeId = spaceScopes.get(page.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
           await this.ingestionService.ingestPage(fetched, scopeId);
+          ingested++;
         }).finally(() => {
           processed++;
           if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
@@ -137,15 +139,14 @@ export class ConfluenceSynchronizationService {
       ),
     );
 
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.filter((r) => r.status === 'rejected').length;
 
-    this.metrics.pagesProcessed.add(succeeded, { tenant: tenant.name, result: 'success' });
+    this.metrics.pagesProcessed.add(ingested, { tenant: tenant.name, result: 'success' });
     if (failed > 0) {
       this.metrics.pagesProcessed.add(failed, { tenant: tenant.name, result: 'failure' });
     }
 
-    this.logSettledResults(results, 'Page ingestion summary');
+    this.logSettledResults(results, failed, 'Page ingestion summary');
   }
 
   private async ingestAttachments(
@@ -162,12 +163,15 @@ export class ConfluenceSynchronizationService {
     let processed = 0;
     const total = attachments.length;
 
+    let ingested = 0;
+
     const results = await Promise.allSettled(
       attachments.map((attachment) =>
         limit(async () => {
           const scopeId = spaceScopes.get(attachment.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${attachment.spaceKey}`);
           await this.ingestionService.ingestAttachment(attachment, scopeId);
+          ingested++;
         }).finally(() => {
           processed++;
           if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
@@ -177,20 +181,22 @@ export class ConfluenceSynchronizationService {
       ),
     );
 
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.filter((r) => r.status === 'rejected').length;
 
-    this.metrics.attachmentsProcessed.add(succeeded, { tenant: tenant.name, result: 'success' });
+    this.metrics.attachmentsProcessed.add(ingested, { tenant: tenant.name, result: 'success' });
     if (failed > 0) {
       this.metrics.attachmentsProcessed.add(failed, { tenant: tenant.name, result: 'failure' });
     }
 
-    this.logSettledResults(results, 'Attachment ingestion summary');
+    this.logSettledResults(results, failed, 'Attachment ingestion summary');
   }
 
-  private logSettledResults(results: PromiseSettledResult<void>[], msg: string): void {
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
+  private logSettledResults(
+    results: PromiseSettledResult<void>[],
+    failed: number,
+    msg: string,
+  ): void {
+    const succeeded = results.length - failed;
     this.logger.log({ total: results.length, succeeded, failed, msg });
   }
 }
