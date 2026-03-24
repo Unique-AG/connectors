@@ -1,6 +1,5 @@
-
-
-
+<!-- confluence-page-id: 2065399822 -->
+<!-- confluence-space-key: PUBDOC -->
 
 # Security
 
@@ -405,4 +404,3 @@ Rotating this secret requires recreating all active subscriptions, as existing o
 - [RFC 6749 - OAuth 2.0](https://datatracker.ietf.org/doc/html/rfc6749) - OAuth 2.0 Authorization Framework
 - [OAuth 2.1](https://oauth.net/2.1/) - OAuth 2.1 specification
 - [NIST SP 800-38D](https://csrc.nist.gov/publications/detail/sp/800-38d/final) - AES-GCM specification
-
