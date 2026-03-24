@@ -75,6 +75,7 @@ Not applicable — no code is being written. Validation is done by reviewing eac
 - Documenting `outlook-mcp` (a separate service)
 - Automating the Confluence publishing pipeline (pages are created manually via MCP tools)
 - End-user documentation (how to use the MCP tools from a chat client perspective)
+- Confluence Publishing (done manually by the user)
 
 ## Tasks
 
@@ -117,19 +118,3 @@ Not applicable — no code is being written. Validation is done by reviewing eac
 ### FAQ
 
 16. **Write `docs/faq.md`** — Cover: general (what kind of MCP server is this, what tools are available), authentication and permissions (admin consent, delegated vs application, client credentials), configuration (redirect URIs, webhook secret, encryption key), sync (full sync vs live catch-up, sync progress, filters), tool usage (search tips, draft attachments, folder IDs), security (token storage, encryption key rotation), deployment edge cases.
-
-### Confluence Publishing
-
-17. **Create root Confluence page `Outlook-Semantic-MCP`** — Publish `docs/README.md` content as the root page in the `PUBDOC` space. Include "auto-generated from outlook-semantic-mcp docs" header. No parent page (top-level, same as Teams-MCP).
-
-18. **Create `Outlook Semantic MCP - Operator Manual` page** — Publish `docs/operator/README.md` content nested under the root page.
-
-19. **Create operator sub-pages (4 pages)** — Publish Authentication, Configuration, Deployment, and Local Development pages each nested under the Operator Manual page.
-
-20. **Create `Outlook Semantic MCP - Technical Manual` page** — Publish `docs/technical/README.md` content nested under the root page.
-
-21. **Create technical sub-pages — core (4 pages)** — Publish Architecture, Flows, Permissions, Security pages each nested under the Technical Manual page.
-
-22. **Create technical sub-pages — new (3 pages)** — Publish Tools, Full Sync, and Live Catch-Up pages each nested under the Technical Manual page.
-
-23. **Create `Outlook Semantic MCP - FAQ` page** — Publish `docs/faq.md` content nested under the root page.
