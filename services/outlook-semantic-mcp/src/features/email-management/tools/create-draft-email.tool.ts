@@ -2,6 +2,7 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import { isString } from 'remeda';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetSubscriptionStatusQuery } from '../../subscriptions/get-subscription-status.query';
@@ -127,6 +128,10 @@ export class CreateDraftEmailTool {
     if (!subscriptionStatus.success) {
       return subscriptionStatus;
     }
-    return this.createDraftEmailCommand.run(userProfileId, input);
+    const chatId = _context.mcpRequest.params._meta?.chatId;
+    return this.createDraftEmailCommand.run(userProfileId, {
+      ...input,
+      chatId: isString(chatId) ? chatId : null,
+    });
   }
 }

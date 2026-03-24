@@ -18,6 +18,7 @@ export interface CreateDraftEmailInput {
     fileName: string;
     data: string;
   }[];
+  chatId: string | null | undefined;
 }
 
 export type CreateDraftEmailResult =
@@ -58,6 +59,7 @@ export class CreateDraftEmailCommand {
     const attachmentResult = await this.addAttachmentsToDraftEmailCommand.run(userProfileId, {
       draftId: createDraftResult.draftId,
       attachments,
+      chatId: input.chatId,
     });
 
     if (!attachmentResult.attachmentsFailed.length) {
