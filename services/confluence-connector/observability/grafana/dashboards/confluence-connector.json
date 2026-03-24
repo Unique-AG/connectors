@@ -292,11 +292,35 @@
       "type": "timeseries"
     },
     {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
-      "id": 20,
-      "title": "Attachment uploads",
-      "type": "row"
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Number of content items deleted per interval. A spike in deletions without corresponding ingestion may indicate a labeling or configuration change.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 8,
+            "lineWidth": 2,
+            "pointSize": 5
+          },
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 26 },
+      "id": 13,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "expr": "round(sum(increase(cfc_content_deleted_total{result=\"success\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Content deleted per tenant (in 1 minute)",
+      "type": "timeseries"
     },
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
@@ -315,7 +339,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 27 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 26 },
       "id": 21,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -353,7 +377,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 },
       "id": 30,
       "title": "Confluence API performance",
       "type": "row"
@@ -375,7 +399,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 37 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 36 },
       "id": 31,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -406,7 +430,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 37 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 36 },
       "id": 32,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -429,7 +453,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
       "id": 35,
       "title": "Unique API performance",
       "type": "row"
@@ -451,7 +475,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 47 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 46 },
       "id": 36,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -482,7 +506,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 47 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 46 },
       "id": 37,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -500,7 +524,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 55 },
       "id": 50,
       "panels": [],
       "title": "Node.js runtime",
@@ -521,7 +545,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 57 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 56 },
       "id": 51,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -552,7 +576,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 57 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 56 },
       "id": 52,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -583,7 +607,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 57 },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 56 },
       "id": 53,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
