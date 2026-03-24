@@ -267,10 +267,11 @@ Detailed behavior by scenario is documented in [Flows](./technical/flows.md#Erro
 - `Sites.Selected` or `Lists.SelectedOperations.Selected` not granted for the site/library
 - Admin consent not completed
 - Certificate/credential issues
+- **Permission scope mismatch:** Library-level grants (issued with the `-List` parameter) require `Lists.SelectedOperations.Selected` on the app registration. If the app only has `Sites.Selected`, those library-level grants are invisible to it and requests return 403.
 
 **Resolution:**
 
-1. Grant site or library access via PowerShell
+1. Check whether the admin issued site-level or library-level grants, and ensure the app registration has the matching permission (`Sites.Selected` for sites, `Lists.SelectedOperations.Selected` for libraries, or both)
 2. Complete admin consent in Azure Portal
 3. Verify certificate configuration
 
