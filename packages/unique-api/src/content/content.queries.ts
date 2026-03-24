@@ -13,6 +13,8 @@ export const GET_CONTENT_BY_ID_QUERY = gql`
   query ContentById($contentIds: [String!]!) {
     contentById(contentIds: $contentIds) {
       id
+      ownerId
+      ownerType
       metadata
       title
       chunks {

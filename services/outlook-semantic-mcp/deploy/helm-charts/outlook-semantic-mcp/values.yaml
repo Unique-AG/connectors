@@ -32,7 +32,7 @@ server:
     - outlook-semantic-mcp-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/outlook-semantic-mcp
-    tag: 0.2.14 # x-release-please-version
+    tag: 0.2.15 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
