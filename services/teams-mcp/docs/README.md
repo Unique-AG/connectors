@@ -64,6 +64,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `Chat.Read` | Delegated | No | Yes |
 | `Team.ReadBasic.All` | Delegated | No | Yes |
 | `Channel.ReadBasic.All` | Delegated | No | Yes |
+| `ChannelMessage.Read.All` | Delegated | Yes | Yes |
 
 For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md#least-privilege-justification).
 

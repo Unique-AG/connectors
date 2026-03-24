@@ -42,7 +42,15 @@ const SCOPES = [
   'offline_access',
   'User.Read',
   'OnlineMeetings.Read',
+  'OnlineMeetingRecording.Read.All',
   'OnlineMeetingTranscript.Read.All',
+  'ChannelMessage.Send',
+  'ChatMessage.Send',
+  'Chat.ReadBasic',
+  'Chat.Read',
+  'Team.ReadBasic.All',
+  'Channel.ReadBasic.All',
+  'ChannelMessage.Read.All',
 ].join(' ');
 
 async function exchangeCode(code: string): Promise<string> {
