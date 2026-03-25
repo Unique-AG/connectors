@@ -86,38 +86,12 @@ Each permission is the minimum required for its function. No narrower alternativ
 |--------|--------|
 | **Purpose** | Obtain refresh tokens for long-lived sessions |
 | **Used For** | Refreshing expired Microsoft access tokens without user re-authentication |
-| **Why Required** | Without this, users would need to re-authenticate every ~1 hour when access tokens expire, interrupting background email sync |
+| **Why Required** | Without this, users would need to re-authenticate every ~1 hour when access tokens expire (Microsoft limit, not configurable), interrupting background email sync |
 
 ## Why Delegated (Not Application) Permissions
 
-<div style="max-width: 800px;">
-
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-flowchart LR
-    subgraph Delegated["Delegated Permissions (Used)"]
-        U1["User signs in"]
-        U2["Consents to permissions"]
-        U3["Token accesses user's data only"]
-    end
-
-    subgraph Application["Application Permissions (Not Used)"]
-        A1["No user sign-in"]
-        A2["Admin configures policies"]
-        A3["Token accesses all tenant data"]
-    end
-
-    U1 --> U2 --> U3
-    A1 --> A2 --> A3
-
-    style Delegated fill:#e8f5e9
-    style Application fill:#ffebee
-```
-
-</div>
-
-| Factor | Delegated | Application |
-|--------|-----------|-------------|
+| Factor | Delegated (used) | Application (not used) |
+|--------|-------------------|------------------------|
 | User involvement | User signs in and consents | No user; admin pre-configures |
 | Data access scope | Only the signed-in user's data | All users' data in tenant |
 | Setup requirement | None (self-service) | Admin creates Application Access Policies via PowerShell |

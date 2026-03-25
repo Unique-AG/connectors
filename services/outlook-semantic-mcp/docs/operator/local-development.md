@@ -150,7 +150,7 @@ Set `MICROSOFT_PUBLIC_WEBHOOK_URL` to your tunnel URL:
 MICROSOFT_PUBLIC_WEBHOOK_URL=https://abc123.devtunnels.ms
 ```
 
-This URL is used when creating Microsoft Graph subscriptions.
+Microsoft Graph appends `/mail-subscription/notification` and `/mail-subscription/lifecycle` to this URL when delivering webhook events. It must be publicly reachable by Microsoft, which is why you need a tunnel URL locally instead of `http://localhost:9542`.
 
 ## Development Workflow
 

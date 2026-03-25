@@ -18,7 +18,7 @@ A subscription is created automatically when a user connects:
 
 Subscriptions are renewed via Microsoft Graph lifecycle notifications:
 
-- Microsoft sends a `reauthorizationRequired` notification 15–45 minutes before expiration
+- Microsoft sends `reauthorizationRequired` lifecycle notifications before the access token or subscription expires (the timing varies based on token TTL; Microsoft does not guarantee a fixed window)
 - The server responds by PATCHing the subscription with a new `expirationDateTime`
 - Subscriptions renew to the next configured UTC expiration hour (set by `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC`)
 

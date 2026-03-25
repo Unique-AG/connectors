@@ -249,7 +249,8 @@ See [Full Sync Documentation](./technical/full-sync.md) and [Live Catch-Up Docum
 3. **Live Mail** (Ongoing)
    - New emails arrive in Outlook
    - Server receives Microsoft Graph webhook notification automatically
-   - Email is processed and available for search immediately
+   - It uploads the email to Unique Knowledge Base
+   - Email is available for search once Knowledge Base ingests it
 
 4. **AI-Assisted Email Tasks** (On-demand)
    - Search emails with `search_emails`
@@ -273,9 +274,9 @@ See [Authentication Architecture](./technical/architecture.md) for details.
 
 | Constraint | Impact | Mitigation |
 |------------|--------|------------|
-| **90-day token expiry** | User must reconnect after ~90 days of inactivity | Monitor for disconnected users; reconnect via `reconnect_inbox` |
-| **Webhook timeout** | Microsoft requires response in < 10 seconds | RabbitMQ decouples notification receipt from email processing |
-| **Subscription expiry** | Graph subscriptions expire after max 3 days | Automatic renewal via Microsoft Graph lifecycle notifications |
+| **90-day token expiry** (Microsoft limit) | User must reconnect after ~90 days of inactivity | Monitor for disconnected users; reconnect via `reconnect_inbox` |
+| **Webhook timeout** (Microsoft limit) | Microsoft requires response in < 10 seconds | RabbitMQ decouples notification receipt from email processing |
+| **Subscription expiry** (Microsoft limit: max 7 days for messages) | The service creates subscriptions that renew daily; Microsoft allows up to 7 days | Automatic renewal via Microsoft Graph lifecycle notifications |
 | **Encryption key change** | All stored tokens become unreadable | Users must reconnect; plan key rotation as a maintenance window |
 
 ### Feature Constraints
@@ -289,13 +290,13 @@ See [Authentication Architecture](./technical/architecture.md) for details.
 
 | Factor | Limit | Notes |
 |--------|-------|-------|
-| **Microsoft Graph rate limits** | ~10,000 requests / 10 min per app | Shared across all users of the app registration |
+| **Microsoft Graph global rate limit** (Microsoft limit) | 130,000 requests / 10 seconds per app across all tenants | Additional per-mailbox and per-service limits may apply; see [Microsoft Graph throttling](https://learn.microsoft.com/en-us/graph/throttling) |
 | **Database connections** | PostgreSQL pool size | Monitor connection usage under load |
 
 ### Not Supported
 
 - **Application permissions**: All access is delegated; no daemon/background-only access model
-- **Shared mailboxes**: Access to shared mailboxes depends entirely on the signed-in user's own delegated rights
+- **Shared mailboxes**: The server syncs and searches only the emails returned by the Microsoft Graph `/me/messages` API — i.e. the signed-in user's own mailbox. Emails in shared mailboxes or other users' inboxes are not included, even if the user has access to them
 - **Calendar or task data**: Only mail and contacts are in scope
 - **Token introspection**: MCP tokens validated locally with short TTLs for performance
 

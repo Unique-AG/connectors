@@ -189,12 +189,12 @@ MCP access and refresh tokens are cryptographically random opaque values:
 **Token TTLs:**
 
 
-| Token Type              | Default TTL | Configurable Via                        |
-| ----------------------- | ----------- | --------------------------------------- |
-| MCP Access Token        | 60 seconds  | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS`  |
-| MCP Refresh Token       | 30 days     | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` |
-| Microsoft Access Token  | ~1 hour     | Issued by Microsoft                     |
-| Microsoft Refresh Token | ~90 days    | Issued by Microsoft                     |
+| Token Type              | Default TTL | Source | Configurable Via                        |
+| ----------------------- | ----------- | ------ | --------------------------------------- |
+| MCP Access Token        | 60 seconds  | Service limit | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS`  |
+| MCP Refresh Token       | 30 days     | Service limit | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` |
+| Microsoft Access Token  | ~1 hour     | Microsoft limit | Not configurable — issued by Microsoft  |
+| Microsoft Refresh Token | ~90 days    | Microsoft limit | Not configurable — issued by Microsoft  |
 
 
 ### Session State Integrity (AUTH_HMAC_SECRET)
@@ -326,10 +326,10 @@ sequenceDiagram
 The server applies IP-based rate limiting to all endpoints:
 
 
-| Scope                  | Limit                    | Purpose                                |
-| ---------------------- | ------------------------ | -------------------------------------- |
-| Global (all endpoints) | 10 requests / 60 seconds | General brute-force protection         |
-| Authorization endpoint | 3 requests / 60 seconds  | Tighter protection for auth initiation |
+| Scope                  | Limit                    | Source | Purpose                                |
+| ---------------------- | ------------------------ | ------ | -------------------------------------- |
+| Global (all endpoints) | 10 requests / 60 seconds | Service limit | General brute-force protection         |
+| Authorization endpoint | 3 requests / 60 seconds  | Service limit | Tighter protection for auth initiation |
 
 
 ## Secret Management
@@ -377,7 +377,7 @@ Rotating this secret requires recreating all active subscriptions, as existing o
 1. Generate new secret: `openssl rand -hex 64`
 2. Update Kubernetes secret and redeploy
 3. All users must call `reconnect_inbox` to recreate their subscriptions with the new secret
-4. Emails arriving during the gap between old subscription expiry and new subscription creation will be missed for live catch-up (full sync is unaffected)
+4. Emails arriving during the gap will not be ingested until `reconnect_inbox` is called. After that, live catch-up picks them up automatically on the next notification or 15-minute cron cycle (it queries from the last watermark)
 
 ## Security Checklist for Operators
 

@@ -28,10 +28,10 @@ In Scenario 3 (Knowledge Base loss), the content must be fully re-ingested becau
 
 The documentation does not provide fixed RTO targets because recovery time varies significantly by deployment. The main factors are:
 
-- **Number of connected users** — each user's mailbox is re-synced independently. The service processes users concurrently but enforces a batch limit of 50 messages per cycle per user before yielding to others.
-- **Mailbox size** — full sync fetches emails in pages of 100 from Microsoft Graph, processing them sequentially. Large mailboxes (100,000+ emails) take proportionally longer.
-- **Microsoft Graph API rate limits** — the shared app registration is subject to approximately 10,000 requests per 10 minutes. Re-syncing many users simultaneously will approach this limit. There is no built-in staggering; operators may need to trigger `restart_full_sync` for users in batches to avoid throttling.
-- **Ingestion concurrency** — the service limits concurrent ingestion requests to 10 per instance to avoid overwhelming the Unique API.
+- **Number of connected users** — each user's mailbox is re-synced independently. The service processes users concurrently but enforces a batch limit of 50 messages per cycle per user before yielding to others (service limit, configurable).
+- **Mailbox size** — full sync fetches emails in pages of 100 from Microsoft Graph (service-configured page size), processing them sequentially. Large mailboxes (100,000+ emails) take proportionally longer.
+- **Microsoft Graph API rate limits** — Microsoft enforces a global limit of 130,000 requests per 10 seconds per app across all tenants; additional per-mailbox and per-service limits may apply (Microsoft limit, not configurable). Re-syncing many users simultaneously may approach these limits. There is no built-in staggering; operators may need to trigger `restart_full_sync` for users in batches to avoid throttling. See [Microsoft Graph throttling](https://learn.microsoft.com/en-us/graph/throttling).
+- **Ingestion concurrency** — the service limits concurrent ingestion requests to 10 per instance to avoid overwhelming the Unique API (service limit, configurable).
 - **Infrastructure provisioning** — if PostgreSQL or RabbitMQ must be provisioned from scratch rather than restored from backup, lead time depends on the platform. Clients using managed database services rather than Kubernetes-native solutions (e.g. CNPG) should account for provider-specific provisioning and configuration time.
 
 ### Backup recommendations
@@ -60,7 +60,7 @@ Emails are sourced from Microsoft Graph, which retains the authoritative copy. I
 | **Database / platform administrator** | Scenario 1 — restores or provisions PostgreSQL. Scenario 2 — restores or provisions RabbitMQ. |
 | **End users** | Scenario 1 only — must call `reconnect_inbox` to re-authenticate. Not needed for Scenarios 2 or 3. |
 
-No Microsoft tenant administrator action is required for recovery. Orphaned webhook subscriptions in Microsoft's systems expire automatically within approximately 1 day.
+No Microsoft tenant administrator action is required for recovery. Orphaned webhook subscriptions in Microsoft's systems expire automatically based on the expiration time set at creation (the service configures subscriptions to renew daily, so orphaned subscriptions typically expire within about 1 day; Microsoft allows up to 7 days for message subscriptions).
 
 ---
 
@@ -77,7 +77,7 @@ No Microsoft tenant administrator action is required for recovery. Orphaned webh
 The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, and all sync state. Total loss of the database means:
 
 - All users must re-authenticate via the OAuth flow.
-- All Graph webhook subscriptions are orphaned in Microsoft's systems (they expire naturally within approximately 1 day, based on the configured daily renewal cycle).
+- All Graph webhook subscriptions are orphaned in Microsoft's systems (they expire naturally based on their expiration time — typically within about 1 day given the service's daily renewal cycle; Microsoft allows up to 7 days for message subscriptions).
 - All sync state (cursor positions, progress counters) is lost.
 - Emails already ingested into the Unique Knowledge Base are **not** affected — they remain searchable.
 

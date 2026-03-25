@@ -7,7 +7,7 @@
 
 This section contains detailed technical documentation for developers and architects working with the Outlook Semantic MCP Server.
 
-**Note:** The Outlook Semantic MCP Server is a traditional MCP server — it exposes 14 MCP tools that AI clients invoke on demand. This contrasts with connector-style servers (like Teams MCP) which ingest data silently in the background without exposing tools. Emails are synced into the Unique knowledge base automatically after connection, but all user-facing interactions go through explicit tool calls.
+**Note:** The Outlook Semantic MCP Server is a traditional MCP server — it exposes 14 MCP tools that AI clients invoke on demand. This contrasts with connector-style servers (like Sharepoint Connector) which ingest data silently in the background without exposing tools. Emails are synced into the Unique knowledge base automatically after connection, but all user-facing interactions go through explicit tool calls.
 
 ## Documentation
 

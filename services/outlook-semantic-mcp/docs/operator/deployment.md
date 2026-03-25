@@ -17,7 +17,7 @@ Before deploying the Outlook Semantic MCP Server, ensure you have:
 
 ## Helm Chart
 
-The Outlook Semantic MCP Server is deployed using a Helm chart that wraps the `backend-service` chart.
+The Outlook Semantic MCP Server is deployed using a Helm chart that wraps the [`backend-service`](https://github.com/Unique-AG/helm-charts/tree/main/charts/backend-service) chart.
 
 ### Add Helm Repository
 
@@ -44,7 +44,39 @@ helm upgrade outlook-semantic-mcp oci://ghcr.io/unique-ag/helm-charts/outlook-se
 
 ## Required Secrets
 
-Create the following Kubernetes secrets before deployment:
+The service requires the following Kubernetes secrets to be present before deployment:
+
+| Secret Key | Description | Source |
+|------------|-------------|--------|
+| `DATABASE_URL` | PostgreSQL connection string | Manual |
+| `AMQP_URL` | RabbitMQ connection URL | Manual |
+| `MICROSOFT_CLIENT_SECRET` | Client secret from Entra app registration | Terraform ([Entra module](#terraform-modules)) |
+| `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string for webhook validation | Auto-generated |
+| `AUTH_HMAC_SECRET` | 64-character hex string (256-bit) for token signing | Auto-generated |
+| `ENCRYPTION_KEY` | 64-character hex string (256-bit) for AES-256-GCM encryption | Auto-generated |
+| `UNIQUE_ZITADEL_CLIENT_SECRET` | Zitadel OAuth client secret (only when `serviceAuthMode: external`) | Manual |
+
+### Provisioning with Terraform (recommended)
+
+A Terraform module is provided to provision all secrets in Azure Key Vault:
+
+```
+deploy/terraform/azure/outlook-semantic-mcp-secrets/
+```
+
+This module:
+
+- **Auto-generates** cryptographic secrets (`AUTH_HMAC_SECRET`, `ENCRYPTION_KEY`, `MICROSOFT_WEBHOOK_SECRET`) using secure random bytes and stores them in Azure Key Vault.
+- **Creates placeholders** for manually managed secrets (`DATABASE_URL`, `AMQP_URL`, `MICROSOFT_CLIENT_SECRET`, `UNIQUE_ZITADEL_CLIENT_SECRET`) that must be set directly in Azure Key Vault after provisioning.
+- Supports **secret rotation** via a `rotation_counter` variable.
+
+Once secrets are in Azure Key Vault, sync them to Kubernetes using the [External Secrets Operator](https://external-secrets.io/) (ESO). Create an `ExternalSecret` resource that references each Key Vault entry and produces the corresponding Kubernetes secret.
+
+See [Authentication Guide](./authentication.md) for Terraform usage details on the Entra application module.
+
+### Manual provisioning
+
+If you are not using Terraform and ESO, create the Kubernetes secrets directly:
 
 ```bash
 kubectl create secret generic outlook-semantic-mcp-secrets \
@@ -57,26 +89,10 @@ kubectl create secret generic outlook-semantic-mcp-secrets \
   --from-literal=ENCRYPTION_KEY="$(openssl rand -hex 32)"
 ```
 
-For external auth mode, also create:
-
 ```bash
-# For external auth mode, also create:
 kubectl create secret generic outlook-semantic-mcp-zitadel-secret \
   --namespace outlook-semantic-mcp \
   --from-literal=UNIQUE_ZITADEL_CLIENT_SECRET="<your-zitadel-client-secret>"
-```
-
-### Generating Secrets
-
-```bash
-# Generate MICROSOFT_WEBHOOK_SECRET (128 characters)
-openssl rand -hex 64
-
-# Generate AUTH_HMAC_SECRET (64 characters hex = 256 bits)
-openssl rand -hex 32
-
-# Generate ENCRYPTION_KEY (64 characters hex = 256 bits)
-openssl rand -hex 32
 ```
 
 ## Minimal Values Configuration
@@ -133,7 +149,7 @@ mcpConfig:
       x-user-id: "<your-service-account-user-id>"
 ```
 
-**Note:** Ingress is disabled by default. Traffic routing is handled by Kong Gateway. Enable and configure ingress in `values.yaml` for your deployment.
+**Note:** Ingress is disabled by default. Enable it and configure hosts/TLS in the `ingress` section of your `values.yaml`. The chart defaults to `ingressClassName: kong` but any ingress controller can be used. MCP servers need to be hosted on their own domain.
 
 ## Database Migration
 
@@ -207,23 +223,29 @@ alerts:
 
 ## Network Policies
 
-Cilium network policies are enforced in QA and UAT clusters under a default-deny ingress and egress model. New deployments must declare all allowed connections.
+If your cluster enforces network policies, the following traffic must be allowed for the service to function correctly.
 
-Allowed ingress traffic:
+### Ingress (who calls the service)
 
-- Kong Gateway (HTTP/HTTPS)
-- Prometheus scraper (port `51346`)
-- kubelet (health check probes)
+| Source | Port | Purpose |
+|--------|------|---------|
+| API Gateway (e.g. Kong) | `51345` (TCP) | Inbound HTTP traffic including Microsoft OAuth callbacks and webhook notifications |
+| Prometheus | `51346` (TCP) | Metrics scraping |
+| kubelet | `51345` (TCP) | Startup, liveness, and readiness probes |
 
-Allowed egress traffic:
+### Egress (what the service calls)
 
-- DNS (UDP/TCP port 53)
-- PostgreSQL (port 5432)
-- RabbitMQ (port 5672)
-- Microsoft Graph APIs (HTTPS)
-- Unique internal services (`node-ingestion`, `node-scope-management`)
+| Destination | Port | Purpose |
+|-------------|------|---------|
+| DNS (kube-dns) | `53` (UDP/TCP) | Cluster DNS resolution |
+| PostgreSQL | `5432` (TCP) | Database access |
+| RabbitMQ | `5672` (TCP) | Message queue |
+| `node-ingestion` | `8080` (TCP) | Unique ingestion service |
+| `node-scope-management` | `8080` (TCP) | Unique scope management service |
+| `login.microsoftonline.com`, `graph.microsoft.com` | `443` (TCP) | Microsoft OAuth and Graph API |
+| `outlook.office.com`, `outlook.office365.com` | `443` (TCP) | Attachment upload sessions (Microsoft Graph) |
 
-See [`../../../deploy/README.md`](../../../deploy/README.md) for details on the network policy configuration.
+The [`backend-service`](https://github.com/Unique-AG/helm-charts/tree/main/charts/backend-service) Helm chart supports Cilium network policies via the `server.networkPolicy` values. See the chart documentation for configuration details.
 
 ## Terraform Modules
 

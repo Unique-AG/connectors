@@ -75,7 +75,7 @@ sequenceDiagram
 
 ## Subscription Creation and Renewal Lifecycle
 
-Microsoft Graph webhook subscriptions expire after a maximum of 3 days. The server manages their full lifecycle:
+Microsoft Graph webhook subscriptions for messages can last up to 7 days (Microsoft limit). The service creates subscriptions that renew daily at the configured UTC hour. The server manages the full lifecycle:
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -91,7 +91,7 @@ sequenceDiagram
     OutlookMCP->>DB: Check for existing subscription
     alt No subscription or expired
         OutlookMCP->>MSGraph: POST /subscriptions (resource: users/{id}/messages)
-        MSGraph->>OutlookMCP: Subscription ID + expiration (3 days)
+        MSGraph->>OutlookMCP: Subscription ID + expiration
         OutlookMCP->>DB: Store subscription record
         OutlookMCP->>AMQP: Publish subscription-created event
     else Subscription still valid
@@ -165,7 +165,7 @@ sequenceDiagram
 
 **Key points:**
 
-- Microsoft requires a response within 10 seconds. The server enqueues the notification immediately and returns `202 Accepted` — actual email processing happens asynchronously.
+- Microsoft requires a response within 10 seconds (Microsoft limit, not configurable). The server enqueues the notification immediately and returns `202 Accepted` — actual email processing happens asynchronously.
 - Buffering applies when another live catch-up consumer is already processing, or when the watermark has not been set yet (full sync has not started). Messages are flushed once the blocker clears.
 - The watermark (`newestLastModifiedDateTime`) is **initialized by full sync** the first time it runs and **maintained by live catch-up** on every subsequent notification.
 - `deleted` change notifications are discarded. Deletions are handled in two ways: when an entire folder is deleted, directory sync detects it via delta sync; when an individual email is deleted, the user first moves it to a folder marked `ignoreForSync` (e.g. Deleted Items), which generates a `created` event for that folder — the server detects the email is in an ignored folder on that `created` event and removes it from the knowledge base.

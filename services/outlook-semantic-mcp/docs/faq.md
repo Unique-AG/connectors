@@ -11,7 +11,7 @@
 
 **What it does:**
 
-- Automatically ingests the user's complete email history into the Unique knowledge base after connection
+- Automatically ingests the user's email history into the Unique knowledge base after connection, based on the configured filters (folder, date range, sender/recipient)
 - Exposes 10 tools (plus 4 debug-mode tools) for searching emails, managing drafts, listing folders, and monitoring sync status
 - Keeps the knowledge base up to date in real time via webhook-driven live catch-up
 - Requires no manual setup beyond the initial connection
@@ -81,7 +81,7 @@ Delegated permissions also ensure the server can only access emails the signed-i
 
 **Answer:** The server can no longer refresh access tokens for that user. All Microsoft Graph operations fail until the user reconnects via the `reconnect_inbox` tool.
 
-Refresh tokens expire after approximately 90 days of inactivity or when the user revokes consent.
+Refresh tokens expire after approximately 90 days of inactivity (Microsoft limit, not configurable) or when the user revokes consent.
 
 **See also:** [Microsoft Token Refresh Flow](./technical/flows.md#microsoft-token-refresh-flow)
 
@@ -383,7 +383,7 @@ Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredCon
 
 ### Why is RabbitMQ required?
 
-**Answer:** Microsoft requires webhook endpoints to respond within 10 seconds. Processing a live catch-up notification involves acquiring database locks, querying Microsoft Graph, and uploading emails to the knowledge base — which can take longer. RabbitMQ decouples receipt from processing: the webhook controller enqueues the notification and returns `202 Accepted` immediately, while the consumer processes it asynchronously.
+**Answer:** Microsoft requires webhook endpoints to respond within 10 seconds (Microsoft limit, not configurable). Processing a live catch-up notification involves acquiring database locks, querying Microsoft Graph, and uploading emails to the knowledge base — which can take longer. RabbitMQ decouples receipt from processing: the webhook controller enqueues the notification and returns `202 Accepted` immediately, while the consumer processes it asynchronously.
 
 **See also:** [Live Catch-Up](./technical/live-catchup.md) — [Architecture](./technical/architecture.md)
 

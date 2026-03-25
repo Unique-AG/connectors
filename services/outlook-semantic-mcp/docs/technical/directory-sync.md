@@ -15,7 +15,7 @@ The server discards `deleted` Microsoft Graph change notifications and instead h
 When a user deletes an email, Microsoft moves it to Deleted Items before permanent removal. This generates a `created` change notification for the Deleted Items folder (not a `deleted` notification for the original folder). Because Deleted Items is marked `ignoreForSync = true`, the server detects on this `created` event that the email has landed in an ignored folder and removes it from the Unique knowledge base.
 
 **Entire folder deletion:**
-When a folder itself is deleted, the directory sync detects the removal via its 5-minute delta sync and cleans up accordingly. No `deleted` change notification is needed.
+When a folder is moved or deleted, Microsoft does not fire individual `deleted` notifications for the messages inside that folder. This means the server has no real-time signal for what happened to those messages. The directory sync cron job (running every 5 minutes) compensates for this gap — it detects folder removals via delta sync and cleans up the associated messages from the Unique knowledge base.
 
 This design means the server only needs to subscribe to `created` change notifications and rely on directory sync for structural changes — no `deleted` subscription is required.
 

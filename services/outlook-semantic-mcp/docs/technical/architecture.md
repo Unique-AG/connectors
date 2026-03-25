@@ -388,12 +388,12 @@ This design ensures that:
 
 ### Token TTL
 
-| Token Type | Default TTL | Purpose |
-|------------|-------------|---------|
-| MCP Access Token | 60 seconds | Short-lived API access |
-| MCP Refresh Token | 30 days | Obtain new access tokens |
-| Microsoft Access Token | ~1 hour | Graph API calls |
-| Microsoft Refresh Token | ~90 days | Renew Graph access |
+| Token Type | Default TTL | Source | Purpose |
+|------------|-------------|--------|---------|
+| MCP Access Token | 60 seconds | Service limit (configurable) | Short-lived API access |
+| MCP Refresh Token | 30 days | Service limit (configurable) | Obtain new access tokens |
+| Microsoft Access Token | ~1 hour | Microsoft limit (not configurable) | Graph API calls |
+| Microsoft Refresh Token | ~90 days | Microsoft limit (not configurable) | Renew Graph access |
 
 ### Unsupported Authentication Methods
 

@@ -11,9 +11,9 @@ Full sync is the process of ingesting a user's emails from Microsoft Outlook int
 2. Applies inbox filters to skip unwanted messages
 3. Uploads each email to the Unique knowledge base for indexing
 4. Tracks progress so it can resume from the last processed page if interrupted
-5. Initializes the watermark (`newestLastModifiedDateTime`) used by live catch-up at the start of the first sync run (set to the current time if not already set)
+5. Initializes a watermark so that live catch-up only processes events that happened after the full sync started
 
-Full sync and live catch-up run concurrently after connection. Live catch-up buffers notifications only until full sync has initialized the watermarks — after that, both pipelines ingest independently.
+Full sync and live catch-up run concurrently after connection. Live catch-up buffers notifications until the full sync has initialized its watermark — after that, both pipelines ingest independently.
 
 ## Trigger Conditions
 
@@ -44,7 +44,7 @@ stateDiagram-v2
 
     note right of wfi
         Waits for Unique KB to confirm
-        all queued messages processed
+        majority of queued messages processed
         (max 10 concurrent ingestions)
     end note
 ```
@@ -59,7 +59,7 @@ stateDiagram-v2
 
 ## How Batching Works
 
-Full sync fetches emails from Microsoft Graph in pages of **100 messages**, processing in order from newest to oldest.
+Full sync fetches emails from Microsoft Graph in pages of **100 messages**, processing in order from newest to oldest. After uploading **50 messages** (uploaded + failed), the batch yields so the scheduler can give other users a turn. This means a single batch may process less than a full page, or span multiple pages if many messages are skipped by filters.
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -92,7 +92,7 @@ sequenceDiagram
 
 **Resume on interruption:**
 
-The `fullSyncNextLink` column stores the Graph API `@odata.nextLink` cursor. On restart or recovery, the sync resumes from this cursor rather than starting over. If the cursor has expired (HTTP 410), the sync falls back to a fresh query filtered from the last recorded `oldestCreatedDateTime`.
+The sync persists both the Graph API cursor (`nextLink`) and the index within the current page (`batchIndex`) after every message. On restart, it resumes from the exact position rather than starting over. If the cursor has expired (HTTP 410), the sync falls back to a fresh query filtered from the last recorded `oldestCreatedDateTime` and resets the batch index — this may re-process some already-uploaded messages, which the ingestion layer handles idempotently.
 
 **Optimistic locking:**
 
@@ -141,13 +141,13 @@ Search results may be incomplete while `fullSyncState` is `running` or `waiting-
 
 ## Stale Sync Recovery
 
-A background scheduler runs every 2 minutes and checks for syncs that have stopped updating their heartbeat:
+A background scheduler runs every 2 minutes (service limit) and checks for syncs that have stopped updating their heartbeat:
 
 | Condition | Threshold | Action |
 |-----------|-----------|--------|
-| `state=running`, heartbeat stale | 20 minutes | Re-trigger full sync |
-| `state=waiting-for-ingestion`, heartbeat stale | 5 minutes | Re-trigger ingestion check |
-| `state=failed`, heartbeat stale | 20 minutes | Re-trigger full sync |
+| `state=running`, heartbeat stale | 20 minutes (service limit) | Re-trigger full sync |
+| `state=waiting-for-ingestion`, heartbeat stale | 5 minutes (service limit) | Re-trigger ingestion check |
+| `state=failed`, heartbeat stale | 20 minutes (service limit) | Re-trigger full sync |
 
 The scheduler publishes a `full-sync.retrigger` event which the full sync consumer processes the same way as any other trigger.
 

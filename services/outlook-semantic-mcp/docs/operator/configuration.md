@@ -19,11 +19,6 @@ These must be provided via Kubernetes secrets:
 | `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret — generate with `openssl rand -hex 64` |
 | `AUTH_HMAC_SECRET` | 64-character hex string | JWT signing key — generate with `openssl rand -hex 32` |
 | `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key — generate with `openssl rand -hex 32` |
-
-For `external` auth mode, also provide via secret:
-
-| Variable | Format | Description |
-|----------|--------|-------------|
 | `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret |
 
 ### Application Configuration
@@ -35,8 +30,8 @@ Set via `mcpConfig.app` in Helm values:
 | `SELF_URL` | `mcpConfig.app.selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
 | `PORT` | — | `9542` | Local HTTP port the server binds to |
 | `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Set to `enabled` to expose debug tools and extra debugging data in tool responses |
-| `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `disabled` | Buffer logs before writing to reduce I/O (`enabled`/`disabled`). When unset, defaults to buffering enabled. |
-| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | `{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}` | JSON string controlling which emails are synced |
+| `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | (not set; app default: `enabled`) | Buffer logs before writing to reduce I/O (`enabled`/`disabled`). Only written to config when explicitly set. |
+| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | `{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}` | JSON string controlling which emails are synced — see [Mail Filters](#mail-filters) |
 
 ### Microsoft Configuration
 
@@ -45,7 +40,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
-| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | same as `SELF_URL` | Public webhook URL if different from `SELF_URL` |
+| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | defaults to `SELF_URL` | Base URL Microsoft Graph uses for webhook callbacks. Microsoft appends `/mail-subscription/notification` and `/mail-subscription/lifecycle` to this URL. Must be publicly reachable by Microsoft Graph. Set this when the externally reachable URL differs from `SELF_URL` (e.g., a dev tunnel URL in local development). In most production deployments this matches `SELF_URL`. |
 | `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC` | `3` | Hour of day in UTC (0–23) when scheduled subscription renewals occur |
 
 ### Unique API Configuration
@@ -73,12 +68,14 @@ Set via `mcpConfig.logs` in Helm values:
 
 ### Authentication Token Configuration
 
+These tokens are issued by the MCP server to MCP clients (e.g., AI assistants) after a user completes OAuth. They are distinct from Microsoft tokens and control how long a client session remains valid without re-authentication.
+
 Set via `mcpConfig.auth` in Helm values (optional — defaults are suitable for most deployments):
 
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
-| `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `mcpConfig.auth.accessTokenExpiresInSeconds` | `60` | MCP access token TTL in seconds |
-| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `mcpConfig.auth.refreshTokenExpiresInSeconds` | `2592000` | MCP refresh token TTL in seconds (30 days) |
+| `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `mcpConfig.auth.accessTokenExpiresInSeconds` | `60` | TTL of the short-lived access token issued to MCP clients |
+| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `mcpConfig.auth.refreshTokenExpiresInSeconds` | `2592000` | TTL of the long-lived refresh token issued to MCP clients (30 days) |
 
 ### Runtime Configuration
 
@@ -89,6 +86,10 @@ Set via `server.env` in Helm values for plain config, or via `server.envVars` (w
 | `LOG_LEVEL` | `info` | Log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` |
 | `MAX_HEAP_MB` | `1920` | Node.js max heap size in MB |
 | `NODE_ENV` | `production` | Node environment |
+| `NODE_EXTRA_CA_CERTS`                 | —                                                 | Path to a PEM file containing additional CA certificates for TLS verification if pod's trust store doesn't have them |
+| `OTEL_METRICS_EXPORTER` | `prometheus` | OpenTelemetry metrics exporter |
+| `OTEL_EXPORTER_PROMETHEUS_HOST` | `0.0.0.0` | Host for the Prometheus metrics scrape endpoint |
+| `OTEL_EXPORTER_PROMETHEUS_PORT` | `51346` | Port for the Prometheus metrics scrape endpoint |
 
 ## Helm Values Reference
 
@@ -132,6 +133,9 @@ server:
     LOG_LEVEL: info
     MAX_HEAP_MB: 1920
     NODE_ENV: production
+    OTEL_METRICS_EXPORTER: prometheus
+    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+    OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
 
 mcpConfig:
   enabled: true
@@ -216,10 +220,6 @@ mcpConfig:
 
 ## Zitadel Service Account
 
-### When a Zitadel Service Account is Required
-
-A Zitadel service account is only needed when using `external` auth mode. It allows the Outlook MCP Server to authenticate with the Unique API using OAuth client credentials, without relying on in-cluster header-based auth.
-
 ### Creating a Zitadel Service Account
 
 1. **Navigate to Zitadel**
@@ -229,7 +229,7 @@ A Zitadel service account is only needed when using `external` auth mode. It all
 
 2. **Create a Service Account**
 
-   - Detailed service account configuration can be found [here](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075/How+To+Configure+A+Service+User)
+   - Service account creation documentation can be found [here](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075/How+To+Configure+A+Service+User)
    
 3. **Generate a Client Secret**
 

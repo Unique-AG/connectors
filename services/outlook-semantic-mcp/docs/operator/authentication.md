@@ -70,8 +70,6 @@ module "outlook_semantic_mcp_app" {
    | Permission | Type | Admin Consent |
    |------------|------|---------------|
    | `User.Read` | Delegated | No |
-   | `Mail.Read` | Delegated | No |
-   | `Mail.ReadBasic` | Delegated | No |
    | `Mail.ReadWrite` | Delegated | No |
    | `MailboxSettings.Read` | Delegated | No |
    | `People.Read` | Delegated | No |
@@ -97,9 +95,7 @@ All permissions are **delegated**, meaning they act on behalf of the signed-in u
 | Permission | Purpose |
 |------------|---------|
 | `User.Read` | Resolve user identity and profile |
-| `Mail.Read` | Read emails for sync and search |
-| `Mail.ReadBasic` | Read basic email metadata |
-| `Mail.ReadWrite` | Create draft emails in the user's mailbox |
+| `Mail.ReadWrite` | Read emails for sync and search; create draft emails in the user's mailbox |
 | `MailboxSettings.Read` | Read mailbox settings and folder structure |
 | `People.Read` | Look up contacts and people |
 | `offline_access` | Obtain refresh tokens for background sync |
@@ -158,71 +154,138 @@ The redirect URI must also match the `SELF_URL` environment variable configured 
 
 ## Tenant Configuration
 
-### Single Tenant (Recommended)
+The Entra ID app registration's **sign-in audience** controls which users can authenticate. The service itself works identically in both modes — there is no code-level difference, no `MICROSOFT_TENANT_ID` environment variable, and no runtime tenant configuration. The choice is made once at app registration time.
 
-For enterprise deployments within one organization, use single-tenant configuration:
+### Which option to pick
 
-- **Sign-in audience**: "Accounts in this organizational directory only"
-- **Terraform**: `sign_in_audience = "AzureADMyOrg"`
+| Question | → Pick |
+|----------|--------|
+| Will **only users from your own Microsoft 365 organization** connect? | **Single Tenant** |
+| Will **users from multiple organizations** (e.g. customer tenants) connect to the same deployment? | **Multi-Tenant** |
 
-### Multi-Tenant App Registration
+### Single Tenant
 
-You can configure the Entra ID app registration to serve **multiple Microsoft tenants** with a single MCP server deployment:
+Use this when the MCP server serves one organization only.
 
-- **Sign-in audience**: "Accounts in any organizational directory"
-- **Terraform**: `sign_in_audience = "AzureADMultipleOrgs"`
+| Setting | Value |
+|---------|-------|
+| Azure Portal → "Supported account types" | **Accounts in this organizational directory only** |
+| Terraform `sign_in_audience` | `"AzureADMyOrg"` |
 
-#### Multi-Tenant Configuration
+**What happens:** Only users from the tenant where the app is registered can sign in. No additional setup is needed for other tenants (they simply cannot authenticate).
 
-For SaaS deployments serving multiple organizations:
+**Admin consent (optional):** You can pre-grant permissions tenant-wide so users are not prompted individually. In Terraform, set the `service_principal_configuration` variable to create a service principal and grant delegated permissions automatically.
 
-1. **Single App Registration**: Created in your tenant with one `CLIENT_ID` and `CLIENT_SECRET`
-2. **Enterprise Application Creation**: When each organization's admin grants consent, Microsoft creates an "Enterprise Application" in their tenant
-3. **User Authentication Flow**: Users authenticate via the Enterprise Application in their tenant
-4. **Shared Infrastructure**: One MCP deployment serves all tenants
+### Multi-Tenant
 
-**Admin Consent for Customer Tenants:**
+Use this when one MCP server deployment serves users from multiple Microsoft 365 organizations (e.g. a SaaS deployment).
 
-Each customer tenant admin must grant consent to create the Enterprise Application in their tenant. Share the following URL with them, substituting their `tenant-id` and your app's `client-id`:
+| Setting | Value |
+|---------|-------|
+| Azure Portal → "Supported account types" | **Accounts in any organizational directory** |
+| Terraform `sign_in_audience` | `"AzureADMultipleOrgs"` (this is the Terraform default) |
 
-```
-https://login.microsoftonline.com/{tenant-id}/adminconsent?client_id={client-id}
-```
+**What happens:** Users from any Microsoft 365 organization can sign in. When a user authenticates, Microsoft's OAuth flow automatically routes them to their home tenant.
 
-When the admin visits this URL and approves, Microsoft creates an Enterprise Application in their tenant and grants the delegated permissions tenant-wide.
+**How customer onboarding works:**
 
-**Considerations:**
+1. You create a single app registration in your own tenant with one `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET`.
+2. Each customer tenant admin must grant consent for their organization. Share this URL with them:
+   ```
+   https://login.microsoftonline.com/{customer-tenant-id}/adminconsent?client_id={your-client-id}
+   ```
+   When the admin approves, Microsoft creates an **Enterprise Application** in their tenant and grants the delegated permissions tenant-wide.
+3. After consent, users from that tenant can sign in and connect their mailbox — the server handles them the same as any other user.
 
-- Data isolation: All tenant data stored in the same database (with tenant-scoped access controls)
-- Enterprise Application management: Each tenant admin controls user assignment and access
-- Compliance: Some organizations may require dedicated infrastructure for data residency
+**Important considerations:**
 
-## Client Secret Management
+- **No Terraform `service_principal_configuration`**: For multi-tenant, set this to `null`. Service principals and delegated permission grants are created per-customer-tenant through the admin consent URL above, not via Terraform.
+- **Data isolation**: All tenants share the same database. Data is scoped per-user (each user gets their own inbox configuration, tokens, and Knowledge Base root scope). There is no tenant-level isolation boundary within the service.
+- **Enterprise Application management**: Each customer tenant admin can independently control user assignment and revoke access from their Azure Portal.
+- **Compliance**: Some organizations may require dedicated infrastructure for data residency — in that case, deploy a separate instance per tenant with single-tenant configuration instead.
 
-### Best Practices
+## Secrets
 
-1. **Set appropriate expiration** - Balance security vs. operational overhead
-2. **Rotate before expiration** - Create new secret before old one expires
-3. **Use Key Vault** - Store secrets in Azure Key Vault, not directly in Kubernetes (the Terraform module writes the secret to Key Vault automatically)
-4. **Monitor expiration** - Set up Azure alerts for upcoming secret expiration
+The service requires four secrets for authentication and data protection. All must be stored in Kubernetes Secrets (not ConfigMaps).
 
-### Rotation Process
+| Secret | Format | Generation | Purpose |
+|--------|--------|------------|---------|
+| `MICROSOFT_CLIENT_SECRET` | Azure-generated string | Created in Entra ID app registration | Authenticates the server to Microsoft Entra ID during OAuth flows |
+| `MICROSOFT_WEBHOOK_SECRET` | 128-char hex string | `openssl rand -hex 64` | Validates that incoming webhook notifications come from Microsoft Graph |
+| `ENCRYPTION_KEY` | 64-char hex string | `openssl rand -hex 32` | Encrypts Microsoft OAuth tokens (access + refresh) at rest in PostgreSQL using AES-256-GCM |
+| `AUTH_HMAC_SECRET` | 64-char hex string | `openssl rand -hex 32` | Signs OAuth session state during the MCP client authentication flow (HMAC-SHA256) |
 
-1. Create new client secret in Entra app registration
-2. Update Kubernetes secret with new value
-3. Restart pods to pick up new secret
-4. Verify authentication works
-5. Delete old client secret from Entra
+### `MICROSOFT_CLIENT_SECRET`
 
-## Webhook Secret
+The client secret from the Entra ID app registration. The server uses it to exchange authorization codes for tokens and to refresh expired access tokens.
 
-The `MICROSOFT_WEBHOOK_SECRET` is used to validate incoming webhook notifications from Microsoft Graph change notifications:
+**What happens if it expires or is deleted:** All OAuth flows fail immediately — no new users can connect, and existing users' tokens cannot be refreshed. Once an access token expires (~1 hour), that user's sync and tool calls stop working.
 
-- **Length**: 128 characters
-- **Format**: Hex string
-- **Generation**: `openssl rand -hex 64`
+**How to rotate:**
 
-This secret is passed to Microsoft when creating Graph subscriptions and returned in webhook payloads for validation.
+1. Create a new client secret in the Entra ID app registration (keep the old one active during transition)
+2. Update the Kubernetes secret with the new value
+3. Restart pods to pick up the new secret
+4. Verify authentication works (connect a test user)
+5. Delete the old secret from Entra ID
+
+This supports zero-downtime rotation because Microsoft allows multiple active client secrets simultaneously.
+
+**Best practices:**
+
+- Set appropriate expiration — balance security vs. operational overhead
+- Rotate before expiration — create the new secret well in advance
+- Use Key Vault — the Terraform module writes the secret to Key Vault automatically
+- Monitor expiration — set up Azure alerts for upcoming secret expiration
+
+### `MICROSOFT_WEBHOOK_SECRET`
+
+Passed to Microsoft as the `clientState` field when creating Graph subscriptions. Microsoft returns it unchanged in every webhook payload, and the server rejects any notification where the value does not match.
+
+**What happens if it is changed:** All existing subscriptions break. Every webhook notification from Microsoft will carry the old `clientState` and the server will reject it. This means:
+
+- **Live catch-up stops** — all incoming email notifications are rejected until subscriptions are recreated.
+- **Full sync is unaffected** — it pulls directly from Microsoft Graph and does not use webhooks.
+- **Emails received during the gap will not be ingested into the Knowledge Base** until subscriptions are recreated. Once a user calls `reconnect_inbox` and the next live catch-up runs (triggered by a new notification or the 15-minute cron), it queries from the last watermark and picks up any emails missed during the gap.
+
+**How to rotate:**
+
+1. Generate a new secret: `openssl rand -hex 64`
+2. Update the Kubernetes secret and redeploy the service
+3. All users must call `reconnect_inbox` to recreate their subscriptions with the new secret
+4. Emails arriving during the gap will not be ingested until `reconnect_inbox` is called. After that, live catch-up picks them up automatically on the next notification or 15-minute cron cycle (it queries from the last watermark)
+
+Plan this as a maintenance window — there is no zero-downtime rotation path.
+
+### `ENCRYPTION_KEY`
+
+Used to encrypt Microsoft OAuth tokens (access and refresh tokens) before storing them in PostgreSQL with AES-256-GCM. Tokens are decrypted in memory when the server needs to call Microsoft Graph.
+
+**What happens if it is changed:** All stored Microsoft tokens become unreadable. Every user's sync stops and all tool calls that require Microsoft Graph access fail. Users must re-authenticate by calling `reconnect_inbox`.
+
+**How to rotate:**
+
+1. Generate a new key: `openssl rand -hex 32`
+2. Update the Kubernetes secret and redeploy
+3. All users must call `reconnect_inbox` to re-authenticate — their stored tokens are no longer decryptable
+
+Plan this as a maintenance window and notify users in advance — there is no zero-downtime rotation path.
+
+### `AUTH_HMAC_SECRET`
+
+Used to sign and validate OAuth session state during the MCP client authentication flow (HMAC-SHA256). This prevents CSRF and session tampering during the OAuth redirect sequence.
+
+**What happens if it is changed:** All in-flight OAuth sessions are immediately invalidated. Users who are in the middle of connecting will see an error and need to restart the flow. Already-connected users are not affected — their existing tokens and subscriptions continue to work.
+
+**How to rotate:**
+
+1. Generate a new secret: `openssl rand -hex 32`
+2. Update the Kubernetes secret and redeploy
+3. MCP clients will re-authenticate automatically on their next request — no user action needed
+
+This is the lowest-impact secret to rotate. Existing connections are unaffected.
+
+For the full security context, see [Secret Management](../technical/security.md#secret-management).
 
 For troubleshooting authentication issues, see [FAQ - Authentication & Permissions](../faq.md#authentication--permissions).
 
