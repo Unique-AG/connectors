@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { LiveCatchUpCommand } from './live-catch-up.command';
 
 @Injectable()
@@ -18,9 +18,9 @@ export class RecoverLiveCatchupCommand {
     this.logger.log({ msg: 'Live catch-up recovery requested', userProfileId });
 
     await this.db
-      .update(inboxConfiguration)
+      .update(inboxConfigurations)
       .set({ liveCatchUpState: 'ready' })
-      .where(eq(inboxConfiguration.userProfileId, userProfileId))
+      .where(eq(inboxConfigurations.userProfileId, userProfileId))
       .execute();
 
     const subscription = await this.db.query.subscriptions.findFirst({

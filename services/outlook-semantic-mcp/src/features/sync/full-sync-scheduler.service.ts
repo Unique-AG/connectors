@@ -4,7 +4,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { and, eq, gt, lt, or, SQL, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import {
   STALE_HEARTBEAT_MINUTES,
   WAITING_FOR_FAILED_HEARTBEAT_MINUTES,
@@ -69,28 +69,28 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
     const waitingForFailedThreshold = getThreshold(WAITING_FOR_FAILED_HEARTBEAT_MINUTES);
 
     const configs = await this.db
-      .select({ userProfileId: inboxConfiguration.userProfileId })
-      .from(inboxConfiguration)
+      .select({ userProfileId: inboxConfigurations.userProfileId })
+      .from(inboxConfigurations)
       .innerJoin(
         subscriptions,
         and(
-          eq(subscriptions.userProfileId, inboxConfiguration.userProfileId),
+          eq(subscriptions.userProfileId, inboxConfigurations.userProfileId),
           gt(subscriptions.expiresAt, sql`NOW()`),
         ),
       )
       .where(
         or(
           and(
-            eq(inboxConfiguration.fullSyncState, 'waiting-for-ingestion'),
-            lt(inboxConfiguration.fullSyncHeartbeatAt, waitingForIngestionThreshold),
+            eq(inboxConfigurations.fullSyncState, 'waiting-for-ingestion'),
+            lt(inboxConfigurations.fullSyncHeartbeatAt, waitingForIngestionThreshold),
           ),
           and(
-            eq(inboxConfiguration.fullSyncState, 'failed'),
-            lt(inboxConfiguration.fullSyncHeartbeatAt, waitingForFailedThreshold),
+            eq(inboxConfigurations.fullSyncState, 'failed'),
+            lt(inboxConfigurations.fullSyncHeartbeatAt, waitingForFailedThreshold),
           ),
           and(
-            eq(inboxConfiguration.fullSyncState, 'running'),
-            lt(inboxConfiguration.fullSyncHeartbeatAt, staleThreshold),
+            eq(inboxConfigurations.fullSyncState, 'running'),
+            lt(inboxConfigurations.fullSyncHeartbeatAt, staleThreshold),
           ),
         ),
       );

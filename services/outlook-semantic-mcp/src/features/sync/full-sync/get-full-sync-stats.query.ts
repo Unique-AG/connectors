@@ -4,7 +4,7 @@ import { Span } from 'nestjs-otel';
 import { omit } from 'remeda';
 import z from 'zod';
 import { AppConfig, appConfig } from '~/config';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../../user-utils/get-user-profile.query';
@@ -82,8 +82,8 @@ export class GetFullSyncStatsQuery {
   @Span()
   public async run(userProfileId: UserProfileTypeID): Promise<FullSyncStats> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const inboxConfig = await this.db.query.inboxConfiguration.findFirst({
-      where: eq(inboxConfiguration.userProfileId, userProfile.id),
+    const inboxConfig = await this.db.query.inboxConfigurations.findFirst({
+      where: eq(inboxConfigurations.userProfileId, userProfile.id),
     });
     const subscription = await this.db.query.subscriptions.findFirst({
       where: eq(subscriptions.userProfileId, userProfile.id),

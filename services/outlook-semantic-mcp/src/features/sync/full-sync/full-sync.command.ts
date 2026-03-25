@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
@@ -13,7 +13,7 @@ import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
 
-type InboxConfig = typeof inboxConfiguration.$inferSelect;
+type InboxConfig = typeof inboxConfigurations.$inferSelect;
 
 export const START_FULL_SYNC_LINK = 'SYNC_STARTED:__EMPTY_DELTA__';
 
@@ -141,17 +141,17 @@ export class FullSyncCommand {
     return this.db.transaction(async (tx): Promise<LockDecision> => {
       const row = await tx
         .select({
-          fullSyncState: inboxConfiguration.fullSyncState,
-          fullSyncVersion: inboxConfiguration.fullSyncVersion,
-          fullSyncNextLink: inboxConfiguration.fullSyncNextLink,
-          fullSyncHeartbeatAt: inboxConfiguration.fullSyncHeartbeatAt,
-          fullSyncLastRunAt: inboxConfiguration.fullSyncLastRunAt,
-          fullSyncExpectedTotal: inboxConfiguration.fullSyncExpectedTotal,
-          newestLastModifiedDateTime: inboxConfiguration.newestLastModifiedDateTime,
-          filters: inboxConfiguration.filters,
+          fullSyncState: inboxConfigurations.fullSyncState,
+          fullSyncVersion: inboxConfigurations.fullSyncVersion,
+          fullSyncNextLink: inboxConfigurations.fullSyncNextLink,
+          fullSyncHeartbeatAt: inboxConfigurations.fullSyncHeartbeatAt,
+          fullSyncLastRunAt: inboxConfigurations.fullSyncLastRunAt,
+          fullSyncExpectedTotal: inboxConfigurations.fullSyncExpectedTotal,
+          newestLastModifiedDateTime: inboxConfigurations.newestLastModifiedDateTime,
+          filters: inboxConfigurations.filters,
         })
-        .from(inboxConfiguration)
-        .where(eq(inboxConfiguration.userProfileId, userProfileId))
+        .from(inboxConfigurations)
+        .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .for('update')
         .then((rows) => rows[0]);
 
@@ -169,7 +169,7 @@ export class FullSyncCommand {
       const now = new Date();
       const isFreshStart = isNullish(row.fullSyncNextLink);
 
-      const updateSet: Partial<typeof inboxConfiguration.$inferInsert> = {
+      const updateSet: Partial<typeof inboxConfigurations.$inferInsert> = {
         fullSyncState: 'running',
         fullSyncVersion: version,
         fullSyncHeartbeatAt: now,
@@ -188,9 +188,9 @@ export class FullSyncCommand {
       }
 
       await tx
-        .update(inboxConfiguration)
+        .update(inboxConfigurations)
         .set(updateSet)
-        .where(eq(inboxConfiguration.userProfileId, userProfileId))
+        .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .execute();
 
       return {

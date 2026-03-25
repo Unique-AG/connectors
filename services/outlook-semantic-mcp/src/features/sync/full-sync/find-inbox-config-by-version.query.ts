@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 
-type InboxConfig = typeof inboxConfiguration.$inferSelect;
+type InboxConfig = typeof inboxConfigurations.$inferSelect;
 
 type FullSyncFields = Pick<
   InboxConfig,
@@ -24,21 +24,21 @@ export class FindInboxConfigByVersionQuery {
   public async run(userProfileId: string, version: string): Promise<FullSyncFields | null> {
     const row = await this.db
       .select({
-        fullSyncNextLink: inboxConfiguration.fullSyncNextLink,
-        fullSyncBatchIndex: inboxConfiguration.fullSyncBatchIndex,
-        fullSyncExpectedTotal: inboxConfiguration.fullSyncExpectedTotal,
-        fullSyncSkipped: inboxConfiguration.fullSyncSkipped,
-        fullSyncScheduledForIngestion: inboxConfiguration.fullSyncScheduledForIngestion,
-        fullSyncFailedToUploadForIngestion: inboxConfiguration.fullSyncFailedToUploadForIngestion,
-        filters: inboxConfiguration.filters,
-        oldestCreatedDateTime: inboxConfiguration.oldestCreatedDateTime,
-        newestCreatedDateTime: inboxConfiguration.newestCreatedDateTime,
+        fullSyncNextLink: inboxConfigurations.fullSyncNextLink,
+        fullSyncBatchIndex: inboxConfigurations.fullSyncBatchIndex,
+        fullSyncExpectedTotal: inboxConfigurations.fullSyncExpectedTotal,
+        fullSyncSkipped: inboxConfigurations.fullSyncSkipped,
+        fullSyncScheduledForIngestion: inboxConfigurations.fullSyncScheduledForIngestion,
+        fullSyncFailedToUploadForIngestion: inboxConfigurations.fullSyncFailedToUploadForIngestion,
+        filters: inboxConfigurations.filters,
+        oldestCreatedDateTime: inboxConfigurations.oldestCreatedDateTime,
+        newestCreatedDateTime: inboxConfigurations.newestCreatedDateTime,
       })
-      .from(inboxConfiguration)
+      .from(inboxConfigurations)
       .where(
         and(
-          eq(inboxConfiguration.userProfileId, userProfileId),
-          eq(inboxConfiguration.fullSyncVersion, version),
+          eq(inboxConfigurations.userProfileId, userProfileId),
+          eq(inboxConfigurations.fullSyncVersion, version),
         ),
       )
       .then((rows) => rows[0] ?? null);

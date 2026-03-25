@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { AppConfig, appConfig } from '~/config';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 
 @Injectable()
@@ -21,7 +21,7 @@ export class SyncOnFilterChangeService implements OnModuleInit {
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        await this.db.update(inboxConfiguration).set({ filters: defaultFilters }).execute();
+        await this.db.update(inboxConfigurations).set({ filters: defaultFilters }).execute();
         return;
       } catch (err) {
         if (attempt === maxAttempts) {

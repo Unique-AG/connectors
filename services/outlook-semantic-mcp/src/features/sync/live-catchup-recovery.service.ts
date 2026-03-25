@@ -4,7 +4,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { and, eq, gt, lt, notInArray, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { traceEvent } from '~/features/tracing.utils';
 import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 
@@ -66,22 +66,22 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
 
   private async recoverStuckLiveCatchUps(): Promise<void> {
     const stuckConfigs = await this.db
-      .select({ userProfileId: inboxConfiguration.userProfileId })
-      .from(inboxConfiguration)
+      .select({ userProfileId: inboxConfigurations.userProfileId })
+      .from(inboxConfigurations)
       .innerJoin(
         subscriptions,
         and(
-          eq(subscriptions.userProfileId, inboxConfiguration.userProfileId),
+          eq(subscriptions.userProfileId, inboxConfigurations.userProfileId),
           gt(subscriptions.expiresAt, sql`NOW()`),
         ),
       )
       .where(
         or(
-          eq(inboxConfiguration.liveCatchUpState, 'failed'),
+          eq(inboxConfigurations.liveCatchUpState, 'failed'),
           and(
-            notInArray(inboxConfiguration.liveCatchUpState, ['ready']),
+            notInArray(inboxConfigurations.liveCatchUpState, ['ready']),
             lt(
-              sql`COALESCE(${inboxConfiguration.liveCatchUpHeartbeatAt}, '-infinity'::timestamptz)`,
+              sql`COALESCE(${inboxConfigurations.liveCatchUpHeartbeatAt}, '-infinity'::timestamptz)`,
               sql`NOW() - ${STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES} * INTERVAL '1 minute'`,
             ),
           ),

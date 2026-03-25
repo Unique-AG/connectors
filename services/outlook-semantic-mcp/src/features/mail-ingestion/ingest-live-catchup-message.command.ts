@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceAttrs } from '~/features/tracing.utils';
 import { IngestEmailCommand } from './ingest-email.command';
@@ -30,9 +30,9 @@ export class IngestEmailLiveCatchupMessageCommand {
 
     assert.ok(subscription, `Subscription missing for: ${subscriptionId}`);
 
-    const inboxConfig = await this.db.query.inboxConfiguration.findFirst({
+    const inboxConfig = await this.db.query.inboxConfigurations.findFirst({
       columns: { filters: true },
-      where: eq(inboxConfiguration.userProfileId, subscription.userProfileId),
+      where: eq(inboxConfigurations.userProfileId, subscription.userProfileId),
     });
 
     // For live catchup there is no point in checking the version because.
