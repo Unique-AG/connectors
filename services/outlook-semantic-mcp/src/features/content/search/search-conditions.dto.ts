@@ -1,4 +1,5 @@
 import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
+import assert from 'node:assert';
 import { first } from 'remeda';
 import { z } from 'zod';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
@@ -200,15 +201,18 @@ function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
     const operator = field.operator as UniqueQLOperator | typeof CONTAINS_ANY_OPERATOR;
     const { value } = field;
     if (operator === CONTAINS_ANY_OPERATOR) {
-      // We do not assert because it's not worth breaking the response to the agent.
-      if (Array.isArray(value)) {
-        leaves.push(
-          wrapConditions(
-            value.map((v) => ({ path, operator: UniqueQLOperator.CONTAINS, value: v })),
-            'or',
-          ),
-        );
-      }
+      // We use assert here as type guard because zod already validates this but typescript does not infer that we can
+      // have just array as value.
+      assert.ok(
+        Array.isArray(value),
+        `Invalid value for operator: ${CONTAINS_ANY_OPERATOR}. Value: ${value} must be an array`,
+      );
+      leaves.push(
+        wrapConditions(
+          value.map((value) => ({ path, operator: UniqueQLOperator.CONTAINS, value })),
+          'or',
+        ),
+      );
     } else {
       leaves.push({ path, operator, value });
     }
