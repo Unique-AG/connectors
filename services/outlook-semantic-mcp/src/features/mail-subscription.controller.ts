@@ -157,6 +157,15 @@ export class MailSubscriptionController {
 
     const bySubscription = new Map<string, string[]>();
     for (const notification of notificationsToProcess) {
+      const isTrusted = this.utils.isWebhookTrustedViaState(notification.clientState);
+      if (!isTrusted) {
+        traceEvent('change notification invalid');
+        this.logger.warn({
+          msg: 'Discarding change notification due to invalid authentication state',
+          changeNotification: notification,
+        });
+        continue;
+      }
       const messageId = notification.resourceData?.id;
       if (!messageId) {
         this.logger.warn({
@@ -173,13 +182,43 @@ export class MailSubscriptionController {
       }
     }
 
-    for (const [subscriptionId, messageIds] of bySubscription) {
-      const payload = LiveCatchUpEventDto.parse({
-        type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
-        payload: { subscriptionId, messageIds },
+    const publishResult = await Promise.allSettled(
+      Array.from(bySubscription).map(([subscriptionId, messageIds]) => {
+        const payload = LiveCatchUpEventDto.parse({
+          type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
+          payload: { subscriptionId, messageIds },
+        });
+        this.logger.log({ msg: 'Publishing live catch-up event', subscriptionId, messageIds });
+        return this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload);
+      }),
+    );
+    const successful = publishResult.filter((result) => result.status === 'fulfilled');
+    const failed = publishResult.filter((result) => result.status === 'rejected');
+    traceEvent('notifications published', {
+      successful: successful.length,
+      failed: failed.length,
+    });
+    this.logger.log({
+      msg: 'Successfully processed all notifications from Microsoft Graph',
+      successful: successful.length,
+      failed: failed.length,
+    });
+
+    // NOTE: if we fail any, we reject this webhook as microsoft will send this again later
+    if (failed.length > 0) {
+      failed.forEach((fail) => {
+        this.logger.warn({
+          msg: 'Failed to publish live catch-up event to message queue',
+          err: fail.reason,
+        });
+        traceError(fail.reason);
       });
-      this.logger.log({ msg: 'Publishing live catch-up event', subscriptionId, messageIds });
-      await this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload);
+      throw new InternalServerErrorException(
+        { errors: failed.map((v) => v.reason) },
+        {
+          description: `internal publishing of ${failed.length} messages failed`,
+        },
+      );
     }
   }
 

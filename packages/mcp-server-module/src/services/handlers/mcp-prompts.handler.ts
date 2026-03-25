@@ -10,6 +10,7 @@ import { Inject, Injectable, Scope } from '@nestjs/common';
 import { ContextIdFactory, ModuleRef } from '@nestjs/core';
 import { ZodError } from 'zod';
 import { HttpRequest } from '../../interfaces/http-adapter.interface';
+import { formatZodError } from '../../utils/format-zod-error';
 import { McpRegistryService } from '../mcp-registry.service';
 import { McpHandlerBase } from './mcp-handler.base';
 
@@ -105,12 +106,9 @@ export class McpPromptsHandler extends McpHandlerBase {
           throw error;
         }
         if (error instanceof ZodError) {
-          const messages = (error.issues || [])
-            .map((issue) => issue.message)
-            .filter((msg) => !!msg);
           throw new McpError(
             ErrorCode.InvalidParams,
-            messages.length > 0 ? messages.join('; ') : 'Invalid or missing arguments',
+            error.issues.length > 0 ? formatZodError(error) : 'Invalid or missing arguments',
           );
         }
         throw new McpError(

@@ -1,6 +1,6 @@
 import { UniqueQLOperator } from '@unique-ag/unique-api';
 import { describe, expect, it } from 'vitest';
-import { buildSearchFilter } from './search-conditions.dto';
+import { buildSearchFilter, CONTAINS_ANY_OPERATOR } from './search-conditions.dto';
 
 describe('buildSearchFilter', () => {
   it('returns undefined when conditions is undefined', () => {
@@ -139,6 +139,85 @@ describe('buildSearchFilter', () => {
           path: ['categories'],
           operator: UniqueQLOperator.IN,
           value: ['important'],
+        },
+      ],
+    });
+  });
+
+  it('expands containsAny with multiple emails to an or of contains leaves', () => {
+    const result = buildSearchFilter([
+      {
+        fromSenders: {
+          value: ['alice@example.com', 'bob@example.com'],
+          operator: CONTAINS_ANY_OPERATOR,
+        },
+      },
+    ]);
+
+    expect(result).toEqual({
+      or: [
+        {
+          path: ['fromEmailAddress'],
+          operator: UniqueQLOperator.CONTAINS,
+          value: 'alice@example.com',
+        },
+        {
+          path: ['fromEmailAddress'],
+          operator: UniqueQLOperator.CONTAINS,
+          value: 'bob@example.com',
+        },
+      ],
+    });
+  });
+
+  it('unwraps containsAny with a single value to a bare contains leaf', () => {
+    const result = buildSearchFilter([
+      {
+        fromSenders: {
+          value: ['alice@example.com'],
+          operator: CONTAINS_ANY_OPERATOR,
+        },
+      },
+    ]);
+
+    expect(result).toEqual({
+      path: ['fromEmailAddress'],
+      operator: UniqueQLOperator.CONTAINS,
+      value: 'alice@example.com',
+    });
+  });
+
+  it('ANDs containsAny with other conditions in the same group', () => {
+    const result = buildSearchFilter([
+      {
+        dateFrom: { value: '2024-01-01', operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL },
+        fromSenders: {
+          value: ['alice@example.com', 'bob@example.com'],
+          operator: CONTAINS_ANY_OPERATOR,
+        },
+      },
+    ]);
+
+    expect(result).toEqual({
+      and: [
+        {
+          path: ['receivedDateTime'],
+          operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
+          value: '2024-01-01',
+        },
+        {
+          or: [
+            {
+              path: ['fromEmailAddress'],
+              operator: UniqueQLOperator.CONTAINS,
+              value: 'alice@example.com',
+            },
+            {
+              path: ['fromEmailAddress'],
+              operator: UniqueQLOperator.CONTAINS,
+              value: 'bob@example.com',
+            },
+          ],
         },
       ],
     });

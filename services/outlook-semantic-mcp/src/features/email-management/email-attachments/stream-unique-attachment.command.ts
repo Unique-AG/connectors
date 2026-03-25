@@ -1,10 +1,8 @@
-import { UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
 import { Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UniqueConfigNamespaced } from '~/config';
-import { InjectUniqueApi } from '~/unique/unique-api.module';
 import {
   AttachmentUploadResult,
   ResolvedUniqueIdentity,
@@ -16,16 +14,14 @@ import {
 export class StreamUniqueAttachmentCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(
-    private readonly configService: ConfigService<UniqueConfigNamespaced, true>,
-    @InjectUniqueApi() private readonly uniqueApiClient: UniqueApiClient,
-  ) {}
+  public constructor(private readonly configService: ConfigService<UniqueConfigNamespaced, true>) {}
 
   public async run({
     client,
     draftId,
     fileInfo: { contentId, fileName },
     uniqueIdentity,
+    chatId,
     userProfileId,
   }: {
     client: Client;
@@ -34,6 +30,7 @@ export class StreamUniqueAttachmentCommand {
       contentId: string;
       fileName: Smeared;
     };
+    chatId: string | null | undefined;
     uniqueIdentity: ResolvedUniqueIdentity;
     userProfileId: string;
   }): Promise<AttachmentUploadResult> {
@@ -50,9 +47,6 @@ export class StreamUniqueAttachmentCommand {
         reason: { fileName: fileName.value, reason: 'Could not resolve unique identity' },
       };
     }
-
-    const content = await this.uniqueApiClient.content.getContentById({ contentId });
-    const chatId = content.ownerType === UniqueOwnerType.Chat ? content.ownerId : undefined;
 
     // We impersonate the Unique user so the content API authorizes
     // the download as if the user themselves initiated it.
