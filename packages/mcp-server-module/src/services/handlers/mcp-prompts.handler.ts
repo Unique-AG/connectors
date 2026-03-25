@@ -9,8 +9,8 @@ import {
 import { Inject, Injectable, Scope } from '@nestjs/common';
 import { ContextIdFactory, ModuleRef } from '@nestjs/core';
 import { ZodError } from 'zod';
-import { formatZodError } from '../../utils/format-zod-error';
 import { HttpRequest } from '../../interfaces/http-adapter.interface';
+import { formatZodError } from '../../utils/format-zod-error';
 import { McpRegistryService } from '../mcp-registry.service';
 import { McpHandlerBase } from './mcp-handler.base';
 
