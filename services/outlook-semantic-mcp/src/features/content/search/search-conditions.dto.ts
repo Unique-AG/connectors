@@ -61,8 +61,12 @@ const emailConditionsSchema = (label: string) =>
       ),
   )
     .or(
-      ArrayConditionFieldSchema(z.array(z.string())).describe(
-        `List of ${label.toLowerCase()} emails or domains. Use containsAny for partial/domain matching — e.g. ["google.com", "microsoft.com"] matches all senders from those domains. Use in/notIn for exact full-address matching only — e.g. ["alice@example.com"]. Never use in with partial values like "@google.com" — use containsAny or the singular contains form instead.`,
+      ArrayConditionFieldSchema(
+        z
+          .array(z.string())
+          .describe(
+            `List of ${label.toLowerCase()} emails or domains. Use containsAny for partial/domain matching — e.g. ["google.com", "microsoft.com"] matches all senders from those domains. Use in/notIn for exact full-address matching only — e.g. ["alice@example.com"]. Never use in with partial values like "@google.com" — use containsAny or the singular contains form instead.`,
+          ),
       ),
     )
     .optional();
