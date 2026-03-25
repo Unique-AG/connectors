@@ -148,9 +148,9 @@ Examples:
 - Production: `https://outlook.semantic.mcp.example.com/auth/callback`
 - Local development: `http://localhost:9542/auth/callback`
 
-**Multiple redirect URIs** can be configured for different environments.
+**Multiple redirect URIs** can be configured for different environments. If you run multiple server instances (e.g., staging and production), add each instance's redirect URI to the same app registration — you do not need a separate app registration per instance.
 
-The redirect URI must also match the `SELF_URL` environment variable configured in the server.
+The redirect URI is derived from `SELF_URL`: the app registration redirect URI must be `<SELF_URL>/auth/callback`. This is unrelated to the `MICROSOFT_PUBLIC_WEBHOOK_URL` variable, which controls webhook callbacks only.
 
 ## Tenant Configuration
 

@@ -30,7 +30,7 @@ Set via `mcpConfig.app` in Helm values:
 | `SELF_URL` | `mcpConfig.app.selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
 | `PORT` | — | `9542` | Local HTTP port the server binds to |
 | `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Set to `enabled` to expose debug tools and extra debugging data in tool responses |
-| `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | (not set; app default: `enabled`) | Buffer logs before writing to reduce I/O (`enabled`/`disabled`). Only written to config when explicitly set. |
+| `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing to reduce I/O. Set to `disabled` only for startup debugging when you need logs to appear immediately. |
 | `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | `{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}` | JSON string controlling which emails are synced — see [Mail Filters](#mail-filters) |
 
 ### Microsoft Configuration
@@ -40,7 +40,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
-| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | defaults to `SELF_URL` | Base URL Microsoft Graph uses for webhook callbacks. Microsoft appends `/mail-subscription/notification` and `/mail-subscription/lifecycle` to this URL. Must be publicly reachable by Microsoft Graph. Set this when the externally reachable URL differs from `SELF_URL` (e.g., a dev tunnel URL in local development). In most production deployments this matches `SELF_URL`. |
+| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | defaults to `SELF_URL` | Base URL Microsoft Graph uses for **webhook** callbacks (not OAuth callbacks — those always use `SELF_URL`). Microsoft appends `/mail-subscription/notification` and `/mail-subscription/lifecycle` to this URL. Must be publicly reachable by Microsoft Graph. Set this when the externally reachable URL differs from `SELF_URL` (e.g., a dev tunnel URL in local development). In most production deployments this matches `SELF_URL`. Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callback`, not this variable. |
 | `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC` | `3` | Hour of day in UTC (0–23) when scheduled subscription renewals occur |
 
 ### Unique API Configuration
@@ -154,7 +154,7 @@ mcpConfig:
     scopeManagementServiceBaseUrl: http://node-scope-management.unique:8092
     serviceExtraHeaders:
       x-company-id: "<your-company-id>"
-      x-user-id: "<your-service-account-user-id>"
+      x-user-id: "<your-zitadel-service-user-id>"
 
   defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
 
@@ -191,6 +191,9 @@ alerts:
 
 For deployments within the same Kubernetes cluster as Unique. Uses in-cluster service URLs with `x-company-id` and `x-user-id` headers passed to all Unique API requests.
 
+!!! warning "`x-user-id` must be a real Zitadel service user"
+    The `x-user-id` value **must** be the ID of an actual service user created in Zitadel — it cannot be an arbitrary value. See [Zitadel Service Account](#zitadel-service-account) for setup instructions.
+
 ```yaml
 mcpConfig:
   unique:
@@ -199,7 +202,7 @@ mcpConfig:
     scopeManagementServiceBaseUrl: http://node-scope-management.unique:8092
     serviceExtraHeaders:
       x-company-id: "<your-company-id>"
-      x-user-id: "<your-service-account-user-id>"
+      x-user-id: "<your-zitadel-service-user-id>"
 ```
 
 #### external
@@ -220,62 +223,28 @@ mcpConfig:
 
 ## Zitadel Service Account
 
-### Creating a Zitadel Service Account
+A Zitadel service account is required for both `cluster_local` and `external` auth modes. For `cluster_local`, its user ID is passed in the `x-user-id` header. For `external`, its credentials are used for service-to-service OAuth.
 
-1. **Navigate to Zitadel**
+For instructions on creating a service user, see the [How To Configure A Service User](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075/How+To+Configure+A+Service+User) guide.
 
-   - Log in to your Zitadel instance
-   - Select the organization where the Outlook MCP Server will operate
+### Service-Specific Setup
 
-2. **Create a Service Account**
+After creating the service user, note the following values for configuration:
 
-   - Service account creation documentation can be found [here](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075/How+To+Configure+A+Service+User)
-   
-3. **Generate a Client Secret**
-
-   - In the service account settings, create a new **Client Secret**
-   - Copy the secret value — it will not be shown again
-
-4. **Note the Required IDs**
-
-   - **Client ID**: The OAuth client ID for the service account
-   - **Project ID**: The Zitadel project ID used for audience validation
-   - **OAuth Token URL**: Your Zitadel instance token endpoint (e.g., `https://your-instance.zitadel.cloud/oauth/v2/token`)
-
-5. **Store the Secret in Kubernetes**
-
-   ```bash
-   kubectl create secret generic outlook-semantic-mcp-secrets \
-     --from-literal=UNIQUE_ZITADEL_CLIENT_SECRET="<client-secret>" \
-     ...
-   ```
-
-6. **Configure in Helm Values**
-
-   ```yaml
-   server:
-     envVars:
-       - name: UNIQUE_ZITADEL_CLIENT_SECRET
-         valueFrom:
-           secretKeyRef:
-             name: outlook-semantic-mcp-secrets
-             key: UNIQUE_ZITADEL_CLIENT_SECRET
-
-   mcpConfig:
-     unique:
-       serviceAuthMode: external
-       zitadel:
-         clientId: "<zitadel-client-id>"
-         oauthTokenUrl: "https://your-instance.zitadel.cloud/oauth/v2/token"
-         projectId: "<zitadel-project-id>"
-   ```
+| Value | Used In | Helm Path |
+|-------|---------|-----------|
+| **User ID** | `cluster_local` | `mcpConfig.unique.serviceExtraHeaders.x-user-id` |
+| **Client ID** | `external` | `mcpConfig.unique.zitadel.clientId` |
+| **Client Secret** | `external` | Secret: `UNIQUE_ZITADEL_CLIENT_SECRET` |
+| **Project ID** | `external` | `mcpConfig.unique.zitadel.projectId` |
+| **OAuth Token URL** | `external` | `mcpConfig.unique.zitadel.oauthTokenUrl` |
 
 ### Service Account Permissions
 
-The service account must have permissions to:
+The service account must have the following Unique platform permissions:
 
-- Submit content to the ingestion service
-- Create and manage scopes via the scope management service
+- **Ingestion**: permission to submit content to the ingestion service (`UNIQUE_INGESTION_SERVICE_BASE_URL`)
+- **Scope management**: permission to create and manage scopes via the scope management service (`UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL`)
 
 ## Mail Filters
 

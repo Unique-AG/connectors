@@ -188,13 +188,11 @@ sequenceDiagram
     OutlookMCP->>DB: Store encrypted tokens
     OutlookMCP->>MCPClient: Opaque MCP bearer token
 
-    Note over User,MCPClient: User invokes inbox connection tool
-    User->>MCPClient: Call verify_inbox_connection tool
-    MCPClient->>OutlookMCP: Tool invocation
+    Note over OutlookMCP: Automatic — triggered by successful authorization
     OutlookMCP->>MSGraph: POST /subscriptions (change notifications)
     MSGraph->>OutlookMCP: Subscription created (ID, expiry)
     OutlookMCP->>DB: Store subscription record
-    OutlookMCP->>MCPClient: Connection verified
+    OutlookMCP->>OutlookMCP: Start full sync automatically
 
     Note over OutlookMCP: Now receiving live mail notifications
 ```
@@ -217,9 +215,9 @@ sequenceDiagram
     Note over OutlookMCP,MSGraph: Full Sync starts automatically after user connects
     OutlookMCP->>MSGraph: GET /messages (paginated, newest first)
     MSGraph->>OutlookMCP: Batch of emails
-    OutlookMCP->>DB: Persist email metadata
+    OutlookMCP->>DB: Update sync progress
     OutlookMCP->>UniqueKB: Upload email for ingestion
-    Note over OutlookMCP: Continues until all history ingested
+    Note over OutlookMCP: Continues until configured time frame ingested
 
     Note over OutlookMCP,MSGraph: Live Catch-Up (webhook-driven)
     MSGraph->>OutlookMCP: POST /webhook/notifications
@@ -229,7 +227,7 @@ sequenceDiagram
     RabbitMQ->>SyncEngine: Deliver notification
     SyncEngine->>MSGraph: GET /messages/{id}
     MSGraph->>SyncEngine: New email content
-    SyncEngine->>DB: Persist email
+    SyncEngine->>DB: Update sync progress
     SyncEngine->>UniqueKB: Upload email for ingestion
 ```
 
@@ -240,11 +238,12 @@ See [Full Sync Documentation](./technical/full-sync.md) and [Live Catch-Up Docum
 1. **User Setup** (One-time)
    - Open MCP client and connect to Outlook Semantic MCP Server
    - Sign in with Microsoft account and grant required permissions
-   - Verify inbox connection via `verify_inbox_connection` tool
+   - The server automatically creates a webhook subscription and starts syncing emails — no user action is needed beyond granting permissions
 
 2. **Initial Sync** (Automatic)
    - After connecting, the server automatically begins syncing emails (within the configured time frame and filters) into the Unique knowledge base
    - Use `sync_progress` to monitor sync status — results will be partial until the sync completes
+   - Use `verify_inbox_connection` to check the status of the webhook subscription
 
 3. **Live Mail** (Ongoing)
    - New emails arrive in Outlook
@@ -290,12 +289,12 @@ See [Authentication Architecture](./technical/architecture.md) for details.
 
 | Factor | Limit | Notes |
 |--------|-------|-------|
-| **Microsoft Graph global rate limit** (Microsoft limit) | 130,000 requests / 10 seconds per app across all tenants | Additional per-mailbox and per-service limits may apply; see [Microsoft Graph throttling](https://learn.microsoft.com/en-us/graph/throttling) |
+| **Microsoft Graph global rate limit** (Microsoft-imposed) | 130,000 requests / 10 seconds per app across all tenants | This limit is set by Microsoft and cannot be changed by operators. Additional per-mailbox and per-service limits may apply; see [Microsoft Graph throttling](https://learn.microsoft.com/en-us/graph/throttling) |
 | **Database connections** | PostgreSQL pool size | Monitor connection usage under load |
 
 ### Not Supported
 
-- **Application permissions**: All access is delegated; no daemon/background-only access model
+- **Application permissions**: The server uses delegated permissions only (acting on behalf of a signed-in user). It does not support application-level permissions, so it cannot run as a background daemon accessing mailboxes without user sign-in
 - **Shared mailboxes**: The server syncs and searches only the emails returned by the Microsoft Graph `/me/messages` API — i.e. the signed-in user's own mailbox. Emails in shared mailboxes or other users' inboxes are not included, even if the user has access to them
 - **Calendar or task data**: Only mail and contacts are in scope
 - **Token introspection**: MCP tokens validated locally with short TTLs for performance
