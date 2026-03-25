@@ -23,7 +23,7 @@ export const inboxSyncState = pgEnum('inbox_sync_state', [
 
 export const liveCatchUpState = pgEnum('live_catch_up_state', ['ready', 'running', 'failed']);
 
-export const inboxConfiguration = pgTable('inbox_configuration', {
+export const inboxConfigurations = pgTable('inbox_configurations', {
   id: varchar('id')
     .primaryKey()
     .$default(() => typeid('inbox_configuration').toString()),
@@ -67,11 +67,11 @@ export const inboxConfiguration = pgTable('inbox_configuration', {
   ...timestamps,
 });
 
-export type InboxConfiguration = typeof inboxConfiguration.$inferSelect;
+export type InboxConfiguration = typeof inboxConfigurations.$inferSelect;
 
-export const inboxConfigurationRelations = relations(inboxConfiguration, ({ one }) => ({
+export const inboxConfigurationRelations = relations(inboxConfigurations, ({ one }) => ({
   userProfile: one(userProfiles, {
-    fields: [inboxConfiguration.userProfileId],
+    fields: [inboxConfigurations.userProfileId],
     references: [userProfiles.id],
   }),
 }));

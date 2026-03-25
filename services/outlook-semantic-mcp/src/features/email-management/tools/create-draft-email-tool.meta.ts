@@ -41,7 +41,7 @@ export const META = createMeta({
     To attach files, pass an array of objects in the \`attachments\` field. Each object must have:
     - \`fileName\`: the name that will appear on the attachment (e.g. \`report.pdf\`)
     - \`data\`: a URI identifying the file content. Supported URI schemes:
-      - **Unique content**: \`unique://chat/{chatId}/content/{contentId}\` — attach a file from the Unique knowledge base using its chat ID and content ID. Example: \`unique://chat/chat_abc123/content/cont_j23i0ifr44sdn7cz97ubleb7\`.
+      - **Unique content**: \`unique://content/{contentId}\` — attach a file from the Unique knowledge base using its content ID. Example: \`unique://content/cont_j23i0ifr44sdn7cz97ubleb7\`.
       - **Data URIs**: \`data:[mediatype];base64,<base64data>\` — inline base64-encoded content.
 
     External URLs (\`https://\`) are **not supported**. Do not pass raw content IDs — always use the \`unique://\` URI scheme for Unique knowledge base files.

@@ -27,6 +27,7 @@ const ConfigSchema = z
     ),
     mcpDebugMode: enabledDisabledBoolean(
       `Enables debug mode. In debug mode tools responses contain debugging data.`,
+      'disabled',
     ),
   })
   .transform((c) => ({

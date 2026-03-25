@@ -4,14 +4,13 @@ export const META = createMeta({
   icon: 'search',
   systemPrompt: `Searches ingested Outlook emails semantically. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns matched passages from emails with metadata.
 
-  By default ALWAYS search in the inbox only. Pass \`"Inbox"\` directly to the \`directories\` parameter — no need to call \`list_folders\`.
+  By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
+  After returning results, inform the user that they can narrow the search to a specific folder if needed.
 
-  For any well-known Outlook system folder you can pass its name directly to the \`directories\` parameter without calling \`list_folders\`.
+  To filter by folder, pass its name directly to the \`directories\` parameter — no need to call \`list_folders\` for well-known folders.
   Use these exact names: "Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History".
   Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized — searching through them will not return results.
   For custom user-defined folders, call \`list_folders\` first to get the folder ID.
-
-  But ALWAYS ask at the end if other folders should be considered for the search.
 
   If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.`,
   toolFormatInformation: `## Email Display Rules
