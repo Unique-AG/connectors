@@ -52,7 +52,7 @@ flowchart TB
 
     IngestionSvc -->|"GraphQL / REST"| UniqueIngestion
     ScopeMgmt -->|"GraphQL"| UniqueScopeMgmt
-    FileDiff -->|"REST"| UniqueIngestion
+    FileDiff -->|"GraphQL"| UniqueIngestion
 
     Connector -.->|"OAuth2 (external mode)"| UniqueIDP
 ```

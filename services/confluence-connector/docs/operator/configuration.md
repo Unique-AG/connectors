@@ -20,7 +20,6 @@ The following environment variables control application-level behavior. They are
 | `OTEL_EXPORTER_PROMETHEUS_HOST` | -- | Prometheus exporter bind host |
 | `OTEL_EXPORTER_PROMETHEUS_PORT` | -- | Prometheus exporter bind port |
 | `NODE_EXTRA_CA_CERTS` | -- | Path to a PEM file containing additional CA certificates for TLS verification if the pod's trust store doesn't have them |
-| `MAX_FILE_SIZE_MB` | `200` | Maximum file size in MB for attachment downloads |
 | `MAX_HEAP_MB` | `896` (Helm) / `1024` (Docker) | Node.js V8 max old space size in MB |
 
 Secret values in tenant YAML files are referenced via the `os.environ/` prefix (e.g., `os.environ/CONFLUENCE_CLIENT_SECRET`). The conventional environment variable names are `CONFLUENCE_CLIENT_SECRET`, `CONFLUENCE_PAT`, and `ZITADEL_CLIENT_SECRET`, but operators can use any variable name as long as the `os.environ/` reference in the tenant YAML matches. See [Authentication -- Secret Resolution](./authentication.md#secret-resolution) for the full resolution mechanism, supported fields, and Kubernetes integration.
