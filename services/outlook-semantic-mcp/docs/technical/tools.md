@@ -27,6 +27,23 @@ The Outlook Semantic MCP Server exposes 10 MCP tools available to all users, plu
 | [`resume_full_sync`](#resume_full_sync) | Full Sync Control (debug only) | Yes | **Yes** |
 | [`restart_full_sync`](#restart_full_sync) | Full Sync Control (debug only) | Yes | **Yes** |
 
+**Mutating** means the tool writes data to at least one of the following:
+
+- **Outlook mailbox** — creates or modifies data in Microsoft Graph (e.g. a draft email or a webhook subscription)
+- **Internal database** — persists or removes state managed by this server (e.g. subscription records, sync state, folder cache)
+- **Unique knowledge base** — indexes or removes email content from the knowledge base used for search
+
+| Tool | What it mutates |
+|------|----------------|
+| `create_draft_email` | Creates a draft message in the user's Outlook mailbox via Microsoft Graph |
+| `list_folders` | Refreshes the folder cache in the internal database by re-fetching the folder tree from Microsoft Graph |
+| `reconnect_inbox` | Creates or renews the Microsoft Graph webhook subscription and writes the subscription record to the internal database |
+| `remove_inbox_connection` | Cancels the Microsoft Graph webhook subscription and deletes the subscription record, folder cache, and root scope from the internal database |
+| `run_full_sync` | Triggers ingestion of all mailbox emails into the Unique knowledge base and updates sync state in the internal database |
+| `pause_full_sync` | Updates the sync state to `paused` in the internal database |
+| `resume_full_sync` | Updates the sync state to resume ingestion in the internal database |
+| `restart_full_sync` | Resets sync state in the internal database and re-triggers full ingestion into the Unique knowledge base |
+
 ---
 
 ## Email Search

@@ -233,7 +233,8 @@ A Zitadel service account is only needed when using `external` auth mode. It all
    - Click **New Service Account**
    - Provide a descriptive name (e.g., "Outlook MCP Server Service Account")
    - Assign appropriate permissions for ingestion and scope management
-
+   - Detailed service account configuration can be found [here](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075/How+To+Configure+A+Service+User)
+   
 3. **Generate a Client Secret**
 
    - In the service account settings, create a new **Client Secret**

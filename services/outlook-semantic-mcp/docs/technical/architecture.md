@@ -255,7 +255,7 @@ erDiagram
 
     inbox_configurations {
         varchar id PK "typeid"
-        varchar userProfileId FK UK
+        varchar userProfileId FK "unique"
         jsonb filters
         enum fullSyncState "ready|running|paused|waiting-for-ingestion|failed"
         uuid fullSyncVersion
@@ -292,7 +292,7 @@ erDiagram
 
     directories_sync {
         varchar id PK "typeid"
-        varchar userProfileId FK UK
+        varchar userProfileId FK "unique"
         string deltaLink
         timestamp lastDeltaSyncRanAt
         timestamp lastDeltaChangeDetectedAt
