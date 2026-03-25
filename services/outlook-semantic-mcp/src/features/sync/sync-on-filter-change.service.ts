@@ -19,6 +19,10 @@ export class SyncOnFilterChangeService implements OnModuleInit {
     const maxAttempts = 5;
     const baseDelayMs = 500;
 
+    // Multiple retry attempts are used with backoff here because this DB update runs at startup.
+    // If there is a brief period of unavailability the pod would crash. If all retries are exhausted,
+    // the service continues rather than crashing — this behavior may be revisited once the preferred
+    // failure mode is determined.
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         await this.db.update(inboxConfigurations).set({ filters: defaultFilters }).execute();
