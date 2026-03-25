@@ -1,5 +1,5 @@
-import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
 import assert from 'node:assert';
+import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
 import { first } from 'remeda';
 import { z } from 'zod';
 import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
