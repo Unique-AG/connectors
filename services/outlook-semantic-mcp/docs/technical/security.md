@@ -73,12 +73,11 @@ flowchart TD
 
 | Action                               | What Is Removed                                                                                        |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| User calls `remove_inbox_connection` | Microsoft Graph subscription, per-user root scopes in Unique KB, inbox configuration, folder sync data |
+| User calls `remove_inbox_connection` | Microsoft Graph subscription, per-user root scopes and all ingested email content in Unique KB, inbox configuration, folder sync data |
 | MCP tokens                           | Expire naturally (access: 60 seconds, refresh: 30 days); not automatically removed from KB             |
-| Ingested email content               | Remains in the Unique knowledge base until explicitly deleted via the Unique platform                  |
 
 
-There is no automatic expiry or purge of ingested email content. Operators who need to remove a user's data from the knowledge base must do so via the Unique platform after calling `remove_inbox_connection`.
+When a user calls `remove_inbox_connection`, the per-user root scopes are removed from the Unique knowledge base, which also removes all ingested email content for that user.
 
 ## Knowledge Base Data Isolation
 

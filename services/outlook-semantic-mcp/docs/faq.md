@@ -273,7 +273,7 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 ### What does `remove_inbox_connection` do?
 
-**Answer:** `remove_inbox_connection` permanently removes the user's inbox connection: it deletes the Microsoft Graph subscription, removes all folder data and root scopes from the Unique knowledge base, and clears the inbox configuration. Previously ingested emails remain in the knowledge base until explicitly deleted.
+**Answer:** `remove_inbox_connection` permanently removes the user's inbox connection: it deletes the Microsoft Graph subscription, removes all folder data and root scopes from the Unique knowledge base (which also removes all ingested email content for that user), and clears the inbox configuration.
 
 **See also:** [Subscription Management](./technical/subscription-management.md#remove_inbox_connection)
 
@@ -331,10 +331,8 @@ Access to the email content itself requires access to the Unique knowledge base,
 **Answer:** Calling `remove_inbox_connection`:
 
 - Deletes the Microsoft Graph subscription (stops future email sync)
-- Removes the per-user root scopes from the Unique knowledge base
+- Removes the per-user root scopes from the Unique knowledge base, which also removes all ingested email content for that user
 - Clears the inbox configuration and folder sync data from PostgreSQL
-
-**Previously ingested email content is not automatically purged.** Emails ingested before disconnection remain in the knowledge base until explicitly deleted through the Unique platform. Operators who need to fully remove a user's data must initiate that deletion separately via Unique platform tooling.
 
 **See also:** [Data Removal](./technical/security.md#data-removal)
 
@@ -349,8 +347,7 @@ Access to the email content itself requires access to the Unique knowledge base,
 - Received date and time
 - Folder location
 - Microsoft-assigned email ID and web link
-
-Attachments are not ingested as content. The `create_draft_email` tool can reference Unique-stored content via `unique://content/{contentId}` URIs, but this is separate from the sync pipeline.
+- Attachments: **All file **
 
 Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredContents`) are never ingested.
 

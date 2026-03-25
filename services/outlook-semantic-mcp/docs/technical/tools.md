@@ -373,7 +373,7 @@ Remove the inbox connection and cease ingesting emails. Deletes the Microsoft Gr
 
 **Usage notes:**
 
-- After removal, no new emails will be ingested. Previously ingested emails remain in the Unique knowledge base.
+- After removal, no new emails will be ingested. Because the root scope is removed, all previously ingested email content for that user is also removed from the Unique knowledge base.
 - To resume ingestion, call `reconnect_inbox`.
 
 ---

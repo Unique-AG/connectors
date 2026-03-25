@@ -54,7 +54,7 @@ Removes the mailbox connection entirely:
 - Deletes the Graph webhook subscription
 - Deletes the `inbox_configurations` record (stops full sync and live catch-up)
 
-Previously ingested emails remain in the Unique knowledge base. To resume ingestion, call `reconnect_inbox`.
+Because the root scope is removed, all previously ingested email content for that user is also removed from the Unique knowledge base. To resume ingestion, call `reconnect_inbox`.
 
 ## Recovery
 
