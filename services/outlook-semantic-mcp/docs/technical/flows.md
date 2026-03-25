@@ -172,7 +172,7 @@ sequenceDiagram
 
 ## Full Sync: Historical Email Ingestion
 
-After a subscription is created, the server automatically begins ingesting the user's complete email history:
+After a subscription is created, the server automatically begins ingesting the user's emails within the configured time frame and filters:
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%

@@ -43,7 +43,7 @@ An additional 4 tools are available only when the server is running in debug mod
 
 ### Do I need to do anything after connecting?
 
-**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting your complete email history. The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
+**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [Inbox Filters](./technical/full-sync.md#inbox-filters)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
 
 ## Authentication & Permissions
 
@@ -151,7 +151,7 @@ When the filters are updated and the service is redeployed, all user inbox confi
 
 | | Full Sync | Live Catch-Up |
 |-|-----------|---------------|
-| Purpose | Ingest complete email history | Ingest new emails in real time |
+| Purpose | Ingest emails within the configured time frame and filters | Ingest new emails in real time |
 | Trigger | Automatic after connection | Microsoft Graph webhook notification |
 | Transport | Direct Graph API (paginated) | RabbitMQ (asynchronous) |
 | State | `ready` / `running` / `waiting-for-ingestion` / `failed` | `ready` / `running` / `failed` |

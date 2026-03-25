@@ -3,7 +3,7 @@
 
 # Full Sync
 
-Full sync is the process of ingesting a user's complete email history from Microsoft Outlook into the Unique knowledge base. It runs automatically after a user connects their mailbox and is resumable across restarts.
+Full sync is the process of ingesting a user's emails from Microsoft Outlook into the Unique knowledge base, scoped to an operator-configured time frame and filtered by sender and content rules. It runs automatically after a user connects their mailbox and is resumable across restarts.
 
 ## What Full Sync Does
 

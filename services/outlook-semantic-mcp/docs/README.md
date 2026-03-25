@@ -15,9 +15,9 @@
 
 ## Overview
 
-The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server performs a full historical email sync and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and manage folders through 10 MCP tools (plus 4 additional debug-mode tools).
+The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and manage folders through 10 MCP tools (plus 4 additional debug-mode tools).
 
-**Note:** This is a hybrid MCP server. It exposes tools for AI clients to invoke on demand, and it also automatically ingests the user's email history and live mail into the Unique knowledge base in the background after connection.
+**Note:** This is a hybrid MCP server. It exposes tools for AI clients to invoke on demand, and it also automatically ingests emails (within an operator-configured time frame and filters) and live mail into the Unique knowledge base in the background after connection.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
@@ -94,7 +94,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 
 **Full Sync (Historical Batch Ingestion)**
 
-- After connecting, the server automatically begins a full sync to ingest your complete email history
+- After connecting, the server automatically begins a full sync to ingest emails within the operator-configured time frame and filters (see [Inbox Filters](./technical/full-sync.md#inbox-filters))
 - Sync progress can be monitored via the `sync_progress` tool, which reports the current state, counters, and date range being processed
 - `sync_progress` returns the current sync state (`ready`, `running`, `paused`, `waiting-for-ingestion`, `failed`), the number of emails ingested, the date window being processed, and a warning if results may be incomplete
 
@@ -243,7 +243,7 @@ See [Full Sync Documentation](./technical/full-sync.md) and [Live Catch-Up Docum
    - Verify inbox connection via `verify_inbox_connection` tool
 
 2. **Initial Sync** (Automatic)
-   - After connecting, the server automatically begins syncing your email history into the Unique knowledge base
+   - After connecting, the server automatically begins syncing emails (within the configured time frame and filters) into the Unique knowledge base
    - Use `sync_progress` to monitor sync status — results will be partial until the sync completes
 
 3. **Live Mail** (Ongoing)
