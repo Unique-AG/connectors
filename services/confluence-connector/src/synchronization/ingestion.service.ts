@@ -148,6 +148,9 @@ export class IngestionService {
     }
   }
 
+  // TODO: Wire `this.config.unique.ingestionConfig` into registration requests.
+  // The config field and GraphQL mutation (`ContentUpsertMutationInput.input.ingestionConfig`)
+  // both exist, but `ContentRegistrationRequest` in @unique-ag/unique-api lacks the field.
   private buildPageRegistrationRequest(
     page: FetchedPage,
     key: string,
