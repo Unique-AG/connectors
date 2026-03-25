@@ -7,7 +7,7 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Outlook Semantic MCP Server is a **hybrid MCP server** — it exposes 10 user-facing MCP tools that AI clients invoke on demand (plus 4 additional tools available only in debug mode), and it also automatically ingests the user's email history and live mail into the Unique knowledge base in the background.
+**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 10 user-facing MCP tools that AI clients invoke on demand (plus 4 additional tools available only in debug mode), and once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background.
 
 **What it does:**
 
