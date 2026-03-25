@@ -138,7 +138,9 @@ mcpConfig:
     # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
     # example: https://outlook.mcp.unique.app
     selfUrl: unset_default_value
-    # -- Debug mode for the MCP server. Set to "enabled" to expose extra debugging data in tool responses.
+    # -- Debug mode for the MCP server. Set to "enabled" to expose:
+    #    1. Debugging tools
+    #    2. Extra debugging data in tool responses.
     mcpDebugMode: disabled
     # -- Optional. Whether to buffer logs before writing. To override:
     # bufferLogs: enabled

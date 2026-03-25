@@ -1,9 +1,11 @@
 {{- define "chart.config.microsoft" -}}
-MICROSOFT_CLIENT_ID: {{ .Values.mcpConfig.microsoft.clientId | quote }}
-{{- if .Values.mcpConfig.microsoft.publicWebhookUrl }}
-MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
+{{- with .Values.mcpConfig.microsoft }}
+MICROSOFT_CLIENT_ID: {{ .clientId | quote }}
+{{- if .publicWebhookUrl }}
+MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .publicWebhookUrl | quote }}
 {{- end }}
-{{- if not (kindIs "invalid" .Values.mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC) }}
-MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC: {{ .Values.mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC | quote }}
+{{- if not (kindIs "invalid" .subscriptionExpirationTimeHoursUTC) }}
+MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC: {{ .subscriptionExpirationTimeHoursUTC | quote }}
+{{- end }}
 {{- end }}
 {{- end }}

@@ -53,7 +53,7 @@ For complete configuration reference, see [Configuration Guide](./docs/operator/
 ```env
 UNIQUE_SERVICE_AUTH_MODE=external
 UNIQUE_SERVICE_EXTRA_HEADERS={"authorization":"Bearer <app-key>","x-app-id":"<app-id>","x-user-id":"<user-id>","x-company-id":"<company-id>"}
-UNIQUE_STORE_INTERNALLY=disabled
+UNIQUE_STORE_INTERNALLY=enabled
 UNIQUE_ZITADEL_CLIENT_ID=<zitadel-client-id>
 UNIQUE_ZITADEL_CLIENT_SECRET=<zitadel-client-secret>
 UNIQUE_ZITADEL_OAUTH_TOKEN_URL=https://your-zitadel-instance.zitadel.cloud/oauth/v2/token
