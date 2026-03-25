@@ -207,12 +207,16 @@ function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
         Array.isArray(value),
         `Invalid value for operator: ${CONTAINS_ANY_OPERATOR}. Value: ${value} must be an array`,
       );
-      leaves.push(
-        wrapConditions(
-          value.map((value) => ({ path, operator: UniqueQLOperator.CONTAINS, value })),
-          'or',
-        ),
-      );
+      const conditions = value.map((value) => ({
+        path,
+        operator: UniqueQLOperator.CONTAINS,
+        value,
+      }));
+      // We do not break if conditions length is empty we skip it beause there is no point
+      // in applying this condition.
+      if (conditions.length > 0) {
+        leaves.push(wrapConditions(conditions, 'or'));
+      }
     } else {
       leaves.push({ path, operator, value });
     }
