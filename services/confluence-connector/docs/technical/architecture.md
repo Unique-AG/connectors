@@ -52,7 +52,7 @@ flowchart TB
 
     IngestionSvc -->|"GraphQL / REST"| UniqueIngestion
     ScopeMgmt -->|"GraphQL"| UniqueScopeMgmt
-    FileDiff -->|"GraphQL"| UniqueIngestion
+    FileDiff -->|"REST"| UniqueIngestion
 
     Connector -.->|"OAuth2 (external mode)"| UniqueIDP
 ```
@@ -258,7 +258,7 @@ The connector initiates outbound requests to these authentication endpoints. No 
 | Ingestion Service | GraphQL | `ingestion.registerContent()` (register content for ingestion) |
 | Ingestion Service | REST | `PUT <writeUrl>` (upload content to pre-signed URL) |
 | Ingestion Service | GraphQL | `ingestion.finalizeIngestion()` (finalize ingested content) |
-| Ingestion Service | GraphQL | `ingestion.performFileDiff()` (compute file diffs per space) |
+| Ingestion Service | REST | `ingestion.performFileDiff()` (compute file diffs per space) |
 | Ingestion Service | GraphQL | `files.getByKeys()`, `files.deleteByIds()`, `files.getCountByKeyPrefix()` (query and delete files) |
 | Scope Management Service | GraphQL | `users.getCurrentId()` (current user ID) |
 | Scope Management Service | GraphQL | `scopes.createFromPaths()`, `scopes.getById()`, `scopes.updateExternalId()`, `scopes.createAccesses()` (scope lifecycle) |
