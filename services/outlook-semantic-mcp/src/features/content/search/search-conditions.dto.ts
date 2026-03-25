@@ -57,17 +57,20 @@ const emailConditionsSchema = (label: string) =>
     z
       .string()
       .describe(
-        `${label} email address to filter by, e.g. "alice@example.com". Must look like an email address. Recommended operators: equals, contains`,
+        `${label} email address or domain to filter by. To match a specific address use equals: "alice@example.com". To match all senders from a domain use contains with just the domain name: "google.com" (do NOT use "@google.com" — that will never match). Recommended operators: equals, contains, notContains.`,
       ),
   )
     .or(
       ArrayConditionFieldSchema(z.array(z.string())).describe(
-        `${label} email addresses to filter by, e.g. ["alice@example.com", "bob@example.com"]. Must look like an email address. Prefer containsAny when matching a list of emails (expands to partial contains checks). Use in/notIn only for exact equality matching.`,
+        `List of ${label.toLowerCase()} emails or domains. Use containsAny for partial/domain matching — e.g. ["google.com", "microsoft.com"] matches all senders from those domains. Use in/notIn for exact full-address matching only — e.g. ["alice@example.com"]. Never use in with partial values like "@google.com" — use containsAny or the singular contains form instead.`,
       ),
     )
     .optional();
 
-const clampedDatetime = z.preprocess(clampToValidDate, z.iso.datetime());
+const clampedDatetime = z.preprocess(
+  clampToValidDate,
+  z.iso.datetime({ message: 'Must be UTC ISO 8601 format, e.g. "2024-01-01T00:00:00Z"' }),
+);
 
 export const SearchConditionSchema = z
   .object({
@@ -130,13 +133,13 @@ export const SearchConditionSchema = z
       'At least one condition field must be provided. Example: { fromSenders: { value: "alice@example.com", operator: "equals" } }',
   })
   .describe(
-    `Condition to narrow down the search, AND operator is applied between mutiple conditions fields`,
+    `Condition to narrow down the search, AND operator is applied between multiple conditions fields`,
   );
 
 export type SearchCondition = z.infer<typeof SearchConditionSchema>;
 
 export const SearchEmailsInputSchema = z.object({
-  search: z.string().nonempty().describe(`Search query`),
+  search: z.string().nonempty().describe('Search query, e.g. "quarterly report from Alice" or "meeting invitation next week"'),
   conditions: z
     .array(SearchConditionSchema)
     .optional()

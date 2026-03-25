@@ -10,7 +10,7 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { META } from './open-email-tool.meta';
 
 const OpenEmailByIdInputSchema = z.object({
-  id: z.string().describe('The content ID returned by the search_emails tool.'),
+  id: z.string().describe('The content ID returned by the search_emails tool, e.g. "cont_zwgng9aoz0gbo6qxgnwese7g".'),
 });
 
 export const EmailDataChunkSchema = z.object({

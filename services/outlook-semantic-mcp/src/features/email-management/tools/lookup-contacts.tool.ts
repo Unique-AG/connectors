@@ -9,7 +9,7 @@ import { LookupContactsQuery, LookupContactsResultSchema } from '../lookup-conta
 import { META } from './lookup-contacts-tool.meta';
 
 const LookupContactsInputSchema = z.object({
-  name: z.string().min(2).describe('The name (or partial name) to search for among contacts.'),
+  name: z.string().min(2).describe('The name (or partial name) to search for among contacts, e.g. "Alice" or "Smith".'),
 });
 
 @Injectable()
