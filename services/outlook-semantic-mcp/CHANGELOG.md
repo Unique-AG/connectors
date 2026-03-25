@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.16](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.15...outlook-semantic-mcp@0.2.16) (2026-03-25)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,main:** cleanup helm templates, expose all configurable vars ([#387](https://github.com/Unique-AG/connectors/issues/387)) ([d6d5a98](https://github.com/Unique-AG/connectors/commit/d6d5a9873d703856ae510a38d7def755212b9841))
+* **outlook-semantic-mcp:** renamed inbox_configuration to inbox_configurations table ([#388](https://github.com/Unique-AG/connectors/issues/388)) ([97868f1](https://github.com/Unique-AG/connectors/commit/97868f1cfe49ae4c0cb2f631f8c0cf901a121abc))
+
 ## [0.2.15](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.14...outlook-semantic-mcp@0.2.15) (2026-03-23)
 
 
