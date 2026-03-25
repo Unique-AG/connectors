@@ -139,7 +139,10 @@ export const SearchConditionSchema = z
 export type SearchCondition = z.infer<typeof SearchConditionSchema>;
 
 export const SearchEmailsInputSchema = z.object({
-  search: z.string().nonempty().describe('Search query, e.g. "quarterly report from Alice" or "meeting invitation next week"'),
+  search: z
+    .string()
+    .nonempty()
+    .describe('Search query, e.g. "quarterly report from Alice" or "meeting invitation next week"'),
   conditions: z
     .array(SearchConditionSchema)
     .optional()
