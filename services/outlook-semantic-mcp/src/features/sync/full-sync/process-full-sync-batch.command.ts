@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm';
 import { MetricService, Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import z from 'zod';
-import { inboxConfiguration } from '~/db';
+import { inboxConfigurations } from '~/db';
 import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
@@ -186,18 +186,18 @@ export class ProcessFullSyncBatchCommand {
         const updateObject: InboxConfigVersionedUpdate = {};
         if (processMessageResult === 'ingested') {
           iterationInfo.uploaded++;
-          updateObject.fullSyncScheduledForIngestion = sql`${inboxConfiguration.fullSyncScheduledForIngestion} + 1`;
+          updateObject.fullSyncScheduledForIngestion = sql`${inboxConfigurations.fullSyncScheduledForIngestion} + 1`;
         } else if (processMessageResult === 'skipped') {
           iterationInfo.skipped++;
-          updateObject.fullSyncSkipped = sql`${inboxConfiguration.fullSyncSkipped} + 1`;
+          updateObject.fullSyncSkipped = sql`${inboxConfigurations.fullSyncSkipped} + 1`;
         } else {
           iterationInfo.failed++;
-          updateObject.fullSyncFailedToUploadForIngestion = sql`${inboxConfiguration.fullSyncFailedToUploadForIngestion} + 1`;
+          updateObject.fullSyncFailedToUploadForIngestion = sql`${inboxConfigurations.fullSyncFailedToUploadForIngestion} + 1`;
         }
 
         iterationInfo.batchIndex++;
-        updateObject.newestCreatedDateTime = sql`GREATEST(${inboxConfiguration.newestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
-        updateObject.oldestCreatedDateTime = sql`LEAST(${inboxConfiguration.oldestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
+        updateObject.newestCreatedDateTime = sql`GREATEST(${inboxConfigurations.newestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
+        updateObject.oldestCreatedDateTime = sql`LEAST(${inboxConfigurations.oldestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
         const isIndexSaved = await this.updateByVersionCommand.run(userProfileId, version, {
           ...updateObject,
           fullSyncBatchIndex: iterationInfo.batchIndex,

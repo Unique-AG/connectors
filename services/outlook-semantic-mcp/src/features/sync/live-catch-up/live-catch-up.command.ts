@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -93,9 +93,9 @@ export class LiveCatchUpCommand {
         subscriptionId,
       });
       await this.db
-        .update(inboxConfiguration)
+        .update(inboxConfigurations)
         .set({ liveCatchUpState: 'failed' })
-        .where(eq(inboxConfiguration.userProfileId, userProfileId))
+        .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .execute();
     }
   }
@@ -107,11 +107,11 @@ export class LiveCatchUpCommand {
     return this.db.transaction(async (tx) => {
       const inboxConfig = await tx
         .select({
-          liveCatchUpState: inboxConfiguration.liveCatchUpState,
-          newestLastModifiedDateTime: inboxConfiguration.newestLastModifiedDateTime,
+          liveCatchUpState: inboxConfigurations.liveCatchUpState,
+          newestLastModifiedDateTime: inboxConfigurations.newestLastModifiedDateTime,
         })
-        .from(inboxConfiguration)
-        .where(eq(inboxConfiguration.userProfileId, userProfileId))
+        .from(inboxConfigurations)
+        .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .for('update')
         .then((rows) => rows[0]);
 
@@ -127,11 +127,11 @@ export class LiveCatchUpCommand {
         }
 
         await tx
-          .update(inboxConfiguration)
+          .update(inboxConfigurations)
           .set({
-            pendingLiveMessageIds: sql`array_cat(${inboxConfiguration.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
+            pendingLiveMessageIds: sql`array_cat(${inboxConfigurations.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
           })
-          .where(eq(inboxConfiguration.userProfileId, userProfileId))
+          .where(eq(inboxConfigurations.userProfileId, userProfileId))
           .execute();
       };
 
@@ -161,17 +161,17 @@ export class LiveCatchUpCommand {
       }
 
       await tx
-        .update(inboxConfiguration)
+        .update(inboxConfigurations)
         .set({
           ...(messageIds.length > 0
             ? {
-                pendingLiveMessageIds: sql`array_cat(${inboxConfiguration.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
+                pendingLiveMessageIds: sql`array_cat(${inboxConfigurations.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
               }
             : {}),
           liveCatchUpState: 'running',
           liveCatchUpHeartbeatAt: sql`NOW()`,
         })
-        .where(eq(inboxConfiguration.userProfileId, userProfileId))
+        .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .execute();
 
       return {
@@ -311,9 +311,9 @@ export class LiveCatchUpCommand {
   }): Promise<number> {
     return await this.db.transaction(async (tx) => {
       const row = await tx
-        .select({ pendingLiveMessageIds: inboxConfiguration.pendingLiveMessageIds })
-        .from(inboxConfiguration)
-        .where(eq(inboxConfiguration.userProfileId, userProfileId))
+        .select({ pendingLiveMessageIds: inboxConfigurations.pendingLiveMessageIds })
+        .from(inboxConfigurations)
+        .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .for('update')
         .then((rows) => rows[0]);
 
@@ -324,9 +324,9 @@ export class LiveCatchUpCommand {
       const idsToFlush = row.pendingLiveMessageIds.filter((id) => !alreadyScheduledIds.has(id));
 
       await tx
-        .update(inboxConfiguration)
+        .update(inboxConfigurations)
         .set({ pendingLiveMessageIds: [], liveCatchUpState: 'ready' })
-        .where(eq(inboxConfiguration.userProfileId, userProfileId))
+        .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .execute();
 
       if (idsToFlush.length > 0) {
@@ -356,13 +356,13 @@ export class LiveCatchUpCommand {
     const batchNewestModified = new Date(Math.max(...modifiedDates.map((d) => d.getTime())));
 
     await this.db
-      .update(inboxConfiguration)
+      .update(inboxConfigurations)
       .set({
-        newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestCreatedDateTime}, '-infinity'::timestamptz), ${batchNewestCreated})`,
-        newestLastModifiedDateTime: sql`GREATEST(COALESCE(${inboxConfiguration.newestLastModifiedDateTime}, '-infinity'::timestamptz), ${batchNewestModified})`,
+        newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfigurations.newestCreatedDateTime}, '-infinity'::timestamptz), ${batchNewestCreated})`,
+        newestLastModifiedDateTime: sql`GREATEST(COALESCE(${inboxConfigurations.newestLastModifiedDateTime}, '-infinity'::timestamptz), ${batchNewestModified})`,
         liveCatchUpHeartbeatAt: sql`NOW()`,
       })
-      .where(eq(inboxConfiguration.userProfileId, userProfileId))
+      .where(eq(inboxConfigurations.userProfileId, userProfileId))
       .execute();
   }
 }
