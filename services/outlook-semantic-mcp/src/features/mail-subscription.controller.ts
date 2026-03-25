@@ -160,10 +160,10 @@ export class MailSubscriptionController {
       const isTrusted = this.utils.isWebhookTrustedViaState(notification.clientState);
       if (!isTrusted) {
         traceEvent('change notification invalid');
-        this.logger.warn(
-          { changeNotification: notification },
-          'Discarding change notification due to invalid authentication state',
-        );
+        this.logger.warn({
+          msg: 'Discarding change notification due to invalid authentication state',
+          changeNotification: notification,
+        });
         continue;
       }
       const messageId = notification.resourceData?.id;
