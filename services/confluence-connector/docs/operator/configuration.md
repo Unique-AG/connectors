@@ -23,15 +23,7 @@ The following environment variables control application-level behavior. They are
 | `MAX_FILE_SIZE_MB` | `200` | Maximum file size in MB for attachment downloads |
 | `MAX_HEAP_MB` | `896` (Helm) / `1024` (Docker) | Node.js V8 max old space size in MB |
 
-The following environment variables provide secrets referenced from tenant configuration YAML files via the `os.environ/` prefix (see [Secret Resolution](./authentication.md#secret-resolution)):
-
-| Variable | Description |
-|---|---|
-| `CONFLUENCE_CLIENT_SECRET` | Confluence OAuth 2.0 (2LO) client secret (required when `confluence.auth.mode` is `oauth_2lo`) |
-| `CONFLUENCE_PAT` | Confluence Personal Access Token (required when `confluence.auth.mode` is `pat`) |
-| `ZITADEL_CLIENT_SECRET` | Zitadel client secret (required when `unique.serviceAuthMode` is `external`) |
-
-The environment variable names above are conventions used in the example configurations and Helm chart. Operators can use any variable name as long as the `os.environ/` reference in the tenant YAML matches.
+Secret values in tenant YAML files are referenced via the `os.environ/` prefix (e.g., `os.environ/CONFLUENCE_CLIENT_SECRET`). The conventional environment variable names are `CONFLUENCE_CLIENT_SECRET`, `CONFLUENCE_PAT`, and `ZITADEL_CLIENT_SECRET`, but operators can use any variable name as long as the `os.environ/` reference in the tenant YAML matches. See [Authentication -- Secret Resolution](./authentication.md#secret-resolution) for the full resolution mechanism, supported fields, and Kubernetes integration.
 
 ## Tenant Configuration File
 
@@ -39,7 +31,7 @@ The environment variable names above are conventions used in the example configu
 
 Tenant configuration files must follow the naming convention `{tenant-name}-tenant-config.yaml`. The tenant name is extracted from the filename by removing the `-tenant-config.yaml` suffix and must match the pattern `^[a-z0-9]+(-[a-z0-9]+)*$` (lowercase alphanumeric with hyphens). Duplicate tenant names cause a startup failure.
 
-The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at startup. At least one file must match the pattern, and at least one tenant must have `active` status.
+The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at startup. At least one file must match the pattern, and at least one tenant must have `active` status. For details on how tenants are isolated at runtime, see [Architecture -- Multi-Tenancy Model](../technical/architecture.md#multi-tenancy-model).
 
 ### Tenant Status
 
@@ -189,22 +181,7 @@ unique:
 | `apiRateLimitPerMinute` | No | `100` | Number of Unique API requests allowed per minute |
 | `ingestionConfig` | No | -- | Optional object passed when submitting files for ingestion (e.g., `{"uniqueIngestionMode": "SKIP_INGESTION"}`) |
 
-**`cluster_local` mode** (in-cluster communication):
-
-| Field | Required | Description |
-|---|---|---|
-| `serviceExtraHeaders` | Yes | Must contain `x-company-id` and `x-user-id` headers. The `x-user-id` must be the ID of an actual service user in Zitadel -- not an arbitrary value. |
-
-**`external` mode** (authenticates via Zitadel):
-
-| Field | Required | Description |
-|---|---|---|
-| `zitadelOauthTokenUrl` | Yes | Zitadel OAuth token endpoint URL |
-| `zitadelProjectId` | Yes | Zitadel project ID (supports `os.environ/` resolution) |
-| `zitadelClientId` | Yes | Zitadel client ID |
-| `zitadelClientSecret` | Yes | Zitadel client secret (supports `os.environ/` resolution) |
-
-For setup instructions and token flows, see [Authentication -- Unique Platform Authentication Methods](./authentication.md#unique-platform-authentication-methods).
+The additional fields required for each auth mode (`serviceExtraHeaders` for `cluster_local`, Zitadel credentials for `external`) are documented in the [Authentication Guide -- Unique Platform Authentication Methods](./authentication.md#unique-platform-authentication-methods), which also covers setup instructions and token flows.
 
 ## Ingestion Settings
 

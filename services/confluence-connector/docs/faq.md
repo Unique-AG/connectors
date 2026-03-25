@@ -33,34 +33,19 @@
 
 ### How does the connector decide which pages to sync?
 
-**Answer:** The connector uses Confluence labels to discover pages. Two labels control this behavior (both are configurable per tenant):
-
-| Label | Recommended Value | Behavior |
-|---|---|---|
-| Single-page label | `ai-ingest` | Marks an individual page for synchronization |
-| All-descendants label | `ai-ingest-all` | Marks a page and all its descendant pages for synchronization |
-
-> **Note:** Both label values are required fields in the tenant configuration file and have no automatic default. They must be explicitly set (e.g., `ingestSingleLabel: ai-ingest` and `ingestAllLabel: ai-ingest-all`).
-
-Pages are discovered using a CQL search that finds all pages carrying either label. For pages labeled with the all-descendants label, an additional CQL `ancestor` query fetches all descendant pages at any depth.
+**Answer:** The connector uses two configurable Confluence labels: one for single-page sync (recommended: `ai-ingest`) and one for syncing a page and all its descendants (recommended: `ai-ingest-all`). Both labels must be explicitly set in the tenant configuration. See the [README](./README.md#core-capabilities) for a full overview of label-driven discovery and the [technical flows documentation](./technical/flows.md#discovery-phase) for the detailed CQL-based discovery process.
 
 ### What happens when a page has both labels?
 
-**Answer:** A page carrying both `ai-ingest` and `ai-ingest-all` is deduplicated. The connector merges all labeled pages and their descendants into a single unique set (by page ID) before processing, so no page is ingested twice.
+**Answer:** The page is deduplicated. The connector merges all labeled pages and their descendants into a single unique set (by page ID), so no page is ingested twice.
 
 ### What happens when a page has `ai-ingest` and its ancestor has `ai-ingest-all`?
 
-**Answer:** The page is discovered through both paths (directly via its own `ai-ingest` label and as a descendant of the `ai-ingest-all` ancestor). The connector deduplicates all discovered pages by ID before processing, so the page is ingested exactly once.
+**Answer:** The page is discovered through both paths but deduplicated by ID, so it is ingested exactly once. See the [discovery flow](./technical/flows.md#discovery-sequence) for details on how deduplication works.
 
 ### Which Confluence content types are synced?
 
-**Answer:** The connector syncs `page`, `blogpost`, and `folder` content types. The following content types are discovered but automatically skipped:
-
-| Skipped Content Type | Reason |
-|---|---|
-| `database` | Not a standard page |
-| `whiteboard` | Not a standard page |
-| `embed` | Not a standard page |
+**Answer:** The connector syncs `page`, `blogpost`, and `folder` content types. Content types `database`, `whiteboard`, and `embed` are discovered but automatically skipped. See the [README](./README.md#core-capabilities) for the full skipped content types table.
 
 ### What format is the page content exported in?
 
@@ -72,37 +57,17 @@ Pages are discovered using a CQL search that finds all pages carrying either lab
 
 ### Which spaces are scanned?
 
-**Answer:** Space filtering depends on the instance type:
-
-| Instance Type | Space Types Included |
-|---|---|
-| Cloud | `global` and `collaboration` spaces |
-| Data Center | `global` spaces only |
-
-Personal spaces are not scanned on either platform.
+**Answer:** Only `global` spaces are scanned (Cloud also includes `collaboration` spaces). Personal spaces are excluded on both platforms. See the [Configuration Guide](./operator/configuration.md#space-scanning) for full details on space type filtering per instance type.
 
 ## Authentication
 
 ### What authentication methods are supported?
 
-**Answer:**
-
-| Instance Type | Auth Method | Details |
-|---|---|---|
-| **Cloud** | OAuth 2.0 (2LO) | Client credentials flow via Atlassian's centralized token endpoint (`https://api.atlassian.com/oauth/token`) |
-| **Data Center** | OAuth 2.0 (2LO) | Client credentials flow via the instance's own token endpoint (`<baseUrl>/rest/oauth2/latest/token`) |
-| **Data Center** | Personal Access Token (PAT) | Static token, no token refresh |
-
-Cloud instances only support OAuth 2.0 (2LO). Data Center instances support both OAuth 2.0 (2LO) and PAT.
+**Answer:** The connector supports OAuth 2.0 (2LO) for Confluence Cloud and Data Center, plus Personal Access Token (PAT) for Data Center. Cloud instances only support OAuth 2.0 (2LO); Data Center instances support both. See the [Authentication Guide](./operator/authentication.md) for full details on each method, credential setup, and token flows.
 
 ### How are secrets managed in configuration?
 
-**Answer:** Secret values in tenant YAML configuration files use the `os.environ/VARIABLE_NAME` syntax to reference environment variables. The values are resolved at startup. For example:
-
-```yaml
-auth:
-  clientSecret: os.environ/CONFLUENCE_CLIENT_SECRET
-```
+**Answer:** Secret values in tenant YAML configuration files use the `os.environ/VARIABLE_NAME` syntax to reference environment variables, resolved at startup. See [Authentication -- Secret Resolution](./operator/authentication.md#secret-resolution) for the full mechanism, supported fields, and Kubernetes integration.
 
 ## Configuration
 
@@ -151,20 +116,7 @@ See the [Configuration Guide](./operator/configuration.md) for all available opt
 
 ### What file extensions are allowed for attachments by default?
 
-**Answer:**
-
-| Extension | Format |
-|---|---|
-| `pdf` | PDF documents |
-| `docx` | Microsoft Word |
-| `xlsx` | Microsoft Excel |
-| `ppt` | Microsoft PowerPoint (legacy) |
-| `pptx` | Microsoft PowerPoint |
-| `txt` | Plain text |
-| `csv` | Comma-separated values |
-| `html` | HTML files |
-
-These can be overridden via the `ingestion.attachments.allowedExtensions` configuration. Extensions are compared case-insensitively.
+**Answer:** The default allowed extensions are pdf, docx, xlsx, ppt, pptx, txt, csv, and html. These can be overridden via `ingestion.attachments.allowedExtensions` (case-insensitive). See [Configuration -- Attachment Configuration](./operator/configuration.md#attachment-configuration) for the full details.
 
 ### How do I find my Atlassian Cloud ID?
 
@@ -194,7 +146,7 @@ The response contains a `cloudId` field with the UUID.
 
 ### How does change detection work?
 
-**Answer:** The connector uses a server-side file diff mechanism. For each space, it submits a list of discovered item keys and their version timestamps to the Unique API. The API compares this against its stored state and returns which items are new, updated, deleted, or moved. Only new and updated items are fetched and ingested.
+**Answer:** The connector uses a server-side file diff mechanism that compares discovered items per space against the state stored in Unique, returning which items are new, updated, deleted, or moved. Only new and updated items are fetched and ingested. See the [file diff mechanism](./technical/flows.md#file-diff-mechanism) documentation for the full details including item attributes, partial key format, and diagrams.
 
 ### What happens when a label is removed from a page?
 
@@ -212,12 +164,7 @@ If the `ai-ingest-all` label is removed from a parent page, all descendant pages
 
 ### How are scopes organized in Unique?
 
-**Answer:** Scopes follow a two-level hierarchy:
-
-1. **Root scope** - Configured per tenant via `ingestion.scopeId`
-2. **Space scopes** - Automatically created as children of the root scope, one per Confluence space key
-
-Child scopes inherit access from the root scope. Each space scope receives an external ID in the format `confc:<tenantName>:<spaceKey>`.
+**Answer:** Scopes follow a two-level hierarchy: a root scope configured per tenant, and child scopes automatically created for each Confluence space key. Child scopes inherit access from the root scope. See the [Scope Management](./technical/README.md#scope-management) concept and the [scope mechanics](./technical/flows.md#scope-management) for full details including external ID format and access inheritance.
 
 ### What is the ingestion key format?
 
@@ -234,13 +181,7 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 
 ### What safety guards does the connector have?
 
-**Answer:** The connector includes two safeguards to prevent accidental full deletion of content:
-
-1. **Zero-submission guard**: If zero items are submitted to the file diff for a space but the diff response indicates deletions, the sync is aborted for that space. This prevents a bug in page discovery from wiping all content.
-
-2. **Full-deletion guard**: If the file diff would delete all files stored in Unique for a given space (even when some items were submitted), the sync is aborted for that space. This catches scenarios such as an accidental key format change.
-
-To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards.
+**Answer:** The connector includes two safeguards -- a zero-submission guard and a full-deletion guard -- that abort synchronization for a space when the file diff results indicate a likely error in discovery or key format. To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards. See the [safety checks](./technical/flows.md#safety-checks) documentation for full details.
 
 ### Are concurrent syncs for the same tenant possible?
 
@@ -307,7 +248,7 @@ To intentionally remove all content from a space, leave at least one page labele
 
 ### Can one connector serve multiple Confluence instances?
 
-**Answer:** Yes. Each Confluence instance is configured as a separate tenant with its own YAML configuration file. All tenants run within a single connector deployment, each with independent authentication, API clients, rate limits, and sync schedules. Tenants are isolated via `AsyncLocalStorage`-based context.
+**Answer:** Yes. Each Confluence instance is configured as a separate tenant with its own YAML configuration file. All tenants run within a single connector deployment with independent authentication, API clients, and sync schedules. See [Architecture -- Multi-Tenancy Model](./technical/architecture.md#multi-tenancy-model) for details on tenant isolation and per-tenant service instances.
 
 ### How do I add a new tenant?
 
@@ -351,14 +292,7 @@ The connector discovers pages via CQL search queries. Pages in spaces where the 
 
 ### How does Unique platform authentication work?
 
-**Answer:** The connector supports two authentication modes for communicating with the Unique platform APIs:
-
-| Mode | Mechanism |
-|---|---|
-| `cluster_local` | Uses in-cluster service URLs. Requests include `x-company-id` and `x-user-id` headers provided via `serviceExtraHeaders` in the tenant configuration. |
-| `external` | Uses external URLs and authenticates via Zitadel OAuth 2.0 client credentials flow. Requires `zitadelOauthTokenUrl`, `zitadelProjectId`, `zitadelClientId`, and `zitadelClientSecret` in the tenant configuration. |
-
-See the [Authentication Guide](./operator/authentication.md) for setup details.
+**Answer:** The connector supports two modes: `cluster_local` for in-cluster deployments (using service headers) and `external` for out-of-cluster deployments (using Zitadel OAuth credentials). See the [Authentication Guide](./operator/authentication.md) for setup details, required YAML fields, and token flows.
 
 ## Resource Requirements
 

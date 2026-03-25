@@ -42,18 +42,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Authentication Methods
 
-| Instance Type | Auth Method | Description |
-|---|---|---|
-| **Cloud** | OAuth 2.0 (2LO) | Client credentials flow via `https://api.atlassian.com/oauth/token` |
-| **Data Center** | OAuth 2.0 (2LO) | Client credentials flow via the Data Center instance's token endpoint |
-| **Data Center** | Personal Access Token | Static token-based authentication |
-
-### Unique Platform Authentication
-
-| Auth Mode | Description |
-|---|---|
-| **cluster_local** | For connectors running in the same Kubernetes cluster as Unique, using service headers (`x-company-id`, `x-user-id`) |
-| **external** | For connectors running outside the cluster, using Zitadel OAuth credentials |
+The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and Data Center, and Personal Access Token (PAT) for Data Center. For Unique platform communication, `cluster_local` mode is available for in-cluster deployments and `external` mode for out-of-cluster deployments via Zitadel OAuth. See the [Authentication Guide](./operator/authentication.md) for full setup instructions, credential management, and token flows.
 
 ## Features
 
@@ -69,10 +58,8 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 **Automatic Change Detection**
 
-- File-diff mechanism compares discovered pages and attachments against the state stored in Unique
-- Only new or modified items are ingested
-- Deleted items are automatically removed from the knowledge base
-- Safety checks prevent accidental full deletion when zero items are submitted or when the diff would delete all stored files
+- A per-space [file diff mechanism](./technical/flows.md#file-diff-mechanism) compares discovered items against the state stored in Unique, ingesting only new or modified items and removing deleted ones
+- [Safety checks](./technical/flows.md#safety-checks) prevent accidental full deletion of content
 
 **Attachment Ingestion**
 
@@ -83,16 +70,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 **Default Allowed Attachment Extensions**
 
-| Extension | Format |
-|---|---|
-| `pdf` | PDF documents |
-| `docx` | Microsoft Word |
-| `xlsx` | Microsoft Excel |
-| `ppt` | Microsoft PowerPoint (legacy) |
-| `pptx` | Microsoft PowerPoint |
-| `txt` | Plain text |
-| `csv` | Comma-separated values |
-| `html` | HTML files |
+Configurable allowed file types (default: pdf, docx, xlsx, ppt, pptx, txt, csv, html). See [Configuration](./operator/configuration.md#attachment-configuration) for details.
 
 **Skipped Content Types**
 
@@ -106,9 +84,8 @@ The following Confluence content types are discovered but skipped during synchro
 
 **Scope Management**
 
-- A root scope is configured per tenant
-- Child scopes are automatically created for each Confluence space (using the space key as the scope name)
-- Scopes inherit access from their parent
+- A pre-existing root scope is configured per tenant (must be created in Unique before the connector starts), with child scopes automatically created per Confluence space
+- See [Scope Management](./technical/README.md#scope-management) for the full conceptual overview and [scope mechanics](./technical/flows.md#scope-management) for implementation details
 
 **Scheduled Synchronization**
 
@@ -120,9 +97,7 @@ The following Confluence content types are discovered but skipped during synchro
 
 **Multi-Tenancy**
 
-- Multiple Confluence instances (tenants) can be configured in a single deployment
-- Each tenant has its own configuration, authentication, API client, and sync schedule
-- Tenants are isolated via `AsyncLocalStorage`-based context
+- Multiple Confluence instances (tenants) can be configured in a single deployment, each with independent configuration, authentication, and sync schedules. See [Architecture -- Multi-Tenancy Model](./technical/architecture.md#multi-tenancy-model) for the isolation model and per-tenant service details.
 
 **Concurrency Control**
 

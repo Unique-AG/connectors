@@ -79,7 +79,7 @@ flowchart TB
 | Content Fetcher | `ConfluenceContentFetcher` | Fetches full page content (HTML storage representation) by page ID |
 | File Diff Service | `FileDiffService` | Computes per-space diffs against Unique's stored state to identify new, updated, and deleted items |
 | Ingestion Service | `IngestionService` | Executes the 3-step ingestion pipeline (register, upload, finalize) and handles content deletion |
-| Scope Management Service | `ScopeManagementService` | Asserts the root scope exists, grants service-account access, and creates child scopes per Confluence space |
+| Scope Management Service | `ScopeManagementService` | Manages the root scope and per-space child scopes (see [Scope Management](./README.md#scope-management)) |
 | Cloud API Client | `CloudConfluenceApiClient` | Communicates with Confluence Cloud via the Atlassian API gateway (`api.atlassian.com`) |
 | Data Center API Client | `DataCenterConfluenceApiClient` | Communicates directly with a Confluence Data Center instance |
 
@@ -283,7 +283,7 @@ The connector is an IO-driven, low CPU workload. Unique AI ingestion services ar
 
 - [Flows](./flows.md) - Content sync, file diff mechanism, discovery, ingestion
 - [Permissions](./permissions.md) - Confluence API and Unique platform permissions
-- [Security](./security.md) - Security practices, authentication strategies, SBOM
+- [Security](./security.md) - Security practices, authentication strategies, data handling
 - [Operator Guide](../operator/README.md) - Deployment and operations
 
 ## Standard References

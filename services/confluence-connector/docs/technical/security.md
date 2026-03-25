@@ -73,9 +73,9 @@ See [Authentication](../operator/authentication.md) for setup and token flow det
 
 The connector implements a 3-layer approach to protecting secrets:
 
-| Layer | Mechanism | Implementation |
+| Layer | Mechanism | Description |
 |---|---|---|
-| Resolution | `os.environ/` prefix in YAML fields | `envResolvableStringSchema` in `zod.util.ts` resolves environment variables at config load time, returning an empty string if the variable is unset. The validation failure comes from the composed `envRequiredSecretSchema`, which chains `.pipe(z.string().nonempty())` to enforce non-empty values. |
+| Resolution | `os.environ/` prefix in YAML fields | Environment variables are resolved at config load time. See [Authentication -- Secret Resolution](../operator/authentication.md#secret-resolution) for the full resolution mechanism and supported fields. |
 | Wrapping | `Redacted<T>` class | Secret values are wrapped in `Redacted`, which overrides `toString()` and `toJSON()` to return `[Redacted]`. The actual value is accessible only via the `.value` getter. |
 | Log redaction | Pino `redact` configuration | `req.headers.authorization` paths are censored via the `Redacted` wrapper in the logger's `redact.censor` function. |
 
@@ -115,12 +115,7 @@ The policy is controlled by the `LOGS_DIAGNOSTICS_DATA_POLICY` environment varia
 
 ### Accidental Deletion Safeguards
 
-The file diff service includes 2 safety checks that abort synchronization to prevent accidental mass deletion:
-
-1. **Zero-item submission guard:** If zero items are submitted to the diff but deletions are returned, the sync aborts with an assertion error.
-2. **Full-deletion guard:** If the diff would delete all files stored in Unique for a given space (checked via `files.getCountByKeyPrefix`), the sync aborts.
-
-These safeguards protect against bugs in page discovery or key format changes that could trigger costly re-ingestion.
+The file diff service includes two safety checks (zero-item submission guard and full-deletion guard) that abort synchronization to prevent accidental mass deletion caused by bugs in page discovery or key format changes. See the [safety checks](./flows.md#safety-checks) documentation for the full explanation of both guards.
 
 ## Container Security
 

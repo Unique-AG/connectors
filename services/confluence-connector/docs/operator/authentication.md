@@ -52,16 +52,9 @@ For detailed instructions on creating and configuring a service user, see:
 
 ### 2. Create the Root Scope in Unique
 
-The connector requires a pre-existing root scope in Unique. The root scope ID is configured in the tenant YAML under `ingestion.scopeId`.
+The connector requires a pre-existing root scope in Unique. The root scope ID is configured in the tenant YAML under `ingestion.scopeId`. If the scope does not exist at startup, the connector fails with an assertion error.
 
-At startup, the connector first grants itself `MANAGE`, `READ`, and `WRITE` access on the root scope (the service account needs permission to query scopes), then verifies the scope exists (via `scopes.getById`). If the scope does not exist, the connector fails with an assertion error.
-
-The connector automatically:
-
-1. Grants itself `MANAGE`, `READ`, and `WRITE` access on the root scope.
-2. Asserts that the root scope exists.
-3. Creates child scopes for each Confluence space (using the space key as the scope name).
-4. Sets `inheritAccess: true` on child scopes so they inherit access from the root.
+At startup, the connector automatically grants itself access on the root scope and creates child scopes for each Confluence space. See the [Scope Management](../technical/README.md#scope-management) concept and the [scope mechanics](../technical/flows.md#scope-management) for details on access inheritance, external IDs, and parent scope traversal.
 
 ### 3. Set Up Confluence Authentication
 

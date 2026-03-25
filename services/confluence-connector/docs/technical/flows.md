@@ -181,6 +181,8 @@ The connector uses Confluence Query Language (CQL) to discover pages. The exact 
 | Cloud | `space.type=global OR space.type=collaboration` | `((label="{ingestSingleLabel}") OR (label="{ingestAllLabel}")) AND ({spaceTypeFilter}) AND type != attachment` |
 | Data Center | `space.type=global` | Same template, different space type filter |
 
+The space type filter varies by instance type. See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on which space types are scanned per platform.
+
 The `type != attachment` clause excludes attachments from top-level CQL results since they are fetched via the `expand=children.attachment` parameter on the page objects themselves.
 
 ### Descendant Discovery
@@ -207,7 +209,7 @@ If a page has more than 25 attachments (the Confluence inline limit), additional
 
 ### Skipped Content Types
 
-Content types `database`, `whiteboard`, and `embed` are discovered by CQL but skipped during the mapping to `DiscoveredPage` objects.
+Content types `database`, `whiteboard`, and `embed` are discovered by CQL but skipped during the mapping to `DiscoveredPage` objects. See the [README](../README.md#core-capabilities) for the full skipped content types table with reasons.
 
 ## File Diff Mechanism
 

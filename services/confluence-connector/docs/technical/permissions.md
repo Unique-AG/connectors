@@ -57,7 +57,7 @@ The connector requests the following expand fields on search queries:
 
 ### Space Type Filter
 
-The Cloud client filters by `space.type=global OR space.type=collaboration`. The OAuth integration must have access to spaces of both types to discover all labeled pages.
+The Cloud client filters by `space.type=global OR space.type=collaboration`. See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on space type filtering. The OAuth integration must have access to spaces of both types to discover all labeled pages.
 
 ## Confluence Data Center Permissions
 
@@ -84,7 +84,7 @@ All endpoints use the `GET` method and require read access only.
 
 ### Space Type Filter
 
-The Data Center client filters by `space.type=global` only (`collaboration` is a Cloud-only space type). The service account must have read access to the target global spaces.
+The Data Center client filters by `space.type=global` only (`collaboration` is a Cloud-only space type). See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on space type filtering. The service account must have read access to the target global spaces.
 
 ## Unique Platform Permissions
 

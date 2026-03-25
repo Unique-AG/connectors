@@ -21,7 +21,7 @@ The Confluence Connector v2 (`@unique-ag/confluence-connector`) is a Node.js ser
 | [Architecture](./architecture.md) | System components, module structure, multi-tenancy model |
 | [Flows](./flows.md) | Content sync, file diff mechanism, discovery, ingestion |
 | [Permissions](./permissions.md) | Confluence API and Unique platform permissions |
-| [Security](./security.md) | Security practices, authentication strategies, SBOM |
+| [Security](./security.md) | Security practices, authentication strategies, data handling |
 
 ## Key Concepts
 
@@ -43,41 +43,15 @@ flowchart LR
 
 ### Label-Driven Page Discovery
 
-Pages are not automatically synced. Users must apply Confluence labels to mark pages for synchronization:
+Pages are not automatically synced. Users must apply configurable Confluence labels (`ingestSingleLabel` and `ingestAllLabel`) to mark individual pages or entire page trees for synchronization. Both labels are required fields in the tenant configuration with no schema default. See [Flows -- Discovery Phase](./flows.md#discovery-phase) for the full CQL-based discovery flow, including descendant resolution, deduplication, and attachment extraction.
 
-```mermaid
-flowchart LR
-    User["Confluence User"] -->|"Applies label"| Label["ingestSingleLabel / ingestAllLabel (configurable)"]
-    Label --> Scanner["Page Scanner (CQL)"]
-    Scanner -->|"Discovers pages"| Diff["File Diff"]
-    Diff -->|"New/Updated"| Ingest["Ingest into Unique"]
-    Diff -->|"Deleted"| Delete["Remove from Unique"]
-```
-
-Two labels control discovery:
-
-| Label | Behavior |
-|-------|----------|
-| `ingestSingleLabel` (recommended: `ai-ingest`) | Marks an individual page for synchronization |
-| `ingestAllLabel` (recommended: `ai-ingest-all`) | Marks a page and all its descendant pages for synchronization |
-
-Labels are REQUIRED fields in the tenant configuration. There is no schema default; operators must explicitly set `ingestSingleLabel` and `ingestAllLabel` in each tenant's YAML.
-
-The scanner filters by space type: Cloud searches `global` and `collaboration` spaces, Data Center searches `global` spaces only. Content types `database`, `whiteboard`, and `embed` are discovered but skipped.
+The scanner filters by [space type](../operator/configuration.md#space-scanning) and skips certain [content types](../README.md#core-capabilities) (databases, whiteboards, embeds).
 
 ### File Diff Mechanism
 
-The connector computes diffs per Confluence space by comparing discovered items against the state stored in Unique:
+The connector computes diffs per Confluence space by comparing discovered items against the state stored in Unique, categorizing each item as new, updated, or deleted based on its key and `updatedAt` timestamp. Two [safety checks](./flows.md#safety-checks) prevent accidental full deletion by aborting the sync when the diff results indicate a likely error in discovery or key format.
 
-- **New items**: Discovered pages/attachments not previously ingested
-- **Updated items**: Items with a changed `updatedAt` timestamp
-- **Deleted items**: Previously ingested items no longer discovered (label removed or page deleted)
-
-Two safety checks prevent accidental full deletion:
-1. If zero items are submitted to the diff but deletions are returned, the sync aborts
-2. If the diff would delete all files stored in Unique for a given space, the sync aborts
-
-See [Flows](./flows.md) for the detailed file diff sequence.
+See [Flows -- File Diff Mechanism](./flows.md#file-diff-mechanism) for the full details including state comparison diagrams, item attributes, partial key format, and change detection logic.
 
 ### Scope Management
 
@@ -87,34 +61,13 @@ Scope external IDs follow the format: `confc:<tenantName>:<spaceKey>`.
 
 ### Multi-Tenancy
 
-Multiple Confluence instances (tenants) can be configured in a single deployment. Each tenant is isolated via `AsyncLocalStorage` and has its own:
+Multiple Confluence instances (tenants) can be configured in a single deployment. Each tenant is isolated via `AsyncLocalStorage` and has its own dedicated service instances, API clients, and sync schedule. See [Architecture -- Multi-Tenancy Model](./architecture.md#multi-tenancy-model) for the full isolation model and per-tenant component details.
 
-- Confluence API client (Cloud or Data Center)
-- Authentication strategy (OAuth 2.0 2LO or PAT)
-- Unique API client
-- Sync schedule and concurrency settings
-- Service instances (scanner, content fetcher, file diff, ingestion, scope management)
-
-Tenant configuration files are loaded from YAML files matching the glob pattern set in `TENANT_CONFIG_PATH_PATTERN` (e.g., `/app/tenant-configs/*-tenant-config.yaml`). See the [Operator Guide](../operator/README.md) for configuration details. The filename determines the tenant name (e.g., `my-tenant-tenant-config.yaml` yields tenant name `my-tenant`). Tenant names must match the pattern `^[a-z0-9]+(-[a-z0-9]+)*$`.
-
-Each tenant has a status (`active`, `inactive`, or `deleted`). Only `active` tenants are registered and scheduled.
+Tenant configuration files are loaded from YAML files matching the glob pattern set in `TENANT_CONFIG_PATH_PATTERN` (e.g., `/app/tenant-configs/*-tenant-config.yaml`). See the [Operator Guide](../operator/README.md) for configuration details.
 
 ### Authentication
 
-**Confluence authentication:**
-
-| Instance Type | Auth Method | Description |
-|---|---|---|
-| Cloud | OAuth 2.0 (2LO) | Client credentials flow via Atlassian API |
-| Data Center | OAuth 2.0 (2LO) | Client credentials flow via the instance's token endpoint |
-| Data Center | Personal Access Token | Static token-based authentication |
-
-**Unique platform authentication** (configured via `serviceAuthMode`):
-
-| Auth Mode | Description |
-|---|---|
-| `cluster_local` | For connectors in the same Kubernetes cluster as Unique. Uses service headers (`x-company-id`, `x-user-id`). Upload URLs are rewritten to the ingestion service's scoped upload endpoint to avoid hairpinning through the gateway. |
-| `external` | For connectors outside the cluster. Uses Zitadel OAuth credentials (`zitadelOauthTokenUrl`, `zitadelClientId`, `zitadelClientSecret`, `zitadelProjectId`). |
+The connector authenticates in two directions: toward Confluence (OAuth 2.0 2LO or PAT) and toward the Unique platform (`cluster_local` via service headers or `external` via Zitadel OAuth). In `cluster_local` mode, upload URLs are rewritten to the ingestion service's scoped upload endpoint to avoid hairpinning through the gateway. See the [Authentication Guide](../operator/authentication.md) for full details on each method, credential setup, and token flows.
 
 ### API Clients
 
