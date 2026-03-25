@@ -19,6 +19,7 @@ For end-user and administrator documentation, see the [Outlook Semantic MCP Over
 | [Configuration](./configuration.md) | Environment variables, Helm values, service auth modes |
 | [Authentication](./authentication.md) | Microsoft Entra ID app registration, OAuth setup |
 | [Local Development](./local-development.md) | Setting up a development environment |
+| [Disaster Recovery](./disaster-recovery.md) | Recovery runbook for DB, RabbitMQ, and Knowledge Base failures |
 | [FAQ](../faq.md) | Frequently asked questions and common mistakes |
 
 ## Architecture Overview

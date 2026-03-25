@@ -406,6 +406,18 @@ Full sync is not affected by RabbitMQ availability — it pulls directly from Mi
 
 **See also:** [Architecture](./technical/architecture.md)
 
+## Disaster Recovery
+
+### What do I do if a core infrastructure component fails?
+
+**Answer:** Recovery depends on which component was lost:
+
+- **Local PostgreSQL DB loss** — all stored OAuth tokens and sync state are gone; every user must re-authenticate via `reconnect_inbox`.
+- **RabbitMQ loss** — both in-progress full syncs and live catch-up are stalled; no re-authentication is needed. Live catch-up resumes automatically once RabbitMQ is restored; stalled full syncs require `restart_full_sync` per affected user.
+- **Unique Knowledge Base loss** — ingested email content must be re-ingested; trigger `restart_full_sync` for each affected user. No re-authentication is needed.
+
+**See also:** [Disaster Recovery Runbook](./operator/disaster-recovery.md)
+
 ## Related Documentation
 
 - [Architecture](./technical/architecture.md) — System components and module descriptions
