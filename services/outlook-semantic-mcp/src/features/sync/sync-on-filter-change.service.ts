@@ -23,9 +23,12 @@ export class SyncOnFilterChangeService implements OnModuleInit {
       try {
         await this.db.update(inboxConfiguration).set({ filters: defaultFilters }).execute();
         return;
-      } catch (error) {
+      } catch (err) {
         if (attempt === maxAttempts) {
-          this.logger.error({ msg: 'Failed to update inbox filters after all retries', error });
+          this.logger.error({
+            msg: 'Failed to update inbox filters after all retries',
+            err,
+          });
           return;
         }
         const delayMs = baseDelayMs * 2 ** (attempt - 1);
@@ -33,7 +36,7 @@ export class SyncOnFilterChangeService implements OnModuleInit {
           msg: `Failed to update inbox filters, retrying`,
           attempt,
           delayMs,
-          error,
+          err,
         });
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
