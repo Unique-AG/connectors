@@ -24,49 +24,49 @@ The Outlook Semantic MCP Server stores **no email content** in its own database.
 
 ### Data Flow
 
+**Connection and Sync** — The user authenticates once. The server obtains Microsoft tokens (kept server-side, encrypted), issues an opaque MCP token to the client, and begins syncing emails into the Unique knowledge base. No email content is stored in the MCP server's database.
+
 ```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-flowchart TD
-    subgraph User["User Device"]
-        MCPClient["MCP Client\n(AI Agent)"]
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as Outlook Semantic MCP
+    participant Entra as Microsoft Entra ID
+    participant Graph as Microsoft Graph
+    participant KB as Unique Knowledge Base
+
+    Client->>Server: 1. OAuth 2.1 + PKCE
+    Server->>Entra: 2. Token exchange
+    Entra-->>Server: Microsoft tokens
+    Note over Server: MS tokens encrypted + stored<br/>Never sent to client
+    Server-->>Client: 3. Opaque MCP token
+
+    rect rgba(200, 200, 200, 0.3)
+        Note over Server,KB: Background process (automatic after connection)
+        Server->>Graph: 4. Fetch emails
+        Graph-->>Server: Email content (in memory only)
+        Server->>KB: 5. Upload emails (pass-through, not stored)
     end
-
-    subgraph Microsoft["Microsoft Cloud"]
-        EntraID["Entra ID\nAuthentication"]
-        MSGraph["Microsoft Graph API\nEmail · Folders · Contacts"]
-    end
-
-    subgraph MCPServer["Outlook Semantic MCP Server"]
-        Auth["MCP OAuth Layer\nIssues opaque bearer tokens"]
-        SyncPipeline["Sync Pipeline\nEmail content in memory only\nnever persisted here"]
-        DB[("PostgreSQL\nCredentials · Tokens · Sync state\nNO email content")]
-    end
-
-    subgraph Unique["Unique Platform"]
-        ScopeMgmt["Scope Management\nPer-user root scopes"]
-        KB["Knowledge Base\nEmail content indexed\nfor semantic search"]
-    end
-
-    MCPClient -->|"1  MCP OAuth 2.1 + PKCE"| Auth
-    Auth <-->|"2  Token exchange"| EntraID
-    Auth -->|"Encrypted Microsoft tokens\nOpaque MCP tokens"| DB
-
-    SyncPipeline -->|"3  Fetch email pages\nDelegated Graph calls"| MSGraph
-    MSGraph -->|"4  Email content\nin memory only"| SyncPipeline
-    SyncPipeline -->|"5  Upload for indexing\nvia Unique ingestion API"| KB
-    SyncPipeline <-->|"Sync state only"| DB
-
-    ScopeMgmt -->|"Per-user scope boundary"| KB
-    MCPClient -->|"6  search_emails tool call\nauthenticated MCP request"| KB
 ```
 
+**Tool Usage** — The MCP client uses its opaque token to call tools. The server handles all Microsoft Graph interaction internally — the client never sees Microsoft tokens.
 
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as Outlook Semantic MCP
+    participant KB as Unique Knowledge Base
+    participant Graph as Microsoft Graph
 
-**Key data flow properties:**
+    Client->>Server: Opaque MCP token + search_emails
+    Server->>KB: Query
+    KB-->>Server: Results
+    Server-->>Client: Search results
 
-- Steps 1–2 (auth): only credentials and tokens are exchanged — no email content involved
-- Steps 3–5 (sync): email content passes through the MCP server's memory only; it is never written to PostgreSQL
-- Step 6 (search): the authenticated user's MCP token is used to scope the search to their own data
+    Client->>Server: Opaque MCP token + create_draft_email
+    Server->>Graph: Create draft (using stored MS token)
+    Graph-->>Server: Draft created
+    Server-->>Client: Draft link
+```
 
 ### Data Removal
 
@@ -104,43 +104,17 @@ Email scopes created by the MCP server are not visible in the Unique Knowledge B
 
 ## Security Layers
 
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-flowchart TB
-    subgraph External["External Boundaries"]
-        Client["MCP Client"]
-        Graph["Microsoft Graph"]
-        Webhook["Incoming Webhooks"]
-    end
+Requests pass through each layer from top to bottom. Each layer must pass before the next is reached.
 
-    subgraph Transport["Transport Security"]
-        TLS["TLS 1.2+"]
-        Kong["Kong Gateway"]
-    end
-
-    subgraph App["Application Security"]
-        OAuth["OAuth 2.1 + PKCE"]
-        Validation["Webhook Validation"]
-        TokenRefresh["Token Refresh Middleware"]
-        RateLimit["Rate Limiting"]
-    end
-
-    subgraph Data["Data Security"]
-        Encryption["AES-256-GCM Encryption"]
-        OpaqueTokens["Opaque Random Tokens"]
-        SessionHmac["Session HMAC"]
-    end
-
-    Client --> TLS --> Kong --> OAuth
-    Graph --> TLS --> Kong --> Validation
-    Webhook --> TLS --> Kong --> Validation
-    OAuth --> RateLimit
-    OAuth --> Encryption
-    OAuth --> OpaqueTokens
-    OAuth --> SessionHmac
-    Validation --> TokenRefresh
-    TokenRefresh --> Encryption
-```
+| Layer | Mechanism | Protects Against |
+|-------|-----------|------------------|
+| **Transport** | TLS 1.2+ via Kong Gateway | Eavesdropping, man-in-the-middle |
+| **Rate Limiting** | IP-based throttling (global + per-endpoint) | Brute-force, abuse |
+| **Authentication** | OAuth 2.1 + PKCE | Unauthorized access, authorization code interception |
+| **Webhook Integrity** | `clientState` validation | Forged webhook notifications |
+| **Session Integrity** | HMAC-SHA256 on OAuth session state | Session hijacking via forged callbacks |
+| **Token Design** | 512-bit cryptographically random opaque values | Token guessing |
+| **Data at Rest** | AES-256-GCM encryption for Microsoft tokens | Token theft from database |
 
 
 
