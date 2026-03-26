@@ -478,8 +478,8 @@ Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, the 
 **Answer:** Recovery depends on which component was lost:
 
 - **Local PostgreSQL DB loss** — all stored OAuth tokens and sync state are gone; every user must re-authenticate via `reconnect_inbox`.
-- **RabbitMQ loss** — both in-progress full syncs and live catch-up are stalled; no re-authentication is needed. Live catch-up resumes automatically once RabbitMQ is restored but message waiting in the queue are lost; `restart_full_sync` would fix the issues it has to be run per affected user.
-- **Unique Knowledge Base loss** — ingested email content must be re-ingested; trigger `restart_full_sync` for each affected user. No re-authentication is needed.
+- **RabbitMQ loss** — both in-progress full syncs and live catch-up are stalled; no re-authentication is needed. Live catch-up resumes automatically once RabbitMQ is restored but messages waiting in the queue are lost; each affected user must call `restart_full_sync` from their own MCP session (debug mode required).
+- **Unique Knowledge Base loss** — ingested email content must be re-ingested; each affected user must call `restart_full_sync` from their own MCP session (debug mode required). No re-authentication is needed.
 
 **See also:** [Disaster Recovery Runbook](./operator/disaster-recovery.md)
 
