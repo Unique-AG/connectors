@@ -84,7 +84,7 @@ sequenceDiagram
         FullSync->>FullSync: Apply in-memory filters (ignoredSenders, ignoredContents)
         FullSync->>UniqueKB: Upload passing messages for ingestion
         FullSync->>DB: Update counters + fullSyncNextLink + watermarks + heartbeat
-        Note over FullSync: Sleep before next cycle
+        Note over FullSync: Wait for Ingestion to process most of the emails before next cycle
     end
 
     FullSync->>DB: Set state=waiting-for-ingestion
