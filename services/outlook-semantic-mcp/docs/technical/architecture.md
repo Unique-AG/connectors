@@ -16,16 +16,13 @@ flowchart LR
         AuthLayer["Authentication"]
         McpTools["MCP Tools"]
         SyncPipeline["Sync Pipeline"]
+        DB[("PostgreSQL")]
+        MQ[("RabbitMQ")]
     end
 
     subgraph Microsoft["Microsoft"]
         EntraID["Entra ID"]
         MSGraph["Graph API"]
-    end
-
-    subgraph Infra["Infrastructure"]
-        DB[("PostgreSQL")]
-        MQ[("RabbitMQ")]
     end
 
     UniqueKB["Unique\nKnowledge Base"]
