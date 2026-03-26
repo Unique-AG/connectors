@@ -109,7 +109,7 @@ The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, a
    - Open the MCP tool interface.
    - Call `reconnect_inbox` (or follow the standard OAuth flow) to re-authenticate and re-create the Graph webhook subscription.
 
-5. After reconnection, a full sync starts automatically. Monitor progress per user with `sync_progress`.
+5. After reconnection, a full sync starts automatically. Users can monitor progress with `sync_progress`.
 
 6. Previously ingested emails remain in the Unique Knowledge Base and are unaffected. The post-recovery full sync checks each email against the Knowledge Base by file key and skips any that already exist — the only overhead is Microsoft Graph API calls and ingestion API lookups, not actual re-ingestion (see [Idempotent re-ingestion](#idempotent-re-ingestion)).
 
@@ -146,7 +146,7 @@ RabbitMQ carries in-flight sync trigger events between the service and its inter
 
 3. Enable debug mode on the deployment if it is not already enabled, by setting `MCP_DEBUG_MODE=enabled` in `mcpConfig.app.mcpDebugMode` and restarting pods. This exposes debug tools including `restart_full_sync`, `run_full_sync`, `pause_full_sync`, and `resume_full_sync`. **Note:** Debug mode exposes these tools to all connected MCP users, not just operators — restrict MCP client access during recovery. See [Configuration](./configuration.md#application-configuration).
 
-4. Notify affected users that they must call `restart_full_sync` from their own MCP session. All MCP tools are scoped to the authenticated user — there is no way for an operator to trigger this on behalf of users. For large deployments, see [Bulk Recovery](#bulk-recovery). This resets sync state in the local database and triggers a re-fetch of all emails from Microsoft Graph via the restored RabbitMQ pipeline. Emails already in the Knowledge Base are detected by file key and skipped — the only overhead is Microsoft Graph API calls and ingestion API lookups (see [Idempotent re-ingestion](#idempotent-re-ingestion)).
+4. Notify affected users that they must call `restart_full_sync` from their own MCP session. All MCP tools are scoped to the authenticated user — there is no way for an operator to trigger this on behalf of users. There is currently no admin API or batch endpoint to trigger this on behalf of users. This resets sync state in the local database and triggers a re-fetch of all emails from Microsoft Graph via the restored RabbitMQ pipeline. Emails already in the Knowledge Base are detected by file key and skipped — the only overhead is Microsoft Graph API calls and ingestion API lookups (see [Idempotent re-ingestion](#idempotent-re-ingestion)).
 
 5. Each user can monitor their own recovery progress with `sync_progress`. The sync is complete when `fullSyncState` transitions to `"ready"` and `state` is `"finished"`.
 
@@ -155,25 +155,6 @@ RabbitMQ carries in-flight sync trigger events between the service and its inter
 7. Once all users show `fullSyncState: "ready"`, disable debug mode by removing or unsetting `MCP_DEBUG_MODE` in the Helm values and redeploying (requires a pod restart). Debug mode should not remain enabled in production.
 
 **See also:** [`restart_full_sync`](../technical/tools.md#restart_full_sync), [`sync_progress`](../technical/tools.md#sync_progress), [Configuration](./configuration.md#application-configuration)
-
----
-
-## Bulk Recovery
-
-All MCP tools — including `restart_full_sync` and `sync_progress` — are scoped to the authenticated user's session. There is no admin API or batch endpoint to trigger recovery across multiple users at once. Each user must call `restart_full_sync` from their own MCP session.
-
-For deployments with many connected users:
-
-1. **Enable debug mode** — set `MCP_DEBUG_MODE=enabled` in the Helm values and redeploy.
-
-2. **Notify affected users** — instruct each user to call `restart_full_sync` from their MCP client. There is no way for an operator to trigger this on behalf of users.
-
-3. **Monitor progress** — each user can check their own recovery status with `sync_progress`. Operators can monitor service-level health via logs and metrics.
-
-4. **Disable debug mode** — once recovery is complete, remove `MCP_DEBUG_MODE` and redeploy.
-
-!!! warning "Debug Mode Security"
-    Enabling `MCP_DEBUG_MODE=enabled` exposes debug tools (`restart_full_sync`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`) to **all connected MCP users**, not just operators. There is currently no way to expose debug tools to operators only — the flag is global. **Mitigation:** restrict MCP client access during the recovery window (e.g., via network policies or ingress rules that limit which clients can reach the server). Enabling and disabling debug mode requires a Helm values change and a pod restart (`kubectl rollout restart`). For large deployments, the recovery window may last hours or days depending on user count and mailbox size — plan accordingly.
 
 ---
 
@@ -200,7 +181,7 @@ The Unique Knowledge Base stores the actual ingested email content used for sema
 
 2. Enable debug mode on the deployment if it is not already enabled, by setting `MCP_DEBUG_MODE=enabled` in `mcpConfig.app.mcpDebugMode` and restarting pods. This exposes debug tools including `restart_full_sync`, `run_full_sync`, `pause_full_sync`, and `resume_full_sync`. **Note:** Debug mode exposes these tools to all connected MCP users, not just operators — restrict MCP client access during recovery. See [Configuration](./configuration.md#application-configuration).
 
-3. Notify affected users that they must call `restart_full_sync` from their own MCP session. All MCP tools are scoped to the authenticated user — there is no way for an operator to trigger this on behalf of users. For large deployments, see [Bulk Recovery](#bulk-recovery). This resets sync state in the local database and re-fetches all emails from Microsoft Graph, re-ingesting them into the restored Knowledge Base. Unlike Scenarios 1 and 2, this is the only recovery scenario where emails must be fully re-ingested — the Knowledge Base no longer contains the files, so the cost includes Microsoft Graph API calls, ingestion API calls, and the full content transfer. Subsequent runs are idempotent — file keys prevent duplicates.
+3. Notify affected users that they must call `restart_full_sync` from their own MCP session. All MCP tools are scoped to the authenticated user — there is no way for an operator to trigger this on behalf of users. There is currently no admin API or batch endpoint to trigger this on behalf of users. This resets sync state in the local database and re-fetches all emails from Microsoft Graph, re-ingesting them into the restored Knowledge Base. Unlike Scenarios 1 and 2, this is the only recovery scenario where emails must be fully re-ingested — the Knowledge Base no longer contains the files, so the cost includes Microsoft Graph API calls, ingestion API calls, and the full content transfer. Subsequent runs are idempotent — file keys prevent duplicates.
 
 4. Each user can monitor their own recovery progress with `sync_progress`. The sync is complete when `fullSyncState` transitions to `"ready"` and `state` is `"finished"`.
 
