@@ -78,12 +78,13 @@ sequenceDiagram
     MSGraph->>FullSync: Expected total
     FullSync->>DB: Store fullSyncExpectedTotal
 
-    loop Until no more pages
-        FullSync->>MSGraph: GET /me/messages?$top=100&$filter=createdDateTime gt {ignoredBefore}&$orderby=createdDateTime desc (nextLink)
-        MSGraph->>FullSync: Page of messages
+    loop Until no more pages (processes one page per cycle, then sleeps)
+        FullSync->>MSGraph: GET /me/messages?$top=100&$filter=createdDateTime gt {ignoredBefore}&$orderby=createdDateTime desc (or resume from nextLink mid-page)
+        MSGraph->>FullSync: Page of messages (or remainder of current page)
         FullSync->>FullSync: Apply in-memory filters (ignoredSenders, ignoredContents)
         FullSync->>UniqueKB: Upload passing messages for ingestion
         FullSync->>DB: Update counters + fullSyncNextLink + watermarks + heartbeat
+        Note over FullSync: Sleep before next cycle
     end
 
     FullSync->>DB: Set state=waiting-for-ingestion
