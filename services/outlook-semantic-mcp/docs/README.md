@@ -135,9 +135,11 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 
 ```mermaid
 flowchart LR
-    subgraph User["User Side"]
-        MCPClient["MCP Client\n(e.g. Claude Desktop)"]
-        Outlook["Microsoft Outlook\n(Email Mailbox)"]
+    MCPClient["MCP Client\n(e.g. Claude Desktop)"]
+
+    subgraph Microsoft["Microsoft"]
+        Outlook["Outlook Mailbox"]
+        GraphAPI["Graph API"]
     end
 
     subgraph Server["Outlook Semantic MCP"]
@@ -154,7 +156,8 @@ flowchart LR
     end
 
     MCPClient -- "MCP tools\n(search, draft, etc.)" --> App
-    Outlook -- "OAuth + webhooks\n(Microsoft Graph)" --> App
+    App -- "OAuth + REST" --> GraphAPI
+    GraphAPI -- "Webhooks" --> App
     App --> PG
     App --> MQ
     MQ --> App
@@ -166,72 +169,45 @@ See [Architecture Documentation](./technical/architecture.md) for detailed compo
 
 ### User Connection Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant MCPClient as MCP Client
-    participant OutlookMCP as Outlook Semantic MCP Server
-    participant EntraID as Microsoft Entra ID
-    participant MSGraph as Microsoft Graph API
-    participant DB as PostgreSQL
+The user opens their MCP client and connects to the server. The client initiates an OAuth 2.1 authorization flow with PKCE against Microsoft Entra ID. After the user grants permissions, the server exchanges the authorization code for Microsoft tokens, encrypts and stores them, and issues a separate short-lived MCP bearer token to the client. A Microsoft Graph webhook subscription and a full email sync are then triggered automatically — no further user action is needed.
 
-    User->>MCPClient: Connect to MCP server
-    MCPClient->>OutlookMCP: GET /mcp
-    OutlookMCP->>MCPClient: 401 with authorization server metadata
-    MCPClient->>EntraID: OAuth authorization request (PKCE)
-    EntraID->>User: Show consent screen
-    User->>EntraID: Grant permissions
-    EntraID->>OutlookMCP: Redirect with auth code
-    OutlookMCP->>EntraID: Exchange code for tokens
-    EntraID->>OutlookMCP: Access + Refresh tokens
-    OutlookMCP->>DB: Store encrypted tokens
-    OutlookMCP->>MCPClient: Opaque MCP bearer token
+See [User OAuth Connection Flow](./technical/flows.md#user-oauth-connection-flow) for the detailed sequence diagram.
 
-    Note over OutlookMCP: Automatic — triggered by successful authorization
-    OutlookMCP->>MSGraph: POST /subscriptions (change notifications)
-    MSGraph->>OutlookMCP: Subscription created (ID, expiry)
-    OutlookMCP->>DB: Store subscription record
-    OutlookMCP->>OutlookMCP: Start full sync automatically
+### Token Refresh
 
-    Note over OutlookMCP: Now receiving live mail notifications
-```
+Microsoft access tokens expire after approximately one hour. The server intercepts `401` responses from the Graph API and transparently refreshes the token using the stored refresh token. If the refresh token itself has expired (~90 days of inactivity), the user must reconnect via `reconnect_inbox`.
 
-See [User Connection Flow](./technical/flows.md) for additional details.
+See [Microsoft Token Refresh Flow](./technical/flows.md#microsoft-token-refresh-flow) for the detailed sequence diagram.
 
-### Email Sync Flow
+### Subscription Lifecycle
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant MCPClient as MCP Client
-    participant OutlookMCP as Outlook Semantic MCP Server
-    participant RabbitMQ as RabbitMQ
-    participant SyncEngine as Sync Engine
-    participant DB as PostgreSQL
-    participant MSGraph as Microsoft Graph API
-    participant UniqueKB as Unique Knowledge Base
+Microsoft Graph webhook subscriptions for messages last up to 7 days. The server creates subscriptions on user connection and renews them automatically via Microsoft lifecycle notifications (`reauthorizationRequired`). If Microsoft removes a subscription (`subscriptionRemoved`), the server cleans up the associated records.
 
-    Note over OutlookMCP,MSGraph: Full Sync starts automatically after user connects
-    OutlookMCP->>MSGraph: GET /messages (paginated, newest first)
-    MSGraph->>OutlookMCP: Batch of emails
-    OutlookMCP->>DB: Update sync progress
-    OutlookMCP->>UniqueKB: Upload email for ingestion
-    Note over OutlookMCP: Continues until configured time frame ingested
+See [Subscription Creation and Renewal Lifecycle](./technical/flows.md#subscription-creation-and-renewal-lifecycle) for the detailed sequence diagram.
 
-    Note over OutlookMCP,MSGraph: Live Catch-Up (webhook-driven)
-    MSGraph->>OutlookMCP: POST /webhook/notifications
-    OutlookMCP->>OutlookMCP: Validate clientState
-    OutlookMCP->>RabbitMQ: Enqueue notification
-    OutlookMCP->>MSGraph: 202 Accepted
-    RabbitMQ->>SyncEngine: Deliver notification
-    SyncEngine->>MSGraph: GET /messages/{id}
-    MSGraph->>SyncEngine: New email content
-    SyncEngine->>DB: Update sync progress
-    SyncEngine->>UniqueKB: Upload email for ingestion
-```
+### Email Sync
 
-See [Full Sync Documentation](./technical/full-sync.md) and [Live Catch-Up Documentation](./technical/live-catchup.md) for additional details.
+Email ingestion uses two concurrent pipelines:
+
+- **Full Sync** — After connection, the server automatically fetches the user's historical emails (within the configured time frame and filters) from Microsoft Graph in paginated batches and uploads them to the Unique knowledge base. The sync is resumable across restarts and initializes a watermark for live catch-up. See [Full Sync](./technical/full-sync.md) for details.
+
+- **Live Catch-Up** — Microsoft Graph sends webhook notifications when new mail arrives. The server enqueues them via RabbitMQ (to meet Microsoft's 10-second response deadline) and processes them asynchronously, fetching new messages since the last watermark and uploading them to the knowledge base. See [Live Catch-Up](./technical/live-catchup.md) for details.
+
+Both pipelines run concurrently after connection. Live catch-up buffers notifications until full sync initializes the watermark, after which both ingest independently.
+
+See [Flows](./technical/flows.md#full-sync-historical-email-ingestion) for the detailed sequence diagrams.
+
+### Directory Sync
+
+The server continuously syncs the user's Outlook folder structure via Microsoft Graph delta queries. This enables folder-based search filtering (`list_folders` tool) and tracks email movement to handle deletions — when an email moves to an excluded folder (e.g. Deleted Items), it is removed from the knowledge base.
+
+See [Directory Sync Flow](./technical/flows.md#directory-sync-flow) for the detailed sequence diagram.
+
+### Draft Creation
+
+The `create_draft_email` tool creates a draft in the user's Outlook Drafts folder via Microsoft Graph. The draft is not sent automatically — the response includes a `webLink` for the user to review and send from Outlook.
+
+See [Email Draft Creation Flow](./technical/flows.md#email-draft-creation-flow) for the detailed sequence diagram.
 
 ### User Workflow
 
