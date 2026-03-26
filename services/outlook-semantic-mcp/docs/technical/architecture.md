@@ -110,7 +110,7 @@ The server integrates with the Unique platform to:
 
 - **Ingest emails** — Uploads email content to the Unique knowledge base during both full sync and live catch-up
 - **Search emails** — Queries the knowledge base for semantic email search (the `search_emails` tool)
-- **Manage scopes** — Creates and updates folder-based scopes so the knowledge base reflects the user's folder structure and exclusion rules
+- **Manage scopes** — Creates and manages the knowledge base scope to which emails are synced
 
 ## Related Documentation
 

@@ -134,48 +134,17 @@ For the detailed sequence diagram and full technical description, see [Live Catc
 
 ## Full Sync: Historical Email Ingestion
 
-After a subscription is created, the server automatically begins ingesting the user's emails within the configured time frame and filters:
+After a subscription is created, the server automatically begins ingesting the user's historical emails. It fetches messages from Microsoft Graph in paginated batches (newest first), applies the configured mail filters, and uploads them to the Unique Knowledge Base. The sync is resumable across restarts and initializes the watermark that live catch-up depends on.
 
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-sequenceDiagram
-    autonumber
-    participant AMQP as RabbitMQ
-    participant FullSync as Full Sync Engine
-    participant MSGraph as Microsoft Graph API
-    participant DB as PostgreSQL
-    participant UniqueKB as Unique Knowledge Base
-
-    Note over AMQP,DB: Triggered automatically after subscription-created
-    AMQP->>FullSync: subscription-created event
-    FullSync->>DB: Acquire lock on inbox_configurations row
-    FullSync->>DB: Set state=running, record version UUID
-    FullSync->>MSGraph: GET /me/messages/$count (with filters)
-    MSGraph->>FullSync: Total message count
-    FullSync->>DB: Store fullSyncExpectedTotal
-
-    loop For each batch (100 messages)
-        FullSync->>MSGraph: GET /me/messages (paginated, newest first)
-        MSGraph->>FullSync: Batch of messages
-        FullSync->>UniqueKB: Ingest email content
-        FullSync->>DB: Update counters + nextLink + watermarks
-    end
-
-    FullSync->>DB: Set state=waiting-for-ingestion
-    Note over FullSync: Waits for Unique KB to confirm ingestion
-    FullSync->>DB: Set state=ready (sync complete)
-```
-
-**Full sync states:** See [Full Sync — Sync States](./full-sync.md#sync-states) for the complete state reference.
+For the detailed sequence diagram and full technical description, see [Full Sync](./full-sync.md).
 
 **Key points:**
 
 - Full sync is triggered automatically when a subscription is created — users do not need to invoke it manually.
-- The sync is resumable: `fullSyncNextLink` stores the Graph pagination cursor so a crash or restart picks up where it left off.
+- The sync is resumable: the Graph pagination cursor is persisted so a crash or restart picks up where it left off.
 - Stale syncs (no heartbeat for 20+ minutes) are automatically restarted by the sync recovery module.
 - `ignoredBefore` is applied as a Graph API query filter. `ignoredSenders` and `ignoredContents` are applied in-memory after each batch is fetched.
-- Full sync **initializes** the watermarks (`newestLastModifiedDateTime`). Once initialized, live catch-up can process notifications in parallel — both pipelines ingest concurrently. Live catch-up ingestion activity can extend the time full sync spends in `waiting-for-ingestion`.
-- Once full sync has initialized the watermarks, live catch-up takes ownership of `newestLastModifiedDateTime` and updates it on every subsequent notification.
+- Full sync **initializes** the watermark (`newestLastModifiedDateTime`). Once initialized, live catch-up takes ownership and updates it on every subsequent notification.
 
 ## Directory Sync Flow
 
