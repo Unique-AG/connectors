@@ -19,26 +19,9 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 
 ## Understanding Consent Requirements
 
-**This is standard Microsoft behavior, not Outlook Semantic MCP specific.** All Microsoft 365 apps use the same consent model. For the full consent flow explanation including admin consent and multi-tenant setup, see [Authentication — Understanding Microsoft Consent Flows](../operator/authentication.md#understanding-microsoft-consent-flows).
+**This is standard Microsoft behavior, not Outlook Semantic MCP specific.** No permission in this app requires admin consent — users can connect independently. Admins can optionally pre-grant consent organisation-wide.
 
-### Standard Microsoft Consent Process
-
-1. **User connects their account**
-
-   - User opens their MCP client and clicks "Connect"
-   - Microsoft shows a standard consent screen listing the permissions above
-   - User approves — no admin action required
-
-2. **Admin consent (optional, for organisational rollout)**
-
-   - An admin can pre-grant all permissions tenant-wide so users are not prompted individually
-   - Done via the `service_principal_configuration` Terraform variable or the Azure Portal
-   - See [Authentication Guide](../operator/authentication.md) for the admin consent URL pattern
-
-**Microsoft Documentation:**
-
-- [User and admin consent overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview) - Standard Microsoft consent flows
-- [Grant admin consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) - Step-by-step guide
+For the full consent flow explanation including admin consent and multi-tenant setup, see [Authentication — Understanding Microsoft Consent Flows](../operator/authentication.md#understanding-microsoft-consent-flows).
 
 ## Least-Privilege Justification
 

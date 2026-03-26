@@ -28,10 +28,10 @@ Set via `mcpConfig.app` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `SELF_URL` | `mcpConfig.app.selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
-| `PORT` | — | `9542` | Local HTTP port the server binds to |
+| `PORT` | — | `9542` | Local HTTP port the server binds to. Note: the Helm chart maps this to port `51345` at the service/ingress level — the application listens on `9542` inside the container, but network policies and ingress rules reference `51345`. |
 | `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Set to `enabled` to expose debug tools and extra debugging data in tool responses |
 | `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing to reduce I/O. Set to `disabled` only for startup debugging when you need logs to appear immediately. |
-| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | Helm default: `{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}` | JSON string controlling which emails are synced — see [Mail Filters](#mail-filters). The application has no built-in default; this value is provided by Helm `values.yaml`. Required when running outside Helm. |
+| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | Helm default: `{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}` | JSON string controlling which emails are synced — see [Mail Filters](#mail-filters). The application has no built-in default; this value is provided by Helm `values.yaml`. Required when running outside Helm. **Warning:** Setting `ignoredBefore` far in the past can cause very large initial syncs for users with large mailboxes, consuming significant time and Microsoft Graph API quota. |
 
 ### Microsoft Configuration
 
@@ -41,7 +41,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | defaults to `SELF_URL` | Base URL Microsoft Graph uses for **webhook** callbacks (not OAuth callbacks — those always use `SELF_URL`). Microsoft appends `/mail-subscription/notification` and `/mail-subscription/lifecycle` to this URL. Must be publicly reachable by Microsoft Graph. Set this when the externally reachable URL differs from `SELF_URL` (e.g., a dev tunnel URL in local development). In most production deployments this matches `SELF_URL`. Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callback`, not this variable. |
-| `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC` | `3` | Hour of day in UTC (0–23) when scheduled subscription renewals occur |
+| `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC` | `3` | Hour of day in UTC (0–23) when scheduled subscription renewals occur. Subscriptions are renewed daily at this hour. Adjust to align with your operations timezone so renewals happen during business hours when monitoring is active. |
 
 ### Unique API Configuration
 
@@ -52,7 +52,7 @@ Set via `mcpConfig.unique` in Helm values:
 | `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
 | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
 | `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `mcpConfig.unique.scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
-| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | Default: `enabled`. Set to `disabled` to prevent storage in Unique Knowledge Base. |
+| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | When `enabled`, emails are ingested into the Unique Knowledge Base for semantic search. Set to `disabled` to prevent ingestion (emails will not be searchable via `search_emails`). |
 | `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | JSON: `{"x-company-id":"...","x-user-id":"..."}` |
 | `UNIQUE_ZITADEL_CLIENT_ID` | `mcpConfig.unique.zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
 | `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `mcpConfig.unique.zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
@@ -84,7 +84,7 @@ Set via `server.env` in Helm values for plain config, or via `server.envVars` (w
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LOG_LEVEL` | `info` | Log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` |
-| `MAX_HEAP_MB` | `1920` | Node.js max heap size in MB |
+| `MAX_HEAP_MB` | `1920` | Node.js max heap size in MB. With the default of 1920 MB, set the pod memory request/limit to at least ~2.5 GB to account for non-heap memory overhead. |
 | `NODE_ENV` | `production` | Node environment |
 | `NODE_EXTRA_CA_CERTS`                 | —                                                 | Path to a PEM file containing additional CA certificates for TLS verification if pod's trust store doesn't have them |
 | `OTEL_METRICS_EXPORTER` | `prometheus` | OpenTelemetry metrics exporter |

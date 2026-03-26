@@ -28,10 +28,10 @@ In Scenario 3 (Knowledge Base loss), the content must be fully re-ingested becau
 
 The documentation does not provide fixed RTO targets because recovery time varies significantly by deployment. The main factors are:
 
-- **Number of connected users** — each user's mailbox is re-synced independently. The service processes users concurrently but enforces a batch limit of 50 messages per cycle per user before yielding to others (service limit, configurable).
+- **Number of connected users** — each user's mailbox is re-synced independently. The service processes users concurrently but enforces a batch limit of 50 messages per cycle per user before yielding to others (hardcoded service limit).
 - **Mailbox size** — full sync fetches emails in pages of 100 from Microsoft Graph (service-configured page size), processing them sequentially. Large mailboxes (100,000+ emails) take proportionally longer.
 - **Microsoft Graph API rate limits** — Microsoft enforces a global limit of 130,000 requests per 10 seconds per app across all tenants; additional per-mailbox and per-service limits may apply (Microsoft limit, not configurable). Re-syncing many users simultaneously may approach these limits. There is no built-in staggering; operators may need to trigger `restart_full_sync` for users in batches to avoid throttling. See [Microsoft Graph throttling](https://learn.microsoft.com/en-us/graph/throttling).
-- **Ingestion concurrency** — the service limits concurrent ingestion requests to 10 per instance to avoid overwhelming the Unique API (service limit, configurable).
+- **Ingestion concurrency** — the RabbitMQ consumer prefetch count is set to 10, limiting in-flight messages per consumer (hardcoded service limit).
 - **Infrastructure provisioning** — if PostgreSQL or RabbitMQ must be provisioned from scratch rather than restored from backup, lead time depends on the platform. Clients using managed database services rather than Kubernetes-native solutions (e.g. CNPG) should account for provider-specific provisioning and configuration time.
 
 ### Backup recommendations
@@ -92,16 +92,16 @@ The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, a
      --dry-run=client -o yaml | kubectl apply -f -
    ```
 
-2. Run database migrations to create the schema:
-
-   ```bash
-   kubectl exec -it deploy/outlook-semantic-mcp -n outlook-semantic-mcp -- pnpm run db:migrate
-   ```
-
-3. Restart the service pods to pick up the new database connection:
+2. Trigger a deploy or restart the service pods. Database migrations run automatically via the Helm hook on deploy — there is no need to run them manually via `kubectl exec` (the pods may not be running if the DB was lost):
 
    ```bash
    kubectl rollout restart deploy/outlook-semantic-mcp -n outlook-semantic-mcp
+   ```
+
+3. Verify migrations ran successfully by checking the pod logs:
+
+   ```bash
+   kubectl logs deploy/outlook-semantic-mcp -n outlook-semantic-mcp | grep -i migration
    ```
 
 4. Notify affected users that they must reconnect their inbox. Each user must:
@@ -144,17 +144,39 @@ RabbitMQ carries in-flight sync trigger events between the service and its inter
    kubectl rollout restart deploy/outlook-semantic-mcp -n outlook-semantic-mcp
    ```
 
-3. Enable debug mode on the deployment if it is not already enabled, by setting `MCP_DEBUG_MODE=enabled` in `mcpConfig.app.mcpDebugMode`. This exposes debug tools including `restart_full_sync`, `run_full_sync`, `pause_full_sync`, and `resume_full_sync`. See [Configuration](./configuration.md#application-configuration).
+3. Enable debug mode on the deployment if it is not already enabled, by setting `MCP_DEBUG_MODE=enabled` in `mcpConfig.app.mcpDebugMode` and restarting pods. This exposes debug tools including `restart_full_sync`, `run_full_sync`, `pause_full_sync`, and `resume_full_sync`. **Note:** Debug mode exposes these tools to all connected MCP users, not just operators — restrict MCP client access during recovery. See [Configuration](./configuration.md#application-configuration).
 
-4. For each affected user, call `restart_full_sync` via the MCP tool interface. This resets sync state in the local database and triggers a re-fetch of all emails from Microsoft Graph via the restored RabbitMQ pipeline. Emails already in the Knowledge Base are detected by file key and skipped — the only overhead is Microsoft Graph API calls and ingestion API lookups (see [Idempotent re-ingestion](#idempotent-re-ingestion)).
+4. For each affected user, call `restart_full_sync` via the MCP tool interface. For large deployments, see [Bulk Recovery](#bulk-recovery) for scripting guidance. This resets sync state in the local database and triggers a re-fetch of all emails from Microsoft Graph via the restored RabbitMQ pipeline. Emails already in the Knowledge Base are detected by file key and skipped — the only overhead is Microsoft Graph API calls and ingestion API lookups (see [Idempotent re-ingestion](#idempotent-re-ingestion)).
 
 5. Monitor recovery progress with `sync_progress`. The sync is complete when `fullSyncState` transitions to `"ready"` and `state` is `"finished"`.
 
 6. Live catch-up resumes automatically once the service reconnects to RabbitMQ. Any emails received during the outage window that were not captured by webhook notifications will be picked up by `restart_full_sync` in step 4.
 
-7. Once all users show `fullSyncState: "ready"`, disable debug mode by removing or unsetting `MCP_DEBUG_MODE` and redeploying. Debug mode should not remain enabled in production.
+7. Once all users show `fullSyncState: "ready"`, disable debug mode by removing or unsetting `MCP_DEBUG_MODE` in the Helm values and redeploying (requires a pod restart). Debug mode should not remain enabled in production.
 
 **See also:** [`restart_full_sync`](../technical/tools.md#restart_full_sync), [`sync_progress`](../technical/tools.md#sync_progress), [Configuration](./configuration.md#application-configuration)
+
+---
+
+## Bulk Recovery
+
+For deployments with many connected users, calling `restart_full_sync` manually for each user is impractical. Use the following approach:
+
+1. **Enable debug mode** — set `MCP_DEBUG_MODE=enabled` in the Helm values and redeploy.
+
+2. **Script the recovery** — use the MCP tool interface or a script to call `restart_full_sync` for each affected user. Stagger calls to avoid hitting Microsoft Graph rate limits (130,000 requests / 10 seconds per app across all tenants).
+
+   Example approach:
+   - Batch users into groups of 10–20
+   - Wait 30–60 seconds between batches
+   - Monitor `sync_progress` for each user to confirm recovery is progressing
+
+3. **Monitor progress** — use `sync_progress` to track when each user's `fullSyncState` reaches `"ready"`.
+
+4. **Disable debug mode** — once all users show `fullSyncState: "ready"`, remove `MCP_DEBUG_MODE` and redeploy.
+
+!!! warning "Debug Mode Security"
+    Enabling `MCP_DEBUG_MODE=enabled` exposes debug tools (`restart_full_sync`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`) to **all connected MCP users**, not just operators. Restrict MCP client access during the recovery window. Enabling and disabling debug mode requires a Helm values change and a pod restart (`kubectl rollout restart`). For large deployments, the recovery window may last hours or days depending on user count and mailbox size — plan accordingly.
 
 ---
 
@@ -179,14 +201,14 @@ The Unique Knowledge Base stores the actual ingested email content used for sema
 
 1. Restore or verify the Unique Knowledge Base is operational and reachable from the service. Confirm `UNIQUE_INGESTION_SERVICE_BASE_URL` and `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` are correct in the Helm values.
 
-2. Enable debug mode on the deployment if it is not already enabled, by setting `MCP_DEBUG_MODE=enabled` in `mcpConfig.app.mcpDebugMode`. This exposes debug tools including `restart_full_sync`, `run_full_sync`, `pause_full_sync`, and `resume_full_sync`. See [Configuration](./configuration.md#application-configuration).
+2. Enable debug mode on the deployment if it is not already enabled, by setting `MCP_DEBUG_MODE=enabled` in `mcpConfig.app.mcpDebugMode` and restarting pods. This exposes debug tools including `restart_full_sync`, `run_full_sync`, `pause_full_sync`, and `resume_full_sync`. **Note:** Debug mode exposes these tools to all connected MCP users, not just operators — restrict MCP client access during recovery. See [Configuration](./configuration.md#application-configuration).
 
-3. For each affected user, call `restart_full_sync` via the MCP tool interface. This resets sync state in the local database and re-fetches all emails from Microsoft Graph, re-ingesting them into the restored Knowledge Base. Unlike Scenarios 1 and 2, this is the only recovery scenario where emails must be fully re-ingested — the Knowledge Base no longer contains the files, so the cost includes Microsoft Graph API calls, ingestion API calls, and the full content transfer. Subsequent runs are idempotent — file keys prevent duplicates.
+3. For each affected user, call `restart_full_sync` via the MCP tool interface. For large deployments, see [Bulk Recovery](#bulk-recovery) for scripting guidance. This resets sync state in the local database and re-fetches all emails from Microsoft Graph, re-ingesting them into the restored Knowledge Base. Unlike Scenarios 1 and 2, this is the only recovery scenario where emails must be fully re-ingested — the Knowledge Base no longer contains the files, so the cost includes Microsoft Graph API calls, ingestion API calls, and the full content transfer. Subsequent runs are idempotent — file keys prevent duplicates.
 
 4. Monitor recovery progress with `sync_progress`. The sync is complete when `fullSyncState` transitions to `"ready"` and `state` is `"finished"`.
 
 5. Live catch-up resumes automatically once ingestion is healthy — emails received during the outage will be processed through the normal webhook pipeline without additional operator action.
 
-6. Once all users show `fullSyncState: "ready"`, disable debug mode by removing or unsetting `MCP_DEBUG_MODE` and redeploying. Debug mode should not remain enabled in production.
+6. Once all users show `fullSyncState: "ready"`, disable debug mode by removing or unsetting `MCP_DEBUG_MODE` in the Helm values and redeploying (requires a pod restart). Debug mode should not remain enabled in production.
 
 **See also:** [`restart_full_sync`](../technical/tools.md#restart_full_sync), [`sync_progress`](../technical/tools.md#sync_progress), [Configuration](./configuration.md#application-configuration)

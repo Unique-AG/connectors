@@ -71,7 +71,7 @@ Each object in `conditions` may include the following fields. All condition fiel
 | `ccRecipients` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" \| "containsAny" }` | Filter by CC recipient — accepts full email addresses or partial strings. Prefer `containsAny` when matching a list of emails. |
 | `directories` | `{ value: string[], operator: "in" \| "notIn" }` | Folder IDs (from `list_folders`) or system names: `"Inbox"`, `"Sent Items"`, `"Drafts"`, `"Archive"`, `"Outbox"`, `"Clutter"`, `"Conversation History"` |
 | `hasAttachments` | `{ value: boolean, operator }` | Filter to emails with or without attachments |
-| `categories` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" }` | Category labels (from `list_categories`) |
+| `categories` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" \| "containsAny" }` | Category labels (from `list_categories`) |
 
 **Available operators:**
 
@@ -341,6 +341,8 @@ Check the status of the inbox connection and Microsoft Graph webhook subscriptio
 | `expired` | Subscription has lapsed | Call `reconnect_inbox` |
 | `not_configured` | No subscription exists | Call `reconnect_inbox` |
 
+See [Subscription Management](./subscription-management.md#subscription-status) for the full subscription status reference.
+
 ---
 
 ### `reconnect_inbox`
@@ -367,7 +369,7 @@ Re-establish the Microsoft Outlook inbox subscription when expired or not config
 **Usage notes:**
 
 - Safe to call even if a subscription already exists — it will return `already_active` without creating a duplicate.
-- Also triggers a new full sync if one has not been run.
+- When a new subscription is created (status: `created`), a full sync is triggered automatically. If the subscription is `already_active` or `expiring_soon`, no full sync is triggered.
 
 ---
 

@@ -13,7 +13,7 @@ This guide walks through setting up the Outlook Semantic MCP Server for local de
 | pnpm | 9+ | Package manager |
 | Docker | 24+ | Run PostgreSQL and RabbitMQ |
 | Azure CLI | Latest | Configure Entra app registration |
-| MCP Inspector | Latest (tested with 0.17.2) | MCP Client for testing |
+| MCP Inspector | Latest | MCP Client for testing |
 
 A public reverse proxy, recommended:
 

@@ -23,7 +23,8 @@ Use the provided Terraform module:
 
 ```hcl
 module "outlook_semantic_mcp_app" {
-  source = "./deploy/terraform/azure/outlook-semantic-mcp-entra-application"
+  # Adjust path based on your working directory — see note below
+  source = "<path-to-connectors-repo>/services/outlook-semantic-mcp/deploy/terraform/azure/outlook-semantic-mcp-entra-application"
 
   display_name     = "Outlook Semantic MCP Server"
   sign_in_audience = "AzureADMyOrg"  # Single tenant
@@ -92,11 +93,9 @@ module "outlook_semantic_mcp_app" {
 
 ## Required Permissions
 
-All permissions are **delegated**, meaning they act on behalf of the signed-in user: `User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`.
+All five permissions (`User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`) are **delegated** and **do not require admin consent**.
 
-**None of these permissions require admin consent** — all are user-consented. However, organisations may still choose to pre-grant admin consent for a smoother user onboarding experience.
-
-For the complete permissions reference with justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
+For the complete permissions reference with justifications for each permission, see [Permissions](../technical/permissions.md).
 
 ## Understanding Microsoft Consent Flows
 
@@ -277,7 +276,7 @@ Used to sign and validate OAuth session state during the MCP client authenticati
 
 1. Generate a new secret: `openssl rand -hex 32`
 2. Update the Kubernetes secret and redeploy
-3. MCP clients will re-authenticate automatically on their next request — no user action needed
+3. Already-authenticated users are **not** affected — their existing MCP tokens and Microsoft tokens continue to work. Only users who are mid-OAuth-flow at the moment of rotation will see an error and need to restart the flow. When an MCP access token expires (60 seconds), the MCP refresh token (unaffected by the HMAC change) is used to obtain a new one — no user action needed.
 
 This is the lowest-impact secret to rotate. Existing connections are unaffected.
 

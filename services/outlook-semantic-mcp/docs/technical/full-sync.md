@@ -45,7 +45,7 @@ stateDiagram-v2
     note right of wfi
         Waits for Unique KB to confirm
         majority of queued messages processed
-        (max 10 concurrent ingestions)
+        (RabbitMQ prefetch count: 10)
     end note
 ```
 

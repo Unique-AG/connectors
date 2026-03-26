@@ -310,35 +310,28 @@ Rate limiting is expected to be handled at the infrastructure/ingress layer (e.g
 
 ### Required Secrets
 
+For the full secrets reference (format, generation, and description), see [Configuration — Required Secrets](../operator/configuration.md#required-secrets).
 
-| Secret                     | Purpose                              | Format          | Rotation Impact                     |
-| -------------------------- | ------------------------------------ | --------------- | ----------------------------------- |
-| `ENCRYPTION_KEY`           | AES-256-GCM key for Microsoft tokens | 64-char hex     | All users must reconnect            |
-| `AUTH_HMAC_SECRET`         | HMAC-SHA256 for OAuth session state  | 64-char hex     | All active sessions invalidated     |
-| `MICROSOFT_CLIENT_SECRET`  | Authenticate server with Entra ID    | Azure-generated | Update + restart only               |
-| `MICROSOFT_WEBHOOK_SECRET` | Validate Graph webhook payloads      | 128-char hex    | All subscriptions must be recreated |
-
+| Secret                     | Rotation Impact                     |
+| -------------------------- | ----------------------------------- |
+| `ENCRYPTION_KEY`           | All users must reconnect            |
+| `AUTH_HMAC_SECRET`         | Only mid-OAuth-flow sessions invalidated |
+| `MICROSOFT_CLIENT_SECRET`  | Update + restart only (zero-downtime) |
+| `MICROSOFT_WEBHOOK_SECRET` | All subscriptions must be recreated |
 
 ### Rotation Procedures
 
-For detailed secret rotation procedures, see [Authentication — Secrets](../operator/authentication.md#secrets).
+For detailed secret rotation procedures, see [Authentication — Secret Rotation](../operator/authentication.md#secret-rotation).
 
 Key security considerations for rotation:
 
 - **`ENCRYPTION_KEY`** and **`MICROSOFT_WEBHOOK_SECRET`** have no zero-downtime rotation path — plan these as maintenance windows and notify users in advance.
-- **`AUTH_HMAC_SECRET`** is the lowest-impact secret to rotate — existing connections are unaffected and MCP clients re-authenticate automatically.
+- **`AUTH_HMAC_SECRET`** is the lowest-impact secret to rotate — existing connections are unaffected and only mid-OAuth-flow users are affected.
 - **`MICROSOFT_CLIENT_SECRET`** supports zero-downtime rotation because Microsoft allows multiple active client secrets simultaneously.
 
 ## Security Checklist for Operators
 
-- `ENCRYPTION_KEY` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
-- `AUTH_HMAC_SECRET` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
-- `MICROSOFT_WEBHOOK_SECRET` is a cryptographically random 128-character string (`openssl rand -hex 64`)
-- All secrets stored in Kubernetes Secrets (not ConfigMaps)
-- TLS termination configured at Kong ingress
-- Network policies restrict pod-to-pod communication
-- Log aggregation in place (tokens are not logged)
-- Monitoring alerts configured for authentication failures
+See [Operator Manual — Security Checklist](../operator/README.md#security-checklist) for the full pre-production checklist.
 
 ## Related Documentation
 

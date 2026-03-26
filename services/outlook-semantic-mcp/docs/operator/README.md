@@ -56,7 +56,11 @@ Follow these steps to go from zero to a running deployment:
 3. **Create Kubernetes secrets** — Generate cryptographic secrets and store them as Kubernetes Secrets. See [Deployment — Required Secrets](./deployment.md#required-secrets).
 4. **Configure Helm values** — Create a minimal `values.yaml` with your secrets, Microsoft client ID, and Unique API endpoints. See [Configuration Guide](./configuration.md).
 5. **Deploy with Helm** — Install the chart. See [Deployment — Install](./deployment.md#install).
-6. **Verify** — Complete an OAuth flow end-to-end, check that webhooks are reachable, and confirm a test email appears in search results.
+6. **Verify** the deployment is working:
+   1. Check the OAuth metadata endpoint: `curl https://<your-domain>/.well-known/oauth-authorization-server`
+   2. Connect with an MCP client and complete the OAuth flow
+   3. Call `verify_inbox_connection` to confirm the webhook subscription is `active`
+   4. Send a test email to the connected account, wait a moment, then use `search_emails` to confirm it appears
 
 ## Infrastructure Requirements
 

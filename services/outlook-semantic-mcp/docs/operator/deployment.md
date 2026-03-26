@@ -150,12 +150,16 @@ mcpConfig:
       x-company-id: "<your-company-id>"
       x-user-id: "<your-service-account-user-id>"
 
-  # Adjust the date to control how far back the initial email sync goes.
-  # Without this, the Helm default of 2025-06-06 applies silently.
+  # IMPORTANT: Adjust `ignoredBefore` to control how far back the initial email sync goes.
+  # Setting this date far in the past (or omitting it) can cause very large initial syncs
+  # for users with large mailboxes, potentially taking hours and consuming significant
+  # Microsoft Graph API quota. Without this value, the Helm default of 2025-06-06 applies.
   defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
 ```
 
-**Note:** Ingress is disabled by default. Enable it and configure hosts/TLS in the `ingress` section of your `values.yaml`. The chart defaults to `ingressClassName: kong` but any ingress controller can be used. MCP servers need to be hosted on their own domain.
+**PostgreSQL backups:** Strongly recommended. Without a backup, all users must re-authenticate and full sync restarts from scratch. See [Disaster Recovery — Backup Recommendations](./disaster-recovery.md#backup-recommendations).
+
+**Note:** Ingress is disabled by default. Enable it and configure hosts/TLS in the `ingress` section of your `values.yaml`. The chart defaults to `ingressClassName: kong` but any ingress controller can be used. MCP servers need to be hosted on their own domain because the OAuth redirect URI (`<SELF_URL>/auth/callback`) must resolve to this service — sharing a domain with other services would cause routing conflicts. Ensure your ingress allows large request bodies (for attachment uploads) and has appropriate timeouts for long-running OAuth flows.
 
 ## Database Migration
 

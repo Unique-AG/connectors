@@ -117,7 +117,7 @@ sequenceDiagram
 
 - Microsoft sends lifecycle notifications before a subscription expires (`reauthorizationRequired`) and when it removes one (`subscriptionRemoved`).
 - All lifecycle notifications are validated against the `MICROSOFT_WEBHOOK_SECRET` via the `clientState` field.
-- `reconnect_inbox` forces creation of a new subscription regardless of current state.
+- `reconnect_inbox` is idempotent: it creates a new subscription only if none exists or the existing one has expired. If the subscription is `already_active` or `expiring_soon`, no changes are made.
 
 ## Live Catch-Up: Webhook-Driven Email Ingestion
 

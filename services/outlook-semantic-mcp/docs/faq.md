@@ -14,6 +14,7 @@
   - [Why does the server need Mail.ReadWrite if it mostly reads emails?](#why-does-the-server-need-mailreadwrite-if-it-mostly-reads-emails)
   - [Why can't I use application permissions instead of delegated?](#why-cant-i-use-application-permissions-instead-of-delegated)
   - [Why do I need a client ID and client secret?](#why-do-i-need-a-client-id-and-a-client-secret)
+  - [What is the "login flicker" when users reconnect?](#what-is-the-login-flicker-when-users-reconnect)
   - [What happens when a user's Microsoft refresh token expires?](#what-happens-when-a-users-microsoft-refresh-token-expires)
 - [Configuration](#configuration)
   - [What redirect URI should I configure in Entra ID?](#what-redirect-uri-should-i-configure-in-entra-id)
@@ -132,6 +133,16 @@ Delegated permissions also ensure the server can only access emails the signed-i
 
 **See also:** [Operator Configuration](./operator/configuration.md)
 
+### What is the "login flicker" when users reconnect?
+
+**Answer:** When a user who has previously connected calls `reconnect_inbox` or reconnects via the OAuth flow, they may see a brief "flicker" — a rapid redirect sequence through Microsoft's login pages. This is **normal** Microsoft OAuth behavior: Microsoft validates the existing session through rapid OAuth redirects without requiring the user to re-enter credentials or re-approve permissions.
+
+**First-time connection:** The user sees the full Microsoft consent screen and must approve permissions.
+
+**Subsequent reconnections:** The user sees the quick flicker (brief redirect) and is reconnected automatically.
+
+**See also:** [Authentication — User Reconnection Experience](./operator/authentication.md#user-reconnection-experience-the-login-flicker)
+
 ### What happens when a user's Microsoft refresh token expires?
 
 **Answer:** The server can no longer refresh access tokens for that user. All Microsoft Graph operations fail until the user reconnects via the `reconnect_inbox` tool.
@@ -150,7 +161,7 @@ Refresh tokens expire after approximately 90 days of inactivity (Microsoft limit
 https://<your-domain>/auth/callback
 ```
 
-This must match exactly — including protocol, domain, and path — in both the Entra ID app registration and the `MICROSOFT_REDIRECT_URI` environment variable.
+This must match exactly — including protocol, domain, and path — in both the Entra ID app registration and the `SELF_URL` environment variable. The redirect URI is derived as `<SELF_URL>/auth/callback`.
 
 **See also:** [Configuration](./operator/configuration.md)
 
@@ -164,39 +175,29 @@ This must match exactly — including protocol, domain, and path — in both the
 
 ### What happens if I change the encryption key?
 
-**Answer:** All stored Microsoft tokens become unreadable. All users must reconnect via `reconnect_inbox` to re-authenticate and obtain fresh tokens. There is no zero-downtime rotation — plan for a maintenance window.
+**Answer:** All stored Microsoft tokens become unreadable. All users must reconnect via `reconnect_inbox`. There is no zero-downtime rotation — plan for a maintenance window.
 
-**See also:** [ENCRYPTION_KEY Rotation](./technical/security.md#rotation-procedures)
+**See also:** [Secret Rotation](./operator/authentication.md#secret-rotation) for the full rotation procedure
 
 ### What happens if I change the webhook secret?
 
-**Answer:** All existing Microsoft Graph subscriptions will fail validation because they were created with the old secret. Notifications will be rejected until subscriptions are recreated with the new secret.
+**Answer:** All existing Microsoft Graph subscriptions will fail validation. Notifications will be rejected until subscriptions are recreated. All users must call `reconnect_inbox` after the change.
 
-To rotate: update the `MICROSOFT_WEBHOOK_SECRET` environment variable, then have all users call `reconnect_inbox` to recreate their subscriptions.
-
-**See also:** [MICROSOFT_WEBHOOK_SECRET Rotation](./technical/security.md#rotation-procedures)
+**See also:** [Secret Rotation](./operator/authentication.md#secret-rotation) for the full rotation procedure
 
 ### What happens if I change the client secret?
 
-**Answer:** Update the Kubernetes secret and restart the pods. Users do not need to reconnect — the server uses the new secret for token refresh operations transparently.
+**Answer:** Update the Kubernetes secret and restart the pods. Users do not need to reconnect — the server uses the new secret transparently. This supports zero-downtime rotation.
 
-**Rotation process:** Create new secret in Entra ID → Update Kubernetes secret → Restart pods → Verify authentication → Delete old secret from Entra ID.
-
-**See also:** [Client Secret Rotation](./technical/security.md#rotation-procedures)
+**See also:** [Secret Rotation](./operator/authentication.md#secret-rotation) for the full rotation procedure
 
 ### What does `DEFAULT_MAIL_FILTERS` do?
 
-**Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during full sync. Emails that match any filter are skipped:
-
-| Filter | Effect |
-|--------|--------|
-| `ignoredBefore` | Skips emails created before this ISO 8601 date |
-| `ignoredSenders` | Skips emails whose sender matches any RegExp pattern. Values must use `/pattern/flags` format (e.g. `/^noreply@/i`). |
-| `ignoredContents` | Skips emails whose subject or body matches any RegExp pattern. Values must use `/pattern/flags` format (e.g. `/unsubscribe/i`). |
+**Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during full sync. It supports three filters: `ignoredBefore` (ISO 8601 date cutoff), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
 
 When the filters are updated and the service is redeployed, all user inbox configurations are updated. The next full sync uses the new filters. Previously ingested emails that would now be filtered are not automatically removed.
 
-**See also:** [Inbox Filters](./technical/full-sync.md#inbox-filters) — [Configuration](./operator/configuration.md)
+**See also:** [Inbox Filters](./technical/full-sync.md#inbox-filters) for the full filter reference — [Configuration](./operator/configuration.md)
 
 ## Sync
 
@@ -212,15 +213,7 @@ When the filters are updated and the service is redeployed, all user inbox confi
 | State | `ready` / `running` / `waiting-for-ingestion` / `paused` / `failed` | `ready` / `running` / `failed` |
 | Resumable | Yes — via `fullSyncNextLink` cursor | N/A (each notification is independent) |
 
-Full sync states:
-
-| State | Description |
-|-------|-------------|
-| `ready` | Full sync has not started or has completed successfully |
-| `running` | Full sync is actively fetching and uploading email batches |
-| `waiting-for-ingestion` | All batches uploaded; waiting for the knowledge base to finish processing |
-| `paused` | Full sync has been paused by the user or operator and can be resumed |
-| `failed` | Full sync encountered an error and stopped |
+Full sync states: `ready`, `running`, `waiting-for-ingestion`, `paused`, `failed`. See [Full Sync — Sync States](./technical/full-sync.md#sync-states) for the complete state reference.
 
 Both pipelines run concurrently after connection and both contribute to the Unique knowledge base ingestion queue.
 
@@ -275,19 +268,15 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 ### What happens to emails sent during full sync?
 
-**Answer:** Live catch-up runs concurrently with full sync. New emails arriving during full sync are processed immediately by live catch-up (once full sync has initialized the watermarks). Live catch-up buffers notifications only if another live catch-up consumer is already running or if the watermarks have not been initialized yet.
+**Answer:** Live catch-up runs concurrently with full sync. New emails are processed by live catch-up once full sync has initialized the watermarks. Notifications received before that point are buffered and flushed once ready.
 
-**See also:** [Relation to Full Sync](./technical/live-catchup.md#relation-to-full-sync)
+**See also:** [Full Sync — Relation to Live Catch-Up](./technical/full-sync.md#relation-to-live-catch-up) — [Live Catch-Up — Relation to Full Sync](./technical/live-catchup.md#relation-to-full-sync)
 
 ### Why are deleted emails still appearing in search results?
 
-**Answer:** Email deletion detection is handled asynchronously:
+**Answer:** Email deletion detection is handled asynchronously via two mechanisms: individual email deletions are detected when Microsoft moves the email to Deleted Items (an ignored folder), and entire folder deletions are detected by directory sync on its 5-minute delta cycle. There may be a brief delay between deletion and removal from search results.
 
-- When a user deletes an email, Microsoft moves it to Deleted Items first. This generates a `created` change notification for the Deleted Items folder. The server detects the email is now in an ignored folder and removes it from the knowledge base.
-- Deleted Items is processed on the next live catch-up cycle. There may be a brief delay between deletion and removal from search results.
-- If an entire folder was deleted, directory sync detects this on its 5-minute delta cycle.
-
-**See also:** [Directory Sync](./technical/directory-sync.md) — [Live Catch-Up](./technical/live-catchup.md)
+**See also:** [Directory Sync](./technical/directory-sync.md) for the full deletion detection mechanism — [Live Catch-Up](./technical/live-catchup.md)
 
 ## Tool Usage
 
@@ -342,7 +331,7 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 ### What does `reconnect_inbox` do?
 
-**Answer:** `reconnect_inbox` creates a new Microsoft Graph subscription if one does not already exist or if the current subscription is near expiry (within 15 minutes). If a valid subscription is already active, it returns `already_active` without creating a duplicate. Use it when:
+**Answer:** `reconnect_inbox` creates a new Microsoft Graph subscription only if none exists or the existing one has expired. If the subscription is within 15 minutes of expiry, it returns `expiring_soon` without making changes (renewal is automatic). If the subscription is active with more than 15 minutes remaining, it returns `already_active`. Use it when:
 
 - `verify_inbox_connection` reports the subscription as `expired` or `not_configured`
 - New emails stopped appearing in search results
