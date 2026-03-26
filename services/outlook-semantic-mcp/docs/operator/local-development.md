@@ -41,7 +41,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The server starts at the configured port (default: `9542`). Note: in Kubernetes deployments, the Helm chart maps container port `9542` to service port `51345` — this mapping does not apply locally.
+The server starts at the configured port (default: `9542`).
 
 ## Infrastructure Setup
 
