@@ -28,10 +28,10 @@ Set via `mcpConfig.app` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `SELF_URL` | `mcpConfig.app.selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
-| `PORT` | — | `9542` | Local HTTP port the server binds to. Note: the Helm chart maps this to port `51345` at the service/ingress level — the application listens on `9542` inside the container, but network policies and ingress rules reference `51345`. |
+| `PORT` | — | `9542` | Local HTTP port the server binds to inside the container. **Port mapping:** The Helm chart maps container port `9542` to service port `51345` — network policies, ingress rules, and probes reference `51345`, not `9542`. |
 | `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Set to `enabled` to expose debug tools and extra debugging data in tool responses |
 | `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing to reduce I/O. Set to `disabled` only for startup debugging when you need logs to appear immediately. |
-| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | Helm default: `{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}` | JSON string controlling which emails are synced — see [Mail Filters](#mail-filters). The application has no built-in default; this value is provided by Helm `values.yaml`. Required when running outside Helm. **Warning:** Setting `ignoredBefore` far in the past can cause very large initial syncs for users with large mailboxes, consuming significant time and Microsoft Graph API quota. |
+| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | Helm default: `{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}` | JSON string controlling which emails are synced — see [Mail Filters](#mail-filters). The application has no built-in default; this value is provided by Helm `values.yaml`. **When running outside Helm:** you must set this variable explicitly. If unset, the application starts but syncs all emails with no date cutoff, which can cause very large initial syncs for users with large mailboxes. **Warning:** Setting `ignoredBefore` far in the past has the same effect — significant time and Microsoft Graph API quota consumption. |
 
 ### Microsoft Configuration
 
@@ -53,7 +53,7 @@ Set via `mcpConfig.unique` in Helm values:
 | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
 | `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `mcpConfig.unique.scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
 | `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | When `enabled`, emails are ingested into the Unique Knowledge Base for semantic search. Set to `disabled` to prevent ingestion (emails will not be searchable via `search_emails`). |
-| `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | JSON: `{"x-company-id":"...","x-user-id":"..."}` |
+| `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | JSON: `{"x-company-id":"...","x-user-id":"..."}`. The `x-company-id` is your organization's ID in the Unique platform (found in the Unique admin dashboard or via the Unique API). The `x-user-id` is the Zitadel service user ID — see [Zitadel Service Account](#zitadel-service-account). |
 | `UNIQUE_ZITADEL_CLIENT_ID` | `mcpConfig.unique.zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
 | `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `mcpConfig.unique.zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
 | `UNIQUE_ZITADEL_PROJECT_ID` | `mcpConfig.unique.zitadel.projectId` | (required for `external`) | Zitadel project ID for audience validation |

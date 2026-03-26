@@ -63,16 +63,7 @@ flowchart LR
     OutlookMCP -->|"Microsoft token\n(internal, never exposed)"| MSGraph["Microsoft Graph API"]
 ```
 
-**Token Lifetimes:**
-
-| Token | TTL | Set By | On Expiry |
-|-------|-----|--------|-----------|
-| MCP Access Token | 60 seconds (configurable) | Service | Client automatically refreshes using MCP refresh token |
-| MCP Refresh Token | 30 days (configurable) | Service | User must re-authenticate via OAuth flow |
-| Microsoft Access Token | ~1 hour | Microsoft (not configurable) | Server refreshes automatically using stored refresh token |
-| Microsoft Refresh Token | ~90 days | Microsoft (not configurable) | User must reconnect via `reconnect_inbox` |
-
-The server automatically refreshes expired Microsoft access tokens using the stored refresh token. If the refresh token itself expires (~90 days of inactivity), the user must reconnect.
+**Token Lifetimes:** MCP tokens (60-second access, 30-day refresh) are configurable. Microsoft tokens (~1-hour access, ~90-day refresh) are set by Microsoft. The server automatically refreshes expired Microsoft access tokens. If the refresh token itself expires (~90 days of inactivity), the user must reconnect. See [Security — Token TTLs](./security.md#mcp-tokens-opaque-bearer-tokens) for the full reference.
 
 ### MCP Tools
 

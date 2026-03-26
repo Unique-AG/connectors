@@ -46,17 +46,7 @@ helm upgrade outlook-semantic-mcp oci://ghcr.io/unique-ag/helm-charts/outlook-se
 
 ## Required Secrets
 
-The service requires the following Kubernetes secrets to be present before deployment:
-
-| Secret Key | Description | Source |
-|------------|-------------|--------|
-| `DATABASE_URL` | PostgreSQL connection string | Manual |
-| `AMQP_URL` | RabbitMQ connection URL | Manual |
-| `MICROSOFT_CLIENT_SECRET` | Client secret from Entra app registration | Terraform ([Entra module](#terraform-modules)) |
-| `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string for webhook validation | Auto-generated |
-| `AUTH_HMAC_SECRET` | 64-character hex string (256-bit) for token signing | Auto-generated |
-| `ENCRYPTION_KEY` | 64-character hex string (256-bit) for AES-256-GCM encryption | Auto-generated |
-| `UNIQUE_ZITADEL_CLIENT_SECRET` | Zitadel OAuth client secret (only when `serviceAuthMode: external`) | Manual |
+The service requires seven Kubernetes secrets to be present before deployment. For the full reference (format, description, and generation commands), see [Configuration — Required Secrets](./configuration.md#required-secrets).
 
 ### Provisioning with Terraform (recommended)
 

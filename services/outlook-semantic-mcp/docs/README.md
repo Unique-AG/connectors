@@ -21,6 +21,12 @@ The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assis
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
+## Documentation
+
+- [FAQ](./faq.md) — Frequently asked questions
+- [Operator Guide](./operator/README.md) — Deployment, configuration, and operations
+- [Technical Reference](./technical/README.md) — Architecture, flows, and design decisions
+
 ## Quick Summary
 
 **What it does:** Provides AI clients with 10 MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, managing folders, and monitoring sync status against a user's Microsoft Outlook mailbox
@@ -48,11 +54,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Permissions
 
-All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to: `User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`.
-
-None of these permissions require admin consent.
-
-For the complete permissions reference, see [Permissions](technical/permissions.md).
+All permissions are **Delegated** (not Application): `User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`. None require admin consent. For details, see [Permissions](technical/permissions.md).
 
 ## Features
 
@@ -90,7 +92,7 @@ For the complete permissions reference, see [Permissions](technical/permissions.
 
 - After connecting, the server automatically begins a full sync to ingest emails within the operator-configured time frame and filters (see [Inbox Filters](./technical/full-sync.md#inbox-filters))
 - Sync progress can be monitored via the `sync_progress` tool, which reports the current state, counters, and date range being processed
-- `sync_progress` returns the current sync state (`ready`, `running`, `paused`, `waiting-for-ingestion`, `failed`), the number of emails ingested, the date window being processed, and a warning if results may be incomplete
+- `sync_progress` returns a top-level `state` (`running`, `finished`, `error`) and a detailed `fullSyncState` (`ready`, `running`, `paused`, `waiting-for-ingestion`, `failed`), along with the number of emails ingested, the date window being processed, and a warning if results may be incomplete
 
 **Live Catch-Up (Real-Time Webhook-Driven)**
 

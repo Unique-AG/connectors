@@ -113,7 +113,7 @@ The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, a
 
 6. Previously ingested emails remain in the Unique Knowledge Base and are unaffected. The post-recovery full sync checks each email against the Knowledge Base by file key and skips any that already exist — the only overhead is Microsoft Graph API calls and ingestion API lookups, not actual re-ingestion (see [Idempotent re-ingestion](#idempotent-re-ingestion)).
 
-**See also:** [Authentication](./authentication.md), [Deployment](./deployment.md#database-migration)
+**See also:** [Authentication](./authentication.md), [Deployment](./deployment.md#database-migration), [Security — Encryption](../technical/security.md#microsoft-tokens-encrypted-at-rest)
 
 ---
 
@@ -176,7 +176,7 @@ For deployments with many connected users, calling `restart_full_sync` manually 
 4. **Disable debug mode** — once all users show `fullSyncState: "ready"`, remove `MCP_DEBUG_MODE` and redeploy.
 
 !!! warning "Debug Mode Security"
-    Enabling `MCP_DEBUG_MODE=enabled` exposes debug tools (`restart_full_sync`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`) to **all connected MCP users**, not just operators. Restrict MCP client access during the recovery window. Enabling and disabling debug mode requires a Helm values change and a pod restart (`kubectl rollout restart`). For large deployments, the recovery window may last hours or days depending on user count and mailbox size — plan accordingly.
+    Enabling `MCP_DEBUG_MODE=enabled` exposes debug tools (`restart_full_sync`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`) to **all connected MCP users**, not just operators. There is currently no way to expose debug tools to operators only — the flag is global. **Mitigation:** restrict MCP client access during the recovery window (e.g., via network policies or ingress rules that limit which clients can reach the server). Enabling and disabling debug mode requires a Helm values change and a pod restart (`kubectl rollout restart`). For large deployments, the recovery window may last hours or days depending on user count and mailbox size — plan accordingly.
 
 ---
 

@@ -439,6 +439,11 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
     finished: number;
     inProgress: number;
   } | { state: "error" } | null;
+  debugData?: {                   // only present when MCP_DEBUG_MODE=enabled
+    providerUserId: string;
+    userProfileId: string;
+    subscriptionId: string;
+  } | null;
 }
 ```
 

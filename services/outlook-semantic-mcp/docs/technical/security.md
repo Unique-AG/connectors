@@ -5,6 +5,15 @@
 
 This document describes the security architecture, cryptographic decisions, and threat model for the Outlook Semantic MCP Server.
 
+**Security at a Glance:**
+
+- No email content stored in the MCP server's database — it acts as a secure pass-through to the Unique knowledge base
+- Microsoft OAuth tokens encrypted at rest with AES-256-GCM
+- OAuth 2.1 with mandatory PKCE for all MCP client authentication
+- MCP tokens are 512-bit cryptographically random opaque values with TTL-based expiration
+- Refresh token rotation with family-based revocation detects token theft
+- Webhook notifications validated via `clientState` secret
+
 ## Data Classification and Flow
 
 ### What Is Stored Where
@@ -81,7 +90,7 @@ When a user calls `remove_inbox_connection`, the per-user root scopes are remove
 
 ## Knowledge Base Data Isolation
 
-Each connected user's emails are stored in a **dedicated root scope** within the Unique knowledge base. Scopes are created automatically when the user connects (by `DirectoriesSyncModule`) and are removed when `remove_inbox_connection` is called.
+Each connected user's emails are stored in a **dedicated root scope** (a top-level isolation boundary in the Unique knowledge base that logically separates one user's data from another's) within the Unique knowledge base. Scopes are created automatically when the user connects (by `DirectoriesSyncModule`) and are removed when `remove_inbox_connection` is called.
 
 **Logical isolation:**
 

@@ -105,11 +105,9 @@ An additional 4 tools are available only when the server is running in debug mod
 
 ### Do any permissions require admin consent?
 
-**Answer:** No. All five permissions used by the server are **delegated permissions that do not require admin consent**. Users can connect and grant consent themselves without IT involvement.
+**Answer:** No. All five permissions (`User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`) are **delegated and do not require admin consent**. Users can connect and grant consent themselves without IT involvement.
 
-The permissions are: `User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`.
-
-**See also:** [Permissions](./technical/permissions.md)
+**See also:** [Permissions](./technical/permissions.md) for the full reference with least-privilege justification.
 
 ### Why does the server need `Mail.ReadWrite` if it mostly reads emails?
 
@@ -135,13 +133,9 @@ Delegated permissions also ensure the server can only access emails the signed-i
 
 ### What is the "login flicker" when users reconnect?
 
-**Answer:** When a user who has previously connected calls `reconnect_inbox` or reconnects via the OAuth flow, they may see a brief "flicker" — a rapid redirect sequence through Microsoft's login pages. This is **normal** Microsoft OAuth behavior: Microsoft validates the existing session through rapid OAuth redirects without requiring the user to re-enter credentials or re-approve permissions.
+**Answer:** When reconnecting, users may see a brief "flicker" — a rapid redirect sequence through Microsoft's login pages. This is **normal** Microsoft OAuth behavior. First-time connections show the full consent screen; subsequent reconnections are automatic.
 
-**First-time connection:** The user sees the full Microsoft consent screen and must approve permissions.
-
-**Subsequent reconnections:** The user sees the quick flicker (brief redirect) and is reconnected automatically.
-
-**See also:** [Authentication — User Reconnection Experience](./operator/authentication.md#user-reconnection-experience-the-login-flicker)
+**See also:** [Authentication — User Reconnection Experience](./operator/authentication.md#user-reconnection-experience-the-login-flicker) for details.
 
 ### What happens when a user's Microsoft refresh token expires?
 
@@ -320,7 +314,7 @@ Search results may be incomplete while full sync is in progress. A `syncWarning`
 
 ### Can I attach files when creating a draft email?
 
-**Answer:** Yes. The `create_draft_email` tool accepts attachments as an array of objects with `filename`, `contentType`, and `content` fields. The `content` field accepts:
+**Answer:** Yes. The `create_draft_email` tool accepts attachments as an array of objects with `fileName` and `data` fields. The `data` field accepts:
 
 - A **base64-encoded data URI** (`data:[mediatype];base64,<data>`) — works in all deployment modes
 - A **Unique content URI** (`unique://content/{contentId}`) — only in cluster-local mode we expect the attachment to be in the chat or in knowledge base. In external mode this URI is unresolvable and the attachment will fail.
@@ -351,15 +345,7 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 **Answer:** No. The Outlook Semantic MCP Server stores **no email content** in its own database. Emails are fetched from Microsoft Graph into memory and forwarded directly to the Unique knowledge base for indexing. Nothing from the email body, subject, sender, or recipients is written to the MCP server's PostgreSQL database.
 
-What the MCP server's PostgreSQL database **does** store:
-
-- Encrypted Microsoft OAuth tokens (access + refresh) — used to call Microsoft Graph on your behalf
-- Opaque MCP bearer tokens — used to authenticate tool calls from the AI client
-- Sync state and progress counters — which page of emails has been processed, etc.
-- Outlook folder structure — folder names and IDs only, no message content
-- Microsoft Graph subscription IDs and expiry dates
-
-**See also:** [Data Classification and Flow](./technical/security.md#data-classification-and-flow)
+The MCP server's PostgreSQL database stores only encrypted OAuth tokens, opaque MCP bearer tokens, sync state, folder metadata, and subscription IDs — no email content. See [Data Classification and Flow](./technical/security.md#data-classification-and-flow) for the full breakdown of what is stored where.
 
 ### Where is my email content stored?
 
@@ -415,7 +401,7 @@ Access to the email content itself requires access to the Unique knowledge base,
 - Received date and time
 - Folder Id
 - Microsoft-assigned email ID and web link
-- Attachments: are ingested here is a list of supported attachment types
+- Attachments (supported types listed below — note that supported types depend on the Unique knowledge base ingestion pipeline and may change independently of this service)
 
 ## Supported Email Attachment Types
 
@@ -473,7 +459,7 @@ Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredCon
 **Answer:** Webhook notifications cannot be published to the queue. The webhook controller will fail to enqueue them and return an error to Microsoft. Microsoft will retry the notification. The server will resume processing once RabbitMQ is available and Microsoft retries, but notifications that exceed Microsoft's retry window may be lost.
 
 Full sync is not affected by RabbitMQ availability — it pulls directly from Microsoft Graph.
-Live Catch-Up stalls but once it will run again when RabbitMQ is available sync it will get the missed messages since it uses a paginated approach.
+Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, the 15-minute catch-up cron re-triggers processing, which picks up missed messages by querying from the last watermark.
 
 ### What happens if PostgreSQL is unavailable?
 

@@ -5,13 +5,15 @@
 
 Full sync is the process of ingesting a user's emails from Microsoft Outlook into the Unique knowledge base, scoped to an operator-configured time frame and filtered by sender and content rules. It runs automatically after a user connects their mailbox and is resumable across restarts.
 
+> **Operator summary:** Full sync progresses through states: `ready` → `running` → `waiting-for-ingestion` → `ready`. If it fails, the recovery scheduler retriggers after 20 minutes. Monitor via `sync_progress`. Emails are filtered by `DEFAULT_MAIL_FILTERS` (date, sender, content). See [Stale Sync Recovery](#stale-sync-recovery) for recovery details.
+
 ## What Full Sync Does
 
 1. Fetches the user's emails from Microsoft Graph in paginated batches (newest first)
 2. Applies inbox filters to skip unwanted messages
 3. Uploads each email to the Unique knowledge base for indexing
 4. Tracks progress so it can resume from the last processed page if interrupted
-5. Initializes a watermark so that live catch-up only processes events that happened after the full sync started
+5. Initializes a watermark (a timestamp — `newestLastModifiedDateTime` — marking the most recent email processed, used by live catch-up to fetch only newer emails)
 
 Full sync and live catch-up run concurrently after connection. Live catch-up buffers notifications until the full sync has initialized its watermark — after that, both pipelines ingest independently.
 

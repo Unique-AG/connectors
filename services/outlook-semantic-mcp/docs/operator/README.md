@@ -52,11 +52,12 @@ The Outlook Semantic MCP Server runs as a **single pod** that handles MCP tool r
 Follow these steps to go from zero to a running deployment:
 
 1. **Register Microsoft Entra ID application** — Create an app registration with the required delegated permissions. See [Authentication Guide](./authentication.md).
-2. **Provision infrastructure** — Set up PostgreSQL 17+, RabbitMQ 4+, and a Kubernetes namespace. See [Deployment — Prerequisites](./deployment.md#prerequisites).
-3. **Create Kubernetes secrets** — Generate cryptographic secrets and store them as Kubernetes Secrets. See [Deployment — Required Secrets](./deployment.md#required-secrets).
-4. **Configure Helm values** — Create a minimal `values.yaml` with your secrets, Microsoft client ID, and Unique API endpoints. See [Configuration Guide](./configuration.md).
-5. **Deploy with Helm** — Install the chart. See [Deployment — Install](./deployment.md#install).
-6. **Verify** the deployment is working:
+2. **Create Zitadel service account** — Create a service user with the `KB_Admin` role in Zitadel. Required for both `cluster_local` and `external` auth modes. See [Zitadel Service Account](./configuration.md#zitadel-service-account).
+3. **Provision infrastructure** — Set up PostgreSQL 17+, RabbitMQ 4+, and a Kubernetes namespace. See [Deployment — Prerequisites](./deployment.md#prerequisites).
+4. **Create Kubernetes secrets** — Generate cryptographic secrets and store them as Kubernetes Secrets. See [Deployment — Required Secrets](./deployment.md#required-secrets).
+5. **Configure Helm values** — Create a minimal `values.yaml` with your secrets, Microsoft client ID, and Unique API endpoints. See [Configuration Guide](./configuration.md).
+6. **Deploy with Helm** — Install the chart. See [Deployment — Install](./deployment.md#install).
+7. **Verify** the deployment is working:
    1. Check the OAuth metadata endpoint: `curl https://<your-domain>/.well-known/oauth-authorization-server`
    2. Connect with an MCP client and complete the OAuth flow
    3. Call `verify_inbox_connection` to confirm the webhook subscription is `active`
@@ -116,7 +117,7 @@ Before going to production, verify the following:
 - [ ] Log aggregation in place (tokens are not logged)
 - [ ] Monitoring alerts configured for authentication failures
 
-For the full security architecture, see [Security Documentation](../technical/security.md).
+For the full security architecture, see [Security Documentation](../technical/security.md). For a breakdown of what data is stored where, see [Data Classification and Flow](../technical/security.md#data-classification-and-flow).
 
 ## Scaling Considerations
 
