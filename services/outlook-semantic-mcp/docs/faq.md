@@ -67,7 +67,7 @@
 
 **What it does:**
 
-- Automatically ingests the user's email history into the Unique knowledge base after connection, based on the configured filters (folder, date range, sender/recipient)
+- Automatically ingests the user's email history into the Unique knowledge base after connection, based on the configured filters
 - Exposes 10 tools (plus 4 debug-mode tools) for searching emails, managing drafts, listing folders, and monitoring sync status
 - Keeps the knowledge base up to date in real time via webhook-driven live catch-up
 - Requires no manual setup beyond the initial connection
