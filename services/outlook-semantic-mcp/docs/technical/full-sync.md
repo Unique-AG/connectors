@@ -102,7 +102,7 @@ Each sync attempt generates a new `fullSyncVersion` UUID. All state-modifying da
 
 ## Inbox Filters
 
-Filters control which emails are ingested. They are set globally via the `DEFAULT_MAIL_FILTERS` environment variable and applied to all users at deployment time.
+Filters control which emails are ingested. They are set globally via the `DEFAULT_MAIL_FILTERS` environment variable and applied to all users at deployment time. The `ignoredBefore` field is required — without it, the application will not start. See [Configuration](../operator/configuration.md#application-configuration) for the full reference.
 
 | Filter | Type | Applied Where | Description |
 |--------|------|--------------|-------------|

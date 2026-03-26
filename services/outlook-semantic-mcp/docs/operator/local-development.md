@@ -41,7 +41,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The server starts at the configured port (default: `9542`).
+The server starts at the configured port (default: `9542`). Note: in Kubernetes deployments, the Helm chart maps container port `9542` to service port `51345` — this mapping does not apply locally.
 
 ## Infrastructure Setup
 
@@ -112,6 +112,8 @@ UNIQUE_ZITADEL_PROJECT_ID=<zitadel-project-id>
 ```
 
 ### Generating Secrets
+
+See [Configuration — Required Secrets](./configuration.md#required-secrets) for the full format reference. Quick generation:
 
 ```bash
 # For MICROSOFT_WEBHOOK_SECRET (128 chars)

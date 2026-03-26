@@ -65,15 +65,7 @@ Follow these steps to go from zero to a running deployment:
 
 ## Infrastructure Requirements
 
-For detailed infrastructure setup, see [Deployment — Prerequisites](./deployment.md#prerequisites).
-
-| Component | Requirement | Notes |
-|-----------|-------------|-------|
-| **Kubernetes** | 1.25+ | Any Kubernetes distribution |
-| **PostgreSQL** | 17+ | Managed service recommended |
-| **RabbitMQ** | 4+ | With management plugin |
-| **Ingress Controller** | Kong 3+ recommended | Handles ingress and TLS termination. Kong is the default but any ingress controller that supports the required routing will work. |
-| **DNS** | Public hostname | Required for Microsoft webhook callbacks |
+See [Deployment — Prerequisites](./deployment.md#prerequisites) for the full infrastructure requirements and version details.
 
 ## Deployment Checklist
 
@@ -108,9 +100,10 @@ For detailed infrastructure setup, see [Deployment — Prerequisites](./deployme
 
 Before going to production, verify the following:
 
-- [ ] `ENCRYPTION_KEY` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
-- [ ] `AUTH_HMAC_SECRET` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
-- [ ] `MICROSOFT_WEBHOOK_SECRET` is a cryptographically random 128-character string (`openssl rand -hex 64`)
+- [ ] `ENCRYPTION_KEY` is a cryptographically random 64-character hex string
+- [ ] `AUTH_HMAC_SECRET` is a cryptographically random 64-character hex string
+- [ ] `MICROSOFT_WEBHOOK_SECRET` is a cryptographically random 128-character string
+- [ ] See [Configuration — Required Secrets](./configuration.md#required-secrets) for generation commands and format details
 - [ ] All secrets stored in Kubernetes Secrets (not ConfigMaps)
 - [ ] TLS termination configured at ingress
 - [ ] Network policies restrict pod-to-pod communication

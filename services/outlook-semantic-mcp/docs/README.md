@@ -13,6 +13,12 @@
 
     Pre-release software is intended for evaluation and testing purposes only. Do not rely on this software for production workloads without understanding these limitations.
 
+## Getting Started
+
+- **IT Operators:** Start with the [Operator Guide](./operator/README.md) for deployment, configuration, and operations
+- **Technical Reference:** See the [Technical Reference](./technical/README.md) for architecture, flows, and design decisions
+- **FAQ:** See the [FAQ](./faq.md) for common questions
+
 ## Overview
 
 The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and manage folders through 10 MCP tools (plus 4 additional debug-mode tools).
@@ -74,7 +80,7 @@ All permissions are **Delegated** (not Application): `User.Read`, `Mail.ReadWrit
 **Contact Lookup**
 
 - Search the user's Microsoft contacts directory via `lookup_contacts`
-- Returns display names, email addresses, and job titles for address resolution
+- Returns display names and email addresses for address resolution
 
 **Mailbox Utilities**
 

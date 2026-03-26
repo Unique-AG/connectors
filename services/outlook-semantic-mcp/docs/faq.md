@@ -187,11 +187,11 @@ This must match exactly — including protocol, domain, and path — in both the
 
 ### What does `DEFAULT_MAIL_FILTERS` do?
 
-**Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during full sync. It supports three filters: `ignoredBefore` (ISO 8601 date cutoff), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
+**Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during full sync. It supports three filters: `ignoredBefore` (ISO 8601 date cutoff — required, the application will not start without it), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
 
-When the filters are updated and the service is redeployed, all user inbox configurations are updated. The next full sync uses the new filters. Previously ingested emails that would now be filtered are not automatically removed.
+When the filters are updated and the service is redeployed, all user inbox configurations are updated. The next full sync uses the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Inbox Filters](./technical/full-sync.md#inbox-filters) for the full filter reference.
 
-**See also:** [Inbox Filters](./technical/full-sync.md#inbox-filters) for the full filter reference — [Configuration](./operator/configuration.md)
+**See also:** [Configuration](./operator/configuration.md)
 
 ## Sync
 
@@ -335,9 +335,7 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 ### What does `remove_inbox_connection` do?
 
-**Answer:** `remove_inbox_connection` permanently removes the user's inbox connection: it deletes the Microsoft Graph subscription, removes all folder data and root scopes from the Unique knowledge base (which also removes all ingested email content for that user), and clears the inbox configuration.
-
-**See also:** [Subscription Management](./technical/subscription-management.md#remove_inbox_connection)
+**Answer:** `remove_inbox_connection` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Subscription Management — remove_inbox_connection](./technical/subscription-management.md#remove_inbox_connection) for the full list of what is removed.
 
 ## Data Privacy & Storage
 
@@ -351,7 +349,7 @@ The MCP server's PostgreSQL database stores only encrypted OAuth tokens, opaque 
 
 **Answer:** Email content (subject, body, sender, recipients, and metadata) is stored in the **Unique knowledge base**, not in the MCP server itself. It is indexed there for semantic search and is accessible via the `search_emails` tool.
 
-The Unique knowledge base organizes each user's emails into a dedicated root scope — logically separating one user's data from another's within the platform.
+The Unique knowledge base organizes each user's emails into a dedicated **root scope** (a top-level isolation boundary that logically separates one user's ingested data from another's within the Unique platform).
 
 **See also:** [Knowledge Base Data Isolation](./technical/security.md#knowledge-base-data-isolation)
 
@@ -458,7 +456,7 @@ Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredCon
 
 **Answer:** Webhook notifications cannot be published to the queue. The webhook controller will fail to enqueue them and return an error to Microsoft. Microsoft will retry the notification. The server will resume processing once RabbitMQ is available and Microsoft retries, but notifications that exceed Microsoft's retry window may be lost.
 
-Full sync is not affected by RabbitMQ availability — it pulls directly from Microsoft Graph.
+Full sync fetches emails directly from Microsoft Graph, but relies on RabbitMQ for inter-batch orchestration — without RabbitMQ, in-progress full syncs complete their current batch but no new batches are triggered. See [Disaster Recovery — Scenario 2](./operator/disaster-recovery.md#scenario-2-rabbitmq-loss) for details.
 Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, the 15-minute catch-up cron re-triggers processing, which picks up missed messages by querying from the last watermark.
 
 ### What happens if PostgreSQL is unavailable?

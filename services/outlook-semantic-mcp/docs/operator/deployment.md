@@ -11,9 +11,11 @@ Before deploying the Outlook Semantic MCP Server, ensure you have:
 - Helm 3.x installed
 - PostgreSQL 17+ database
 - RabbitMQ 4+ instance
-- Kong Gateway 3+ with public access configured
+- Kong Gateway 3+ with public access configured (Kong is the default but any ingress controller that supports the required routing will work)
 - Microsoft Entra ID app registration ([Authentication Guide](./authentication.md))
 - Public DNS hostname for webhook callbacks
+
+**Port mapping:** The Helm chart maps container port `9542` to service port `51345`. Network policies, ingress rules, and probes reference `51345`, not `9542`. See [Configuration — Application Configuration](./configuration.md#application-configuration) for details.
 
 ## Helm Chart
 

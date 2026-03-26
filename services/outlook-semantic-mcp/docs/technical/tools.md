@@ -6,7 +6,7 @@
 The Outlook Semantic MCP Server exposes 10 MCP tools available to all users, plus 4 debug-mode tools only exposed when `MCP_DEBUG_MODE=enabled` is set on the server.
 
 !!! warning "Debug-Mode Tools"
-    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_DEBUG_MODE=enabled`** is configured. They are intended for operators diagnosing sync issues — they do not appear in the tool list for standard deployments.
+    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_DEBUG_MODE=enabled`** is configured. They are intended for operators diagnosing sync issues — they do not appear in the tool list for standard deployments. **Note:** Debug mode exposes these tools to **all** connected MCP users, not just operators. Do not leave enabled in production.
 
 ## Tool Overview
 
