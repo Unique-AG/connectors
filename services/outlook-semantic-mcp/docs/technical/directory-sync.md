@@ -38,7 +38,7 @@ sequenceDiagram
     DirectoriesSync->>MSGraph: GET /me/mailFolders (full list)
     MSGraph->>DirectoriesSync: All folders with IDs, display names, parent IDs
     DirectoriesSync->>DB: Store folder tree in directories table
-    DirectoriesSync->>UniqueKB: Register root scopes for synced folders
+    DirectoriesSync->>UniqueKB: Register root for user to store emails
 
     Note over DirectoriesSync,DB: Ongoing delta sync (every 5 minutes)
     DirectoriesSync->>MSGraph: GET /me/mailFolders/delta?$deltaToken={token}

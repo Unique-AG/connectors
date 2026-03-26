@@ -19,7 +19,6 @@ sequenceDiagram
     participant Controller as Webhook Controller
     participant AMQP as RabbitMQ
     participant Consumer as Live Catch-Up Consumer
-    participant Ingestion as Ingestion Queue
     participant DB as PostgreSQL
     participant UniqueKB as Unique Knowledge Base
 
@@ -34,17 +33,15 @@ sequenceDiagram
     Note over AMQP,UniqueKB: Stage 2 — Ingestion (async)
     AMQP->>Consumer: Deliver message
     Consumer->>DB: Acquire lock on inbox_configurations row
-    alt liveCatchUpState = running (another consumer active)
-        Consumer->>DB: Buffer messageIds in pendingLiveMessageIds
-    else Watermark not yet set
+
+    alt liveCatchUpState = running OR watermark not yet set
         Consumer->>DB: Buffer messageIds in pendingLiveMessageIds
     else liveCatchUpState = ready
         Consumer->>DB: Set liveCatchUpState = running
         Consumer->>MSGraph: GET /me/messages?$filter=lastModifiedDateTime ge {watermark}
-        MSGraph->>Consumer: New messages
-        Note over Consumer,Ingestion: Consumer acts as producer — publishes<br/>each message to the ingestion queue
-        Consumer->>Ingestion: Publish mail-event per message
-        AMQP->>UniqueKB: Ingest each email into knowledge base
+        MSGraph->>Consumer: New/modified messages since watermark
+        Consumer->>AMQP: Publish mail-event per message to ingestion queue
+        AMQP->>UniqueKB: Ingestion consumer uploads each email
         Consumer->>DB: Update newestLastModifiedDateTime watermark
         Consumer->>DB: Flush pendingLiveMessageIds, set liveCatchUpState = ready
     end

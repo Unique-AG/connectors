@@ -56,12 +56,16 @@ Removes the mailbox connection entirely:
 
 Because the root scope is removed, all previously ingested email content for that user is also removed from the Unique knowledge base. To resume ingestion, call `reconnect_inbox`.
 
-## Recovery
+## Subscription Failure Handling
 
-| Condition | Recovery |
-|-----------|---------|
-| `subscriptionRemoved` lifecycle event | Subscription and inbox_configurations deleted; user must call `reconnect_inbox` |
-| `reauthorizationRequired` lifecycle event | Server automatically renews the subscription |
+Microsoft Graph sends lifecycle notifications when a subscription's state changes. The server handles these automatically where possible — manual user action is only required when the subscription is irrecoverably removed.
+
+| Condition | What Happens | User Action Required? |
+|-----------|-------------|----------------------|
+| `reauthorizationRequired` lifecycle event | Server automatically PATCHes the subscription with a new expiration time | No |
+| `subscriptionRemoved` lifecycle event | Subscription and `inbox_configurations` records are deleted — live catch-up and full sync stop | Yes — user must call `reconnect_inbox` |
+| Subscription expired (missed renewal) | `verify_inbox_connection` reports `expired`; no notifications are received | Yes — user must call `reconnect_inbox` |
+| No subscription exists | `verify_inbox_connection` reports `not_configured` | Yes — user must call `reconnect_inbox` |
 
 ## Related Documentation
 
