@@ -426,7 +426,20 @@ Access to the email content itself requires access to the Unique knowledge base,
 - Received date and time
 - Folder location
 - Microsoft-assigned email ID and web link
-- Attachments: **All file **
+- Attachments: are ingested here is a list of supported attachment types
+
+## Supported Email Attachment Types
+
+### Documents
+- **PDF** (`.pdf`)
+- **Word** (`.doc`, `.docx`, `.dotx`)
+- **PowerPoint** (`.ppt`, `.pptx`)
+
+### Text-based
+- **Plain text** (`.txt`)
+- **HTML** (`.html`, `.htm`)
+- **Markdown** (`.md`)
+
 
 Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredContents`) are never ingested.
 
