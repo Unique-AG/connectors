@@ -145,9 +145,6 @@ flowchart LR
 
     subgraph Server["Outlook Semantic MCP"]
         App["NestJS App"]
-    end
-
-    subgraph Infra["Infrastructure"]
         PG["PostgreSQL"]
         MQ["RabbitMQ"]
     end
