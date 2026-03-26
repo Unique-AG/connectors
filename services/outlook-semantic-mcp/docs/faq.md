@@ -187,9 +187,9 @@ This must match exactly — including protocol, domain, and path — in both the
 
 ### What does `DEFAULT_MAIL_FILTERS` do?
 
-**Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during full sync. It supports three filters: `ignoredBefore` (ISO 8601 date cutoff — required, the application will not start without it), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
+**Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `ignoredBefore` (ISO 8601 date cutoff — required, the application will not start without it), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
 
-When the filters are updated and the service is redeployed, all user inbox configurations are updated. The next full sync uses the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Inbox Filters](./technical/full-sync.md#inbox-filters) for the full filter reference.
+When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Inbox Filters](./technical/full-sync.md#inbox-filters) for the full filter reference.
 
 **See also:** [Configuration](./operator/configuration.md)
 
