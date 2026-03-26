@@ -142,10 +142,10 @@ mcpConfig:
       x-company-id: "<your-company-id>"
       x-user-id: "<your-service-account-user-id>"
 
-  # IMPORTANT: Adjust `ignoredBefore` to control how far back the initial email sync goes.
-  # Setting this date far in the past (or omitting it) can cause very large initial syncs
-  # for users with large mailboxes, potentially taking hours and consuming significant
-  # Microsoft Graph API quota. Without this value, the Helm default of 2025-06-06 applies.
+  # IMPORTANT: `ignoredBefore` is mandatory — the application will not start without it.
+  # Adjust it to control how far back the initial email sync goes. Setting this date far
+  # in the past can cause very large initial syncs for users with large mailboxes,
+  # potentially taking hours and consuming significant Microsoft Graph API quota.
   defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
 ```
 
