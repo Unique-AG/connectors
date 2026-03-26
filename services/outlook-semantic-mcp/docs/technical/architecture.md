@@ -40,9 +40,7 @@ flowchart LR
     SyncPipeline <-->|"Async processing"| MQ
     SyncPipeline -->|"Ingest"| UniqueKB
 
-    AuthLayer --> DB
-    McpTools --> DB
-    SyncPipeline --> DB
+    OutlookMCP --> DB
 ```
 
 ## System Components
