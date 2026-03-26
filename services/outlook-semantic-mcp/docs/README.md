@@ -17,7 +17,7 @@
 
 The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and manage folders through 10 MCP tools (plus 4 additional debug-mode tools).
 
-**Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and filters) into the Unique knowledge base in the background.
+**Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./technical/full-sync.md#inbox-filters)) into the Unique knowledge base in the background.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
@@ -112,7 +112,6 @@ For the complete permissions reference, see [Permissions](technical/permissions.
 - RabbitMQ message queue for asynchronous webhook processing
 - Dead Letter Exchange (DLX) for failed message inspection and retry
 - Meets Microsoft's strict webhook response requirements (< 10 seconds)
-- See [Live Catch-Up Documentation](./technical/live-catchup.md) for details
 
 **Observability**
 
@@ -252,7 +251,7 @@ See [Authentication Architecture](./technical/architecture.md) for details.
 
 | Constraint | Details |
 |------------|---------|
-| **Delegated access scope** | Server can only access mail and contacts the signed-in user can access; no cross-mailbox or shared mailbox access beyond user permissions |
+| **Delegated access scope** | Server syncs and searches only the signed-in user's own inbox (what Microsoft Graph `/me/messages` returns) |
 | **Draft only, no direct send** | `create_draft_email` creates drafts; sending requires a separate action by the user or a future tool |
 
 ### Scaling Considerations

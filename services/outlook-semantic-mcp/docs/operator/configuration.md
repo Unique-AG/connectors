@@ -241,10 +241,19 @@ After creating the service user, note the following values for configuration:
 
 ### Service Account Permissions
 
-The service account must have the following Unique platform permissions:
+The service account must be assigned the **`KB_Admin`** (Knowledge Base Admin) Gatekeeper role. This is the minimum role that grants all permissions the MCP server needs:
 
-- **Ingestion**: permission to submit content to the ingestion service (`UNIQUE_INGESTION_SERVICE_BASE_URL`)
-- **Scope management**: permission to create and manage scopes via the scope management service (`UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL`)
+| Resource | Required Permissions | Used For |
+|----------|---------------------|----------|
+| `CONTENT` | `READ`, `WRITE`, `DELETE` | Ingesting, updating, and removing email content via the ingestion service |
+| `SCOPE` | `READ`, `WRITE` | Creating and managing Knowledge Base scopes via the scope management service |
+| `SCOPE_ACCESS` | `READ`, `WRITE` | Managing user access to scopes |
+| `FOLDER` | `READ`, `WRITE`, `DELETE` | Managing Knowledge Base folders |
+
+The `KB_Admin` role covers all of the above. Using a broader role such as `Company_Admin` also works but grants unnecessary privileges.
+
+!!! note "Gatekeeper enforcement"
+    Even though the MCP server identifies itself as `outlook-semantic-mcp` via the `x-service-id` header, the Gatekeeper authorization checks are enforced against the service user specified by `x-user-id` (in `cluster_local` mode) or the Zitadel client credentials (in `external` mode). The service user must have the `KB_Admin` role assigned in the Gatekeeper, otherwise API calls to the ingestion and scope management services will be rejected.
 
 ## Mail Filters
 

@@ -229,7 +229,7 @@ Search results are incomplete while `fullSyncState` is `running` or `waiting-for
 
 ### Why is my full sync stuck in `waiting-for-ingestion`?
 
-**Answer:** Full sync enters `waiting-for-ingestion` after uploading all email batches and waits for the Unique knowledge base to confirm all queued messages are processed. Because live catch-up uploads its own batches to the same ingestion queue, high live catch-up activity extends the time full sync spends in this state. This is normal behavior.
+**Answer:** Full sync enters `waiting-for-ingestion` after uploading all email batches and waits for the Unique knowledge base to confirm that almost all queued messages are processed. Because live catch-up uploads its own batches to the same ingestion queue, high live catch-up activity extends the time full sync spends in this state. This is normal behavior.
 
 If the sync has been in `waiting-for-ingestion` with a stale heartbeat for more than 5 minutes, the recovery scheduler will automatically re-trigger the ingestion check.
 
@@ -413,7 +413,7 @@ Access to the email content itself requires access to the Unique knowledge base,
 - Sender (name and email address)
 - To, CC, and BCC recipients
 - Received date and time
-- Folder location
+- Folder Id
 - Microsoft-assigned email ID and web link
 - Attachments: are ingested here is a list of supported attachment types
 
@@ -473,6 +473,7 @@ Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredCon
 **Answer:** Webhook notifications cannot be published to the queue. The webhook controller will fail to enqueue them and return an error to Microsoft. Microsoft will retry the notification. The server will resume processing once RabbitMQ is available and Microsoft retries, but notifications that exceed Microsoft's retry window may be lost.
 
 Full sync is not affected by RabbitMQ availability — it pulls directly from Microsoft Graph.
+Live Catch-Up stalls but once it will run again when RabbitMQ is available sync it will get the missed messages since it uses a paginated approach.
 
 ### What happens if PostgreSQL is unavailable?
 
@@ -491,7 +492,7 @@ Full sync is not affected by RabbitMQ availability — it pulls directly from Mi
 **Answer:** Recovery depends on which component was lost:
 
 - **Local PostgreSQL DB loss** — all stored OAuth tokens and sync state are gone; every user must re-authenticate via `reconnect_inbox`.
-- **RabbitMQ loss** — both in-progress full syncs and live catch-up are stalled; no re-authentication is needed. Live catch-up resumes automatically once RabbitMQ is restored; stalled full syncs require `restart_full_sync` per affected user.
+- **RabbitMQ loss** — both in-progress full syncs and live catch-up are stalled; no re-authentication is needed. Live catch-up resumes automatically once RabbitMQ is restored but message waiting in the queue are lost; `restart_full_sync` would fix the issues it has to be run per affected user.
 - **Unique Knowledge Base loss** — ingested email content must be re-ingested; trigger `restart_full_sync` for each affected user. No re-authentication is needed.
 
 **See also:** [Disaster Recovery Runbook](./operator/disaster-recovery.md)

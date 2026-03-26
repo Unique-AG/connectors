@@ -104,14 +104,25 @@ Email scopes created by the MCP server are not visible in the Unique Knowledge B
 
 ## Security Layers
 
-Requests pass through each layer from top to bottom. Each layer must pass before the next is reached.
+### Webhook Requests
+
+Webhook requests pass through each layer from top to bottom. Each layer must pass before the next is reached.
+
+| Layer | Mechanism | Protects Against |
+|-------|-----------|------------------|
+| **Transport** | TLS 1.2+ via Kong Gateway | Eavesdropping, man-in-the-middle |
+| **Rate Limiting** | IP-based throttling at ingress layer (e.g., Kong) | Brute-force, abuse |
+| **Webhook Integrity** | `clientState` validation | Forged webhook notifications |
+
+### MCP Requests
+
+MCP requests pass through each layer from top to bottom. Each layer must pass before the next is reached.
 
 | Layer | Mechanism | Protects Against |
 |-------|-----------|------------------|
 | **Transport** | TLS 1.2+ via Kong Gateway | Eavesdropping, man-in-the-middle |
 | **Rate Limiting** | IP-based throttling at ingress layer (e.g., Kong) | Brute-force, abuse |
 | **Authentication** | OAuth 2.1 + PKCE | Unauthorized access, authorization code interception |
-| **Webhook Integrity** | `clientState` validation | Forged webhook notifications |
 | **Session Integrity** | HMAC-SHA256 on OAuth session state | Session hijacking via forged callbacks |
 | **Token Design** | 512-bit cryptographically random opaque values | Token guessing |
 | **Data at Rest** | AES-256-GCM encryption for Microsoft tokens | Token theft from database |

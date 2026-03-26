@@ -53,7 +53,7 @@ stateDiagram-v2
 |-------|---------|
 | `ready` | Idle — no sync running. A 5-minute cooldown prevents immediate re-trigger after completion. |
 | `running` | Actively fetching pages from Microsoft Graph and uploading to Unique KB |
-| `waiting-for-ingestion` | All batches uploaded; waiting for the Unique ingestion service to confirm processing |
+| `waiting-for-ingestion` | All batches uploaded; waiting for the Unique ingestion service to confirm that almost all queued messages are processed |
 | `paused` | Manually paused via `pause_full_sync` (debug mode only) |
 | `failed` | An error occurred; recovery scheduler will re-trigger after 20 minutes |
 
@@ -86,7 +86,7 @@ sequenceDiagram
 
     FullSync->>DB: Set state=waiting-for-ingestion
     FullSync->>UniqueKB: Poll ingestion stats (max 10 concurrent)
-    UniqueKB->>FullSync: All messages processed
+    UniqueKB->>FullSync: Almost all messages processed
     FullSync->>DB: Set state=ready, record fullSyncLastRunAt
 ```
 
@@ -156,7 +156,7 @@ The scheduler publishes a `full-sync.retrigger` event which the full sync consum
 Full sync and live catch-up run **concurrently** after a user connects. They are independent pipelines that both contribute to the Unique knowledge base ingestion queue.
 
 - **Watermark initialisation**: Full sync initializes `newestLastModifiedDateTime` (the watermark) at the start of the first sync run. Once initialized, live catch-up can use it for delta queries and both pipelines ingest in parallel.
-- **Impact on `waiting-for-ingestion`**: When full sync finishes uploading all its batches, it enters `waiting-for-ingestion` and waits for the Unique KB to confirm all queued messages are processed. Because live catch-up is uploading its own batches to the same ingestion queue, full sync may remain in `waiting-for-ingestion` longer when live catch-up activity is high.
+- **Impact on `waiting-for-ingestion`**: When full sync finishes uploading all its batches, it enters `waiting-for-ingestion` and waits for the Unique KB to confirm that almost all queued messages are processed. Because live catch-up is uploading its own batches to the same ingestion queue, full sync may remain in `waiting-for-ingestion` longer when live catch-up activity is high.
 - **Watermark ownership**: Once full sync has initialized the watermarks, live catch-up takes ownership of `newestLastModifiedDateTime` and updates it on every notification going forward.
 
 ## Related Documentation
