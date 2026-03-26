@@ -30,7 +30,7 @@ sequenceDiagram
     OutlookMCP->>EntraID: Exchange code for Microsoft tokens
     EntraID->>OutlookMCP: Access token + refresh token
     OutlookMCP->>DB: Encrypt and store Microsoft tokens in user_profiles
-    OutlookMCP->>DB: Store MCP token (hashed) in tokens table
+    OutlookMCP->>DB: Store MCP token in tokens table
     OutlookMCP->>AMQP: Publish user-authorized event
     OutlookMCP->>MCPClient: Issue opaque MCP bearer token
 ```
@@ -111,14 +111,7 @@ sequenceDiagram
     OutlookMCP->>DB: Delete subscription and inbox_configurations records
 ```
 
-**Subscription states** (as returned by `verify_inbox_connection`):
-
-| State | Meaning |
-|-------|---------|
-| `active` | Subscription exists and is not near expiry |
-| `expiring_soon` | Subscription expires within 15 minutes |
-| `expired` | Subscription has expired; call `reconnect_inbox` |
-| `not_configured` | No subscription exists for this user |
+**Subscription states:** See [Subscription Management — Subscription Status](./subscription-management.md#subscription-status) for the full status reference.
 
 **Key points:**
 
@@ -128,47 +121,16 @@ sequenceDiagram
 
 ## Live Catch-Up: Webhook-Driven Email Ingestion
 
-When a new email arrives in the user's Outlook mailbox, Microsoft Graph sends a webhook notification:
+When a new email arrives in the user's Outlook mailbox, Microsoft Graph sends a webhook notification. The server enqueues the notification in RabbitMQ and returns `202 Accepted` immediately, then processes it asynchronously.
 
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-sequenceDiagram
-    autonumber
-    participant MSGraph as Microsoft Graph API
-    participant OutlookMCP as Outlook Semantic MCP Server
-    participant AMQP as RabbitMQ
-    participant Consumer as Live Catch-Up Consumer
-    participant DB as PostgreSQL
-    participant UniqueKB as Unique Knowledge Base
-
-    MSGraph->>OutlookMCP: POST /mail-subscription/notification
-    OutlookMCP->>OutlookMCP: Validate clientState secret
-    OutlookMCP->>OutlookMCP: Filter out deleted notifications
-    OutlookMCP->>OutlookMCP: Group message IDs by subscriptionId
-    OutlookMCP->>AMQP: Publish live-catch-up.execute (subscriptionId, messageIds)
-    OutlookMCP->>MSGraph: 202 Accepted
-
-    AMQP->>Consumer: Deliver message
-    Consumer->>DB: Acquire lock on inbox_configurations row
-    alt Another live catch-up already running
-        Consumer->>DB: Buffer messageIds in pendingLiveMessageIds
-    else Watermark not yet set (full sync not started)
-        Consumer->>DB: Buffer messageIds in pendingLiveMessageIds
-    else Ready
-        Consumer->>DB: Read watermark (newestLastModifiedDateTime)
-        Consumer->>MSGraph: GET /me/messages?$filter=lastModifiedDateTime ge {watermark}
-        MSGraph->>Consumer: Batch of new messages
-        Consumer->>UniqueKB: Ingest email content
-        Consumer->>DB: Update watermark + flush any buffered pending messages
-    end
-```
+For the detailed sequence diagram and full technical description, see [Live Catch-Up](./live-catchup.md).
 
 **Key points:**
 
 - Microsoft requires a response within 10 seconds (Microsoft limit, not configurable). The server enqueues the notification immediately and returns `202 Accepted` — actual email processing happens asynchronously.
 - Buffering applies when another live catch-up consumer is already processing, or when the watermark has not been set yet (full sync has not started). Messages are flushed once the blocker clears.
 - The watermark (`newestLastModifiedDateTime`) is **initialized by full sync** the first time it runs and **maintained by live catch-up** on every subsequent notification.
-- `deleted` change notifications are discarded. Deletions are handled in two ways: when an entire folder is deleted, directory sync detects it via delta sync; when an individual email is deleted, the user first moves it to a folder marked `ignoreForSync` (e.g. Deleted Items), which generates a `created` event for that folder — the server detects the email is in an ignored folder on that `created` event and removes it from the knowledge base.
+- `deleted` change notifications are discarded. Deletions are handled by [directory sync](./directory-sync.md) and by detecting emails moved to ignored folders.
 
 ## Full Sync: Historical Email Ingestion
 
@@ -204,15 +166,7 @@ sequenceDiagram
     FullSync->>DB: Set state=ready (sync complete)
 ```
 
-**Full sync states:**
-
-| State | Meaning |
-|-------|---------|
-| `running` | Actively fetching and uploading email batches |
-| `waiting-for-ingestion` | All batches uploaded; waiting for Unique KB to confirm |
-| `paused` | Manually paused (debug mode only) |
-| `failed` | Error occurred; check `sync_progress` for details |
-| `ready` | Sync complete or not yet started |
+**Full sync states:** See [Full Sync — Sync States](./full-sync.md#sync-states) for the complete state reference.
 
 **Key points:**
 
@@ -227,42 +181,13 @@ sequenceDiagram
 
 The server continuously syncs the user's Outlook folder structure from Microsoft Graph. This serves two purposes: enabling folder-based search filtering via the `list_folders` tool, and tracking email movement between folders to handle "deleted" emails without relying on delete notifications.
 
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-sequenceDiagram
-    autonumber
-    participant OutlookMCP as Outlook Semantic MCP Server
-    participant MSGraph as Microsoft Graph API
-    participant DB as PostgreSQL
-    participant UniqueKB as Unique Knowledge Base
+For the detailed sequence diagram and full technical description, see [Directory Sync](./directory-sync.md).
 
-    Note over OutlookMCP,DB: Initial sync after user connects
-    OutlookMCP->>MSGraph: GET /me/mailFolders (full list)
-    MSGraph->>OutlookMCP: All folders with IDs and display names
-    OutlookMCP->>DB: Store folder tree in directories table
-    OutlookMCP->>UniqueKB: Register root scopes for synced folders
+**Key points:**
 
-    Note over OutlookMCP,DB: Ongoing delta sync (periodic)
-    OutlookMCP->>MSGraph: GET /me/mailFolders/delta?$deltaToken={token}
-    MSGraph->>OutlookMCP: Changed folders since last sync
-    OutlookMCP->>DB: Update directories table + store new deltaLink
-
-    Note over OutlookMCP,DB: Email moved to unsynced folder (e.g. Deleted Items)
-    OutlookMCP->>DB: Detect email now in ignored folder
-    OutlookMCP->>UniqueKB: Remove email from knowledge base
-```
-
-**Why directory sync exists:**
-
-Microsoft Graph does not provide a direct "email deleted" change notification for permanently deleted messages. Instead the server tracks the folder each email belongs to:
-
-- Folders such as Deleted Items and Junk Email are excluded from sync (`ignoreForSync = true` in the `directories` table).
-- When the delta sync detects that an email has moved into an excluded folder, the server removes it from the Unique knowledge base.
-- When an email is permanently deleted, it has already been removed from Unique when it was moved to Deleted Items.
-
-**Search integration:**
-
-The `list_folders` tool returns the folder tree synced here. The folder IDs it returns can be passed as a `folderId` filter to `search_emails` to narrow results to a specific mailbox folder.
+- Directory sync runs on a 5-minute schedule using Graph delta queries, plus on-demand at the start of each full sync and live catch-up execution.
+- Folders such as Deleted Items and Junk Email are excluded from sync (`ignoreForSync = true`). When an email is moved to an excluded folder, it is removed from the knowledge base.
+- The `list_folders` tool returns the folder tree synced here. The folder IDs it returns can be passed in the `conditions[].directories` field of `search_emails` to narrow results to a specific mailbox folder.
 
 ## Email Draft Creation Flow
 

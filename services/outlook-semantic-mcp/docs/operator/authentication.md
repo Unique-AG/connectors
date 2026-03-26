@@ -19,6 +19,8 @@ For technical details about the OAuth flow and why client credentials are requir
 
 Use the provided Terraform module:
 
+> **Prerequisite:** Assumes an existing Azure Key Vault resource (referenced as `azurerm_key_vault.main` below). The Terraform module writes the client secret to Key Vault automatically.
+
 ```hcl
 module "outlook_semantic_mcp_app" {
   source = "./deploy/terraform/azure/outlook-semantic-mcp-entra-application"
@@ -90,17 +92,11 @@ module "outlook_semantic_mcp_app" {
 
 ## Required Permissions
 
-All permissions are **delegated**, meaning they act on behalf of the signed-in user. See [Microsoft Graph Permissions](../technical/permissions.md) for the complete list with justifications.
-
-| Permission | Purpose |
-|------------|---------|
-| `User.Read` | Resolve user identity and profile |
-| `Mail.ReadWrite` | Read emails for sync and search; create draft emails in the user's mailbox |
-| `MailboxSettings.Read` | Read mailbox settings and folder structure |
-| `People.Read` | Look up contacts and people |
-| `offline_access` | Obtain refresh tokens for background sync |
+All permissions are **delegated**, meaning they act on behalf of the signed-in user: `User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`.
 
 **None of these permissions require admin consent** — all are user-consented. However, organisations may still choose to pre-grant admin consent for a smoother user onboarding experience.
+
+For the complete permissions reference with justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
 
 ## Understanding Microsoft Consent Flows
 
@@ -131,7 +127,7 @@ For detailed explanation, see [Microsoft Graph Permissions - Understanding Conse
 
 **First-time connection:** User sees full Microsoft consent screen and approves permissions.
 
-**Subsequent reconnections:** User sees a quick "flicker" (brief redirect sequence). This is **normal** — Microsoft validates the existing session through rapid OAuth redirects. Standard Microsoft OAuth behavior. See [FAQ - Login "Flicker"](../faq.md#what-is-the-login-flicker-when-users-reconnect) for details.
+**Subsequent reconnections:** User sees a quick "flicker" (brief redirect sequence). This is **normal** — Microsoft validates the existing session through rapid OAuth redirects. Standard Microsoft OAuth behavior.
 
 For troubleshooting consent issues, see [FAQ - Authentication & Permissions](../faq.md#authentication--permissions).
 
@@ -204,7 +200,7 @@ Use this when one MCP server deployment serves users from multiple Microsoft 365
 - **Enterprise Application management**: Each customer tenant admin can independently control user assignment and revoke access from their Azure Portal.
 - **Compliance**: Some organizations may require dedicated infrastructure for data residency — in that case, deploy a separate instance per tenant with single-tenant configuration instead.
 
-## Secrets
+## Secret Rotation
 
 The service requires four secrets for authentication and data protection. All must be stored in Kubernetes Secrets (not ConfigMaps).
 

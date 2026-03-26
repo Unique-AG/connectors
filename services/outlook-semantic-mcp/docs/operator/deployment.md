@@ -25,6 +25,8 @@ The Outlook Semantic MCP Server is deployed using a Helm chart that wraps the [`
 helm registry login ghcr.io
 ```
 
+Use a GitHub Personal Access Token (PAT) with `read:packages` scope as the password.
+
 ### Install
 
 ```bash
@@ -147,6 +149,10 @@ mcpConfig:
     serviceExtraHeaders:
       x-company-id: "<your-company-id>"
       x-user-id: "<your-service-account-user-id>"
+
+  # Adjust the date to control how far back the initial email sync goes.
+  # Without this, the Helm default of 2025-06-06 applies silently.
+  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
 ```
 
 **Note:** Ingress is disabled by default. Enable it and configure hosts/TLS in the `ingress` section of your `values.yaml`. The chart defaults to `ingressClassName: kong` but any ingress controller can be used. MCP servers need to be hosted on their own domain.
@@ -176,7 +182,7 @@ The service exposes health endpoints:
 
 | Endpoint | Purpose |
 |----------|---------|
-| `/probe` | Kubernetes liveness and readiness probe |
+| `/probe` | Kubernetes liveness and readiness probe (configured via the Helm chart's probe settings) |
 
 ## Monitoring
 
@@ -240,8 +246,8 @@ If your cluster enforces network policies, the following traffic must be allowed
 | DNS (kube-dns) | `53` (UDP/TCP) | Cluster DNS resolution |
 | PostgreSQL | `5432` (TCP) | Database access |
 | RabbitMQ | `5672` (TCP) | Message queue |
-| `node-ingestion` | `8080` (TCP) | Unique ingestion service |
-| `node-scope-management` | `8080` (TCP) | Unique scope management service |
+| `node-ingestion` | `8091` (TCP) | Unique ingestion service |
+| `node-scope-management` | `8092` (TCP) | Unique scope management service |
 | `login.microsoftonline.com`, `graph.microsoft.com` | `443` (TCP) | Microsoft OAuth and Graph API |
 | `outlook.office.com`, `outlook.office365.com` | `443` (TCP) | Attachment upload sessions (Microsoft Graph) |
 

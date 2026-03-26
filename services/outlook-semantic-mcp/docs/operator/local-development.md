@@ -13,7 +13,7 @@ This guide walks through setting up the Outlook Semantic MCP Server for local de
 | pnpm | 9+ | Package manager |
 | Docker | 24+ | Run PostgreSQL and RabbitMQ |
 | Azure CLI | Latest | Configure Entra app registration |
-| MCP Inspector | 0.17.2 | MCP Client for testing |
+| MCP Inspector | Latest (tested with 0.17.2) | MCP Client for testing |
 
 A public reverse proxy, recommended:
 
@@ -123,7 +123,7 @@ openssl rand -hex 32
 
 ## Webhook Testing
 
-Microsoft Graph webhooks require a publicly accessible HTTPS endpoint. For local development, use Azure Dev Tunnels:
+Microsoft Graph webhooks require a publicly accessible HTTPS endpoint. For local development, use Azure Dev Tunnels or any other HTTPS tunnel solution (e.g., ngrok, Cloudflare Tunnel):
 
 ### Setup Dev Tunnel
 

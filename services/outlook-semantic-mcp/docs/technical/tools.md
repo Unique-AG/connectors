@@ -17,7 +17,7 @@ The Outlook Semantic MCP Server exposes 10 MCP tools available to all users, plu
 | [`create_draft_email`](#create_draft_email) | Draft Creation | Yes | No |
 | [`lookup_contacts`](#lookup_contacts) | Contact Lookup | No | No |
 | [`list_categories`](#list_categories) | Mailbox Utilities | No | No |
-| [`list_folders`](#list_folders) | Mailbox Utilities | Yes | No |
+| [`list_folders`](#list_folders) | Mailbox Utilities | Yes (refreshes folder cache) | No |
 | [`verify_inbox_connection`](#verify_inbox_connection) | Subscription Management | No | No |
 | [`reconnect_inbox`](#reconnect_inbox) | Subscription Management | Yes | No |
 | [`remove_inbox_connection`](#remove_inbox_connection) | Subscription Management | Yes | No |
@@ -101,9 +101,28 @@ Each object in `conditions` may include the following fields. All condition fiel
 }
 ```
 
+**Example:**
+
+```json
+{
+  "search": "quarterly report from Alice",
+  "conditions": [
+    {
+      "fromSenders": { "value": "alice@example.com", "operator": "equals" },
+      "dateFrom": { "value": "2024-01-01T00:00:00Z", "operator": "greaterThanOrEqual" },
+      "dateTo": { "value": "2024-03-31T23:59:59Z", "operator": "lessThanOrEqual" },
+      "directories": { "value": ["Inbox"], "operator": "in" }
+    }
+  ],
+  "limit": 40
+}
+```
+
+This searches for emails from `alice@example.com` in Q1 2024 within the Inbox folder. System folder names like `"Inbox"`, `"Sent Items"`, `"Drafts"` can be used directly in `directories` — for custom folders, use the ID from `list_folders`.
+
 **Usage notes:**
 
-- Call `list_folders` first to obtain folder IDs for the `directories` filter.
+- Call `list_folders` first to obtain folder IDs for the `directories` filter (not needed for well-known system folders).
 - Call `list_categories` first to obtain valid category names for the `categories` filter.
 - Pass a result's `id` to `open_email_by_id` to retrieve the full email body.
 - If `syncWarning` is present, the full sync is still running — results are partial.

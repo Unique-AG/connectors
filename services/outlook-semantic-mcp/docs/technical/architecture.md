@@ -65,12 +65,12 @@ flowchart LR
 
 **Token Lifetimes:**
 
-| Token | TTL | Set By |
-|-------|-----|--------|
-| MCP Access Token | 60 seconds (configurable) | Service |
-| MCP Refresh Token | 30 days (configurable) | Service |
-| Microsoft Access Token | ~1 hour | Microsoft (not configurable) |
-| Microsoft Refresh Token | ~90 days | Microsoft (not configurable) |
+| Token | TTL | Set By | On Expiry |
+|-------|-----|--------|-----------|
+| MCP Access Token | 60 seconds (configurable) | Service | Client automatically refreshes using MCP refresh token |
+| MCP Refresh Token | 30 days (configurable) | Service | User must re-authenticate via OAuth flow |
+| Microsoft Access Token | ~1 hour | Microsoft (not configurable) | Server refreshes automatically using stored refresh token |
+| Microsoft Refresh Token | ~90 days | Microsoft (not configurable) | User must reconnect via `reconnect_inbox` |
 
 The server automatically refreshes expired Microsoft access tokens using the stored refresh token. If the refresh token itself expires (~90 days of inactivity), the user must reconnect.
 

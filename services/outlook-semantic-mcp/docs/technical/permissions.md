@@ -19,7 +19,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 
 ## Understanding Consent Requirements
 
-**This is standard Microsoft behavior, not Outlook Semantic MCP specific.** All Microsoft 365 apps use the same consent model.
+**This is standard Microsoft behavior, not Outlook Semantic MCP specific.** All Microsoft 365 apps use the same consent model. For the full consent flow explanation including admin consent and multi-tenant setup, see [Authentication — Understanding Microsoft Consent Flows](../operator/authentication.md#understanding-microsoft-consent-flows).
 
 ### Standard Microsoft Consent Process
 

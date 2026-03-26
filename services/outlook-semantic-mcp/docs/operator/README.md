@@ -47,14 +47,27 @@ flowchart LR
 
 The Outlook Semantic MCP Server runs as a **single pod** that handles MCP tool requests, receives Microsoft Graph webhook notifications, processes email via RabbitMQ consumers, stores state in PostgreSQL, and ingests email content into the Unique knowledge base.
 
+## Quick Start
+
+Follow these steps to go from zero to a running deployment:
+
+1. **Register Microsoft Entra ID application** — Create an app registration with the required delegated permissions. See [Authentication Guide](./authentication.md).
+2. **Provision infrastructure** — Set up PostgreSQL 17+, RabbitMQ 4+, and a Kubernetes namespace. See [Deployment — Prerequisites](./deployment.md#prerequisites).
+3. **Create Kubernetes secrets** — Generate cryptographic secrets and store them as Kubernetes Secrets. See [Deployment — Required Secrets](./deployment.md#required-secrets).
+4. **Configure Helm values** — Create a minimal `values.yaml` with your secrets, Microsoft client ID, and Unique API endpoints. See [Configuration Guide](./configuration.md).
+5. **Deploy with Helm** — Install the chart. See [Deployment — Install](./deployment.md#install).
+6. **Verify** — Complete an OAuth flow end-to-end, check that webhooks are reachable, and confirm a test email appears in search results.
+
 ## Infrastructure Requirements
+
+For detailed infrastructure setup, see [Deployment — Prerequisites](./deployment.md#prerequisites).
 
 | Component | Requirement | Notes |
 |-----------|-------------|-------|
 | **Kubernetes** | 1.25+ | Any Kubernetes distribution |
 | **PostgreSQL** | 17+ | Managed service recommended |
 | **RabbitMQ** | 4+ | With management plugin |
-| **Kong Gateway** | 3+ | Handles ingress and TLS termination |
+| **Ingress Controller** | Kong 3+ recommended | Handles ingress and TLS termination. Kong is the default but any ingress controller that supports the required routing will work. |
 | **DNS** | Public hostname | Required for Microsoft webhook callbacks |
 
 ## Deployment Checklist
@@ -78,10 +91,29 @@ The Outlook Semantic MCP Server runs as a **single pod** that handles MCP tool r
    - [ ] Kubernetes secrets created
    - [ ] Helm values configured ([Configuration Guide](./configuration.md))
    - [ ] Helm chart deployed ([Deployment Guide](./deployment.md))
-   - [ ] Database migration run
+   - [ ] Database migration — runs automatically via Helm hook; verify post-deploy
 
 4. **Verification**
 
    - [ ] OAuth flow works end-to-end
    - [ ] Webhook endpoint accessible from Microsoft
    - [ ] Test email appears in search results
+
+## Security Checklist
+
+Before going to production, verify the following:
+
+- [ ] `ENCRYPTION_KEY` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
+- [ ] `AUTH_HMAC_SECRET` is a cryptographically random 64-character hex string (`openssl rand -hex 32`)
+- [ ] `MICROSOFT_WEBHOOK_SECRET` is a cryptographically random 128-character string (`openssl rand -hex 64`)
+- [ ] All secrets stored in Kubernetes Secrets (not ConfigMaps)
+- [ ] TLS termination configured at ingress
+- [ ] Network policies restrict pod-to-pod communication
+- [ ] Log aggregation in place (tokens are not logged)
+- [ ] Monitoring alerts configured for authentication failures
+
+For the full security architecture, see [Security Documentation](../technical/security.md).
+
+## Scaling Considerations
+
+- **Directory sync** processes a maximum of 10 users per scheduled run (every 5 minutes). For large deployments with many connected users, account for the fact that folder sync updates are distributed across multiple runs.

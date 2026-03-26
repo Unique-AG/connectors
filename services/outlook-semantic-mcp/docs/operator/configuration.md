@@ -17,9 +17,9 @@ These must be provided via Kubernetes secrets:
 | `AMQP_URL` | `amqp://user:pass@host:5672/vhost` | RabbitMQ connection string (or use individual `AMQP_*` fields) |
 | `MICROSOFT_CLIENT_SECRET` | String from Azure portal | Entra app client secret |
 | `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret — generate with `openssl rand -hex 64` |
-| `AUTH_HMAC_SECRET` | 64-character hex string | JWT signing key — generate with `openssl rand -hex 32` |
+| `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key — generate with `openssl rand -hex 32` |
 | `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key — generate with `openssl rand -hex 32` |
-| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret |
+| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret (required for `external` auth mode only) |
 
 ### Application Configuration
 
@@ -31,7 +31,7 @@ Set via `mcpConfig.app` in Helm values:
 | `PORT` | — | `9542` | Local HTTP port the server binds to |
 | `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Set to `enabled` to expose debug tools and extra debugging data in tool responses |
 | `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing to reduce I/O. Set to `disabled` only for startup debugging when you need logs to appear immediately. |
-| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | `{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}` | JSON string controlling which emails are synced — see [Mail Filters](#mail-filters) |
+| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | Helm default: `{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}` | JSON string controlling which emails are synced — see [Mail Filters](#mail-filters). The application has no built-in default; this value is provided by Helm `values.yaml`. Required when running outside Helm. |
 
 ### Microsoft Configuration
 
@@ -52,7 +52,7 @@ Set via `mcpConfig.unique` in Helm values:
 | `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
 | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
 | `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `mcpConfig.unique.scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
-| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | Whether to store emails internally in Unique knowledge base (`enabled`/`disabled`). Helm default is not set; the application default is `enabled`. |
+| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | Default: `enabled`. Set to `disabled` to prevent storage in Unique Knowledge Base. |
 | `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | JSON: `{"x-company-id":"...","x-user-id":"..."}` |
 | `UNIQUE_ZITADEL_CLIENT_ID` | `mcpConfig.unique.zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
 | `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `mcpConfig.unique.zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
@@ -249,6 +249,8 @@ The service account must have the following Unique platform permissions:
 ## Mail Filters
 
 The `DEFAULT_MAIL_FILTERS` value controls which emails are synced during the initial import and ongoing sync. It is a JSON string set via `mcpConfig.defaultMailFilters`.
+
+> **Warning:** Changing `DEFAULT_MAIL_FILTERS` only affects newly synced emails. Emails that were already ingested under a previous filter configuration are **not** removed. To remove previously ingested emails, you must delete them manually.
 
 ### Fields
 

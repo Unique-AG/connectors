@@ -48,17 +48,11 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Permissions
 
-All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to.
+All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to: `User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`.
 
-| Permission | Type | Admin Consent | Required | Purpose |
-|------------|------|---------------|----------|---------|
-| `User.Read` | Delegated | No | Yes | Resolve user identity and profile |
-| `Mail.ReadWrite` | Delegated | No | Yes | Read emails for sync and search; create draft emails |
-| `MailboxSettings.Read` | Delegated | No | Yes | Read mailbox settings and folder structure |
-| `People.Read` | Delegated | No | Yes | Look up contacts and people for address resolution |
-| `offline_access` | Delegated | No | Yes | Obtain refresh tokens for background sync |
+None of these permissions require admin consent.
 
-For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md).
+For the complete permissions reference, see [Permissions](technical/permissions.md).
 
 ## Features
 

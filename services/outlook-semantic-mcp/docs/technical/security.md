@@ -109,7 +109,7 @@ Requests pass through each layer from top to bottom. Each layer must pass before
 | Layer | Mechanism | Protects Against |
 |-------|-----------|------------------|
 | **Transport** | TLS 1.2+ via Kong Gateway | Eavesdropping, man-in-the-middle |
-| **Rate Limiting** | IP-based throttling (global + per-endpoint) | Brute-force, abuse |
+| **Rate Limiting** | IP-based throttling at ingress layer (e.g., Kong) | Brute-force, abuse |
 | **Authentication** | OAuth 2.1 + PKCE | Unauthorized access, authorization code interception |
 | **Webhook Integrity** | `clientState` validation | Forged webhook notifications |
 | **Session Integrity** | HMAC-SHA256 on OAuth session state | Session hijacking via forged callbacks |
@@ -130,7 +130,7 @@ Microsoft access and refresh tokens are stored encrypted using **AES-256-GCM**:
 | Algorithm     | AES-256-GCM (authenticated encryption)                 |
 | Key Size      | 256 bits (32 bytes, provided as 64 hex characters)     |
 | IV            | Random 12 bytes generated per encryption operation     |
-| Stored Format | `{iv}.{tag}.{data}` — all components base64 encoded |
+| Stored Format | `{iv}.{tag}.{data}` — all components base64 encoded (handled by the `@unique-ag/mcp-oauth` package) |
 | Key Storage   | `ENCRYPTION_KEY` environment variable                  |
 
 
@@ -297,13 +297,13 @@ sequenceDiagram
 
 ## Rate Limiting
 
-The server applies IP-based rate limiting to all endpoints:
+Rate limiting is expected to be handled at the infrastructure/ingress layer (e.g., Kong ingress controller), not within the application itself. The following limits are recommended:
 
 
-| Scope                  | Limit                    | Source | Purpose                                |
-| ---------------------- | ------------------------ | ------ | -------------------------------------- |
-| Global (all endpoints) | 10 requests / 60 seconds | Service limit | General brute-force protection         |
-| Authorization endpoint | 3 requests / 60 seconds  | Service limit | Tighter protection for auth initiation |
+| Scope                  | Recommended Limit        | Layer | Purpose                                |
+| ---------------------- | ------------------------ | ----- | -------------------------------------- |
+| Global (all endpoints) | 10 requests / 60 seconds | Ingress (Kong) | General brute-force protection         |
+| Authorization endpoint | 3 requests / 60 seconds  | Ingress (Kong) | Tighter protection for auth initiation |
 
 
 ## Secret Management
@@ -321,37 +321,13 @@ The server applies IP-based rate limiting to all endpoints:
 
 ### Rotation Procedures
 
-`**ENCRYPTION_KEY` rotation:**
+For detailed secret rotation procedures, see [Authentication — Secrets](../operator/authentication.md#secrets).
 
-There is no zero-downtime rotation — changing the key renders all stored Microsoft tokens unreadable.
+Key security considerations for rotation:
 
-1. Generate new key: `openssl rand -hex 32`
-2. Update Kubernetes secret and redeploy
-3. All users must reconnect — their stored tokens are no longer decryptable
-4. Notify users before rotating — treat this as a maintenance window
-
-`**AUTH_HMAC_SECRET` rotation:**
-
-1. Generate new secret: `openssl rand -hex 32`
-2. Update Kubernetes secret and redeploy
-3. All active MCP sessions are immediately invalidated
-4. MCP clients will re-authenticate automatically on their next request
-
-`**MICROSOFT_CLIENT_SECRET` rotation:**
-
-1. Create a new client secret in Microsoft Entra ID (keep the old one active during transition)
-2. Update the Kubernetes secret with the new value
-3. Restart pods
-4. Delete the old secret from Entra ID
-
-`**MICROSOFT_WEBHOOK_SECRET` rotation:**
-
-Rotating this secret requires recreating all active subscriptions, as existing ones hold the old `clientState`:
-
-1. Generate new secret: `openssl rand -hex 64`
-2. Update Kubernetes secret and redeploy
-3. All users must call `reconnect_inbox` to recreate their subscriptions with the new secret
-4. Emails arriving during the gap will not be ingested until `reconnect_inbox` is called. After that, live catch-up picks them up automatically on the next notification or 15-minute cron cycle (it queries from the last watermark)
+- **`ENCRYPTION_KEY`** and **`MICROSOFT_WEBHOOK_SECRET`** have no zero-downtime rotation path — plan these as maintenance windows and notify users in advance.
+- **`AUTH_HMAC_SECRET`** is the lowest-impact secret to rotate — existing connections are unaffected and MCP clients re-authenticate automatically.
+- **`MICROSOFT_CLIENT_SECRET`** supports zero-downtime rotation because Microsoft allows multiple active client secrets simultaneously.
 
 ## Security Checklist for Operators
 

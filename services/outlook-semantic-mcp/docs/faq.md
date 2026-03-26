@@ -3,6 +3,61 @@
 
 # FAQ
 
+## Table of Contents
+
+- [General](#general)
+  - [What type of MCP server is this?](#what-type-of-mcp-server-is-this)
+  - [What tools are available?](#what-tools-are-available)
+  - [Do I need to do anything after connecting?](#do-i-need-to-do-anything-after-connecting)
+- [Authentication & Permissions](#authentication--permissions)
+  - [Do any permissions require admin consent?](#do-any-permissions-require-admin-consent)
+  - [Why does the server need Mail.ReadWrite if it mostly reads emails?](#why-does-the-server-need-mailreadwrite-if-it-mostly-reads-emails)
+  - [Why can't I use application permissions instead of delegated?](#why-cant-i-use-application-permissions-instead-of-delegated)
+  - [Why do I need a client ID and client secret?](#why-do-i-need-a-client-id-and-a-client-secret)
+  - [What happens when a user's Microsoft refresh token expires?](#what-happens-when-a-users-microsoft-refresh-token-expires)
+- [Configuration](#configuration)
+  - [What redirect URI should I configure in Entra ID?](#what-redirect-uri-should-i-configure-in-entra-id)
+  - [Why do I need a webhook secret?](#why-do-i-need-a-webhook-secret)
+  - [What happens if I change the encryption key?](#what-happens-if-i-change-the-encryption-key)
+  - [What happens if I change the webhook secret?](#what-happens-if-i-change-the-webhook-secret)
+  - [What happens if I change the client secret?](#what-happens-if-i-change-the-client-secret)
+  - [What does DEFAULT_MAIL_FILTERS do?](#what-does-default_mail_filters-do)
+- [Sync](#sync)
+  - [What is the difference between full sync and live catch-up?](#what-is-the-difference-between-full-sync-and-live-catch-up)
+  - [How do I check sync progress?](#how-do-i-check-sync-progress)
+  - [Why is my full sync stuck in waiting-for-ingestion?](#why-is-my-full-sync-stuck-in-waiting-for-ingestion)
+  - [Why is my full sync stuck in running?](#why-is-my-full-sync-stuck-in-running)
+  - [What happens if full sync is interrupted?](#what-happens-if-full-sync-is-interrupted-restart-crash)
+  - [Why are new emails not appearing in search results?](#why-are-new-emails-not-appearing-in-search-results)
+  - [What happens to emails sent during full sync?](#what-happens-to-emails-sent-during-full-sync)
+  - [Why are deleted emails still appearing in search results?](#why-are-deleted-emails-still-appearing-in-search-results)
+- [Tool Usage](#tool-usage)
+  - [How does search_emails search?](#how-does-search_emails-search)
+  - [How do I filter search results to a specific folder?](#how-do-i-filter-search-results-to-a-specific-folder)
+  - [Can I attach files when creating a draft email?](#can-i-attach-files-when-creating-a-draft-email)
+  - [What does reconnect_inbox do?](#what-does-reconnect_inbox-do)
+  - [What does remove_inbox_connection do?](#what-does-remove_inbox_connection-do)
+- [Data Privacy & Storage](#data-privacy--storage)
+  - [Does the MCP server store my emails?](#does-the-mcp-server-store-my-emails)
+  - [Where is my email content stored?](#where-is-my-email-content-stored)
+  - [Who can access my email data once it is ingested?](#who-can-access-my-email-data-once-it-is-ingested)
+  - [Can an operator with database access read my emails?](#can-an-operator-with-database-access-read-my-emails)
+  - [What happens to my email data when I disconnect?](#what-happens-to-my-email-data-when-i-disconnect)
+  - [What email data is actually ingested into the knowledge base?](#what-email-data-is-actually-ingested-into-the-knowledge-base)
+- [Security](#security)
+  - [How are Microsoft tokens stored?](#how-are-microsoft-tokens-stored)
+  - [How are MCP tokens stored?](#how-are-mcp-tokens-stored)
+  - [Why does the server use PKCE?](#why-does-the-server-use-pkce)
+  - [What happens if a refresh token is stolen?](#what-happens-if-a-refresh-token-is-stolen)
+- [Deployment](#deployment)
+  - [Why is RabbitMQ required?](#why-is-rabbitmq-required)
+  - [What happens if RabbitMQ is unavailable?](#what-happens-if-rabbitmq-is-unavailable)
+  - [What happens if PostgreSQL is unavailable?](#what-happens-if-postgresql-is-unavailable)
+  - [Can one deployment serve multiple Microsoft tenants?](#can-one-deployment-serve-multiple-microsoft-tenants)
+- [Disaster Recovery](#disaster-recovery)
+  - [What do I do if a core infrastructure component fails?](#what-do-i-do-if-a-core-infrastructure-component-fails)
+- [Related Documentation](#related-documentation)
+
 ## General
 
 ### What type of MCP server is this?
@@ -154,8 +209,18 @@ When the filters are updated and the service is redeployed, all user inbox confi
 | Purpose | Ingest emails within the configured time frame and filters | Ingest new emails in real time |
 | Trigger | Automatic after connection | Microsoft Graph webhook notification |
 | Transport | Direct Graph API (paginated) | RabbitMQ (asynchronous) |
-| State | `ready` / `running` / `waiting-for-ingestion` / `failed` | `ready` / `running` / `failed` |
+| State | `ready` / `running` / `waiting-for-ingestion` / `paused` / `failed` | `ready` / `running` / `failed` |
 | Resumable | Yes — via `fullSyncNextLink` cursor | N/A (each notification is independent) |
+
+Full sync states:
+
+| State | Description |
+|-------|-------------|
+| `ready` | Full sync has not started or has completed successfully |
+| `running` | Full sync is actively fetching and uploading email batches |
+| `waiting-for-ingestion` | All batches uploaded; waiting for the knowledge base to finish processing |
+| `paused` | Full sync has been paused by the user or operator and can be resumed |
+| `failed` | Full sync encountered an error and stopped |
 
 Both pipelines run concurrently after connection and both contribute to the Unique knowledge base ingestion queue.
 
@@ -230,7 +295,7 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 **Answer:** `search_emails` performs semantic search against the Unique knowledge base — not a keyword search against a local index. It supports natural language queries and returns semantically relevant results even when exact words do not match.
 
-Optional filters: `folderId` (from `list_folders`), `fromSenders`, `toRecipients`, `ccRecipients` (full or partial email addresses), `startDate`, `endDate`, `limit`.
+Optional structured filters can be passed via the `conditions` array. Each condition is an object with fields like `directories`, `dateFrom`, `dateTo`, `fromSenders`, `toRecipients`, `ccRecipients`, `hasAttachments`, and `categories`. Each field uses a `{ value, operator }` wrapper. Multiple conditions in the array are OR-combined; fields within a single condition are AND-combined. A `limit` parameter (40–100) controls the maximum number of results.
 
 Search results may be incomplete while full sync is in progress. A `syncWarning` field is returned in that case.
 
@@ -238,14 +303,28 @@ Search results may be incomplete while full sync is in progress. A `syncWarning`
 
 ### How do I filter search results to a specific folder?
 
-**Answer:** Use the `list_folders` tool to get the folder tree, then pass the folder's `id` as the `folderId` parameter to `search_emails`.
+**Answer:** Use the `list_folders` tool to get the folder tree, then pass the folder ID in the `conditions` array using the `directories` field. Well-known system folders like "Inbox", "Sent Items", and "Drafts" can be used by name directly — no need to call `list_folders` for those.
 
 ```json
-// 1. List folders to get IDs
-{ "tool": "list_folders" }
+// Search within a specific folder by name
+{
+  "search": "quarterly report",
+  "conditions": [
+    {
+      "directories": { "value": ["Inbox"], "operator": "in" }
+    }
+  ]
+}
 
-// 2. Search within a specific folder
-{ "tool": "search_emails", "folderId": "<folder-id-from-list_folders>", "query": "..." }
+// Search within a custom folder by ID (from list_folders)
+{
+  "search": "project update",
+  "conditions": [
+    {
+      "directories": { "value": ["<folder-id-from-list_folders>"], "operator": "in" }
+    }
+  ]
+}
 ```
 
 **See also:** [Tools — list_folders](./technical/tools.md#list_folders) — [Tools — search_emails](./technical/tools.md#search_emails)
@@ -263,7 +342,7 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 ### What does `reconnect_inbox` do?
 
-**Answer:** `reconnect_inbox` forces creation of a new Microsoft Graph subscription regardless of the current subscription state. This restarts live catch-up and triggers a new full sync. Use it when:
+**Answer:** `reconnect_inbox` creates a new Microsoft Graph subscription if one does not already exist or if the current subscription is near expiry (within 15 minutes). If a valid subscription is already active, it returns `already_active` without creating a duplicate. Use it when:
 
 - `verify_inbox_connection` reports the subscription as `expired` or `not_configured`
 - New emails stopped appearing in search results

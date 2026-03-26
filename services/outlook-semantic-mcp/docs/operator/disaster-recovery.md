@@ -122,7 +122,7 @@ The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, a
 ### Symptoms
 
 - Service logs show AMQP connection errors or failed message publish attempts.
-- In-progress full syncs stall — `sync_progress` shows `fullSyncState: "running"` but `scheduledForIngestion` stops incrementing.
+- In-progress full syncs complete their current batch but no new batches are triggered — `sync_progress` shows `fullSyncState: "running"` but `scheduledForIngestion` stops incrementing after the current batch finishes.
 - Live catch-up stops processing new webhook notifications — recently received emails are not ingested.
 
 ### Impact
