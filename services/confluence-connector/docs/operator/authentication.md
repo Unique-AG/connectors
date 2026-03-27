@@ -62,9 +62,23 @@ At startup, the connector automatically grants itself access on the root scope a
 #### Option A: OAuth 2.0 (2LO) -- Cloud
 
 1. In the [Atlassian Admin Console](https://admin.atlassian.com/), go to **Settings** > **User Management** > **Service Accounts**.
-2. Create a new service account.
-3. Note the **Client ID** and **Client Secret**.
-4. Obtain the **Cloud ID** for your Confluence instance (see [How do I find my Atlassian Cloud ID?](../faq.md#how-do-i-find-my-atlassian-cloud-id)).
+2. Create a new service account and generate credentials.
+3. Grant the service account access to the Confluence application and assign the following scopes:
+
+> **Note:** The scopes listed below are preliminary and subject to validation. The minimum required set may change before the stable release.
+
+| Scope | Purpose |
+|-------|---------|
+| `search:confluence` | CQL search for labeled pages |
+| `read:confluence-content.all` | Read full page content (body, metadata) |
+| `read:confluence-content.summary` | Read content summaries and version info |
+| `read:confluence-space.summary` | Read space metadata (key, name, type) |
+| `read:label:confluence` | Read page labels to determine sync eligibility |
+| `read:page:confluence` | Read individual pages |
+| `read:attachment:confluence` | Download file attachments (required when attachment ingestion is enabled) |
+
+4. Note the **Client ID** and **Client Secret**.
+5. Obtain the **Cloud ID** for your Confluence instance (see [How do I find my Atlassian Cloud ID?](../faq.md#how-do-i-find-my-atlassian-cloud-id)).
 
 **Required tenant YAML fields:**
 
@@ -84,8 +98,22 @@ The `clientSecret` field uses the `os.environ/` prefix to resolve the value from
 #### Option B: OAuth 2.0 (2LO) -- Data Center
 
 1. In the [Atlassian Admin Console](https://admin.atlassian.com/), go to **Settings** > **User Management** > **Service Accounts**.
-2. Create a new service account.
-3. Note the **Client ID** and **Client Secret**.
+2. Create a new service account and generate credentials.
+3. Grant the service account access to the Confluence application and assign the following scopes:
+
+> **Note:** The scopes listed below are preliminary and subject to validation. The minimum required set may change before the stable release.
+
+| Scope | Purpose |
+|-------|---------|
+| `search:confluence` | CQL search for labeled pages |
+| `read:confluence-content.all` | Read full page content (body, metadata) |
+| `read:confluence-content.summary` | Read content summaries and version info |
+| `read:confluence-space.summary` | Read space metadata (key, name, type) |
+| `read:label:confluence` | Read page labels to determine sync eligibility |
+| `read:page:confluence` | Read individual pages |
+| `read:attachment:confluence` | Download file attachments (required when attachment ingestion is enabled) |
+
+4. Note the **Client ID** and **Client Secret**.
 
 **Required tenant YAML fields:**
 
