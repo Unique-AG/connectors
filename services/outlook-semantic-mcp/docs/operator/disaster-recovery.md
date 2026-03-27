@@ -30,8 +30,9 @@ The documentation does not provide fixed RTO targets because recovery time varie
 
 - **Number of connected users** — each user's mailbox is re-synced independently. The service processes users concurrently but enforces a batch limit of 50 messages per cycle per user before yielding to others (hardcoded service limit).
 - **Mailbox size** — full sync fetches emails in pages of 100 from Microsoft Graph (service-configured page size), processing them sequentially. Large mailboxes (100,000+ emails) take proportionally longer.
-- **Microsoft Graph API rate limits** — Microsoft enforces a global limit of 130,000 requests per 10 seconds per app across all tenants; additional per-mailbox and per-service limits may apply (Microsoft limit, not configurable). Re-syncing many users simultaneously may approach these limits. There is no built-in staggering; operators may need to trigger `restart_full_sync` for users in batches to avoid throttling. See [Microsoft Graph throttling](https://learn.microsoft.com/en-us/graph/throttling).
+- **Microsoft Graph API rate limits** — Microsoft enforces a global limit of 130,000 requests per 10 seconds per app across all tenants; additional per-mailbox and per-service limits may apply (Microsoft limit, not configurable). Re-syncing many users simultaneously may approach these limits. There is no built-in staggering; operators should coordinate with users to stagger their `restart_full_sync` calls in batches to avoid throttling. See [Microsoft Graph throttling](https://learn.microsoft.com/en-us/graph/throttling).
 - **Ingestion concurrency** — the RabbitMQ consumer prefetch count is set to 10, limiting in-flight messages per consumer (hardcoded service limit).
+- **Ingestion worker capacity** — the MCP server publishes emails to RabbitMQ but the actual upload to the Unique Knowledge Base is performed by the ingestion worker (a separate service). If the ingestion worker is under-provisioned or scaled down, messages queue up and full sync stalls in `waiting-for-ingestion`. Ensure the ingestion worker has sufficient replicas and resources during recovery.
 - **Infrastructure provisioning** — if PostgreSQL or RabbitMQ must be provisioned from scratch rather than restored from backup, lead time depends on the platform. Clients using managed database services rather than Kubernetes-native solutions (e.g. CNPG) should account for provider-specific provisioning and configuration time.
 
 ### Backup recommendations
@@ -49,8 +50,8 @@ The documentation does not provide fixed RTO targets because recovery time varie
 Emails are sourced from Microsoft Graph, which retains the authoritative copy. In all three disaster scenarios, email content is not permanently lost — it can be re-fetched and re-ingested. The data loss window refers to the delay before the system catches up:
 
 - **Webhook notifications lost during an outage** are recovered by the 15-minute live catch-up cron, which polls Microsoft Graph for any emails modified since the last known watermark.
-- **If a webhook subscription expires during an extended outage** (subscriptions renew daily), the operator or user must call `reconnect_inbox` to re-create it. Emails received during the gap are picked up by the subsequent full re-sync.
-- **Worst case:** emails received between the last successful live catch-up and service restoration are delayed, not lost. Full re-sync recovers all historical email from Microsoft Graph.
+- **If a webhook subscription expires during an extended outage** (subscriptions renew daily), users must call `reconnect_inbox` to re-create it. Emails received during the gap are picked up by the subsequent full re-sync.
+- **Worst case:** emails received between the last successful live catch-up and service restoration are delayed, not lost. Full re-sync recovers all emails from Microsoft Graph that match the operator-configured [Inbox Filters](../technical/full-sync.md#Inbox-Filters) — emails outside the configured date window or matching exclusion rules are not synced.
 
 ### Personnel
 
@@ -58,7 +59,7 @@ Emails are sourced from Microsoft Graph, which retains the authoritative copy. I
 |---|---|
 | **Kubernetes operator** | All scenarios — restarts pods, updates secrets, runs migrations, enables debug mode. |
 | **Database / platform administrator** | Scenario 1 — restores or provisions PostgreSQL. Scenario 2 — restores or provisions RabbitMQ. |
-| **End users** | Scenario 1 only — must call `reconnect_inbox` to re-authenticate. Not needed for Scenarios 2 or 3. |
+| **End users** | All scenarios — must call the relevant MCP tools themselves (`reconnect_inbox` for Scenario 1; `restart_full_sync` for Scenarios 2 and 3). The operator cannot call tools on behalf of users. |
 
 No Microsoft tenant administrator action is required for recovery. Orphaned webhook subscriptions in Microsoft's systems expire automatically based on the expiration time set at creation (the service configures subscriptions to renew daily, so orphaned subscriptions typically expire within about 1 day; Microsoft allows up to 7 days for message subscriptions).
 
@@ -70,7 +71,7 @@ No Microsoft tenant administrator action is required for recovery. Orphaned webh
 
 - Service fails to start with database connection errors in the logs.
 - All MCP tools return errors or empty responses.
-- No users appear connected — `verify_inbox_connection` returns `not_configured` for all users.
+- No users appear connected — `verify_inbox_connection` returns `not_configured` for all users if db was already reprovisioned or it just returns errors because it cannot connect to the database.
 
 ### Impact
 
