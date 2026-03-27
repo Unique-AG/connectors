@@ -1,4 +1,4 @@
-import { Effect, Result, Schema } from "effect"
+import { Effect, Match, Result, Schema } from "effect"
 import {
   InsufficientPermissionsError,
   InvalidRequestError,
@@ -36,13 +36,13 @@ const parseRetryAfter = (headers: Record<string, string | undefined>): number =>
 
 const parseODataBody = (
   body: unknown,
-): ODataError["error"] | null => {
-  const result = Schema.decodeUnknownResult(ODataErrorSchema)(body)
-  if (Result.isSuccess(result)) {
-    return result.success.error
-  }
-  return null
-}
+): ODataError["error"] | null =>
+  Schema.decodeUnknownResult(ODataErrorSchema)(body).pipe(
+    Result.match({
+      onSuccess: (r) => r.error,
+      onFailure: () => null,
+    }),
+  )
 
 export const decodeGraphError = (
   statusCode: number,
@@ -52,31 +52,31 @@ export const decodeGraphError = (
 ): MsGraphError => {
   const odataError = parseODataBody(body)
 
-  switch (statusCode) {
-    case 401:
-      return new TokenExpiredError({
+  return Match.value(statusCode).pipe(
+    Match.when(401, () =>
+      new TokenExpiredError({
         expiredAt: Date.now(),
-      })
-
-    case 403:
-      return new InsufficientPermissionsError({
+      }),
+    ),
+    Match.when(403, () =>
+      new InsufficientPermissionsError({
         requiredScope: odataError?.code ?? "unknown",
         grantedScopes: [],
-      })
-
-    case 404:
-      return new ResourceNotFoundError({
+      }),
+    ),
+    Match.when(404, () =>
+      new ResourceNotFoundError({
         resource,
         id: odataError?.message ?? "unknown",
-      })
-
-    case 429:
-      return new RateLimitedError({
+      }),
+    ),
+    Match.when(429, () =>
+      new RateLimitedError({
         retryAfter: parseRetryAfter(headers),
         resource,
-      })
-
-    case 503: {
+      }),
+    ),
+    Match.when(503, () => {
       const retryAfterHeader = headers["retry-after"] ?? headers["Retry-After"]
       const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : undefined
       return new ServiceUnavailableError({
@@ -84,25 +84,28 @@ export const decodeGraphError = (
           ? retryAfterSeconds
           : undefined,
       })
-    }
-
-    default:
-      return new InvalidRequestError({
+    }),
+    Match.orElse(() =>
+      new InvalidRequestError({
         code: odataError?.code ?? `HTTP_${statusCode}`,
         message: odataError?.message ?? `Request failed with status ${statusCode}`,
         target: odataError?.target ?? undefined,
         details: odataError?.details ?? [],
-      })
-  }
+      }),
+    ),
+  )
 }
 
-export const decodeGraphErrorEffect = (
-  statusCode: number,
-  body: unknown,
-  headers: Record<string, string | undefined>,
-  resource = "unknown",
-): Effect.Effect<never, MsGraphError> =>
-  Effect.fail(decodeGraphError(statusCode, body, headers, resource))
+export const decodeGraphErrorEffect = Effect.fn("decodeGraphErrorEffect")(
+  function*(
+    statusCode: number,
+    body: unknown,
+    headers: Record<string, string | undefined>,
+    resource = "unknown",
+  ): Effect.fn.Return<never, MsGraphError> {
+    return yield* Effect.fail(decodeGraphError(statusCode, body, headers, resource))
+  },
+)
 
 export const mapResponseToError = <E>(
   statusCode: number,

@@ -1,4 +1,4 @@
-import { Effect, Layer, Stream, pipe } from "effect"
+import { Effect, Layer, Match, Stream } from "effect"
 import { DelegatedAuth } from "../Auth/MsGraphAuth"
 import {
   InsufficientPermissionsError,
@@ -24,40 +24,41 @@ const AttachmentPageSchema = ODataPage(AttachmentSchema)
 
 const MoveResponseSchema = MessageSchema
 
-const narrowToRateLimitOrInvalid = (
-  error: MsGraphError,
-): RateLimitedError | InvalidRequestError => {
-  if (error._tag === "RateLimitedError") return error as RateLimitedError
-  if (error._tag === "InvalidRequest") return error as InvalidRequestError
-  return new InvalidRequestError({
-    code: error._tag,
-    message: "Unexpected error",
-    target: undefined,
-    details: [],
-  })
-}
+const narrowToRateLimitOrInvalid = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("InvalidRequest", (e) => e),
+  Match.orElse(
+    (e) =>
+      new InvalidRequestError({
+        code: e._tag,
+        message: "Unexpected error",
+        target: undefined,
+        details: [],
+      }),
+  ),
+)
 
-const narrowToSendErrors = (
-  error: MsGraphError,
-): RateLimitedError | InsufficientPermissionsError | InvalidRequestError => {
-  if (error._tag === "RateLimitedError") return error as RateLimitedError
-  if (error._tag === "InsufficientPermissions") return error as InsufficientPermissionsError
-  if (error._tag === "InvalidRequest") return error as InvalidRequestError
-  return new InvalidRequestError({
-    code: error._tag,
-    message: "Unexpected error",
-    target: undefined,
-    details: [],
-  })
-}
+const narrowToSendErrors = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("InsufficientPermissions", (e) => e),
+  Match.tag("InvalidRequest", (e) => e),
+  Match.orElse(
+    (e) =>
+      new InvalidRequestError({
+        code: e._tag,
+        message: "Unexpected error",
+        target: undefined,
+        details: [],
+      }),
+  ),
+)
 
-const narrowToNotFoundOrRateLimit = (
-  error: MsGraphError,
-): ResourceNotFoundError | RateLimitedError => {
-  if (error._tag === "RateLimitedError") return error as RateLimitedError
-  if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-  return new ResourceNotFoundError({ resource: "Message", id: "unknown" })
-}
+const narrowToNotFoundOrRateLimit = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.orElse(() => new ResourceNotFoundError({ resource: "Message", id: "unknown" })),
+)
+
 
 export const MailServiceLive: Layer.Layer<
   MailService,
@@ -68,98 +69,141 @@ export const MailServiceLive: Layer.Layer<
   Effect.gen(function* () {
     const client = yield* MsGraphHttpClient
 
-    const listMessages = (
-      userId: string,
-      folderId?: string,
-      params?: ODataParams<Message>,
-    ) => {
-      const basePath = folderId
-        ? `/users/${encodeURIComponent(userId)}/mailFolders/${encodeURIComponent(folderId)}/messages`
-        : `/users/${encodeURIComponent(userId)}/messages`
-      return pipe(
-        client.get(`${basePath}${params ? buildQueryString(params) : ""}`, MessagePageSchema),
-        Effect.mapError(narrowToRateLimitOrInvalid),
-      )
-    }
+    const listMessages = Effect.fn("MailService.listMessages")(
+      function* (
+        userId: string,
+        folderId?: string,
+        params?: ODataParams<Message>,
+      ) {
+        const basePath = folderId
+          ? `/users/${encodeURIComponent(userId)}/mailFolders/${encodeURIComponent(folderId)}/messages`
+          : `/users/${encodeURIComponent(userId)}/messages`
+        const path = params ? `${basePath}${buildQueryString(params)}` : basePath
+        return yield* client.get(path, MessagePageSchema).pipe(
+          Effect.mapError(narrowToRateLimitOrInvalid),
+        )
+      },
+    )
 
-    const getMessage = (
-      userId: string,
-      messageId: string,
-      params?: Pick<ODataParams<Message>, "$select" | "$expand">,
-    ) =>
-      pipe(
-        client.get(
-          `/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}${params ? buildQueryString(params) : ""}`,
-          MessageSchema,
-        ),
-        Effect.mapError(narrowToNotFoundOrRateLimit),
-      )
+    const getMessage = Effect.fn("MailService.getMessage")(
+      function* (
+        userId: string,
+        messageId: string,
+        params?: Pick<ODataParams<Message>, "$select" | "$expand">,
+      ) {
+        const basePath = `/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}`
+        const path = params ? `${basePath}${buildQueryString(params)}` : basePath
+        return yield* client.get(path, MessageSchema).pipe(
+          Effect.mapError(narrowToNotFoundOrRateLimit),
+        )
+      },
+    )
 
-    const send = (userId: string, payload: SendMailPayload) =>
-      pipe(
-        client.postVoid(`/users/${encodeURIComponent(userId)}/sendMail`, payload),
-        Effect.mapError(narrowToSendErrors),
-      )
+    const send = Effect.fn("MailService.send")(
+      function* (userId: string, payload: SendMailPayload) {
+        return yield* client
+          .postVoid(`/users/${encodeURIComponent(userId)}/sendMail`, payload)
+          .pipe(Effect.mapError(narrowToSendErrors))
+      },
+    )
 
-    const reply = (userId: string, messageId: string, comment: string) =>
-      pipe(
-        client.postVoid(
-          `/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}/reply`,
-          { comment },
-        ),
-        Effect.mapError(narrowToNotFoundOrRateLimit),
-      )
+    const reply = Effect.fn("MailService.reply")(
+      function* (userId: string, messageId: string, comment: string) {
+        return yield* client
+          .postVoid(
+            `/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}/reply`,
+            { comment },
+          )
+          .pipe(Effect.mapError(narrowToNotFoundOrRateLimit))
+      },
+    )
 
-    const move = (userId: string, messageId: string, destinationFolderId: string) =>
-      pipe(
-        client.post(
-          `/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}/move`,
-          { destinationId: destinationFolderId },
-          MoveResponseSchema,
-        ),
-        Effect.mapError(narrowToNotFoundOrRateLimit),
-      )
+    const move = Effect.fn("MailService.move")(
+      function* (
+        userId: string,
+        messageId: string,
+        destinationFolderId: string,
+      ) {
+        return yield* client
+          .post(
+            `/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}/move`,
+            { destinationId: destinationFolderId },
+            MoveResponseSchema,
+          )
+          .pipe(Effect.mapError(narrowToNotFoundOrRateLimit))
+      },
+    )
 
-    const listFolders = (userId: string) =>
-      pipe(
-        client.get(`/users/${encodeURIComponent(userId)}/mailFolders`, MailFolderPageSchema),
-        Effect.mapError((error): RateLimitedError => {
-          if (error._tag === "RateLimitedError") return error as RateLimitedError
-          return new RateLimitedError({ retryAfter: 0, resource: `/users/${userId}/mailFolders` })
-        }),
-      )
+    const listFolders = Effect.fn("MailService.listFolders")(
+      function* (userId: string) {
+        return yield* client
+          .get(`/users/${encodeURIComponent(userId)}/mailFolders`, MailFolderPageSchema)
+          .pipe(
+            Effect.mapError(
+              Match.type<MsGraphError>().pipe(
+                Match.tag("RateLimitedError", (e) => e),
+                Match.orElse(
+                  () =>
+                    new RateLimitedError({
+                      retryAfter: 0,
+                      resource: `/users/${userId}/mailFolders`,
+                    }),
+                ),
+              ),
+            ),
+          )
+      },
+    )
 
-    const listAttachments = (userId: string, messageId: string) =>
-      pipe(
-        client.get(
-          `/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}/attachments`,
-          AttachmentPageSchema,
-        ),
-        Effect.map((page) => page.value),
-        Effect.mapError(narrowToNotFoundOrRateLimit),
-      )
+    const listAttachments = Effect.fn("MailService.listAttachments")(
+      function* (userId: string, messageId: string) {
+        return yield* client
+          .get(
+            `/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}/attachments`,
+            AttachmentPageSchema,
+          )
+          .pipe(
+            Effect.map((page) => page.value),
+            Effect.mapError(narrowToNotFoundOrRateLimit),
+          )
+      },
+    )
 
-    const downloadAttachment = (userId: string, messageId: string, attachmentId: string) =>
-      pipe(
-        client.stream(
-          `/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/$value`,
-        ),
-        Effect.flatMap((byteStream) =>
-          Effect.succeed(
-            Stream.mapError(byteStream, (error): RateLimitedError => {
-              if (error._tag === "RateLimitedError") return error as RateLimitedError
-              return new RateLimitedError({
-                retryAfter: 0,
-                resource: `/users/${userId}/messages/${messageId}/attachments/${attachmentId}/$value`,
-              })
-            }),
+    const downloadAttachment = Effect.fn("MailService.downloadAttachment")(
+      function* (userId: string, messageId: string, attachmentId: string) {
+        const byteStream = yield* client
+          .stream(
+            `/users/${encodeURIComponent(userId)}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}/$value`,
+          )
+          .pipe(
+            Effect.mapError(
+              Match.type<MsGraphError>().pipe(
+                Match.tag("ResourceNotFound", (e) => e),
+                Match.orElse(
+                  () =>
+                    new ResourceNotFoundError({
+                      resource: "Attachment",
+                      id: attachmentId,
+                    }),
+                ),
+              ),
+            ),
+          )
+        return Stream.mapError(
+          byteStream,
+          Match.type<MsGraphError>().pipe(
+            Match.tag("RateLimitedError", (e) => e),
+            Match.orElse(
+              () =>
+                new RateLimitedError({
+                  retryAfter: 0,
+                  resource: `/users/${userId}/messages/${messageId}/attachments/${attachmentId}/$value`,
+                }),
+            ),
           ),
-        ),
-        Effect.mapError((error): ResourceNotFoundError => {
-          if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-          return new ResourceNotFoundError({ resource: "Attachment", id: attachmentId })
-        }),
-      )
+        )
+      },
+    )
 
     return MailService.of({
       listMessages,

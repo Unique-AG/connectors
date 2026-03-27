@@ -1,6 +1,6 @@
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
 import { NodeHttpClient } from "@effect/platform-node"
-import { Effect, Layer, Option, Schema, Stream, pipe } from "effect"
+import { Effect, Layer, Match, Option, Schema, Stream, pipe } from "effect"
 import type { AuthFlow } from "../Auth/MsGraphAuth"
 import { ApplicationAuth, DelegatedAuth } from "../Auth/MsGraphAuth"
 import type { MsGraphAuthInterface } from "../Auth/MsGraphAuth"
@@ -83,139 +83,121 @@ const makeHttpClient = (
   auth: MsGraphAuthInterface,
   httpClient: HttpClient.HttpClient,
 ): MsGraphHttpClient["Service"] => {
-  const authorizeAndExecute = (
-    request: HttpClientRequest.HttpClientRequest,
-  ): Effect.Effect<HttpClientResponse.HttpClientResponse, MsGraphError> =>
-    pipe(
-      auth.acquireToken,
-      Effect.flatMap((tokenInfo) =>
-        pipe(
-          request,
-          HttpClientRequest.setHeader("Authorization", `${tokenInfo.tokenType} ${tokenInfo.accessToken}`),
-          HttpClientRequest.setHeader("Content-Type", "application/json"),
-          httpClient.execute,
-        ),
-      ),
-      Effect.mapError((error): MsGraphError => {
-        if (error instanceof TokenExpiredError) return error
-        return new TokenExpiredError({ expiredAt: Date.now() })
-      }),
-      Effect.scoped,
-    )
+  const authorizeAndExecute = Effect.fn("MsGraphHttpClient.authorizeAndExecute")(
+    function*(request: HttpClientRequest.HttpClientRequest) {
+      const tokenInfo = yield* auth.acquireToken
+      return yield* pipe(
+        request,
+        HttpClientRequest.setHeader("Authorization", `${tokenInfo.tokenType} ${tokenInfo.accessToken}`),
+        HttpClientRequest.setHeader("Content-Type", "application/json"),
+        httpClient.execute,
+      )
+    },
+    Effect.mapError((error): MsGraphError => {
+      if (error instanceof TokenExpiredError) return error
+      return new TokenExpiredError({ expiredAt: Date.now() })
+    }),
+    Effect.scoped,
+  )
 
   const checkStatus = (
     response: HttpClientResponse.HttpClientResponse,
     resource: string,
-  ): Effect.Effect<HttpClientResponse.HttpClientResponse, MsGraphError> => {
-    if (response.status >= 200 && response.status < 300) {
-      return Effect.succeed(response)
-    }
-    return handleErrorResponse(response, resource)
-  }
+  ): Effect.Effect<HttpClientResponse.HttpClientResponse, MsGraphError> =>
+    Match.value(response.status).pipe(
+      Match.when((s) => s >= 200 && s < 300, () => Effect.succeed(response)),
+      Match.orElse(() => handleErrorResponse(response, resource)),
+    )
 
-  const get = <A>(
+  const get = Effect.fn("MsGraphHttpClient.get")(function*<A>(
     path: string,
     schema: Schema.Schema<A>,
-  ): Effect.Effect<A, MsGraphError> => {
+  ): Effect.fn.Return<A, MsGraphError> {
     const url = path.startsWith("https://") ? path : `${BASE_URL}${path}`
-    return pipe(
-      authorizeAndExecute(HttpClientRequest.get(url)),
-      Effect.flatMap((response) => checkStatus(response, path)),
-      Effect.flatMap(decodeResponse(schema)),
-      Effect.retry(rateLimitSchedule),
-    )
-  }
+    const response = yield* authorizeAndExecute(HttpClientRequest.get(url))
+    const checked = yield* checkStatus(response, path)
+    return yield* decodeResponse(schema)(checked)
+  },
+  Effect.retry(rateLimitSchedule),
+  )
 
-  const post = <A>(
+  const post = Effect.fn("MsGraphHttpClient.post")(function*<A>(
     path: string,
     body: unknown,
     schema: Schema.Schema<A>,
-  ): Effect.Effect<A, MsGraphError> => {
+  ): Effect.fn.Return<A, MsGraphError> {
     const url = path.startsWith("https://") ? path : `${BASE_URL}${path}`
-    return pipe(
-      Effect.flatMap(
-        Effect.tryPromise({
-          try: () => Promise.resolve(JSON.stringify(body)),
-          catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: undefined, details: [] }),
-        }),
-        (json) => authorizeAndExecute(
-          HttpClientRequest.post(url).pipe(
-            HttpClientRequest.setHeader("Content-Type", "application/json"),
-            HttpClientRequest.bodyText(json, "application/json"),
-          ),
-        ),
+    const json = yield* Effect.try({
+      try: () => JSON.stringify(body),
+      catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: undefined, details: [] }),
+    })
+    const response = yield* authorizeAndExecute(
+      HttpClientRequest.post(url).pipe(
+        HttpClientRequest.setHeader("Content-Type", "application/json"),
+        HttpClientRequest.bodyText(json, "application/json"),
       ),
-      Effect.flatMap((response) => checkStatus(response, path)),
-      Effect.flatMap(decodeResponse(schema)),
-      Effect.retry(rateLimitSchedule),
     )
-  }
+    const checked = yield* checkStatus(response, path)
+    return yield* decodeResponse(schema)(checked)
+  },
+  Effect.retry(rateLimitSchedule),
+  )
 
-  const postVoid = (
+  const postVoid = Effect.fn("MsGraphHttpClient.postVoid")(function*(
     path: string,
     body: unknown,
-  ): Effect.Effect<void, MsGraphError> => {
+  ): Effect.fn.Return<void, MsGraphError> {
     const url = path.startsWith("https://") ? path : `${BASE_URL}${path}`
-    return pipe(
-      Effect.flatMap(
-        Effect.tryPromise({
-          try: () => Promise.resolve(JSON.stringify(body)),
-          catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: undefined, details: [] }),
-        }),
-        (json) => authorizeAndExecute(
-          HttpClientRequest.post(url).pipe(
-            HttpClientRequest.setHeader("Content-Type", "application/json"),
-            HttpClientRequest.bodyText(json, "application/json"),
-          ),
-        ),
+    const json = yield* Effect.try({
+      try: () => JSON.stringify(body),
+      catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: undefined, details: [] }),
+    })
+    const response = yield* authorizeAndExecute(
+      HttpClientRequest.post(url).pipe(
+        HttpClientRequest.setHeader("Content-Type", "application/json"),
+        HttpClientRequest.bodyText(json, "application/json"),
       ),
-      Effect.flatMap((response) => {
-        if (response.status >= 200 && response.status < 300) {
-          return Effect.void
-        }
-        return handleErrorResponse(response, path)
-      }),
-      Effect.retry(rateLimitSchedule),
     )
-  }
+    yield* Match.value(response.status).pipe(
+      Match.when((s) => s >= 200 && s < 300, () => Effect.void),
+      Match.orElse(() => handleErrorResponse(response, path)),
+    )
+  },
+  Effect.retry(rateLimitSchedule),
+  )
 
-  const patch = <A>(
+  const patch = Effect.fn("MsGraphHttpClient.patch")(function*<A>(
     path: string,
     body: unknown,
     schema: Schema.Schema<A>,
     headers?: Record<string, string>,
-  ): Effect.Effect<A, MsGraphError> => {
+  ): Effect.fn.Return<A, MsGraphError> {
     const url = path.startsWith("https://") ? path : `${BASE_URL}${path}`
-    return pipe(
-      Effect.flatMap(
-        Effect.tryPromise({
-          try: () => Promise.resolve(JSON.stringify(body)),
-          catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: undefined, details: [] }),
-        }),
-        (json) => {
-          const baseRequest = HttpClientRequest.patch(url).pipe(
-            HttpClientRequest.setHeader("Content-Type", "application/json"),
-            HttpClientRequest.bodyText(json, "application/json"),
-          )
-          const withExtraHeaders = headers
-            ? Object.entries(headers).reduce(
-                (r, [k, v]) => HttpClientRequest.setHeader(k, v)(r),
-                baseRequest,
-              )
-            : baseRequest
-          return authorizeAndExecute(withExtraHeaders)
-        },
-      ),
-      Effect.flatMap((response) => checkStatus(response, path)),
-      Effect.flatMap(decodeResponse(schema)),
-      Effect.retry(rateLimitSchedule),
+    const json = yield* Effect.try({
+      try: () => JSON.stringify(body),
+      catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: undefined, details: [] }),
+    })
+    const baseRequest = HttpClientRequest.patch(url).pipe(
+      HttpClientRequest.setHeader("Content-Type", "application/json"),
+      HttpClientRequest.bodyText(json, "application/json"),
     )
-  }
+    const withExtraHeaders = headers
+      ? Object.entries(headers).reduce(
+          (r, [k, v]) => HttpClientRequest.setHeader(k, v)(r),
+          baseRequest,
+        )
+      : baseRequest
+    const response = yield* authorizeAndExecute(withExtraHeaders)
+    const checked = yield* checkStatus(response, path)
+    return yield* decodeResponse(schema)(checked)
+  },
+  Effect.retry(rateLimitSchedule),
+  )
 
-  const del = (
+  const del = Effect.fn("MsGraphHttpClient.delete")(function*(
     path: string,
     headers?: Record<string, string>,
-  ): Effect.Effect<void, MsGraphError> => {
+  ): Effect.fn.Return<void, MsGraphError> {
     const url = path.startsWith("https://") ? path : `${BASE_URL}${path}`
     const baseRequest = HttpClientRequest.delete(url)
     const withExtraHeaders = headers
@@ -224,56 +206,49 @@ const makeHttpClient = (
           baseRequest,
         )
       : baseRequest
-
-    return pipe(
-      authorizeAndExecute(withExtraHeaders),
-      Effect.flatMap((response) => {
-        if (response.status >= 200 && response.status < 300) {
-          return Effect.void
-        }
-        return handleErrorResponse(response, path)
-      }),
-      Effect.retry(rateLimitSchedule),
+    const response = yield* authorizeAndExecute(withExtraHeaders)
+    yield* Match.value(response.status).pipe(
+      Match.when((s) => s >= 200 && s < 300, () => Effect.void),
+      Match.orElse(() => handleErrorResponse(response, path)),
     )
-  }
+  },
+  Effect.retry(rateLimitSchedule),
+  )
 
-  const stream = (
+  const stream = Effect.fn("MsGraphHttpClient.stream")(function*(
     path: string,
-  ): Effect.Effect<Stream.Stream<Uint8Array, MsGraphError>, MsGraphError> => {
+  ): Effect.fn.Return<Stream.Stream<Uint8Array, MsGraphError>, MsGraphError> {
     const url = path.startsWith("https://") ? path : `${BASE_URL}${path}`
-    return pipe(
-      auth.acquireToken,
-      Effect.flatMap((tokenInfo) =>
-        pipe(
-          HttpClientRequest.get(url),
-          HttpClientRequest.setHeader("Authorization", `${tokenInfo.tokenType} ${tokenInfo.accessToken}`),
-          httpClient.execute,
-        ),
-      ),
+    const tokenInfo = yield* auth.acquireToken
+    const response = yield* pipe(
+      HttpClientRequest.get(url),
+      HttpClientRequest.setHeader("Authorization", `${tokenInfo.tokenType} ${tokenInfo.accessToken}`),
+      httpClient.execute,
       Effect.mapError((error): MsGraphError => {
         if (error instanceof TokenExpiredError) return error
         return new TokenExpiredError({ expiredAt: Date.now() })
       }),
-      Effect.flatMap((response) => {
-        if (response.status >= 200 && response.status < 300) {
-          const byteStream = pipe(
-            response.stream,
-            Stream.mapError((error): MsGraphError =>
-              new InvalidRequestError({
-                code: "StreamError",
-                message: String(error),
-                target: path,
-                details: [],
-              }),
-            ),
-          )
-          return Effect.succeed(byteStream)
-        }
-        return handleErrorResponse(response, path)
-      }),
-      Effect.scoped,
     )
-  }
+    return yield* Match.value(response.status).pipe(
+      Match.when((s) => s >= 200 && s < 300, () => {
+        const byteStream = pipe(
+          response.stream,
+          Stream.mapError((error): MsGraphError =>
+            new InvalidRequestError({
+              code: "StreamError",
+              message: String(error),
+              target: path,
+              details: [],
+            }),
+          ),
+        )
+        return Effect.succeed(byteStream)
+      }),
+      Match.orElse(() => handleErrorResponse(response, path)),
+    )
+  },
+  Effect.scoped,
+  )
 
   return MsGraphHttpClient.of({ get, post, postVoid, patch, delete: del, stream })
 }

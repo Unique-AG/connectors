@@ -1,6 +1,6 @@
 import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { NodeHttpClient } from "@effect/platform-node"
-import { Effect, Layer, Option, Ref, pipe } from "effect"
+import { Effect, Layer, Option, Ref, Result, Schema } from "effect"
 import { AuthenticationFailedError } from "../Errors/errors"
 import type { AccessTokenInfo, MsGraphAuthInterface } from "./MsGraphAuth"
 import { ManagedIdentityAuth } from "./MsGraphAuth"
@@ -11,18 +11,20 @@ const IMDS_ENDPOINT =
   "http://169.254.169.254/metadata/identity/oauth2/token"
 const IMDS_API_VERSION = "2018-02-01"
 
-interface ImdsTokenResponse {
-  readonly access_token: string
-  readonly expires_on: string
-  readonly resource: string
-  readonly token_type: string
-  readonly client_id?: string
-}
+const ImdsTokenResponseSchema = Schema.Struct({
+  access_token: Schema.String,
+  expires_on: Schema.String,
+  resource: Schema.String,
+  token_type: Schema.String,
+  client_id: Schema.optionalKey(Schema.String),
+})
 
-interface ImdsErrorResponse {
-  readonly error: string
-  readonly error_description: string
-}
+const ImdsErrorResponseSchema = Schema.Struct({
+  error: Schema.String,
+  error_description: Schema.optionalKey(Schema.String),
+})
+
+type ImdsTokenResponse = typeof ImdsTokenResponseSchema.Type
 
 const extractResourceFromScope = (scope: string): string => {
   if (scope.endsWith("/.default")) {
@@ -36,45 +38,41 @@ const extractResourceFromScope = (scope: string): string => {
   }
 }
 
-const parseImdsJson = (
-  json: unknown,
-): Effect.Effect<ImdsTokenResponse, AuthenticationFailedError> => {
-  if (
-    typeof json !== "object" ||
-    json === null ||
-    !("access_token" in json) ||
-    typeof (json as Record<string, unknown>)["access_token"] !== "string"
-  ) {
-    if (
-      typeof json === "object" &&
-      json !== null &&
-      "error_description" in json
-    ) {
-      const errJson = json as ImdsErrorResponse
-      return Effect.fail(
+const parseImdsJson = Effect.fn("ManagedIdentityAuth.parseImdsJson")(
+  function*(json: unknown): Effect.fn.Return<ImdsTokenResponse, AuthenticationFailedError> {
+    const errorCheck = Schema.decodeUnknownResult(ImdsErrorResponseSchema)(json)
+    const errorDescription = Result.match(errorCheck, {
+      onSuccess: (r) => r.error_description,
+      onFailure: () => undefined,
+    })
+    if (errorDescription) {
+      return yield* Effect.fail(
         new AuthenticationFailedError({
           reason: "unknown",
-          message: `IMDS token acquisition failed: ${errJson.error_description}`,
+          message: `IMDS token acquisition failed: ${errorDescription}`,
           correlationId: undefined,
         }),
       )
     }
-    return Effect.fail(
-      new AuthenticationFailedError({
-        reason: "unknown",
-        message: `Unexpected IMDS response shape: ${JSON.stringify(json)}`,
-        correlationId: undefined,
-      }),
-    )
-  }
-  return Effect.succeed(json as ImdsTokenResponse)
-}
 
-const acquireFromImds = (
-  scopes: ReadonlyArray<string>,
-  clientId?: string,
-): Effect.Effect<ImdsTokenResponse, AuthenticationFailedError> =>
-  Effect.gen(function* () {
+    return yield* Schema.decodeUnknownEffect(ImdsTokenResponseSchema)(json).pipe(
+      Effect.mapError(
+        (e) =>
+          new AuthenticationFailedError({
+            reason: "unknown",
+            message: `Unexpected IMDS response shape: ${e.message}`,
+            correlationId: undefined,
+          }),
+      ),
+    )
+  },
+)
+
+const acquireFromImds = Effect.fn("ManagedIdentityAuth.acquireFromImds")(
+  function*(
+    scopes: ReadonlyArray<string>,
+    clientId?: string,
+  ): Effect.fn.Return<ImdsTokenResponse, AuthenticationFailedError> {
     const primaryScope = scopes[0]
     if (!primaryScope) {
       return yield* Effect.fail(
@@ -104,8 +102,7 @@ const acquireFromImds = (
 
     const imdsUrl = `${IMDS_ENDPOINT}?${queryString}`
 
-    const json = yield* pipe(
-      HttpClientRequest.get(imdsUrl),
+    const json = yield* HttpClientRequest.get(imdsUrl).pipe(
       HttpClientRequest.setHeader("Metadata", "true"),
       HttpClient.execute,
       Effect.flatMap((resp) => resp.json),
@@ -122,7 +119,8 @@ const acquireFromImds = (
     )
 
     return yield* parseImdsJson(json)
-  })
+  },
+)
 
 const parseImdsExpiresOn = (expiresOn: string): Date => {
   const asUnixSeconds = Number(expiresOn)
@@ -132,6 +130,38 @@ const parseImdsExpiresOn = (expiresOn: string): Date => {
   return new Date(expiresOn)
 }
 
+const acquireManagedIdentityToken = Effect.fn("ManagedIdentityAuth.acquireManagedIdentityToken")(
+  function*(
+    config: { readonly scopes: ReadonlyArray<string>; readonly clientId?: string },
+    cachedRef: Ref.Ref<Option.Option<AccessTokenInfo>>,
+  ): Effect.fn.Return<AccessTokenInfo, AuthenticationFailedError> {
+    const cached = yield* Ref.get(cachedRef).pipe(
+      Effect.map(Option.filter((token) => !isTokenExpired(token.expiresOn, REFRESH_BUFFER_MS))),
+    )
+
+    return yield* Option.match(cached, {
+      onSome: (token) => Effect.succeed(token),
+      onNone: () =>
+        Effect.gen(function* () {
+          const raw = yield* acquireFromImds(config.scopes, config.clientId)
+
+          const expiresOn = parseImdsExpiresOn(raw.expires_on)
+          const tokenInfo: AccessTokenInfo = {
+            accessToken: raw.access_token,
+            expiresOn,
+            scopes: [...config.scopes],
+            account: null,
+            tokenType: "Bearer",
+          }
+
+          yield* Ref.set(cachedRef, Option.some(tokenInfo))
+
+          return tokenInfo
+        }),
+    })
+  },
+)
+
 const makeService = (
   config: {
     readonly scopes: ReadonlyArray<string>
@@ -139,38 +169,9 @@ const makeService = (
   },
   cachedRef: Ref.Ref<Option.Option<AccessTokenInfo>>,
 ): MsGraphAuthInterface => {
-  const acquireToken: Effect.Effect<
-    AccessTokenInfo,
-    AuthenticationFailedError
-  > = Effect.gen(function* () {
-    const cached = yield* Ref.get(cachedRef)
-
-    if (Option.isSome(cached)) {
-      const token = cached.value
-      if (!isTokenExpired(token.expiresOn, REFRESH_BUFFER_MS)) {
-        return token
-      }
-    }
-
-    const raw = yield* acquireFromImds(config.scopes, config.clientId)
-
-    const expiresOn = parseImdsExpiresOn(raw.expires_on)
-    const tokenInfo: AccessTokenInfo = {
-      accessToken: raw.access_token,
-      expiresOn,
-      scopes: [...config.scopes],
-      account: null,
-      tokenType: "Bearer",
-    }
-
-    yield* Ref.set(cachedRef, Option.some(tokenInfo))
-
-    return tokenInfo
-  })
-
   return {
     grantedScopes: config.scopes,
-    acquireToken,
+    acquireToken: acquireManagedIdentityToken(config, cachedRef),
     getCachedAccounts: Effect.succeed([]),
     removeCachedAccount: (_accountId: string) =>
       Ref.set(cachedRef, Option.none()),

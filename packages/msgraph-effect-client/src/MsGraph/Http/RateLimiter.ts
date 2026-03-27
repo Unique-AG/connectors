@@ -1,15 +1,13 @@
-import { Duration, Effect, Schedule } from "effect"
-import type { MsGraphError, RateLimitedError, ServiceUnavailableError } from "../Errors/errors"
+import { Effect, Match, Schedule } from "effect"
+import type { MsGraphError } from "../Errors/errors"
 
 const MAX_RETRIES = 3
 
-const isRetryableError = (
-  error: MsGraphError,
-): error is RateLimitedError | ServiceUnavailableError =>
-  error._tag === "RateLimitedError" || error._tag === "ServiceUnavailable"
-
-const baseExponential: Schedule.Schedule<Duration.Duration, unknown, never, never> =
-  Schedule.exponential(Duration.seconds(1), 2).pipe(Schedule.jittered)
+const isRetryableError = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", () => true),
+  Match.tag("ServiceUnavailable", () => true),
+  Match.orElse(() => false),
+)
 
 export const rateLimitSchedule: Schedule.Schedule<number, MsGraphError, never, never> =
   Schedule.recurs(MAX_RETRIES).pipe(

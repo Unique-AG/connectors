@@ -1,8 +1,7 @@
-import { Effect, Layer, Schema, Stream, pipe } from "effect"
+import { Effect, Layer, Match, Schema, Stream } from "effect"
 import type { ApplicationAuth, DelegatedAuth } from "../Auth/MsGraphAuth"
 import {
   InvalidRequestError,
-  QuotaExceededError,
   RateLimitedError,
   ResourceNotFoundError,
 } from "../Errors/errors"
@@ -22,10 +21,8 @@ const CHUNK_SIZE = 320 * 1024
 
 const DriveItemPageSchema = ODataPage(DriveItemSchema)
 
-const collectStream = (
-  stream: Stream.Stream<Uint8Array>,
-): Effect.Effect<Uint8Array, never> =>
-  Effect.gen(function* () {
+const collectStream = Effect.fn("DriveService.collectStream")(
+  function* (stream: Stream.Stream<Uint8Array>) {
     const chunks = yield* Stream.runCollect(stream)
     const totalLength = Array.from(chunks).reduce(
       (acc, chunk) => acc + chunk.length,
@@ -38,14 +35,15 @@ const collectStream = (
       offset += chunk.length
     }
     return result
-  })
+  },
+)
 
-const uploadChunks = (
-  uploadUrl: string,
-  content: Stream.Stream<Uint8Array>,
-  fileSize: number,
-): Effect.Effect<DriveItem, MsGraphError> =>
-  Effect.gen(function* () {
+const uploadChunks = Effect.fn("DriveService.uploadChunks")(
+  function* (
+    uploadUrl: string,
+    content: Stream.Stream<Uint8Array>,
+    fileSize: number,
+  ): Effect.fn.Return<DriveItem, MsGraphError> {
     const allBytes = yield* collectStream(content)
 
     let position = 0
@@ -56,8 +54,8 @@ const uploadChunks = (
       const chunk = allBytes.slice(position, end)
       const contentRange = `bytes ${position}-${end - 1}/${fileSize}`
 
-      const response = yield* Effect.tryPromise({
-        try: () =>
+      const fetchResponse = yield* Effect.tryPromise({
+        try: async () =>
           fetch(uploadUrl, {
             method: "PUT",
             headers: {
@@ -66,11 +64,22 @@ const uploadChunks = (
               "Content-Type": "application/octet-stream",
             },
             body: chunk,
-          }).then((r) => r.json()),
+          }),
         catch: () =>
           new InvalidRequestError({
             code: "UploadChunkFailed",
             message: "Failed to upload chunk to upload session URL",
+            target: undefined,
+            details: [],
+          }),
+      })
+
+      const response = yield* Effect.tryPromise({
+        try: async () => fetchResponse.json(),
+        catch: () =>
+          new InvalidRequestError({
+            code: "UploadChunkFailed",
+            message: "Failed to parse upload chunk response",
             target: undefined,
             details: [],
           }),
@@ -108,104 +117,139 @@ const uploadChunks = (
           details: [],
         }),
     )
-  })
+  },
+)
 
-const narrowToQuotaOrRateLimit = (
-  error: MsGraphError,
-): QuotaExceededError | RateLimitedError => {
-  if (error._tag === "RateLimitedError") return error as RateLimitedError
-  if (error._tag === "QuotaExceeded") return error as QuotaExceededError
-  return new RateLimitedError({ retryAfter: 0, resource: "drive" })
-}
+const narrowToQuotaOrRateLimit = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("QuotaExceeded", (e) => e),
+  Match.orElse(() => new RateLimitedError({ retryAfter: 0, resource: "drive" })),
+)
 
-const narrowToNotFoundOrRateLimit = (
-  error: MsGraphError,
-): ResourceNotFoundError | RateLimitedError => {
-  if (error._tag === "RateLimitedError") return error as RateLimitedError
-  if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-  return new ResourceNotFoundError({ resource: "driveItem", id: "unknown" })
-}
+const narrowToNotFoundOrRateLimit = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.orElse(
+    () => new ResourceNotFoundError({ resource: "driveItem", id: "unknown" }),
+  ),
+)
 
 export const DriveServiceLive = Layer.effect(
   DriveService,
   Effect.gen(function* () {
     const http = yield* MsGraphHttpClient
 
-    return DriveService.of({
-      listItems: (driveId, folderId, params) => {
+    const listItems = Effect.fn("DriveService.listItems")(
+      function* (
+        driveId: string,
+        folderId?: string,
+        params?: ODataParams<DriveItem>,
+      ) {
         const basePath = folderId
           ? `/drives/${driveId}/items/${folderId}/children`
           : `/drives/${driveId}/root/children`
         const qs = params
           ? buildQueryString<DriveItem>(params as ODataParams<DriveItem>)
           : ""
-        return pipe(
-          http.get(`${basePath}${qs}`, DriveItemPageSchema),
+        return yield* http.get(`${basePath}${qs}`, DriveItemPageSchema).pipe(
           Effect.mapError(narrowToNotFoundOrRateLimit),
         )
       },
+    )
 
-      getItem: (driveId, itemId) =>
-        pipe(
-          http.get(`/drives/${driveId}/items/${itemId}`, DriveItemSchema),
-          Effect.mapError(narrowToNotFoundOrRateLimit),
-        ),
+    const getItem = Effect.fn("DriveService.getItem")(
+      function* (driveId: string, itemId: string) {
+        return yield* http
+          .get(`/drives/${driveId}/items/${itemId}`, DriveItemSchema)
+          .pipe(Effect.mapError(narrowToNotFoundOrRateLimit))
+      },
+    )
 
-      getByPath: (driveId, path) =>
-        pipe(
-          http.get(`/drives/${driveId}/root:/${path}`, DriveItemSchema),
-          Effect.mapError(narrowToNotFoundOrRateLimit),
-        ),
+    const getByPath = Effect.fn("DriveService.getByPath")(
+      function* (driveId: string, path: string) {
+        return yield* http
+          .get(`/drives/${driveId}/root:/${path}`, DriveItemSchema)
+          .pipe(Effect.mapError(narrowToNotFoundOrRateLimit))
+      },
+    )
 
-      downloadContent: (driveId, itemId) =>
-        pipe(
-          http.stream(`/drives/${driveId}/items/${itemId}/content`),
-          Effect.map((stream) =>
-            Stream.mapError(stream, (error): RateLimitedError => {
-              if (error._tag === "RateLimitedError")
-                return error as RateLimitedError
-              return new RateLimitedError({
-                retryAfter: 0,
-                resource: `/drives/${driveId}/items/${itemId}/content`,
-              })
-            }),
+    const downloadContent = Effect.fn("DriveService.downloadContent")(
+      function* (driveId: string, itemId: string) {
+        const stream = yield* http
+          .stream(`/drives/${driveId}/items/${itemId}/content`)
+          .pipe(
+            Effect.mapError(
+              Match.type<MsGraphError>().pipe(
+                Match.tag("ResourceNotFound", (e) => e),
+                Match.orElse(
+                  () =>
+                    new ResourceNotFoundError({
+                      resource: "driveItem",
+                      id: itemId,
+                    }),
+                ),
+              ),
+            ),
+          )
+        return Stream.mapError(
+          stream,
+          Match.type<MsGraphError>().pipe(
+            Match.tag("RateLimitedError", (e) => e),
+            Match.orElse(
+              () =>
+                new RateLimitedError({
+                  retryAfter: 0,
+                  resource: `/drives/${driveId}/items/${itemId}/content`,
+                }),
+            ),
           ),
-          Effect.mapError((error): ResourceNotFoundError => {
-            if (error._tag === "ResourceNotFound")
-              return error as ResourceNotFoundError
-            return new ResourceNotFoundError({
-              resource: "driveItem",
-              id: itemId,
-            })
-          }),
-        ),
+        )
+      },
+    )
 
-      uploadSmall: (driveId, parentPath, fileName, _content, _contentType) =>
-        pipe(
-          http.post(
+    const uploadSmall = Effect.fn("DriveService.uploadSmall")(
+      function* (
+        driveId: string,
+        parentPath: string,
+        fileName: string,
+        _content: Uint8Array,
+        _contentType: string,
+      ) {
+        return yield* http
+          .post(
             `/drives/${driveId}/root:/${parentPath}/${fileName}:/content`,
             {},
             DriveItemSchema,
-          ),
-          Effect.mapError(narrowToQuotaOrRateLimit),
-        ),
+          )
+          .pipe(Effect.mapError(narrowToQuotaOrRateLimit))
+      },
+    )
 
-      uploadSession: (driveId, parentPath, fileName, content, fileSize) =>
-        pipe(
-          Effect.gen(function* () {
-            const session = yield* http.post(
-              `/drives/${driveId}/root:/${parentPath}/${fileName}:/createUploadSession`,
-              { item: { "@microsoft.graph.conflictBehavior": "replace" } },
-              UploadSessionSchema,
-            )
-            return yield* uploadChunks(session.uploadUrl, content, fileSize)
-          }),
+    const uploadSession = Effect.fn("DriveService.uploadSession")(
+      function* (
+        driveId: string,
+        parentPath: string,
+        fileName: string,
+        content: Stream.Stream<Uint8Array>,
+        fileSize: number,
+      ) {
+        const session = yield* http
+          .post(
+            `/drives/${driveId}/root:/${parentPath}/${fileName}:/createUploadSession`,
+            { item: { "@microsoft.graph.conflictBehavior": "replace" } },
+            UploadSessionSchema,
+          )
+          .pipe(Effect.mapError(narrowToQuotaOrRateLimit))
+        return yield* uploadChunks(session.uploadUrl, content, fileSize).pipe(
           Effect.mapError(narrowToQuotaOrRateLimit),
-        ),
+        )
+      },
+    )
 
-      createFolder: (driveId, parentId, name) =>
-        pipe(
-          http.post(
+    const createFolder = Effect.fn("DriveService.createFolder")(
+      function* (driveId: string, parentId: string, name: string) {
+        return yield* http
+          .post(
             `/drives/${driveId}/items/${parentId}/children`,
             {
               name,
@@ -213,47 +257,85 @@ export const DriveServiceLive = Layer.effect(
               "@microsoft.graph.conflictBehavior": "rename",
             },
             DriveItemSchema,
-          ),
-          Effect.mapError(
-            (error): RateLimitedError | InvalidRequestError => {
-              if (error._tag === "RateLimitedError") return error as RateLimitedError
-              if (error._tag === "InvalidRequest") return error as InvalidRequestError
-              return new RateLimitedError({ retryAfter: 0, resource: `/drives/${driveId}/items/${parentId}/children` })
-            },
-          ),
-        ),
+          )
+          .pipe(
+            Effect.mapError(
+              Match.type<MsGraphError>().pipe(
+                Match.tag("RateLimitedError", (e) => e),
+                Match.tag("InvalidRequest", (e) => e),
+                Match.orElse(
+                  () =>
+                    new RateLimitedError({
+                      retryAfter: 0,
+                      resource: `/drives/${driveId}/items/${parentId}/children`,
+                    }),
+                ),
+              ),
+            ),
+          )
+      },
+    )
 
-      delete: (driveId, itemId) =>
-        pipe(
-          http.delete(`/drives/${driveId}/items/${itemId}`),
-          Effect.mapError(narrowToNotFoundOrRateLimit),
-        ),
+    const deleteItem = Effect.fn("DriveService.delete")(
+      function* (driveId: string, itemId: string) {
+        return yield* http
+          .delete(`/drives/${driveId}/items/${itemId}`)
+          .pipe(Effect.mapError(narrowToNotFoundOrRateLimit))
+      },
+    )
 
-      search: (driveId, query) =>
-        pipe(
-          http.get(
+    const search = Effect.fn("DriveService.search")(
+      function* (driveId: string, query: string) {
+        return yield* http
+          .get(
             `/drives/${driveId}/root/search(q='${encodeURIComponent(query)}')`,
             DriveItemPageSchema,
-          ),
-          Effect.mapError((error): RateLimitedError => {
-            if (error._tag === "RateLimitedError")
-              return error as RateLimitedError
-            return new RateLimitedError({
-              retryAfter: 0,
-              resource: `/drives/${driveId}/root/search`,
-            })
-          }),
-        ),
+          )
+          .pipe(
+            Effect.mapError(
+              Match.type<MsGraphError>().pipe(
+                Match.tag("RateLimitedError", (e) => e),
+                Match.orElse(
+                  () =>
+                    new RateLimitedError({
+                      retryAfter: 0,
+                      resource: `/drives/${driveId}/root/search`,
+                    }),
+                ),
+              ),
+            ),
+          )
+      },
+    )
 
-      createSharingLink: (driveId, itemId, type, scope) =>
-        pipe(
-          http.post(
+    const createSharingLink = Effect.fn("DriveService.createSharingLink")(
+      function* (
+        driveId: string,
+        itemId: string,
+        type: "view" | "edit",
+        scope: "anonymous" | "organization",
+      ) {
+        return yield* http
+          .post(
             `/drives/${driveId}/items/${itemId}/createLink`,
             { type, scope },
             SharingLinkSchema,
-          ),
-          Effect.mapError(narrowToNotFoundOrRateLimit),
-        ),
+          )
+          .pipe(Effect.mapError(narrowToNotFoundOrRateLimit))
+      },
+    )
+
+    return DriveService.of({
+      listItems,
+      getItem,
+      getByPath,
+      downloadContent,
+      uploadSmall,
+      uploadSession,
+      createFolder,
+      delete: deleteItem,
+      search,
+      createSharingLink,
     })
   }),
 ) as Layer.Layer<

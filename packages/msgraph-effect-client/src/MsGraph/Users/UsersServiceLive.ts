@@ -1,4 +1,4 @@
-import { Effect, Layer, Stream, pipe } from "effect"
+import { Effect, Layer, Match, Stream } from "effect"
 import { ApplicationAuth } from "../Auth/MsGraphAuth"
 import {
   InvalidRequestError,
@@ -15,21 +15,29 @@ import { UsersService } from "./UsersService"
 
 const UserPageSchema = ODataPage(UserSchema)
 
-const narrowToRateLimit = (error: MsGraphError): RateLimitedError | InvalidRequestError => {
-  if (error._tag === "RateLimitedError") return error as RateLimitedError
-  return new InvalidRequestError({
-    code: error._tag,
-    message: "Unexpected error",
-    target: undefined,
-    details: [],
-  })
-}
+const narrowToRateLimit = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.orElse(
+    (e) =>
+      new InvalidRequestError({
+        code: e._tag,
+        message: "Unexpected error",
+        target: undefined,
+        details: [],
+      }),
+  ),
+)
 
-const narrowToNotFoundOrRateLimit = (error: MsGraphError): ResourceNotFoundError | RateLimitedError => {
-  if (error._tag === "RateLimitedError") return error as RateLimitedError
-  if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-  return new ResourceNotFoundError({ resource: "User", id: "unknown" })
-}
+const narrowToNotFoundOrRateLimit = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.orElse(() => new ResourceNotFoundError({ resource: "User", id: "unknown" })),
+)
+
+const narrowToRateLimitForMe = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.orElse(() => new RateLimitedError({ retryAfter: 0, resource: "/me" })),
+)
 
 export const UsersServiceLive: Layer.Layer<
   UsersService,
@@ -40,70 +48,90 @@ export const UsersServiceLive: Layer.Layer<
   Effect.gen(function* () {
     const client = yield* MsGraphHttpClient
 
-    const list = (
-      params?: ODataParams<User>,
-    ) =>
-      pipe(
-        client.get(`/users${params ? buildQueryString(params) : ""}`, UserPageSchema),
-        Effect.mapError(narrowToRateLimit),
-      )
+    const list = Effect.fn("UsersService.list")(
+      function* (params?: ODataParams<User>) {
+        const path = params ? `/users${buildQueryString(params)}` : "/users"
+        return yield* client.get(path, UserPageSchema).pipe(
+          Effect.mapError(narrowToRateLimit),
+        )
+      },
+    )
 
-    const getById = (
-      id: string,
-      params?: Pick<ODataParams<User>, "$select" | "$expand">,
-    ) =>
-      pipe(
-        client.get(`/users/${encodeURIComponent(id)}${params ? buildQueryString(params) : ""}`, UserSchema),
-        Effect.mapError(narrowToNotFoundOrRateLimit),
-      )
+    const getById = Effect.fn("UsersService.getById")(
+      function* (
+        id: string,
+        params?: Pick<ODataParams<User>, "$select" | "$expand">,
+      ) {
+        const path = params
+          ? `/users/${encodeURIComponent(id)}${buildQueryString(params)}`
+          : `/users/${encodeURIComponent(id)}`
+        return yield* client.get(path, UserSchema).pipe(
+          Effect.mapError(narrowToNotFoundOrRateLimit),
+        )
+      },
+    )
 
-    const me = (
-      params?: Pick<ODataParams<User>, "$select" | "$expand">,
-    ) =>
-      pipe(
-        client.get(`/me${params ? buildQueryString(params) : ""}`, UserSchema),
-        Effect.mapError((error): RateLimitedError => {
-          if (error._tag === "RateLimitedError") return error as RateLimitedError
-          return new RateLimitedError({ retryAfter: 0, resource: "/me" })
-        }),
-      )
+    const me = Effect.fn("UsersService.me")(
+      function* (params?: Pick<ODataParams<User>, "$select" | "$expand">) {
+        const path = params ? `/me${buildQueryString(params)}` : "/me"
+        return yield* client.get(path, UserSchema).pipe(
+          Effect.mapError(narrowToRateLimitForMe),
+        )
+      },
+    )
 
-    const listDirectReports = (
-      userId: string,
-      params?: ODataParams<User>,
-    ) =>
-      pipe(
-        client.get(
-          `/users/${encodeURIComponent(userId)}/directReports${params ? buildQueryString(params) : ""}`,
-          UserPageSchema,
-        ),
-        Effect.mapError(narrowToNotFoundOrRateLimit),
-      )
+    const listDirectReports = Effect.fn("UsersService.listDirectReports")(
+      function* (userId: string, params?: ODataParams<User>) {
+        const path = params
+          ? `/users/${encodeURIComponent(userId)}/directReports${buildQueryString(params)}`
+          : `/users/${encodeURIComponent(userId)}/directReports`
+        return yield* client.get(path, UserPageSchema).pipe(
+          Effect.mapError(narrowToNotFoundOrRateLimit),
+        )
+      },
+    )
 
-    const getManager = (userId: string) =>
-      pipe(
-        client.get(`/users/${encodeURIComponent(userId)}/manager`, UserSchema),
-        Effect.mapError(narrowToNotFoundOrRateLimit),
-      )
+    const getManager = Effect.fn("UsersService.getManager")(
+      function* (userId: string) {
+        return yield* client
+          .get(`/users/${encodeURIComponent(userId)}/manager`, UserSchema)
+          .pipe(Effect.mapError(narrowToNotFoundOrRateLimit))
+      },
+    )
 
-    const getPhoto = (
-      userId: string,
-    ) =>
-      pipe(
-        client.stream(`/users/${encodeURIComponent(userId)}/photo/$value`),
-        Effect.flatMap((byteStream) =>
-          Effect.succeed(
-            Stream.mapError(byteStream, (error): RateLimitedError => {
-              if (error._tag === "RateLimitedError") return error as RateLimitedError
-              return new RateLimitedError({ retryAfter: 0, resource: `/users/${userId}/photo/$value` })
-            }),
+    const getPhoto = Effect.fn("UsersService.getPhoto")(
+      function* (userId: string) {
+        const byteStream = yield* client
+          .stream(`/users/${encodeURIComponent(userId)}/photo/$value`)
+          .pipe(
+            Effect.mapError(
+              Match.type<MsGraphError>().pipe(
+                Match.tag("ResourceNotFound", (e) => e),
+                Match.orElse(
+                  () =>
+                    new ResourceNotFoundError({
+                      resource: "UserPhoto",
+                      id: userId,
+                    }),
+                ),
+              ),
+            ),
+          )
+        return Stream.mapError(
+          byteStream,
+          Match.type<MsGraphError>().pipe(
+            Match.tag("RateLimitedError", (e) => e),
+            Match.orElse(
+              () =>
+                new RateLimitedError({
+                  retryAfter: 0,
+                  resource: `/users/${userId}/photo/$value`,
+                }),
+            ),
           ),
-        ),
-        Effect.mapError((error): ResourceNotFoundError => {
-          if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-          return new ResourceNotFoundError({ resource: "UserPhoto", id: userId })
-        }),
-      )
+        )
+      },
+    )
 
     return UsersService.of({
       list,

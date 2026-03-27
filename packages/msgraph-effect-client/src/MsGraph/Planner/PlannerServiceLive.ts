@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Match } from "effect"
 import type { DelegatedAuth } from "../Auth/MsGraphAuth"
 import {
   InvalidRequestError,
@@ -9,85 +9,108 @@ import type { MsGraphError } from "../Errors/errors"
 import { MsGraphHttpClient } from "../Http/MsGraphHttpClient"
 import { ODataPage } from "../Schemas/OData"
 import { PlannerPlanSchema, PlannerTaskSchema } from "../Schemas/PlannerTask"
+import type { CreatePlannerTaskPayload, PlannerTask } from "../Schemas/PlannerTask"
 import { PlannerService } from "./PlannerService"
 
 const PlannerPlanPageSchema = ODataPage(PlannerPlanSchema)
 const PlannerTaskPageSchema = ODataPage(PlannerTaskSchema)
+
+const narrowToRateLimitOrNotFound = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.orElse(
+    () => new ResourceNotFoundError({ resource: "planner", id: "unknown" }),
+  ),
+)
+
+const narrowToRateLimitOrInvalidRequest = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("InvalidRequest", (e) => e),
+  Match.orElse(
+    () => new RateLimitedError({ retryAfter: 0, resource: "planner" }),
+  ),
+)
+
+const narrowToRateLimitNotFoundOrInvalidRequest = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.tag("InvalidRequest", (e) => e),
+  Match.orElse(
+    () => new RateLimitedError({ retryAfter: 0, resource: "planner" }),
+  ),
+)
 
 export const PlannerServiceLive = Layer.effect(
   PlannerService,
   Effect.gen(function* () {
     const http = yield* MsGraphHttpClient
 
-    const narrowToRateLimitOrNotFound = (
-      error: MsGraphError,
-    ): RateLimitedError | ResourceNotFoundError => {
-      if (error._tag === "RateLimitedError") return error as RateLimitedError
-      if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-      return new ResourceNotFoundError({ resource: "planner", id: "unknown" })
-    }
+    const listPlans = Effect.fn("PlannerService.listPlans")(
+      function* (groupId: string) {
+        return yield* http
+          .get(`/groups/${groupId}/planner/plans`, PlannerPlanPageSchema)
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
 
-    const narrowToRateLimitOrInvalidRequest = (
-      error: MsGraphError,
-    ): RateLimitedError | InvalidRequestError => {
-      if (error._tag === "RateLimitedError") return error as RateLimitedError
-      if (error._tag === "InvalidRequest") return error as InvalidRequestError
-      return new RateLimitedError({ retryAfter: 0, resource: "planner" })
-    }
+    const getPlan = Effect.fn("PlannerService.getPlan")(
+      function* (planId: string) {
+        return yield* http
+          .get(`/planner/plans/${planId}`, PlannerPlanSchema)
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
 
-    const narrowToRateLimitNotFoundOrInvalidRequest = (
-      error: MsGraphError,
-    ): RateLimitedError | ResourceNotFoundError | InvalidRequestError => {
-      if (error._tag === "RateLimitedError") return error as RateLimitedError
-      if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-      if (error._tag === "InvalidRequest") return error as InvalidRequestError
-      return new RateLimitedError({ retryAfter: 0, resource: "planner" })
-    }
+    const listTasks = Effect.fn("PlannerService.listTasks")(
+      function* (planId: string) {
+        return yield* http
+          .get(`/planner/plans/${planId}/tasks`, PlannerTaskPageSchema)
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
+
+    const getTask = Effect.fn("PlannerService.getTask")(
+      function* (taskId: string) {
+        return yield* http
+          .get(`/planner/tasks/${taskId}`, PlannerTaskSchema)
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
+
+    const createTask = Effect.fn("PlannerService.createTask")(
+      function* (task: CreatePlannerTaskPayload) {
+        return yield* http
+          .post("/planner/tasks", task, PlannerTaskSchema)
+          .pipe(Effect.mapError(narrowToRateLimitOrInvalidRequest))
+      },
+    )
+
+    const updateTask = Effect.fn("PlannerService.updateTask")(
+      function* (taskId: string, etag: string, patch: Partial<CreatePlannerTaskPayload>) {
+        return yield* http
+          .patch(`/planner/tasks/${taskId}`, patch, PlannerTaskSchema, {
+            "If-Match": etag,
+          })
+          .pipe(Effect.mapError(narrowToRateLimitNotFoundOrInvalidRequest))
+      },
+    )
+
+    const deleteTask = Effect.fn("PlannerService.deleteTask")(
+      function* (taskId: string, etag: string) {
+        return yield* http
+          .delete(`/planner/tasks/${taskId}`, { "If-Match": etag })
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
 
     return PlannerService.of({
-      listPlans: (groupId) =>
-        Effect.mapError(
-          http.get(`/groups/${groupId}/planner/plans`, PlannerPlanPageSchema),
-          narrowToRateLimitOrNotFound,
-        ),
-
-      getPlan: (planId) =>
-        Effect.mapError(
-          http.get(`/planner/plans/${planId}`, PlannerPlanSchema),
-          narrowToRateLimitOrNotFound,
-        ),
-
-      listTasks: (planId) =>
-        Effect.mapError(
-          http.get(`/planner/plans/${planId}/tasks`, PlannerTaskPageSchema),
-          narrowToRateLimitOrNotFound,
-        ),
-
-      getTask: (taskId) =>
-        Effect.mapError(
-          http.get(`/planner/tasks/${taskId}`, PlannerTaskSchema),
-          narrowToRateLimitOrNotFound,
-        ),
-
-      createTask: (task) =>
-        Effect.mapError(
-          http.post("/planner/tasks", task, PlannerTaskSchema),
-          narrowToRateLimitOrInvalidRequest,
-        ),
-
-      updateTask: (taskId, etag, patch) =>
-        Effect.mapError(
-          http.patch(`/planner/tasks/${taskId}`, patch, PlannerTaskSchema, {
-            "If-Match": etag,
-          }),
-          narrowToRateLimitNotFoundOrInvalidRequest,
-        ),
-
-      deleteTask: (taskId, etag) =>
-        Effect.mapError(
-          http.delete(`/planner/tasks/${taskId}`, { "If-Match": etag }),
-          narrowToRateLimitOrNotFound,
-        ),
+      listPlans,
+      getPlan,
+      listTasks,
+      getTask,
+      createTask,
+      updateTask,
+      deleteTask,
     })
   }),
 ) as Layer.Layer<

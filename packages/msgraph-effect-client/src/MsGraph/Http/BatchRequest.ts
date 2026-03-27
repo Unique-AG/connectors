@@ -54,27 +54,26 @@ const decodeBatchItem = (
   return { id: rawItem.id, status: rawItem.status, headers: rawItem.headers, body: rawItem.body, error }
 }
 
-export const executeBatch = (
-  client: MsGraphHttpClient["Service"],
-  requests: ReadonlyArray<BatchRequestItem>,
-): Effect.Effect<ReadonlyArray<BatchResponseItem>, MsGraphError> => {
-  if (requests.length > 20) {
-    return Effect.die(new Error("Microsoft Graph $batch supports at most 20 requests per batch"))
-  }
+export const executeBatch = Effect.fn("executeBatch")(
+  function*(
+    client: MsGraphHttpClient["Service"],
+    requests: ReadonlyArray<BatchRequestItem>,
+  ): Effect.fn.Return<ReadonlyArray<BatchResponseItem>, MsGraphError> {
+    if (requests.length > 20) {
+      return yield* Effect.die(new Error("Microsoft Graph $batch supports at most 20 requests per batch"))
+    }
 
-  const batchBody = {
-    requests: requests.map((req) => ({
-      id: req.id,
-      method: req.method,
-      url: req.url,
-      ...(req.body !== undefined ? { body: req.body } : {}),
-      ...(req.headers ? { headers: req.headers } : {}),
-    })),
-  }
+    const batchBody = {
+      requests: requests.map((req) => ({
+        id: req.id,
+        method: req.method,
+        url: req.url,
+        ...(req.body !== undefined ? { body: req.body } : {}),
+        ...(req.headers ? { headers: req.headers } : {}),
+      })),
+    }
 
-  return Effect.flatMap(
-    client.post("/$batch", batchBody, BatchResponseBodySchema),
-    (batchResponse) =>
-      Effect.succeed(batchResponse.responses.map(decodeBatchItem)),
-  )
-}
+    const batchResponse = yield* client.post("/$batch", batchBody, BatchResponseBodySchema)
+    return batchResponse.responses.map(decodeBatchItem)
+  },
+)

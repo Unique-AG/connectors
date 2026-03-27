@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Match } from "effect"
 import type { ApplicationAuth } from "../Auth/MsGraphAuth"
 import {
   InvalidRequestError,
@@ -19,70 +19,85 @@ const UserPageSchema = ODataPage(UserSchema)
 
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 
+const narrowToRateLimitOrInvalidRequest = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("InvalidRequest", (e) => e),
+  Match.orElse(
+    () => new RateLimitedError({ retryAfter: 0, resource: "groups" }),
+  ),
+)
+
+const narrowToRateLimitOrNotFound = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.orElse(
+    () => new ResourceNotFoundError({ resource: "group", id: "unknown" }),
+  ),
+)
+
+const narrowToRateLimitNotFoundOrInvalidRequest = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.tag("InvalidRequest", (e) => e),
+  Match.orElse(
+    () => new RateLimitedError({ retryAfter: 0, resource: "groups" }),
+  ),
+)
+
 export const GroupsServiceLive = Layer.effect(
   GroupsService,
   Effect.gen(function* () {
     const http = yield* MsGraphHttpClient
 
-    const narrowToRateLimitOrInvalidRequest = (
-      error: MsGraphError,
-    ): RateLimitedError | InvalidRequestError => {
-      if (error._tag === "RateLimitedError") return error as RateLimitedError
-      if (error._tag === "InvalidRequest") return error as InvalidRequestError
-      return new RateLimitedError({ retryAfter: 0, resource: "groups" })
-    }
-
-    const narrowToRateLimitOrNotFound = (
-      error: MsGraphError,
-    ): RateLimitedError | ResourceNotFoundError => {
-      if (error._tag === "RateLimitedError") return error as RateLimitedError
-      if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-      return new ResourceNotFoundError({ resource: "group", id: "unknown" })
-    }
-
-    const narrowToRateLimitNotFoundOrInvalidRequest = (
-      error: MsGraphError,
-    ): RateLimitedError | ResourceNotFoundError | InvalidRequestError => {
-      if (error._tag === "RateLimitedError") return error as RateLimitedError
-      if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-      if (error._tag === "InvalidRequest") return error as InvalidRequestError
-      return new RateLimitedError({ retryAfter: 0, resource: "groups" })
-    }
-
-    return GroupsService.of({
-      list: (params?) => {
+    const list = Effect.fn("GroupsService.list")(
+      function* (params?: ODataParams<Group>) {
         const qs = params ? buildQueryString<Group>(params as ODataParams<Group>) : ""
-        return Effect.mapError(
-          http.get(`/groups${qs}`, GroupPageSchema),
-          narrowToRateLimitOrInvalidRequest,
+        return yield* http.get(`/groups${qs}`, GroupPageSchema).pipe(
+          Effect.mapError(narrowToRateLimitOrInvalidRequest),
         )
       },
+    )
 
-      getById: (groupId) =>
-        Effect.mapError(
-          http.get(`/groups/${groupId}`, GroupSchema),
-          narrowToRateLimitOrNotFound,
-        ),
+    const getById = Effect.fn("GroupsService.getById")(
+      function* (groupId: string) {
+        return yield* http
+          .get(`/groups/${groupId}`, GroupSchema)
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
 
-      listMembers: (groupId) =>
-        Effect.mapError(
-          http.get(`/groups/${groupId}/members`, UserPageSchema),
-          narrowToRateLimitOrNotFound,
-        ),
+    const listMembers = Effect.fn("GroupsService.listMembers")(
+      function* (groupId: string) {
+        return yield* http
+          .get(`/groups/${groupId}/members`, UserPageSchema)
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
 
-      addMember: (groupId, userId) =>
-        Effect.mapError(
-          http.postVoid(`/groups/${groupId}/members/$ref`, {
+    const addMember = Effect.fn("GroupsService.addMember")(
+      function* (groupId: string, userId: string) {
+        return yield* http
+          .postVoid(`/groups/${groupId}/members/$ref`, {
             "@odata.id": `${GRAPH_BASE_URL}/directoryObjects/${userId}`,
-          }),
-          narrowToRateLimitNotFoundOrInvalidRequest,
-        ),
+          })
+          .pipe(Effect.mapError(narrowToRateLimitNotFoundOrInvalidRequest))
+      },
+    )
 
-      removeMember: (groupId, userId) =>
-        Effect.mapError(
-          http.delete(`/groups/${groupId}/members/${userId}/$ref`),
-          narrowToRateLimitOrNotFound,
-        ),
+    const removeMember = Effect.fn("GroupsService.removeMember")(
+      function* (groupId: string, userId: string) {
+        return yield* http
+          .delete(`/groups/${groupId}/members/${userId}/$ref`)
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
+
+    return GroupsService.of({
+      list,
+      getById,
+      listMembers,
+      addMember,
+      removeMember,
     })
   }),
 ) as Layer.Layer<

@@ -1,4 +1,4 @@
-import { Effect, Layer, pipe } from "effect"
+import { Effect, Layer, Match } from "effect"
 import { DelegatedAuth } from "../Auth/MsGraphAuth"
 import {
   InvalidRequestError,
@@ -18,40 +18,42 @@ import { CalendarService } from "./CalendarService"
 
 const CalendarEventPageSchema = ODataPage(CalendarEventSchema)
 
-const narrowToRateLimitOrInvalid = (
-  error: MsGraphError,
-): RateLimitedError | InvalidRequestError => {
-  if (error._tag === "RateLimitedError") return error as RateLimitedError
-  if (error._tag === "InvalidRequest") return error as InvalidRequestError
-  return new InvalidRequestError({
-    code: error._tag,
-    message: "Unexpected error",
-    target: undefined,
-    details: [],
-  })
-}
+const narrowToRateLimitOrInvalid = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("InvalidRequest", (e) => e),
+  Match.orElse(
+    (e) =>
+      new InvalidRequestError({
+        code: e._tag,
+        message: "Unexpected error",
+        target: undefined,
+        details: [],
+      }),
+  ),
+)
 
-const narrowToNotFoundOrRateLimit = (
-  error: MsGraphError,
-): ResourceNotFoundError | RateLimitedError => {
-  if (error._tag === "RateLimitedError") return error as RateLimitedError
-  if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-  return new ResourceNotFoundError({ resource: "CalendarEvent", id: "unknown" })
-}
+const narrowToNotFoundOrRateLimit = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.orElse(
+    () => new ResourceNotFoundError({ resource: "CalendarEvent", id: "unknown" }),
+  ),
+)
 
-const narrowToNotFoundRateLimitOrInvalid = (
-  error: MsGraphError,
-): ResourceNotFoundError | RateLimitedError | InvalidRequestError => {
-  if (error._tag === "RateLimitedError") return error as RateLimitedError
-  if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-  if (error._tag === "InvalidRequest") return error as InvalidRequestError
-  return new InvalidRequestError({
-    code: error._tag,
-    message: "Unexpected error",
-    target: undefined,
-    details: [],
-  })
-}
+const narrowToNotFoundRateLimitOrInvalid = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.tag("InvalidRequest", (e) => e),
+  Match.orElse(
+    (e) =>
+      new InvalidRequestError({
+        code: e._tag,
+        message: "Unexpected error",
+        target: undefined,
+        details: [],
+      }),
+  ),
+)
 
 export const CalendarServiceLive: Layer.Layer<
   CalendarService,
@@ -62,87 +64,100 @@ export const CalendarServiceLive: Layer.Layer<
   Effect.gen(function* () {
     const client = yield* MsGraphHttpClient
 
-    const listEvents = (userId: string, params?: ODataParams<CalendarEvent>) =>
-      pipe(
-        client.get(
-          `/users/${encodeURIComponent(userId)}/events${params ? buildQueryString(params) : ""}`,
-          CalendarEventPageSchema,
-        ),
-        Effect.mapError(narrowToRateLimitOrInvalid),
-      )
+    const listEvents = Effect.fn("CalendarService.listEvents")(
+      function* (userId: string, params?: ODataParams<CalendarEvent>) {
+        const path = params
+          ? `/users/${encodeURIComponent(userId)}/events${buildQueryString(params)}`
+          : `/users/${encodeURIComponent(userId)}/events`
+        return yield* client.get(path, CalendarEventPageSchema).pipe(
+          Effect.mapError(narrowToRateLimitOrInvalid),
+        )
+      },
+    )
 
-    const getEvent = (userId: string, eventId: string) =>
-      pipe(
-        client.get(
-          `/users/${encodeURIComponent(userId)}/events/${encodeURIComponent(eventId)}`,
-          CalendarEventSchema,
-        ),
-        Effect.mapError(narrowToNotFoundOrRateLimit),
-      )
+    const getEvent = Effect.fn("CalendarService.getEvent")(
+      function* (userId: string, eventId: string) {
+        return yield* client
+          .get(
+            `/users/${encodeURIComponent(userId)}/events/${encodeURIComponent(eventId)}`,
+            CalendarEventSchema,
+          )
+          .pipe(Effect.mapError(narrowToNotFoundOrRateLimit))
+      },
+    )
 
-    const createEvent = (userId: string, event: CreateEventPayload) =>
-      pipe(
-        client.post(
-          `/users/${encodeURIComponent(userId)}/events`,
-          event,
-          CalendarEventSchema,
-        ),
-        Effect.mapError(narrowToRateLimitOrInvalid),
-      )
+    const createEvent = Effect.fn("CalendarService.createEvent")(
+      function* (userId: string, event: CreateEventPayload) {
+        return yield* client
+          .post(
+            `/users/${encodeURIComponent(userId)}/events`,
+            event,
+            CalendarEventSchema,
+          )
+          .pipe(Effect.mapError(narrowToRateLimitOrInvalid))
+      },
+    )
 
-    const updateEvent = (
-      userId: string,
-      eventId: string,
-      patch: Partial<CreateEventPayload>,
-    ) =>
-      pipe(
-        client.patch(
-          `/users/${encodeURIComponent(userId)}/events/${encodeURIComponent(eventId)}`,
-          patch,
-          CalendarEventSchema,
-        ),
-        Effect.mapError(narrowToNotFoundRateLimitOrInvalid),
-      )
+    const updateEvent = Effect.fn("CalendarService.updateEvent")(
+      function* (
+        userId: string,
+        eventId: string,
+        patch: Partial<CreateEventPayload>,
+      ) {
+        return yield* client
+          .patch(
+            `/users/${encodeURIComponent(userId)}/events/${encodeURIComponent(eventId)}`,
+            patch,
+            CalendarEventSchema,
+          )
+          .pipe(Effect.mapError(narrowToNotFoundRateLimitOrInvalid))
+      },
+    )
 
-    const deleteEvent = (userId: string, eventId: string) =>
-      pipe(
-        client.delete(
-          `/users/${encodeURIComponent(userId)}/events/${encodeURIComponent(eventId)}`,
-        ),
-        Effect.mapError(narrowToNotFoundOrRateLimit),
-      )
+    const deleteEvent = Effect.fn("CalendarService.deleteEvent")(
+      function* (userId: string, eventId: string) {
+        return yield* client
+          .delete(
+            `/users/${encodeURIComponent(userId)}/events/${encodeURIComponent(eventId)}`,
+          )
+          .pipe(Effect.mapError(narrowToNotFoundOrRateLimit))
+      },
+    )
 
-    const calendarView = (
-      userId: string,
-      startDateTime: string,
-      endDateTime: string,
-      params?: ODataParams<CalendarEvent>,
-    ) => {
-      const dateParams = `startDateTime=${encodeURIComponent(startDateTime)}&endDateTime=${encodeURIComponent(endDateTime)}`
-      const odataQuery = params ? buildQueryString(params) : ""
-      const separator = odataQuery ? "&" : ""
-      const queryString = odataQuery
-        ? `${odataQuery}${separator}${dateParams}`
-        : `?${dateParams}`
+    const calendarView = Effect.fn("CalendarService.calendarView")(
+      function* (
+        userId: string,
+        startDateTime: string,
+        endDateTime: string,
+        params?: ODataParams<CalendarEvent>,
+      ) {
+        const dateParams = `startDateTime=${encodeURIComponent(startDateTime)}&endDateTime=${encodeURIComponent(endDateTime)}`
+        const odataQuery = params ? buildQueryString(params) : ""
+        const separator = odataQuery ? "&" : ""
+        const queryString = odataQuery
+          ? `${odataQuery}${separator}${dateParams}`
+          : `?${dateParams}`
 
-      return pipe(
-        client.get(
-          `/users/${encodeURIComponent(userId)}/calendarView${queryString}`,
-          CalendarEventPageSchema,
-        ),
-        Effect.mapError(narrowToRateLimitOrInvalid),
-      )
-    }
+        return yield* client
+          .get(
+            `/users/${encodeURIComponent(userId)}/calendarView${queryString}`,
+            CalendarEventPageSchema,
+          )
+          .pipe(Effect.mapError(narrowToRateLimitOrInvalid))
+      },
+    )
 
-    const findMeetingTimes = (userId: string, request: FindMeetingTimesRequest) =>
-      pipe(
-        client.post(
-          `/users/${encodeURIComponent(userId)}/findMeetingTimes`,
-          request,
-          MeetingTimeSuggestionsResultSchema,
-        ),
-        Effect.mapError(narrowToRateLimitOrInvalid),
-      )
+    const findMeetingTimes = Effect.fn("CalendarService.findMeetingTimes")(
+      function* (userId: string, request: FindMeetingTimesRequest) {
+        return yield* client
+          .post(
+            `/users/${encodeURIComponent(userId)}/findMeetingTimes`,
+            request,
+            MeetingTimeSuggestionsResultSchema,
+          )
+          .pipe(Effect.mapError(narrowToRateLimitOrInvalid))
+      },
+    )
 
     return CalendarService.of({
       listEvents,

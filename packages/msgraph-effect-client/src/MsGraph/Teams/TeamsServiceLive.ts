@@ -1,4 +1,4 @@
-import { Effect, Layer, pipe } from "effect"
+import { Effect, Layer, Match } from "effect"
 import type { ApplicationAuth, DelegatedAuth } from "../Auth/MsGraphAuth"
 import {
   InsufficientPermissionsError,
@@ -17,86 +17,115 @@ const TeamPageSchema = ODataPage(TeamSchema)
 const ChannelPageSchema = ODataPage(ChannelSchema)
 const ChatMessagePageSchema = ODataPage(ChatMessageSchema)
 
+const narrowToRateLimit = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.orElse(() => new RateLimitedError({ retryAfter: 0, resource: "teams" })),
+)
+
+const narrowToRateLimitOrNotFound = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.orElse(
+    () => new ResourceNotFoundError({ resource: "team", id: "unknown" }),
+  ),
+)
+
+const narrowToRateLimitNotFoundOrInsufficient = Match.type<MsGraphError>().pipe(
+  Match.tag("RateLimitedError", (e) => e),
+  Match.tag("ResourceNotFound", (e) => e),
+  Match.tag("InsufficientPermissions", (e) => e),
+  Match.orElse(() => new RateLimitedError({ retryAfter: 0, resource: "teams" })),
+)
+
 export const TeamsServiceLive = Layer.effect(
   TeamsService,
   Effect.gen(function* () {
     const http = yield* MsGraphHttpClient
 
-    const narrowToRateLimit = (error: MsGraphError): RateLimitedError => {
-      if (error._tag === "RateLimitedError") return error as RateLimitedError
-      return new RateLimitedError({ retryAfter: 0, resource: "teams" })
-    }
-
-    const narrowToRateLimitOrNotFound = (
-      error: MsGraphError,
-    ): RateLimitedError | ResourceNotFoundError => {
-      if (error._tag === "RateLimitedError") return error as RateLimitedError
-      if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-      return new ResourceNotFoundError({ resource: "team", id: "unknown" })
-    }
-
-    const narrowToRateLimitNotFoundOrInsufficient = (
-      error: MsGraphError,
-    ): RateLimitedError | ResourceNotFoundError | InsufficientPermissionsError => {
-      if (error._tag === "RateLimitedError") return error as RateLimitedError
-      if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
-      if (error._tag === "InsufficientPermissions") return error as InsufficientPermissionsError
-      return new RateLimitedError({ retryAfter: 0, resource: "teams" })
-    }
-
-    return TeamsService.of({
-      listTeams: (params?) => {
+    const listTeams = Effect.fn("TeamsService.listTeams")(
+      function* (params?: ODataParams<Team>) {
         const qs = params ? buildQueryString<Team>(params as ODataParams<Team>) : ""
-        return Effect.mapError(
-          http.get(`/me/joinedTeams${qs}`, TeamPageSchema),
-          narrowToRateLimit,
+        return yield* http.get(`/me/joinedTeams${qs}`, TeamPageSchema).pipe(
+          Effect.mapError(narrowToRateLimit),
         )
       },
+    )
 
-      getTeam: (teamId) =>
-        Effect.mapError(
-          http.get(`/teams/${teamId}`, TeamSchema),
-          narrowToRateLimitOrNotFound,
-        ),
+    const getTeam = Effect.fn("TeamsService.getTeam")(
+      function* (teamId: string) {
+        return yield* http
+          .get(`/teams/${teamId}`, TeamSchema)
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
 
-      listChannels: (teamId) =>
-        Effect.mapError(
-          http.get(`/teams/${teamId}/channels`, ChannelPageSchema),
-          narrowToRateLimitOrNotFound,
-        ),
+    const listChannels = Effect.fn("TeamsService.listChannels")(
+      function* (teamId: string) {
+        return yield* http
+          .get(`/teams/${teamId}/channels`, ChannelPageSchema)
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
 
-      listMessages: (teamId, channelId, params?) => {
+    const listMessages = Effect.fn("TeamsService.listMessages")(
+      function* (
+        teamId: string,
+        channelId: string,
+        params?: ODataParams<ChatMessage>,
+      ) {
         const qs = params
           ? buildQueryString<ChatMessage>(params as ODataParams<ChatMessage>)
           : ""
-        return Effect.mapError(
-          http.get(
+        return yield* http
+          .get(
             `/teams/${teamId}/channels/${channelId}/messages${qs}`,
             ChatMessagePageSchema,
-          ),
-          narrowToRateLimitOrNotFound,
-        )
+          )
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
       },
+    )
 
-      sendMessage: (teamId, channelId, content, contentType = "text") =>
-        pipe(
-          http.post(
+    const sendMessage = Effect.fn("TeamsService.sendMessage")(
+      function* (
+        teamId: string,
+        channelId: string,
+        content: string,
+        contentType: "text" | "html" = "text",
+      ) {
+        return yield* http
+          .post(
             `/teams/${teamId}/channels/${channelId}/messages`,
             { body: { contentType, content } },
             ChatMessageSchema,
-          ),
-          Effect.mapError(narrowToRateLimitNotFoundOrInsufficient),
-        ),
+          )
+          .pipe(Effect.mapError(narrowToRateLimitNotFoundOrInsufficient))
+      },
+    )
 
-      replyToMessage: (teamId, channelId, messageId, content) =>
-        Effect.mapError(
-          http.post(
+    const replyToMessage = Effect.fn("TeamsService.replyToMessage")(
+      function* (
+        teamId: string,
+        channelId: string,
+        messageId: string,
+        content: string,
+      ) {
+        return yield* http
+          .post(
             `/teams/${teamId}/channels/${channelId}/messages/${messageId}/replies`,
             { body: { contentType: "text", content } },
             ChatMessageSchema,
-          ),
-          narrowToRateLimitOrNotFound,
-        ),
+          )
+          .pipe(Effect.mapError(narrowToRateLimitOrNotFound))
+      },
+    )
+
+    return TeamsService.of({
+      listTeams,
+      getTeam,
+      listChannels,
+      listMessages,
+      sendMessage,
+      replyToMessage,
     })
   }),
 ) as Layer.Layer<

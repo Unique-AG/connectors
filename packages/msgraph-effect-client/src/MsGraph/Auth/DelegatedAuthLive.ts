@@ -5,10 +5,12 @@ import {
   Effect,
   Fiber,
   Layer,
+  Match,
   Option,
   Ref,
+  Result,
   Schedule,
-  pipe,
+  Schema,
 } from "effect"
 import {
   AuthenticationFailedError,
@@ -27,28 +29,35 @@ import {
   type TokenCacheState,
 } from "./TokenCache"
 
-interface OAuthTokenResponse {
-  readonly access_token: string
-  readonly token_type: string
-  readonly expires_in: number
-  readonly scope: string
-  readonly refresh_token?: string
-  readonly id_token?: string
-}
+const OAuthTokenResponseSchema = Schema.Struct({
+  access_token: Schema.String,
+  token_type: Schema.String,
+  expires_in: Schema.Number,
+  scope: Schema.String,
+  refresh_token: Schema.optionalKey(Schema.String),
+  id_token: Schema.optionalKey(Schema.String),
+})
 
-interface OAuthErrorResponse {
-  readonly error: string
-  readonly error_description: string
-}
+const OAuthErrorResponseSchema = Schema.Struct({
+  error: Schema.String,
+  error_description: Schema.optionalKey(Schema.String),
+})
 
-interface DeviceCodeResponse {
-  readonly device_code: string
-  readonly user_code: string
-  readonly verification_uri: string
-  readonly expires_in: number
-  readonly interval: number
-  readonly message: string
-}
+const DeviceCodeResponseSchema = Schema.Struct({
+  device_code: Schema.String,
+  user_code: Schema.String,
+  verification_uri: Schema.String,
+  expires_in: Schema.Number,
+  interval: Schema.Number,
+  message: Schema.String,
+})
+
+type OAuthTokenResponse = typeof OAuthTokenResponseSchema.Type
+type DeviceCodeResponse = typeof DeviceCodeResponseSchema.Type
+
+type PollError =
+  | { readonly _tag: "pending" }
+  | { readonly _tag: "fatal"; readonly error: AuthenticationFailedError }
 
 const parseTokenResponse = (
   raw: OAuthTokenResponse,
@@ -97,87 +106,80 @@ const extractAccountFromJwt = (idToken: string): AccountCacheEntry | null => {
   }
 }
 
-const postForm = (
-  url: string,
-  params: Record<string, string>,
-): Effect.Effect<unknown, AuthenticationFailedError> =>
-  pipe(
-    HttpClientRequest.post(url),
-    HttpClientRequest.bodyUrlParams(params),
-    HttpClient.execute,
-    Effect.flatMap((resp) => resp.json),
-    Effect.scoped,
-    Effect.mapError(
-      (e) =>
-        new AuthenticationFailedError({
-          reason: "unknown",
-          message: `Token request failed: ${String(e)}`,
-          correlationId: undefined,
-        }),
-    ),
-    Effect.provide(NodeHttpClient.layerUndici),
-  )
+const postForm = Effect.fn("DelegatedAuth.postForm")(
+  function*(
+    url: string,
+    params: Record<string, string>,
+  ): Effect.fn.Return<unknown, AuthenticationFailedError> {
+    return yield* HttpClientRequest.post(url).pipe(
+      HttpClientRequest.bodyUrlParams(params),
+      HttpClient.execute,
+      Effect.flatMap((resp) => resp.json),
+      Effect.scoped,
+      Effect.mapError(
+        (e) =>
+          new AuthenticationFailedError({
+            reason: "unknown",
+            message: `Token request failed: ${String(e)}`,
+            correlationId: undefined,
+          }),
+      ),
+      Effect.provide(NodeHttpClient.layerUndici),
+    )
+  },
+)
 
-const parseTokenJson = (
-  json: unknown,
-): Effect.Effect<OAuthTokenResponse, AuthenticationFailedError> => {
-  if (
-    typeof json !== "object" ||
-    json === null ||
-    !("access_token" in json) ||
-    typeof (json as Record<string, unknown>)["access_token"] !== "string"
-  ) {
-    if (
-      typeof json === "object" &&
-      json !== null &&
-      "error_description" in json
-    ) {
-      const errJson = json as OAuthErrorResponse
-      return Effect.fail(
+const parseTokenJson = Effect.fn("DelegatedAuth.parseTokenJson")(
+  function*(json: unknown): Effect.fn.Return<OAuthTokenResponse, AuthenticationFailedError> {
+    const errorCheck = Schema.decodeUnknownResult(OAuthErrorResponseSchema)(json)
+    const errorDescription = Result.match(errorCheck, {
+      onSuccess: (r) => r.error_description,
+      onFailure: () => undefined,
+    })
+    if (errorDescription) {
+      return yield* Effect.fail(
         new AuthenticationFailedError({
           reason: "invalid_grant",
-          message: `Token endpoint error: ${errJson.error_description}`,
+          message: `Token endpoint error: ${errorDescription}`,
           correlationId: undefined,
         }),
       )
     }
-    return Effect.fail(
-      new AuthenticationFailedError({
-        reason: "unknown",
-        message: `Unexpected token response shape: ${JSON.stringify(json)}`,
-        correlationId: undefined,
-      }),
-    )
-  }
-  return Effect.succeed(json as OAuthTokenResponse)
-}
 
-const parseDeviceCodeJson = (
-  json: unknown,
-): Effect.Effect<DeviceCodeResponse, AuthenticationFailedError> => {
-  if (
-    typeof json !== "object" ||
-    json === null ||
-    !("device_code" in json) ||
-    typeof (json as Record<string, unknown>)["device_code"] !== "string"
-  ) {
-    return Effect.fail(
-      new AuthenticationFailedError({
-        reason: "unknown",
-        message: `Unexpected device code response shape: ${JSON.stringify(json)}`,
-        correlationId: undefined,
-      }),
+    return yield* Schema.decodeUnknownEffect(OAuthTokenResponseSchema)(json).pipe(
+      Effect.mapError(
+        (e) =>
+          new AuthenticationFailedError({
+            reason: "unknown",
+            message: `Unexpected token response shape: ${e.message}`,
+            correlationId: undefined,
+          }),
+      ),
     )
-  }
-  return Effect.succeed(json as DeviceCodeResponse)
-}
+  },
+)
 
-const acquireSilent = (
-  stateRef: Ref.Ref<TokenCacheState>,
-  config: DelegatedAuthConfig["Service"],
-  tokenEndpoint: string,
-) =>
-  Effect.gen(function* () {
+const parseDeviceCodeJson = Effect.fn("DelegatedAuth.parseDeviceCodeJson")(
+  function*(json: unknown): Effect.fn.Return<DeviceCodeResponse, AuthenticationFailedError> {
+    return yield* Schema.decodeUnknownEffect(DeviceCodeResponseSchema)(json).pipe(
+      Effect.mapError(
+        (e) =>
+          new AuthenticationFailedError({
+            reason: "unknown",
+            message: `Unexpected device code response shape: ${e.message}`,
+            correlationId: undefined,
+          }),
+      ),
+    )
+  },
+)
+
+const acquireSilent = Effect.fn("DelegatedAuth.acquireSilent")(
+  function*(
+    stateRef: Ref.Ref<TokenCacheState>,
+    config: DelegatedAuthConfig["Service"],
+    tokenEndpoint: string,
+  ): Effect.fn.Return<AccessTokenInfo, AuthenticationFailedError | TokenExpiredError> {
     const state = yield* Ref.get(stateRef)
     const scopesKey = makeScopesKey("any", config.scopes)
 
@@ -242,15 +244,16 @@ const acquireSilent = (
         expiredAt: Date.now(),
       }),
     )
-  })
+  },
+)
 
-const acquireByCode = (
-  stateRef: Ref.Ref<TokenCacheState>,
-  config: DelegatedAuthConfig["Service"],
-  tokenEndpoint: string,
-  authorizationCode: string,
-) =>
-  Effect.gen(function* () {
+const acquireByCode = Effect.fn("DelegatedAuth.acquireByCode")(
+  function*(
+    stateRef: Ref.Ref<TokenCacheState>,
+    config: DelegatedAuthConfig["Service"],
+    tokenEndpoint: string,
+    authorizationCode: string,
+  ): Effect.fn.Return<AccessTokenInfo, AuthenticationFailedError> {
     const params: Record<string, string> = {
       client_id: config.clientId,
       grant_type: "authorization_code",
@@ -293,85 +296,71 @@ const acquireByCode = (
     }
 
     return tokenInfo
-  })
+  },
+)
 
-type PollError =
-  | { readonly _tag: "pending" }
-  | { readonly _tag: "fatal"; readonly error: AuthenticationFailedError }
-
-const pollDeviceCodeToken = (
-  tokenEndpoint: string,
-  clientId: string,
-  deviceCode: string,
-  pollInterval: Duration.Duration,
-): Effect.Effect<OAuthTokenResponse, AuthenticationFailedError> =>
-  Effect.gen(function* () {
+const pollDeviceCodeTokenLoop = Effect.fn("DelegatedAuth.pollDeviceCodeTokenLoop")(
+  function*(
+    tokenEndpoint: string,
+    clientId: string,
+    deviceCode: string,
+    pollInterval: Duration.Duration,
+  ): Effect.fn.Return<OAuthTokenResponse, AuthenticationFailedError> {
     const params: Record<string, string> = {
       client_id: clientId,
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       device_code: deviceCode,
     }
 
-    const json = yield* postForm(tokenEndpoint, params).pipe(
-      Effect.mapError(
-        (e): PollError => ({
-          _tag: "fatal",
-          error: e,
-        }),
-      ),
-    )
+    const poll: Effect.Effect<OAuthTokenResponse, AuthenticationFailedError> = Effect.gen(function* () {
+      const json = yield* postForm(tokenEndpoint, params).pipe(
+        Effect.mapError(
+          (e): PollError => ({ _tag: "fatal", error: e }),
+        ),
+      )
 
-    const shaped = json as Record<string, unknown>
-    if (
-      "error" in shaped &&
-      shaped["error"] === "authorization_pending"
-    ) {
-      return yield* Effect.fail<PollError>({ _tag: "pending" })
-    }
-
-    if ("error" in shaped) {
-      const errJson = json as OAuthErrorResponse
-      return yield* Effect.fail<PollError>({
-        _tag: "fatal",
-        error: new AuthenticationFailedError({
-          reason: "unknown",
-          message: `Device code poll failed: ${errJson.error_description}`,
-          correlationId: undefined,
-        }),
-      })
-    }
-
-    const raw = yield* parseTokenJson(json).pipe(
-      Effect.mapError(
-        (e): PollError => ({ _tag: "fatal", error: e }),
-      ),
-    )
-    return raw
-  }).pipe(
-    Effect.catch((e: PollError) => {
-      if (e._tag === "pending") {
-        return pipe(
-          Effect.sleep(pollInterval),
-          Effect.flatMap(() =>
-            pollDeviceCodeToken(
-              tokenEndpoint,
-              clientId,
-              deviceCode,
-              pollInterval,
-            ),
-          ),
-        )
+      const shaped = json as Record<string, unknown>
+      if ("error" in shaped && shaped["error"] === "authorization_pending") {
+        return yield* Effect.fail<PollError>({ _tag: "pending" })
       }
-      return Effect.fail(e.error)
-    }),
-  )
 
-const acquireByDeviceCode = (
-  stateRef: Ref.Ref<TokenCacheState>,
-  config: DelegatedAuthConfig["Service"],
-  tokenEndpoint: string,
-) =>
-  Effect.gen(function* () {
+      if ("error" in shaped) {
+        const errMsg = "error_description" in shaped
+          ? String(shaped["error_description"])
+          : String(shaped["error"])
+        return yield* Effect.fail<PollError>({
+          _tag: "fatal",
+          error: new AuthenticationFailedError({
+            reason: "unknown",
+            message: `Device code poll failed: ${errMsg}`,
+            correlationId: undefined,
+          }),
+        })
+      }
+
+      return yield* parseTokenJson(json).pipe(
+        Effect.mapError((e): PollError => ({ _tag: "fatal", error: e })),
+      )
+    }).pipe(
+      Effect.catch((e: PollError) =>
+        Match.value(e).pipe(
+          Match.tag("pending", () => Effect.andThen(Effect.sleep(pollInterval), poll)),
+          Match.tag("fatal", ({ error }) => Effect.fail(error)),
+          Match.exhaustive,
+        ),
+      ),
+    )
+
+    return yield* poll
+  },
+)
+
+const acquireByDeviceCode = Effect.fn("DelegatedAuth.acquireByDeviceCode")(
+  function*(
+    stateRef: Ref.Ref<TokenCacheState>,
+    config: DelegatedAuthConfig["Service"],
+    tokenEndpoint: string,
+  ): Effect.fn.Return<{ tokenInfo: AccessTokenInfo; deviceCodeMessage: string }, AuthenticationFailedError> {
     const deviceCodeEndpoint = tokenEndpoint.replace("/token", "/devicecode")
 
     const deviceCodeParams: Record<string, string> = {
@@ -383,7 +372,7 @@ const acquireByDeviceCode = (
     const deviceCodeRaw = yield* parseDeviceCodeJson(deviceCodeJson)
 
     const pollInterval = Duration.millis(deviceCodeRaw.interval * 1000)
-    const raw = yield* pollDeviceCodeToken(
+    const raw = yield* pollDeviceCodeTokenLoop(
       tokenEndpoint,
       config.clientId,
       deviceCodeRaw.device_code,
@@ -414,63 +403,64 @@ const acquireByDeviceCode = (
     })
 
     return { tokenInfo, deviceCodeMessage: deviceCodeRaw.message }
-  })
+  },
+)
 
 const proactiveRefreshFiber = (
   stateRef: Ref.Ref<TokenCacheState>,
   config: DelegatedAuthConfig["Service"],
   tokenEndpoint: string,
 ) =>
-  pipe(
-    Effect.gen(function* () {
-      const state = yield* Ref.get(stateRef)
-      const now = Date.now()
+  Effect.gen(function* () {
+    const state = yield* Ref.get(stateRef)
+    const now = Date.now()
 
-      for (const [key, entry] of state.tokens) {
-        const msUntilExpiry = entry.expiresOn.getTime() - now
-        if (msUntilExpiry > 0 && msUntilExpiry <= REFRESH_BUFFER_MS) {
-          if (Option.isSome(entry.refreshToken)) {
-            const params: Record<string, string> = {
-              client_id: config.clientId,
-              grant_type: "refresh_token",
-              refresh_token: entry.refreshToken.value,
-              scope: config.scopes.join(" "),
-            }
-            if (config.clientSecret) {
-              params["client_secret"] = config.clientSecret
-            }
+    for (const [key, entry] of state.tokens) {
+      const msUntilExpiry = entry.expiresOn.getTime() - now
+      if (msUntilExpiry > 0 && msUntilExpiry <= REFRESH_BUFFER_MS) {
+        if (Option.isSome(entry.refreshToken)) {
+          const params: Record<string, string> = {
+            client_id: config.clientId,
+            grant_type: "refresh_token",
+            refresh_token: entry.refreshToken.value,
+            scope: config.scopes.join(" "),
+          }
+          if (config.clientSecret) {
+            params["client_secret"] = config.clientSecret
+          }
 
-            const refreshed = yield* postForm(tokenEndpoint, params).pipe(
-              Effect.flatMap(parseTokenJson),
-              Effect.orElseSucceed(() => null),
-            )
+          const refreshed = yield* postForm(tokenEndpoint, params).pipe(
+            Effect.flatMap(parseTokenJson),
+            Effect.option,
+          )
 
-            if (refreshed) {
-              yield* Ref.update(stateRef, (s) => {
+          yield* Option.match(refreshed, {
+            onNone: () => Effect.void,
+            onSome: (token) =>
+              Ref.update(stateRef, (s) => {
                 const newTokens = new Map(s.tokens)
                 newTokens.set(key, {
-                  accessToken: refreshed.access_token,
-                  expiresOn: new Date(
-                    Date.now() + refreshed.expires_in * 1000,
-                  ),
-                  scopes: refreshed.scope.split(" "),
-                  refreshToken: refreshed.refresh_token
-                    ? Option.some(refreshed.refresh_token)
+                  accessToken: token.access_token,
+                  expiresOn: new Date(Date.now() + token.expires_in * 1000),
+                  scopes: token.scope.split(" "),
+                  refreshToken: token.refresh_token
+                    ? Option.some(token.refresh_token)
                     : entry.refreshToken,
                   accountId: entry.accountId,
                 })
                 return { ...s, tokens: newTokens }
-              })
-
-              if (config.cachePlugin) {
-                const ctx = makeTokenCacheContext(stateRef)
-                yield* config.cachePlugin.afterCacheAccess(ctx)
-              }
-            }
-          }
+              }).pipe(
+                Effect.tap(() =>
+                  config.cachePlugin
+                    ? config.cachePlugin.afterCacheAccess(makeTokenCacheContext(stateRef))
+                    : Effect.void
+                ),
+              ),
+          })
         }
       }
-    }),
+    }
+  }).pipe(
     Effect.repeat(Schedule.spaced(Duration.minutes(1))),
     Effect.ignore,
   )
@@ -533,3 +523,7 @@ export const DelegatedAuthLive = <_P extends string = string>() => Layer.effect(
     return DelegatedAuth.of(makeService(config, stateRef))
   }),
 )
+
+// Suppress unused variable warnings for internal helpers used in tests or extended flows
+void acquireByCode
+void acquireByDeviceCode

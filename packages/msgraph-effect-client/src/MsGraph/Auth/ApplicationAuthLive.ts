@@ -1,6 +1,6 @@
 import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { NodeHttpClient } from "@effect/platform-node"
-import { Effect, Layer, Option, Ref, pipe } from "effect"
+import { Effect, Layer, Option, Ref, Result, Schema } from "effect"
 import { createSign } from "node:crypto"
 import { AuthenticationFailedError } from "../Errors/errors"
 import type { AccessTokenInfo, MsGraphAuthInterface } from "./MsGraphAuth"
@@ -14,17 +14,19 @@ import {
   type TokenCacheState,
 } from "./TokenCache"
 
-interface OAuthTokenResponse {
-  readonly access_token: string
-  readonly token_type: string
-  readonly expires_in: number
-  readonly scope: string
-}
+const OAuthTokenResponseSchema = Schema.Struct({
+  access_token: Schema.String,
+  expires_in: Schema.Number,
+  token_type: Schema.String,
+  scope: Schema.optionalKey(Schema.String),
+})
 
-interface OAuthErrorResponse {
-  readonly error: string
-  readonly error_description: string
-}
+const OAuthErrorResponseSchema = Schema.Struct({
+  error: Schema.String,
+  error_description: Schema.optionalKey(Schema.String),
+})
+
+type OAuthTokenResponse = typeof OAuthTokenResponseSchema.Type
 
 const base64UrlEncode = (input: string | Buffer): string => {
   const buf = typeof input === "string" ? Buffer.from(input) : input
@@ -67,97 +69,94 @@ const makeClientAssertion = (
   return `${signingInput}.${signature}`
 }
 
-const buildTokenParams = (
-  config: ApplicationAuthConfig["Service"],
-  tokenEndpoint: string,
-): Effect.Effect<Record<string, string>, AuthenticationFailedError> => {
-  const base: Record<string, string> = {
-    client_id: config.clientId,
-    grant_type: "client_credentials",
-    scope: config.scopes.join(" "),
-  }
+const buildTokenParams = Effect.fn("ApplicationAuth.buildTokenParams")(
+  function*(
+    config: ApplicationAuthConfig["Service"],
+    tokenEndpoint: string,
+  ): Effect.fn.Return<Record<string, string>, AuthenticationFailedError> {
+    const base: Record<string, string> = {
+      client_id: config.clientId,
+      grant_type: "client_credentials",
+      scope: config.scopes.join(" "),
+    }
 
-  if (config.clientSecret) {
-    return Effect.succeed({ ...base, client_secret: config.clientSecret })
-  }
+    if (config.clientSecret) {
+      return { ...base, client_secret: config.clientSecret }
+    }
 
-  if (config.clientCertificate) {
-    const { thumbprint, privateKey, x5c } = config.clientCertificate
-    return Effect.try({
-      try: () => ({
-        ...base,
-        client_assertion_type:
-          "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
-        client_assertion: makeClientAssertion(
-          config.clientId,
-          tokenEndpoint,
-          thumbprint,
-          privateKey,
-          x5c,
-        ),
-      }),
-      catch: (e) =>
-        new AuthenticationFailedError({
-          reason: "unknown",
-          message: `Failed to build client assertion: ${String(e)}`,
-          correlationId: undefined,
+    if (config.clientCertificate) {
+      const { thumbprint, privateKey, x5c } = config.clientCertificate
+      return yield* Effect.try({
+        try: () => ({
+          ...base,
+          client_assertion_type:
+            "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+          client_assertion: makeClientAssertion(
+            config.clientId,
+            tokenEndpoint,
+            thumbprint,
+            privateKey,
+            x5c,
+          ),
         }),
+        catch: (e) =>
+          new AuthenticationFailedError({
+            reason: "unknown",
+            message: `Failed to build client assertion: ${String(e)}`,
+            correlationId: undefined,
+          }),
+      })
+    }
+
+    return yield* Effect.fail(
+      new AuthenticationFailedError({
+        reason: "invalid_client",
+        message:
+          "ApplicationAuthConfig requires either clientSecret or clientCertificate",
+        correlationId: undefined,
+      }),
+    )
+  },
+)
+
+const parseTokenJson = Effect.fn("ApplicationAuth.parseTokenJson")(
+  function*(json: unknown): Effect.fn.Return<OAuthTokenResponse, AuthenticationFailedError> {
+    const errorCheck = Schema.decodeUnknownResult(OAuthErrorResponseSchema)(json)
+    const errorDescription = Result.match(errorCheck, {
+      onSuccess: (r) => r.error_description,
+      onFailure: () => undefined,
     })
-  }
-
-  return Effect.fail(
-    new AuthenticationFailedError({
-      reason: "invalid_client",
-      message:
-        "ApplicationAuthConfig requires either clientSecret or clientCertificate",
-      correlationId: undefined,
-    }),
-  )
-}
-
-const parseTokenJson = (
-  json: unknown,
-): Effect.Effect<OAuthTokenResponse, AuthenticationFailedError> => {
-  if (
-    typeof json !== "object" ||
-    json === null ||
-    !("access_token" in json) ||
-    typeof (json as Record<string, unknown>)["access_token"] !== "string"
-  ) {
-    if (
-      typeof json === "object" &&
-      json !== null &&
-      "error_description" in json
-    ) {
-      const errJson = json as OAuthErrorResponse
-      return Effect.fail(
+    if (errorDescription) {
+      return yield* Effect.fail(
         new AuthenticationFailedError({
           reason: "invalid_grant",
-          message: `Token endpoint error: ${errJson.error_description}`,
+          message: `Token endpoint error: ${errorDescription}`,
           correlationId: undefined,
         }),
       )
     }
-    return Effect.fail(
-      new AuthenticationFailedError({
-        reason: "unknown",
-        message: `Unexpected token response shape: ${JSON.stringify(json)}`,
-        correlationId: undefined,
-      }),
-    )
-  }
-  return Effect.succeed(json as OAuthTokenResponse)
-}
 
-const acquireClientCredentials = (
-  config: ApplicationAuthConfig["Service"],
-  tokenEndpoint: string,
-): Effect.Effect<OAuthTokenResponse, AuthenticationFailedError> =>
-  Effect.gen(function* () {
+    return yield* Schema.decodeUnknownEffect(OAuthTokenResponseSchema)(json).pipe(
+      Effect.mapError(
+        (e) =>
+          new AuthenticationFailedError({
+            reason: "unknown",
+            message: `Unexpected token response shape: ${e.message}`,
+            correlationId: undefined,
+          }),
+      ),
+    )
+  },
+)
+
+const acquireClientCredentials = Effect.fn("ApplicationAuth.acquireClientCredentials")(
+  function*(
+    config: ApplicationAuthConfig["Service"],
+    tokenEndpoint: string,
+  ): Effect.fn.Return<OAuthTokenResponse, AuthenticationFailedError> {
     const params = yield* buildTokenParams(config, tokenEndpoint)
 
-    const json = yield* pipe(
-      HttpClientRequest.post(tokenEndpoint),
+    const json = yield* HttpClientRequest.post(tokenEndpoint).pipe(
       HttpClientRequest.bodyUrlParams(params),
       HttpClient.execute,
       Effect.flatMap((resp) => resp.json),
@@ -174,7 +173,46 @@ const acquireClientCredentials = (
     )
 
     return yield* parseTokenJson(json)
-  })
+  },
+)
+
+const acquireToken = Effect.fn("ApplicationAuth.acquireToken")(
+  function*(
+    config: ApplicationAuthConfig["Service"],
+    cachedTokenRef: Ref.Ref<Option.Option<AccessTokenInfo>>,
+    cacheStateRef: Ref.Ref<TokenCacheState>,
+    tokenEndpoint: string,
+  ): Effect.fn.Return<AccessTokenInfo, AuthenticationFailedError> {
+    const cached = yield* Ref.get(cachedTokenRef).pipe(
+      Effect.map(Option.filter((token) => !isTokenExpired(token.expiresOn, REFRESH_BUFFER_MS))),
+    )
+
+    return yield* Option.match(cached, {
+      onSome: (token) => Effect.succeed(token),
+      onNone: () =>
+        Effect.gen(function* () {
+          const raw = yield* acquireClientCredentials(config, tokenEndpoint)
+          const expiresOn = new Date(Date.now() + raw.expires_in * 1000)
+          const tokenInfo: AccessTokenInfo = {
+            accessToken: raw.access_token,
+            expiresOn,
+            scopes: raw.scope ? raw.scope.split(" ") : config.scopes,
+            account: null,
+            tokenType: "Bearer",
+          }
+
+          yield* Ref.set(cachedTokenRef, Option.some(tokenInfo))
+
+          if (config.cachePlugin) {
+            const ctx = makeTokenCacheContext(cacheStateRef)
+            yield* config.cachePlugin.afterCacheAccess(ctx)
+          }
+
+          return tokenInfo
+        }),
+    })
+  },
+)
 
 const makeService = (
   config: ApplicationAuthConfig["Service"],
@@ -183,42 +221,9 @@ const makeService = (
 ): MsGraphAuthInterface => {
   const tokenEndpoint = `${config.authority}/oauth2/v2.0/token`
 
-  const acquireToken: Effect.Effect<
-    AccessTokenInfo,
-    AuthenticationFailedError
-  > = Effect.gen(function* () {
-    const cached = yield* Ref.get(cachedTokenRef)
-
-    if (Option.isSome(cached)) {
-      const token = cached.value
-      if (!isTokenExpired(token.expiresOn, REFRESH_BUFFER_MS)) {
-        return token
-      }
-    }
-
-    const raw = yield* acquireClientCredentials(config, tokenEndpoint)
-    const expiresOn = new Date(Date.now() + raw.expires_in * 1000)
-    const tokenInfo: AccessTokenInfo = {
-      accessToken: raw.access_token,
-      expiresOn,
-      scopes: raw.scope.split(" "),
-      account: null,
-      tokenType: "Bearer",
-    }
-
-    yield* Ref.set(cachedTokenRef, Option.some(tokenInfo))
-
-    if (config.cachePlugin) {
-      const ctx = makeTokenCacheContext(cacheStateRef)
-      yield* config.cachePlugin.afterCacheAccess(ctx)
-    }
-
-    return tokenInfo
-  })
-
   return {
     grantedScopes: config.scopes,
-    acquireToken,
+    acquireToken: acquireToken(config, cachedTokenRef, cacheStateRef, tokenEndpoint),
     getCachedAccounts: Effect.succeed([]),
     removeCachedAccount: (_accountId: string) =>
       Ref.set(cachedTokenRef, Option.none()),
