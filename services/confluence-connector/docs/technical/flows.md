@@ -368,7 +368,7 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 |---|---|---|
 | Sync already in progress | Overlapping cron triggers or long-running sync | Skip the cycle entirely (re-entrancy guard) |
 | Root scope not found | Misconfigured `scopeId` or scope deleted | `assert.ok` -- abort the entire sync cycle |
-| Accidental full deletion detected | Bug in page fetching or key format change | `assert.fail` -- abort the space's sync (see [Safety Checks](#safety-checks)) |
+| Accidental full deletion detected | Bug in page fetching or key format change | `assert.fail` -- abort the entire tenant sync cycle (see [Safety Checks](#safety-checks)) |
 | Page fetch failure | Page deleted between discovery and content fetch, transient API error | Log error, return `null`, skip the page, continue other pages |
 | Page not found | Page deleted between discovery and content fetch | Log warning, return `null`, skip the page |
 | Page with empty body | Page has no content (e.g., newly created) | Log, skip the page |

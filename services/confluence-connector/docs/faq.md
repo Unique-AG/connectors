@@ -183,7 +183,7 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 
 ### What safety guards does the connector have?
 
-**Answer:** The connector includes two safeguards -- a zero-submission guard and a full-deletion guard -- that abort synchronization for a space when the file diff results indicate a likely error in discovery or key format. To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards. See the [safety checks](./technical/flows.md#safety-checks) documentation for full details.
+**Answer:** The connector includes two safeguards -- a zero-submission guard and a full-deletion guard -- that abort the current tenant sync cycle when the file diff results indicate a likely error in discovery or key format for a space. To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards. See the [safety checks](./technical/flows.md#safety-checks) documentation for full details.
 
 ### Are concurrent syncs for the same tenant possible?
 
