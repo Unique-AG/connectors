@@ -158,7 +158,7 @@ If the `ai-ingest-all` label is removed from a parent page, all descendant pages
 
 **Answer:** If the page's space is still discovered during the next sync cycle, the file diff detects the missing page and deletes the corresponding content (page and its attachments) from Unique.
 
-If an entire previously synced space disappears from discovery results, cleanup is not guaranteed by the current per-space diff behavior and may require manual deletion of the stale content in Unique.
+If an entire previously synced space disappears from discovery results (for example, because all its labels were removed or the space was deleted), the connector does not automatically clean up its content. This is because the file diff runs per-space and only executes for spaces that still appear in the current discovery results. Content from the disappeared space remains in Unique and requires manual deletion.
 
 ### What happens to attachments when their parent page is unlabeled?
 
@@ -292,7 +292,7 @@ The connector discovers pages via CQL search queries. Pages in spaces where the 
 
 **Answer:** Pages in inaccessible spaces are silently excluded from CQL search results. The connector does not receive an error; it simply never discovers those pages.
 
-If a space that was previously accessible becomes inaccessible, the connector does not currently guarantee automatic cleanup of that space's already ingested content, because the file diff runs only for spaces that still appear in discovery results. In that situation, manual cleanup in Unique may be required.
+If a space that was previously accessible becomes inaccessible, the connector does not automatically clean up that space's already ingested content. The file diff runs per-space and only executes for spaces that still appear in discovery results, so a space that vanishes from CQL results is never diffed and its content remains in Unique. Manual cleanup is required in that situation.
 
 ### How does Unique platform authentication work?
 
