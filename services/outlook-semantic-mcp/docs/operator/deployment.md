@@ -46,7 +46,7 @@ helm upgrade outlook-semantic-mcp oci://ghcr.io/unique-ag/helm-charts/outlook-se
 
 ## Required Secrets
 
-The service requires seven Kubernetes secrets to be present before deployment. For the full reference (format, description, and generation commands), see [Configuration — Required Secrets](./configuration.md#Required-Secrets).
+The required secrets depend on the auth mode. For the full reference (format, description, and generation commands), see [Configuration — Required Secrets](./configuration.md#Required-Secrets).
 
 ### Provisioning with Terraform (recommended)
 

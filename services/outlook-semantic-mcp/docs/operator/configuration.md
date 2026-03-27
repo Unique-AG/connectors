@@ -16,9 +16,9 @@ These must be provided via Kubernetes secrets:
 | `DATABASE_URL` | `postgresql://user:pass@host:5432/db` | PostgreSQL connection string |
 | `AMQP_URL` | `amqp://user:pass@host:5672/vhost` | RabbitMQ connection string (or use individual `AMQP_*` fields) |
 | `MICROSOFT_CLIENT_SECRET` | String from Azure portal | Entra app client secret |
-| `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret — generate with `openssl rand -hex 64` |
-| `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key — generate with `openssl rand -hex 32` |
-| `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key — generate with `openssl rand -hex 32` |
+| `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret — see [Generating Secrets](#Generating-Secrets) |
+| `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key — see [Generating Secrets](#Generating-Secrets) |
+| `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key — see [Generating Secrets](#Generating-Secrets) |
 | `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret (required for `external` auth mode only) |
 
 ### Application Configuration
@@ -28,10 +28,10 @@ Set via `mcpConfig.app` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `SELF_URL` | `mcpConfig.app.selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
-| `PORT` | — | `9542` | HTTP port the server binds to. In Helm deployments, `server.ports.application` (default `51345`) overrides this value. |
-| `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Set to `enabled` to expose debug tools and extra debugging data in tool responses. **Warning:** Debug mode exposes debug tools (`run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) to **all** connected MCP users, not just operators. Do not leave enabled in production. |
-| `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing to reduce I/O. Set to `disabled` only for startup debugging when you need logs to appear immediately. |
-| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | (required) | JSON string controlling which emails are synced — see [Mail Filters](#Mail-Filters). The application binary has no built-in default for this value. The Helm chart provides a default in `values.yaml` (`ignoredBefore: 2025-06-06`, empty arrays), but when running outside Helm (e.g., local development) this value must be set explicitly. The `ignoredBefore` field is required — without it, the application will not start. **Warning:** Setting `ignoredBefore` far in the past can cause very large initial syncs — significant time and Microsoft Graph API quota consumption. |
+| `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
+| `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
+| `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
+| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | (required) | JSON email sync filters — see [Mail Filters](#Mail-Filters) |
 
 ### Microsoft Configuration
 
@@ -40,8 +40,8 @@ Set via `mcpConfig.microsoft` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
-| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | defaults to `SELF_URL` | Base URL Microsoft Graph uses for **webhook** callbacks (not OAuth callbacks — those always use `SELF_URL`). Microsoft appends `/mail-subscription/notification` and `/mail-subscription/lifecycle` to this URL. Must be publicly reachable by Microsoft Graph. Set this when the externally reachable URL differs from `SELF_URL` (e.g., a dev tunnel URL in local development). In most production deployments this matches `SELF_URL`. Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callback`, not this variable. |
-| `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC` | `3` | Hour of day in UTC (0–23) when scheduled subscription renewals occur. Subscriptions are renewed daily at this hour. Adjust to align with your operations timezone so renewals happen during business hours when monitoring is active. |
+| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | defaults to `SELF_URL` | Base URL for Microsoft Graph webhook callbacks — see [MICROSOFT_PUBLIC_WEBHOOK_URL](#MICROSOFT_PUBLIC_WEBHOOK_URL) |
+| `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC` | `3` | UTC hour (0–23) when daily subscription renewals run |
 
 ### Unique API Configuration
 
@@ -52,8 +52,8 @@ Set via `mcpConfig.unique` in Helm values:
 | `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
 | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
 | `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `mcpConfig.unique.scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
-| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | When `enabled`, emails are ingested into the Unique Knowledge Base and stored for semantic search. Set to `disabled` to ingest emails without storing as physical files (emails will be searchable via `search_emails`). |
-| `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | JSON: `{"x-company-id":"...","x-user-id":"..."}`. The `x-company-id` is your organization's ID in the Unique platform — find it in the Unique admin dashboard under **Settings > Organization**, or query it via the Unique API (e.g., `GET /api/company`). The `x-user-id` is the Zitadel service user ID — see [Zitadel Service Account](#Zitadel-Service-Account). |
+| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | Store emails as files in the Knowledge Base — see [UNIQUE_STORE_INTERNALLY](#UNIQUE_STORE_INTERNALLY) |
+| `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | `x-company-id` and `x-user-id` headers for `cluster_local` mode — see [UNIQUE_SERVICE_EXTRA_HEADERS](#UNIQUE_SERVICE_EXTRA_HEADERS) |
 | `UNIQUE_ZITADEL_CLIENT_ID` | `mcpConfig.unique.zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
 | `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `mcpConfig.unique.zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
 | `UNIQUE_ZITADEL_PROJECT_ID` | `mcpConfig.unique.zitadel.projectId` | (required for `external`) | Zitadel project ID for audience validation |
@@ -84,9 +84,9 @@ Set via `server.env` in Helm values for plain config, or via `server.envVars` (w
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LOG_LEVEL` | `info` | Log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` |
-| `MAX_HEAP_MB` | `1920` | Node.js max heap size in MB. With the default of 1920 MB, set the pod memory request/limit to at least ~2.5 GB to account for non-heap memory overhead. |
+| `MAX_HEAP_MB` | `1920` | Node.js max heap size in MB — see [MAX_HEAP_MB](#MAX_HEAP_MB) |
 | `NODE_ENV` | `production` | Node environment |
-| `NODE_EXTRA_CA_CERTS`                 | —                                                 | Path to a PEM file containing additional CA certificates for TLS verification if pod's trust store doesn't have them |
+| `NODE_EXTRA_CA_CERTS` | — | Path to a PEM file with additional CA certificates for TLS verification |
 | `OTEL_METRICS_EXPORTER` | `prometheus` | OpenTelemetry metrics exporter |
 | `OTEL_EXPORTER_PROMETHEUS_HOST` | `0.0.0.0` | Host for the Prometheus metrics scrape endpoint |
 | `OTEL_EXPORTER_PROMETHEUS_PORT` | `51346` | Port for the Prometheus metrics scrape endpoint |
@@ -317,3 +317,52 @@ Instead of `AMQP_URL`, you can provide individual connection fields:
 3. Keep `LOGS_DIAGNOSTICS_DATA_POLICY` set to `conceal` (the default) in production to avoid logging sensitive data
 4. Enable network policies to restrict inbound and outbound traffic to only required services
 5. Monitor deployments using the provided Grafana dashboards and alert rules (`grafana.dashboard.enabled: true`, `alerts.enabled: true`)
+
+## Variable Details
+
+### Generating Secrets
+
+The following secrets must be generated with a cryptographically secure random source:
+
+| Variable | Command |
+|----------|---------|
+| `MICROSOFT_WEBHOOK_SECRET` | `openssl rand -hex 64` |
+| `AUTH_HMAC_SECRET` | `openssl rand -hex 32` |
+| `ENCRYPTION_KEY` | `openssl rand -hex 32` |
+
+### PORT
+
+The server listens on `PORT` (default `9542`). In Helm deployments, `server.ports.application` (default `51345`) overrides this value — the Helm chart injects the port via the deployment spec, so `PORT` typically does not need to be set explicitly.
+
+### MCP_DEBUG_MODE
+
+When set to `enabled`, exposes four additional debug tools to all connected MCP users: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync`. These tools are intended for troubleshooting sync issues, but because MCP tools are scoped to the authenticated user there is no way to restrict them to operators only — all users can call them while debug mode is active. Enable only during active troubleshooting and disable immediately after.
+
+### MICROSOFT_PUBLIC_WEBHOOK_URL
+
+Microsoft Graph sends webhook callbacks (change notifications and lifecycle events) to this base URL. Microsoft appends `/mail-subscription/notification` and `/mail-subscription/lifecycle` to construct the full endpoints. The URL must be publicly reachable by Microsoft Graph.
+
+This defaults to `SELF_URL`. Set it explicitly only when the externally reachable webhook URL differs from `SELF_URL` — for example, when using a dev tunnel in local development. In most production deployments the two values are identical.
+
+Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callback`, not this variable.
+
+### UNIQUE_STORE_INTERNALLY
+
+When `enabled` (default), emails are ingested into the Unique Knowledge Base and stored as physical files, making them available for semantic search via `search_emails`.
+
+When `disabled`, emails are indexed (metadata recorded) but not stored as files. They remain searchable via `search_emails`, but the email content is not persisted in the Knowledge Base.
+
+### UNIQUE_SERVICE_EXTRA_HEADERS
+
+Required for `cluster_local` auth mode. Provide as a JSON object:
+
+```json
+{"x-company-id": "<your-company-id>", "x-user-id": "<your-zitadel-service-user-id>"}
+```
+
+- **`x-company-id`** — your organization's ID in the Unique platform. Find it in the Unique admin dashboard under **Settings > Organization**, or via the Unique API (`GET /api/company`).
+- **`x-user-id`** — the Zitadel service user ID. See [Zitadel Service Account](#Zitadel-Service-Account).
+
+### MAX_HEAP_MB
+
+Sets the Node.js `--max-old-space-size` flag. With the default of `1920` MB, set the pod memory request/limit to at least ~2.5 GB to account for non-heap memory overhead (native modules, OS buffers, etc.).
