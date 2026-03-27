@@ -263,6 +263,67 @@ describe('IngestionService', () => {
     expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
   });
 
+  describe('cleanup after failed page ingestion', () => {
+    it('deletes registered content when page upload fails', async () => {
+      const { service, uniqueApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 500 });
+
+      await service.ingestPage(pageFixture, 'space-scope-1');
+
+      expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contentId: 'id-1',
+          msg: 'Deleted orphaned content after failed ingestion',
+        }),
+      );
+    });
+
+    it('deletes registered content when page finalization fails', async () => {
+      const { service, uniqueApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+      vi.mocked(uniqueApiClient.ingestion.finalizeIngestion).mockRejectedValue(
+        new Error('finalize failed'),
+      );
+
+      await service.ingestPage(pageFixture, 'space-scope-1');
+
+      expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contentId: 'id-1',
+          msg: 'Deleted orphaned content after failed ingestion',
+        }),
+      );
+    });
+
+    it('does not attempt cleanup when page registration fails', async () => {
+      const { service, uniqueApiClient } = makeService();
+      vi.mocked(uniqueApiClient.ingestion.registerContent).mockRejectedValue(
+        new Error('register failed'),
+      );
+
+      await service.ingestPage(pageFixture, 'space-scope-1');
+
+      expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
+    });
+
+    it('continues pipeline when cleanup delete fails', async () => {
+      const { service, uniqueApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 500 });
+      vi.mocked(uniqueApiClient.files.deleteByIds).mockRejectedValue(new Error('network error'));
+
+      await service.ingestPage(pageFixture, 'space-scope-1');
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contentId: 'id-1',
+          msg: 'Failed to clean up orphaned content after failed ingestion',
+        }),
+      );
+    });
+  });
+
   it('rewrites writeUrl to in-cluster ingestion endpoint in cluster_local mode', async () => {
     const clusterLocalConfig = {
       confluence: { instanceType: 'cloud', baseUrl: CONFLUENCE_BASE_URL },
@@ -443,6 +504,52 @@ describe('IngestionService', () => {
           msg: 'Failed to ingest attachment, skipping',
         }),
       );
+    });
+
+    describe('cleanup after failed attachment ingestion', () => {
+      it('deletes registered content when attachment upload fails', async () => {
+        const { service, uniqueApiClient } = makeService();
+        mockRequest.mockResolvedValueOnce({ statusCode: 500 });
+
+        await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+        expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            contentId: 'id-1',
+            msg: 'Deleted orphaned content after failed ingestion',
+          }),
+        );
+      });
+
+      it('deletes registered content when attachment finalization fails', async () => {
+        const { service, uniqueApiClient } = makeService();
+        mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+        vi.mocked(uniqueApiClient.ingestion.finalizeIngestion).mockRejectedValue(
+          new Error('finalize failed'),
+        );
+
+        await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+        expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            contentId: 'id-1',
+            msg: 'Deleted orphaned content after failed ingestion',
+          }),
+        );
+      });
+
+      it('does not attempt cleanup when attachment registration fails', async () => {
+        const { service, uniqueApiClient } = makeService();
+        vi.mocked(uniqueApiClient.ingestion.registerContent).mockRejectedValue(
+          new Error('register failed'),
+        );
+
+        await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+        expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
+      });
     });
 
     it('rewrites writeUrl in cluster_local mode for attachment ingestion', async () => {
