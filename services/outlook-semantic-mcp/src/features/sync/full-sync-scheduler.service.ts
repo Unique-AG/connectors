@@ -2,10 +2,9 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
+import { and, eq, gt, lt, or, SQL, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
-import { getThreshold } from '~/utils/get-threshold';
 import {
   STALE_HEARTBEAT_MINUTES,
   WAITING_FOR_FAILED_HEARTBEAT_MINUTES,
@@ -114,3 +113,7 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 }
+
+const getThreshold = (thresholdInMinutes: number): SQL<unknown> => {
+  return sql`NOW() - (${thresholdInMinutes} * INTERVAL '1 minute')`;
+};

@@ -113,4 +113,4 @@ USER nestjs
 EXPOSE 3000
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "node --enable-source-maps --max-old-space-size=${MAX_HEAP_MB:-850} dist/main.js"]
+CMD ["sh", "-c", "node --enable-source-maps --max-old-space-size=${MAX_HEAP_MB:-1024} dist/main.js"]
