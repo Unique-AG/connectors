@@ -11,8 +11,8 @@ The Confluence Connector requires specific permissions to access the Confluence 
 
 | Instance Type | Auth Method | Permissions Required |
 |---|---|---|
-| Cloud | OAuth 2.0 (2LO) | Application link with read access to pages, attachments, labels, and spaces (no explicit OAuth scopes are sent in the token request) |
-| Data Center | OAuth 2.0 (2LO) | Application link with `READ` scope |
+| Cloud | OAuth 2.0 (2LO) | OAuth application configured for the client credentials flow with read access to pages, attachments, labels, and spaces (no explicit OAuth scopes are sent in the token request) |
+| Data Center | OAuth 2.0 (2LO) | OAuth 2.0 application configured with `READ` scope |
 | Data Center | Personal Access Token | User account with read access to target spaces |
 
 ### Unique Platform Permissions
@@ -197,5 +197,5 @@ The connector also rate-limits requests to the Unique platform API:
 - [Confluence Cloud REST API v1](https://developer.atlassian.com/cloud/confluence/rest/v1/intro/) - Atlassian Confluence Cloud API documentation
 - [Confluence Cloud REST API v2](https://developer.atlassian.com/cloud/confluence/rest/v2/intro/) - Atlassian Confluence Cloud v2 API documentation
 - [Confluence Data Center REST API](https://docs.atlassian.com/ConfluenceServer/rest/latest/) - Atlassian Confluence Data Center API documentation
-- [Atlassian OAuth 2.0 (2LO)](https://developer.atlassian.com/cloud/confluence/oauth-2-3lo-apps/) - Atlassian OAuth documentation
+- [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) - Manage Atlassian Cloud OAuth applications
 - [Confluence Data Center OAuth](https://confluence.atlassian.com/doc/configure-an-incoming-link-1115674733.html) - Data Center OAuth application link configuration
