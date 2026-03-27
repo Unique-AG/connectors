@@ -67,7 +67,7 @@ Tenant configuration files are loaded from YAML files matching the glob pattern 
 
 ### Authentication
 
-The connector authenticates in two directions: toward Confluence (OAuth 2.0 2LO or PAT) and toward the Unique platform (`cluster_local` via service headers or `external` via Zitadel OAuth). In `cluster_local` mode, upload URLs are rewritten to the ingestion service's scoped upload endpoint to avoid hairpinning through the gateway. See the [Authentication Guide](../operator/authentication.md) for full details on each method, credential setup, and token flows.
+The connector authenticates in two directions: toward Confluence (OAuth 2.0 2LO, recommended; or PAT for Data Center below 10.1 only, not recommended) and toward the Unique platform (`cluster_local` via service headers or `external` via Zitadel OAuth). In `cluster_local` mode, upload URLs are rewritten to the ingestion service's scoped upload endpoint to avoid hairpinning through the gateway. See the [Authentication Guide](../operator/authentication.md) for full details on each method, credential setup, and token flows.
 
 ### API Clients
 

@@ -126,7 +126,7 @@ Each release contains a Terraform module for secret provisioning:
 
 ### Secrets Module
 
-The secrets module provisions Azure Key Vault secret placeholders for the connector's credentials (OAuth client secret, PAT). The secret values are set to `<TO BE SET MANUALLY>` on creation and must be populated by the operator. The `lifecycle.ignore_changes` block ensures Terraform does not overwrite manually set values on subsequent applies.
+The secrets module provisions Azure Key Vault secret placeholders for the connector's credentials (OAuth client secret, or PAT for Data Center below 10.1 only). The secret values are set to `<TO BE SET MANUALLY>` on creation and must be populated by the operator. The `lifecycle.ignore_changes` block ensures Terraform does not overwrite manually set values on subsequent applies.
 
 ```hcl
 module "confluence_connector_secrets" {
@@ -270,7 +270,7 @@ Check the pod logs for specific validation error messages. See [Configuration](.
 
 ### Authentication Errors
 
-- Verify OAuth client credentials or PAT are valid
+- Verify OAuth client credentials (or PAT for Data Center below 10.1) are valid
 - Confirm the `os.environ/` references resolve to non-empty environment variables
 - Check Kubernetes Secrets exist and contain the expected keys
 - For `cluster_local` mode, ensure `x-company-id` and `x-user-id` headers are set

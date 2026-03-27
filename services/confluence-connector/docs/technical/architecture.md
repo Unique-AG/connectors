@@ -186,7 +186,7 @@ flowchart LR
 | Aspect | Responsibility |
 |--------|---------------|
 | Connector hosting | Client |
-| Confluence app / PAT | Client |
+| Confluence app / PAT (PAT only for DC < 10.1) | Client |
 | Unique deliverable | Container image, Helm chart, documentation |
 
 ### Single-Tenant: Client-Hosted
@@ -202,7 +202,7 @@ Client uses Unique Single Tenant but hosts the connector:
 Unique hosts the connector on behalf of the client:
 
 - For Confluence Cloud: Unique provides the OAuth 2.0 app; client provides Cloud ID, base URL, and label configuration
-- For Confluence Data Center: client provides PAT or OAuth credentials and instance URL
+- For Confluence Data Center: client provides OAuth credentials and instance URL (recommended), or PAT for Data Center versions below 10.1 only (not recommended)
 
 ## Container Platform
 
@@ -230,7 +230,7 @@ All external communication is encrypted via HTTPS (TCP:443).
 |---------------|----------|-------------|
 | Cloud | `https://api.atlassian.com/oauth/token` | Atlassian centralized OAuth 2.0 token endpoint (client credentials grant) |
 | Data Center (OAuth) | `<baseUrl>/rest/oauth2/latest/token` | Instance-specific OAuth 2.0 token endpoint (client credentials grant) |
-| Data Center (PAT) | N/A (no token exchange) | Static token sent as Bearer header |
+| Data Center (PAT; below 10.1 only, not recommended) | N/A (no token exchange) | Static token sent as Bearer header |
 | Unique (external mode) | Configured via `zitadelOauthTokenUrl` (e.g., `https://idp.unique.app/oauth/v2/token`) | Zitadel OAuth 2.0 token endpoint |
 
 The connector initiates outbound requests to these authentication endpoints. No inbound connections are required for authentication.

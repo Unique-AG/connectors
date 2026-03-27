@@ -55,7 +55,7 @@ The connector only reads content from Confluence. All Confluence API calls use t
 
 - **Cloud OAuth 2.0 (2LO):** The token request sends `grant_type`, `client_id`, and `client_secret` only. Access is limited to the permissions configured on the OAuth 2.0 integration in the Atlassian Developer Console.
 - **Data Center OAuth 2.0 (2LO):** The token request explicitly includes `scope=READ`, limiting the service account to read-only operations even if the application link grants broader permissions.
-- **Data Center PAT:** The token inherits the permissions of the user who created it. Operators should create a dedicated user with read-only access.
+- **Data Center PAT (not recommended; Data Center below 10.1 only):** The token inherits the permissions of the user who created it. Operators should create a dedicated user with read-only access. PATs are static and must be manually rotated. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead.
 
 See [Permissions](./permissions.md) for the full list of API endpoints and their justification.
 
@@ -152,7 +152,7 @@ All operations are logged with structured JSON via Pino, including:
 
 | Control | Implementation |
 |---|---|
-| Confluence authentication | OAuth 2.0 (2LO) client credentials or Personal Access Token |
+| Confluence authentication | OAuth 2.0 (2LO) client credentials (recommended) or Personal Access Token (Data Center below 10.1 only; not recommended) |
 | Unique authentication | Cluster-local service headers or Zitadel OAuth client credentials |
 | Secret protection | `Redacted` wrapper, `os.environ/` resolution, log redaction |
 | Authorization header redaction | Pino `redact` configuration on `req.headers.authorization` |
@@ -166,7 +166,7 @@ All operations are logged with structured JSON via Pino, including:
 1. **Use `os.environ/` resolution** for all secret fields and inject values via Kubernetes Secrets
 2. **Set `LOGS_DIAGNOSTICS_DATA_POLICY` to `conceal`** (the default) in production to mask diagnostic data in logs
 3. **Provide `NODE_EXTRA_CA_CERTS`** if running in environments with corporate proxies or custom PKI
-4. **Use OAuth 2.0 (2LO) over PAT** where possible -- OAuth tokens expire and are automatically refreshed, while PATs are static and must be manually rotated
+4. **Use OAuth 2.0 (2LO) instead of PAT** -- OAuth tokens expire and are automatically refreshed, while PATs are static and must be manually rotated. PATs are not recommended and should only be used on Data Center versions below 10.1 where OAuth 2.0 (2LO) is not available
 5. **Review Confluence access grants** periodically to ensure the connector's service account has read-only access to only the required spaces
 6. **Monitor logs** for authentication failures, file diff anomalies, and accidental deletion safeguard triggers
 7. **Update promptly** when security patches are released

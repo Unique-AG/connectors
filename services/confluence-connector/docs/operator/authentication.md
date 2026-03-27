@@ -16,10 +16,11 @@ This guide covers both authentication paths, including credential setup, secret 
 |---|---|---|---|
 | **Cloud** | OAuth 2.0 (2LO) | `oauth_2lo` | Client credentials flow via `https://api.atlassian.com/oauth/token` |
 | **Data Center** | OAuth 2.0 (2LO) | `oauth_2lo` | Client credentials flow via `{baseUrl}/rest/oauth2/latest/token` |
-| **Data Center** | Personal Access Token | `pat` | Static token-based authentication |
+| **Data Center** (below 10.1) | Personal Access Token | `pat` | Static token-based authentication (not recommended; use OAuth 2.0 2LO on Data Center 10.1+) |
 
 - Confluence Cloud supports **only** OAuth 2.0 two-legged (2LO).
-- Confluence Data Center supports **both** OAuth 2.0 (2LO) and Personal Access Token (PAT).
+- Confluence Data Center 10.1+ supports **both** OAuth 2.0 (2LO) and Personal Access Token (PAT). OAuth 2.0 (2LO) is recommended.
+- Confluence Data Center below 10.1 must use **Personal Access Token (PAT)**, as OAuth 2.0 (2LO) is not available on those versions.
 
 ## Unique Platform Authentication Methods
 
@@ -102,7 +103,9 @@ confluence:
     clientSecret: os.environ/CONFLUENCE_CLIENT_SECRET
 ```
 
-#### Option C: Personal Access Token -- Data Center Only
+#### Option C: Personal Access Token -- Data Center Below 10.1 Only (Not Recommended)
+
+> **Note:** PATs are not recommended. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead. PATs are static tokens that do not expire automatically and must be manually rotated. Only use this option on Data Center versions below 10.1 where OAuth 2.0 (2LO) is not available.
 
 1. In Confluence Data Center, go to **Profile** > **Personal Access Tokens**.
 2. Create a new token with read access to the target spaces.

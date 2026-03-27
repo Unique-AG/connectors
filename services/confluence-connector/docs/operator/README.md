@@ -107,6 +107,8 @@ In cluster-internal mode (`serviceAuthMode: cluster_local`), Zitadel token valid
 | Destination | Port | Protocol | Direction | Notes |
 |-------------|------|----------|-----------|-------|
 | `api.atlassian.com` | 443 | HTTPS | Outbound | OAuth token endpoint and REST API for Cloud instances |
+| `auth.atlassian.com` | 443 | HTTPS | Outbound | Atlassian authentication service (Cloud) |
+| `api.media.atlassian.com` | 443 | HTTPS | Outbound | Attachment file downloads for Cloud instances |
 | `{instance}.atlassian.net` | 443 | HTTPS | Outbound | Confluence Cloud base URL (used for page web links) |
 | `{data-center-host}` | 443 | HTTPS | Outbound | Confluence Data Center REST API and OAuth token endpoint |
 | Unique Ingestion Service | 443 / internal | HTTPS / HTTP | Outbound / Internal | File upload and ingestion |
@@ -119,15 +121,17 @@ In cluster-internal mode (`serviceAuthMode: cluster_local`), Zitadel token valid
 ### 1. Infrastructure
 
 - [ ] Kubernetes namespace created
-- [ ] Network egress to Confluence instance allowed (Cloud: `api.atlassian.com` and `*.atlassian.net`; Data Center: your instance host)
+- [ ] Network egress to Confluence instance allowed (Cloud: `api.atlassian.com`, `auth.atlassian.com`, `api.media.atlassian.com`, and `*.atlassian.net`; Data Center: your instance host)
 - [ ] Connectivity to Unique Ingestion Service verified
 - [ ] Connectivity to Unique Scope Management Service verified
 
 ### 2. Confluence Authentication
 
-- [ ] OAuth 2.0 (2LO) application created in Confluence (or PAT generated for Data Center)
-- [ ] Client ID and client secret noted (or PAT token)
-- [ ] Application granted read access to the target spaces and pages
+- [ ] OAuth 2.0 (2LO) application created in Confluence (recommended for Cloud and Data Center 10.1+), or PAT generated for Data Center versions below 10.1
+- [ ] Client ID and client secret noted (OAuth 2.0), or PAT token noted (Data Center < 10.1)
+- [ ] Application or token granted read access to the target spaces and pages
+
+> **Note:** OAuth 2.0 (2LO) is the recommended authentication method. Personal Access Tokens (PATs) are not recommended and should only be used on Confluence Data Center versions below 10.1 where OAuth 2.0 (2LO) is not available.
 
 ### 3. Unique Platform
 

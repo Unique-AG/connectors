@@ -63,7 +63,7 @@
 
 ### What authentication methods are supported?
 
-**Answer:** The connector supports OAuth 2.0 (2LO) for Confluence Cloud and Data Center, plus Personal Access Token (PAT) for Data Center. Cloud instances only support OAuth 2.0 (2LO); Data Center instances support both. See the [Authentication Guide](./operator/authentication.md) for full details on each method, credential setup, and token flows.
+**Answer:** The connector supports OAuth 2.0 (2LO) for Confluence Cloud and Data Center (10.1+), which is the recommended authentication method. Personal Access Token (PAT) is supported only on Data Center versions below 10.1 where OAuth 2.0 (2LO) is not available, and is not recommended. Cloud instances support only OAuth 2.0 (2LO). See the [Authentication Guide](./operator/authentication.md) for full details on each method, credential setup, and token flows.
 
 ### How are secrets managed in configuration?
 
@@ -284,7 +284,7 @@ Rate limiting is enforced client-side using the Bottleneck library.
 **Answer:** The connector requires read access to the Confluence spaces and pages it needs to sync. The specific mechanism depends on the authentication method:
 
 - **OAuth 2.0 (2LO):** The OAuth application must be granted read access to the target spaces.
-- **Personal Access Token (Data Center only):** The PAT owner's account must have read access to the target spaces.
+- **Personal Access Token (Data Center below 10.1 only; not recommended):** The PAT owner's account must have read access to the target spaces. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead.
 
 The connector discovers pages via CQL search queries. Pages in spaces where the configured credentials lack read access simply do not appear in CQL results and are not synced.
 

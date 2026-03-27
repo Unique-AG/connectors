@@ -15,7 +15,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 **Supported platforms:** Confluence Cloud and Confluence Data Center
 
-**Authentication:** OAuth 2.0 two-legged (Cloud and Data Center) or Personal Access Token (Data Center only)
+**Authentication:** OAuth 2.0 two-legged (recommended; Cloud and Data Center 10.1+) or Personal Access Token (Data Center below 10.1 only; not recommended)
 
 **Scheduling:** Configurable automated scans (default: every 15 minutes)
 
@@ -31,18 +31,18 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 |---|---|
 | **Confluence Cloud** | Active instance with an Atlassian Cloud ID |
 | **Confluence Data Center** | Self-hosted instance with REST API access |
-| **Authentication** | OAuth 2.0 application credentials or a Personal Access Token (Data Center only) |
+| **Authentication** | OAuth 2.0 application credentials (recommended) or a Personal Access Token (Data Center below 10.1 only; not recommended) |
 | **Permissions** | Read access to spaces and pages that should be synchronized |
 
 **Prerequisites:**
 
 - Ability to create and apply labels on Confluence pages
-- An OAuth 2.0 application configured in Confluence (or a PAT for Data Center)
+- An OAuth 2.0 application configured in Confluence (recommended), or a PAT for Data Center below 10.1 only (not recommended)
 - A configured scope in the Unique platform to receive ingested content
 
 ### Authentication Methods
 
-The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and Data Center, and Personal Access Token (PAT) for Data Center. For Unique platform communication, `cluster_local` mode is available for in-cluster deployments and `external` mode for out-of-cluster deployments via Zitadel OAuth. See the [Authentication Guide](./operator/authentication.md) for full setup instructions, credential management, and token flows.
+The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and Data Center (10.1+), which is the recommended authentication method. Personal Access Token (PAT) is supported only on Data Center versions below 10.1 where OAuth 2.0 (2LO) is not available, and is not recommended. For Unique platform communication, `cluster_local` mode is available for in-cluster deployments and `external` mode for out-of-cluster deployments via Zitadel OAuth. See the [Authentication Guide](./operator/authentication.md) for full setup instructions, credential management, and token flows.
 
 ## Features
 
@@ -107,7 +107,7 @@ Content types `database`, `whiteboard`, and `embed` are explicitly skipped (no b
 **Security**
 
 - OAuth 2.0 two-legged (2LO) authentication for Cloud and Data Center
-- Personal Access Token (PAT) support for Data Center
+- Personal Access Token (PAT) support for Data Center below 10.1 only (not recommended; use OAuth 2.0 2LO on 10.1+)
 - Configurable rate limiting for Confluence and Unique API calls
 
 **v1-Compatible Key Format**
