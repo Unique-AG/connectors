@@ -329,16 +329,26 @@ The connector registers Unique API metrics with the prefix `confluence_connector
 | `confluence_connector_unique_api_slow_requests_total` | Counter | Total number of slow Unique API requests by duration bucket |
 | `confluence_connector_unique_api_auth_token_refresh_total` | Counter | Total number of auth token refreshes |
 
+### Connector Metrics
+
+The connector registers custom metrics with the `cfc_` prefix:
+
+| Metric | Type | Description |
+|---|---|---|
+| `cfc_sync_duration_seconds` | Histogram | Duration of sync cycles (labels: `tenant`, `result`) |
+| `cfc_scan_duration_seconds` | Histogram | Duration of the Confluence page discovery phase (labels: `tenant`) |
+| `cfc_pages_processed_total` | Counter | Pages processed during ingestion (labels: `tenant`, `result`) |
+| `cfc_attachments_processed_total` | Counter | Attachments processed during ingestion (labels: `tenant`, `result`) |
+| `cfc_content_deleted_total` | Counter | Content items deleted from Unique (labels: `tenant`, `result`) |
+| `cfc_file_diff_events_total` | Counter | File change detection events (labels: `tenant`, `diff_result_type`) |
+| `cfc_attachment_upload_duration_seconds` | Histogram | Duration of a single attachment upload to Unique (labels: `tenant`) |
+| `cfc_confluence_api_request_duration_seconds` | Histogram | Confluence API request latency (labels: `tenant`, `endpoint`, `result`) |
+| `cfc_confluence_api_throttle_events_total` | Counter | Confluence API rate-limit throttling events (labels: `tenant`) |
+| `cfc_confluence_api_errors_total` | Counter | Confluence API error responses (labels: `tenant`, `http_status_class`) |
+
 ### Grafana Dashboard
 
-The Helm chart contains an optional Grafana dashboard ConfigMap. Before enabling it, review the bundled queries and verify that they match the metrics emitted in your deployment.
-
-From the connector source, the verifiable metric families are:
-
-- Standard host metrics and NestJS HTTP API metrics from `nestjs-otel`
-- Unique API metrics with the `confluence_connector_unique_api_*` prefix
-
-Enable the dashboard ConfigMap with:
+A Grafana dashboard ConfigMap is available in the Helm chart. The dashboard visualizes sync durations, content throughput, attachment uploads, Confluence API performance, Unique API performance, and Node.js runtime metrics. Enable it with:
 
 ```yaml
 grafana:
@@ -347,17 +357,15 @@ grafana:
     folder: connectors
 ```
 
-The bundled dashboard should be treated as a starting point for operator customization rather than as a guaranteed drop-in dashboard for every deployment.
-
 ## Alerts
 
 ### Default Alerts
 
-The Helm chart contains one optional alert template:
+The Helm chart provides one default alert:
 
 | Category | Alert Name | Description |
 |---|---|---|
-| `uniqueApi` | `ConfluenceConnectorUniqueAPIErrors` | Intended to alert on elevated Unique API error rates |
+| `uniqueApi` | `ConfluenceConnectorUniqueAPIErrors` | Fires when the Unique API error rate (4xx/5xx responses) exceeds the configured threshold |
 
 **Default alert parameters:**
 
@@ -392,8 +400,6 @@ alerts:
 ```
 
 Alerts require the `monitoring.coreos.com/v1` API (Prometheus Operator) to be available in the cluster.
-
-Before enabling the bundled alert rules, verify that their PromQL queries match the metric names emitted by your deployment.
 
 ## Complete Re-ingestion
 
