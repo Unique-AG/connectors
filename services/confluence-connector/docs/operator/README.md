@@ -22,7 +22,7 @@ For end-user and administrator documentation, see the [Confluence Connector Over
 
 The connector uses **YAML-based tenant configuration files** mounted into the container. Each file defines exactly one tenant, with its own Confluence connection, Unique platform endpoints, processing schedule, and ingestion settings. The tenant name is derived from the filename.
 
-Tenant configuration files are discovered at startup via the glob pattern defined in `TENANT_CONFIG_PATH_PATTERN` (default: `/app/tenant-configs/*-tenant-config.yaml`).
+Tenant configuration files are discovered at startup via the glob pattern defined in `TENANT_CONFIG_PATH_PATTERN`. This environment variable is required and has no code default; the Helm chart sets it to `/app/tenant-configs/*-tenant-config.yaml`.
 
 Secrets (such as OAuth client secrets or PATs) are referenced from within the YAML using the `os.environ/ENV_VAR_NAME` pattern, which resolves the value from an environment variable at runtime.
 
@@ -143,7 +143,7 @@ In cluster-internal mode (`serviceAuthMode: cluster_local`), Zitadel token valid
 - [ ] Secrets created in Kubernetes (OAuth client secret, PAT, or Zitadel credentials)
 - [ ] Tenant config ConfigMap created (`confluence-connector-tenant-config`)
 - [ ] Helm chart deployed
-- [ ] `TENANT_CONFIG_PATH_PATTERN` set correctly (default: `/app/tenant-configs/*-tenant-config.yaml`)
+- [ ] `TENANT_CONFIG_PATH_PATTERN` set correctly (Helm default: `/app/tenant-configs/*-tenant-config.yaml`)
 
 ### 5. Verification
 

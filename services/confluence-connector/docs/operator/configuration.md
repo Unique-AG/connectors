@@ -15,7 +15,7 @@ The following environment variables control application-level behavior. They are
 | `PORT` | `51349` | HTTP port the application binds to |
 | `LOG_LEVEL` | `info` | Log verbosity: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`. See [Logging](#logging) |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | Controls whether diagnostic data (emails, usernames, IDs) is logged in full (`disclose`) or partially masked (`conceal`). See [Logging](#diagnostics-data-policy) |
-| `TENANT_CONFIG_PATH_PATTERN` | -- (required) | Glob pattern to tenant configuration YAML files (e.g., `/app/tenant-configs/*-tenant-config.yaml`) |
+| `TENANT_CONFIG_PATH_PATTERN` | -- (required; Helm chart sets `/app/tenant-configs/*-tenant-config.yaml`) | Glob pattern to tenant configuration YAML files |
 | `OTEL_METRICS_EXPORTER` | -- | OpenTelemetry metrics exporter (e.g., `prometheus`). See [Metrics](#metrics) |
 | `OTEL_EXPORTER_PROMETHEUS_HOST` | -- | Prometheus exporter bind host |
 | `OTEL_EXPORTER_PROMETHEUS_PORT` | -- | Prometheus exporter bind port |
