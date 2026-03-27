@@ -165,22 +165,28 @@ In cluster-internal mode (`serviceAuthMode: cluster_local`):
 
 ### Self-Hosted (SH)
 
+Client hosts the connector and manages Confluence authentication credentials:
+
 ```mermaid
 flowchart LR
     subgraph Client["Client Infrastructure"]
         Connector["Confluence Connector"]
     end
 
-    subgraph Atlassian["Atlassian"]
-        ConfAPI["Confluence API"]
+    subgraph Atlassian["Atlassian Cloud / Data Center"]
+        ConfluenceAPI["Confluence API"]
+        AtlassianAuth["Atlassian OAuth"]
     end
 
-    subgraph Unique["Unique"]
-        API["Unique API"]
+    subgraph Unique["Unique Platform"]
+        IngestionSvc["Ingestion Service"]
+        ScopeMgmt["Scope Management"]
     end
 
-    Connector --> ConfAPI
-    Connector --> API
+    Connector -->|"OAuth2 / PAT"| AtlassianAuth
+    Connector -->|"HTTPS"| ConfluenceAPI
+    Connector -->|"HTTPS"| IngestionSvc
+    Connector -->|"HTTPS"| ScopeMgmt
 ```
 
 | Aspect | Responsibility |
@@ -203,7 +209,7 @@ Unique hosts the connector on behalf of the client:
 
 - Client creates the service account in their own Atlassian Admin Console and provides the credentials (client ID and client secret) to Unique
 - Client provides their Confluence instance details (Cloud ID, base URL, label configuration)
-- For Data Center below 10.1: client provides a PAT instead (not recommended), or PAT for Data Center versions below 10.1 only (not recommended)
+- For Data Center below 10.1: client provides a PAT instead (not recommended)
 
 ### Multi-Tenant: Unique-Hosted
 
@@ -211,8 +217,18 @@ Unique hosts a single connector deployment serving multiple tenants:
 
 - Each tenant is configured via a separate tenant YAML file
 - Each tenant has its own Confluence instance, credentials, and Unique platform endpoints
-- Tenants are isolated at the configuration level (separate scopes, separate sync schedules)
+- Tenants are isolated at the configuration level (separate scopes, separate sync schedules, separate credentials)
 - The connector processes all tenants within a single pod
+
+**Customer onboarding:**
+
+1. Create a new tenant YAML file with the customer's Confluence instance details, credentials, and Unique platform endpoints
+2. Mount the file into the connector pod via the tenant config ConfigMap
+3. Restart the connector to pick up the new tenant
+
+**Data isolation:** Each tenant has its own root scope and child scopes in the Unique knowledge base. Content from different tenants is never mixed. Credentials are per-tenant and resolved from separate environment variables.
+
+**Compliance:** Some organizations may require dedicated infrastructure for data residency. In that case, deploy a separate connector instance with single-tenant configuration instead.
 
 ## Container Platform
 
