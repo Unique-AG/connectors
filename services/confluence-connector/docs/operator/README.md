@@ -20,7 +20,7 @@ For end-user and administrator documentation, see the [Confluence Connector Over
 
 ## Configuration Approach
 
-The connector uses a **YAML-based tenant configuration file** mounted into the container. Each file defines one or more tenants, each with its own Confluence connection, Unique platform endpoints, processing schedule, and ingestion settings.
+The connector uses **YAML-based tenant configuration files** mounted into the container. Each file defines exactly one tenant, with its own Confluence connection, Unique platform endpoints, processing schedule, and ingestion settings. The tenant name is derived from the filename.
 
 Tenant configuration files are discovered at startup via the glob pattern defined in `TENANT_CONFIG_PATH_PATTERN` (default: `/app/tenant-configs/*-tenant-config.yaml`).
 
