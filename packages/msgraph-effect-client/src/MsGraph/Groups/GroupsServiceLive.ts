@@ -1,6 +1,5 @@
 import { Effect, Layer } from "effect"
-import type { MsGraphAuth } from "../Auth/MsGraphAuth"
-import type { GroupPermissions } from "../Auth/Permissions"
+import type { ApplicationAuth } from "../Auth/MsGraphAuth"
 import {
   InvalidRequestError,
   RateLimitedError,
@@ -89,5 +88,5 @@ export const GroupsServiceLive = Layer.effect(
 ) as Layer.Layer<
   GroupsService,
   never,
-  MsGraphHttpClient | MsGraphAuth<"Application", GroupPermissions>
+  MsGraphHttpClient | ApplicationAuth
 >

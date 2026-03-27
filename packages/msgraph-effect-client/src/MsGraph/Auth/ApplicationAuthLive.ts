@@ -1,9 +1,9 @@
-import { HttpClient, HttpClientRequest } from "@effect/platform"
+import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { NodeHttpClient } from "@effect/platform-node"
 import { Effect, Layer, Option, Ref, pipe } from "effect"
 import { createSign } from "node:crypto"
 import { AuthenticationFailedError } from "../Errors/errors"
-import type { AccessTokenInfo, MsGraphAuth } from "./MsGraphAuth"
+import type { AccessTokenInfo, MsGraphAuthInterface } from "./MsGraphAuth"
 import { ApplicationAuth } from "./MsGraphAuth"
 import { ApplicationAuthConfig } from "./MsGraphAuthConfig"
 import {
@@ -68,7 +68,7 @@ const makeClientAssertion = (
 }
 
 const buildTokenParams = (
-  config: ApplicationAuthConfig,
+  config: ApplicationAuthConfig["Service"],
   tokenEndpoint: string,
 ): Effect.Effect<Record<string, string>, AuthenticationFailedError> => {
   const base: Record<string, string> = {
@@ -100,7 +100,7 @@ const buildTokenParams = (
         new AuthenticationFailedError({
           reason: "unknown",
           message: `Failed to build client assertion: ${String(e)}`,
-          correlationId: Option.none(),
+          correlationId: undefined,
         }),
     })
   }
@@ -110,7 +110,7 @@ const buildTokenParams = (
       reason: "invalid_client",
       message:
         "ApplicationAuthConfig requires either clientSecret or clientCertificate",
-      correlationId: Option.none(),
+      correlationId: undefined,
     }),
   )
 }
@@ -134,7 +134,7 @@ const parseTokenJson = (
         new AuthenticationFailedError({
           reason: "invalid_grant",
           message: `Token endpoint error: ${errJson.error_description}`,
-          correlationId: Option.none(),
+          correlationId: undefined,
         }),
       )
     }
@@ -142,7 +142,7 @@ const parseTokenJson = (
       new AuthenticationFailedError({
         reason: "unknown",
         message: `Unexpected token response shape: ${JSON.stringify(json)}`,
-        correlationId: Option.none(),
+        correlationId: undefined,
       }),
     )
   }
@@ -150,7 +150,7 @@ const parseTokenJson = (
 }
 
 const acquireClientCredentials = (
-  config: ApplicationAuthConfig,
+  config: ApplicationAuthConfig["Service"],
   tokenEndpoint: string,
 ): Effect.Effect<OAuthTokenResponse, AuthenticationFailedError> =>
   Effect.gen(function* () {
@@ -167,20 +167,20 @@ const acquireClientCredentials = (
           new AuthenticationFailedError({
             reason: "unknown",
             message: `Token request failed: ${String(e)}`,
-            correlationId: Option.none(),
+            correlationId: undefined,
           }),
       ),
-      Effect.provide(NodeHttpClient.layer),
+      Effect.provide(NodeHttpClient.layerUndici),
     )
 
     return yield* parseTokenJson(json)
   })
 
-const makeService = <P extends string>(
-  config: ApplicationAuthConfig,
+const makeService = (
+  config: ApplicationAuthConfig["Service"],
   cachedTokenRef: Ref.Ref<Option.Option<AccessTokenInfo>>,
   cacheStateRef: Ref.Ref<TokenCacheState>,
-): MsGraphAuth<"Application", P> => {
+): MsGraphAuthInterface => {
   const tokenEndpoint = `${config.authority}/oauth2/v2.0/token`
 
   const acquireToken: Effect.Effect<
@@ -217,9 +217,7 @@ const makeService = <P extends string>(
   })
 
   return {
-    _flow: "Application",
-    _permissions: "" as P,
-    grantedScopes: config.scopes as ReadonlyArray<P>,
+    grantedScopes: config.scopes,
     acquireToken,
     getCachedAccounts: Effect.succeed([]),
     removeCachedAccount: (_accountId: string) =>
@@ -227,23 +225,23 @@ const makeService = <P extends string>(
   }
 }
 
-export const ApplicationAuthLive = <P extends string>() =>
-  Layer.effect(
-    ApplicationAuth<P>(),
-    Effect.gen(function* () {
-      const config = yield* ApplicationAuthConfig
-      const cachedTokenRef = yield* Ref.make<Option.Option<AccessTokenInfo>>(
-        Option.none(),
-      )
-      const cacheStateRef = yield* Ref.make<TokenCacheState>(
-        emptyTokenCacheState,
-      )
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const ApplicationAuthLive = <_P extends string = string>() => Layer.effect(
+  ApplicationAuth,
+  Effect.gen(function* () {
+    const config = yield* ApplicationAuthConfig
+    const cachedTokenRef = yield* Ref.make<Option.Option<AccessTokenInfo>>(
+      Option.none(),
+    )
+    const cacheStateRef = yield* Ref.make<TokenCacheState>(
+      emptyTokenCacheState,
+    )
 
-      if (config.cachePlugin) {
-        const ctx = makeTokenCacheContext(cacheStateRef)
-        yield* config.cachePlugin.beforeCacheAccess(ctx)
-      }
+    if (config.cachePlugin) {
+      const ctx = makeTokenCacheContext(cacheStateRef)
+      yield* config.cachePlugin.beforeCacheAccess(ctx)
+    }
 
-      return makeService<P>(config, cachedTokenRef, cacheStateRef)
-    }),
-  )
+    return ApplicationAuth.of(makeService(config, cachedTokenRef, cacheStateRef))
+  }),
+)

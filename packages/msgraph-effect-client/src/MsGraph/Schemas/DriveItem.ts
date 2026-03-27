@@ -7,8 +7,8 @@ export const DriveItemSchema = Schema.Struct({
   name: Schema.String,
   size: Schema.Number,
   webUrl: Schema.String,
-  createdDateTime: Schema.DateFromString,
-  lastModifiedDateTime: Schema.DateFromString,
+  createdDateTime: Schema.String,
+  lastModifiedDateTime: Schema.String,
   createdBy: IdentitySetSchema,
   lastModifiedBy: IdentitySetSchema,
   description: Schema.optional(Schema.NullOr(Schema.String)),
@@ -42,7 +42,7 @@ export const DriveItemSchema = Schema.Struct({
   parentReference: Schema.optional(
     Schema.Struct({
       driveId: Schema.String,
-      driveType: Schema.optional(Schema.Literal("personal", "business", "documentLibrary")),
+      driveType: Schema.optional(Schema.Union([Schema.Literal("personal"), Schema.Literal("business"), Schema.Literal("documentLibrary")])),
       id: Schema.String,
       name: Schema.optional(Schema.String),
       path: Schema.optional(Schema.String),
@@ -86,7 +86,7 @@ export const DriveItemSchema = Schema.Struct({
   ),
   shared: Schema.optional(
     Schema.Struct({
-      scope: Schema.optional(Schema.Literal("anonymous", "organization", "users")),
+      scope: Schema.optional(Schema.Union([Schema.Literal("anonymous"), Schema.Literal("organization"), Schema.Literal("users")])),
       owner: Schema.optional(IdentitySetSchema),
       sharedBy: Schema.optional(IdentitySetSchema),
       sharedDateTime: Schema.optional(Schema.String),
@@ -117,7 +117,7 @@ export type DriveItem = Schema.Schema.Type<typeof DriveItemSchema>;
 
 export const UploadSessionSchema = Schema.Struct({
   uploadUrl: Schema.String,
-  expirationDateTime: Schema.DateFromString,
+  expirationDateTime: Schema.String,
   nextExpectedRanges: Schema.Array(Schema.String),
 });
 
@@ -125,8 +125,8 @@ export type UploadSession = Schema.Schema.Type<typeof UploadSessionSchema>;
 
 export const SharingLinkSchema = Schema.Struct({
   id: Schema.optional(Schema.String),
-  type: Schema.Literal("view", "edit", "embed"),
-  scope: Schema.Literal("anonymous", "organization", "users"),
+  type: Schema.Union([Schema.Literal("view"), Schema.Literal("edit"), Schema.Literal("embed")]),
+  scope: Schema.Union([Schema.Literal("anonymous"), Schema.Literal("organization"), Schema.Literal("users")]),
   webUrl: Schema.String,
   webHtml: Schema.optional(Schema.String),
   application: Schema.optional(

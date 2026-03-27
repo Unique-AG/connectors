@@ -1,4 +1,4 @@
-import { Context, Effect } from "effect"
+import { Effect, ServiceMap } from "effect"
 import type {
   InvalidRequestError,
   RateLimitedError,
@@ -8,7 +8,7 @@ import type { Group } from "../Schemas/Group"
 import type { ODataPageType, ODataParams } from "../Schemas/OData"
 import type { User } from "../Schemas/User"
 
-export interface GroupsService {
+export class GroupsService extends ServiceMap.Service<GroupsService, {
   readonly list: (
     params?: ODataParams<Group>,
   ) => Effect.Effect<ODataPageType<Group>, RateLimitedError | InvalidRequestError>
@@ -30,6 +30,6 @@ export interface GroupsService {
     groupId: string,
     userId: string,
   ) => Effect.Effect<void, ResourceNotFoundError | RateLimitedError>
-}
-
-export const GroupsService = Context.GenericTag<GroupsService>("MsGraph/GroupsService")
+}>()(
+  "MsGraph/GroupsService",
+) {}

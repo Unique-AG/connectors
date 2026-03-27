@@ -1,4 +1,4 @@
-import { Context, Effect, Option, Ref } from "effect"
+import { Effect, Option, Ref, ServiceMap } from "effect"
 
 export interface TokenCachePlugin {
   readonly beforeCacheAccess: (
@@ -41,9 +41,9 @@ export const emptyTokenCacheState: TokenCacheState = {
   accounts: new Map(),
 }
 
-export const TokenCacheStateRef = Context.GenericTag<
-  Ref.Ref<TokenCacheState>
->("MsGraph/TokenCacheStateRef")
+export class TokenCacheStateRef extends ServiceMap.Service<TokenCacheStateRef, Ref.Ref<TokenCacheState>>()(
+  "MsGraph/Auth/TokenCacheStateRef",
+) {}
 
 export const makeScopesKey = (
   accountId: string,

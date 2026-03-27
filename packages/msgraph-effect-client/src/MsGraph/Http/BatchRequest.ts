@@ -24,7 +24,7 @@ const BatchResponseBodySchema = Schema.Struct({
     Schema.Struct({
       id: Schema.String,
       status: Schema.Number,
-      headers: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.String })),
+      headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
       body: Schema.optional(Schema.Unknown),
     }),
   ),
@@ -55,11 +55,11 @@ const decodeBatchItem = (
 }
 
 export const executeBatch = (
-  client: MsGraphHttpClient,
+  client: MsGraphHttpClient["Service"],
   requests: ReadonlyArray<BatchRequestItem>,
 ): Effect.Effect<ReadonlyArray<BatchResponseItem>, MsGraphError> => {
   if (requests.length > 20) {
-    return Effect.dieMessage("Microsoft Graph $batch supports at most 20 requests per batch")
+    return Effect.die(new Error("Microsoft Graph $batch supports at most 20 requests per batch"))
   }
 
   const batchBody = {

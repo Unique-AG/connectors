@@ -1,7 +1,7 @@
-import { Context, Effect } from "effect"
+import { Effect, ServiceMap } from "effect"
 import type { AuthenticationFailedError, TokenExpiredError } from "../Errors/errors"
 
-export type AuthFlow = "Delegated" | "Application"
+export type AuthFlow = "Delegated" | "Application" | "OnBehalfOf" | "ManagedIdentity"
 
 export interface AccessTokenInfo {
   readonly accessToken: string
@@ -19,10 +19,7 @@ export interface AccountInfo {
   readonly name: string | null
 }
 
-export interface MsGraphAuth<F extends AuthFlow, P extends string> {
-  readonly _flow: F
-  readonly _permissions: P
-
+export interface MsGraphAuthInterface {
   readonly acquireToken: Effect.Effect<
     AccessTokenInfo,
     TokenExpiredError | AuthenticationFailedError
@@ -34,15 +31,21 @@ export interface MsGraphAuth<F extends AuthFlow, P extends string> {
     accountId: string,
   ) => Effect.Effect<void, never>
 
-  readonly grantedScopes: ReadonlyArray<P>
+  readonly grantedScopes: ReadonlyArray<string>
 }
 
-export const MsGraphAuthTag = <F extends AuthFlow, P extends string>(
-  flow: F,
-) => Context.GenericTag<MsGraphAuth<F, P>>(`MsGraph/Auth/${flow}`)
+export class DelegatedAuth extends ServiceMap.Service<DelegatedAuth, MsGraphAuthInterface>()(
+  "MsGraph/Auth/Delegated",
+) {}
 
-export const DelegatedAuth = <P extends string>() =>
-  MsGraphAuthTag<"Delegated", P>("Delegated")
+export class ApplicationAuth extends ServiceMap.Service<ApplicationAuth, MsGraphAuthInterface>()(
+  "MsGraph/Auth/Application",
+) {}
 
-export const ApplicationAuth = <P extends string>() =>
-  MsGraphAuthTag<"Application", P>("Application")
+export class OnBehalfOfAuth extends ServiceMap.Service<OnBehalfOfAuth, MsGraphAuthInterface>()(
+  "MsGraph/Auth/OnBehalfOf",
+) {}
+
+export class ManagedIdentityAuth extends ServiceMap.Service<ManagedIdentityAuth, MsGraphAuthInterface>()(
+  "MsGraph/Auth/ManagedIdentity",
+) {}

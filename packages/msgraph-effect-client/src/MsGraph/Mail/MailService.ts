@@ -1,4 +1,4 @@
-import { Context, Effect, Stream } from "effect"
+import { Effect, ServiceMap, Stream } from "effect"
 import type {
   InsufficientPermissionsError,
   InvalidRequestError,
@@ -8,7 +8,7 @@ import type {
 import type { ODataParams, ODataPageType } from "../Schemas/OData"
 import type { Attachment, MailFolder, Message, SendMailPayload } from "../Schemas/Message"
 
-export interface MailService {
+export class MailService extends ServiceMap.Service<MailService, {
   readonly listMessages: (
     userId: string,
     folderId?: string,
@@ -52,6 +52,6 @@ export interface MailService {
     messageId: string,
     attachmentId: string,
   ) => Effect.Effect<Stream.Stream<Uint8Array, RateLimitedError>, ResourceNotFoundError>
-}
-
-export const MailService = Context.GenericTag<MailService>("MsGraph/MailService")
+}>()(
+  "MsGraph/MailService",
+) {}

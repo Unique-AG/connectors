@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from "effect"
+import { Effect, Result, Schema } from "effect"
 import {
   InsufficientPermissionsError,
   InvalidRequestError,
@@ -37,9 +37,9 @@ const parseRetryAfter = (headers: Record<string, string | undefined>): number =>
 const parseODataBody = (
   body: unknown,
 ): ODataError["error"] | null => {
-  const result = Schema.decodeUnknownEither(ODataErrorSchema)(body)
-  if (result._tag === "Right") {
-    return result.right.error
+  const result = Schema.decodeUnknownResult(ODataErrorSchema)(body)
+  if (Result.isSuccess(result)) {
+    return result.success.error
   }
   return null
 }
@@ -78,13 +78,11 @@ export const decodeGraphError = (
 
     case 503: {
       const retryAfterHeader = headers["retry-after"] ?? headers["Retry-After"]
-      const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : null
+      const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : undefined
       return new ServiceUnavailableError({
-        retryAfter: Option.fromNullable(
-          retryAfterSeconds !== null && !Number.isNaN(retryAfterSeconds)
-            ? retryAfterSeconds
-            : null,
-        ),
+        retryAfter: retryAfterSeconds !== undefined && !Number.isNaN(retryAfterSeconds)
+          ? retryAfterSeconds
+          : undefined,
       })
     }
 
@@ -92,7 +90,7 @@ export const decodeGraphError = (
       return new InvalidRequestError({
         code: odataError?.code ?? `HTTP_${statusCode}`,
         message: odataError?.message ?? `Request failed with status ${statusCode}`,
-        target: Option.fromNullable(odataError?.target ?? null),
+        target: odataError?.target ?? undefined,
         details: odataError?.details ?? [],
       })
   }

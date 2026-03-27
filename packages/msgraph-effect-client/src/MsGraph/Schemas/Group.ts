@@ -18,7 +18,7 @@ export const GroupSchema = Schema.Struct({
   groupTypes: Schema.Array(Schema.String),
   membershipRule: Schema.optional(Schema.NullOr(Schema.String)),
   membershipRuleProcessingState: Schema.optional(
-    Schema.NullOr(Schema.Literal("On", "Paused")),
+    Schema.NullOr(Schema.Union([Schema.Literal("On"), Schema.Literal("Paused")])),
   ),
   createdDateTime: Schema.optional(Schema.NullOr(Schema.String)),
   deletedDateTime: Schema.optional(Schema.NullOr(Schema.String)),
@@ -28,7 +28,7 @@ export const GroupSchema = Schema.Struct({
   preferredDataLocation: Schema.optional(Schema.NullOr(Schema.String)),
   preferredLanguage: Schema.optional(Schema.NullOr(Schema.String)),
   theme: Schema.optional(Schema.NullOr(Schema.String)),
-  visibility: Schema.optional(Schema.NullOr(Schema.Literal("Private", "Public", "HiddenMembership"))),
+  visibility: Schema.optional(Schema.NullOr(Schema.Union([Schema.Literal("Private"), Schema.Literal("Public"), Schema.Literal("HiddenMembership")]))),
   isAssignableToRole: Schema.optional(Schema.NullOr(Schema.Boolean)),
   isManagementRestricted: Schema.optional(Schema.NullOr(Schema.Boolean)),
   securityIdentifier: Schema.optional(Schema.NullOr(Schema.String)),
@@ -75,7 +75,7 @@ export const CreateGroupPayloadSchema = Schema.Struct({
   securityEnabled: Schema.Boolean,
   description: Schema.optional(Schema.String),
   groupTypes: Schema.optional(Schema.Array(Schema.String)),
-  visibility: Schema.optional(Schema.Literal("Private", "Public", "HiddenMembership")),
+  visibility: Schema.optional(Schema.Union([Schema.Literal("Private"), Schema.Literal("Public"), Schema.Literal("HiddenMembership")])),
   members: Schema.optional(Schema.Array(Schema.String)),
   owners: Schema.optional(Schema.Array(Schema.String)),
 });

@@ -1,4 +1,4 @@
-import { Context, Effect } from "effect"
+import { Effect, ServiceMap } from "effect"
 import type {
   InvalidRequestError,
   RateLimitedError,
@@ -11,7 +11,7 @@ import type {
 } from "../Schemas/PlannerTask"
 import type { ODataPageType } from "../Schemas/OData"
 
-export interface PlannerService {
+export class PlannerService extends ServiceMap.Service<PlannerService, {
   readonly listPlans: (
     groupId: string,
   ) => Effect.Effect<ODataPageType<PlannerPlan>, ResourceNotFoundError | RateLimitedError>
@@ -42,6 +42,6 @@ export interface PlannerService {
     taskId: string,
     etag: string,
   ) => Effect.Effect<void, ResourceNotFoundError | RateLimitedError>
-}
-
-export const PlannerService = Context.GenericTag<PlannerService>("MsGraph/PlannerService")
+}>()(
+  "MsGraph/PlannerService",
+) {}

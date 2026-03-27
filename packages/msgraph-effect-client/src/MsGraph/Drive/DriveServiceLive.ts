@@ -1,6 +1,5 @@
-import { Effect, Layer, Option, Schema, Stream, pipe } from "effect"
-import type { AuthFlow, MsGraphAuth } from "../Auth/MsGraphAuth"
-import type { DrivePermissions } from "../Auth/Permissions"
+import { Effect, Layer, Schema, Stream, pipe } from "effect"
+import type { ApplicationAuth, DelegatedAuth } from "../Auth/MsGraphAuth"
 import {
   InvalidRequestError,
   QuotaExceededError,
@@ -72,7 +71,7 @@ const uploadChunks = (
           new InvalidRequestError({
             code: "UploadChunkFailed",
             message: "Failed to upload chunk to upload session URL",
-            target: Option.none(),
+            target: undefined,
             details: [],
           }),
       })
@@ -93,19 +92,19 @@ const uploadChunks = (
         new InvalidRequestError({
           code: "UploadSessionFailed",
           message: "Upload session completed without returning a DriveItem",
-          target: Option.none(),
+          target: undefined,
           details: [],
         }),
       )
     }
 
     return yield* Effect.mapError(
-      Schema.decodeUnknown(DriveItemSchema)(lastResponse),
+      Schema.decodeUnknownEffect(DriveItemSchema)(lastResponse),
       () =>
         new InvalidRequestError({
           code: "UploadResponseDecodeFailed",
           message: "Upload session response did not match DriveItem schema",
-          target: Option.none(),
+          target: undefined,
           details: [],
         }),
     )
@@ -260,5 +259,5 @@ export const DriveServiceLive = Layer.effect(
 ) as Layer.Layer<
   DriveService,
   never,
-  MsGraphHttpClient | MsGraphAuth<AuthFlow, DrivePermissions>
+  MsGraphHttpClient | ApplicationAuth | DelegatedAuth
 >

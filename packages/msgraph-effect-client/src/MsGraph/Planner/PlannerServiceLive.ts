@@ -1,6 +1,5 @@
 import { Effect, Layer } from "effect"
-import type { MsGraphAuth } from "../Auth/MsGraphAuth"
-import type { PlannerPermissions } from "../Auth/Permissions"
+import type { DelegatedAuth } from "../Auth/MsGraphAuth"
 import {
   InvalidRequestError,
   RateLimitedError,
@@ -94,5 +93,5 @@ export const PlannerServiceLive = Layer.effect(
 ) as Layer.Layer<
   PlannerService,
   never,
-  MsGraphHttpClient | MsGraphAuth<"Delegated", PlannerPermissions>
+  MsGraphHttpClient | DelegatedAuth
 >

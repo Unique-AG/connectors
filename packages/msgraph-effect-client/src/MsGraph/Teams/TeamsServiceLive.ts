@@ -1,6 +1,5 @@
 import { Effect, Layer, pipe } from "effect"
-import type { AuthFlow, MsGraphAuth } from "../Auth/MsGraphAuth"
-import type { TeamsPermissions } from "../Auth/Permissions"
+import type { ApplicationAuth, DelegatedAuth } from "../Auth/MsGraphAuth"
 import {
   InsufficientPermissionsError,
   RateLimitedError,
@@ -103,5 +102,5 @@ export const TeamsServiceLive = Layer.effect(
 ) as Layer.Layer<
   TeamsService,
   never,
-  MsGraphHttpClient | MsGraphAuth<AuthFlow, TeamsPermissions>
+  MsGraphHttpClient | ApplicationAuth | DelegatedAuth
 >

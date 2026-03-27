@@ -1,4 +1,4 @@
-import { Context, Effect } from "effect"
+import { Effect, ServiceMap } from "effect"
 import type {
   InvalidRequestError,
   RateLimitedError,
@@ -12,7 +12,7 @@ import type {
   MeetingTimeSuggestionsResult,
 } from "../Schemas/Event"
 
-export interface CalendarService {
+export class CalendarService extends ServiceMap.Service<CalendarService, {
   readonly listEvents: (
     userId: string,
     params?: ODataParams<CalendarEvent>,
@@ -50,6 +50,6 @@ export interface CalendarService {
     userId: string,
     request: FindMeetingTimesRequest,
   ) => Effect.Effect<MeetingTimeSuggestionsResult, RateLimitedError | InvalidRequestError>
-}
-
-export const CalendarService = Context.GenericTag<CalendarService>("MsGraph/CalendarService")
+}>()(
+  "MsGraph/CalendarService",
+) {}

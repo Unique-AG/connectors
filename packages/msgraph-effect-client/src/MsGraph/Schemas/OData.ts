@@ -11,7 +11,7 @@ export interface ODataParams<T> {
   readonly $search?: string
 }
 
-export const ODataPage = <A, I, R>(itemSchema: Schema.Schema<A, I, R>) =>
+export const ODataPage = <A>(itemSchema: Schema.Schema<A>) =>
   Schema.Struct({
     value: Schema.Array(itemSchema),
     "@odata.nextLink": Schema.optional(Schema.String),

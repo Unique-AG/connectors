@@ -1,4 +1,4 @@
-import { Context, Effect } from "effect"
+import { Effect, ServiceMap } from "effect"
 import type {
   InsufficientPermissionsError,
   RateLimitedError,
@@ -7,7 +7,7 @@ import type {
 import type { Channel, ChatMessage, Team } from "../Schemas/Team"
 import type { ODataPageType, ODataParams } from "../Schemas/OData"
 
-export interface TeamsService {
+export class TeamsService extends ServiceMap.Service<TeamsService, {
   readonly listTeams: (
     params?: ODataParams<Team>,
   ) => Effect.Effect<ODataPageType<Team>, RateLimitedError>
@@ -42,6 +42,6 @@ export interface TeamsService {
     messageId: string,
     content: string,
   ) => Effect.Effect<ChatMessage, ResourceNotFoundError | RateLimitedError>
-}
-
-export const TeamsService = Context.GenericTag<TeamsService>("MsGraph/TeamsService")
+}>()(
+  "MsGraph/TeamsService",
+) {}

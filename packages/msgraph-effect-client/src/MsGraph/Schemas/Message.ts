@@ -3,7 +3,7 @@ import { Schema } from "effect";
 import { RecipientSchema } from "./Common";
 
 export const BodySchema = Schema.Struct({
-  contentType: Schema.Literal("text", "html"),
+  contentType: Schema.Union([Schema.Literal("text"), Schema.Literal("html")]),
   content: Schema.String,
 });
 
@@ -43,12 +43,12 @@ export const MessageSchema = Schema.Struct({
   toRecipients: Schema.Array(RecipientSchema),
   ccRecipients: Schema.Array(RecipientSchema),
   bccRecipients: Schema.optional(Schema.Array(RecipientSchema)),
-  receivedDateTime: Schema.DateFromString,
-  sentDateTime: Schema.DateFromString,
+  receivedDateTime: Schema.String,
+  sentDateTime: Schema.String,
   isRead: Schema.Boolean,
   isDraft: Schema.Boolean,
   hasAttachments: Schema.Boolean,
-  importance: Schema.Literal("low", "normal", "high"),
+  importance: Schema.Union([Schema.Literal("low"), Schema.Literal("normal"), Schema.Literal("high")]),
   conversationId: Schema.NullOr(Schema.String),
   parentFolderId: Schema.String,
   webLink: Schema.optional(Schema.String),
@@ -56,7 +56,7 @@ export const MessageSchema = Schema.Struct({
   replyTo: Schema.optional(Schema.Array(RecipientSchema)),
   flag: Schema.optional(
     Schema.Struct({
-      flagStatus: Schema.Literal("notFlagged", "complete", "flagged"),
+      flagStatus: Schema.Union([Schema.Literal("notFlagged"), Schema.Literal("complete"), Schema.Literal("flagged")]),
     }),
   ),
   categories: Schema.optional(Schema.Array(Schema.String)),
@@ -74,15 +74,15 @@ export const SendMailPayloadSchema = Schema.Struct({
     ccRecipients: Schema.optional(Schema.Array(RecipientSchema)),
     bccRecipients: Schema.optional(Schema.Array(RecipientSchema)),
     replyTo: Schema.optional(Schema.Array(RecipientSchema)),
-    importance: Schema.optional(Schema.Literal("low", "normal", "high")),
+    importance: Schema.optional(Schema.Union([Schema.Literal("low"), Schema.Literal("normal"), Schema.Literal("high")])),
     attachments: Schema.optional(
       Schema.Array(
         Schema.Struct({
-          "@odata.type": Schema.Literal(
-            "#microsoft.graph.fileAttachment",
-            "#microsoft.graph.itemAttachment",
-            "#microsoft.graph.referenceAttachment",
-          ),
+          "@odata.type": Schema.Union([
+            Schema.Literal("#microsoft.graph.fileAttachment"),
+            Schema.Literal("#microsoft.graph.itemAttachment"),
+            Schema.Literal("#microsoft.graph.referenceAttachment"),
+          ]),
           name: Schema.String,
           contentType: Schema.optional(Schema.String),
           contentBytes: Schema.optional(Schema.String),

@@ -1,7 +1,9 @@
-import { HttpClient, HttpClientRequest, HttpClientResponse } from "@effect/platform"
-import { Chunk, Effect, Layer, Option, Schema, Stream, pipe } from "effect"
+import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http"
+import { NodeHttpClient } from "@effect/platform-node"
+import { Effect, Layer, Option, Schema, Stream, pipe } from "effect"
 import type { AuthFlow } from "../Auth/MsGraphAuth"
-import { MsGraphAuthTag } from "../Auth/MsGraphAuth"
+import { ApplicationAuth, DelegatedAuth } from "../Auth/MsGraphAuth"
+import type { MsGraphAuthInterface } from "../Auth/MsGraphAuth"
 import { InvalidRequestError, TokenExpiredError } from "../Errors/errors"
 import type { MsGraphError } from "../Errors/errors"
 import { decodeGraphError } from "../Errors/errorDecoder"
@@ -12,16 +14,16 @@ import { MsGraphHttpClient } from "./MsGraphHttpClient"
 const BASE_URL = "https://graph.microsoft.com/v1.0"
 
 const decodeResponse =
-  <A, I>(schema: Schema.Schema<A, I>) =>
+  <A>(schema: Schema.Schema<A>) =>
   (response: HttpClientResponse.HttpClientResponse): Effect.Effect<A, MsGraphError> =>
     pipe(
       response.json,
-      Effect.flatMap(Schema.decodeUnknown(schema)),
+      Effect.flatMap((json) => Schema.decodeUnknownEffect(schema)(json) as Effect.Effect<A, Schema.SchemaError>),
       Effect.mapError((parseError) =>
         new InvalidRequestError({
           code: "ResponseDecodeFailed",
           message: `Response did not match expected schema: ${String(parseError)}`,
-          target: Option.none(),
+          target: undefined,
           details: [],
         }),
       ),
@@ -51,38 +53,36 @@ const handleErrorResponse = (
 
 export const unfoldPages = <A>(
   firstPage: ODataPageType<A>,
-  client: MsGraphHttpClient,
+  client: MsGraphHttpClient["Service"],
   schema: Schema.Schema<ODataPageType<A>>,
 ): Stream.Stream<A, MsGraphError> =>
-  Stream.unfoldChunkEffect(
+  Stream.paginate(
     firstPage as ODataPageType<A> | undefined,
-    (page) => {
+    (page): Effect.Effect<readonly [ReadonlyArray<A>, Option.Option<ODataPageType<A> | undefined>], MsGraphError> => {
       if (page === undefined) {
-        return Effect.succeed(Option.none())
+        return Effect.succeed([[], Option.none()] as const)
       }
 
-      const chunk = Chunk.fromIterable(page.value)
+      const items = [...page.value]
       const nextLink = page["@odata.nextLink"]
 
       if (!nextLink) {
-        return Effect.succeed(
-          Option.some([chunk, undefined as unknown as ODataPageType<A>] as const),
-        )
+        return Effect.succeed([items, Option.none()] as const)
       }
 
       return pipe(
         client.get(nextLink, schema),
         Effect.map((nextPage) =>
-          Option.some([chunk, nextPage as ODataPageType<A>] as const),
+          [items, Option.some(nextPage as ODataPageType<A>)] as const,
         ),
       )
     },
   )
 
-const makeHttpClient = <F extends AuthFlow, P extends string>(
-  auth: { acquireToken: Effect.Effect<{ tokenType: string; accessToken: string }, MsGraphError> },
+const makeHttpClient = (
+  auth: MsGraphAuthInterface,
   httpClient: HttpClient.HttpClient,
-): MsGraphHttpClient => {
+): MsGraphHttpClient["Service"] => {
   const authorizeAndExecute = (
     request: HttpClientRequest.HttpClientRequest,
   ): Effect.Effect<HttpClientResponse.HttpClientResponse, MsGraphError> =>
@@ -113,9 +113,9 @@ const makeHttpClient = <F extends AuthFlow, P extends string>(
     return handleErrorResponse(response, resource)
   }
 
-  const get = <A, I>(
+  const get = <A>(
     path: string,
-    schema: Schema.Schema<A, I>,
+    schema: Schema.Schema<A>,
   ): Effect.Effect<A, MsGraphError> => {
     const url = path.startsWith("https://") ? path : `${BASE_URL}${path}`
     return pipe(
@@ -126,17 +126,17 @@ const makeHttpClient = <F extends AuthFlow, P extends string>(
     )
   }
 
-  const post = <A, I>(
+  const post = <A>(
     path: string,
     body: unknown,
-    schema: Schema.Schema<A, I>,
+    schema: Schema.Schema<A>,
   ): Effect.Effect<A, MsGraphError> => {
     const url = path.startsWith("https://") ? path : `${BASE_URL}${path}`
     return pipe(
       Effect.flatMap(
         Effect.tryPromise({
           try: () => Promise.resolve(JSON.stringify(body)),
-          catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: Option.none(), details: [] }),
+          catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: undefined, details: [] }),
         }),
         (json) => authorizeAndExecute(
           HttpClientRequest.post(url).pipe(
@@ -160,7 +160,7 @@ const makeHttpClient = <F extends AuthFlow, P extends string>(
       Effect.flatMap(
         Effect.tryPromise({
           try: () => Promise.resolve(JSON.stringify(body)),
-          catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: Option.none(), details: [] }),
+          catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: undefined, details: [] }),
         }),
         (json) => authorizeAndExecute(
           HttpClientRequest.post(url).pipe(
@@ -179,10 +179,10 @@ const makeHttpClient = <F extends AuthFlow, P extends string>(
     )
   }
 
-  const patch = <A, I>(
+  const patch = <A>(
     path: string,
     body: unknown,
-    schema: Schema.Schema<A, I>,
+    schema: Schema.Schema<A>,
     headers?: Record<string, string>,
   ): Effect.Effect<A, MsGraphError> => {
     const url = path.startsWith("https://") ? path : `${BASE_URL}${path}`
@@ -190,7 +190,7 @@ const makeHttpClient = <F extends AuthFlow, P extends string>(
       Effect.flatMap(
         Effect.tryPromise({
           try: () => Promise.resolve(JSON.stringify(body)),
-          catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: Option.none(), details: [] }),
+          catch: () => new InvalidRequestError({ code: "SerializeFailed", message: "Failed to serialize request body", target: undefined, details: [] }),
         }),
         (json) => {
           const baseRequest = HttpClientRequest.patch(url).pipe(
@@ -217,7 +217,7 @@ const makeHttpClient = <F extends AuthFlow, P extends string>(
     headers?: Record<string, string>,
   ): Effect.Effect<void, MsGraphError> => {
     const url = path.startsWith("https://") ? path : `${BASE_URL}${path}`
-    const baseRequest = HttpClientRequest.del(url)
+    const baseRequest = HttpClientRequest.delete(url)
     const withExtraHeaders = headers
       ? Object.entries(headers).reduce(
           (r, [k, v]) => HttpClientRequest.setHeader(k, v)(r),
@@ -262,7 +262,7 @@ const makeHttpClient = <F extends AuthFlow, P extends string>(
               new InvalidRequestError({
                 code: "StreamError",
                 message: String(error),
-                target: Option.some(path),
+                target: path,
                 details: [],
               }),
             ),
@@ -282,8 +282,12 @@ export const MsGraphHttpClientLive = <F extends AuthFlow, P extends string>(flow
   Layer.effect(
     MsGraphHttpClient,
     Effect.gen(function* () {
-      const auth = yield* MsGraphAuthTag<F, P>(flow)
+      const auth: MsGraphAuthInterface = flow === "Delegated"
+        ? yield* DelegatedAuth
+        : yield* ApplicationAuth
       const httpClient = yield* HttpClient.HttpClient
-      return makeHttpClient<F, P>(auth, httpClient)
+      return makeHttpClient(auth, httpClient)
     }),
+  ).pipe(
+    Layer.provide(NodeHttpClient.layerUndici),
   )

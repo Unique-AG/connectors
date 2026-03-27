@@ -1,9 +1,9 @@
-import { HttpClient, HttpClientRequest } from "@effect/platform"
+import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { NodeHttpClient } from "@effect/platform-node"
 import { Effect, Layer, Option, Ref, pipe } from "effect"
 import { AuthenticationFailedError } from "../Errors/errors"
-import type { AccessTokenInfo, AccountInfo, MsGraphAuth } from "./MsGraphAuth"
-import { DelegatedAuth } from "./MsGraphAuth"
+import type { AccessTokenInfo, AccountInfo, MsGraphAuthInterface } from "./MsGraphAuth"
+import { OnBehalfOfAuth } from "./MsGraphAuth"
 import { OnBehalfOfAuthConfig } from "./MsGraphAuthConfig"
 import { REFRESH_BUFFER_MS, isTokenExpired } from "./TokenCache"
 
@@ -40,7 +40,7 @@ const parseTokenJson = (
         new AuthenticationFailedError({
           reason: "invalid_grant",
           message: `OBO token exchange failed: ${errJson.error_description}`,
-          correlationId: Option.none(),
+          correlationId: undefined,
         }),
       )
     }
@@ -48,7 +48,7 @@ const parseTokenJson = (
       new AuthenticationFailedError({
         reason: "unknown",
         message: `Unexpected OBO response shape: ${JSON.stringify(json)}`,
-        correlationId: Option.none(),
+        correlationId: undefined,
       }),
     )
   }
@@ -108,14 +108,14 @@ const exchangeOboToken = (
         new AuthenticationFailedError({
           reason: "unknown",
           message: `OBO request failed: ${String(e)}`,
-          correlationId: Option.none(),
+          correlationId: undefined,
         }),
     ),
-    Effect.provide(NodeHttpClient.layer),
+    Effect.provide(NodeHttpClient.layerUndici),
     Effect.flatMap(parseTokenJson),
   )
 
-const makeService = <P extends string>(
+const makeService = (
   config: {
     readonly clientId: string
     readonly clientSecret: string
@@ -127,7 +127,7 @@ const makeService = <P extends string>(
     >
   },
   cachedRef: Ref.Ref<Option.Option<AccessTokenInfo>>,
-): MsGraphAuth<"Delegated", P> => {
+): MsGraphAuthInterface => {
   const acquireToken: Effect.Effect<
     AccessTokenInfo,
     AuthenticationFailedError
@@ -167,9 +167,7 @@ const makeService = <P extends string>(
   })
 
   return {
-    _flow: "Delegated",
-    _permissions: "" as P,
-    grantedScopes: config.scopes as ReadonlyArray<P>,
+    grantedScopes: config.scopes,
     acquireToken,
     getCachedAccounts: Effect.gen(function* () {
       const cached = yield* Ref.get(cachedRef)
@@ -183,25 +181,25 @@ const makeService = <P extends string>(
   }
 }
 
-export const OnBehalfOfAuthLive = <P extends string>() =>
-  Layer.effect(
-    DelegatedAuth<P>(),
-    Effect.gen(function* () {
-      const config = yield* OnBehalfOfAuthConfig
-      const cachedRef = yield* Ref.make<Option.Option<AccessTokenInfo>>(
-        Option.none(),
-      )
-      const tokenEndpoint = `${config.authority}/oauth2/v2.0/token`
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const OnBehalfOfAuthLive = <_P extends string = string>() => Layer.effect(
+  OnBehalfOfAuth,
+  Effect.gen(function* () {
+    const config = yield* OnBehalfOfAuthConfig
+    const cachedRef = yield* Ref.make<Option.Option<AccessTokenInfo>>(
+      Option.none(),
+    )
+    const tokenEndpoint = `${config.authority}/oauth2/v2.0/token`
 
-      return makeService<P>(
-        {
-          clientId: config.clientId,
-          clientSecret: config.clientSecret,
-          scopes: config.scopes,
-          tokenEndpoint,
-          userAssertionProvider: config.userAssertionProvider,
-        },
-        cachedRef,
-      )
-    }),
-  )
+    return OnBehalfOfAuth.of(makeService(
+      {
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+        scopes: config.scopes,
+        tokenEndpoint,
+        userAssertionProvider: config.userAssertionProvider,
+      },
+      cachedRef,
+    ))
+  }),
+)

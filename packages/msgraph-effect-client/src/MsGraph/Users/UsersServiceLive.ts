@@ -1,6 +1,5 @@
-import { Effect, Layer, Option, Stream, pipe } from "effect"
+import { Effect, Layer, Stream, pipe } from "effect"
 import { ApplicationAuth } from "../Auth/MsGraphAuth"
-import type { UserPermissions } from "../Auth/Permissions"
 import {
   InvalidRequestError,
   RateLimitedError,
@@ -21,7 +20,7 @@ const narrowToRateLimit = (error: MsGraphError): RateLimitedError | InvalidReque
   return new InvalidRequestError({
     code: error._tag,
     message: "Unexpected error",
-    target: Option.none(),
+    target: undefined,
     details: [],
   })
 }
@@ -35,7 +34,7 @@ const narrowToNotFoundOrRateLimit = (error: MsGraphError): ResourceNotFoundError
 export const UsersServiceLive: Layer.Layer<
   UsersService,
   never,
-  MsGraphHttpClient | ReturnType<typeof ApplicationAuth<UserPermissions>>
+  MsGraphHttpClient | ApplicationAuth
 > = Layer.effect(
   UsersService,
   Effect.gen(function* () {

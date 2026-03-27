@@ -1,4 +1,4 @@
-import { Context, Effect, Stream } from "effect"
+import { Effect, ServiceMap, Stream } from "effect"
 import type {
   InvalidRequestError,
   QuotaExceededError,
@@ -8,7 +8,7 @@ import type {
 import type { DriveItem, SharingLink } from "../Schemas/DriveItem"
 import type { ODataPageType, ODataParams } from "../Schemas/OData"
 
-export interface DriveService {
+export class DriveService extends ServiceMap.Service<DriveService, {
   readonly listItems: (
     driveId: string,
     folderId?: string,
@@ -68,6 +68,6 @@ export interface DriveService {
     type: "view" | "edit",
     scope: "anonymous" | "organization",
   ) => Effect.Effect<SharingLink, ResourceNotFoundError | RateLimitedError>
-}
-
-export const DriveService = Context.GenericTag<DriveService>("MsGraph/DriveService")
+}>()(
+  "MsGraph/DriveService",
+) {}

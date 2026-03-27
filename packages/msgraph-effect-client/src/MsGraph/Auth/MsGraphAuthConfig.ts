@@ -1,8 +1,8 @@
-import { Context, Effect } from "effect"
+import { Effect, ServiceMap } from "effect"
 import type { TokenCachePlugin } from "./TokenCache"
 import type { AuthenticationFailedError } from "../Errors/errors"
 
-export interface DelegatedAuthConfig {
+export interface DelegatedAuthConfigShape {
   readonly clientId: string
   readonly authority: string
   readonly clientSecret?: string
@@ -11,7 +11,7 @@ export interface DelegatedAuthConfig {
   readonly cachePlugin?: TokenCachePlugin
 }
 
-export interface ApplicationAuthConfig {
+export interface ApplicationAuthConfigShape {
   readonly clientId: string
   readonly authority: string
   readonly clientSecret?: string
@@ -24,7 +24,7 @@ export interface ApplicationAuthConfig {
   readonly cachePlugin?: TokenCachePlugin
 }
 
-export interface OnBehalfOfAuthConfig {
+export interface OnBehalfOfAuthConfigShape {
   readonly clientId: string
   readonly authority: string
   readonly clientSecret: string
@@ -35,21 +35,23 @@ export interface OnBehalfOfAuthConfig {
   >
 }
 
-export interface ManagedIdentityAuthConfig {
+export interface ManagedIdentityAuthConfigShape {
   readonly clientId?: string
   readonly scopes: ReadonlyArray<string>
 }
 
-export const DelegatedAuthConfig =
-  Context.GenericTag<DelegatedAuthConfig>("MsGraph/DelegatedAuthConfig")
+export class DelegatedAuthConfig extends ServiceMap.Service<DelegatedAuthConfig, DelegatedAuthConfigShape>()(
+  "MsGraph/Auth/DelegatedAuthConfig",
+) {}
 
-export const ApplicationAuthConfig =
-  Context.GenericTag<ApplicationAuthConfig>("MsGraph/ApplicationAuthConfig")
+export class ApplicationAuthConfig extends ServiceMap.Service<ApplicationAuthConfig, ApplicationAuthConfigShape>()(
+  "MsGraph/Auth/ApplicationAuthConfig",
+) {}
 
-export const OnBehalfOfAuthConfig =
-  Context.GenericTag<OnBehalfOfAuthConfig>("MsGraph/OnBehalfOfAuthConfig")
+export class OnBehalfOfAuthConfig extends ServiceMap.Service<OnBehalfOfAuthConfig, OnBehalfOfAuthConfigShape>()(
+  "MsGraph/Auth/OnBehalfOfAuthConfig",
+) {}
 
-export const ManagedIdentityAuthConfig =
-  Context.GenericTag<ManagedIdentityAuthConfig>(
-    "MsGraph/ManagedIdentityAuthConfig",
-  )
+export class ManagedIdentityAuthConfig extends ServiceMap.Service<ManagedIdentityAuthConfig, ManagedIdentityAuthConfigShape>()(
+  "MsGraph/Auth/ManagedIdentityAuthConfig",
+) {}

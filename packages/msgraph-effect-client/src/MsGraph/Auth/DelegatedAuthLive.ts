@@ -1,4 +1,4 @@
-import { HttpClient, HttpClientRequest } from "@effect/platform"
+import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { NodeHttpClient } from "@effect/platform-node"
 import {
   Duration,
@@ -14,7 +14,7 @@ import {
   AuthenticationFailedError,
   TokenExpiredError,
 } from "../Errors/errors"
-import type { AccessTokenInfo, AccountInfo, MsGraphAuth } from "./MsGraphAuth"
+import type { AccessTokenInfo, AccountInfo, MsGraphAuthInterface } from "./MsGraphAuth"
 import { DelegatedAuth } from "./MsGraphAuth"
 import { DelegatedAuthConfig } from "./MsGraphAuthConfig"
 import {
@@ -112,10 +112,10 @@ const postForm = (
         new AuthenticationFailedError({
           reason: "unknown",
           message: `Token request failed: ${String(e)}`,
-          correlationId: Option.none(),
+          correlationId: undefined,
         }),
     ),
-    Effect.provide(NodeHttpClient.layer),
+    Effect.provide(NodeHttpClient.layerUndici),
   )
 
 const parseTokenJson = (
@@ -137,7 +137,7 @@ const parseTokenJson = (
         new AuthenticationFailedError({
           reason: "invalid_grant",
           message: `Token endpoint error: ${errJson.error_description}`,
-          correlationId: Option.none(),
+          correlationId: undefined,
         }),
       )
     }
@@ -145,7 +145,7 @@ const parseTokenJson = (
       new AuthenticationFailedError({
         reason: "unknown",
         message: `Unexpected token response shape: ${JSON.stringify(json)}`,
-        correlationId: Option.none(),
+        correlationId: undefined,
       }),
     )
   }
@@ -165,7 +165,7 @@ const parseDeviceCodeJson = (
       new AuthenticationFailedError({
         reason: "unknown",
         message: `Unexpected device code response shape: ${JSON.stringify(json)}`,
-        correlationId: Option.none(),
+        correlationId: undefined,
       }),
     )
   }
@@ -174,7 +174,7 @@ const parseDeviceCodeJson = (
 
 const acquireSilent = (
   stateRef: Ref.Ref<TokenCacheState>,
-  config: DelegatedAuthConfig,
+  config: DelegatedAuthConfig["Service"],
   tokenEndpoint: string,
 ) =>
   Effect.gen(function* () {
@@ -246,7 +246,7 @@ const acquireSilent = (
 
 const acquireByCode = (
   stateRef: Ref.Ref<TokenCacheState>,
-  config: DelegatedAuthConfig,
+  config: DelegatedAuthConfig["Service"],
   tokenEndpoint: string,
   authorizationCode: string,
 ) =>
@@ -336,7 +336,7 @@ const pollDeviceCodeToken = (
         error: new AuthenticationFailedError({
           reason: "unknown",
           message: `Device code poll failed: ${errJson.error_description}`,
-          correlationId: Option.none(),
+          correlationId: undefined,
         }),
       })
     }
@@ -348,7 +348,7 @@ const pollDeviceCodeToken = (
     )
     return raw
   }).pipe(
-    Effect.catchAll((e: PollError) => {
+    Effect.catch((e: PollError) => {
       if (e._tag === "pending") {
         return pipe(
           Effect.sleep(pollInterval),
@@ -368,7 +368,7 @@ const pollDeviceCodeToken = (
 
 const acquireByDeviceCode = (
   stateRef: Ref.Ref<TokenCacheState>,
-  config: DelegatedAuthConfig,
+  config: DelegatedAuthConfig["Service"],
   tokenEndpoint: string,
 ) =>
   Effect.gen(function* () {
@@ -418,7 +418,7 @@ const acquireByDeviceCode = (
 
 const proactiveRefreshFiber = (
   stateRef: Ref.Ref<TokenCacheState>,
-  config: DelegatedAuthConfig,
+  config: DelegatedAuthConfig["Service"],
   tokenEndpoint: string,
 ) =>
   pipe(
@@ -472,19 +472,17 @@ const proactiveRefreshFiber = (
       }
     }),
     Effect.repeat(Schedule.spaced(Duration.minutes(1))),
-    Effect.ignoreLogged,
+    Effect.ignore,
   )
 
-const makeService = <P extends string>(
-  config: DelegatedAuthConfig,
+const makeService = (
+  config: DelegatedAuthConfig["Service"],
   stateRef: Ref.Ref<TokenCacheState>,
-): MsGraphAuth<"Delegated", P> => {
+): MsGraphAuthInterface => {
   const tokenEndpoint = `${config.authority}/oauth2/v2.0/token`
 
   return {
-    _flow: "Delegated",
-    _permissions: "" as P,
-    grantedScopes: config.scopes as ReadonlyArray<P>,
+    grantedScopes: config.scopes,
 
     acquireToken: acquireSilent(stateRef, config, tokenEndpoint),
 
@@ -513,25 +511,25 @@ const makeService = <P extends string>(
   }
 }
 
-export const DelegatedAuthLive = <P extends string>() =>
-  Layer.scoped(
-    DelegatedAuth<P>(),
-    Effect.gen(function* () {
-      const config = yield* DelegatedAuthConfig
-      const stateRef = yield* Ref.make<TokenCacheState>(emptyTokenCacheState)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const DelegatedAuthLive = <_P extends string = string>() => Layer.effect(
+  DelegatedAuth,
+  Effect.gen(function* () {
+    const config = yield* DelegatedAuthConfig
+    const stateRef = yield* Ref.make<TokenCacheState>(emptyTokenCacheState)
 
-      if (config.cachePlugin) {
-        const ctx = makeTokenCacheContext(stateRef)
-        yield* config.cachePlugin.beforeCacheAccess(ctx)
-      }
+    if (config.cachePlugin) {
+      const ctx = makeTokenCacheContext(stateRef)
+      yield* config.cachePlugin.beforeCacheAccess(ctx)
+    }
 
-      const tokenEndpoint = `${config.authority}/oauth2/v2.0/token`
-      const refreshFiber = yield* Effect.forkScoped(
-        proactiveRefreshFiber(stateRef, config, tokenEndpoint),
-      )
+    const tokenEndpoint = `${config.authority}/oauth2/v2.0/token`
+    const refreshFiber = yield* Effect.forkScoped(
+      proactiveRefreshFiber(stateRef, config, tokenEndpoint),
+    )
 
-      yield* Effect.addFinalizer(() => Fiber.interrupt(refreshFiber))
+    yield* Effect.addFinalizer(() => Fiber.interrupt(refreshFiber))
 
-      return makeService<P>(config, stateRef)
-    }),
-  )
+    return DelegatedAuth.of(makeService(config, stateRef))
+  }),
+)

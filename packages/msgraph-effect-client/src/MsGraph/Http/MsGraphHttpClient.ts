@@ -1,16 +1,16 @@
-import { Context, Effect, Schema, Stream } from "effect"
+import { Effect, Schema, ServiceMap, Stream } from "effect"
 import type { MsGraphError } from "../Errors/errors"
 
-export interface MsGraphHttpClient {
-  readonly get: <A, I>(
+export class MsGraphHttpClient extends ServiceMap.Service<MsGraphHttpClient, {
+  readonly get: <A>(
     path: string,
-    schema: Schema.Schema<A, I>,
+    schema: Schema.Schema<A>,
   ) => Effect.Effect<A, MsGraphError>
 
-  readonly post: <A, I>(
+  readonly post: <A>(
     path: string,
     body: unknown,
-    schema: Schema.Schema<A, I>,
+    schema: Schema.Schema<A>,
   ) => Effect.Effect<A, MsGraphError>
 
   readonly postVoid: (
@@ -18,10 +18,10 @@ export interface MsGraphHttpClient {
     body: unknown,
   ) => Effect.Effect<void, MsGraphError>
 
-  readonly patch: <A, I>(
+  readonly patch: <A>(
     path: string,
     body: unknown,
-    schema: Schema.Schema<A, I>,
+    schema: Schema.Schema<A>,
     headers?: Record<string, string>,
   ) => Effect.Effect<A, MsGraphError>
 
@@ -33,8 +33,6 @@ export interface MsGraphHttpClient {
   readonly stream: (
     path: string,
   ) => Effect.Effect<Stream.Stream<Uint8Array, MsGraphError>, MsGraphError>
-}
-
-export const MsGraphHttpClient = Context.GenericTag<MsGraphHttpClient>(
-  "MsGraph/HttpClient",
-)
+}>()(
+  "MsGraph/Http/MsGraphHttpClient",
+) {}

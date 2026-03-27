@@ -1,9 +1,9 @@
-import { HttpClient, HttpClientRequest } from "@effect/platform"
+import { HttpClient, HttpClientRequest } from "effect/unstable/http"
 import { NodeHttpClient } from "@effect/platform-node"
 import { Effect, Layer, Option, Ref, pipe } from "effect"
 import { AuthenticationFailedError } from "../Errors/errors"
-import type { AccessTokenInfo, MsGraphAuth } from "./MsGraphAuth"
-import { ApplicationAuth } from "./MsGraphAuth"
+import type { AccessTokenInfo, MsGraphAuthInterface } from "./MsGraphAuth"
+import { ManagedIdentityAuth } from "./MsGraphAuth"
 import { ManagedIdentityAuthConfig } from "./MsGraphAuthConfig"
 import { REFRESH_BUFFER_MS, isTokenExpired } from "./TokenCache"
 
@@ -55,7 +55,7 @@ const parseImdsJson = (
         new AuthenticationFailedError({
           reason: "unknown",
           message: `IMDS token acquisition failed: ${errJson.error_description}`,
-          correlationId: Option.none(),
+          correlationId: undefined,
         }),
       )
     }
@@ -63,7 +63,7 @@ const parseImdsJson = (
       new AuthenticationFailedError({
         reason: "unknown",
         message: `Unexpected IMDS response shape: ${JSON.stringify(json)}`,
-        correlationId: Option.none(),
+        correlationId: undefined,
       }),
     )
   }
@@ -82,7 +82,7 @@ const acquireFromImds = (
           reason: "invalid_client",
           message:
             "At least one scope must be provided for managed identity token acquisition",
-          correlationId: Option.none(),
+          correlationId: undefined,
         }),
       )
     }
@@ -115,10 +115,10 @@ const acquireFromImds = (
           new AuthenticationFailedError({
             reason: "unknown",
             message: `IMDS request failed: ${String(e)}`,
-            correlationId: Option.none(),
+            correlationId: undefined,
           }),
       ),
-      Effect.provide(NodeHttpClient.layer),
+      Effect.provide(NodeHttpClient.layerUndici),
     )
 
     return yield* parseImdsJson(json)
@@ -132,13 +132,13 @@ const parseImdsExpiresOn = (expiresOn: string): Date => {
   return new Date(expiresOn)
 }
 
-const makeService = <P extends string>(
+const makeService = (
   config: {
     readonly scopes: ReadonlyArray<string>
     readonly clientId?: string
   },
   cachedRef: Ref.Ref<Option.Option<AccessTokenInfo>>,
-): MsGraphAuth<"Application", P> => {
+): MsGraphAuthInterface => {
   const acquireToken: Effect.Effect<
     AccessTokenInfo,
     AuthenticationFailedError
@@ -169,9 +169,7 @@ const makeService = <P extends string>(
   })
 
   return {
-    _flow: "Application",
-    _permissions: "" as P,
-    grantedScopes: config.scopes as ReadonlyArray<P>,
+    grantedScopes: config.scopes,
     acquireToken,
     getCachedAccounts: Effect.succeed([]),
     removeCachedAccount: (_accountId: string) =>
@@ -179,18 +177,18 @@ const makeService = <P extends string>(
   }
 }
 
-export const ManagedIdentityAuthLive = <P extends string>() =>
-  Layer.effect(
-    ApplicationAuth<P>(),
-    Effect.gen(function* () {
-      const config = yield* ManagedIdentityAuthConfig
-      const cachedRef = yield* Ref.make<Option.Option<AccessTokenInfo>>(
-        Option.none(),
-      )
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const ManagedIdentityAuthLive = <_P extends string = string>() => Layer.effect(
+  ManagedIdentityAuth,
+  Effect.gen(function* () {
+    const config = yield* ManagedIdentityAuthConfig
+    const cachedRef = yield* Ref.make<Option.Option<AccessTokenInfo>>(
+      Option.none(),
+    )
 
-      return makeService<P>(
-        { scopes: config.scopes, clientId: config.clientId },
-        cachedRef,
-      )
-    }),
-  )
+    return ManagedIdentityAuth.of(makeService(
+      { scopes: config.scopes, clientId: config.clientId },
+      cachedRef,
+    ))
+  }),
+)

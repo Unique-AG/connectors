@@ -1,6 +1,5 @@
-import { Effect, Layer, Option, Stream, pipe } from "effect"
+import { Effect, Layer, Stream, pipe } from "effect"
 import { DelegatedAuth } from "../Auth/MsGraphAuth"
-import type { MailPermissions } from "../Auth/Permissions"
 import {
   InsufficientPermissionsError,
   InvalidRequestError,
@@ -33,7 +32,7 @@ const narrowToRateLimitOrInvalid = (
   return new InvalidRequestError({
     code: error._tag,
     message: "Unexpected error",
-    target: Option.none(),
+    target: undefined,
     details: [],
   })
 }
@@ -47,7 +46,7 @@ const narrowToSendErrors = (
   return new InvalidRequestError({
     code: error._tag,
     message: "Unexpected error",
-    target: Option.none(),
+    target: undefined,
     details: [],
   })
 }
@@ -63,7 +62,7 @@ const narrowToNotFoundOrRateLimit = (
 export const MailServiceLive: Layer.Layer<
   MailService,
   never,
-  MsGraphHttpClient | ReturnType<typeof DelegatedAuth<MailPermissions>>
+  MsGraphHttpClient | DelegatedAuth
 > = Layer.effect(
   MailService,
   Effect.gen(function* () {

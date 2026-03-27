@@ -1,4 +1,4 @@
-import { Context, Effect, Stream } from "effect"
+import { Effect, ServiceMap, Stream } from "effect"
 import type {
   InvalidRequestError,
   RateLimitedError,
@@ -7,7 +7,7 @@ import type {
 import type { ODataParams, ODataPageType } from "../Schemas/OData"
 import type { User } from "../Schemas/User"
 
-export interface UsersService {
+export class UsersService extends ServiceMap.Service<UsersService, {
   readonly list: (
     params?: ODataParams<User>,
   ) => Effect.Effect<ODataPageType<User>, RateLimitedError | InvalidRequestError>
@@ -33,6 +33,6 @@ export interface UsersService {
   readonly getPhoto: (
     userId: string,
   ) => Effect.Effect<Stream.Stream<Uint8Array, RateLimitedError>, ResourceNotFoundError>
-}
-
-export const UsersService = Context.GenericTag<UsersService>("MsGraph/UsersService")
+}>()(
+  "MsGraph/UsersService",
+) {}

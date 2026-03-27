@@ -1,6 +1,5 @@
-import { Effect, Layer, Option, pipe } from "effect"
+import { Effect, Layer, pipe } from "effect"
 import { DelegatedAuth } from "../Auth/MsGraphAuth"
-import type { CalendarPermissions } from "../Auth/Permissions"
 import {
   InvalidRequestError,
   RateLimitedError,
@@ -27,7 +26,7 @@ const narrowToRateLimitOrInvalid = (
   return new InvalidRequestError({
     code: error._tag,
     message: "Unexpected error",
-    target: Option.none(),
+    target: undefined,
     details: [],
   })
 }
@@ -49,7 +48,7 @@ const narrowToNotFoundRateLimitOrInvalid = (
   return new InvalidRequestError({
     code: error._tag,
     message: "Unexpected error",
-    target: Option.none(),
+    target: undefined,
     details: [],
   })
 }
@@ -57,7 +56,7 @@ const narrowToNotFoundRateLimitOrInvalid = (
 export const CalendarServiceLive: Layer.Layer<
   CalendarService,
   never,
-  MsGraphHttpClient | ReturnType<typeof DelegatedAuth<CalendarPermissions>>
+  MsGraphHttpClient | DelegatedAuth
 > = Layer.effect(
   CalendarService,
   Effect.gen(function* () {
