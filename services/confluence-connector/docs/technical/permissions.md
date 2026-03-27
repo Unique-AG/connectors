@@ -26,7 +26,7 @@ The Confluence Connector requires specific permissions to access the Confluence 
 
 ### Authentication Model
 
-Confluence Cloud uses OAuth 2.0 two-legged (client credentials) authentication via the centralized Atlassian identity endpoint (`https://api.atlassian.com/oauth/token`). The token request sends `grant_type`, `client_id`, and `client_secret` as a JSON body. No explicit OAuth scopes are included in the token request; the access token inherits the permissions configured on the OAuth 2.0 (2LO) integration in the Atlassian Developer Console.
+Confluence Cloud uses OAuth 2.0 two-legged (client credentials) authentication via the centralized Atlassian identity endpoint (`https://api.atlassian.com/oauth/token`). The token request sends `grant_type`, `client_id`, and `client_secret` as a JSON body. No explicit OAuth scopes are included in the token request; the access token inherits the permissions of the service account configured in the Atlassian Admin Console.
 
 ### Required API Access
 

@@ -53,7 +53,7 @@ flowchart TB
 
 The connector only reads content from Confluence. All Confluence API calls use the `GET` method. No write, update, or delete operations are performed against Confluence.
 
-- **Cloud OAuth 2.0 (2LO):** The token request sends `grant_type`, `client_id`, and `client_secret` only. Access is limited to the permissions configured on the OAuth 2.0 integration in the Atlassian Developer Console.
+- **Cloud OAuth 2.0 (2LO):** The token request sends `grant_type`, `client_id`, and `client_secret` only. Access is limited to the permissions of the service account configured in the Atlassian Admin Console.
 - **Data Center OAuth 2.0 (2LO):** The token request explicitly includes `scope=READ`, limiting the service account to read-only operations even if the application link grants broader permissions.
 - **Data Center PAT (not recommended; Data Center below 10.1 only):** The token inherits the permissions of the user who created it. Operators should create a dedicated user with read-only access. PATs are static and must be manually rotated. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead.
 

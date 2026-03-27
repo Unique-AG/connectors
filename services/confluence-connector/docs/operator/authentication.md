@@ -55,18 +55,16 @@ For detailed instructions on creating and configuring a service user, see:
 
 The connector requires a pre-existing root scope in Unique. The root scope ID is configured in the tenant YAML under `ingestion.scopeId`. If the scope does not exist at startup, the connector fails with an assertion error.
 
-At startup, the connector automatically grants itself access on the root scope and creates child scopes for each Confluence space. See the [Scope Management](../technical/README.md#scope-management) concept and the [scope mechanics](../technical/flows.md#scope-management) for details on access inheritance, external IDs, and parent scope traversal.
+At startup, the connector automatically grants itself access on the root scope and will create child scopes for each Confluence space that has content to ingest. See the [Scope Management](../technical/README.md#scope-management) concept and the [scope mechanics](../technical/flows.md#scope-management) for details on access inheritance, external IDs, and parent scope traversal.
 
 ### 3. Set Up Confluence Authentication
 
 #### Option A: OAuth 2.0 (2LO) -- Cloud
 
-1. Create an OAuth 2.0 application in the [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/).
-2. Configure the application with:
-   - **Grant type:** Client credentials
-   - **Scopes:** Read access to Confluence content (pages and attachments in the target spaces)
+1. In the [Atlassian Admin Console](https://admin.atlassian.com/), go to **Settings** > **User Management** > **Service Accounts**.
+2. Create a new service account.
 3. Note the **Client ID** and **Client Secret**.
-4. Note the **Cloud ID** (UUID) for your Atlassian site.
+4. Obtain the **Cloud ID** for your Confluence instance (see [How do I find my Atlassian Cloud ID?](../faq.md#how-do-i-find-my-atlassian-cloud-id)).
 
 **Required tenant YAML fields:**
 
@@ -85,10 +83,8 @@ The `clientSecret` field uses the `os.environ/` prefix to resolve the value from
 
 #### Option B: OAuth 2.0 (2LO) -- Data Center
 
-1. Create an OAuth 2.0 application in Confluence Data Center administration.
-2. Configure the application with:
-   - **Grant type:** Client credentials
-   - **Scope:** `READ` access
+1. In the [Atlassian Admin Console](https://admin.atlassian.com/), go to **Settings** > **User Management** > **Service Accounts**.
+2. Create a new service account.
 3. Note the **Client ID** and **Client Secret**.
 
 **Required tenant YAML fields:**
