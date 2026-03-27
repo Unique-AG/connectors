@@ -91,9 +91,9 @@ In cluster-internal mode (`serviceAuthMode: cluster_local`), Zitadel token valid
 | **Kubernetes** | 1.25+ | Any Kubernetes distribution |
 | **Container Runtime** | Docker / containerd | Standard container runtime |
 | **Memory (requests)** | 512 Mi | As defined in Helm chart defaults |
-| **Memory (limits)** | 768 Mi | As defined in Helm chart defaults |
-| **CPU (requests)** | 500m | As defined in Helm chart defaults |
-| **Max heap size** | 896 MB | 896 MB (Helm chart default; container image default is 1024 MB if `MAX_HEAP_MB` is unset) |
+| **Memory (limits)** | 1 Gi | As defined in Helm chart defaults |
+| **CPU (requests)** | 1 core | As defined in Helm chart defaults |
+| **Max heap size** | 1920 MB | 1920 MB (Helm chart default; container image default is 1024 MB if `MAX_HEAP_MB` is unset) |
 
 ### Ports
 

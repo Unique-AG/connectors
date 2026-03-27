@@ -7,7 +7,7 @@ connector:
     LOG_LEVEL: info
     LOGS_DIAGNOSTICS_DATA_POLICY: conceal
     MAX_FILE_SIZE_MB: "200"
-    MAX_HEAP_MB: 896
+    MAX_HEAP_MB: 1920
     NODE_ENV: production
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51350"
@@ -41,9 +41,9 @@ connector:
     metrics: 51350
   resources:
     limits:
-      memory: 768Mi
+      memory: 1Gi
     requests:
-      cpu: 500m
+      cpu: 1
       memory: 512Mi
   routes:
     paths:
