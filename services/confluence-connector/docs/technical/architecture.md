@@ -186,7 +186,7 @@ flowchart LR
 | Aspect | Responsibility |
 |--------|---------------|
 | Connector hosting | Client |
-| Confluence app / PAT (PAT only for DC < 10.1) | Client |
+| Confluence service account or PAT (PAT only for DC < 10.1; not recommended) | Client |
 | Unique deliverable | Container image, Helm chart, documentation |
 
 ### Single-Tenant: Client-Hosted
@@ -201,8 +201,17 @@ Client uses Unique Single Tenant but hosts the connector:
 
 Unique hosts the connector on behalf of the client:
 
-- For Confluence Cloud: Unique provides the OAuth 2.0 app; client provides Cloud ID, base URL, and label configuration
-- For Confluence Data Center: client provides OAuth credentials and instance URL (recommended), or PAT for Data Center versions below 10.1 only (not recommended)
+- For Confluence Cloud: Unique provides the OAuth 2.0 service account; client provides Cloud ID, base URL, and label configuration
+- For Confluence Data Center: client provides OAuth credentials and instance URL, or PAT for Data Center versions below 10.1 only (not recommended)
+
+### Multi-Tenant: Unique-Hosted
+
+Unique hosts a single connector deployment serving multiple tenants:
+
+- Each tenant is configured via a separate tenant YAML file
+- Each tenant has its own Confluence instance, credentials, and Unique platform endpoints
+- Tenants are isolated at the configuration level (separate scopes, separate sync schedules)
+- The connector processes all tenants within a single pod
 
 ## Container Platform
 

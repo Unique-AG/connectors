@@ -309,56 +309,61 @@ PAT tokens are not cached (the static token is returned directly).
 
 ## Hosting Models
 
-### Cluster-Local Deployment
+### Self-Hosted (SH)
 
-The connector runs inside the same Kubernetes cluster as the Unique platform. It communicates with Unique services over internal cluster networking using service headers instead of OAuth tokens.
-
-```mermaid
-flowchart LR
-    subgraph External["Atlassian Cloud / Data Center"]
-        ConfluenceAPI["Confluence API"]
-        AtlassianAuth["Atlassian OAuth"]
-    end
-
-    subgraph K8s["Kubernetes Cluster"]
-        Connector["Confluence Connector"]
-        IngestionSvc["Unique Ingestion Service"]
-        ScopeMgmt["Unique Scope Management"]
-    end
-
-    Connector -->|"OAuth2 / PAT"| AtlassianAuth
-    Connector -->|"HTTPS"| ConfluenceAPI
-    Connector -->|"Internal HTTP<br/>(x-company-id, x-user-id)"| IngestionSvc
-    Connector -->|"Internal HTTP<br/>(x-company-id, x-user-id)"| ScopeMgmt
-```
-
-### External Deployment
-
-The connector runs outside the Unique platform's Kubernetes cluster. It authenticates with Unique via Zitadel OAuth.
+Client hosts the connector and manages Confluence authentication credentials:
 
 ```mermaid
 flowchart LR
-    subgraph External["Atlassian Cloud / Data Center"]
-        ConfluenceAPI["Confluence API"]
-        AtlassianAuth["Atlassian OAuth"]
+    subgraph Client["Client Infrastructure"]
+        Connector["Confluence Connector"]
     end
 
-    subgraph ConnectorInfra["Connector Infrastructure"]
-        Connector["Confluence Connector"]
+    subgraph Atlassian["Atlassian Cloud / Data Center"]
+        ConfluenceAPI["Confluence API"]
+        AtlassianAuth["Atlassian OAuth"]
     end
 
     subgraph Unique["Unique Platform"]
-        Zitadel["Zitadel IdP"]
         IngestionSvc["Ingestion Service"]
         ScopeMgmt["Scope Management"]
     end
 
     Connector -->|"OAuth2 / PAT"| AtlassianAuth
     Connector -->|"HTTPS"| ConfluenceAPI
-    Connector -->|"OAuth2 token"| Zitadel
-    Connector -->|"HTTPS (Bearer token)"| IngestionSvc
-    Connector -->|"HTTPS (Bearer token)"| ScopeMgmt
+    Connector -->|"HTTPS"| IngestionSvc
+    Connector -->|"HTTPS"| ScopeMgmt
 ```
+
+| Aspect | Responsibility |
+|--------|---------------|
+| Connector hosting | Client |
+| Confluence service account or PAT (PAT only for DC < 10.1; not recommended) | Client |
+| Unique deliverable | Container image, Helm chart, documentation |
+
+### Single-Tenant: Client-Hosted
+
+Client uses Unique Single Tenant but hosts the connector:
+
+- Suitable for on-premise Confluence Data Center deployments
+- Client manages the connector and Confluence credentials
+- Connector connects to Unique via external API (`serviceAuthMode: external`)
+
+### Single-Tenant: Unique-Hosted
+
+Unique hosts the connector on behalf of the client:
+
+- For Confluence Cloud: Unique provides the OAuth 2.0 service account; client provides Cloud ID, base URL, and label configuration
+- For Confluence Data Center: client provides OAuth credentials and instance URL, or PAT for Data Center versions below 10.1 only (not recommended)
+
+### Multi-Tenant: Unique-Hosted
+
+Unique hosts a single connector deployment serving multiple tenants:
+
+- Each tenant is configured via a separate tenant YAML file
+- Each tenant has its own Confluence instance, credentials, and Unique platform endpoints
+- Tenants are isolated at the configuration level (separate scopes, separate sync schedules)
+- The connector processes all tenants within a single pod
 
 ## Configuration Summary
 
