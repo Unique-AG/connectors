@@ -135,32 +135,27 @@ All permissions are **Delegated** (not Application): `User.Read`, `Mail.ReadWrit
 ### High-Level Architecture
 
 ```mermaid
-flowchart LR
-    MCPClient["MCP Client\n(e.g. Claude Desktop)"]
+C4Context
+    title Outlook Semantic MCP – System Context
 
-    subgraph Microsoft["Microsoft"]
-        Outlook["Outlook Mailbox"]
-        GraphAPI["Graph API"]
-    end
+    Person(client, "MCP Client", "e.g. Claude Desktop")
 
-    subgraph Server["Outlook Semantic MCP"]
-        App["NestJS App"]
-        PG["PostgreSQL"]
-        MQ["RabbitMQ"]
-    end
+    System_Boundary(server, "Outlook Semantic MCP") {
+        SystemDb(pg, "PostgreSQL", "Persistent storage")
+        System(app, "NestJS App", "Core application")
+        SystemQueue(mq, "RabbitMQ", "Message broker")
+    }
 
-    subgraph Unique["Unique Platform"]
-        KB["Knowledge Base"]
-    end
+    System_Ext(graph, "Microsoft Graph API", "Email access via OAuth + REST")
+    System_Ext(kb, "Unique Knowledge Base", "Semantic search & storage")
 
-    MCPClient -- "MCP tools\n(search, draft, etc.)" --> App
-    App -- "OAuth + REST" --> GraphAPI
-    GraphAPI -- "Webhooks" --> App
-    App --> PG
-    App --> MQ
-    MQ --> App
-    App -- "Email ingestion" --> KB
-    App -- "Email search" --> KB
+    Rel(client, app, "MCP tools", "search, draft, etc.")
+    BiRel(app, graph, "OAuth + REST / Webhooks")
+    Rel(app, pg, "Reads/Writes")
+    BiRel(app, mq, "Pub/Sub")
+    Rel(app, kb, "Email ingestion & search")
+
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
 
 See [Architecture Documentation](./technical/architecture.md) for detailed component diagrams.

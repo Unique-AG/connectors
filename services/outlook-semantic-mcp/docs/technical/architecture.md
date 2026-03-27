@@ -8,39 +8,27 @@ The Outlook Semantic MCP Server is a NestJS-based microservice that connects Mic
 ## High-Level Architecture
 
 ```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-flowchart LR
-    MCPClient["MCP Client"]
+C4Context
+    title Outlook Semantic MCP – System Context
 
-    subgraph OutlookMCP["Outlook Semantic MCP Server"]
-        AuthLayer["Authentication"]
-        McpTools["MCP Tools"]
-        SyncPipeline["Sync Pipeline"]
-        DB[("PostgreSQL")]
-        MQ[("RabbitMQ")]
-    end
+    Person(client, "MCP Client", "e.g. Claude Desktop")
 
-    subgraph Microsoft["Microsoft"]
-        EntraID["Entra ID"]
-        MSGraph["Graph API"]
-    end
+    System_Boundary(server, "Outlook Semantic MCP") {
+        SystemDb(pg, "PostgreSQL", "Persistent storage")
+        System(app, "NestJS App", "Core application")
+        SystemQueue(mq, "RabbitMQ", "Message broker")
+    }
 
-    UniqueKB["Unique\nKnowledge Base"]
+    System_Ext(graph, "Microsoft Graph API", "Email access via OAuth + REST")
+    System_Ext(kb, "Unique Knowledge Base", "Semantic search & storage")
 
-    MCPClient -->|"OAuth 2.1 + PKCE"| AuthLayer
-    MCPClient -->|"Tool calls"| McpTools
+    Rel(client, app, "MCP tools", "search, draft, etc.")
+    BiRel(app, graph, "OAuth + REST / Webhooks")
+    Rel(app, pg, "Reads/Writes")
+    BiRel(app, mq, "Pub/Sub")
+    Rel(app, kb, "Email ingestion & search")
 
-    AuthLayer <-->|"Token exchange"| EntraID
-
-    McpTools -->|"Read/write"| MSGraph
-    McpTools -->|"Search"| UniqueKB
-
-    MSGraph -->|"Webhooks"| SyncPipeline
-    SyncPipeline -->|"Fetch emails"| MSGraph
-    SyncPipeline <-->|"Async processing"| MQ
-    SyncPipeline -->|"Ingest"| UniqueKB
-
-    OutlookMCP --> DB
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
 
 ## System Components
