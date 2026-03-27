@@ -45,7 +45,7 @@
 
 ### Which Confluence content types are synced?
 
-**Answer:** The connector syncs `page`, `blogpost`, and `folder` content types. Content types `database`, `whiteboard`, and `embed` are discovered but automatically skipped. See the [README](./README.md#core-capabilities) for the full skipped content types table.
+**Answer:** The connector processes `page`, `blogpost`, and `folder` content types. When any of these carry the `ai-ingest-all` label, the connector also discovers and syncs their descendant pages. Content types `database`, `whiteboard`, and `embed` are discovered but automatically skipped. See the [README](./README.md#core-capabilities) for the full skipped content types table.
 
 ### What format is the page content exported in?
 
