@@ -209,15 +209,13 @@ unique:
 
 ## Secret Resolution
 
-The connector supports resolving secret values from environment variables at runtime. In the tenant YAML, any field using the `envRequiredSecretSchema` validator accepts the format:
+Secret fields in the tenant YAML support the `os.environ/ENV_VAR_NAME` format to resolve values from environment variables at runtime:
 
 ```
 os.environ/ENV_VAR_NAME
 ```
 
-At startup, the connector replaces this with the value of the referenced environment variable. If the variable is not set or is empty, config validation fails.
-
-Secret values are wrapped in a `Redacted` class that prevents them from appearing in logs or JSON serialization (they render as `[Redacted]`).
+If the referenced environment variable is not set or is empty, startup fails with a validation error. Secret values are automatically redacted in logs.
 
 **Fields that support `os.environ/` resolution:**
 
