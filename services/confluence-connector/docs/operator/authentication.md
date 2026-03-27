@@ -245,6 +245,64 @@ connector:
           key: ZITADEL_CLIENT_SECRET
 ```
 
+## Secret Rotation
+
+The connector uses three types of secrets. All must be stored in Kubernetes Secrets (not ConfigMaps).
+
+| Secret | Used By | Purpose |
+|--------|---------|---------|
+| OAuth 2.0 client secret | Confluence Cloud and Data Center | Authenticates the connector to the Confluence OAuth token endpoint |
+| Personal Access Token | Confluence Data Center < 10.1 only | Static bearer token for API requests (not recommended) |
+| Zitadel client secret | Unique platform (`external` mode only) | Authenticates the connector to the Unique platform via Zitadel OAuth |
+
+### OAuth 2.0 Client Secret (Confluence)
+
+The client secret from the Atlassian service account. The connector uses it to obtain access tokens via the client credentials grant.
+
+**What happens if it expires or is revoked:** All Confluence API requests fail once the cached token expires. No new tokens can be acquired. The sync cycle stops producing results until the secret is replaced.
+
+**How to rotate:**
+
+1. Generate a new client secret in the Atlassian Admin Console for the service account
+2. Update the Kubernetes Secret with the new value
+3. Restart the connector pods to pick up the new secret
+4. Verify the connector logs show successful token acquisition
+
+### Personal Access Token (Data Center < 10.1 only)
+
+A static bearer token associated with a Confluence Data Center user account.
+
+**What happens if it expires or is revoked:** All Confluence API requests immediately return `401 Unauthorized`. The sync cycle stops.
+
+**How to rotate:**
+
+1. Generate a new PAT in Confluence Data Center (**Profile** > **Personal Access Tokens**)
+2. Update the Kubernetes Secret with the new value
+3. Restart the connector pods
+4. Verify the connector logs show successful API requests
+
+> **Note:** PATs do not expire automatically unless an expiration date was set at creation time. However, they can be revoked at any time by the user or an administrator.
+
+### Zitadel Client Secret (External Mode)
+
+The client secret for the connector's Zitadel service account. Used only when `serviceAuthMode: external`.
+
+**What happens if it expires or is revoked:** All requests to the Unique Ingestion and Scope Management services fail. Content is read from Confluence but cannot be ingested into the Unique knowledge base.
+
+**How to rotate:**
+
+1. Generate a new client secret in Zitadel for the connector's service user
+2. Update the Kubernetes Secret with the new value
+3. Restart the connector pods
+4. Verify the connector logs show successful Zitadel token acquisition
+
+### Best Practices
+
+- **Rotate before expiration** — create the new secret before the old one expires to avoid downtime
+- **Use Kubernetes Secrets or a secret manager** — never store secrets in ConfigMaps or plain text
+- **Monitor for authentication failures** — failed token acquisition is logged and indicates an expired or revoked secret
+- **Document rotation procedures** — include secret rotation in your operational runbook
+
 ## Helm Chart Field Mapping
 
 The Helm chart `values.yaml` uses `unique.authMode`, which the Helm template maps to `serviceAuthMode` in the generated tenant config. The following table shows how Helm values map to the actual tenant config fields:
@@ -303,9 +361,7 @@ No token exchange is required. The PAT is sent directly as a `Bearer` token in t
 
 ### Token Caching
 
-OAuth 2.0 tokens are cached in memory with a 5-minute buffer before expiry (`DEFAULT_BUFFER_MS = 5 * 60 * 1000`). Concurrent token requests are deduplicated -- only one token fetch runs at a time, and concurrent callers await the same in-flight promise.
-
-PAT tokens are not cached (the static token is returned directly).
+OAuth 2.0 tokens are cached in memory and automatically refreshed before expiry. PAT tokens are not cached (the static token is sent directly on every request).
 
 ## Hosting Models
 
@@ -362,8 +418,18 @@ Unique hosts a single connector deployment serving multiple tenants:
 
 - Each tenant is configured via a separate tenant YAML file
 - Each tenant has its own Confluence instance, credentials, and Unique platform endpoints
-- Tenants are isolated at the configuration level (separate scopes, separate sync schedules)
+- Tenants are isolated at the configuration level (separate scopes, separate sync schedules, separate credentials)
 - The connector processes all tenants within a single pod
+
+**Customer onboarding:**
+
+1. Create a new tenant YAML file with the customer's Confluence instance details, credentials, and Unique platform endpoints
+2. Mount the file into the connector pod via the tenant config ConfigMap
+3. Restart the connector to pick up the new tenant
+
+**Data isolation:** Each tenant has its own root scope and child scopes in the Unique knowledge base. Content from different tenants is never mixed. Credentials are per-tenant and resolved from separate environment variables.
+
+**Compliance:** Some organizations may require dedicated infrastructure for data residency. In that case, deploy a separate connector instance with single-tenant configuration instead.
 
 ## Configuration Summary
 
