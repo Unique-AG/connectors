@@ -44,7 +44,10 @@ The Helm chart wraps the [`backend-service`](https://artifacthub.io/packages/hel
 
 ### Installation
 
-Installation instructions are available in the [Helm chart README](https://github.com/Unique-AG/connectors/tree/main/services/confluence-connector/deploy/helm-charts/confluence-connector#installation).
+Installation details live alongside the chart in:
+
+- [`Chart.yaml`](https://github.com/Unique-AG/connectors/blob/main/services/confluence-connector/deploy/helm-charts/confluence-connector/Chart.yaml) for the current chart and app versions
+- [`values.yaml`](https://github.com/Unique-AG/connectors/blob/main/services/confluence-connector/deploy/helm-charts/confluence-connector/values.yaml) for the current default values
 
 **Helm (via `helm-git` plugin):**
 
@@ -65,7 +68,7 @@ helm install confluence-connector cfc/confluence-connector \
 
 ### Helm Values Example
 
-For the full list of Helm values, see the [chart README values table](https://github.com/Unique-AG/connectors/tree/main/services/confluence-connector/deploy/helm-charts/confluence-connector#values). For detailed configuration reference, see [Configuration](./configuration.md).
+For the current Helm defaults, use [`values.yaml`](https://github.com/Unique-AG/connectors/blob/main/services/confluence-connector/deploy/helm-charts/confluence-connector/values.yaml). For chart metadata, use [`Chart.yaml`](https://github.com/Unique-AG/connectors/blob/main/services/confluence-connector/deploy/helm-charts/confluence-connector/Chart.yaml). For detailed configuration reference, see [Configuration](./configuration.md).
 
 ```yaml
 connector:
