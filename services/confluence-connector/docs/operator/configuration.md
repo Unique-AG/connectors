@@ -407,9 +407,11 @@ Scale down the deployment:
 kubectl scale deployment confluence-connector --replicas=0 -n <namespace>
 ```
 
-### Step 2: Delete Root Scope and All Content
+### Step 2: Delete Synced Content Under the Root Scope
 
-Use the Unique Public API to delete content recursively starting from the root scope. This removes all synced content.
+Use the Unique Public API or admin interface to remove the connector-managed content under the configured root scope.
+
+Do not delete the root scope itself. The connector expects `ingestion.scopeId` to reference a pre-existing scope and aborts startup if that scope no longer exists.
 
 **Warning:** This operation is irreversible. Ensure you have backups if needed.
 
@@ -421,7 +423,7 @@ Scale up the deployment:
 kubectl scale deployment confluence-connector --replicas=1 -n <namespace>
 ```
 
-The connector triggers an initial sync immediately on startup, re-ingesting all labeled content from scratch.
+The connector triggers an initial sync immediately on startup, re-ingesting all labeled content from scratch into the existing root scope.
 
 ### Further Guidance
 
