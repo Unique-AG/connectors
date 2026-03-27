@@ -16,11 +16,11 @@ import { AMQPService } from './amqp.service';
           exchanges: [MAIN_EXCHANGE, DEAD_EXCHANGE],
           queues: [DEAD_QUEUE],
           enableControllerDiscovery: true,
-          // We set the default prefetch count is 10 because usually have bulky messages so for full sync if
-          // we process 10 messages asyncronosly it can result in: 10 * 100 * 4 = 4000 calls to
+          // We set the default prefetch count is 7 because usually have bulky messages so for full sync if
+          // we process 7 messages asyncronosly it can result in: 7 * 100 * 4 = 2800 calls to
           // unique in async mode we should limit the prefetching to not overhelm ourselves
           // and also to not overhelm unique.
-          prefetchCount: 10,
+          prefetchCount: 7,
           // NOTE: (de)serialisation for empty messages doesn't work well with OTEL & json parsing
         };
       },
