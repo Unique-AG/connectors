@@ -37,15 +37,25 @@ The connector's tenant YAML field for selecting the Unique auth mode is `service
 
 ### 1. Create a Unique Service User
 
-The connector requires a service user in the Unique platform (Zitadel). This user identity is referenced:
+The connector requires a service user in the Unique platform (Zitadel) with the following permissions:
+
+| Permission | Purpose |
+|------------|---------|
+| `chat.admin.all` | Scope management (create child scopes, grant access, set external IDs) |
+| `chat.knowledge.read` | Read knowledge base content (file diff, file queries) |
+| `chat.knowledge.write` | Write knowledge base content (ingestion, file deletion) |
+
+This user identity is referenced:
 
 - In `cluster_local` mode: as the `x-user-id` header value in `serviceExtraHeaders`. This **must** be the ID of an actual service user in Zitadel -- it cannot be an arbitrary value.
 - In `external` mode: implicitly via the Zitadel client credentials (`zitadelClientId` / `zitadelClientSecret`).
 
-The service user needs permissions to:
+Steps:
 
-- Read and write knowledge base content (ingestion)
-- Manage scopes (create child scopes, grant access)
+1. Navigate to Zitadel.
+2. Create a new service user.
+3. Assign the required permissions listed above.
+4. Note the user ID for configuration.
 
 For detailed instructions on creating and configuring a service user, see:
 - [How To Configure A Service User](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075/How+To+Configure+A+Service+User)
