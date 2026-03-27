@@ -207,9 +207,42 @@ If a page has more than 25 attachments (the Confluence inline limit), additional
 - **Cloud**: Uses the v2 REST API (`/wiki/api/v2/pages/{pageId}/attachments`) because the v1 pagination endpoint returns 410 Gone
 - **Data Center**: Follows v1 `_links.next` pagination links
 
-### Skipped Content Types
+### Content Type Ingestion Map
 
-Content types `database`, `whiteboard`, and `embed` are discovered by CQL but skipped during the mapping to `DiscoveredPage` objects. See the [README](../README.md#core-capabilities) for the full skipped content types table with reasons.
+The connector uses label-based discovery via CQL. After fetching, it explicitly skips three content types defined in `confluence-page-scanner.ts`:
+
+```typescript
+const SKIPPED_CONTENT_TYPES = [ContentType.DATABASE, ContentType.WHITEBOARD, ContentType.EMBED];
+```
+
+Content that passes the filter has its `body.storage` HTML extracted and ingested. Items with empty bodies are skipped. Descendants of skipped content types (such as sub-pages under a database) are still discovered and ingested.
+
+#### Confluence Cloud
+
+| Content Type | Ingested? | Body Available via API? | Notes |
+|---|---|---|---|
+| Page | **Yes** | Yes (`body.storage` / ADF) | Primary content type. Full body ingestion. |
+| Blog Post | **Yes** | Yes (`body.storage` / ADF) | Treated identically to pages by the connector. |
+| Attachment | **Yes** (conditional) | No (binary) | Only when `attachments.mode=enabled`. Filtered by extension and size. |
+| Whiteboard | **No** | No (no body via API) | Explicitly skipped. API returns no body content. Descendants are still discovered. |
+| Database | **No** | No (structured data, not exposed) | Explicitly skipped. No body via API. Descendants (sub-pages) are still discovered and ingested. |
+| Embed / Smart Link | **No** | No (only has `embedUrl`) | Explicitly skipped. Only contains a URL reference, no renderable body. |
+| Folder | **No** (effectively) | No (organizational container) | Not in `SKIPPED_CONTENT_TYPES`, but has no body -- skipped by the empty-body filter. Descendants are still discovered. |
+| Comment (inline/footer) | **No** | Yes (`body.storage` / ADF) | Not discovered -- comments do not appear in label/ancestor CQL results. |
+| Live Doc (page subtype) | **Yes** (as page) | Yes (`body.storage` / ADF) | Subtype of page. Passes through as a regular page. |
+| Custom Content (app-defined) | **No** | Yes (`body.storage`) | Not discovered -- uses `ac:key:type` format, not matched by standard CQL. |
+| Task (standalone) | **No** | Yes (`body.storage` / ADF) | Not a CQL-searchable content type. Only accessible via `/tasks` v2 endpoint. |
+
+#### Confluence Data Center
+
+| Content Type | Exists in DC? | Ingested? | Notes |
+|---|---|---|---|
+| Page | Yes | **Yes** | Primary content type. Full body ingestion (storage format / XHTML). |
+| Blog Post | Yes | **Yes** | Treated identically to pages by the connector. |
+| Attachment | Yes | **Yes** (conditional) | Only when `attachments.mode=enabled`. Uses v1 pagination (`_links.next`). |
+| Comment (inline/footer) | Yes | **No** | Not discovered -- comments do not appear in label/ancestor CQL results. |
+| Custom Content (plugin-defined) | Yes | **No** | Accessed via plugin-specific REST APIs, not standard `/rest/api/content`. |
+| Whiteboard, Database, Embed, Folder, Live Doc | No | N/A | Cloud-only features. Do not exist in Data Center. |
 
 ## File Diff Mechanism
 

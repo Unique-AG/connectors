@@ -45,7 +45,7 @@
 
 ### Which Confluence content types are synced?
 
-**Answer:** The connector processes `page`, `blogpost`, and `folder` content types. When any of these carry the `ai-ingest-all` label, the connector also discovers and syncs their descendant pages. Content types `database`, `whiteboard`, and `embed` are discovered but automatically skipped. See the [README](./README.md#core-capabilities) for the full skipped content types table.
+**Answer:** The connector ingests `page` and `blogpost` content (including Live Docs, which are a page subtype). Attachments are ingested conditionally when `attachments.mode=enabled`. Content types `database`, `whiteboard`, and `embed` are explicitly skipped because their APIs expose no renderable body. Folders have no body and are effectively skipped by the empty-body filter. Descendants of all non-skipped types (including skipped ones like databases) are still discovered and ingested when using `ai-ingest-all`. See the [Content Type Ingestion Map](./technical/flows.md#content-type-ingestion-map) for the full Cloud and Data Center breakdown.
 
 ### What format is the page content exported in?
 
