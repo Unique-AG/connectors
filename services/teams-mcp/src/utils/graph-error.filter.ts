@@ -37,7 +37,10 @@ export class GraphErrorFilter implements ExceptionFilter {
 
     // Pass through the Graph API status code so MCP clients can react appropriately —
     // e.g., a 401 lets the client retrigger authentication. Fall back to 500 for unknown codes.
-    const statusCode = exception.statusCode ?? HttpStatus.INTERNAL_SERVER_ERROR;
+    // GraphError initializes statusCode to -1 (not null/undefined) when no HTTP status is available,
+    // so we validate the range rather than using ??.
+    const isValidHttpStatus = exception.statusCode >= 100 && exception.statusCode <= 599;
+    const statusCode = isValidHttpStatus ? exception.statusCode : HttpStatus.INTERNAL_SERVER_ERROR;
     response.status(statusCode).json({
       error: 'Microsoft Graph API Error',
       code: exception.code,
