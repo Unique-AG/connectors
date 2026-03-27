@@ -331,7 +331,14 @@ The connector registers Unique API metrics with the prefix `confluence_connector
 
 ### Grafana Dashboard
 
-A Grafana dashboard template is available in the Helm chart. The dashboard visualizes sync cycle success/failure counts, pages processed, and Unique API p95 latency. Enable it with:
+The Helm chart contains an optional Grafana dashboard ConfigMap. Before enabling it, review the bundled queries and verify that they match the metrics emitted in your deployment.
+
+From the connector source, the verifiable metric families are:
+
+- Standard host metrics and NestJS HTTP API metrics from `nestjs-otel`
+- Unique API metrics with the `confluence_connector_unique_api_*` prefix
+
+Enable the dashboard ConfigMap with:
 
 ```yaml
 grafana:
@@ -340,21 +347,17 @@ grafana:
     folder: connectors
 ```
 
-The dashboard references the following metric names (as used in the Grafana queries):
-
-- `cfc_sync_duration_seconds` -- sync cycle duration
-- `cfc_pages_processed_total` -- pages processed count
-- `cfc_unique_rest_api_request_duration_seconds` -- Unique REST API latency
+The bundled dashboard should be treated as a starting point for operator customization rather than as a guaranteed drop-in dashboard for every deployment.
 
 ## Alerts
 
 ### Default Alerts
 
-The Helm chart provides one default alert category:
+The Helm chart contains one optional alert template:
 
 | Category | Alert Name | Description |
 |---|---|---|
-| `uniqueApi` | `ConfluenceConnectorUniqueAPIErrors` | Fires when the Unique REST API error rate (4xx/5xx responses) exceeds the threshold |
+| `uniqueApi` | `ConfluenceConnectorUniqueAPIErrors` | Intended to alert on elevated Unique API error rates |
 
 **Default alert parameters:**
 
@@ -389,6 +392,8 @@ alerts:
 ```
 
 Alerts require the `monitoring.coreos.com/v1` API (Prometheus Operator) to be available in the cluster.
+
+Before enabling the bundled alert rules, verify that their PromQL queries match the metric names emitted by your deployment.
 
 ## Complete Re-ingestion
 
