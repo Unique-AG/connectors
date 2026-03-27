@@ -24,12 +24,12 @@ import type {
 const delegatedHttpLive = MsGraphHttpClientLive<
   "Delegated",
   AllDelegatedPermissions
->()
+>("Delegated")
 
 const applicationHttpLive = MsGraphHttpClientLive<
   "Application",
   AllApplicationPermissions
->()
+>("Application")
 
 export const MsGraphDelegatedClientLive = Layer.mergeAll(
   MailServiceLive,
@@ -58,7 +58,7 @@ export const MsGraphOnBehalfOfClientLive = Layer.mergeAll(
   DriveServiceLive,
 ).pipe(
   Layer.provide(
-    MsGraphHttpClientLive<"Delegated", MailPermissions | CalendarPermissions | DrivePermissions>(),
+    MsGraphHttpClientLive<"Delegated", MailPermissions | CalendarPermissions | DrivePermissions>("Delegated"),
   ),
   Layer.provide(
     OnBehalfOfAuthLive<MailPermissions | CalendarPermissions | DrivePermissions>(),
@@ -70,7 +70,7 @@ export const MsGraphManagedIdentityClientLive = Layer.mergeAll(
   GroupsServiceLive,
 ).pipe(
   Layer.provide(
-    MsGraphHttpClientLive<"Application", UserPermissions | GroupPermissions>(),
+    MsGraphHttpClientLive<"Application", UserPermissions | GroupPermissions>("Application"),
   ),
   Layer.provide(
     ManagedIdentityAuthLive<UserPermissions | GroupPermissions>(),
