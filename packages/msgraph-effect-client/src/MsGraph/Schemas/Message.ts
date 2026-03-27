@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { RecipientSchema } from "./Common.js";
+import { RecipientSchema } from "./Common";
 
 export const BodySchema = Schema.Struct({
   contentType: Schema.Literal("text", "html"),

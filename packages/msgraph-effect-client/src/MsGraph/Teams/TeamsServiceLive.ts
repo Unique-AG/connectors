@@ -1,6 +1,12 @@
 import { Effect, Layer, pipe } from "effect"
 import type { AuthFlow, MsGraphAuth } from "../Auth/MsGraphAuth"
 import type { TeamsPermissions } from "../Auth/Permissions"
+import {
+  InsufficientPermissionsError,
+  RateLimitedError,
+  ResourceNotFoundError,
+} from "../Errors/errors"
+import type { MsGraphError } from "../Errors/errors"
 import { MsGraphHttpClient } from "../Http/MsGraphHttpClient"
 import { ChannelSchema, ChatMessageSchema, TeamSchema } from "../Schemas/Team"
 import { ODataPage, buildQueryString } from "../Schemas/OData"
@@ -17,24 +23,59 @@ export const TeamsServiceLive = Layer.effect(
   Effect.gen(function* () {
     const http = yield* MsGraphHttpClient
 
+    const narrowToRateLimit = (error: MsGraphError): RateLimitedError => {
+      if (error._tag === "RateLimitedError") return error as RateLimitedError
+      return new RateLimitedError({ retryAfter: 0, resource: "teams" })
+    }
+
+    const narrowToRateLimitOrNotFound = (
+      error: MsGraphError,
+    ): RateLimitedError | ResourceNotFoundError => {
+      if (error._tag === "RateLimitedError") return error as RateLimitedError
+      if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
+      return new ResourceNotFoundError({ resource: "team", id: "unknown" })
+    }
+
+    const narrowToRateLimitNotFoundOrInsufficient = (
+      error: MsGraphError,
+    ): RateLimitedError | ResourceNotFoundError | InsufficientPermissionsError => {
+      if (error._tag === "RateLimitedError") return error as RateLimitedError
+      if (error._tag === "ResourceNotFound") return error as ResourceNotFoundError
+      if (error._tag === "InsufficientPermissions") return error as InsufficientPermissionsError
+      return new RateLimitedError({ retryAfter: 0, resource: "teams" })
+    }
+
     return TeamsService.of({
-      listTeams: (params) => {
+      listTeams: (params?) => {
         const qs = params ? buildQueryString<Team>(params as ODataParams<Team>) : ""
-        return http.get(`/me/joinedTeams${qs}`, TeamPageSchema)
+        return Effect.mapError(
+          http.get(`/me/joinedTeams${qs}`, TeamPageSchema),
+          narrowToRateLimit,
+        )
       },
 
-      getTeam: (teamId) => http.get(`/teams/${teamId}`, TeamSchema),
+      getTeam: (teamId) =>
+        Effect.mapError(
+          http.get(`/teams/${teamId}`, TeamSchema),
+          narrowToRateLimitOrNotFound,
+        ),
 
       listChannels: (teamId) =>
-        http.get(`/teams/${teamId}/channels`, ChannelPageSchema),
+        Effect.mapError(
+          http.get(`/teams/${teamId}/channels`, ChannelPageSchema),
+          narrowToRateLimitOrNotFound,
+        ),
 
-      listMessages: (teamId, channelId, params) => {
+      listMessages: (teamId, channelId, params?) => {
         const qs = params
           ? buildQueryString<ChatMessage>(params as ODataParams<ChatMessage>)
           : ""
-        return http.get(
-          `/teams/${teamId}/channels/${channelId}/messages${qs}`,
-          ChatMessagePageSchema,
+        return Effect.mapError(
+          http.get(
+            `/teams/${teamId}/channels/${channelId}/messages${qs}`,
+            ChatMessagePageSchema,
+          ),
+          narrowToRateLimitOrNotFound,
         )
       },
 
@@ -45,13 +86,17 @@ export const TeamsServiceLive = Layer.effect(
             { body: { contentType, content } },
             ChatMessageSchema,
           ),
+          Effect.mapError(narrowToRateLimitNotFoundOrInsufficient),
         ),
 
       replyToMessage: (teamId, channelId, messageId, content) =>
-        http.post(
-          `/teams/${teamId}/channels/${channelId}/messages/${messageId}/replies`,
-          { body: { contentType: "text", content } },
-          ChatMessageSchema,
+        Effect.mapError(
+          http.post(
+            `/teams/${teamId}/channels/${channelId}/messages/${messageId}/replies`,
+            { body: { contentType: "text", content } },
+            ChatMessageSchema,
+          ),
+          narrowToRateLimitOrNotFound,
         ),
     })
   }),

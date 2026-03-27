@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 
-import { IdentitySetSchema } from "./Common.js";
+import { IdentitySetSchema } from "./Common";
 
 export const DriveItemSchema = Schema.Struct({
   id: Schema.String,

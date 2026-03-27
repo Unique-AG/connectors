@@ -1,4 +1,4 @@
-import { Effect, Layer, Schema, Stream, pipe } from "effect"
+import { Effect, Layer, Option, Schema, Stream, pipe } from "effect"
 import type { AuthFlow, MsGraphAuth } from "../Auth/MsGraphAuth"
 import type { DrivePermissions } from "../Auth/Permissions"
 import {
@@ -72,7 +72,7 @@ const uploadChunks = (
           new InvalidRequestError({
             code: "UploadChunkFailed",
             message: "Failed to upload chunk to upload session URL",
-            target: { _tag: "None" } as never,
+            target: Option.none(),
             details: [],
           }),
       })
@@ -93,7 +93,7 @@ const uploadChunks = (
         new InvalidRequestError({
           code: "UploadSessionFailed",
           message: "Upload session completed without returning a DriveItem",
-          target: { _tag: "None" } as never,
+          target: Option.none(),
           details: [],
         }),
       )
@@ -105,7 +105,7 @@ const uploadChunks = (
         new InvalidRequestError({
           code: "UploadResponseDecodeFailed",
           message: "Upload session response did not match DriveItem schema",
-          target: { _tag: "None" } as never,
+          target: Option.none(),
           details: [],
         }),
     )
@@ -214,6 +214,13 @@ export const DriveServiceLive = Layer.effect(
               "@microsoft.graph.conflictBehavior": "rename",
             },
             DriveItemSchema,
+          ),
+          Effect.mapError(
+            (error): RateLimitedError | InvalidRequestError => {
+              if (error._tag === "RateLimitedError") return error as RateLimitedError
+              if (error._tag === "InvalidRequest") return error as InvalidRequestError
+              return new RateLimitedError({ retryAfter: 0, resource: `/drives/${driveId}/items/${parentId}/children` })
+            },
           ),
         ),
 
