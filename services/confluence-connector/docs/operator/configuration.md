@@ -178,7 +178,6 @@ unique:
 | `ingestionServiceBaseUrl` | Yes | -- | Base URL for the Unique ingestion service. Must not end with a trailing slash |
 | `scopeManagementServiceBaseUrl` | Yes | -- | Base URL for the Unique scope management service. Must not end with a trailing slash |
 | `apiRateLimitPerMinute` | No | `100` | Number of Unique API requests allowed per minute |
-| `ingestionConfig` | No | -- | Optional object passed when submitting files for ingestion (e.g., `{"uniqueIngestionMode": "SKIP_INGESTION"}`) |
 
 The additional fields required for each auth mode (`serviceExtraHeaders` for `cluster_local`, Zitadel credentials for `external`) are documented in the [Authentication Guide -- Unique Platform Authentication Methods](./authentication.md#unique-platform-authentication-methods), which also covers setup instructions and token flows.
 
