@@ -111,7 +111,7 @@ sequenceDiagram
     OutlookMCP->>DB: Delete subscription and inbox_configurations records
 ```
 
-**Subscription states:** See [Subscription Management — Subscription Status](./subscription-management.md#subscription-status) for the full status reference.
+**Subscription states:** See [Subscription Management — Subscription Status](./subscription-management.md#Subscription-Status) for the full status reference.
 
 **Key points:**
 

@@ -330,7 +330,7 @@ Rate limiting is expected to be handled at the infrastructure/ingress layer (e.g
 
 ### Required Secrets
 
-For the full secrets reference (format, generation, and description), see [Configuration — Required Secrets](../operator/configuration.md#required-secrets).
+For the full secrets reference (format, generation, and description), see [Configuration — Required Secrets](../operator/configuration.md#Required-Secrets).
 
 | Secret                     | Rotation Impact                     |
 | -------------------------- | ----------------------------------- |
@@ -341,7 +341,7 @@ For the full secrets reference (format, generation, and description), see [Confi
 
 ### Rotation Procedures
 
-For detailed secret rotation procedures, see [Authentication — Secret Rotation](../operator/authentication.md#secret-rotation).
+For detailed secret rotation procedures, see [Authentication — Secret Rotation](../operator/authentication.md#Secret-Rotation).
 
 Key security considerations for rotation:
 
@@ -351,7 +351,7 @@ Key security considerations for rotation:
 
 ## Security Checklist for Operators
 
-See [Operator Manual — Security Checklist](../operator/README.md#security-checklist) for the full pre-production checklist.
+See [Operator Manual — Security Checklist](../operator/README.md#Security-Checklist) for the full pre-production checklist.
 
 ## Related Documentation
 

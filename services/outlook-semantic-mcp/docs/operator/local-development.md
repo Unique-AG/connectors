@@ -113,7 +113,7 @@ UNIQUE_ZITADEL_PROJECT_ID=<zitadel-project-id>
 
 ### Generating Secrets
 
-See [Configuration — Required Secrets](./configuration.md#required-secrets) for the full format reference. Quick generation:
+See [Configuration — Required Secrets](./configuration.md#Required-Secrets) for the full format reference. Quick generation:
 
 ```bash
 # For MICROSOFT_WEBHOOK_SECRET (128 chars)

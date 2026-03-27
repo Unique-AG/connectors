@@ -102,12 +102,12 @@ A background scheduler runs every **5 minutes** and checks for live catch-ups th
 | `liveCatchUpState = failed`, heartbeat stale | 5 minutes | Reset to `ready` and retrigger |
 | `liveCatchUpState = running`, heartbeat stale | 5 minutes | Reset to `ready` and retrigger |
 
-For subscription-level failures (e.g. `subscriptionRemoved`), see [Subscription Management](./subscription-management.md#recovery).
+For subscription-level failures (e.g. `subscriptionRemoved`), see [Subscription Management](./subscription-management.md#Recovery).
 
 ## Related Documentation
 
 - [Subscription Management](./subscription-management.md) - Subscription lifecycle, `reconnect_inbox`, `remove_inbox_connection`
 - [Directory Sync](./directory-sync.md) - Folder sync and email delete detection
 - [Full Sync](./full-sync.md) - Historical batch ingestion and watermark initialisation
-- [Flows](./flows.md#live-catch-up-webhook-driven-email-ingestion) - Live catch-up sequence diagram
+- [Flows](./flows.md#Live-Catch-Up:-Webhook-Driven-Email-Ingestion) - Live catch-up sequence diagram
 - [Configuration](../operator/configuration.md) - `MICROSOFT_WEBHOOK_SECRET` and related env vars

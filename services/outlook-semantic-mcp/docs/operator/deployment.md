@@ -46,7 +46,7 @@ helm upgrade outlook-semantic-mcp oci://ghcr.io/unique-ag/helm-charts/outlook-se
 
 ## Required Secrets
 
-The service requires seven Kubernetes secrets to be present before deployment. For the full reference (format, description, and generation commands), see [Configuration — Required Secrets](./configuration.md#required-secrets).
+The service requires seven Kubernetes secrets to be present before deployment. For the full reference (format, description, and generation commands), see [Configuration — Required Secrets](./configuration.md#Required-Secrets).
 
 ### Provisioning with Terraform (recommended)
 
@@ -147,7 +147,7 @@ mcpConfig:
   defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
 ```
 
-**PostgreSQL backups:** Strongly recommended. Without a backup, all users must re-authenticate and full sync restarts from scratch. See [Disaster Recovery — Backup Recommendations](./disaster-recovery.md#backup-recommendations).
+**PostgreSQL backups:** Strongly recommended. Without a backup, all users must re-authenticate and full sync restarts from scratch. See [Disaster Recovery — Backup Recommendations](./disaster-recovery.md#Backup-recommendations).
 
 **Note:** Ingress is disabled by default. Enable it and configure hosts/TLS in the `ingress` section of your `values.yaml`. The chart defaults to `ingressClassName: kong` but any ingress controller can be used. The application listens on port `51345` (set via `server.ports.application` in the Helm values; the default `9542` only applies outside Helm). MCP servers need to be hosted on their own domain because the OAuth redirect URI (`<SELF_URL>/auth/callback`) must resolve to this service — sharing a domain with other services would cause routing conflicts. Ensure your ingress allows large request bodies (for attachment uploads) and has appropriate timeouts for long-running OAuth flows.
 

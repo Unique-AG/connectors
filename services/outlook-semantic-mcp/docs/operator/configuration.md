@@ -31,7 +31,7 @@ Set via `mcpConfig.app` in Helm values:
 | `PORT` | — | `9542` | HTTP port the server binds to. In Helm deployments, `server.ports.application` (default `51345`) overrides this value. |
 | `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Set to `enabled` to expose debug tools and extra debugging data in tool responses. **Warning:** Debug mode exposes debug tools (`run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) to **all** connected MCP users, not just operators. Do not leave enabled in production. |
 | `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing to reduce I/O. Set to `disabled` only for startup debugging when you need logs to appear immediately. |
-| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | (required) | JSON string controlling which emails are synced — see [Mail Filters](#mail-filters). The application binary has no built-in default for this value. The Helm chart provides a default in `values.yaml` (`ignoredBefore: 2025-06-06`, empty arrays), but when running outside Helm (e.g., local development) this value must be set explicitly. The `ignoredBefore` field is required — without it, the application will not start. **Warning:** Setting `ignoredBefore` far in the past can cause very large initial syncs — significant time and Microsoft Graph API quota consumption. |
+| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | (required) | JSON string controlling which emails are synced — see [Mail Filters](#Mail-Filters). The application binary has no built-in default for this value. The Helm chart provides a default in `values.yaml` (`ignoredBefore: 2025-06-06`, empty arrays), but when running outside Helm (e.g., local development) this value must be set explicitly. The `ignoredBefore` field is required — without it, the application will not start. **Warning:** Setting `ignoredBefore` far in the past can cause very large initial syncs — significant time and Microsoft Graph API quota consumption. |
 
 ### Microsoft Configuration
 
@@ -52,8 +52,8 @@ Set via `mcpConfig.unique` in Helm values:
 | `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
 | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
 | `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `mcpConfig.unique.scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
-| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | When `enabled`, emails are ingested into the Unique Knowledge Base and stored for semantic search. Set to `disabled` to ingest emails without storing as phisical files (emails will be searchable via `search_emails`). |
-| `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | JSON: `{"x-company-id":"...","x-user-id":"..."}`. The `x-company-id` is your organization's ID in the Unique platform — find it in the Unique admin dashboard under **Settings > Organization**, or query it via the Unique API (e.g., `GET /api/company`). The `x-user-id` is the Zitadel service user ID — see [Zitadel Service Account](#zitadel-service-account). |
+| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | When `enabled`, emails are ingested into the Unique Knowledge Base and stored for semantic search. Set to `disabled` to ingest emails without storing as physical files (emails will be searchable via `search_emails`). |
+| `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | JSON: `{"x-company-id":"...","x-user-id":"..."}`. The `x-company-id` is your organization's ID in the Unique platform — find it in the Unique admin dashboard under **Settings > Organization**, or query it via the Unique API (e.g., `GET /api/company`). The `x-user-id` is the Zitadel service user ID — see [Zitadel Service Account](#Zitadel-Service-Account). |
 | `UNIQUE_ZITADEL_CLIENT_ID` | `mcpConfig.unique.zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
 | `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `mcpConfig.unique.zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
 | `UNIQUE_ZITADEL_PROJECT_ID` | `mcpConfig.unique.zitadel.projectId` | (required for `external`) | Zitadel project ID for audience validation |
@@ -192,7 +192,7 @@ alerts:
 For deployments within the same Kubernetes cluster as Unique. Uses in-cluster service URLs with `x-company-id` and `x-user-id` headers passed to all Unique API requests.
 
 !!! warning "`x-user-id` must be a real Zitadel service user"
-    The `x-user-id` value **must** be the ID of an actual service user created in Zitadel — it cannot be an arbitrary value. See [Zitadel Service Account](#zitadel-service-account) for setup instructions.
+    The `x-user-id` value **must** be the ID of an actual service user created in Zitadel — it cannot be an arbitrary value. See [Zitadel Service Account](#Zitadel-Service-Account) for setup instructions.
 
 ```yaml
 mcpConfig:

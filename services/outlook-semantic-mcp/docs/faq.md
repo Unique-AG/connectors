@@ -5,59 +5,59 @@
 
 ## Table of Contents
 
-- [General](#general)
-  - [What type of MCP server is this?](#what-type-of-mcp-server-is-this)
-  - [What tools are available?](#what-tools-are-available)
-  - [Do I need to do anything after connecting?](#do-i-need-to-do-anything-after-connecting)
-- [Authentication & Permissions](#authentication--permissions)
-  - [Do any permissions require admin consent?](#do-any-permissions-require-admin-consent)
-  - [Why does the server need Mail.ReadWrite if it mostly reads emails?](#why-does-the-server-need-mailreadwrite-if-it-mostly-reads-emails)
-  - [Why can't I use application permissions instead of delegated?](#why-cant-i-use-application-permissions-instead-of-delegated)
-  - [Why do I need a client ID and client secret?](#why-do-i-need-a-client-id-and-a-client-secret)
-  - [What is the "login flicker" when users reconnect?](#what-is-the-login-flicker-when-users-reconnect)
-  - [What happens when a user's Microsoft refresh token expires?](#what-happens-when-a-users-microsoft-refresh-token-expires)
-- [Configuration](#configuration)
-  - [What redirect URI should I configure in Entra ID?](#what-redirect-uri-should-i-configure-in-entra-id)
-  - [Why do I need a webhook secret?](#why-do-i-need-a-webhook-secret)
-  - [What happens if I change the encryption key?](#what-happens-if-i-change-the-encryption-key)
-  - [What happens if I change the webhook secret?](#what-happens-if-i-change-the-webhook-secret)
-  - [What happens if I change the client secret?](#what-happens-if-i-change-the-client-secret)
-  - [What does DEFAULT_MAIL_FILTERS do?](#what-does-default_mail_filters-do)
-- [Sync](#sync)
-  - [What is the difference between full sync and live catch-up?](#what-is-the-difference-between-full-sync-and-live-catch-up)
-  - [How do I check sync progress?](#how-do-i-check-sync-progress)
-  - [Why is my full sync stuck in waiting-for-ingestion?](#why-is-my-full-sync-stuck-in-waiting-for-ingestion)
-  - [Why is my full sync stuck in running?](#why-is-my-full-sync-stuck-in-running)
-  - [What happens if full sync is interrupted?](#what-happens-if-full-sync-is-interrupted-restart-crash)
-  - [Why are new emails not appearing in search results?](#why-are-new-emails-not-appearing-in-search-results)
-  - [What happens to emails sent during full sync?](#what-happens-to-emails-sent-during-full-sync)
-  - [Why are deleted emails still appearing in search results?](#why-are-deleted-emails-still-appearing-in-search-results)
-- [Tool Usage](#tool-usage)
-  - [How does search_emails search?](#how-does-search_emails-search)
-  - [How do I filter search results to a specific folder?](#how-do-i-filter-search-results-to-a-specific-folder)
-  - [Can I attach files when creating a draft email?](#can-i-attach-files-when-creating-a-draft-email)
-  - [What does reconnect_inbox do?](#what-does-reconnect_inbox-do)
-  - [What does remove_inbox_connection do?](#what-does-remove_inbox_connection-do)
-- [Data Privacy & Storage](#data-privacy--storage)
-  - [Does the MCP server store my emails?](#does-the-mcp-server-store-my-emails)
-  - [Where is my email content stored?](#where-is-my-email-content-stored)
-  - [Who can access my email data once it is ingested?](#who-can-access-my-email-data-once-it-is-ingested)
-  - [Can an operator with database access read my emails?](#can-an-operator-with-database-access-read-my-emails)
-  - [What happens to my email data when I disconnect?](#what-happens-to-my-email-data-when-i-disconnect)
-  - [What email data is actually ingested into the knowledge base?](#what-email-data-is-actually-ingested-into-the-knowledge-base)
-- [Security](#security)
-  - [How are Microsoft tokens stored?](#how-are-microsoft-tokens-stored)
-  - [How are MCP tokens stored?](#how-are-mcp-tokens-stored)
-  - [Why does the server use PKCE?](#why-does-the-server-use-pkce)
-  - [What happens if a refresh token is stolen?](#what-happens-if-a-refresh-token-is-stolen)
-- [Deployment](#deployment)
-  - [Why is RabbitMQ required?](#why-is-rabbitmq-required)
-  - [What happens if RabbitMQ is unavailable?](#what-happens-if-rabbitmq-is-unavailable)
-  - [What happens if PostgreSQL is unavailable?](#what-happens-if-postgresql-is-unavailable)
-  - [Can one deployment serve multiple Microsoft tenants?](#can-one-deployment-serve-multiple-microsoft-tenants)
-- [Disaster Recovery](#disaster-recovery)
-  - [What do I do if a core infrastructure component fails?](#what-do-i-do-if-a-core-infrastructure-component-fails)
-- [Related Documentation](#related-documentation)
+- [General](#General)
+  - [What type of MCP server is this?](#What-type-of-MCP-server-is-this)
+  - [What tools are available?](#What-tools-are-available)
+  - [Do I need to do anything after connecting?](#Do-I-need-to-do-anything-after-connecting)
+- [Authentication & Permissions](#Authentication-&-Permissions)
+  - [Do any permissions require admin consent?](#Do-any-permissions-require-admin-consent)
+  - [Why does the server need Mail.ReadWrite if it mostly reads emails?](#Why-does-the-server-need-Mail.ReadWrite-if-it-mostly-reads-emails)
+  - [Why can't I use application permissions instead of delegated?](#Why-can't-I-use-application-permissions-instead-of-delegated)
+  - [Why do I need a client ID and client secret?](#Why-do-I-need-a-client-ID-and-client-secret)
+  - [What is the "login flicker" when users reconnect?](#What-is-the-"login-flicker"-when-users-reconnect)
+  - [What happens when a user's Microsoft refresh token expires?](#What-happens-when-a-user's-Microsoft-refresh-token-expires)
+- [Configuration](#Configuration)
+  - [What redirect URI should I configure in Entra ID?](#What-redirect-URI-should-I-configure-in-Entra-ID)
+  - [Why do I need a webhook secret?](#Why-do-I-need-a-webhook-secret)
+  - [What happens if I change the encryption key?](#What-happens-if-I-change-the-encryption-key)
+  - [What happens if I change the webhook secret?](#What-happens-if-I-change-the-webhook-secret)
+  - [What happens if I change the client secret?](#What-happens-if-I-change-the-client-secret)
+  - [What does DEFAULT_MAIL_FILTERS do?](#What-does-DEFAULT_MAIL_FILTERS-do)
+- [Sync](#Sync)
+  - [What is the difference between full sync and live catch-up?](#What-is-the-difference-between-full-sync-and-live-catch-up)
+  - [How do I check sync progress?](#How-do-I-check-sync-progress)
+  - [Why is my full sync stuck in waiting-for-ingestion?](#Why-is-my-full-sync-stuck-in-waiting-for-ingestion)
+  - [Why is my full sync stuck in running?](#Why-is-my-full-sync-stuck-in-running)
+  - [What happens if full sync is interrupted?](#What-happens-if-full-sync-is-interrupted-(restart,-crash))
+  - [Why are new emails not appearing in search results?](#Why-are-new-emails-not-appearing-in-search-results)
+  - [What happens to emails sent during full sync?](#What-happens-to-emails-sent-during-full-sync)
+  - [Why are deleted emails still appearing in search results?](#Why-are-deleted-emails-still-appearing-in-search-results)
+- [Tool Usage](#Tool-Usage)
+  - [How does search_emails search?](#How-does-search_emails-search)
+  - [How do I filter search results to a specific folder?](#How-do-I-filter-search-results-to-a-specific-folder)
+  - [Can I attach files when creating a draft email?](#Can-I-attach-files-when-creating-a-draft-email)
+  - [What does reconnect_inbox do?](#What-does-reconnect_inbox-do)
+  - [What does remove_inbox_connection do?](#What-does-remove_inbox_connection-do)
+- [Data Privacy & Storage](#Data-Privacy-&-Storage)
+  - [Does the MCP server store my emails?](#Does-the-MCP-server-store-my-emails)
+  - [Where is my email content stored?](#Where-is-my-email-content-stored)
+  - [Who can access my email data once it is ingested?](#Who-can-access-my-email-data-once-it-is-ingested)
+  - [Can an operator with database access read my emails?](#Can-an-operator-with-database-access-read-my-emails)
+  - [What happens to my email data when I disconnect?](#What-happens-to-my-email-data-when-I-disconnect)
+  - [What email data is actually ingested into the knowledge base?](#What-email-data-is-actually-ingested-into-the-knowledge-base)
+- [Security](#Security)
+  - [How are Microsoft tokens stored?](#How-are-Microsoft-tokens-stored)
+  - [How are MCP tokens stored?](#How-are-MCP-tokens-stored)
+  - [Why does the server use PKCE?](#Why-does-the-server-use-PKCE)
+  - [What happens if a refresh token is stolen?](#What-happens-if-a-refresh-token-is-stolen)
+- [Deployment](#Deployment)
+  - [Why is RabbitMQ required?](#Why-is-RabbitMQ-required)
+  - [What happens if RabbitMQ is unavailable?](#What-happens-if-RabbitMQ-is-unavailable)
+  - [What happens if PostgreSQL is unavailable?](#What-happens-if-PostgreSQL-is-unavailable)
+  - [Can one deployment serve multiple Microsoft tenants?](#Can-one-deployment-serve-multiple-Microsoft-tenants)
+- [Disaster Recovery](#Disaster-Recovery)
+  - [What do I do if a core infrastructure component fails?](#What-do-I-do-if-a-core-infrastructure-component-fails)
+- [Related Documentation](#Related-Documentation)
 
 ## General
 
@@ -95,11 +95,11 @@
 
 An additional 4 tools are available only when the server is running in debug mode (`MCP_DEBUG_MODE=enabled`): `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`. These are intended for development and troubleshooting and are not exposed in production deployments.
 
-**See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#debug-mode-tools)
+**See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#Debug-Mode-Tools)
 
 ### Do I need to do anything after connecting?
 
-**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [Inbox Filters](./technical/full-sync.md#inbox-filters)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
+**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [Inbox Filters](./technical/full-sync.md#Inbox-Filters)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
 
 ## Authentication & Permissions
 
@@ -123,7 +123,7 @@ Delete detection does not require write access — it works by observing `create
 
 Delegated permissions also ensure the server can only access emails the signed-in user can access — not mailboxes of other users.
 
-**See also:** [Why Delegated (Not Application) Permissions](./technical/permissions.md#why-delegated-not-application-permissions)
+**See also:** [Why Delegated (Not Application) Permissions](./technical/permissions.md#Why-Delegated-(Not-Application)-Permissions)
 
 ### Why do I need a client ID and client secret?
 
@@ -135,7 +135,7 @@ Delegated permissions also ensure the server can only access emails the signed-i
 
 **Answer:** When reconnecting, users may see a brief "flicker" — a rapid redirect sequence through Microsoft's login pages. This is **normal** Microsoft OAuth behavior. First-time connections show the full consent screen; subsequent reconnections are automatic.
 
-**See also:** [Authentication — User Reconnection Experience](./operator/authentication.md#user-reconnection-experience-the-login-flicker) for details.
+**See also:** [Authentication — User Reconnection Experience](./operator/authentication.md#User-Reconnection-Experience-(The-"Login-Flicker")) for details.
 
 ### What happens when a user's Microsoft refresh token expires?
 
@@ -143,7 +143,7 @@ Delegated permissions also ensure the server can only access emails the signed-i
 
 Refresh tokens expire after approximately 90 days of inactivity (Microsoft limit, not configurable) or when the user revokes consent.
 
-**See also:** [Microsoft Token Refresh Flow](./technical/flows.md#microsoft-token-refresh-flow)
+**See also:** [Microsoft Token Refresh Flow](./technical/flows.md#Microsoft-Token-Refresh-Flow)
 
 ## Configuration
 
@@ -165,31 +165,31 @@ This must match exactly — including protocol, domain, and path — in both the
 
 **Generate:** `openssl rand -hex 64` (128 characters)
 
-**See also:** [Webhook Validation](./technical/security.md#webhook-validation) — [Configuration](./operator/configuration.md)
+**See also:** [Webhook Validation](./technical/security.md#Webhook-Validation) — [Configuration](./operator/configuration.md)
 
 ### What happens if I change the encryption key?
 
 **Answer:** All stored Microsoft tokens become unreadable. All users must reconnect via `reconnect_inbox`. There is no zero-downtime rotation — plan for a maintenance window.
 
-**See also:** [Secret Rotation](./operator/authentication.md#secret-rotation) for the full rotation procedure
+**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
 
 ### What happens if I change the webhook secret?
 
 **Answer:** All existing Microsoft Graph subscriptions will fail validation. Notifications will be rejected until subscriptions are recreated. All users must call `reconnect_inbox` after the change.
 
-**See also:** [Secret Rotation](./operator/authentication.md#secret-rotation) for the full rotation procedure
+**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
 
 ### What happens if I change the client secret?
 
 **Answer:** Update the Kubernetes secret and restart the pods. Users do not need to reconnect — the server uses the new secret transparently. This supports zero-downtime rotation.
 
-**See also:** [Secret Rotation](./operator/authentication.md#secret-rotation) for the full rotation procedure
+**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
 
 ### What does `DEFAULT_MAIL_FILTERS` do?
 
 **Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `ignoredBefore` (ISO 8601 date cutoff — required, the application will not start without it), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
 
-When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Inbox Filters](./technical/full-sync.md#inbox-filters) for the full filter reference.
+When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Inbox Filters](./technical/full-sync.md#Inbox-Filters) for the full filter reference.
 
 **See also:** [Configuration](./operator/configuration.md)
 
@@ -207,7 +207,7 @@ When the filters are updated and the service is redeployed, all user inbox confi
 | State | `ready` / `running` / `waiting-for-ingestion` / `paused` / `failed` | `ready` / `running` / `failed` |
 | Resumable | Yes — via `fullSyncNextLink` cursor | N/A (each notification is independent) |
 
-Full sync states: `ready`, `running`, `waiting-for-ingestion`, `paused`, `failed`. See [Full Sync — Sync States](./technical/full-sync.md#sync-states) for the complete state reference.
+Full sync states: `ready`, `running`, `waiting-for-ingestion`, `paused`, `failed`. See [Full Sync — Sync States](./technical/full-sync.md#Sync-States) for the complete state reference.
 
 Both pipelines run concurrently after connection and both contribute to the Unique knowledge base ingestion queue.
 
@@ -227,7 +227,7 @@ Search results are incomplete while `fullSyncState` is `running` or `waiting-for
 
 If the sync has been in `waiting-for-ingestion` with a stale heartbeat for more than 5 minutes, the recovery scheduler will automatically re-trigger the ingestion check.
 
-**See also:** [Stale Sync Recovery](./technical/full-sync.md#stale-sync-recovery)
+**See also:** [Stale Sync Recovery](./technical/full-sync.md#Stale-Sync-Recovery)
 
 ### Why is my full sync stuck in `running`?
 
@@ -239,7 +239,7 @@ If the sync has been in `waiting-for-ingestion` with a stale heartbeat for more 
 
 If the heartbeat is stale for more than 20 minutes, the recovery scheduler automatically retriggers the sync. Check `sync_progress` for the current counters to verify the sync is making progress.
 
-**See also:** [Stale Sync Recovery](./technical/full-sync.md#stale-sync-recovery)
+**See also:** [Stale Sync Recovery](./technical/full-sync.md#Stale-Sync-Recovery)
 
 ### What happens if full sync is interrupted (restart, crash)?
 
@@ -247,7 +247,7 @@ If the heartbeat is stale for more than 20 minutes, the recovery scheduler autom
 
 If the cursor has expired (HTTP 410), the sync falls back to a fresh query filtered from the oldest recorded creation date.
 
-**See also:** [How Batching Works](./technical/full-sync.md#how-batching-works)
+**See also:** [How Batching Works](./technical/full-sync.md#How-Batching-Works)
 
 ### Why are new emails not appearing in search results?
 
@@ -264,7 +264,7 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 **Answer:** Live catch-up runs concurrently with full sync. New emails are processed by live catch-up once full sync has initialized the watermarks. Notifications received before that point are buffered and flushed once ready.
 
-**See also:** [Full Sync — Relation to Live Catch-Up](./technical/full-sync.md#relation-to-live-catch-up) — [Live Catch-Up — Relation to Full Sync](./technical/live-catchup.md#relation-to-full-sync)
+**See also:** [Full Sync — Relation to Live Catch-Up](./technical/full-sync.md#Relation-to-Live-Catch-Up) — [Live Catch-Up — Relation to Full Sync](./technical/live-catchup.md#Relation-to-Full-Sync)
 
 ### Why are deleted emails still appearing in search results?
 
@@ -343,7 +343,7 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 **Answer:** No. The Outlook Semantic MCP Server stores **no email content** in its own database. Emails are fetched from Microsoft Graph into memory and forwarded directly to the Unique knowledge base for indexing. Nothing from the email body, subject, sender, or recipients is written to the MCP server's PostgreSQL database.
 
-The MCP server's PostgreSQL database stores only encrypted OAuth tokens, opaque MCP bearer tokens, sync state, folder metadata, and subscription IDs — no email content. See [Data Classification and Flow](./technical/security.md#data-classification-and-flow) for the full breakdown of what is stored where.
+The MCP server's PostgreSQL database stores only encrypted OAuth tokens, opaque MCP bearer tokens, sync state, folder metadata, and subscription IDs — no email content. See [Data Classification and Flow](./technical/security.md#Data-Classification-and-Flow) for the full breakdown of what is stored where.
 
 ### Where is my email content stored?
 
@@ -351,7 +351,7 @@ The MCP server's PostgreSQL database stores only encrypted OAuth tokens, opaque 
 
 The Unique knowledge base organizes each user's emails into a dedicated **root scope** (a top-level isolation boundary that logically separates one user's ingested data from another's within the Unique platform).
 
-**See also:** [Knowledge Base Data Isolation](./technical/security.md#knowledge-base-data-isolation)
+**See also:** [Knowledge Base Data Isolation](./technical/security.md#Knowledge-Base-Data-Isolation)
 
 ### Who can access my email data once it is ingested?
 
@@ -366,7 +366,7 @@ The Unique knowledge base organizes each user's emails into a dedicated **root s
 
 Organizations with strict email privacy requirements should control who has API and database access to the Unique platform.
 
-**See also:** [Knowledge Base Data Isolation](./technical/security.md#knowledge-base-data-isolation)
+**See also:** [Knowledge Base Data Isolation](./technical/security.md#Knowledge-Base-Data-Isolation)
 
 ### Can an operator with database access read my emails?
 
@@ -376,7 +376,7 @@ Decrypting the stored Microsoft tokens would require the `ENCRYPTION_KEY` value,
 
 Access to the email content itself requires access to the Unique knowledge base, which is governed separately by Unique platform policies.
 
-**See also:** [Data Classification and Flow](./technical/security.md#data-classification-and-flow)
+**See also:** [Data Classification and Flow](./technical/security.md#Data-Classification-and-Flow)
 
 ### What happens to my email data when I disconnect?
 
@@ -386,7 +386,7 @@ Access to the email content itself requires access to the Unique knowledge base,
 - Removes the per-user root scopes from the Unique knowledge base, which also removes all ingested email content for that user
 - Clears the inbox configuration and folder sync data from PostgreSQL
 
-**See also:** [Data Removal](./technical/security.md#data-removal)
+**See also:** [Data Removal](./technical/security.md#Data-Removal)
 
 ### What email data is actually ingested into the knowledge base?
 
@@ -416,7 +416,7 @@ Access to the email content itself requires access to the Unique knowledge base,
 
 Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredContents`) are never ingested.
 
-**See also:** [Inbox Filters](./technical/full-sync.md#inbox-filters)
+**See also:** [Inbox Filters](./technical/full-sync.md#Inbox-Filters)
 
 ## Security
 
@@ -424,25 +424,25 @@ Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredCon
 
 **Answer:** Microsoft access and refresh tokens are encrypted at rest using AES-256-GCM and stored in the `user_profiles` table. They are never sent to AI clients — the server issues separate opaque MCP bearer tokens for all client interactions.
 
-**See also:** [Token Security](./technical/security.md#microsoft-tokens-encrypted-at-rest)
+**See also:** [Token Security](./technical/security.md#Microsoft-Tokens-(Encrypted-at-Rest))
 
 ### How are MCP tokens stored?
 
 **Answer:** MCP tokens are opaque 512-bit random values (`randomBytes(64)`). The full token value is stored directly in the `tokens` table and used for equality comparison during validation. Token unguessability is the security property — not one-way hashing.
 
-**See also:** [MCP Tokens](./technical/security.md#mcp-tokens-opaque-bearer-tokens)
+**See also:** [MCP Tokens](./technical/security.md#MCP-Tokens-(Opaque-Random-Values))
 
 ### Why does the server use PKCE?
 
 **Answer:** PKCE (Proof Key for Code Exchange) prevents authorization code interception. Even if an attacker observes the redirect, they cannot exchange the authorization code without the code verifier that was generated client-side. PKCE is required by OAuth 2.1 for all authorization code flows.
 
-**See also:** [OAuth 2.1 with PKCE](./technical/security.md#oauth-21-with-pkce)
+**See also:** [OAuth 2.1 with PKCE](./technical/security.md#OAuth-2.1-with-PKCE)
 
 ### What happens if a refresh token is stolen?
 
 **Answer:** The token family revocation mechanism detects reuse. Each refresh token has a `familyId`, `generation`, and `usedAt` timestamp. If a token is presented after it has already been used (indicating possible theft), the entire token family is revoked and the user must re-authenticate.
 
-**See also:** [Refresh Token Rotation](./technical/security.md#refresh-token-rotation)
+**See also:** [Refresh Token Rotation](./technical/security.md#Refresh-Token-Rotation)
 
 ## Deployment
 
@@ -456,7 +456,7 @@ Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredCon
 
 **Answer:** Webhook notifications cannot be published to the queue. The webhook controller will fail to enqueue them and return an error to Microsoft. Microsoft will retry the notification. The server will resume processing once RabbitMQ is available and Microsoft retries, but notifications that exceed Microsoft's retry window may be lost.
 
-Full sync fetches emails directly from Microsoft Graph, but relies on RabbitMQ for inter-batch orchestration — without RabbitMQ, in-progress full syncs complete their current batch but no new batches are triggered. See [Disaster Recovery — Scenario 2](./operator/disaster-recovery.md#scenario-2-rabbitmq-loss) for details.
+Full sync fetches emails directly from Microsoft Graph, but relies on RabbitMQ for inter-batch orchestration — without RabbitMQ, in-progress full syncs complete their current batch but no new batches are triggered. See [Disaster Recovery — Scenario 2](./operator/disaster-recovery.md#Scenario-2:-RabbitMQ-Loss) for details.
 Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, the 15-minute catch-up cron re-triggers processing, which picks up missed messages by querying from the last watermark.
 
 ### What happens if PostgreSQL is unavailable?

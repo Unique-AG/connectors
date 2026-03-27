@@ -5,7 +5,7 @@
 
 Full sync is the process of ingesting a user's emails from Microsoft Outlook into the Unique knowledge base, scoped to an operator-configured time frame and filtered by sender and content rules. It runs automatically after a user connects their mailbox and is resumable across restarts.
 
-> **Operator summary:** Full sync progresses through states: `ready` → `running` → `waiting-for-ingestion` → `ready`. If it fails, the recovery scheduler retriggers after 20 minutes. Monitor via `sync_progress`. Emails are filtered by `DEFAULT_MAIL_FILTERS` (date, sender, content). See [Stale Sync Recovery](#stale-sync-recovery) for recovery details.
+> **Operator summary:** Full sync progresses through states: `ready` → `running` → `waiting-for-ingestion` → `ready`. If it fails, the recovery scheduler retriggers after 20 minutes. Monitor via `sync_progress`. Emails are filtered by `DEFAULT_MAIL_FILTERS` (date, sender, content). See [Stale Sync Recovery](#Stale-Sync-Recovery) for recovery details.
 
 ## What Full Sync Does
 
@@ -103,7 +103,7 @@ Each sync attempt generates a new `fullSyncVersion` UUID. All state-modifying da
 
 ## Inbox Filters
 
-Filters control which emails are ingested. They are set globally via the `DEFAULT_MAIL_FILTERS` environment variable and applied to all users at deployment time. The `ignoredBefore` field is required — without it, the application will not start. See [Configuration](../operator/configuration.md#application-configuration) for the full reference.
+Filters control which emails are ingested. They are set globally via the `DEFAULT_MAIL_FILTERS` environment variable and applied to all users at deployment time. The `ignoredBefore` field is required — without it, the application will not start. See [Configuration](../operator/configuration.md#Application-Configuration) for the full reference.
 
 | Filter | Type | Applied Where | Description |
 |--------|------|--------------|-------------|
@@ -168,6 +168,6 @@ Full sync and live catch-up run **concurrently** after a user connects. They are
 - [Subscription Management](./subscription-management.md) - Subscription creation that triggers full sync
 - [Directory Sync](./directory-sync.md) - Folder sync that tracks email movement and deletions
 - [Tools](./tools.md#sync_progress) - `sync_progress` tool reference
-- [Tools](./tools.md#debug-mode-tools) - Debug-mode sync control tools
-- [Flows](./flows.md#full-sync-historical-email-ingestion) - Full sync sequence diagram
+- [Tools](./tools.md#Debug-Mode-Tools) - Debug-mode sync control tools
+- [Flows](./flows.md#Full-Sync:-Historical-Email-Ingestion) - Full sync sequence diagram
 - [Configuration](../operator/configuration.md) - `DEFAULT_MAIL_FILTERS` and related env vars

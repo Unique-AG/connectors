@@ -23,7 +23,7 @@
 
 The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 10 MCP tools (plus 4 additional debug-mode tools).
 
-**Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./technical/full-sync.md#inbox-filters)) into the Unique knowledge base in the background.
+**Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./technical/full-sync.md#Inbox-Filters)) into the Unique knowledge base in the background.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
@@ -96,7 +96,7 @@ All permissions are **Delegated** (not Application): `User.Read`, `Mail.ReadWrit
 
 **Full Sync (Historical Batch Ingestion)**
 
-- After connecting, the server automatically begins a full sync to ingest emails within the operator-configured time frame and filters (see [Inbox Filters](./technical/full-sync.md#inbox-filters))
+- After connecting, the server automatically begins a full sync to ingest emails within the operator-configured time frame and filters (see [Inbox Filters](./technical/full-sync.md#Inbox-Filters))
 - Sync progress can be monitored via the `sync_progress` tool, which reports the current state, counters, and date range being processed
 - `sync_progress` returns a top-level `state` (`running`, `finished`, `error`) and a detailed `fullSyncState` (`ready`, `running`, `paused`, `waiting-for-ingestion`, `failed`), along with the number of emails ingested, the date window being processed, and a warning if results may be incomplete
 
@@ -164,19 +164,19 @@ See [Architecture Documentation](./technical/architecture.md) for detailed compo
 
 The user opens their MCP client and connects to the server. The client initiates an OAuth 2.1 authorization flow with PKCE against Microsoft Entra ID. After the user grants permissions, the server exchanges the authorization code for Microsoft tokens, encrypts and stores them, and issues a separate short-lived MCP bearer token to the client. A Microsoft Graph webhook subscription and a full email sync are then triggered automatically — no further user action is needed.
 
-See [User OAuth Connection Flow](./technical/flows.md#user-oauth-connection-flow) for the detailed sequence diagram.
+See [User OAuth Connection Flow](./technical/flows.md#User-OAuth-Connection-Flow) for the detailed sequence diagram.
 
 ### Token Refresh
 
 Microsoft access tokens expire after approximately one hour. The server intercepts `401` responses from the Graph API and transparently refreshes the token using the stored refresh token. If the refresh token itself has expired (~90 days of inactivity), the user must reconnect via `reconnect_inbox`.
 
-See [Microsoft Token Refresh Flow](./technical/flows.md#microsoft-token-refresh-flow) for the detailed sequence diagram.
+See [Microsoft Token Refresh Flow](./technical/flows.md#Microsoft-Token-Refresh-Flow) for the detailed sequence diagram.
 
 ### Subscription Lifecycle
 
 Microsoft Graph webhook subscriptions for messages last up to 7 days. The server creates subscriptions on user connection and renews them automatically via Microsoft lifecycle notifications (`reauthorizationRequired`). If Microsoft removes a subscription (`subscriptionRemoved`), the server cleans up the associated records.
 
-See [Subscription Creation and Renewal Lifecycle](./technical/flows.md#subscription-creation-and-renewal-lifecycle) for the detailed sequence diagram.
+See [Subscription Creation and Renewal Lifecycle](./technical/flows.md#Subscription-Creation-and-Renewal-Lifecycle) for the detailed sequence diagram.
 
 ### Email Sync
 
@@ -188,19 +188,19 @@ Email ingestion uses two concurrent pipelines:
 
 Both pipelines run concurrently after connection. Live catch-up buffers notifications until full sync initializes the watermark, after which both ingest independently.
 
-See [Flows](./technical/flows.md#full-sync-historical-email-ingestion) for the detailed sequence diagrams.
+See [Flows](./technical/flows.md#Full-Sync:-Historical-Email-Ingestion) for the detailed sequence diagrams.
 
 ### Directory Sync
 
 The server continuously syncs the user's Outlook folder structure via Microsoft Graph delta queries. This enables folder-based search filtering (`list_folders` tool) and tracks email movement to handle deletions — when an email moves to an excluded folder (e.g. Deleted Items), it is removed from the knowledge base.
 
-See [Directory Sync Flow](./technical/flows.md#directory-sync-flow) for the detailed sequence diagram.
+See [Directory Sync Flow](./technical/flows.md#Directory-Sync-Flow) for the detailed sequence diagram.
 
 ### Draft Creation
 
 The `create_draft_email` tool creates a draft in the user's Outlook Drafts folder via Microsoft Graph. The draft is not sent automatically — the response includes a `webLink` for the user to review and send from Outlook.
 
-See [Email Draft Creation Flow](./technical/flows.md#email-draft-creation-flow) for the detailed sequence diagram.
+See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) for the detailed sequence diagram.
 
 ### User Workflow
 

@@ -77,5 +77,5 @@ Directory sync runs as long as the user has an active inbox connection. When `re
 
 - [Subscription Management](./subscription-management.md) - Inbox connection and subscription lifecycle
 - [Live Catch-Up](./live-catchup.md) - Webhook-driven ingestion that runs alongside directory sync
-- [Flows](./flows.md#directory-sync-flow) - Directory sync sequence diagram
+- [Flows](./flows.md#Directory-Sync-Flow) - Directory sync sequence diagram
 - [Tools](./tools.md#list_folders) - `list_folders` tool reference

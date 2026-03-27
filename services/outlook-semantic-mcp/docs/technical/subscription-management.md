@@ -72,6 +72,6 @@ Microsoft Graph sends lifecycle notifications when a subscription's state change
 - [Live Catch-Up](./live-catchup.md) - Webhook-driven ingestion that depends on an active subscription
 - [Directory Sync](./directory-sync.md) - Folder sync that also depends on an active connection
 - [Full Sync](./full-sync.md) - Historical batch ingestion triggered on subscription creation
-- [Flows](./flows.md#subscription-creation-and-renewal-lifecycle) - Subscription lifecycle sequence diagram
+- [Flows](./flows.md#Subscription-Creation-and-Renewal-Lifecycle) - Subscription lifecycle sequence diagram
 - [Tools](./tools.md#verify_inbox_connection) - `verify_inbox_connection`, `reconnect_inbox`, `remove_inbox_connection` tool reference
 - [Configuration](../operator/configuration.md) - `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` and related env vars

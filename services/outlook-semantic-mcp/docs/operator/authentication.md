@@ -11,7 +11,7 @@ For technical details about the OAuth flow and why client credentials are requir
 
 - [Authentication Flows](../technical/flows.md)
 - [Microsoft Graph Permissions](../technical/permissions.md)
-- [FAQ - Why do I need a client ID and client secret?](../faq.md#why-do-i-need-a-client-id-and-client-secret)
+- [FAQ - Why do I need a client ID and client secret?](../faq.md#Why-do-I-need-a-client-ID-and-client-secret)
 
 ## App Registration
 
@@ -120,7 +120,7 @@ Because no permission in this app requires admin consent, users can complete the
 - [Grant admin consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) - Step-by-step guide
 - [Admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) - Per-user approval process
 
-For detailed explanation, see [Microsoft Graph Permissions - Understanding Consent Requirements](../technical/permissions.md#understanding-consent-requirements).
+For detailed explanation, see [Microsoft Graph Permissions - Understanding Consent Requirements](../technical/permissions.md#Understanding-Consent-Requirements).
 
 ### User Reconnection Experience (The "Login Flicker")
 
@@ -128,7 +128,7 @@ For detailed explanation, see [Microsoft Graph Permissions - Understanding Conse
 
 **Subsequent reconnections:** User sees a quick "flicker" (brief redirect sequence). This is **normal** — Microsoft validates the existing session through rapid OAuth redirects. Standard Microsoft OAuth behavior.
 
-For troubleshooting consent issues, see [FAQ - Authentication & Permissions](../faq.md#authentication--permissions).
+For troubleshooting consent issues, see [FAQ - Authentication & Permissions](../faq.md#Authentication-&-Permissions).
 
 ## Redirect URI Configuration
 
@@ -280,9 +280,9 @@ Used to sign and validate OAuth session state during the MCP client authenticati
 
 This is the lowest-impact secret to rotate. Existing connections are unaffected.
 
-For the full security context, see [Secret Management](../technical/security.md#secret-management).
+For the full security context, see [Secret Management](../technical/security.md#Secret-Management).
 
-For troubleshooting authentication issues, see [FAQ - Authentication & Permissions](../faq.md#authentication--permissions).
+For troubleshooting authentication issues, see [FAQ - Authentication & Permissions](../faq.md#Authentication-&-Permissions).
 
 ## Microsoft Documentation
 

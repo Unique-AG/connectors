@@ -341,7 +341,7 @@ Check the status of the inbox connection and Microsoft Graph webhook subscriptio
 | `expired` | Subscription has lapsed | Call `reconnect_inbox` |
 | `not_configured` | No subscription exists | Call `reconnect_inbox` |
 
-See [Subscription Management](./subscription-management.md#subscription-status) for the full subscription status reference.
+See [Subscription Management](./subscription-management.md#Subscription-Status) for the full subscription status reference.
 
 ---
 

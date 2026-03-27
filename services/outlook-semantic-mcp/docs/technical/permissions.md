@@ -21,7 +21,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 
 **This is standard Microsoft behavior, not Outlook Semantic MCP specific.** No permission in this app requires admin consent — users can connect independently. Admins can optionally pre-grant consent organisation-wide.
 
-For the full consent flow explanation including admin consent and multi-tenant setup, see [Authentication — Understanding Microsoft Consent Flows](../operator/authentication.md#understanding-microsoft-consent-flows).
+For the full consent flow explanation including admin consent and multi-tenant setup, see [Authentication — Understanding Microsoft Consent Flows](../operator/authentication.md#Understanding-Microsoft-Consent-Flows).
 
 ## Least-Privilege Justification
 

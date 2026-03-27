@@ -52,11 +52,11 @@ The Outlook Semantic MCP Server runs as a **single pod** that handles MCP tool r
 Follow these steps to go from zero to a running deployment:
 
 1. **Register Microsoft Entra ID application** — Create an app registration with the required delegated permissions. See [Authentication Guide](./authentication.md).
-2. **Create Zitadel service account** — Create a service user with the `KB_Admin` role in Zitadel. Required for both `cluster_local` and `external` auth modes. See [Zitadel Service Account](./configuration.md#zitadel-service-account).
-3. **Provision infrastructure** — Set up PostgreSQL 17+, RabbitMQ 4+, and a Kubernetes namespace. See [Deployment — Prerequisites](./deployment.md#prerequisites).
-4. **Create Kubernetes secrets** — Generate cryptographic secrets and store them as Kubernetes Secrets. See [Deployment — Required Secrets](./deployment.md#required-secrets).
+2. **Create Zitadel service account** — Create a service user with the `KB_Admin` role in Zitadel. Required for both `cluster_local` and `external` auth modes. See [Zitadel Service Account](./configuration.md#Zitadel-Service-Account).
+3. **Provision infrastructure** — Set up PostgreSQL 17+, RabbitMQ 4+, and a Kubernetes namespace. See [Deployment — Prerequisites](./deployment.md#Prerequisites).
+4. **Create Kubernetes secrets** — Generate cryptographic secrets and store them as Kubernetes Secrets. See [Deployment — Required Secrets](./deployment.md#Required-Secrets).
 5. **Configure Helm values** — Create a minimal `values.yaml` with your secrets, Microsoft client ID, and Unique API endpoints. See [Configuration Guide](./configuration.md).
-6. **Deploy with Helm** — Install the chart. See [Deployment — Install](./deployment.md#install).
+6. **Deploy with Helm** — Install the chart. See [Deployment — Install](./deployment.md#Install).
 7. **Verify** the deployment is working:
    1. Check the OAuth metadata endpoint: `curl https://<your-domain>/.well-known/oauth-authorization-server`
    2. Connect with an MCP client and complete the OAuth flow
@@ -65,7 +65,7 @@ Follow these steps to go from zero to a running deployment:
 
 ## Infrastructure Requirements
 
-See [Deployment — Prerequisites](./deployment.md#prerequisites) for the full infrastructure requirements and version details.
+See [Deployment — Prerequisites](./deployment.md#Prerequisites) for the full infrastructure requirements and version details.
 
 ## Deployment Checklist
 
@@ -103,14 +103,14 @@ Before going to production, verify the following:
 - [ ] `ENCRYPTION_KEY` is a cryptographically random 64-character hex string
 - [ ] `AUTH_HMAC_SECRET` is a cryptographically random 64-character hex string
 - [ ] `MICROSOFT_WEBHOOK_SECRET` is a cryptographically random 128-character string
-- [ ] See [Configuration — Required Secrets](./configuration.md#required-secrets) for generation commands and format details
+- [ ] See [Configuration — Required Secrets](./configuration.md#Required-Secrets) for generation commands and format details
 - [ ] All secrets stored in Kubernetes Secrets (not ConfigMaps)
 - [ ] TLS termination configured at ingress
 - [ ] Network policies restrict pod-to-pod communication
 - [ ] Log aggregation in place (tokens are not logged)
 - [ ] Monitoring alerts configured for authentication failures
 
-For the full security architecture, see [Security Documentation](../technical/security.md). For a breakdown of what data is stored where, see [Data Classification and Flow](../technical/security.md#data-classification-and-flow).
+For the full security architecture, see [Security Documentation](../technical/security.md). For a breakdown of what data is stored where, see [Data Classification and Flow](../technical/security.md#Data-Classification-and-Flow).
 
 ## Scaling Considerations
 
