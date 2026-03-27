@@ -103,8 +103,8 @@ connectorConfig:
         ingestAllLabel: ai-ingest-all
       unique:
         authMode: cluster_local
-        ingestionServiceBaseUrl: "http://node-ingestion.namespace:8091"
-        scopeManagementServiceBaseUrl: "http://node-scope-management.namespace:8094"
+        ingestionServiceBaseUrl: "http://node-ingestion.<namespace>:8091"
+        scopeManagementServiceBaseUrl: "http://node-scope-management.<namespace>:8094"
         apiRateLimitPerMinute: 100
         serviceExtraHeaders:
           x-company-id: "your-company-id"

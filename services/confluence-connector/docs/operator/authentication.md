@@ -135,8 +135,8 @@ unique:
   serviceExtraHeaders:
     x-company-id: your-company-id
     x-user-id: your-user-id
-  ingestionServiceBaseUrl: http://node-ingestion-service:8080
-  scopeManagementServiceBaseUrl: http://scope-management-service:8080
+  ingestionServiceBaseUrl: http://node-ingestion.<namespace>:8091
+  scopeManagementServiceBaseUrl: http://node-scope-management.<namespace>:8094
 ```
 
 | Header | Description |

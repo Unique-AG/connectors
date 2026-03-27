@@ -96,8 +96,8 @@ unique:
   serviceExtraHeaders:
     x-company-id: your-company-id
     x-user-id: your-user-id
-  ingestionServiceBaseUrl: http://node-ingestion-service:8080
-  scopeManagementServiceBaseUrl: http://scope-management-service:8080
+  ingestionServiceBaseUrl: http://node-ingestion.<namespace>:8091
+  scopeManagementServiceBaseUrl: http://node-scope-management.<namespace>:8094
   apiRateLimitPerMinute: 100
 
 processing:
@@ -164,8 +164,8 @@ The `unique` section configures how the connector communicates with the Unique p
 ```yaml
 unique:
   serviceAuthMode: cluster_local
-  ingestionServiceBaseUrl: http://node-ingestion-service:8080
-  scopeManagementServiceBaseUrl: http://scope-management-service:8080
+  ingestionServiceBaseUrl: http://node-ingestion.<namespace>:8091
+  scopeManagementServiceBaseUrl: http://node-scope-management.<namespace>:8094
   apiRateLimitPerMinute: 100
   serviceExtraHeaders:
     x-company-id: "company-id"
