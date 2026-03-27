@@ -27,12 +27,6 @@ The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assis
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
-## Documentation
-
-- [FAQ](./faq.md) — Frequently asked questions
-- [Operator Guide](./operator/README.md) — Deployment, configuration, and operations
-- [Technical Reference](./technical/README.md) — Architecture, flows, and design decisions
-
 ## Quick Summary
 
 **What it does:** Provides AI clients with 10 MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, listing folders, and monitoring sync status against a user's Microsoft Outlook mailbox
