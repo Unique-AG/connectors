@@ -201,8 +201,9 @@ Client uses Unique Single Tenant but hosts the connector:
 
 Unique hosts the connector on behalf of the client:
 
-- For Confluence Cloud: Unique provides the OAuth 2.0 service account; client provides Cloud ID, base URL, and label configuration
-- For Confluence Data Center: client provides OAuth credentials and instance URL, or PAT for Data Center versions below 10.1 only (not recommended)
+- Client creates the service account in their own Atlassian Admin Console and provides the credentials (client ID and client secret) to Unique
+- Client provides their Confluence instance details (Cloud ID, base URL, label configuration)
+- For Data Center below 10.1: client provides a PAT instead (not recommended), or PAT for Data Center versions below 10.1 only (not recommended)
 
 ### Multi-Tenant: Unique-Hosted
 
