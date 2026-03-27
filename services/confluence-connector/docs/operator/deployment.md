@@ -7,7 +7,7 @@ The Confluence Connector is delivered as part of the [Unique Connectors](https:/
 
 - Container images with the application code
 - Helm charts for Kubernetes deployment
-- Terraform modules for infrastructure provisioning
+- Terraform module for Azure Key Vault secret placeholders
 - Versioned documentation
 
 ## Container Image
