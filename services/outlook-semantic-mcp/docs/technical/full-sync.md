@@ -61,7 +61,7 @@ stateDiagram-v2
 
 ## How Batching Works
 
-Full sync fetches emails from Microsoft Graph in pages of **100 messages**, processing in order from newest to oldest. After uploading **50 messages** (uploaded + failed), the batch yields so the scheduler can give other users a turn. This means a single batch may process less than a full page, or span multiple pages if many messages are skipped by filters.
+Full sync fetches emails from Microsoft Graph in pages of **100 messages**, processing in order from newest to oldest. After completing a page, if at least **50 messages** were uploaded or failed, the batch yields so the scheduler can give other users a turn — otherwise it continues to the next page. This means a batch always processes at least one full page and may span multiple pages if many messages are skipped by filters.
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -144,7 +144,7 @@ Search results may be incomplete while `fullSyncState` is `running` or `waiting-
 
 ## Stale Sync Recovery
 
-A background scheduler runs every 2 minutes (service limit) and checks for syncs that have stopped updating their heartbeat:
+A background scheduler runs every 2 minutes and checks for syncs that have stopped updating their heartbeat:
 
 | Condition | Threshold | Action |
 |-----------|-----------|--------|

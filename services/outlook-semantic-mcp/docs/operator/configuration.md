@@ -253,7 +253,7 @@ The service account must be assigned the **`KB_Admin`** (Knowledge Base Admin) G
 The `KB_Admin` role covers all of the above. Using a broader role such as `Company_Admin` also works but grants unnecessary privileges.
 
 !!! note "Gatekeeper enforcement"
-    Even though the MCP server identifies itself as `outlook-semantic-mcp` via the `x-service-id` header, the Gatekeeper authorization checks are enforced against the service user specified by `x-user-id` (in `cluster_local` mode) or the Zitadel client credentials (in `external` mode). The service user must have the `KB_Admin` role assigned in the Gatekeeper, otherwise API calls to the ingestion and scope management services will be rejected.
+    Authorization behavior differs by mode. In `cluster_local` mode, Gatekeeper does **not** check user roles — instead, the MCP server's service ID (`outlook-semantic-mcp`) must be listed in the guards of the relevant resolvers. In `external` mode, Gatekeeper authorization is enforced against the Zitadel client credentials, which must have the `KB_Admin` role assigned.
 
 ## Mail Filters
 
