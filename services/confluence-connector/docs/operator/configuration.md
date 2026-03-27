@@ -416,7 +416,7 @@ kubectl scale deployment confluence-connector --replicas=0 -n <namespace>
 
 Use the Unique Public API or admin interface to remove the connector-managed content under the configured root scope.
 
-Do not delete the root scope itself. The connector expects `ingestion.scopeId` to reference a pre-existing scope and aborts startup if that scope no longer exists.
+Do not delete the root scope itself. The connector validates that the scope referenced by `ingestion.scopeId` exists at the start of each sync cycle. If the scope is missing, the sync cycle fails with an assertion error. The application remains running but every sync attempt fails until the scope is restored or the configuration is corrected.
 
 **Warning:** This operation is irreversible. Ensure you have backups if needed.
 
