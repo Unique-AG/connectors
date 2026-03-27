@@ -285,16 +285,6 @@ See [Authentication Architecture](./technical/architecture.md) for details.
   - [Authentication](./operator/authentication.md) - Microsoft Entra ID setup
   - [Local Development](./operator/local-development.md) - Running the server locally
 
-### Technical Reference
-
-- [Technical Reference](./technical/README.md) - Architecture, flows, and design decisions
-  - [Architecture](./technical/architecture.md) - System components and infrastructure
-  - [Flows](./technical/flows.md) - User connection, subscription lifecycle, and sync flows
-  - [Full Sync](./technical/full-sync.md) - Historical batch email ingestion details
-  - [Live Catch-Up](./technical/live-catchup.md) - Real-time webhook-driven sync details
-  - [Tools](./technical/tools.md) - MCP tool reference and behavior
-  - [Permissions](./technical/permissions.md) - Microsoft Graph permissions with justification
-  - [Security](./technical/security.md) - Encryption, authentication, and threat model
 
 ## Standard References
 

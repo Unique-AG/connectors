@@ -5,7 +5,7 @@
 
 Live catch-up is the real-time email ingestion pipeline. It receives Microsoft Graph change notifications the moment new mail arrives and processes them asynchronously via RabbitMQ to meet Microsoft's strict 10-second response deadline.
 
-> **Operator summary:** Live catch-up runs automatically. States: `ready` → `running` → `ready`. If it fails, the recovery scheduler resets it within 5 minutes. A 15-minute cron also ensures missed notifications are caught up. The watermark (a timestamp marking the most recent email processed) is used to fetch only newer emails.
+> **Operator summary:** Live catch-up runs automatically. States: `ready` → `running` → `ready`. If it fails, the recovery scheduler resets it within 5 minutes. If no activity occurs for 4 hours (e.g. missed webhook), the recovery scheduler also retriggers it. The watermark (a timestamp marking the most recent email processed) is used to fetch only newer emails.
 
 ## How It Works
 
@@ -84,10 +84,6 @@ When `liveCatchUpState = running`, new incoming notifications are appended to `p
 
 If `newestLastModifiedDateTime` is `null` (full sync has not initialized the watermarks yet), incoming notifications are also buffered. They are flushed once the watermarks are initialized.
 
-## Periodic Catch-Up Cron
-
-In addition to webhook-driven notifications, a background cron job runs every **15 minutes** and publishes `live-catch-up.execute` events for all users with valid subscriptions. This ensures that any notifications missed due to transient webhook failures or RabbitMQ unavailability are eventually processed.
-
 ## Relation to Full Sync
 
 Live catch-up and full sync run **concurrently** after a user connects:
@@ -98,10 +94,13 @@ Live catch-up and full sync run **concurrently** after a user connects:
 
 ## Recovery
 
-| Condition | Recovery |
-|-----------|---------|
-| `liveCatchUpState = failed` | Recovery scheduler resets to `ready` and retriggers every 5 minutes |
-| `liveCatchUpState = running` with stale heartbeat (5+ minutes) | Recovery scheduler resets to `ready` and retriggers |
+A background scheduler runs every **5 minutes** and checks for live catch-ups that need recovery:
+
+| Condition | Threshold | Action |
+|-----------|-----------|--------|
+| `liveCatchUpState = ready`, heartbeat stale | 4 hours | Retrigger — Microsoft does not always send webhooks for events such as category changes |
+| `liveCatchUpState = failed`, heartbeat stale | 5 minutes | Reset to `ready` and retrigger |
+| `liveCatchUpState = running`, heartbeat stale | 5 minutes | Reset to `ready` and retrigger |
 
 For subscription-level failures (e.g. `subscriptionRemoved`), see [Subscription Management](./subscription-management.md#recovery).
 

@@ -407,12 +407,12 @@ Access to the email content itself requires access to the Unique knowledge base,
 - **PDF** (`.pdf`)
 - **Word** (`.doc`, `.docx`, `.dotx`)
 - **PowerPoint** (`.ppt`, `.pptx`)
+- **Excel** (`.xls`, `.xlsx`)
 
 ### Text-based
 - **Plain text** (`.txt`)
 - **HTML** (`.html`, `.htm`)
 - **Markdown** (`.md`)
-
 
 Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredContents`) are never ingested.
 
