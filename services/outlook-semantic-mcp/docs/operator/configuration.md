@@ -84,7 +84,7 @@ Set via `server.env` in Helm values for plain config, or via `server.envVars` (w
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LOG_LEVEL` | `info` | Log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` |
-| `MAX_HEAP_MB` | `1920` | Node.js max heap size in MB — see [MAX_HEAP_MB](#MAX_HEAP_MB) |
+| `MAX_HEAP_MB` | `850` | Node.js max heap size in MB — see [MAX_HEAP_MB](#MAX_HEAP_MB) |
 | `NODE_ENV` | `production` | Node environment |
 | `NODE_EXTRA_CA_CERTS` | — | Path to a PEM file with additional CA certificates for TLS verification |
 | `OTEL_METRICS_EXPORTER` | `prometheus` | OpenTelemetry metrics exporter |
@@ -131,7 +131,7 @@ server:
 
   env:
     LOG_LEVEL: info
-    MAX_HEAP_MB: 1920
+    MAX_HEAP_MB: 850
     NODE_ENV: production
     OTEL_METRICS_EXPORTER: prometheus
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
@@ -365,4 +365,4 @@ Required for `cluster_local` auth mode. Provide as a JSON object:
 
 ### MAX_HEAP_MB
 
-Sets the Node.js `--max-old-space-size` flag. With the default of `1920` MB, set the pod memory request/limit to at least ~2.5 GB to account for non-heap memory overhead (native modules, OS buffers, etc.).
+Sets the Node.js `--max-old-space-size` flag. With the default of `850` MB, set the pod memory request/limit to at least ~1 GB to account for non-heap memory overhead (native modules, OS buffers, etc.).
