@@ -108,7 +108,7 @@ confluence:
 > **Note:** PATs are not recommended. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead. PATs are static tokens that do not expire automatically and must be manually rotated. Only use this option on Data Center versions below 10.1 where OAuth 2.0 (2LO) is not available.
 
 1. In Confluence Data Center, go to **Profile** > **Personal Access Tokens**.
-2. Create a new token with read access to the target spaces.
+2. Create a new token (the token inherits the creating user's permissions).
 3. Note the generated token value.
 
 **Required tenant YAML fields:**
@@ -383,7 +383,7 @@ flowchart LR
 
 **Causes:**
 - Token expired or revoked
-- Token does not have read access to the target spaces
+- The user who created the token lacks read access
 - Incorrect environment variable reference
 
 **Resolution:**

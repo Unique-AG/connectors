@@ -11,9 +11,9 @@ The Confluence Connector requires specific permissions to access the Confluence 
 
 | Instance Type | Auth Method | Permissions Required |
 |---|---|---|
-| Cloud | OAuth 2.0 (2LO) | OAuth application configured for the client credentials flow with read access to pages, attachments, labels, and spaces (no explicit OAuth scopes are sent in the token request) |
-| Data Center | OAuth 2.0 (2LO) | OAuth 2.0 application configured with `READ` scope |
-| Data Center (below 10.1) | Personal Access Token (not recommended) | User account with read access to target spaces. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead. |
+| Cloud | OAuth 2.0 (2LO) | OAuth application configured for the client credentials flow with instance-wide read access (no explicit OAuth scopes are sent in the token request) |
+| Data Center | OAuth 2.0 (2LO) | OAuth 2.0 application configured with `READ` scope (instance-wide) |
+| Data Center (below 10.1) | Personal Access Token (not recommended) | Inherits the permissions of the user who created it. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead. |
 
 ### Unique Platform Permissions
 
@@ -67,7 +67,7 @@ Data Center supports two authentication methods:
 
 **OAuth 2.0 (2LO):** Client credentials flow against the instance's own token endpoint (`<baseUrl>/rest/oauth2/latest/token`). The token request sends `grant_type`, `client_id`, `client_secret`, and `scope=READ` as a URL-encoded form body. The `READ` scope explicitly limits the service account to read-only access.
 
-**Personal Access Token (PAT) -- not recommended, Data Center below 10.1 only:** A static bearer token associated with a Data Center user account. The token inherits the permissions of the user who created it. The user must have read access to all target spaces. PATs do not expire automatically and must be manually rotated. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead.
+**Personal Access Token (PAT) -- not recommended, Data Center below 10.1 only:** A static bearer token associated with a Data Center user account. The token inherits the permissions of the user who created it. The PAT inherits the user's instance-level permissions. PATs do not expire automatically and must be manually rotated. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead.
 
 ### Required API Access
 
@@ -84,7 +84,7 @@ All endpoints use the `GET` method and require read access only.
 
 ### Space Type Filter
 
-The Data Center client filters by `space.type=global` only (`collaboration` is a Cloud-only space type). See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on space type filtering. The service account must have read access to the target global spaces.
+The Data Center client filters by `space.type=global` only (`collaboration` is a Cloud-only space type). See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on space type filtering. The service account has instance-wide read access; space type filtering is applied client-side via CQL.
 
 ## Unique Platform Permissions
 

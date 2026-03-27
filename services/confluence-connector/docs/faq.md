@@ -281,12 +281,12 @@ Rate limiting is enforced client-side using the Bottleneck library.
 
 ### What Confluence permissions does the connector need?
 
-**Answer:** The connector requires read access to the Confluence spaces and pages it needs to sync. The specific mechanism depends on the authentication method:
+**Answer:** The connector requires read access to the Confluence instance. OAuth 2.0 (2LO) and PAT credentials grant instance-wide read access — there is no way to scope them down to specific spaces or pages.
 
-- **OAuth 2.0 (2LO):** The OAuth application must be granted read access to the target spaces.
-- **Personal Access Token (Data Center below 10.1 only; not recommended):** The PAT owner's account must have read access to the target spaces. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead.
+- **OAuth 2.0 (2LO):** The OAuth application is configured with read access to the entire Confluence instance.
+- **Personal Access Token (Data Center below 10.1 only; not recommended):** The PAT inherits the permissions of the user who created it. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead.
 
-The connector discovers pages via CQL search queries. Pages in spaces where the configured credentials lack read access simply do not appear in CQL results and are not synced.
+The connector discovers pages via CQL search queries filtered by label. Only pages carrying the configured sync labels are ingested.
 
 ### What happens if the connector lacks permission to a space?
 

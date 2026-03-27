@@ -129,7 +129,7 @@ In cluster-internal mode (`serviceAuthMode: cluster_local`), Zitadel token valid
 
 - [ ] OAuth 2.0 (2LO) application created in Confluence (recommended for Cloud and Data Center 10.1+), or PAT generated for Data Center versions below 10.1
 - [ ] Client ID and client secret noted (OAuth 2.0), or PAT token noted (Data Center < 10.1)
-- [ ] Application or token granted read access to the target spaces and pages
+- [ ] Application configured with read access to the Confluence instance
 
 > **Note:** OAuth 2.0 (2LO) is the recommended authentication method. Personal Access Tokens (PATs) are not recommended and should only be used on Confluence Data Center versions below 10.1 where OAuth 2.0 (2LO) is not available.
 
