@@ -3,9 +3,9 @@ import type {
   InsufficientPermissionsError,
   RateLimitedError,
   ResourceNotFoundError,
-} from '../Errors/errors';
-import type { ODataPageType, ODataParams } from '../Schemas/OData';
-import type { Channel, ChatMessage, Team } from '../Schemas/Team';
+} from '../errors/errors.js';
+import type { ODataPageType, ODataParams } from '../schemas/odata.schema.js';
+import type { Channel, ChatMessage, Team } from './team.schema.js';
 
 export class TeamsService extends ServiceMap.Service<
   TeamsService,
@@ -45,4 +45,4 @@ export class TeamsService extends ServiceMap.Service<
       content: string,
     ) => Effect.Effect<ChatMessage, ResourceNotFoundError | RateLimitedError>;
   }
->()('MsGraph/TeamsService') {}
+>()('MsGraph/Teams/TeamsService') {}

@@ -1,5 +1,5 @@
 import { Schema } from 'effect';
-import { RecipientSchema } from './Common';
+import { RecipientSchema } from '../schemas/common.schema.js';
 
 export const BodySchema = Schema.Struct({
   contentType: Schema.Union([Schema.Literal('text'), Schema.Literal('html')]),

@@ -1,5 +1,5 @@
 import { Effect, Schema, ServiceMap, Stream } from 'effect';
-import type { MsGraphError } from '../Errors/errors';
+import type { MsGraphError } from '../errors/errors.js';
 
 export class MsGraphHttpClient extends ServiceMap.Service<
   MsGraphHttpClient,

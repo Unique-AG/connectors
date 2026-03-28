@@ -1,5 +1,5 @@
 import { Schema } from 'effect';
-import { IdentitySetSchema } from './Common';
+import { IdentitySetSchema } from '../schemas/common.schema.js';
 
 export const PlannerAssignmentSchema = Schema.Struct({
   assignedBy: Schema.optional(IdentitySetSchema),

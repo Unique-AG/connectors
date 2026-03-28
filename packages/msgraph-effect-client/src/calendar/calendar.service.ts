@@ -3,14 +3,14 @@ import type {
   InvalidRequestError,
   RateLimitedError,
   ResourceNotFoundError,
-} from '../Errors/errors';
+} from '../errors/errors.js';
+import type { ODataPageType, ODataParams } from '../schemas/odata.schema.js';
 import type {
   CalendarEvent,
   CreateEventPayload,
   FindMeetingTimesRequest,
   MeetingTimeSuggestionsResult,
-} from '../Schemas/Event';
-import type { ODataPageType, ODataParams } from '../Schemas/OData';
+} from './event.schema.js';
 
 export class CalendarService extends ServiceMap.Service<
   CalendarService,
@@ -56,4 +56,4 @@ export class CalendarService extends ServiceMap.Service<
       request: FindMeetingTimesRequest,
     ) => Effect.Effect<MeetingTimeSuggestionsResult, RateLimitedError | InvalidRequestError>;
   }
->()('MsGraph/CalendarService') {}
+>()('MsGraph/Calendar/CalendarService') {}

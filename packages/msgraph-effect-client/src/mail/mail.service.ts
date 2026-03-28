@@ -4,9 +4,9 @@ import type {
   InvalidRequestError,
   RateLimitedError,
   ResourceNotFoundError,
-} from '../Errors/errors';
-import type { Attachment, MailFolder, Message, SendMailPayload } from '../Schemas/Message';
-import type { ODataPageType, ODataParams } from '../Schemas/OData';
+} from '../errors/errors.js';
+import type { ODataPageType, ODataParams } from '../schemas/odata.schema.js';
+import type { Attachment, MailFolder, Message, SendMailPayload } from './message.schema.js';
 
 export class MailService extends ServiceMap.Service<
   MailService,
@@ -55,4 +55,4 @@ export class MailService extends ServiceMap.Service<
       attachmentId: string,
     ) => Effect.Effect<Stream.Stream<Uint8Array, RateLimitedError>, ResourceNotFoundError>;
   }
->()('MsGraph/MailService') {}
+>()('MsGraph/Mail/MailService') {}

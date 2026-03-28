@@ -1,5 +1,5 @@
 import { Schema } from 'effect';
-import { DateTimeTimeZoneSchema } from './Common';
+import { DateTimeTimeZoneSchema } from '../schemas/common.schema.js';
 
 export const EventLocationSchema = Schema.Struct({
   displayName: Schema.String,

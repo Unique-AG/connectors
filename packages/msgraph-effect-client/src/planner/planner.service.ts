@@ -3,9 +3,9 @@ import type {
   InvalidRequestError,
   RateLimitedError,
   ResourceNotFoundError,
-} from '../Errors/errors';
-import type { ODataPageType } from '../Schemas/OData';
-import type { CreatePlannerTaskPayload, PlannerPlan, PlannerTask } from '../Schemas/PlannerTask';
+} from '../errors/errors.js';
+import type { ODataPageType } from '../schemas/odata.schema.js';
+import type { CreatePlannerTaskPayload, PlannerPlan, PlannerTask } from './planner-task.schema.js';
 
 export class PlannerService extends ServiceMap.Service<
   PlannerService,
@@ -41,4 +41,4 @@ export class PlannerService extends ServiceMap.Service<
       etag: string,
     ) => Effect.Effect<void, ResourceNotFoundError | RateLimitedError>;
   }
->()('MsGraph/PlannerService') {}
+>()('MsGraph/Planner/PlannerService') {}

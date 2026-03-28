@@ -1,5 +1,5 @@
 import { Effect, ServiceMap } from 'effect';
-import type { AuthenticationFailedError, TokenExpiredError } from '../Errors/errors';
+import type { AuthenticationFailedError, TokenExpiredError } from '../errors/errors.js';
 
 export type AuthFlow = 'Delegated' | 'Application' | 'OnBehalfOf' | 'ManagedIdentity';
 

@@ -3,10 +3,10 @@ import type {
   InvalidRequestError,
   RateLimitedError,
   ResourceNotFoundError,
-} from '../Errors/errors';
-import type { Group } from '../Schemas/Group';
-import type { ODataPageType, ODataParams } from '../Schemas/OData';
-import type { User } from '../Schemas/User';
+} from '../errors/errors.js';
+import type { ODataPageType, ODataParams } from '../schemas/odata.schema.js';
+import type { User } from '../users/user.schema.js';
+import type { Group } from './group.schema.js';
 
 export class GroupsService extends ServiceMap.Service<
   GroupsService,
@@ -33,4 +33,4 @@ export class GroupsService extends ServiceMap.Service<
       userId: string,
     ) => Effect.Effect<void, ResourceNotFoundError | RateLimitedError>;
   }
->()('MsGraph/GroupsService') {}
+>()('MsGraph/Groups/GroupsService') {}

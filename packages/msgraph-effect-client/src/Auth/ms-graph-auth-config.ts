@@ -1,6 +1,6 @@
 import { Effect, ServiceMap } from 'effect';
-import type { AuthenticationFailedError } from '../Errors/errors';
-import type { TokenCachePlugin } from './TokenCache';
+import type { AuthenticationFailedError } from '../errors/errors.js';
+import type { TokenCachePlugin } from './token-cache.js';
 
 export interface DelegatedAuthConfigShape {
   readonly clientId: string;

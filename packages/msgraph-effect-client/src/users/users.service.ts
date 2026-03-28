@@ -3,9 +3,9 @@ import type {
   InvalidRequestError,
   RateLimitedError,
   ResourceNotFoundError,
-} from '../Errors/errors';
-import type { ODataPageType, ODataParams } from '../Schemas/OData';
-import type { User } from '../Schemas/User';
+} from '../errors/errors.js';
+import type { ODataPageType, ODataParams } from '../schemas/odata.schema.js';
+import type { User } from './user.schema.js';
 
 export class UsersService extends ServiceMap.Service<
   UsersService,
@@ -36,4 +36,4 @@ export class UsersService extends ServiceMap.Service<
       userId: string,
     ) => Effect.Effect<Stream.Stream<Uint8Array, RateLimitedError>, ResourceNotFoundError>;
   }
->()('MsGraph/UsersService') {}
+>()('MsGraph/Users/UsersService') {}

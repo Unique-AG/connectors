@@ -4,12 +4,12 @@ import type {
   QuotaExceededError,
   RateLimitedError,
   ResourceNotFoundError,
-} from '../Errors/errors';
-import type { DriveItem, SharingLink } from '../Schemas/DriveItem';
-import type { ODataPageType, ODataParams } from '../Schemas/OData';
+} from '../errors/errors.js';
+import type { ODataPageType, ODataParams } from '../schemas/odata.schema.js';
+import type { DriveItem, SharingLink } from './drive-item.schema.js';
 
-export class DriveService extends ServiceMap.Service<
-  DriveService,
+export class FilesService extends ServiceMap.Service<
+  FilesService,
   {
     readonly listItems: (
       driveId: string,
@@ -71,4 +71,4 @@ export class DriveService extends ServiceMap.Service<
       scope: 'anonymous' | 'organization',
     ) => Effect.Effect<SharingLink, ResourceNotFoundError | RateLimitedError>;
   }
->()('MsGraph/DriveService') {}
+>()('MsGraph/Files/FilesService') {}

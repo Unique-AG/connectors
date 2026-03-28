@@ -1,4 +1,4 @@
-import type { BatchItemError } from '../Errors/errors';
+import type { BatchItemError } from '../errors/errors.js';
 
 export interface BatchRequestItem {
   readonly id: string;
