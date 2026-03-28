@@ -1,1 +1,1 @@
-export * from "./MsGraph/index"
+export * from './MsGraph/index';

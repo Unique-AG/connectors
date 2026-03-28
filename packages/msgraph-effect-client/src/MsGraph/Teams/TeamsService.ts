@@ -1,47 +1,48 @@
-import { Effect, ServiceMap } from "effect"
+import { Effect, ServiceMap } from 'effect';
 import type {
   InsufficientPermissionsError,
   RateLimitedError,
   ResourceNotFoundError,
-} from "../Errors/errors"
-import type { Channel, ChatMessage, Team } from "../Schemas/Team"
-import type { ODataPageType, ODataParams } from "../Schemas/OData"
+} from '../Errors/errors';
+import type { ODataPageType, ODataParams } from '../Schemas/OData';
+import type { Channel, ChatMessage, Team } from '../Schemas/Team';
 
-export class TeamsService extends ServiceMap.Service<TeamsService, {
-  readonly listTeams: (
-    params?: ODataParams<Team>,
-  ) => Effect.Effect<ODataPageType<Team>, RateLimitedError>
+export class TeamsService extends ServiceMap.Service<
+  TeamsService,
+  {
+    readonly listTeams: (
+      params?: ODataParams<Team>,
+    ) => Effect.Effect<ODataPageType<Team>, RateLimitedError>;
 
-  readonly getTeam: (
-    teamId: string,
-  ) => Effect.Effect<Team, ResourceNotFoundError | RateLimitedError>
+    readonly getTeam: (
+      teamId: string,
+    ) => Effect.Effect<Team, ResourceNotFoundError | RateLimitedError>;
 
-  readonly listChannels: (
-    teamId: string,
-  ) => Effect.Effect<ODataPageType<Channel>, ResourceNotFoundError | RateLimitedError>
+    readonly listChannels: (
+      teamId: string,
+    ) => Effect.Effect<ODataPageType<Channel>, ResourceNotFoundError | RateLimitedError>;
 
-  readonly listMessages: (
-    teamId: string,
-    channelId: string,
-    params?: ODataParams<ChatMessage>,
-  ) => Effect.Effect<ODataPageType<ChatMessage>, ResourceNotFoundError | RateLimitedError>
+    readonly listMessages: (
+      teamId: string,
+      channelId: string,
+      params?: ODataParams<ChatMessage>,
+    ) => Effect.Effect<ODataPageType<ChatMessage>, ResourceNotFoundError | RateLimitedError>;
 
-  readonly sendMessage: (
-    teamId: string,
-    channelId: string,
-    content: string,
-    contentType?: "text" | "html",
-  ) => Effect.Effect<
-    ChatMessage,
-    ResourceNotFoundError | InsufficientPermissionsError | RateLimitedError
-  >
+    readonly sendMessage: (
+      teamId: string,
+      channelId: string,
+      content: string,
+      contentType?: 'text' | 'html',
+    ) => Effect.Effect<
+      ChatMessage,
+      ResourceNotFoundError | InsufficientPermissionsError | RateLimitedError
+    >;
 
-  readonly replyToMessage: (
-    teamId: string,
-    channelId: string,
-    messageId: string,
-    content: string,
-  ) => Effect.Effect<ChatMessage, ResourceNotFoundError | RateLimitedError>
-}>()(
-  "MsGraph/TeamsService",
-) {}
+    readonly replyToMessage: (
+      teamId: string,
+      channelId: string,
+      messageId: string,
+      content: string,
+    ) => Effect.Effect<ChatMessage, ResourceNotFoundError | RateLimitedError>;
+  }
+>()('MsGraph/TeamsService') {}

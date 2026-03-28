@@ -1,6 +1,5 @@
-import { Schema } from "effect";
-
-import { IdentitySetSchema } from "./Common";
+import { Schema } from 'effect';
+import { IdentitySetSchema } from './Common';
 
 export const PlannerAssignmentSchema = Schema.Struct({
   assignedBy: Schema.optional(IdentitySetSchema),
@@ -37,11 +36,11 @@ export const PlannerTaskSchema = Schema.Struct({
   previewType: Schema.optional(
     Schema.NullOr(
       Schema.Union([
-        Schema.Literal("automatic"),
-        Schema.Literal("noPreview"),
-        Schema.Literal("checklist"),
-        Schema.Literal("description"),
-        Schema.Literal("reference"),
+        Schema.Literal('automatic'),
+        Schema.Literal('noPreview'),
+        Schema.Literal('checklist'),
+        Schema.Literal('description'),
+        Schema.Literal('reference'),
       ]),
     ),
   ),
@@ -59,11 +58,11 @@ export const PlannerContainerSchema = Schema.Struct({
   containerId: Schema.String,
   type: Schema.optional(
     Schema.Union([
-      Schema.Literal("group"),
-      Schema.Literal("roster"),
-      Schema.Literal("driveItem"),
-      Schema.Literal("project"),
-      Schema.Literal("unknownFutureValue"),
+      Schema.Literal('group'),
+      Schema.Literal('roster'),
+      Schema.Literal('driveItem'),
+      Schema.Literal('project'),
+      Schema.Literal('unknownFutureValue'),
     ]),
   ),
   url: Schema.optional(Schema.String),
@@ -98,11 +97,11 @@ export const CreatePlannerTaskPayloadSchema = Schema.Struct({
   previewType: Schema.optional(
     Schema.NullOr(
       Schema.Union([
-        Schema.Literal("automatic"),
-        Schema.Literal("noPreview"),
-        Schema.Literal("checklist"),
-        Schema.Literal("description"),
-        Schema.Literal("reference"),
+        Schema.Literal('automatic'),
+        Schema.Literal('noPreview'),
+        Schema.Literal('checklist'),
+        Schema.Literal('description'),
+        Schema.Literal('reference'),
       ]),
     ),
   ),
@@ -117,11 +116,11 @@ export const PlannerTaskDetailsSchema = Schema.Struct({
   previewType: Schema.optional(
     Schema.NullOr(
       Schema.Union([
-        Schema.Literal("automatic"),
-        Schema.Literal("noPreview"),
-        Schema.Literal("checklist"),
-        Schema.Literal("description"),
-        Schema.Literal("reference"),
+        Schema.Literal('automatic'),
+        Schema.Literal('noPreview'),
+        Schema.Literal('checklist'),
+        Schema.Literal('description'),
+        Schema.Literal('reference'),
       ]),
     ),
   ),

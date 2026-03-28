@@ -1,14 +1,14 @@
-import { Schema } from "effect"
+import { Schema } from 'effect';
 
 export class AuthenticationFailedError extends Schema.TaggedErrorClass<AuthenticationFailedError>()(
-  "AuthenticationFailed",
+  'AuthenticationFailed',
   {
     reason: Schema.Union([
-      Schema.Literal("invalid_grant"),
-      Schema.Literal("invalid_client"),
-      Schema.Literal("interaction_required"),
-      Schema.Literal("expired_token"),
-      Schema.Literal("unknown"),
+      Schema.Literal('invalid_grant'),
+      Schema.Literal('invalid_client'),
+      Schema.Literal('interaction_required'),
+      Schema.Literal('expired_token'),
+      Schema.Literal('unknown'),
     ]),
     message: Schema.String,
     correlationId: Schema.optionalKey(Schema.String),
@@ -16,7 +16,7 @@ export class AuthenticationFailedError extends Schema.TaggedErrorClass<Authentic
 ) {}
 
 export class RateLimitedError extends Schema.TaggedErrorClass<RateLimitedError>()(
-  "RateLimitedError",
+  'RateLimitedError',
   {
     retryAfter: Schema.Number,
     resource: Schema.String,
@@ -24,7 +24,7 @@ export class RateLimitedError extends Schema.TaggedErrorClass<RateLimitedError>(
 ) {}
 
 export class InsufficientPermissionsError extends Schema.TaggedErrorClass<InsufficientPermissionsError>()(
-  "InsufficientPermissions",
+  'InsufficientPermissions',
   {
     requiredScope: Schema.String,
     grantedScopes: Schema.Array(Schema.String),
@@ -32,7 +32,7 @@ export class InsufficientPermissionsError extends Schema.TaggedErrorClass<Insuff
 ) {}
 
 export class ResourceNotFoundError extends Schema.TaggedErrorClass<ResourceNotFoundError>()(
-  "ResourceNotFound",
+  'ResourceNotFound',
   {
     resource: Schema.String,
     id: Schema.String,
@@ -40,7 +40,7 @@ export class ResourceNotFoundError extends Schema.TaggedErrorClass<ResourceNotFo
 ) {}
 
 export class QuotaExceededError extends Schema.TaggedErrorClass<QuotaExceededError>()(
-  "QuotaExceeded",
+  'QuotaExceeded',
   {
     resource: Schema.String,
     limit: Schema.optionalKey(Schema.Number),
@@ -48,39 +48,34 @@ export class QuotaExceededError extends Schema.TaggedErrorClass<QuotaExceededErr
 ) {}
 
 export class InvalidRequestError extends Schema.TaggedErrorClass<InvalidRequestError>()(
-  "InvalidRequest",
+  'InvalidRequest',
   {
     code: Schema.String,
     message: Schema.String,
     target: Schema.optionalKey(Schema.String),
-    details: Schema.Array(
-      Schema.Struct({ code: Schema.String, message: Schema.String }),
-    ),
+    details: Schema.Array(Schema.Struct({ code: Schema.String, message: Schema.String })),
   },
 ) {}
 
 export class TokenExpiredError extends Schema.TaggedErrorClass<TokenExpiredError>()(
-  "TokenExpired",
+  'TokenExpired',
   {
     expiredAt: Schema.Number,
   },
 ) {}
 
 export class ServiceUnavailableError extends Schema.TaggedErrorClass<ServiceUnavailableError>()(
-  "ServiceUnavailable",
+  'ServiceUnavailable',
   {
     retryAfter: Schema.optionalKey(Schema.Number),
   },
 ) {}
 
-export class BatchItemError extends Schema.TaggedErrorClass<BatchItemError>()(
-  "BatchItemError",
-  {
-    requestId: Schema.String,
-    statusCode: Schema.Number,
-    inner: Schema.Any,
-  },
-) {}
+export class BatchItemError extends Schema.TaggedErrorClass<BatchItemError>()('BatchItemError', {
+  requestId: Schema.String,
+  statusCode: Schema.Number,
+  inner: Schema.Any,
+}) {}
 
 export type MsGraphError =
   | AuthenticationFailedError
@@ -91,4 +86,4 @@ export type MsGraphError =
   | InvalidRequestError
   | TokenExpiredError
   | ServiceUnavailableError
-  | BatchItemError
+  | BatchItemError;

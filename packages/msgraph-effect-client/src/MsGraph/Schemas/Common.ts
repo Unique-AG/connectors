@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Schema } from 'effect';
 
 export const EmailAddressSchema = Schema.Struct({
   address: Schema.String,

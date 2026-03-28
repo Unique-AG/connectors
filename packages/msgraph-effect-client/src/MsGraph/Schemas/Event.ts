@@ -1,21 +1,20 @@
-import { Schema } from "effect";
-
-import { DateTimeTimeZoneSchema } from "./Common";
+import { Schema } from 'effect';
+import { DateTimeTimeZoneSchema } from './Common';
 
 export const EventLocationSchema = Schema.Struct({
   displayName: Schema.String,
   locationType: Schema.optional(
     Schema.Union([
-      Schema.Literal("default"),
-      Schema.Literal("conferenceRoom"),
-      Schema.Literal("homeAddress"),
-      Schema.Literal("businessAddress"),
-      Schema.Literal("geoCoordinates"),
-      Schema.Literal("streetAddress"),
-      Schema.Literal("hotel"),
-      Schema.Literal("restaurant"),
-      Schema.Literal("localBusiness"),
-      Schema.Literal("postalAddress"),
+      Schema.Literal('default'),
+      Schema.Literal('conferenceRoom'),
+      Schema.Literal('homeAddress'),
+      Schema.Literal('businessAddress'),
+      Schema.Literal('geoCoordinates'),
+      Schema.Literal('streetAddress'),
+      Schema.Literal('hotel'),
+      Schema.Literal('restaurant'),
+      Schema.Literal('localBusiness'),
+      Schema.Literal('postalAddress'),
     ]),
   ),
   uniqueId: Schema.optional(Schema.String),
@@ -44,16 +43,20 @@ export const AttendeeSchema = Schema.Struct({
     address: Schema.String,
     name: Schema.optional(Schema.String),
   }),
-  type: Schema.Union([Schema.Literal("required"), Schema.Literal("optional"), Schema.Literal("resource")]),
+  type: Schema.Union([
+    Schema.Literal('required'),
+    Schema.Literal('optional'),
+    Schema.Literal('resource'),
+  ]),
   status: Schema.optional(
     Schema.Struct({
       response: Schema.Union([
-        Schema.Literal("none"),
-        Schema.Literal("organizer"),
-        Schema.Literal("tentativelyAccepted"),
-        Schema.Literal("accepted"),
-        Schema.Literal("declined"),
-        Schema.Literal("notResponded"),
+        Schema.Literal('none'),
+        Schema.Literal('organizer'),
+        Schema.Literal('tentativelyAccepted'),
+        Schema.Literal('accepted'),
+        Schema.Literal('declined'),
+        Schema.Literal('notResponded'),
       ]),
       time: Schema.optional(Schema.String),
     }),
@@ -72,12 +75,12 @@ export const PatternedRecurrenceSchema = Schema.Struct({
   pattern: Schema.optional(
     Schema.Struct({
       type: Schema.Union([
-        Schema.Literal("daily"),
-        Schema.Literal("weekly"),
-        Schema.Literal("absoluteMonthly"),
-        Schema.Literal("relativeMonthly"),
-        Schema.Literal("absoluteYearly"),
-        Schema.Literal("relativeYearly"),
+        Schema.Literal('daily'),
+        Schema.Literal('weekly'),
+        Schema.Literal('absoluteMonthly'),
+        Schema.Literal('relativeMonthly'),
+        Schema.Literal('absoluteYearly'),
+        Schema.Literal('relativeYearly'),
       ]),
       interval: Schema.Number,
       month: Schema.optional(Schema.Number),
@@ -89,7 +92,11 @@ export const PatternedRecurrenceSchema = Schema.Struct({
   ),
   range: Schema.optional(
     Schema.Struct({
-      type: Schema.Union([Schema.Literal("endDate"), Schema.Literal("noEnd"), Schema.Literal("numbered")]),
+      type: Schema.Union([
+        Schema.Literal('endDate'),
+        Schema.Literal('noEnd'),
+        Schema.Literal('numbered'),
+      ]),
       startDate: Schema.String,
       endDate: Schema.optional(Schema.String),
       recurrenceTimeZone: Schema.optional(Schema.String),
@@ -104,7 +111,7 @@ export const CalendarEventSchema = Schema.Struct({
   id: Schema.String,
   subject: Schema.String,
   body: Schema.Struct({
-    contentType: Schema.Union([Schema.Literal("text"), Schema.Literal("html")]),
+    contentType: Schema.Union([Schema.Literal('text'), Schema.Literal('html')]),
     content: Schema.String,
   }),
   bodyPreview: Schema.optional(Schema.String),
@@ -135,32 +142,36 @@ export const CalendarEventSchema = Schema.Struct({
     ),
   ),
   recurrence: Schema.NullOr(PatternedRecurrenceSchema),
-  importance: Schema.Union([Schema.Literal("low"), Schema.Literal("normal"), Schema.Literal("high")]),
+  importance: Schema.Union([
+    Schema.Literal('low'),
+    Schema.Literal('normal'),
+    Schema.Literal('high'),
+  ]),
   sensitivity: Schema.Union([
-    Schema.Literal("normal"),
-    Schema.Literal("personal"),
-    Schema.Literal("private"),
-    Schema.Literal("confidential"),
+    Schema.Literal('normal'),
+    Schema.Literal('personal'),
+    Schema.Literal('private'),
+    Schema.Literal('confidential'),
   ]),
   showAs: Schema.optional(
     Schema.Union([
-      Schema.Literal("free"),
-      Schema.Literal("tentative"),
-      Schema.Literal("busy"),
-      Schema.Literal("oof"),
-      Schema.Literal("workingElsewhere"),
-      Schema.Literal("unknown"),
+      Schema.Literal('free'),
+      Schema.Literal('tentative'),
+      Schema.Literal('busy'),
+      Schema.Literal('oof'),
+      Schema.Literal('workingElsewhere'),
+      Schema.Literal('unknown'),
     ]),
   ),
   responseStatus: Schema.optional(
     Schema.Struct({
       response: Schema.Union([
-        Schema.Literal("none"),
-        Schema.Literal("organizer"),
-        Schema.Literal("tentativelyAccepted"),
-        Schema.Literal("accepted"),
-        Schema.Literal("declined"),
-        Schema.Literal("notResponded"),
+        Schema.Literal('none'),
+        Schema.Literal('organizer'),
+        Schema.Literal('tentativelyAccepted'),
+        Schema.Literal('accepted'),
+        Schema.Literal('declined'),
+        Schema.Literal('notResponded'),
       ]),
       time: Schema.optional(Schema.String),
     }),
@@ -172,19 +183,19 @@ export const CalendarEventSchema = Schema.Struct({
   seriesMasterId: Schema.optional(Schema.NullOr(Schema.String)),
   type: Schema.optional(
     Schema.Union([
-      Schema.Literal("singleInstance"),
-      Schema.Literal("occurrence"),
-      Schema.Literal("exception"),
-      Schema.Literal("seriesMaster"),
+      Schema.Literal('singleInstance'),
+      Schema.Literal('occurrence'),
+      Schema.Literal('exception'),
+      Schema.Literal('seriesMaster'),
     ]),
   ),
   webLink: Schema.optional(Schema.String),
   onlineMeetingProvider: Schema.optional(
     Schema.Union([
-      Schema.Literal("unknown"),
-      Schema.Literal("skypeForBusiness"),
-      Schema.Literal("skypeForConsumer"),
-      Schema.Literal("teamsForBusiness"),
+      Schema.Literal('unknown'),
+      Schema.Literal('skypeForBusiness'),
+      Schema.Literal('skypeForConsumer'),
+      Schema.Literal('teamsForBusiness'),
     ]),
   ),
   hasAttachments: Schema.optional(Schema.Boolean),
@@ -199,7 +210,7 @@ export const CreateEventPayloadSchema = Schema.Struct({
   subject: Schema.String,
   body: Schema.optional(
     Schema.Struct({
-      contentType: Schema.Union([Schema.Literal("text"), Schema.Literal("html")]),
+      contentType: Schema.Union([Schema.Literal('text'), Schema.Literal('html')]),
       content: Schema.String,
     }),
   ),
@@ -211,28 +222,32 @@ export const CreateEventPayloadSchema = Schema.Struct({
   isOnlineMeeting: Schema.optional(Schema.Boolean),
   onlineMeetingProvider: Schema.optional(
     Schema.Union([
-      Schema.Literal("unknown"),
-      Schema.Literal("skypeForBusiness"),
-      Schema.Literal("skypeForConsumer"),
-      Schema.Literal("teamsForBusiness"),
+      Schema.Literal('unknown'),
+      Schema.Literal('skypeForBusiness'),
+      Schema.Literal('skypeForConsumer'),
+      Schema.Literal('teamsForBusiness'),
     ]),
   ),
   recurrence: Schema.optional(PatternedRecurrenceSchema),
-  importance: Schema.optional(Schema.Union([Schema.Literal("low"), Schema.Literal("normal"), Schema.Literal("high")])),
-  sensitivity: Schema.optional(Schema.Union([
-    Schema.Literal("normal"),
-    Schema.Literal("personal"),
-    Schema.Literal("private"),
-    Schema.Literal("confidential"),
-  ])),
+  importance: Schema.optional(
+    Schema.Union([Schema.Literal('low'), Schema.Literal('normal'), Schema.Literal('high')]),
+  ),
+  sensitivity: Schema.optional(
+    Schema.Union([
+      Schema.Literal('normal'),
+      Schema.Literal('personal'),
+      Schema.Literal('private'),
+      Schema.Literal('confidential'),
+    ]),
+  ),
   showAs: Schema.optional(
     Schema.Union([
-      Schema.Literal("free"),
-      Schema.Literal("tentative"),
-      Schema.Literal("busy"),
-      Schema.Literal("oof"),
-      Schema.Literal("workingElsewhere"),
-      Schema.Literal("unknown"),
+      Schema.Literal('free'),
+      Schema.Literal('tentative'),
+      Schema.Literal('busy'),
+      Schema.Literal('oof'),
+      Schema.Literal('workingElsewhere'),
+      Schema.Literal('unknown'),
     ]),
   ),
   reminderMinutesBeforeStart: Schema.optional(Schema.Number),
@@ -248,7 +263,13 @@ export const AttendeeAvailabilitySchema = Schema.Struct({
       address: Schema.String,
       name: Schema.optional(Schema.String),
     }),
-    type: Schema.optional(Schema.Union([Schema.Literal("required"), Schema.Literal("optional"), Schema.Literal("resource")])),
+    type: Schema.optional(
+      Schema.Union([
+        Schema.Literal('required'),
+        Schema.Literal('optional'),
+        Schema.Literal('resource'),
+      ]),
+    ),
   }),
   availabilityView: Schema.optional(Schema.String),
   scheduleItems: Schema.optional(
@@ -256,12 +277,12 @@ export const AttendeeAvailabilitySchema = Schema.Struct({
       Schema.Struct({
         isPrivate: Schema.Boolean,
         status: Schema.Union([
-          Schema.Literal("free"),
-          Schema.Literal("tentative"),
-          Schema.Literal("busy"),
-          Schema.Literal("oof"),
-          Schema.Literal("workingElsewhere"),
-          Schema.Literal("unknown"),
+          Schema.Literal('free'),
+          Schema.Literal('tentative'),
+          Schema.Literal('busy'),
+          Schema.Literal('oof'),
+          Schema.Literal('workingElsewhere'),
+          Schema.Literal('unknown'),
         ]),
         subject: Schema.optional(Schema.String),
         location: Schema.optional(Schema.String),
@@ -280,7 +301,13 @@ export const FindMeetingTimesRequestSchema = Schema.Struct({
           address: Schema.String,
           name: Schema.optional(Schema.String),
         }),
-        type: Schema.optional(Schema.Union([Schema.Literal("required"), Schema.Literal("optional"), Schema.Literal("resource")])),
+        type: Schema.optional(
+          Schema.Union([
+            Schema.Literal('required'),
+            Schema.Literal('optional'),
+            Schema.Literal('resource'),
+          ]),
+        ),
       }),
     ),
   ),
@@ -288,10 +315,10 @@ export const FindMeetingTimesRequestSchema = Schema.Struct({
     Schema.Struct({
       activityDomain: Schema.optional(
         Schema.Union([
-          Schema.Literal("work"),
-          Schema.Literal("personal"),
-          Schema.Literal("unrestricted"),
-          Schema.Literal("unknown"),
+          Schema.Literal('work'),
+          Schema.Literal('personal'),
+          Schema.Literal('unrestricted'),
+          Schema.Literal('unknown'),
         ]),
       ),
       timeslots: Schema.Array(
@@ -318,12 +345,12 @@ export const MeetingTimeSuggestionsResultSchema = Schema.Struct({
       confidence: Schema.Number,
       order: Schema.optional(Schema.Number),
       organizerAvailability: Schema.Union([
-        Schema.Literal("free"),
-        Schema.Literal("tentative"),
-        Schema.Literal("busy"),
-        Schema.Literal("oof"),
-        Schema.Literal("workingElsewhere"),
-        Schema.Literal("unknown"),
+        Schema.Literal('free'),
+        Schema.Literal('tentative'),
+        Schema.Literal('busy'),
+        Schema.Literal('oof'),
+        Schema.Literal('workingElsewhere'),
+        Schema.Literal('unknown'),
       ]),
       attendeeAvailability: Schema.Array(AttendeeAvailabilitySchema),
       locations: Schema.optional(Schema.Array(EventLocationSchema)),
@@ -336,4 +363,6 @@ export const MeetingTimeSuggestionsResultSchema = Schema.Struct({
   ),
 });
 
-export type MeetingTimeSuggestionsResult = Schema.Schema.Type<typeof MeetingTimeSuggestionsResultSchema>;
+export type MeetingTimeSuggestionsResult = Schema.Schema.Type<
+  typeof MeetingTimeSuggestionsResultSchema
+>;

@@ -1,6 +1,5 @@
-import { Schema } from "effect";
-
-import { IdentitySetSchema } from "./Common";
+import { Schema } from 'effect';
+import { IdentitySetSchema } from './Common';
 
 export const DriveItemSchema = Schema.Struct({
   id: Schema.String,
@@ -42,7 +41,13 @@ export const DriveItemSchema = Schema.Struct({
   parentReference: Schema.optional(
     Schema.Struct({
       driveId: Schema.String,
-      driveType: Schema.optional(Schema.Union([Schema.Literal("personal"), Schema.Literal("business"), Schema.Literal("documentLibrary")])),
+      driveType: Schema.optional(
+        Schema.Union([
+          Schema.Literal('personal'),
+          Schema.Literal('business'),
+          Schema.Literal('documentLibrary'),
+        ]),
+      ),
       id: Schema.String,
       name: Schema.optional(Schema.String),
       path: Schema.optional(Schema.String),
@@ -86,7 +91,13 @@ export const DriveItemSchema = Schema.Struct({
   ),
   shared: Schema.optional(
     Schema.Struct({
-      scope: Schema.optional(Schema.Union([Schema.Literal("anonymous"), Schema.Literal("organization"), Schema.Literal("users")])),
+      scope: Schema.optional(
+        Schema.Union([
+          Schema.Literal('anonymous'),
+          Schema.Literal('organization'),
+          Schema.Literal('users'),
+        ]),
+      ),
       owner: Schema.optional(IdentitySetSchema),
       sharedBy: Schema.optional(IdentitySetSchema),
       sharedDateTime: Schema.optional(Schema.String),
@@ -125,8 +136,12 @@ export type UploadSession = Schema.Schema.Type<typeof UploadSessionSchema>;
 
 export const SharingLinkSchema = Schema.Struct({
   id: Schema.optional(Schema.String),
-  type: Schema.Union([Schema.Literal("view"), Schema.Literal("edit"), Schema.Literal("embed")]),
-  scope: Schema.Union([Schema.Literal("anonymous"), Schema.Literal("organization"), Schema.Literal("users")]),
+  type: Schema.Union([Schema.Literal('view'), Schema.Literal('edit'), Schema.Literal('embed')]),
+  scope: Schema.Union([
+    Schema.Literal('anonymous'),
+    Schema.Literal('organization'),
+    Schema.Literal('users'),
+  ]),
   webUrl: Schema.String,
   webHtml: Schema.optional(Schema.String),
   application: Schema.optional(

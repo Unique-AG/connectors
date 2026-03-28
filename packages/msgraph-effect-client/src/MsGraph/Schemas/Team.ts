@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Schema } from 'effect';
 
 export const TeamSchema = Schema.Struct({
   id: Schema.String,
@@ -9,22 +9,24 @@ export const TeamSchema = Schema.Struct({
   specialization: Schema.optional(
     Schema.NullOr(
       Schema.Union([
-        Schema.Literal("none"),
-        Schema.Literal("educationStandard"),
-        Schema.Literal("educationClass"),
-        Schema.Literal("educationProfessionalLearningCommunity"),
-        Schema.Literal("educationStaff"),
-        Schema.Literal("unknownFutureValue"),
+        Schema.Literal('none'),
+        Schema.Literal('educationStandard'),
+        Schema.Literal('educationClass'),
+        Schema.Literal('educationProfessionalLearningCommunity'),
+        Schema.Literal('educationStaff'),
+        Schema.Literal('unknownFutureValue'),
       ]),
     ),
   ),
   visibility: Schema.optional(
-    Schema.NullOr(Schema.Union([
-      Schema.Literal("private"),
-      Schema.Literal("public"),
-      Schema.Literal("hiddenMembership"),
-      Schema.Literal("unknownFutureValue"),
-    ])),
+    Schema.NullOr(
+      Schema.Union([
+        Schema.Literal('private'),
+        Schema.Literal('public'),
+        Schema.Literal('hiddenMembership'),
+        Schema.Literal('unknownFutureValue'),
+      ]),
+    ),
   ),
   webUrl: Schema.optional(Schema.NullOr(Schema.String)),
   isArchived: Schema.optional(Schema.NullOr(Schema.Boolean)),
@@ -57,7 +59,13 @@ export const TeamSchema = Schema.Struct({
   funSettings: Schema.optional(
     Schema.Struct({
       allowGiphy: Schema.optional(Schema.Boolean),
-      giphyContentRating: Schema.optional(Schema.Union([Schema.Literal("strict"), Schema.Literal("moderate"), Schema.Literal("unknownFutureValue")])),
+      giphyContentRating: Schema.optional(
+        Schema.Union([
+          Schema.Literal('strict'),
+          Schema.Literal('moderate'),
+          Schema.Literal('unknownFutureValue'),
+        ]),
+      ),
       allowStickersAndMemes: Schema.optional(Schema.Boolean),
       allowCustomMemes: Schema.optional(Schema.Boolean),
     }),
@@ -80,10 +88,10 @@ export const ChannelSchema = Schema.Struct({
   createdDateTime: Schema.optional(Schema.NullOr(Schema.String)),
   membershipType: Schema.optional(
     Schema.Union([
-      Schema.Literal("standard"),
-      Schema.Literal("private"),
-      Schema.Literal("unknownFutureValue"),
-      Schema.Literal("shared"),
+      Schema.Literal('standard'),
+      Schema.Literal('private'),
+      Schema.Literal('unknownFutureValue'),
+      Schema.Literal('shared'),
     ]),
   ),
   isFavoriteByDefault: Schema.optional(Schema.NullOr(Schema.Boolean)),
@@ -93,17 +101,17 @@ export const ChannelSchema = Schema.Struct({
       Schema.Struct({
         userNewMessageRestriction: Schema.optional(
           Schema.Union([
-            Schema.Literal("everyone"),
-            Schema.Literal("everyoneExceptGuests"),
-            Schema.Literal("moderators"),
-            Schema.Literal("unknownFutureValue"),
+            Schema.Literal('everyone'),
+            Schema.Literal('everyoneExceptGuests'),
+            Schema.Literal('moderators'),
+            Schema.Literal('unknownFutureValue'),
           ]),
         ),
         replyRestriction: Schema.optional(
           Schema.Union([
-            Schema.Literal("everyone"),
-            Schema.Literal("authorAndModerators"),
-            Schema.Literal("unknownFutureValue"),
+            Schema.Literal('everyone'),
+            Schema.Literal('authorAndModerators'),
+            Schema.Literal('unknownFutureValue'),
           ]),
         ),
         allowNewMessageFromBots: Schema.optional(Schema.Boolean),
@@ -116,7 +124,7 @@ export const ChannelSchema = Schema.Struct({
 export type Channel = Schema.Schema.Type<typeof ChannelSchema>;
 
 export const ChatMessageBodySchema = Schema.Struct({
-  contentType: Schema.Union([Schema.Literal("text"), Schema.Literal("html")]),
+  contentType: Schema.Union([Schema.Literal('text'), Schema.Literal('html')]),
   content: Schema.NullOr(Schema.String),
 });
 
@@ -173,11 +181,11 @@ export const ChatMessageSchema = Schema.Struct({
   replyToId: Schema.optional(Schema.NullOr(Schema.String)),
   etag: Schema.optional(Schema.String),
   messageType: Schema.Union([
-    Schema.Literal("message"),
-    Schema.Literal("chatEvent"),
-    Schema.Literal("typing"),
-    Schema.Literal("unknownFutureValue"),
-    Schema.Literal("systemEventMessage"),
+    Schema.Literal('message'),
+    Schema.Literal('chatEvent'),
+    Schema.Literal('typing'),
+    Schema.Literal('unknownFutureValue'),
+    Schema.Literal('systemEventMessage'),
   ]),
   createdDateTime: Schema.NullOr(Schema.String),
   lastModifiedDateTime: Schema.optional(Schema.NullOr(Schema.String)),
@@ -225,7 +233,11 @@ export const ChatMessageSchema = Schema.Struct({
   ),
   attachments: Schema.optional(Schema.Array(ChatMessageAttachmentSchema)),
   mentions: Schema.optional(Schema.Array(ChatMessageMentionSchema)),
-  importance: Schema.Union([Schema.Literal("normal"), Schema.Literal("high"), Schema.Literal("urgent")]),
+  importance: Schema.Union([
+    Schema.Literal('normal'),
+    Schema.Literal('high'),
+    Schema.Literal('urgent'),
+  ]),
   reactions: Schema.optional(
     Schema.Array(
       Schema.Struct({
@@ -257,7 +269,9 @@ export type ChatMessage = Schema.Schema.Type<typeof ChatMessageSchema>;
 export const SendChatMessagePayloadSchema = Schema.Struct({
   body: ChatMessageBodySchema,
   subject: Schema.optional(Schema.NullOr(Schema.String)),
-  importance: Schema.optional(Schema.Union([Schema.Literal("normal"), Schema.Literal("high"), Schema.Literal("urgent")])),
+  importance: Schema.optional(
+    Schema.Union([Schema.Literal('normal'), Schema.Literal('high'), Schema.Literal('urgent')]),
+  ),
   mentions: Schema.optional(Schema.Array(ChatMessageMentionSchema)),
   attachments: Schema.optional(Schema.Array(ChatMessageAttachmentSchema)),
 });
