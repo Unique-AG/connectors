@@ -20,6 +20,9 @@ import { AMQPService } from './amqp.service';
           // we process 7 messages asyncronosly it can result in: 7 * 100 * 4 = 2800 calls to
           // unique in async mode we should limit the prefetching to not overhelm ourselves
           // and also to not overhelm unique.
+          // Important note: This seeting increases the pod memory consumption be sure you read the comment
+          // from: ingest-email.command.ts -> "IMPORTANT NOTE REGARDING MEMORY CONSUMPTION" line 292 before
+          // increasing this value.
           prefetchCount: 7,
           // NOTE: (de)serialisation for empty messages doesn't work well with OTEL & json parsing
         };

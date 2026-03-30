@@ -220,15 +220,11 @@ export class IngestEmailCommand {
     this.logger.debug({ ...logContext, msg: `Register content: Finished` });
 
     try {
-      const contentLength = await this.getContentLength({ messageId, client });
-      const contentStream = await this.getEmlFileStream({ messageId, client });
       this.logger.debug({ ...logContext, msg: `File Upload: Started` });
+      const emailBuffer = await this.getEmlFile({ messageId, client });
       await this.uploadFileForIngestionCommand.run({
         uploadUrl: content.writeUrl,
-        // We read the content length consuming the stream because our upload email
-        // fails without it and it expects it up front.
-        contentLength,
-        content: contentStream,
+        content: emailBuffer,
         mimeType: createContentRequest.mimeType,
       });
       this.logger.debug({ ...logContext, msg: `File Upload: Finished` });
@@ -260,31 +256,49 @@ export class IngestEmailCommand {
     }
   }
 
-  private async getContentLength({
+  private async getEmlFile({
     messageId,
     client,
   }: {
     messageId: string;
     client: Client;
-  }): Promise<number> {
-    const emlFileStream = await this.getEmlFileStream({ messageId, client });
-    let contentLength = 0;
-    for await (const chunk of emlFileStream) {
-      contentLength += chunk.length;
-    }
-    return contentLength;
-  }
-
-  private async getEmlFileStream({
-    messageId,
-    client,
-  }: {
-    messageId: string;
-    client: Client;
-  }): Promise<ReadableStream<Uint8Array<ArrayBuffer>>> {
-    return (await client
+  }): Promise<Buffer> {
+    const emlStream = (await client
       .api(`me/messages/${messageId}/$value`)
       .header(`Prefer`, `IdType="ImmutableId"`)
-      .getStream()) as Promise<ReadableStream<Uint8Array<ArrayBuffer>>>;
+      .getStream()) as ReadableStream<Uint8Array<ArrayBuffer>>;
+
+    // Unfortunately we have to take all the chunks in memory because the request to
+    // Microsoft returns only the following headers:
+    // ===============
+    // cache-control: private
+    // content-type: text/plain
+    // strict-transport-security: max-age=31536000
+    // request-id: 82e0492b-0659-4ee9-b3c2-c4d5b0341f85
+    // client-request-id: 711d6458-b1bb-6caf-236f-1720ce107c15
+    // x-ms-ags-diagnostic: {"ServerInfo":{"DataCenter":"Poland Central","Slice":"E","Ring":"2","ScaleUnit":"002","RoleInstance":"WA3PEPF000004A1"}}
+    // access-control-allow-origin: *
+    // access-control-expose-headers: ETag, Location, Preference-Applied, Content-Range,
+    //   request-id, client-request-id, ReadWriteConsistencyToken, Retry-After, SdkVersion,
+    //   WWW-Authenticate, x-ms-client-gcc-tenant, X-Planner-Operationid,
+    //   x-ms-permissions-recommendations
+    // ===============
+    // There is no `Transfer-Encoding: chunked` and no `Content-Length`, which means the
+    // response uses connection-close framing — the server sends the entire email body and
+    // then closes the TCP connection. The full content is delivered in one shot, but you
+    // can't know the size until the last byte arrives and the connection closes.
+    // The Azure upload API requires Content-Length up front, so there's no point running
+    // through the stream again just to count bytes.
+    // IMPORTANT NOTE REGARDING MEMORY CONSUMPTION: With prefetch=7, up to 7 emails could be
+    // buffered simultaneously per queues adding up to ~280MB of additional memory
+    // (7 × 34MB max EML size) for every queue which processes emails. Since right now we have
+    // 2 queues processing emails this means we add an additional ~476MB mb just from the email
+    // transfer alose if we set the prefetch count to 7. The pod memory limit is 1Gi so we
+    // should monitor heap usage closely.
+    const chunks: Buffer[] = [];
+    for await (const chunk of emlStream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
   }
 }
