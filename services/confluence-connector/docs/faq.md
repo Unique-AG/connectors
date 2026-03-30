@@ -187,7 +187,7 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 
 ### Are concurrent syncs for the same tenant possible?
 
-**Answer:** No. If a sync cycle is already running for a tenant when the next scheduled cycle triggers, the new cycle is skipped. This is tracked via an `isScanning` flag on the tenant context.
+**Answer:** No. If a sync cycle is already running for a tenant when the next scheduled cycle triggers, the new cycle is skipped.
 
 ## Troubleshooting
 
@@ -244,7 +244,7 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 
 ### How does the connector handle errors during ingestion?
 
-**Answer:** The connector uses `Promise.allSettled` for page and attachment ingestion. Individual item failures are logged and skipped without aborting the entire sync cycle. At the end of each batch, a summary is logged showing how many items succeeded and how many failed.
+**Answer:** Individual item failures are logged and skipped without aborting the entire sync cycle. At the end of each batch, a summary is logged showing how many items succeeded and how many failed.
 
 ## Multi-Tenancy
 
@@ -271,7 +271,7 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 | Confluence | `confluence.apiRateLimitPerMinute` | No default (must be set) |
 | Unique | `unique.apiRateLimitPerMinute` | 100 requests/minute |
 
-Rate limiting is enforced client-side using the Bottleneck library.
+Rate limiting is enforced client-side.
 
 ### What is the initial sync behavior?
 

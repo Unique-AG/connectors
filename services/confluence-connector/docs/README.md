@@ -100,7 +100,7 @@ Content types `database`, `whiteboard`, and `embed` are explicitly skipped (no b
 
 **Observability**
 
-- Structured JSON logging via pino
+- Structured JSON logging
 - OpenTelemetry metrics integration
 - Prometheus metrics endpoint
 

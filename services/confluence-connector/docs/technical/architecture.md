@@ -55,7 +55,7 @@ flowchart TB
     Connector -.->|"OAuth2 (external mode)"| UniqueIDP
 ```
 
-> Only one API client is active per tenant: `CloudConfluenceApiClient` for Cloud instances or `DataCenterConfluenceApiClient` for Data Center instances.
+> Only one API client is active per tenant: the Cloud API client for Cloud instances or the Data Center API client for Data Center instances.
 
 ## Key Components
 
@@ -149,7 +149,7 @@ In cluster-internal mode (`serviceAuthMode: cluster_local`):
 
 ## Multi-Tenancy Support
 
-Multiple Confluence instances (tenants) can be configured in a single deployment. Each tenant is isolated via `AsyncLocalStorage` and has its own service instances, API clients, authentication strategy, and sync schedule. The `TenantRegistry` initializes all per-tenant services at startup.
+Multiple Confluence instances (tenants) can be configured in a single deployment. Each tenant is isolated at runtime and has its own service instances, API clients, authentication strategy, and sync schedule. All per-tenant services are initialized at startup.
 
 Tenant configuration files are loaded from YAML files matching the glob pattern set in `TENANT_CONFIG_PATH_PATTERN` (default: `/app/tenant-configs/*-tenant-config.yaml`). Each tenant has a status (`active`, `inactive`, or `deleted`). Only `active` tenants are registered and scheduled. See the [Operator Guide](../operator/README.md) for configuration details.
 

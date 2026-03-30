@@ -348,7 +348,7 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 | Page ingestion failure | Upload error, registration error | Log error, skip the page |
 | Attachment ingestion failure | Download error, upload error | Destroy stream, log error, skip the attachment |
 | Content deletion failure | Unique API error | Log error, return 0 deleted count |
-| Unhandled sync error | Unexpected exception | Caught at top level, logged, scanning flag reset |
+| Unhandled sync error | Unexpected exception | Caught at top level, logged, sync state reset |
 
 ### Retry Logic
 
