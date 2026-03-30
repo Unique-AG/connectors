@@ -79,7 +79,7 @@ Content types `database`, `whiteboard`, and `embed` are explicitly skipped (no b
 **Scope Management**
 
 - A pre-existing root scope is configured per tenant (must be created in Unique before the connector starts), with child scopes automatically created per Confluence space
-- See [Scope Management](./technical/README.md#scope-management) for the full conceptual overview and [scope mechanics](./technical/flows.md#scope-management) for implementation details
+- See the [Scope Hierarchy](./technical/flows.md#scope-hierarchy) for details
 
 **Scheduled Synchronization**
 

@@ -166,7 +166,7 @@ If an entire previously synced space disappears from discovery results (for exam
 
 ### How are scopes organized in Unique?
 
-**Answer:** Scopes follow a two-level hierarchy: a root scope configured per tenant, and child scopes automatically created for each Confluence space key. Child scopes inherit access from the root scope. See the [Scope Management](./technical/README.md#scope-management) concept and the [scope mechanics](./technical/flows.md#scope-management) for full details including external ID format and access inheritance.
+**Answer:** Scopes follow a two-level hierarchy: a root scope configured per tenant, and child scopes automatically created for each Confluence space key. Child scopes inherit access from the root scope. See the [Scope Hierarchy](./technical/flows.md#scope-hierarchy) for details.
 
 ### What is the ingestion key format?
 

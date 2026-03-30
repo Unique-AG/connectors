@@ -288,7 +288,7 @@ Each item sent to the diff API contains:
 
 ## Ingestion Pipeline
 
-For details on the 3-step ingestion pipeline (register, upload, finalize), key format, and sourceKind values, see [Technical Reference - Ingestion Pipeline](./README.md#ingestion-pipeline) and [Technical Reference - v1-Compatible Key Format](./README.md#v1-compatible-key-format).
+The ingestion pipeline follows a 3-step process for each item: register, upload, and finalize.
 
 ### Page Ingestion
 
