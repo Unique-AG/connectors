@@ -128,24 +128,18 @@ sequenceDiagram
     Note over Connector: Sync cycle complete
 ```
 
-### Sync Execution Order
+### Scope Hierarchy
 
-The `synchronize()` method in `ConfluenceSynchronizationService` executes these steps **sequentially**:
+The connector manages a two-level scope hierarchy:
 
-1. **Re-entrancy guard** -- If `tenant.isScanning` is already `true`, the sync is skipped entirely. This prevents overlapping sync cycles for the same tenant.
-2. **Scope initialization** -- `ScopeManagementService.initialize()` grants the service account MANAGE/READ/WRITE access to the root scope, verifies the root scope exists, traverses parent scopes, and returns the full root scope path.
-3. **Discovery** -- `ConfluencePageScanner.discoverPages()` returns all discovered pages and attachments (see [Discovery Phase](#discovery-phase)).
-4. **File diff** -- `FileDiffService.computeDiff()` groups items by space key and calls the Unique file diff API once per space (see [File Diff Mechanism](#file-diff-mechanism)).
-5. **Scope creation** -- `ScopeManagementService.ensureSpaceScopes()` creates child scopes for each space that has items to ingest, using paths like `/<rootScopePath>/<spaceKey>`.
-6. **Page ingestion** -- `fetchAndIngestPages()` fetches full page content and ingests pages with concurrency controlled by `processing.concurrency` (default: 1). Uses `Promise.allSettled` with `p-limit`.
-7. **Attachment ingestion** -- `ingestAttachments()` runs **after** page ingestion completes. Same concurrency control. Downloads attachment streams from Confluence and uploads them to Unique.
-8. **Deletion** -- Deleted items (identified by the diff) are resolved from content keys to content IDs, then deleted via the Unique API.
+1. **Root scope** -- Must pre-exist in the Unique platform. Configured via `ingestion.scopeId`. The connector grants itself MANAGE, READ, and WRITE access at initialization.
+2. **Space scopes** -- Created automatically as children of the root scope, one per Confluence space key. Created with inherited access. External IDs follow the format `confc:{tenantName}:{spaceKey}`.
 
-Pages and attachments are ingested **sequentially** (pages first, then attachments) -- not in parallel.
+If the root scope has parent scopes, the connector traverses upward and grants READ access to each parent so that the scope path can be resolved.
 
 ## Discovery Phase
 
-The `ConfluencePageScanner` discovers pages through a CQL-based label search, then optionally extracts attachments from the already-fetched page objects.
+Pages are discovered through a CQL-based label search, then attachments are optionally extracted from the already-fetched page objects.
 
 ### Discovery Sequence
 
@@ -156,8 +150,8 @@ flowchart TB
     FilterIngestAll --> HasIngestAll{"Any ingestAll<br/>pages?"}
     HasIngestAll -->|Yes| FetchDescendants["CQL ancestor query<br/>(batches of 100)"]
     HasIngestAll -->|No| Merge
-    FetchDescendants --> Merge["Merge & deduplicate<br/>(uniqueBy page ID)"]
-    Merge --> MapPages["Map to DiscoveredPage[]"]
+    FetchDescendants --> Merge["Merge & deduplicate<br/>(by page ID)"]
+    Merge --> MapPages["Map to discovered pages"]
     MapPages --> LimitCheck{"maxItemsToScan<br/>reached?"}
     LimitCheck -->|Yes| Stop["Stop accepting"]
     LimitCheck -->|No| SkipTypes{"Content type<br/>check"}
@@ -190,9 +184,9 @@ The `type != attachment` clause excludes attachments from top-level CQL results 
 Pages labeled with `ingestAllLabel` trigger a descendant search:
 
 1. Collect all page IDs that carry the `ingestAllLabel`
-2. Batch IDs into groups of 100 (`ANCESTOR_BATCH_SIZE`)
+2. Batch IDs into groups of 100
 3. For each batch, execute CQL: `ancestor IN ({batch}) AND type != attachment`
-4. Deduplicate results with labeled pages using `uniqueBy(page.id)`
+4. Deduplicate results with labeled pages by page ID
 
 ### Attachment Extraction
 
@@ -209,11 +203,7 @@ If a page has more than 25 attachments (the Confluence inline limit), additional
 
 ### Content Type Ingestion Map
 
-The connector uses label-based discovery via CQL. After fetching, it explicitly skips three content types defined in `confluence-page-scanner.ts`:
-
-```typescript
-const SKIPPED_CONTENT_TYPES = [ContentType.DATABASE, ContentType.WHITEBOARD, ContentType.EMBED];
-```
+The connector uses label-based discovery via CQL. After fetching, it skips three content types: database, whiteboard, and embed.
 
 Content that passes the filter has its `body.storage` HTML extracted and ingested. Items with empty bodies are skipped. Descendants of skipped content types (such as sub-pages under a database) are still discovered and ingested.
 
@@ -227,7 +217,7 @@ Content that passes the filter has its `body.storage` HTML extracted and ingeste
 | Whiteboard | **No** | No (no body via API) | Explicitly skipped. API returns no body content. Descendants are still discovered. |
 | Database | **No** | No (structured data, not exposed) | Explicitly skipped. No body via API. Descendants (sub-pages) are still discovered and ingested. |
 | Embed / Smart Link | **No** | No (only has `embedUrl`) | Explicitly skipped. Only contains a URL reference, no renderable body. |
-| Folder | **No** (effectively) | No (organizational container) | Not in `SKIPPED_CONTENT_TYPES`, but has no body -- skipped by the empty-body filter. Descendants are still discovered. |
+| Folder | **No** (effectively) | No (organizational container) | Not explicitly skipped, but has no body -- skipped by the empty-body filter. Descendants are still discovered. |
 | Comment (inline/footer) | **No** | Yes (`body.storage` / ADF) | Not discovered -- comments do not appear in label/ancestor CQL results. |
 | Live Doc (page subtype) | **Yes** (as page) | Yes (`body.storage` / ADF) | Subtype of page. Passes through as a regular page. |
 | Custom Content (app-defined) | **No** | Yes (`body.storage`) | Not discovered -- uses `ac:key:type` format, not matched by standard CQL. |
@@ -285,9 +275,9 @@ flowchart TB
 ```mermaid
 flowchart TB
     Start["Group discovered items by spaceKey"] --> Loop["For each space"]
-    Loop --> BuildItems["Build FileDiffItem[] for pages + attachments"]
+    Loop --> BuildItems["Build diff items for pages + attachments"]
     BuildItems --> BuildPartialKey["Build partialKey from spaceId, spaceKey, tenantName"]
-    BuildPartialKey --> CallDiff["performFileDiff(items, partialKey, sourceKind, baseUrl)"]
+    BuildPartialKey --> CallDiff["POST performFileDiff"]
 
     CallDiff --> NewFiles["newFiles: IDs not previously known"]
     CallDiff --> UpdatedFiles["updatedFiles: IDs with changed updatedAt"]
@@ -295,8 +285,8 @@ flowchart TB
     CallDiff --> DeletedFiles["deletedFiles: previously known IDs no longer in list"]
 
     DeletedFiles --> SafetyCheck{"Safety checks pass?"}
-    SafetyCheck -->|Yes| AccumulateResults["Accumulate into FileDiffResult"]
-    SafetyCheck -->|No| Abort["assert.fail — abort sync"]
+    SafetyCheck -->|Yes| AccumulateResults["Accumulate results"]
+    SafetyCheck -->|No| Abort["Abort sync"]
     NewFiles --> AccumulateResults
     UpdatedFiles --> AccumulateResults
     MovedFiles --> AccumulateResults
@@ -323,10 +313,10 @@ The `partialKey` scopes the diff to a single Confluence space and determines the
 
 ### Safety Checks
 
-Two assertions prevent accidental full deletion of a space's content:
+Two checks prevent accidental full deletion of a space's content:
 
-1. **Zero-item submission**: If zero items are submitted to the diff but deletions are returned, the sync aborts with `assert.fail`. This guards against bugs in the Confluence page fetching logic.
-2. **Full deletion**: If the number of deleted files equals the total file count stored in Unique for that `partialKey` (checked via `getCountByKeyPrefix`), the sync aborts. This guards against unexpected changes in key format or diff logic.
+1. **Zero-item submission**: If zero items are submitted to the diff but deletions are returned, the sync aborts. This guards against bugs in the Confluence page fetching logic.
+2. **Full deletion**: If the number of deleted files equals the total file count stored in Unique for that `partialKey`, the sync aborts. This guards against unexpected changes in key format or diff logic.
 
 Both checks log an error before aborting. If a user genuinely wants to remove all content from a space, they should leave at least one page labeled for synchronization.
 
@@ -338,10 +328,10 @@ For details on the 3-step ingestion pipeline (register, upload, finalize), key f
 
 For each new or updated page:
 
-1. **Fetch content** -- `ConfluenceContentFetcher.fetchPageContent()` retrieves the full page via `getPageById()` with `body.storage` expansion. Returns `null` (and skips the page) if the page is not found, if fetching fails, or if the page body is empty.
+1. **Fetch content** -- The connector retrieves the full page with `body.storage` expansion. The page is skipped if it is not found, if fetching fails, or if the page body is empty.
 2. **Extract labels** -- Confluence labels are extracted from the page, excluding the `ingestSingleLabel` and `ingestAllLabel` values. Labels are sorted alphabetically for deterministic ordering.
 3. **Register** -- Sends metadata to the Unique ingestion API (key, title, mimeType `text/html`, scopeId, sourceKind, metadata including `confluenceLabels`, `spaceKey`, `spaceName`).
-4. **Upload** -- The page body (Confluence storage format HTML) is converted to a `Buffer` and uploaded via HTTP PUT to the `writeUrl`.
+4. **Upload** -- The page body (Confluence storage format HTML) is converted to a buffer and uploaded via HTTP PUT to the `writeUrl`.
 5. **Finalize** -- Triggers downstream processing in Unique.
 
 If any step fails for a page, the error is logged and that page is skipped. Other pages continue processing.
@@ -350,7 +340,7 @@ If any step fails for a page, the error is logged and that page is skipped. Othe
 
 For each new or updated attachment:
 
-1. **Skip zero-byte** -- Attachments with `fileSize === 0` are skipped.
+1. **Skip zero-byte** -- Attachments with zero file size are skipped.
 2. **Register** -- Sends metadata to the Unique ingestion API (key, title, original mediaType, scopeId, sourceKind, metadata including `spaceKey`, `spaceName`).
 3. **Download** -- Streams the attachment from Confluence. Cloud uses `/wiki/rest/api/content/{pageId}/child/attachment/{attachmentId}/download` through the Atlassian API gateway. Data Center uses `_links.download` directly.
 4. **Upload** -- The stream is uploaded via HTTP PUT to the `writeUrl` with the original content type and content length.
@@ -363,33 +353,16 @@ If any step fails, the stream is destroyed and the error is logged. Other attach
 Deleted items identified by the file diff are processed after ingestion:
 
 1. Build content keys from `{partialKey}/{id}` for each deleted item
-2. Resolve keys to content IDs via `getByKeys()`
-3. Delete content by IDs via `deleteByIds()`
+2. Resolve keys to content IDs
+3. Delete content by IDs
 
 If no content is found for the given keys, a warning is logged and no deletion occurs.
 
 ### Concurrency and Progress
 
-Ingestion concurrency is controlled by `processing.concurrency` (default: 1). Both page and attachment ingestion use `p-limit` to enforce the concurrency limit and `Promise.allSettled` to ensure all items are attempted even if some fail.
+Ingestion concurrency is controlled by `processing.concurrency` (default: 1). Pages are ingested first, then attachments -- not in parallel. All items in a batch are attempted even if some fail.
 
-Progress is logged every 100 items (`INGESTION_PROGRESS_LOG_INTERVAL`). After all items complete, a summary is logged with the total, succeeded, and failed counts.
-
-## Scope Management
-
-The connector manages a two-level scope hierarchy:
-
-1. **Root scope** -- Must pre-exist in the Unique platform. Configured via `ingestion.scopeId`. The connector grants itself MANAGE, READ, and WRITE access at initialization.
-2. **Space scopes** -- Created automatically as children of the root scope, one per Confluence space key. Created via `createFromPaths()` with `inheritAccess: true`. External IDs follow the format `confc:{tenantName}:{spaceKey}`.
-
-If the root scope has parent scopes, the connector traverses upward and grants READ access to each parent so that the scope path can be resolved.
-
-## Scheduling and Re-Entrancy
-
-The `TenantSyncScheduler` manages sync scheduling:
-
-1. **On module init**: For each registered tenant, an initial sync is triggered immediately (`void this.syncTenant(tenant)`), then a cron job is registered using the tenant's `processing.scanIntervalCron` expression (default: `*/15 * * * *`).
-2. **Re-entrancy guard**: Each sync cycle checks `tenant.isScanning`. If a previous cycle is still running, the new cycle is skipped. The flag is set to `true` at the start and reset to `false` in a `finally` block.
-3. **Shutdown**: On module destroy, `isShuttingDown` is set to `true` and all cron jobs are stopped. Running sync cycles check this flag before starting.
+Progress is logged periodically. After all items complete, a summary is logged with the total, succeeded, and failed counts.
 
 ## Error Handling
 
@@ -400,48 +373,46 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 | Scenario | Typical Cause | Connector Behavior |
 |---|---|---|
 | Sync already in progress | Overlapping cron triggers or long-running sync | Skip the cycle entirely (re-entrancy guard) |
-| Root scope not found | Misconfigured `scopeId` or scope deleted | `assert.ok` -- abort the entire sync cycle |
-| Accidental full deletion detected | Bug in page fetching or key format change | `assert.fail` -- abort the entire tenant sync cycle (see [Safety Checks](#safety-checks)) |
-| Page fetch failure | Page deleted between discovery and content fetch, transient API error | Log error, return `null`, skip the page, continue other pages |
-| Page not found | Page deleted between discovery and content fetch | Log warning, return `null`, skip the page |
+| Root scope not found | Misconfigured `scopeId` or scope deleted | Abort the entire sync cycle |
+| Accidental full deletion detected | Bug in page fetching or key format change | Abort the entire tenant sync cycle (see [Safety Checks](#safety-checks)) |
+| Page fetch failure | Page deleted between discovery and content fetch, transient API error | Log error, skip the page, continue other pages |
+| Page not found | Page deleted between discovery and content fetch | Log warning, skip the page |
 | Page with empty body | Page has no content (e.g., newly created) | Log, skip the page |
 | Attachment with zero bytes | Empty attachment | Log, skip the attachment |
-| Page ingestion failure | Upload error, registration error | Log error, skip the page (via `Promise.allSettled`) |
-| Attachment ingestion failure | Download error, upload error | Destroy stream, log error, skip the attachment (via `Promise.allSettled`) |
+| Page ingestion failure | Upload error, registration error | Log error, skip the page |
+| Attachment ingestion failure | Download error, upload error | Destroy stream, log error, skip the attachment |
 | Content deletion failure | Unique API error | Log error, return 0 deleted count |
-| Unhandled sync error | Unexpected exception | Caught at top level, logged, `isScanning` reset via `finally` |
+| Unhandled sync error | Unexpected exception | Caught at top level, logged, scanning flag reset |
 
 ### Rate Limiting
 
 API requests are rate-limited at two levels:
 
-| Level | Mechanism | Configuration |
-|---|---|---|
-| Confluence API | `RateLimitedHttpClient` using Bottleneck | `confluence.apiRateLimitPerMinute` (required field, no default) |
-| Unique API | `RateLimitedHttpClient` using Bottleneck | `unique.apiRateLimitPerMinute` (default: 100) |
+| Level | Configuration |
+|---|---|
+| Confluence API | `confluence.apiRateLimitPerMinute` (required field, no default) |
+| Unique API | `unique.apiRateLimitPerMinute` (default: 100) |
 
-The `RateLimitedHttpClient` uses a Bottleneck reservoir that refreshes every 60 seconds. When the reservoir is depleted, requests are queued until the next refresh.
+The rate limiter uses a per-minute reservoir. When the reservoir is depleted, requests are queued until the next refresh.
 
-### HTTP Retry Logic
-
-The `RateLimitedHttpClient` uses undici's `interceptors.retry()` interceptor, which provides automatic retry with backoff for transient HTTP errors. Requests also follow redirects via `interceptors.redirect()` (up to 10 redirections).
+### Retry Logic
 
 ```mermaid
 flowchart TB
-    Request["API Request<br/>(via Bottleneck rate limiter)"] --> UndiciDispatch["undici dispatch<br/>with retry + redirect interceptors"]
-    UndiciDispatch --> Response{"Status code<br/>2xx?"}
+    Request["API Request<br/>(rate-limited)"] --> Dispatch["HTTP dispatch<br/>with retry + redirect"]
+    Dispatch --> Response{"Status code<br/>2xx?"}
     Response -->|Yes| Continue["Return response"]
-    Response -->|No| RetryInterceptor{"Retryable?<br/>(undici interceptors.retry)"}
-    RetryInterceptor -->|Yes| UndiciDispatch
-    RetryInterceptor -->|No| HandleError["handleErrorStatus:<br/>throw Error with status + body"]
+    Response -->|No| RetryCheck{"Retryable?"}
+    RetryCheck -->|Yes| Dispatch
+    RetryCheck -->|No| HandleError["Throw error<br/>with status + body"]
 ```
 
-Non-2xx responses that exhaust retries are thrown as errors by `handleErrorStatus()`, which reads the response body text and throws an `Error` with the status code and response content.
+Transient HTTP errors are retried automatically with backoff. Requests follow redirects (up to 10 redirections). Non-2xx responses that exhaust retries are thrown as errors with the status code and response content.
 
 ## Related Documentation
 
 - [Technical Reference](./README.md) - Architecture overview, key concepts, ingestion pipeline
-- [Architecture](./architecture.md) - System components and module structure
+- [Architecture](./architecture.md) - System components and infrastructure
 - [Configuration](../operator/configuration.md) - Scheduler and processing settings
 
 ## Standard References
