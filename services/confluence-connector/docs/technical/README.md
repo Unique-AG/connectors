@@ -1,9 +1,7 @@
 <!-- confluence-page-id: -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Technical Reference
-
-The Confluence Connector is a Node.js-based service that synchronizes page content and file attachments from Confluence to the Unique platform for RAG ingestion. It supports both Confluence Cloud and Confluence Data Center deployments.
+The Confluence Connector is a Node.js-based service that synchronizes page content and file attachments from Confluence to the Unique platform. It supports both Confluence Cloud and Confluence Data Center deployments.
 
 **Core Capabilities:**
 
@@ -43,9 +41,17 @@ flowchart LR
 
 ### Label-Driven Page Discovery
 
-Pages are not automatically synced. Users must apply configurable Confluence labels (`ingestSingleLabel` and `ingestAllLabel`) to mark individual pages or entire page trees for synchronization. Both labels are required fields in the tenant configuration with no schema default. See [Flows -- Discovery Phase](./flows.md#discovery-phase) for the full CQL-based discovery flow, including descendant resolution, deduplication, and attachment extraction.
+Pages are not automatically synced. Users must apply configurable Confluence labels to mark individual pages or entire page trees for synchronization:
 
-The scanner filters by [space type](../operator/configuration.md#space-scanning) and skips certain [content types](../README.md#core-capabilities) (databases, whiteboards, embeds).
+```mermaid
+flowchart LR
+    User["User"] -->|"Applies label"| Page["Confluence Page"]
+    Page --> Scanner["Connector Scanner"]
+    Scanner -->|"Discovers labeled pages"| Fetch["Fetch Content"]
+    Fetch --> Unique["Unique Knowledge Base"]
+```
+
+See [Flows -- Discovery Phase](./flows.md#discovery-phase) for details.
 
 ### File Diff Mechanism
 
