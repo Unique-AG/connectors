@@ -259,7 +259,7 @@ The connector uses three types of secrets. All must be stored in Kubernetes Secr
 
 The client secret from the Atlassian service account. The connector uses it to obtain access tokens via the client credentials grant.
 
-**What happens if it expires or is revoked:** All Confluence API requests fail once the cached token expires. No new tokens can be acquired. The sync cycle stops producing results until the secret is replaced.
+**What happens if it expires or is revoked:** All Confluence API requests fail once the token expires. No new tokens can be acquired. The sync cycle stops producing results until the secret is replaced.
 
 **How to rotate:**
 
@@ -394,7 +394,7 @@ flowchart LR
 | Aspect | Responsibility |
 |--------|---------------|
 | Connector hosting | Client |
-| Confluence service account or PAT (PAT only for DC < 10.1; not recommended) | Client |
+| Confluence service account or PAT (PAT only for DC < 10.1) | Client |
 | Unique deliverable | Container image, Helm chart, documentation |
 
 ### Single-Tenant: Client-Hosted

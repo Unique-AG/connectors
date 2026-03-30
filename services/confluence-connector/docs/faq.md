@@ -306,11 +306,11 @@ If a space that was previously accessible becomes inaccessible, the connector do
 
 | Resource | Value |
 |---|---|
-| CPU request | 500m |
+| CPU request | 1 core |
 | CPU limit | Not set |
-| Memory request | 512Mi |
-| Memory limit | 768Mi |
-| Node.js max heap (`MAX_HEAP_MB`) | 896 MB |
+| Memory request | 512 Mi |
+| Memory limit | 1 Gi |
+| Node.js max heap (`MAX_HEAP_MB`) | 1920 MB |
 
 These defaults are suitable for a single-tenant deployment with moderate page counts. For deployments with many tenants, large numbers of labeled pages, or high concurrency settings, consider increasing memory limits accordingly.
 

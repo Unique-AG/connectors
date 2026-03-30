@@ -27,7 +27,7 @@ ghcr.io/unique-ag/connectors/services/confluence-connector:<version>
 | Runtime user | `nestjs` (UID 1001, non-root) |
 | Entrypoint | `node --enable-source-maps --max-old-space-size=${MAX_HEAP_MB:-1024} dist/main.js` |
 
-The image contains the application code plus all necessary runtime dependencies. The `MAX_HEAP_MB` environment variable controls the Node.js V8 max old space size (default: `1024` MB in the Docker image, overridden to `896` MB by the Helm chart).
+The image contains the application code plus all necessary runtime dependencies. The `MAX_HEAP_MB` environment variable controls the Node.js V8 max old space size (default: `1024` MB in the Docker image, overridden to `1920` MB by the Helm chart).
 
 ## Helm Chart
 
@@ -80,9 +80,9 @@ connector:
   envVars: []
   resources:
     limits:
-      memory: 768Mi
+      memory: 1Gi
     requests:
-      cpu: 500m
+      cpu: 1
       memory: 512Mi
 
 # Tenant configuration (rendered into a ConfigMap and mounted as YAML)

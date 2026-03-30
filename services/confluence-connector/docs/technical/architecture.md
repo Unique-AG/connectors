@@ -192,7 +192,7 @@ flowchart LR
 | Aspect | Responsibility |
 |--------|---------------|
 | Connector hosting | Client |
-| Confluence service account or PAT (PAT only for DC < 10.1; not recommended) | Client |
+| Confluence service account or PAT (PAT only for DC < 10.1) | Client |
 | Unique deliverable | Container image, Helm chart, documentation |
 
 ### Single-Tenant: Client-Hosted
@@ -296,10 +296,10 @@ The Node.js service operates with the following default resource allocation (fro
 | Resource | Value |
 |----------|-------|
 | Memory request | 512 Mi |
-| Memory limit | 768 Mi |
-| CPU request | 500m |
+| Memory limit | 1 Gi |
+| CPU request | 1 core |
 | Default max heap size | 1024 MB (configurable via `MAX_HEAP_MB`) |
-| Helm chart `MAX_HEAP_MB` | 896 MB |
+| Helm chart `MAX_HEAP_MB` | 1920 MB |
 | Application port | 51349 |
 | Metrics port (Prometheus) | 51350 |
 
