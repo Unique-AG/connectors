@@ -76,7 +76,7 @@ sequenceDiagram
 
     Connector->>Unique: Initialize root scope<br/>(grant access, verify exists)
 
-    rect rgb(40, 40, 80)
+    rect rgb(200, 210, 240)
         Note over Connector,Confluence: Discovery Phase
         Connector->>Confluence: CQL search: pages with<br/>ingestSingleLabel OR ingestAllLabel
         Confluence->>Connector: Labeled pages<br/>(with inline attachments)
@@ -89,7 +89,7 @@ sequenceDiagram
         Note over Connector: Deduplicate, filter skipped types,<br/>extract attachments (if enabled)
     end
 
-    rect rgb(40, 80, 40)
+    rect rgb(200, 235, 200)
         Note over Connector,Unique: Processing Phase
         loop For each Confluence space
             Connector->>Unique: POST file diff<br/>(pages + attachments per space)
@@ -99,7 +99,7 @@ sequenceDiagram
         end
     end
 
-    rect rgb(80, 40, 40)
+    rect rgb(240, 210, 200)
         Note over Connector,Unique: Sync Phase — Ingestion
         Connector->>Unique: Ensure space scopes
 
