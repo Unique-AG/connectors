@@ -84,5 +84,3 @@ See the [Authentication Guide](../operator/authentication.md) for setup instruct
 - [Confluence Cloud REST API v1](https://developer.atlassian.com/cloud/confluence/rest/v1/intro/) - Atlassian Confluence Cloud API documentation
 - [Confluence Cloud REST API v2](https://developer.atlassian.com/cloud/confluence/rest/v2/intro/) - Atlassian Confluence Cloud v2 API documentation
 - [Confluence Data Center REST API](https://developer.atlassian.com/server/confluence/rest/) - Atlassian Confluence Data Center API documentation
-- [Atlassian OAuth 2.0 (3LO) apps](https://developer.atlassian.com/cloud/confluence/oauth-2-3lo-apps/) - Atlassian Cloud OAuth app setup (prerequisite for 2LO client credentials)
-- [Confluence Data Center - Configure an incoming link](https://confluence.atlassian.com/doc/configure-an-incoming-link-1115674733.html) - Data Center OAuth 2.0 application link setup
