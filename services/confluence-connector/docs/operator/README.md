@@ -94,6 +94,7 @@ In cluster-internal mode, Zitadel token validation is not needed. The connector 
 | `api.atlassian.com` | 443 | HTTPS | Outbound |
 | `auth.atlassian.com` | 443 | HTTPS | Outbound |
 | `api.media.atlassian.com` | 443 | HTTPS | Outbound |
+| `*.atlassian.net` | 443 | HTTPS | Outbound |
 | `{data-center-host}` | 443 | HTTPS | Outbound |
 | Unique Ingestion Service | 443 / internal | HTTPS / HTTP | Outbound / Internal |
 | Unique Scope Management Service | 443 / internal | HTTPS / HTTP | Outbound / Internal |
@@ -105,7 +106,7 @@ In cluster-internal mode, Zitadel token validation is not needed. The connector 
 ### 1. Infrastructure
 
 - [ ] Kubernetes namespace created
-- [ ] Network egress to Confluence instance allowed (Cloud: `api.atlassian.com`, `auth.atlassian.com`, `api.media.atlassian.com`; Data Center: your instance host)
+- [ ] Network egress to Confluence instance allowed (Cloud: `api.atlassian.com`, `auth.atlassian.com`, `api.media.atlassian.com`, and `*.atlassian.net`; Data Center: your instance host)
 - [ ] Connectivity to Unique Ingestion Service verified
 - [ ] Connectivity to Unique Scope Management Service verified
 
