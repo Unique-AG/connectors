@@ -233,60 +233,49 @@ Content that passes the filter has its `body.storage` HTML extracted and ingeste
 
 ## File Diff Mechanism
 
-The connector computes file diffs **per Confluence space** by comparing discovered items against the state stored in Unique. The connector does not compute local content hashes -- it sends each item's `key`, `url`, and `updatedAt` timestamp to the Unique platform's file diff API.
+The connector uses the Unique platform's server-side file diff API to detect changes between sync cycles. The connector does **not** compute local content hashes -- instead, it sends each item's `key`, `url`, and `updatedAt` timestamp to the diff endpoint, which returns categorized results. The diff is called once per Confluence space.
 
 ### State Comparison
 
 ```mermaid
 flowchart TB
-    subgraph Input["Input (per space)"]
-        PageItems["Page diff items<br/>(key=pageId, url=webUrl,<br/>updatedAt=versionTimestamp)"]
-        AttachmentItems["Attachment diff items<br/>(key=pageId::attachmentId,<br/>url=webUrl,<br/>updatedAt=versionTimestamp)"]
+    subgraph Input["Input"]
+        ConfluenceState["Confluence State<br/>(current scan: key, url, updatedAt per item)"]
     end
 
-    subgraph DiffCall["Per-Space Diff Call"]
-        Merge["Merge page + attachment items"]
-        BuildKey["Build partialKey:<br/>tenantName/spaceId_spaceKey<br/>(or spaceId_spaceKey if v1 format)"]
-        Call["POST performFileDiff<br/>(items, partialKey, sourceKind, baseUrl)"]
+    subgraph Comparison["Server-Side Diff"]
+        Compare["POST file diff<br/>(Unique Platform)"]
     end
 
     subgraph Output["Output"]
-        New["newFiles"]
-        Updated["updatedFiles"]
-        Moved["movedFiles"]
-        Deleted["deletedFiles"]
+        New["New Items"]
+        Modified["Updated Items"]
+        Moved["Moved Items"]
+        Deleted["Deleted Items"]
     end
 
-    PageItems --> Merge
-    AttachmentItems --> Merge
-    Merge --> BuildKey
-    BuildKey --> Call
-    Call --> New
-    Call --> Updated
-    Call --> Moved
-    Call --> Deleted
+    ConfluenceState --> Compare
+    Compare --> New
+    Compare --> Modified
+    Compare --> Moved
+    Compare --> Deleted
 ```
 
 ### Change Detection Logic
 
 ```mermaid
 flowchart TB
-    Start["Group discovered items by spaceKey"] --> Loop["For each space"]
-    Loop --> BuildItems["Build diff items for pages + attachments"]
-    BuildItems --> BuildPartialKey["Build partialKey from spaceId, spaceKey, tenantName"]
-    BuildPartialKey --> CallDiff["POST performFileDiff"]
+    Start["Collect all discovered items<br/>from Confluence"] --> BuildList["Build item list<br/>(key, url, updatedAt)"]
+    BuildList --> CallDiff["POST file diff"]
 
-    CallDiff --> NewFiles["newFiles: IDs not previously known"]
-    CallDiff --> UpdatedFiles["updatedFiles: IDs with changed updatedAt"]
-    CallDiff --> MovedFiles["movedFiles: IDs that were relocated"]
-    CallDiff --> DeletedFiles["deletedFiles: previously known IDs no longer in list"]
+    CallDiff --> NewFiles["newFiles: keys not previously known"]
+    CallDiff --> UpdatedFiles["updatedFiles: keys with changed updatedAt"]
+    CallDiff --> MovedFiles["movedFiles: keys that were relocated"]
+    CallDiff --> DeletedFiles["deletedFiles: previously known keys no longer in list"]
 
-    DeletedFiles --> SafetyCheck{"Safety checks pass?"}
-    SafetyCheck -->|Yes| AccumulateResults["Accumulate results"]
-    SafetyCheck -->|No| Abort["Abort sync"]
-    NewFiles --> AccumulateResults
-    UpdatedFiles --> AccumulateResults
-    MovedFiles --> AccumulateResults
+    NewFiles --> Ingest["Fetch & ingest"]
+    UpdatedFiles --> Ingest
+    DeletedFiles --> Delete["Delete from Unique"]
 ```
 
 ### File Diff Item Attributes
@@ -295,27 +284,9 @@ Each item sent to the diff API contains:
 
 | Attribute | Description | Used For |
 |---|---|---|
-| `key` | Unique key identifying the item (page ID or page-attachment composite) | Identity and change tracking |
+| `key` | Unique key identifying the item (derived from page and attachment IDs) | Identity and change tracking |
 | `url` | Confluence URL of the page or attachment | Location tracking |
 | `updatedAt` | Last modification timestamp from Confluence | Change detection |
-
-### Partial Key Format
-
-The `partialKey` scopes the diff to a single Confluence space and determines the ingestion key prefix:
-
-| Key Format | `partialKey` | Full Ingestion Key (page) | Full Ingestion Key (attachment) |
-|---|---|---|---|
-| Default | `{tenantName}/{spaceId}_{spaceKey}` | `{tenantName}/{spaceId}_{spaceKey}/{pageId}` | `{tenantName}/{spaceId}_{spaceKey}/{pageId}::{attachmentId}` |
-| v1 compatible | `{spaceId}_{spaceKey}` | `{spaceId}_{spaceKey}/{pageId}` | `{spaceId}_{spaceKey}/{pageId}::{attachmentId}` |
-
-### Safety Checks
-
-Two checks prevent accidental full deletion of a space's content:
-
-1. **Zero-item submission**: If zero items are submitted to the diff but deletions are returned, the sync aborts. This guards against bugs in the Confluence page fetching logic.
-2. **Full deletion**: If the number of deleted files equals the total file count stored in Unique for that `partialKey`, the sync aborts. This guards against unexpected changes in key format or diff logic.
-
-Both checks log an error before aborting. If a user genuinely wants to remove all content from a space, they should leave at least one page labeled for synchronization.
 
 ## Ingestion Pipeline
 
