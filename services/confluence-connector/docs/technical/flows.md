@@ -233,7 +233,7 @@ Content that passes the filter has its `body.storage` HTML extracted and ingeste
 
 ## File Diff Mechanism
 
-The connector uses the Unique platform's server-side file diff API to detect changes between sync cycles. The connector does **not** compute local content hashes -- instead, it sends each item's `key`, `url`, and `updatedAt` timestamp to the diff endpoint, which returns categorized results. The diff is called once per Confluence space.
+The connector uses the Unique platform's server-side file diff API (`/v2/content/file-diff`) to detect changes between sync cycles. The connector does **not** compute local content hashes -- instead, it sends each item's `key`, `url`, and `updatedAt` timestamp to the diff endpoint, which returns categorized results. The diff is called once per Confluence space.
 
 ### State Comparison
 
@@ -244,7 +244,7 @@ flowchart TB
     end
 
     subgraph Comparison["Server-Side Diff"]
-        Compare["POST file diff<br/>(Unique Platform)"]
+        Compare["POST /v2/content/file-diff<br/>(Unique Platform)"]
     end
 
     subgraph Output["Output"]
@@ -266,7 +266,7 @@ flowchart TB
 ```mermaid
 flowchart TB
     Start["Collect all discovered items<br/>from Confluence"] --> BuildList["Build item list<br/>(key, url, updatedAt)"]
-    BuildList --> CallDiff["POST file diff"]
+    BuildList --> CallDiff["POST /v2/content/file-diff"]
 
     CallDiff --> NewFiles["newFiles: keys not previously known"]
     CallDiff --> UpdatedFiles["updatedFiles: keys with changed updatedAt"]
