@@ -43,12 +43,16 @@ export class IngestEmailLiveCatchupMessageCommand {
       ? inboxConfigurationMailFilters.parse(inboxConfig.filters)
       : undefined;
 
-    await this.ingestEmailCommand.run({
+    const result = await this.ingestEmailCommand.run({
       userProfileId: subscription.userProfileId,
       messageId,
       // Filters are applied client-side here because live catchup queries by updatedAt rather than
       // receivedAt, so the Graph API cannot enforce sender/folder filters on our behalf.
       filters,
     });
+
+    if (result === 'failed') {
+      throw new Error(`Email ingestion failed for messageId: ${messageId}`);
+    }
   }
 }
