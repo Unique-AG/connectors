@@ -28,12 +28,12 @@ The Confluence Connector requires specific permissions to access the Confluence 
 
 The Cloud API client calls the following endpoints through the Atlassian API gateway (`https://api.atlassian.com/ex/confluence/<cloudId>`):
 
-| API Endpoint | Method | Use Case |
-|---|---|---|
-| `/wiki/rest/api/content/search?cql=...` | GET | Search for labeled pages using CQL; discover descendant pages via `ancestor IN (...)` |
-| `/wiki/rest/api/content/search?cql=id%3D{pageId}` | GET | Fetch a single page with `body.storage` for content ingestion |
-| `/wiki/api/v2/pages/{pageId}/attachments` | GET | Fetch attachment list for pages exceeding the Confluence-imposed inline limit (typically 25 attachments; v1 pagination returns 410 Gone) |
-| `/wiki/rest/api/content/{pageId}/child/attachment/{attachmentId}/download` | GET | Download attachment binary content |
+| API Endpoint | Method | Use Case                                                                                           |
+|---|---|----------------------------------------------------------------------------------------------------|
+| `/wiki/rest/api/content/search?cql=...` | GET | Search for labeled pages using CQL; discover descendant pages via `ancestor IN (...)`              |
+| `/wiki/rest/api/content/search?cql=id%3D{pageId}` | GET | Fetch a single page with `body.storage` for content ingestion                                      |
+| `/wiki/api/v2/pages/{pageId}/attachments` | GET | Fetch attachment list for pages exceeding the Confluence-imposed inline limit (max 25 attachments) |
+| `/wiki/rest/api/content/{pageId}/child/attachment/{attachmentId}/download` | GET | Download attachment binary content                                                                 |
 
 ### Space Type Filter
 
@@ -45,12 +45,13 @@ The Cloud client filters by `space.type=global OR space.type=collaboration`. See
 
 The Data Center API client calls the following endpoints directly against the Confluence instance (`<baseUrl>`):
 
-| API Endpoint | Method | Use Case |
-|---|---|---|
-| `/rest/api/content/search?cql=...` | GET | Search for labeled pages using CQL; discover descendant pages via `ancestor IN (...)` |
-| `/rest/api/content/{pageId}` | GET | Fetch a single page with `body.storage` for content ingestion |
-| `{_links.download}` | GET | Download attachment binary content (path from attachment metadata) |
-| `{_links.next}` | GET | Paginate through attachment lists exceeding the Confluence-imposed inline limit (typically 25 per page) |
+| API Endpoint | Method | Use Case                                                                                          |
+|---|---|---------------------------------------------------------------------------------------------------|
+| `/rest/api/content/search?cql=...` | GET | Search for labeled pages using CQL; discover descendant pages via `ancestor IN (...)`             |
+| `/rest/api/content/{pageId}` | GET | Fetch a single page with `body.storage` for content ingestion                                     |
+| `/rest/api/content/{pageId}/child/attachment` | GET | Paginate through attachment lists exceeding the Confluence-imposed inline limit (max 25 per page) |
+
+Attachment binary content is downloaded from the path provided in each attachment's `_links.download` metadata field.
 
 ### Space Type Filter
 
@@ -60,7 +61,7 @@ The Data Center client filters by `space.type=global` only (`collaboration` is a
 
 ### Confluence (Cloud and Data Center)
 
-The connector only reads content from Confluence — it never creates, updates, or deletes pages or attachments. On Data Center, the OAuth 2.0 token request explicitly includes `scope=READ` to enforce least privilege at the token level, even if the application link grants broader permissions.
+The connector only reads content from Confluence — it never creates, updates, or deletes pages or attachments. On Data Center, the OAuth 2.0 token request explicitly includes `scope=READ` to enforce least privilege at the token level.
 
 ### Unique Platform
 
@@ -82,6 +83,6 @@ See the [Authentication Guide](../operator/authentication.md) for setup instruct
 
 - [Confluence Cloud REST API v1](https://developer.atlassian.com/cloud/confluence/rest/v1/intro/) - Atlassian Confluence Cloud API documentation
 - [Confluence Cloud REST API v2](https://developer.atlassian.com/cloud/confluence/rest/v2/intro/) - Atlassian Confluence Cloud v2 API documentation
-- [Confluence Data Center REST API](https://docs.atlassian.com/ConfluenceServer/rest/latest/) - Atlassian Confluence Data Center API documentation
+- [Confluence Data Center REST API](https://developer.atlassian.com/server/confluence/rest/) - Atlassian Confluence Data Center API documentation
 - [Atlassian OAuth 2.0 (3LO) apps](https://developer.atlassian.com/cloud/confluence/oauth-2-3lo-apps/) - Atlassian Cloud OAuth app setup (prerequisite for 2LO client credentials)
 - [Confluence Data Center - Configure an incoming link](https://confluence.atlassian.com/doc/configure-an-incoming-link-1115674733.html) - Data Center OAuth 2.0 application link setup

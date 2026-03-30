@@ -80,7 +80,7 @@ The connector uses two concrete implementations of the abstract `ConfluenceApiCl
 
 Both clients use CQL to search for labeled pages and fetch descendants. Key differences:
 
-- **Attachment pagination**: Cloud uses the v2 REST API (`/wiki/api/v2/pages/<id>/attachments`) for pages with more than 25 attachments (v1 pagination returns 410 Gone). Data Center follows v1 `_links.next` pagination links.
+- **Attachment pagination**: Cloud uses the v2 REST API (`/wiki/api/v2/pages/<id>/attachments`) for pages with more than 25 attachments. Data Center follows v1 `_links.next` pagination links.
 - **Attachment download**: Cloud uses `/wiki/rest/api/content/<pageId>/child/attachment/<attachmentId>/download` through the Atlassian API gateway. Data Center uses `_links.download` directly.
 - **Page URLs**: Cloud builds URLs from `_links.webui`. Data Center uses `/pages/viewpage.action?pageId=<id>`.
 
