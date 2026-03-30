@@ -94,8 +94,7 @@ sequenceDiagram
         loop For each Confluence space
             Connector->>Unique: POST file diff<br/>(pages + attachments per space)
             Unique->>Connector: newFiles, updatedFiles,<br/>deletedFiles, movedFiles
-            Note over Connector: Safety checks:<br/>abort if accidental full deletion
-            Note over Connector: Note: movedFiles are returned by the diff API<br/>but are not separately processed by the connector<br/>(tracked for informational/logging purposes only)
+            Note over Connector: Safety checks:<br/>abort if accidental full deletion<br/>(movedFiles are not processed)
         end
     end
 
@@ -107,15 +106,15 @@ sequenceDiagram
             Connector->>Confluence: GET page by ID<br/>(body.storage)
             Confluence->>Connector: Page HTML content
             Connector->>Unique: Register content
-            Connector->>Unique: Upload HTML buffer
+            Connector->>Unique: PUT buffer upload (text/html)
             Connector->>Unique: Finalize ingestion
         end
 
         loop For each new/updated attachment (concurrency-limited)
-            Connector->>Confluence: Download attachment stream
-            Confluence->>Connector: File stream
             Connector->>Unique: Register content
-            Connector->>Unique: Upload stream
+            Connector->>Confluence: Download attachment
+            Confluence->>Connector: File stream
+            Connector->>Unique: PUT stream upload (original media type)
             Connector->>Unique: Finalize ingestion
         end
     end
