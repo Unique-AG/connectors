@@ -97,18 +97,6 @@ The policy is controlled by the `LOGS_DIAGNOSTICS_DATA_POLICY` environment varia
 - **No persistent storage:** No local file storage of Confluence content
 - **Data flow:** Confluence API --> Connector (memory/stream) --> Unique Ingestion API
 
-## Container Security
-
-The connector image implements the following security measures:
-
-| Measure | Implementation |
-|---|---|
-| Non-root execution | Dedicated non-root user |
-| Minimal runtime image | Slim base image with only required system packages |
-| Signal handling | Proper signal forwarding for graceful shutdown |
-| Read-only config | Tenant config volume mounted as read-only |
-| Production mode | `NODE_ENV=production` |
-
 ## Compliance Considerations
 
 ### Data Residency
