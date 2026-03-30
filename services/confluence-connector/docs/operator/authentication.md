@@ -63,9 +63,9 @@ For detailed instructions on creating and configuring a service user, see:
 
 ### 2. Create the Root Scope in Unique
 
-The connector requires a pre-existing root scope in Unique. The root scope ID is configured in the tenant YAML under `ingestion.scopeId`. If the scope does not exist at startup, the connector fails with an assertion error.
+The connector requires a pre-existing root scope in Unique. The root scope ID is configured in the tenant YAML under `ingestion.scopeId`. If the scope does not exist at startup, the connector fails.
 
-At startup, the connector automatically grants itself access on the root scope and will create child scopes for each Confluence space that has content to ingest. See the [Scope Management](../technical/README.md#scope-management) concept and the [scope mechanics](../technical/flows.md#scope-management) for details on access inheritance, external IDs, and parent scope traversal.
+At startup, the connector automatically grants itself access on the root scope and will create child scopes for each Confluence space that has content to ingest. See the [Scope Management](../technical/README.md#scope-management) concept and the [Scope Hierarchy](../technical/flows.md#scope-hierarchy) for details.
 
 ### 3. Set Up Confluence Authentication
 
@@ -432,36 +432,6 @@ Unique hosts a single connector deployment serving multiple tenants:
 
 **Compliance:** Some organizations may require dedicated infrastructure for data residency. In that case, deploy a separate connector instance with single-tenant configuration instead.
 
-## Configuration Summary
-
-### Confluence Configuration Fields
-
-| Field | Required | Auth Mode | Type | Description |
-|---|---|---|---|---|
-| `confluence.auth.mode` | Yes | All | `oauth_2lo` or `pat` | Authentication method |
-| `confluence.auth.clientId` | Yes | `oauth_2lo` | String | OAuth 2.0 application client ID |
-| `confluence.auth.clientSecret` | Yes | `oauth_2lo` | String (`os.environ/` supported) | OAuth 2.0 client secret |
-| `confluence.auth.token` | Yes | `pat` | String (`os.environ/` supported) | Personal Access Token |
-| `confluence.cloudId` | Yes | Cloud only | String | Atlassian Cloud ID (UUID) |
-| `confluence.baseUrl` | Yes | All | URL | Confluence instance base URL (no trailing slash) |
-| `confluence.ingestSingleLabel` | Yes | All | String | Label for single-page sync (required, no default) |
-| `confluence.ingestAllLabel` | Yes | All | String | Label for all-descendants sync (required, no default) |
-| `confluence.apiRateLimitPerMinute` | Yes | All | Number | Number of Confluence API requests allowed per minute (required, no default) |
-
-### Unique Configuration Fields
-
-| Field | Required | Auth Mode | Type | Description |
-|---|---|---|---|---|
-| `unique.serviceAuthMode` | Yes | All | `cluster_local` or `external` | Unique platform auth mode |
-| `unique.serviceExtraHeaders` | Yes | `cluster_local` | Object | Must contain `x-company-id` and `x-user-id` |
-| `unique.zitadelOauthTokenUrl` | Yes | `external` | URL | Zitadel OAuth token endpoint |
-| `unique.zitadelProjectId` | Yes | `external` | String (`os.environ/` supported) | Zitadel project ID |
-| `unique.zitadelClientId` | Yes | `external` | String | Zitadel client ID |
-| `unique.zitadelClientSecret` | Yes | `external` | String (`os.environ/` supported) | Zitadel client secret |
-| `unique.ingestionServiceBaseUrl` | Yes | All | URL | Unique Ingestion Service URL (no trailing slash) |
-| `unique.scopeManagementServiceBaseUrl` | Yes | All | URL | Unique Scope Management Service URL (no trailing slash) |
-| `unique.apiRateLimitPerMinute` | No | All | Number | Number of Unique API requests allowed per minute (default: 100) |
-
 ## Troubleshooting
 
 ### OAuth Token Acquisition Failure
@@ -495,9 +465,9 @@ Unique hosts a single connector deployment serving multiple tenants:
 2. Regenerate the token if expired
 3. Confirm the environment variable referenced by `os.environ/` is set and non-empty
 
-### Root Scope Assertion Failure
+### Root Scope Not Found
 
-**Symptom:** `Root scope with ID {scopeId} not found` assertion error at startup.
+**Symptom:** `Root scope with ID {scopeId} not found` error at startup.
 
 **Cause:** The `ingestion.scopeId` references a scope that does not exist in the Unique platform.
 

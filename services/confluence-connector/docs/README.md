@@ -53,7 +53,7 @@ The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and 
 - Pages are discovered via configurable Confluence labels and ingested in HTML format (Confluence storage representation)
 - The `ai-ingest` label (configurable per tenant) marks individual pages for synchronization
 - The `ai-ingest-all` label (configurable per tenant) marks a page and all its descendant pages for synchronization
-- The recommended convention is `ai-ingest` / `ai-ingest-all`, but operators must explicitly set these label names in their tenant configuration
+- operators must explicitly set these label names in their tenant configuration
 - Only pages in global spaces are scanned (Cloud also includes collaboration spaces)
 
 **Automatic Change Detection**
