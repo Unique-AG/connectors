@@ -23,6 +23,8 @@ export class UploadFileForIngestionCommand {
         'Content-Type': mimeType || 'application/octet-stream',
         'x-ms-blob-type': 'BlockBlob',
       },
+      // For some reason the types for Body are resolved to the browser types instead of node types which
+      // makes the body expect a readable stream instead of a Buffer.
       body: content as BodyInit,
     });
   }
