@@ -231,10 +231,26 @@ export class SharepointSynchronizationService {
     }
   }
 
+  // IMPORTANT: getSiteInfo must run before initializeRootScope. The root scope init permanently
+  // stamps the scope's externalId with the configured siteId. If that siteId is wrong, the scope
+  // becomes locked to it and cannot be re-bound without manual intervention. Validating the site
+  // exists via the Graph API first ensures we never claim a scope with a bogus siteId.
   private async initializeSiteContext(
     siteConfig: SiteConfig,
     logPrefix: string,
   ): Promise<{ context: SharepointSyncContext } | { failureStep: SyncStep }> {
+    let siteName: Smeared;
+    let managedPath: ManagedPath;
+    try {
+      ({ siteName, managedPath } = await this.graphApiService.getSiteInfo(siteConfig.siteId));
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to get site name`,
+        error: sanitizeError(error),
+      });
+      return { failureStep: SyncStep.SiteNameFetch };
+    }
+
     let baseContext: RootScopeInfo;
     try {
       baseContext = await this.scopeManagementService.initializeRootScope(
@@ -248,18 +264,6 @@ export class SharepointSynchronizationService {
         error: sanitizeError(error),
       });
       return { failureStep: SyncStep.RootScopeInit };
-    }
-
-    let siteName: Smeared;
-    let managedPath: ManagedPath;
-    try {
-      ({ siteName, managedPath } = await this.graphApiService.getSiteInfo(siteConfig.siteId));
-    } catch (error) {
-      this.logger.error({
-        msg: `${logPrefix} Failed to get site name`,
-        error: sanitizeError(error),
-      });
-      return { failureStep: SyncStep.SiteNameFetch };
     }
 
     return {
