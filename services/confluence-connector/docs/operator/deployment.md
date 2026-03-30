@@ -18,33 +18,15 @@ Container images are available from GitHub Container Registry:
 ghcr.io/unique-ag/connectors/services/confluence-connector:<version>
 ```
 
-### Image Details
-
-| Property | Value |
-|---|---|
-| Base image | `node:24-bookworm-slim` |
-| Process manager | `dumb-init` (PID 1 signal forwarding) |
-| Runtime user | `nestjs` (UID 1001, non-root) |
-| Entrypoint | `node --enable-source-maps --max-old-space-size=${MAX_HEAP_MB:-1024} dist/main.js` |
-
-The image contains the application code plus all necessary runtime dependencies. The `MAX_HEAP_MB` environment variable controls the Node.js V8 max old space size (default: `1024` MB in the Docker image, overridden to `1920` MB by the Helm chart).
+The image contains the application code plus all necessary runtime dependencies.
 
 ## Helm Chart
 
 The Helm chart wraps the [`backend-service`](https://artifacthub.io/packages/helm/unique/backend-service) subchart (aliased as `connector`), so image, env, resources, and volumes are nested under the `connector` key. Tenant-specific configuration lives under `connectorConfig`.
 
-### Chart Metadata
-
-| Property | Value |
-|---|---|
-| Chart name | `confluence-connector` |
-| Chart version | `2.0.0-alpha.4` |
-| App version | `2.0.0-alpha.4` |
-| Dependency | `backend-service` `~10.1.0` from `oci://ghcr.io/unique-ag/helm-charts` |
-
 ### Installation
 
-Installation details live alongside the chart in:
+Chart and app versions are maintained in:
 
 - [`Chart.yaml`](https://github.com/Unique-AG/connectors/blob/main/services/confluence-connector/deploy/helm-charts/confluence-connector/Chart.yaml) for the current chart and app versions
 - [`values.yaml`](https://github.com/Unique-AG/connectors/blob/main/services/confluence-connector/deploy/helm-charts/confluence-connector/values.yaml) for the current default values
@@ -74,7 +56,7 @@ For the current Helm defaults, use [`values.yaml`](https://github.com/Unique-AG/
 connector:
   image:
     repository: ghcr.io/unique-ag/connectors/services/confluence-connector
-    tag: "2.0.0-alpha.4"
+    tag: "<version>"
   env:
     LOG_LEVEL: info
   envVars: []
@@ -173,8 +155,6 @@ Pre-release versions are marked with suffixes like `-alpha` or `-beta`:
 2.0.0  (GA)
 ```
 
-The current version is `2.0.0-alpha.4`. Configuration options and behavior may change before the stable release.
-
 ### Release Tags
 
 Release tags in the repository follow the format:
@@ -182,8 +162,6 @@ Release tags in the repository follow the format:
 ```
 confluence-connector@<version>
 ```
-
-For example: `confluence-connector@2.0.0-alpha.4`.
 
 ## Version Support and Maintenance Policy
 
