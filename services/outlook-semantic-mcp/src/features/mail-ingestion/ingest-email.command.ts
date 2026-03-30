@@ -18,6 +18,7 @@ import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UploadFileForIngestionCommand } from '~/unique/upload-file-for-ingestion.command';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
+import { GetFolderPathsQuery } from '../directories-sync/get-folder-paths.query';
 import { UpsertDirectoryCommand } from '../directories-sync/upsert-directory.command';
 import { GraphMessage } from './dtos/microsoft-graph.dtos';
 import { GetMessageDetailsQuery } from './get-message-details.query';
@@ -59,6 +60,7 @@ export class IngestEmailCommand {
     private readonly getMessageDetailsQuery: GetMessageDetailsQuery,
     private readonly uploadFileForIngestionCommand: UploadFileForIngestionCommand,
     private readonly upsertDirectoryCommand: UpsertDirectoryCommand,
+    private readonly getFolderPathsQuery: GetFolderPathsQuery,
   ) {}
 
   public async run({
@@ -147,7 +149,6 @@ export class IngestEmailCommand {
       }
     }
 
-    const metadata = getMetadataFromMessage(graphMessage);
     const fileKey = getUniqueKeyForMessage(userProfile.email, graphMessage);
     const files = await this.uniqueApi.files.getByKeys([fileKey]);
     const file = files.at(0);
@@ -181,6 +182,11 @@ export class IngestEmailCommand {
       });
     }
 
+    const folderPaths = await this.getFolderPathsQuery.run(userProfileId);
+    const currentFolderPath =
+      folderPaths[graphMessage.parentFolderId] ?? `/${parentDirectory.displayName}`;
+    const metadata = getMetadataFromMessage(graphMessage, currentFolderPath);
+
     logContext.parentDirectoryIgnoredForSync = parentDirectory.ignoreForSync ?? false;
     logContext.parentDirectoryType = parentDirectory.internalType;
     traceAttrs(logContext);
@@ -201,7 +207,14 @@ export class IngestEmailCommand {
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
-    if (isNonNullish(file) && metadata.sentDateTime === file.metadata?.sentDateTime) {
+    const emailMovedFolders =
+      isNonNullish(file) && file.metadata?.emailProviderFolderPath !== currentFolderPath;
+
+    if (
+      isNonNullish(file) &&
+      metadata.sentDateTime === file.metadata?.sentDateTime &&
+      !emailMovedFolders
+    ) {
       if (metadata.lastModifiedDateTime === file.metadata?.lastModifiedDateTime) {
         this.logger.log({
           ...logContext,

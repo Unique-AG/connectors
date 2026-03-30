@@ -25,6 +25,7 @@ function createCommand() {
     undefined as any,
     undefined as any,
     undefined as any,
+    undefined as any,
   );
   vi.spyOn(command as any, 'sleep').mockResolvedValue(undefined);
   return command;
