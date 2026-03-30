@@ -251,9 +251,10 @@ See [Authentication -- Troubleshooting](./authentication.md#troubleshooting) for
 ### Network Connectivity
 
 - Verify egress to Confluence endpoints is allowed (Cloud: `api.atlassian.com` and `api.media.atlassian.com`; Data Center: your instance host)
+- Verify connectivity to Unique Ingestion and Scope Management services
+- For `external` mode, verify egress to the Zitadel IdP
 - Check DNS resolution works
 - Confirm firewall rules permit HTTPS traffic on port 443
-- For `external` mode, verify egress to the Zitadel IdP
 
 See the network requirements table in the [Operator Guide](./README.md#network-requirements) for the full list of required endpoints.
 
