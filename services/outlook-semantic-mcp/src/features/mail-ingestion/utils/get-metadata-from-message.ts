@@ -28,6 +28,7 @@ export interface MessageMetadata {
   inferenceClassification: string;
   webLink: string;
   flagStatus: string;
+  emailProviderFolderPath: string;
 }
 
 const filterOutNilOrEmptyValues = (
@@ -62,7 +63,10 @@ const extractFromEmailArray = (
   return filterOutNilOrEmptyValues(input?.map((item) => item.emailAddress?.[prop]));
 };
 
-export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata => {
+export const getMetadataFromMessage = (
+  message: GraphMessage,
+  folderPath: string,
+): MessageMetadata => {
   return {
     id: message.id,
     subject: message.subject ?? '',
@@ -88,5 +92,6 @@ export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata =
     importance: message.importance ?? '',
     inferenceClassification: message.inferenceClassification ?? '',
     flagStatus: message.flag?.flagStatus ?? '',
+    emailProviderFolderPath: folderPath,
   };
 };
