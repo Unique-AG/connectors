@@ -448,7 +448,7 @@ Unique hosts a single connector deployment serving multiple tenants:
 **Resolution:**
 1. Verify `clientId` and `clientSecret` are correct
 2. Confirm the OAuth application is configured for the client credentials grant type
-3. Check network egress to the token endpoint (Cloud: `api.atlassian.com:443`, Data Center: your instance host)
+3. Check network egress to Atlassian endpoints (Cloud: `api.atlassian.com`, `auth.atlassian.com`, `api.media.atlassian.com`, and `*.atlassian.net` on port 443; Data Center: your instance host)
 4. Verify the environment variable referenced by `os.environ/` is set and non-empty
 
 ### PAT Authentication Failure

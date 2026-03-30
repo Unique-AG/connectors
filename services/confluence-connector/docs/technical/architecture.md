@@ -182,7 +182,7 @@ The connector initiates outbound requests to these authentication endpoints. No 
 | `api.atlassian.com/ex/confluence/<cloudId>/wiki/api/v2/pages/<pageId>/attachments` | Fetch page attachments (v2 API, used when the inline attachment count reaches the Confluence-imposed limit) |
 | `api.atlassian.com/ex/confluence/<cloudId>/wiki/rest/api/content/<pageId>/child/attachment/<attachmentId>/download` | Download attachment content |
 
-Attachment downloads are served via `api.media.atlassian.com`. The connector's HTTP client follows the redirect automatically. Firewall rules must allow outbound HTTPS to this domain in addition to `api.atlassian.com`.
+Attachment downloads are served via `api.media.atlassian.com`. The connector's HTTP client follows the redirect automatically. Firewall rules must allow outbound HTTPS to `api.media.atlassian.com` and `*.atlassian.net` in addition to `api.atlassian.com`.
 
 ### Confluence Data Center API Endpoints
 

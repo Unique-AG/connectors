@@ -250,7 +250,7 @@ See [Authentication -- Troubleshooting](./authentication.md#troubleshooting) for
 
 ### Network Connectivity
 
-- Verify egress to Confluence endpoints is allowed (Cloud: `api.atlassian.com`, `api.media.atlassian.com`, and `auth.atlassian.com`; Data Center: your instance host)
+- Verify egress to Confluence endpoints is allowed (Cloud: `api.atlassian.com`, `auth.atlassian.com`, `api.media.atlassian.com`, and `*.atlassian.net`; Data Center: your instance host)
 - Verify connectivity to Unique Ingestion and Scope Management services
 - For `external` mode, verify egress to the Zitadel IdP
 - Check DNS resolution works
