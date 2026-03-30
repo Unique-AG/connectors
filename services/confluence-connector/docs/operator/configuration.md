@@ -138,7 +138,7 @@ confluence:
 | `ingestSingleLabel` | Yes | -- | Confluence label that marks individual pages for synchronization (e.g., `ai-ingest`) |
 | `ingestAllLabel` | Yes | -- | Confluence label that marks a page and all its descendants for synchronization (e.g., `ai-ingest-all`) |
 
-**Important:** `ingestSingleLabel` and `ingestAllLabel` are required fields with no schema default. Operators must explicitly configure them. The recommended convention is `ai-ingest` and `ai-ingest-all`.
+**Important:** `ingestSingleLabel` and `ingestAllLabel` are required fields with no schema default. Operators must explicitly configure them.
 
 **Important:** `apiRateLimitPerMinute` is a required field with no schema default. Atlassian recommends Data Center admins allow at least 20 requests/second (1200 RPM). Cloud uses a points-based quota -- consult the [Atlassian REST API rate limiting documentation](https://developer.atlassian.com/cloud/confluence/rate-limiting/) for details.
 
@@ -313,18 +313,6 @@ The Helm chart ships these values by default.
 ### Host and API Metrics
 
 The connector exposes standard host metrics (CPU, memory, event loop) and HTTP API metrics.
-
-### Unique API Metrics
-
-The connector registers Unique API metrics with the prefix `confluence_connector_unique_api`:
-
-| Metric | Type | Description |
-|---|---|---|
-| `confluence_connector_unique_api_requests_total` | Counter | Total number of Unique API requests |
-| `confluence_connector_unique_api_errors_total` | Counter | Total number of Unique API errors |
-| `confluence_connector_unique_api_request_duration_ms` | Histogram | Duration of Unique API requests in milliseconds |
-| `confluence_connector_unique_api_slow_requests_total` | Counter | Total number of slow Unique API requests by duration bucket |
-| `confluence_connector_unique_api_auth_token_refresh_total` | Counter | Total number of auth token refreshes |
 
 ### Connector Metrics
 
