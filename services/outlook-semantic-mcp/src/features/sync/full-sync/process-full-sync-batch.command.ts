@@ -2,7 +2,6 @@ import assert from 'node:assert';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
-import Bottleneck from 'bottleneck';
 import { sql } from 'drizzle-orm';
 import { MetricService, Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
@@ -41,8 +40,6 @@ export type BatchResult =
 const GRAPH_PAGE_LIMIT = 100;
 // We aim to upload 100 messages and we do not want to upload twice as much when a couple failed.
 const MAX_MESSAGES_PROCESSED_PAGE_LIMIT = GRAPH_PAGE_LIMIT - 50;
-const MAX_RETRIES = 3;
-const BASE_BACKOFF_MS = 500;
 
 type PossibleIngestionResults = MessageIngestionResult | 'failed';
 
@@ -347,7 +344,7 @@ export class ProcessFullSyncBatchCommand {
     const ingestionResult = await recordInHistogram({
       histogram: this.ingestionDuration,
       attributes: (result) => ({ outcome: result === 'failed' ? 'failure' : 'success' }),
-      fn: () => this.ingestWithRetries(userProfileId, message.id),
+      fn: () => this.ingestEmailCommand.run({ userProfileId, messageId: message.id }),
     });
 
     const mapToOurResult: Record<PossibleIngestionResults, 'ingested' | 'skipped' | 'failed'> = {
@@ -369,46 +366,5 @@ export class ProcessFullSyncBatchCommand {
     this.messagesProcessed.add(1, { outcome });
 
     return outcome;
-  }
-
-  private async ingestWithRetries(
-    userProfileId: string,
-    messageId: string,
-  ): Promise<MessageIngestionResult | 'failed'> {
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        return await this.ingestEmailCommand.run({ userProfileId, messageId });
-      } catch (error) {
-        // Bottleneck errors mean the rate limiter is overwhelmed or stopped.
-        // Retrying is pointless — re-throw so the sync transitions to failed
-        // state and the scheduler can pick it up later.
-        if (error instanceof Bottleneck.BottleneckError) {
-          throw error;
-        }
-
-        this.logger.warn({
-          err: error,
-          userProfileId,
-          messageId,
-          attempt,
-          msg: `Ingestion attempt ${attempt}/${MAX_RETRIES} failed`,
-        });
-
-        if (attempt < MAX_RETRIES) {
-          await this.sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
-        }
-      }
-    }
-
-    this.logger.error({
-      userProfileId,
-      messageId,
-      msg: `Ingestion failed after ${MAX_RETRIES} retries`,
-    });
-    return 'failed';
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

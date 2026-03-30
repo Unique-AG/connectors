@@ -4,6 +4,7 @@ import { createSmeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import Bottleneck from 'bottleneck';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish, omit } from 'remeda';
@@ -22,6 +23,9 @@ import { GetMessageDetailsQuery } from './get-message-details.query';
 import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
 import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
 import { shouldSkipEmail } from './utils/should-skip-email';
+
+const MAX_RETRIES = 3;
+const BASE_BACKOFF_MS = 500;
 
 type LogContext = Partial<{
   messageId: string;
@@ -56,8 +60,48 @@ export class IngestEmailCommand {
     private readonly upsertDirectoryCommand: UpsertDirectoryCommand,
   ) {}
 
-  @Span()
   public async run({
+    userProfileId,
+    messageId,
+    filters,
+  }: {
+    userProfileId: string;
+    messageId: string;
+    filters?: InboxConfigurationMailFilters;
+  }): Promise<MessageIngestionResult | 'failed'> {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        return await this.ingestEmail({ userProfileId, messageId, filters });
+      } catch (error) {
+        if (error instanceof Bottleneck.BottleneckError) {
+          throw error;
+        }
+        this.logger.warn({
+          err: error,
+          userProfileId,
+          messageId,
+          attempt,
+          msg: `Ingestion attempt ${attempt}/${MAX_RETRIES} failed`,
+        });
+        if (attempt < MAX_RETRIES) {
+          await this.sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
+        }
+      }
+    }
+    this.logger.error({
+      userProfileId,
+      messageId,
+      msg: `Ingestion failed after ${MAX_RETRIES} retries`,
+    });
+    return 'failed';
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  @Span()
+  private async ingestEmail({
     userProfileId,
     messageId,
     filters,

@@ -69,7 +69,7 @@ function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGrap
 
 function createMockIngestEmailCommand(shouldFail = false) {
   const run = shouldFail
-    ? vi.fn().mockRejectedValue(new Error('Ingestion failed'))
+    ? vi.fn().mockResolvedValue('failed')
     : vi.fn().mockResolvedValue('ingested');
   return { run };
 }
@@ -128,7 +128,6 @@ function createCommand({
     findConfig as any,
     createMockMetricService() as any,
   );
-  vi.spyOn(command as any, 'sleep').mockResolvedValue(undefined);
   return command;
 }
 
@@ -588,7 +587,7 @@ describe('ProcessFullSyncBatchCommand', () => {
       );
     });
 
-    it('increments failedToUploadForIngestion after retries exhausted', async () => {
+    it('increments failedToUploadForIngestion when ingestion returns failed', async () => {
       const graphApi = createMockGraphApi();
       graphApi.get.mockResolvedValue(makeGraphResponse([makeMessage('msg-1')]));
 
@@ -597,9 +596,6 @@ describe('ProcessFullSyncBatchCommand', () => {
       const command = createCommand({ graphApi, ingestCommand, updateCommand });
 
       await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
-
-      // 3 retries attempted
-      expect(ingestCommand.run).toHaveBeenCalledTimes(3);
 
       // Failed counter incremented
       expect(updateCommand.run).toHaveBeenCalledWith(
@@ -615,7 +611,7 @@ describe('ProcessFullSyncBatchCommand', () => {
   // -------------------------------------------------------------------------
 
   describe('retry logic', () => {
-    it('retries ingestion up to 3 times before marking as failed', async () => {
+    it('marks message as failed when ingestEmailCommand.run returns failed', async () => {
       const graphApi = createMockGraphApi();
       graphApi.get.mockResolvedValue(makeGraphResponse([makeMessage('msg-1')]));
 
@@ -625,25 +621,20 @@ describe('ProcessFullSyncBatchCommand', () => {
       const result = await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
 
       expect(result).toEqual({ outcome: 'completed' });
-      expect(ingestCommand.run).toHaveBeenCalledTimes(3);
+      expect(ingestCommand.run).toHaveBeenCalledTimes(1);
     });
 
-    it('succeeds on second retry attempt', async () => {
+    it('marks message as ingested when ingestEmailCommand.run returns ingested', async () => {
       const graphApi = createMockGraphApi();
       graphApi.get.mockResolvedValue(makeGraphResponse([makeMessage('msg-1')]));
 
-      const ingestCommand = {
-        run: vi
-          .fn()
-          .mockRejectedValueOnce(new Error('Attempt 1 failed'))
-          .mockResolvedValueOnce('ingested'),
-      };
+      const ingestCommand = { run: vi.fn().mockResolvedValue('ingested') };
       const updateCommand = createMockUpdateByVersionCommand();
       const command = createCommand({ graphApi, ingestCommand, updateCommand });
 
       await command.run({ userProfileId: USER_PROFILE_ID, version: VERSION });
 
-      expect(ingestCommand.run).toHaveBeenCalledTimes(2);
+      expect(ingestCommand.run).toHaveBeenCalledTimes(1);
 
       // Should increment scheduledForIngestion, not failedToUpload
       expect(updateCommand.run).toHaveBeenCalledWith(
