@@ -35,8 +35,6 @@ The Cloud API client calls the following endpoints through the Atlassian API gat
 | `/wiki/api/v2/pages/{pageId}/attachments` | GET | Fetch attachment list for pages exceeding the Confluence-imposed inline limit (typically 25 attachments; v1 pagination returns 410 Gone) |
 | `/wiki/rest/api/content/{pageId}/child/attachment/{attachmentId}/download` | GET | Download attachment binary content |
 
-All endpoints use the `GET` method and require read access only.
-
 ### Space Type Filter
 
 The Cloud client filters by `space.type=global OR space.type=collaboration`. See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on space type filtering. The OAuth integration must have access to spaces of both types to discover all labeled pages.
@@ -54,44 +52,23 @@ The Data Center API client calls the following endpoints directly against the Co
 | `{_links.download}` | GET | Download attachment binary content (path from attachment metadata) |
 | `{_links.next}` | GET | Paginate through attachment lists exceeding the Confluence-imposed inline limit (typically 25 per page) |
 
-All endpoints use the `GET` method and require read access only.
-
 ### Space Type Filter
 
 The Data Center client filters by `space.type=global` only (`collaboration` is a Cloud-only space type). See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on space type filtering. The service account has instance-wide read access; space type filtering is applied client-side via CQL.
 
 ## Permission Justification
 
-### Confluence Cloud: Read-Only Access
+### Confluence (Cloud and Data Center)
 
-**Justification:** The connector only reads content from Confluence. It never creates, updates, or deletes pages or attachments. All Confluence API calls use the `GET` method.
+The connector only reads content from Confluence — it never creates, updates, or deletes pages or attachments. On Data Center, the OAuth 2.0 token request explicitly includes `scope=READ` to enforce least privilege at the token level, even if the application link grants broader permissions.
 
-**Why read-only is sufficient:**
+### Unique Platform
 
-- CQL search is a read operation
-- Page content fetch is a read operation
-- Attachment listing and download are read operations
-- No write operations are performed against Confluence
+The connector requires scope management and ingestion access because it:
 
-### Confluence Data Center: Explicit READ Scope
-
-**Justification:** The Data Center OAuth 2.0 token request explicitly includes `scope=READ`, limiting the service account to read-only operations even if the application link grants broader permissions.
-
-**Why not broader scopes?**
-
-- The connector only reads content -- no write access is needed
-- Explicit `READ` scope enforces least privilege at the token level
-- Reduces risk if the application link is misconfigured with broader permissions
-
-### Unique Platform: Scope Management and Ingestion
-
-**Justification:** The connector creates scopes and ingests content into the Unique platform. The service user requires sufficient privileges to manage scopes and perform content ingestion.
-
-**Why needed?**
-
-- The connector creates child scopes for each Confluence space
-- Content ingestion requires registering, uploading, and finalizing content
-- File deletion requires querying and removing previously ingested content
+- Creates child scopes for each Confluence space
+- Registers, uploads, and finalizes content during ingestion
+- Queries and removes previously ingested content during deletion
 
 See the [Authentication Guide](../operator/authentication.md) for setup instructions.
 

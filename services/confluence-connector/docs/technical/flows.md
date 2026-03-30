@@ -112,7 +112,7 @@ sequenceDiagram
 
         loop For each new/updated attachment (concurrency-limited)
             Connector->>Unique: Register content
-            Connector->>Confluence: Download attachment
+            Connector->>Confluence: Get attachment stream
             Confluence->>Connector: File stream
             Connector->>Unique: PUT stream upload (original media type)
             Connector->>Unique: Finalize ingestion
@@ -194,9 +194,7 @@ An attachment is accepted if:
 - Its file size does not exceed `maxFileSizeMb` (default: 200 MB)
 - The `maxItemsToScan` capacity has not been exhausted (pages count first, attachments use remaining capacity)
 
-If a page has more than 25 attachments (the Confluence inline limit), additional attachments are fetched:
-- **Cloud**: Uses the v2 REST API (`/wiki/api/v2/pages/{pageId}/attachments`) because the v1 pagination endpoint returns 410 Gone
-- **Data Center**: Follows v1 `_links.next` pagination links
+If a page has more than 25 attachments (the Confluence inline limit), additional attachments are fetched via pagination.
 
 ### Content Type Ingestion Map
 
