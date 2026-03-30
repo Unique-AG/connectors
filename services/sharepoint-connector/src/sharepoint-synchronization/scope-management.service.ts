@@ -131,6 +131,18 @@ export class ScopeManagementService {
       for (const child of children) {
         const result = await this.uniqueScopesService.deleteScope(child.id, { recursive: true });
 
+        if (result.failedFolders.length > 0) {
+          this.logger.warn({
+            msg: `${logPrefix} Partial deletion failure for child scope ${child.id}`,
+            failedFolders: result.failedFolders.map((f) => ({
+              id: f.id,
+              name: f.name,
+              path: createSmeared(f.path),
+              reason: f.failReason,
+            })),
+          });
+        }
+
         assert.strictEqual(
           result.failedFolders.length,
           0,

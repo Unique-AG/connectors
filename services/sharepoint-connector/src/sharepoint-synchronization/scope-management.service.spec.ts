@@ -1227,6 +1227,69 @@ describe('ScopeManagementService', () => {
       );
     });
 
+    it('throws and does not delete or clear anything when listChildrenScopes fails', async () => {
+      listChildrenScopesMock.mockRejectedValue(new Error('API unavailable'));
+
+      await expect(service.resetRootScope('root-scope-id')).rejects.toThrow('API unavailable');
+
+      expect(deleteScopeMock).not.toHaveBeenCalled();
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: expect.stringContaining('Failed to reset root scope'),
+        }),
+      );
+    });
+
+    it('throws when clearing externalId fails after children were already deleted', async () => {
+      const children: Scope[] = [
+        { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
+      ];
+      listChildrenScopesMock.mockResolvedValue(children);
+      updateScopeExternalIdMock.mockRejectedValue(new Error('externalId update failed'));
+
+      await expect(service.resetRootScope('root-scope-id')).rejects.toThrow(
+        'externalId update failed',
+      );
+
+      expect(deleteScopeMock).toHaveBeenCalledTimes(1);
+      expect(deleteScopeMock).toHaveBeenCalledWith('child-1', { recursive: true });
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: expect.stringContaining('Failed to reset root scope'),
+        }),
+      );
+    });
+
+    it('logs failed folders before aborting on partial deletion failure', async () => {
+      const children: Scope[] = [
+        { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
+      ];
+      listChildrenScopesMock.mockResolvedValue(children);
+      deleteScopeMock.mockResolvedValue({
+        successFolders: [],
+        failedFolders: [
+          { id: 'sub-1', name: 'Sub1', path: '/Sub1', failReason: 'locked' },
+          { id: 'sub-2', name: 'Sub2', path: '/Sub2', failReason: 'in use' },
+        ],
+      });
+
+      await expect(service.resetRootScope('root-scope-id')).rejects.toThrow();
+
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: expect.stringContaining('Partial deletion failure for child scope child-1'),
+          failedFolders: expect.arrayContaining([
+            expect.objectContaining({ id: 'sub-1', reason: 'locked' }),
+            expect.objectContaining({ id: 'sub-2', reason: 'in use' }),
+          ]),
+        }),
+      );
+    });
+
     it('does not delete the root scope itself', async () => {
       const children: Scope[] = [
         { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
