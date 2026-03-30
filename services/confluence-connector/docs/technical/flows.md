@@ -131,10 +131,8 @@ sequenceDiagram
 
 The connector manages a two-level scope hierarchy:
 
-1. **Root scope** -- Must pre-exist in the Unique platform. Configured via `ingestion.scopeId`. The connector grants itself MANAGE, READ, and WRITE access at initialization.
-2. **Space scopes** -- Created automatically as children of the root scope, one per Confluence space key. Created with inherited access. External IDs follow the format `confc:{tenantName}:{spaceKey}`.
-
-If the root scope has parent scopes, the connector traverses upward and grants READ access to each parent so that the scope path can be resolved.
+1. **Root scope** -- Must pre-exist in the Unique platform. Configured via `ingestion.scopeId`. The connector grants itself access at initialization.
+2. **Space scopes** -- Created automatically as children of the root scope, one per Confluence space key. Access is inherited from the root scope.
 
 ## Discovery Phase
 
@@ -295,11 +293,11 @@ flowchart TB
 
 Each item sent to the diff API contains:
 
-| Attribute | Source (Pages) | Source (Attachments) | Used For |
-|---|---|---|---|
-| `key` | `page.id` | `{pageId}::{attachmentId}` | Identity and change tracking |
-| `url` | `page.webUrl` | `attachment.webUrl` | Location tracking |
-| `updatedAt` | `page.versionTimestamp` | `attachment.versionTimestamp` (falls back to page version) | Change detection |
+| Attribute | Description | Used For |
+|---|---|---|
+| `key` | Unique key identifying the item (page ID or page-attachment composite) | Identity and change tracking |
+| `url` | Confluence URL of the page or attachment | Location tracking |
+| `updatedAt` | Last modification timestamp from Confluence | Change detection |
 
 ### Partial Key Format
 
@@ -327,10 +325,10 @@ For details on the 3-step ingestion pipeline (register, upload, finalize), key f
 
 For each new or updated page:
 
-1. **Fetch content** -- The connector retrieves the full page with `body.storage` expansion. The page is skipped if it is not found, if fetching fails, or if the page body is empty.
-2. **Extract labels** -- Confluence labels are extracted from the page, excluding the `ingestSingleLabel` and `ingestAllLabel` values. Labels are sorted alphabetically for deterministic ordering.
-3. **Register** -- Sends metadata to the Unique ingestion API (key, title, mimeType `text/html`, scopeId, sourceKind, metadata including `confluenceLabels`, `spaceKey`, `spaceName`).
-4. **Upload** -- The page body (Confluence storage format HTML) is converted to a buffer and uploaded via HTTP PUT to the `writeUrl`.
+1. **Fetch content** -- The connector retrieves the full page content (HTML storage representation). The page is skipped if it is not found, if fetching fails, or if the page body is empty.
+2. **Extract labels** -- Confluence labels are extracted from the page, excluding the configured sync labels. Labels are sorted alphabetically for deterministic ordering.
+3. **Register** -- Sends metadata to the Unique ingestion API.
+4. **Upload** -- The page body (Confluence storage format HTML) is uploaded to Unique.
 5. **Finalize** -- Triggers downstream processing in Unique.
 
 If any step fails for a page, the error is logged and that page is skipped. Other pages continue processing.
@@ -340,9 +338,9 @@ If any step fails for a page, the error is logged and that page is skipped. Othe
 For each new or updated attachment:
 
 1. **Skip zero-byte** -- Attachments with zero file size are skipped.
-2. **Register** -- Sends metadata to the Unique ingestion API (key, title, original mediaType, scopeId, sourceKind, metadata including `spaceKey`, `spaceName`).
-3. **Download** -- Streams the attachment from Confluence. Cloud uses `/wiki/rest/api/content/{pageId}/child/attachment/{attachmentId}/download` through the Atlassian API gateway. Data Center uses `_links.download` directly.
-4. **Upload** -- The stream is uploaded via HTTP PUT to the `writeUrl` with the original content type and content length.
+2. **Register** -- Sends metadata to the Unique ingestion API.
+3. **Download** -- Streams the attachment from Confluence.
+4. **Upload** -- The stream is uploaded to Unique with the original content type and content length.
 5. **Finalize** -- Triggers downstream processing in Unique.
 
 If any step fails, the stream is destroyed and the error is logged. Other attachments continue processing.
@@ -382,17 +380,6 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 | Attachment ingestion failure | Download error, upload error | Destroy stream, log error, skip the attachment |
 | Content deletion failure | Unique API error | Log error, return 0 deleted count |
 | Unhandled sync error | Unexpected exception | Caught at top level, logged, scanning flag reset |
-
-### Rate Limiting
-
-API requests are rate-limited at two levels:
-
-| Level | Configuration |
-|---|---|
-| Confluence API | `confluence.apiRateLimitPerMinute` (required field, no default) |
-| Unique API | `unique.apiRateLimitPerMinute` (default: 100) |
-
-The rate limiter uses a per-minute reservoir. When the reservoir is depleted, requests are queued until the next refresh.
 
 ### Retry Logic
 
