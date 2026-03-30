@@ -221,7 +221,7 @@ export class IngestEmailCommand {
 
     try {
       this.logger.debug({ ...logContext, msg: `File Upload: Started` });
-      const emailBuffer = await this.getEmlFileStream({ messageId, client });
+      const emailBuffer = await this.getEmlFile({ messageId, client });
       await this.uploadFileForIngestionCommand.run({
         uploadUrl: content.writeUrl,
         content: emailBuffer,
@@ -256,7 +256,7 @@ export class IngestEmailCommand {
     }
   }
 
-  private async getEmlFileStream({
+  private async getEmlFile({
     messageId,
     client,
   }: {
@@ -289,9 +289,12 @@ export class IngestEmailCommand {
     // can't know the size until the last byte arrives and the connection closes.
     // The Azure upload API requires Content-Length up front, so there's no point running
     // through the stream again just to count bytes.
-    // Important note: With prefetch=10, up to 10 emails could be buffered simultaneously,
-    // adding up to ~340MB of additional memory (10 × 34MB max EML size). The pod memory
-    // limit is 1Gi — monitor heap usage closely during full syncs.
+    // Important note: With prefetch=10, up to 10 emails could be buffered simultaneously
+    // per queues adding up to ~340MB of additional memory (10 × 34MB max EML size) for every
+    // queue which processes emails. Since right now we have 2 queues processing emails this
+    // means we add an additional ~680MB mb just from the email transfer alose if we set the
+    // prefetch count to 10. The pod memory limit is 1Gi so we should monitor heap usage
+    // closely.
     const chunks: Buffer[] = [];
     for await (const chunk of emlStream) {
       chunks.push(Buffer.from(chunk));
