@@ -30,7 +30,7 @@ Secret values in tenant YAML files are referenced via the `os.environ/` prefix (
 
 Tenant configuration files must follow the naming convention `{tenant-name}-tenant-config.yaml`. The tenant name is extracted from the filename by removing the `-tenant-config.yaml` suffix and must match the pattern `^[a-z0-9]+(-[a-z0-9]+)*$` (lowercase alphanumeric with hyphens). Duplicate tenant names cause a startup failure.
 
-The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at startup. At least one file must match the pattern, and at least one tenant must have `active` status. For details on how tenants are isolated at runtime, see [Architecture -- Multi-Tenancy Model](../technical/architecture.md#multi-tenancy-model).
+The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at startup. At least one file must match the pattern, and at least one tenant must have `active` status. For details on how tenants are isolated at runtime, see [Architecture -- Multi-Tenancy Support](../technical/architecture.md#multi-tenancy-support).
 
 ### Tenant Status
 
@@ -259,9 +259,7 @@ The connector runs sync cycles on a per-tenant cron schedule. Key behaviors:
 
 ### Structured JSON Logs
 
-The connector produces structured JSON logs via [pino](https://github.com/pinojs/pino). In production (`NODE_ENV=production`), logs are written as JSON to stdout. In development, logs use a human-readable format.
-
-Log buffering is enabled at startup (`bufferLogs: true`): log messages produced before the logger is fully initialized are buffered and flushed once the pino logger is ready. This ensures no log messages are lost during the NestJS bootstrap phase.
+The connector produces structured JSON logs. In production (`NODE_ENV=production`), logs are written as JSON to stdout. In development, logs use a human-readable format.
 
 ### Log Levels
 
@@ -279,7 +277,7 @@ Set via the `LOG_LEVEL` environment variable:
 
 ### Tenant Context in Logs
 
-Every log entry emitted within a tenant sync context automatically includes the `tenantName` field. Logs emitted during the bootstrap phase (before tenant context is established) do not include this field.
+Every log entry emitted within a tenant sync context automatically includes the `tenantName` field.
 
 ### Diagnostics Data Policy
 
@@ -290,7 +288,7 @@ The `LOGS_DIAGNOSTICS_DATA_POLICY` environment variable controls how diagnostic 
 | `conceal` (default) | Partially masks values (e.g., `John Smith` becomes `**** *mith`) |
 | `disclose` | Shows values in full |
 
-This applies to diagnostic data only. Actual secrets (passwords, tokens, keys) are always fully redacted regardless of this setting -- they appear as `[Redacted]` in logs and JSON serialization.
+This applies to diagnostic data only. Actual secrets (passwords, tokens, keys) are always fully redacted regardless of this setting.
 
 ### Sensitive Header Redaction
 
@@ -314,11 +312,11 @@ The Helm chart ships these values by default.
 
 ### Host and API Metrics
 
-The connector exposes standard host metrics (CPU, memory, event loop) and HTTP API metrics via the `nestjs-otel` OpenTelemetry module.
+The connector exposes standard host metrics (CPU, memory, event loop) and HTTP API metrics.
 
 ### Unique API Metrics
 
-The connector registers Unique API metrics with the prefix `confluence_connector_unique_api`. These metrics are created by the shared `@unique-ag/unique-api` package:
+The connector registers Unique API metrics with the prefix `confluence_connector_unique_api`:
 
 | Metric | Type | Description |
 |---|---|---|
@@ -356,9 +354,9 @@ grafana:
     folder: connectors
 ```
 
-## Alerts
+### Alerts
 
-### Default Alerts
+#### Default Alerts
 
 The Helm chart provides one default alert:
 
@@ -374,7 +372,7 @@ The Helm chart provides one default alert:
 | `for` | `30s` |
 | `severity` | `warning` |
 
-### Alert Configuration
+#### Alert Configuration
 
 Enable alerts and customize per-alert parameters in Helm `values.yaml`:
 
@@ -421,7 +419,7 @@ kubectl scale deployment confluence-connector --replicas=0 -n <namespace>
 
 Use the Unique Public API or admin interface to remove the connector-managed content under the configured root scope.
 
-Do not delete the root scope itself. The connector validates that the scope referenced by `ingestion.scopeId` exists at the start of each sync cycle. If the scope is missing, the sync cycle fails with an assertion error. The application remains running but every sync attempt fails until the scope is restored or the configuration is corrected.
+Do not delete the root scope itself. The connector validates that the scope referenced by `ingestion.scopeId` exists at the start of each sync cycle. If the scope is missing, the sync cycle fails. The application remains running but every sync attempt fails until the scope is restored or the configuration is corrected.
 
 **Warning:** This operation is irreversible. Ensure you have backups if needed.
 

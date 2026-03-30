@@ -84,3 +84,4 @@ See the [Authentication Guide](../operator/authentication.md) for setup instruct
 - [Confluence Cloud REST API v1](https://developer.atlassian.com/cloud/confluence/rest/v1/intro/) - Atlassian Confluence Cloud API documentation
 - [Confluence Cloud REST API v2](https://developer.atlassian.com/cloud/confluence/rest/v2/intro/) - Atlassian Confluence Cloud v2 API documentation
 - [Confluence Data Center REST API](https://developer.atlassian.com/server/confluence/rest/) - Atlassian Confluence Data Center API documentation
+- [Atlassian Service Accounts](https://support.atlassian.com/user-management/docs/understand-service-accounts/) - Atlassian Cloud service account setup for OAuth 2.0 credentials
