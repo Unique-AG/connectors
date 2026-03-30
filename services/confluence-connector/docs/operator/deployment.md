@@ -7,7 +7,7 @@ The Confluence Connector is delivered as part of the [Unique Connectors](https:/
 
 - Container images with the application code
 - Helm charts for Kubernetes deployment
-- Terraform module for Azure Key Vault secret placeholders
+- Terraform modules for infrastructure provisioning
 - Versioned documentation
 
 ## Container Image
@@ -237,14 +237,7 @@ helm rollback confluence-connector <revision> -n confluence-connector
 
 ### Configuration Validation Errors
 
-The connector validates all tenant configuration at startup. Common validation failures include:
-
-- Missing required fields (`ingestSingleLabel`, `ingestAllLabel`, `apiRateLimitPerMinute`, `scopeId`)
-- Empty or unset environment variables referenced via `os.environ/`
-- Duplicate tenant names across configuration files
-- No active tenants found
-
-Check the pod logs for specific validation error messages. See [Configuration](./configuration.md) for required fields and defaults.
+The connector validates all tenant configuration at startup. Check the pod logs for specific validation error messages. See [Configuration](./configuration.md) for required fields and defaults.
 
 ### Authentication Errors
 
