@@ -10,7 +10,7 @@ server:
         pnpm run db:migrate
   env:
     LOG_LEVEL: info
-    MAX_HEAP_MB: 1920
+    MAX_HEAP_MB: 850
     NODE_ENV: production
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"

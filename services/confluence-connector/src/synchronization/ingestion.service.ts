@@ -43,6 +43,7 @@ export class IngestionService {
       return;
     }
 
+    let contentId: string | undefined;
     try {
       const htmlBuffer = Buffer.from(page.body, 'utf-8');
       const baseKey = `${page.spaceId}_${page.spaceKey}/${page.id}`;
@@ -56,6 +57,7 @@ export class IngestionService {
       );
       const registrationResponse =
         await this.uniqueApiClient.ingestion.registerContent(registrationRequest);
+      contentId = registrationResponse.id;
 
       const uploadUrl = this.correctWriteUrl(registrationResponse.writeUrl);
       await this.uploadBuffer(uploadUrl, htmlBuffer, INGESTION_MIME_TYPE);
@@ -72,6 +74,9 @@ export class IngestionService {
         err: error,
         msg: 'Failed to ingest page, skipping',
       });
+      if (contentId) {
+        await this.cleanupFailedRegistration(contentId, { pageId: page.id, title: page.title });
+      }
     }
   }
 
@@ -86,6 +91,7 @@ export class IngestionService {
     }
 
     let stream: Readable | undefined;
+    let contentId: string | undefined;
     try {
       const baseKey = `${attachment.spaceId}_${attachment.spaceKey}/${attachment.pageId}::${attachment.id}`;
       const key = this.config.ingestion.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
@@ -93,6 +99,7 @@ export class IngestionService {
       const registrationRequest = this.buildAttachmentRegistrationRequest(attachment, key, scopeId);
       const registrationResponse =
         await this.uniqueApiClient.ingestion.registerContent(registrationRequest);
+      contentId = registrationResponse.id;
 
       const uploadUrl = this.correctWriteUrl(registrationResponse.writeUrl);
       stream = await this.confluenceApiClient.getAttachmentDownloadStream(
@@ -114,6 +121,33 @@ export class IngestionService {
         title: createSmeared(attachment.title),
         err: error,
         msg: 'Failed to ingest attachment, skipping',
+      });
+      if (contentId) {
+        await this.cleanupFailedRegistration(contentId, {
+          attachmentId: attachment.id,
+          title: createSmeared(attachment.title),
+        });
+      }
+    }
+  }
+
+  private async cleanupFailedRegistration(
+    contentId: string,
+    logContext: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.uniqueApiClient.files.deleteByIds([contentId]);
+      this.logger.warn({
+        ...logContext,
+        contentId,
+        msg: 'Deleted orphaned content after failed ingestion',
+      });
+    } catch (error) {
+      this.logger.error({
+        ...logContext,
+        contentId,
+        err: error,
+        msg: 'Failed to clean up orphaned content after failed ingestion',
       });
     }
   }
