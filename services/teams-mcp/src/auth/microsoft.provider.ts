@@ -11,6 +11,13 @@ export const SCOPES = [
   'OnlineMeetings.Read', // (delegated): 9be106e1-f4e3-4df5-bdff-e4bc531cbe43
   'OnlineMeetingRecording.Read.All', // (delegated): 190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3
   'OnlineMeetingTranscript.Read.All', // (delegated): 30b87d18-ebb1-45db-97f8-82ccb1f0190c
+  'ChannelMessage.Send', // (delegated): send messages to channels
+  'ChatMessage.Send', // (delegated): send messages to chats
+  'Chat.ReadBasic', // (delegated): list user's chats
+  'Chat.Read', // (delegated): read chat messages
+  'Team.ReadBasic.All', // (delegated): list joined teams
+  'Channel.ReadBasic.All', // (delegated): list channels in a team
+  'ChannelMessage.Read.All', // (delegated): read channel messages
 ];
 
 export const MicrosoftOAuthProvider: OAuthProviderConfig = {

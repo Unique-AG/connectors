@@ -17,7 +17,7 @@
 
 The Teams MCP Server is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
-**Note:** This is a connector-style MCP server, not a traditional MCP server. It does not provide tools, prompts, resources, or other MCP capabilities. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base without requiring any additional interaction or tool calls.
+**Note:** This is a connector-style MCP server. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base. It also exposes 6 MCP tools for Teams chat messaging: listing teams, channels, and chats; reading chat messages; and sending messages to channels or chats.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
@@ -58,6 +58,13 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `OnlineMeetingRecording.Read.All` | Delegated | Yes | Yes |
 | `OnlineMeetingTranscript.Read.All` | Delegated | Yes | Yes |
 | `offline_access` | Delegated | No | Yes |
+| `ChannelMessage.Send` | Delegated | No | Yes |
+| `ChatMessage.Send` | Delegated | No | Yes |
+| `Chat.ReadBasic` | Delegated | No | Yes |
+| `Chat.Read` | Delegated | No | Yes |
+| `Team.ReadBasic.All` | Delegated | No | Yes |
+| `Channel.ReadBasic.All` | Delegated | No | Yes |
+| `ChannelMessage.Read.All` | Delegated | Yes | Yes |
 
 For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md#least-privilege-justification).
 
@@ -89,6 +96,15 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 - Microsoft Graph webhook subscriptions created automatically on user connection
 - Subscriptions renewed automatically before expiration
 - Failed renewals handled gracefully with user reconnection required
+
+**Teams Chat Messaging**
+
+- `list_teams`: List all Microsoft Teams the user is a member of
+- `list_channels`: List all channels in a specific team
+- `list_chats`: List the user's recent chats (1:1, group, and meeting chats)
+- `get_chat_messages`: Retrieve recent messages from a chat
+- `send_channel_message`: Send a plain text message to a Teams channel
+- `send_chat_message`: Send a plain text message to a Teams chat
 
 ### Advanced Features
 
@@ -291,7 +307,7 @@ See [Authentication Architecture - Single App Registration Architecture](./techn
 ### Not Supported
 
 - **Real-time transcription**: Only processes completed transcripts, not live captions
-- **Meeting creation**: Read-only access; cannot create or modify meetings
+- **Meeting creation**: Cannot create or modify meetings (read-only for meetings)
 - **Selective meeting capture**: All meetings with transcription enabled are captured
 - **Token introspection**: Tokens validated locally with short TTLs for performance
 

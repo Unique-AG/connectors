@@ -13,6 +13,13 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | `OnlineMeetingRecording.Read.All` | Delegated | `190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3` | Yes | Yes |
 | `OnlineMeetingTranscript.Read.All` | Delegated | `30b87d18-ebb1-45db-97f8-82ccb1f0190c` | Yes | Yes |
 | `offline_access` | Delegated | `7427e0e9-2fba-42fe-b0c0-848c9e6a8182` | No | Yes |
+| `ChannelMessage.Send` | Delegated | `ebf0f66e-9fb1-49e4-a278-222f76911cf4` | No | Yes |
+| `ChatMessage.Send` | Delegated | `116b7235-2ffd-4103-963e-baec9c8e5c8b` | No | Yes |
+| `Chat.ReadBasic` | Delegated | `9547fcb5-d03f-419d-9948-5928bbf71b0f` | No | Yes |
+| `Chat.Read` | Delegated | `f501c180-9344-439a-bca0-6cbf209fd270` | No | Yes |
+| `Team.ReadBasic.All` | Delegated | `2280dda6-0bfd-44ee-a2f4-cb867cfc4c1e` | No | Yes |
+| `Channel.ReadBasic.All` | Delegated | `3aeca27b-ee3a-4c2b-8ded-80376e2134a4` | No | Yes |
+| `ChannelMessage.Read.All` | Delegated | `767156cb-16ae-4d10-8f8b-41b657c8c8c8` | Yes | Yes |
 
 ## Understanding Consent Requirements
 
@@ -24,6 +31,8 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 
    - Organization-wide OR per-user
    - For Teams MCP: `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` require admin consent
+   - These chat messaging permissions do **not** require admin consent and can be approved by individual users: `ChannelMessage.Send`, `ChatMessage.Send`, `Chat.ReadBasic`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`.
+   - `ChannelMessage.Read.All` **does** require admin consent (required for `get_channel_messages` to read channel message content).
 
 2. **Admin approval workflow (if tenant has it enabled)**
 
@@ -100,6 +109,70 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Purpose** | Obtain refresh tokens for long-lived sessions |
 | **Used For** | Refreshing expired access tokens without user re-authentication |
 | **Why Required** | Without this, users would need to re-authenticate every ~1 hour when access tokens expire |
+
+### `ChannelMessage.Send`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Send messages to Microsoft Teams channels |
+| **Used For** | `send_channel_message` tool to post messages on behalf of the user |
+| **Why Not Less** | No narrower permission exists for sending channel messages |
+| **Why Not `ChannelMessage.ReadWrite`** | We only send messages, not read or modify them |
+
+### `ChatMessage.Send`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Send messages to Microsoft Teams chats |
+| **Used For** | `send_chat_message` tool to post messages on behalf of the user |
+| **Why Not Less** | No narrower permission exists for sending chat messages |
+| **Why Not `Chat.ReadWrite`** | We only send messages, not read full chat content via this permission |
+
+### `Chat.ReadBasic`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | List the user's chats with basic metadata (topic, members, chat type) |
+| **Used For** | `list_chats` tool and resolving chats by topic or member name |
+| **Why Not Less** | No narrower permission exists for listing chats |
+| **Why Not `Chat.Read`** | `Chat.ReadBasic` is sufficient for listing chats; `Chat.Read` is only needed for reading message content |
+
+### `Chat.Read`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Read full message content from Teams chats |
+| **Used For** | `get_chat_messages` tool to retrieve message history |
+| **Why Not Less** | `Chat.ReadBasic` does not grant access to message content |
+| **Why Not `Chat.ReadWrite`** | We do not modify or delete chat messages |
+
+### `Team.ReadBasic.All`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | List all Teams the user is a member of |
+| **Used For** | `list_teams` tool and resolving teams by display name |
+| **Why Not Less** | No narrower permission exists for listing joined teams |
+| **Why Not `Team.Read.All`** | `Team.ReadBasic.All` is sufficient for listing teams with display names |
+
+### `Channel.ReadBasic.All`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | List channels in a Team |
+| **Used For** | `list_channels` tool and resolving channels by display name |
+| **Why Not Less** | No narrower permission exists for listing channels |
+| **Why Not `Channel.Read.All`** | `Channel.ReadBasic.All` is sufficient for listing channels with display names |
+
+### `ChannelMessage.Read.All`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Read message content from Teams channels |
+| **Used For** | `get_channel_messages` tool to retrieve channel message history |
+| **Why Not Less** | `Channel.ReadBasic.All` only covers listing channels, not reading message content |
+| **Why Not `ChannelMessage.ReadWrite`** | We do not modify or delete channel messages |
+| **Admin Consent** | Required because channel messages may contain sensitive organisational content |
 
 ## Why Delegated (Not Application) Permissions
 

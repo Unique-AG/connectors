@@ -14,6 +14,13 @@ locals {
     "OnlineMeetings.Read",
     "OnlineMeetingRecording.Read.All",
     "OnlineMeetingTranscript.Read.All",
+    "ChannelMessage.Send",
+    "ChatMessage.Send",
+    "Chat.ReadBasic",
+    "Chat.Read",
+    "Team.ReadBasic.All",
+    "Channel.ReadBasic.All",
+    "ChannelMessage.Read.All",
   ])
 }
 
