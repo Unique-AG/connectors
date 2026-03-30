@@ -36,11 +36,11 @@ The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at 
 
 Each tenant configuration file can include a top-level `status` field:
 
-| Status | Default | Behavior |
-|---|---|---|
-| `active` | Yes | Tenant is loaded and sync jobs are scheduled |
+| Status | Default | Behavior                                        |
+|---|---|-------------------------------------------------|
+| `active` | Yes | Tenant is loaded and sync jobs are scheduled    |
 | `inactive` | -- | Tenant config is validated but no sync jobs run |
-| `deleted` | -- | Tenant is skipped entirely (config is not validated) |
+| `deleted` | -- | Tenant is skipped entirely (for now)            |
 
 ### Complete Example (Cloud + External Auth)
 
@@ -134,9 +134,9 @@ confluence:
 | `baseUrl` | Yes | -- | Base URL of the Confluence instance (e.g., `https://acme.atlassian.net`). Must not end with a trailing slash |
 | `cloudId` | Yes (Cloud only) | -- | Atlassian Cloud ID (UUID) for the Confluence site |
 | `auth` | Yes | -- | Authentication configuration (see [Authentication](./authentication.md#confluence-authentication-methods)) |
-| `apiRateLimitPerMinute` | Yes | -- (required) | Number of Confluence API requests allowed per minute |
-| `ingestSingleLabel` | Yes | -- (required) | Confluence label that marks individual pages for synchronization (e.g., `ai-ingest`) |
-| `ingestAllLabel` | Yes | -- (required) | Confluence label that marks a page and all its descendants for synchronization (e.g., `ai-ingest-all`) |
+| `apiRateLimitPerMinute` | Yes | -- | Number of Confluence API requests allowed per minute |
+| `ingestSingleLabel` | Yes | -- | Confluence label that marks individual pages for synchronization (e.g., `ai-ingest`) |
+| `ingestAllLabel` | Yes | -- | Confluence label that marks a page and all its descendants for synchronization (e.g., `ai-ingest-all`) |
 
 **Important:** `ingestSingleLabel` and `ingestAllLabel` are required fields with no schema default. Operators must explicitly configure them. The recommended convention is `ai-ingest` and `ai-ingest-all`.
 
