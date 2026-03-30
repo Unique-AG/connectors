@@ -55,7 +55,13 @@ See [Flows -- Discovery Phase](./flows.md#discovery-phase) for details.
 
 ### File Diff Mechanism
 
-The connector computes diffs per Confluence space by comparing discovered items against the state stored in Unique, categorizing each item as new, updated, or deleted based on its key and `updatedAt` timestamp. See [Flows -- File Diff Mechanism](./flows.md#file-diff-mechanism) for details.
+The connector maintains state to detect changes:
+
+- **New items**: Labeled pages and attachments not previously synced
+- **Updated items**: Items with changed metadata since last sync
+- **Deleted items**: Previously synced items no longer labeled or deleted from Confluence
+
+See [Flows -- File Diff Mechanism](./flows.md#file-diff-mechanism) for details.
 
 ## Related Documentation
 
