@@ -93,7 +93,7 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
           and(
             // Normally we should not do anything about the ready state since we get webhook notifications
             // but because microsoft does not trigger this webhook if a user updates the categories to be
-            // on the safe side we trigger every 4 hours if the user did not reaceive any emails
+            // on the safe side we trigger every 4 hours if the user did not receive any emails
             eq(inboxConfigurations.liveCatchUpState, 'ready'),
             lt(
               inboxConfigurations.liveCatchUpHeartbeatAt,
