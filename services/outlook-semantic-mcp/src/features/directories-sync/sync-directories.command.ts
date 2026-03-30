@@ -1,7 +1,9 @@
 import assert from 'node:assert';
 import { createSmeared } from '@unique-ag/utils';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes } from '@opentelemetry/api';
+import { Cache } from 'cache-manager';
 import { and, eq, inArray } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish } from 'remeda';
@@ -11,6 +13,7 @@ import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
+import { folderPathsCacheKey } from './get-folder-paths.query';
 import { graphOutlookDirectoriesDeltaResponse } from './microsoft-graph.dtos';
 import { SyncDirectoriesForUserProfileCommand } from './sync-directories-for-user-profile.command';
 
@@ -20,6 +23,7 @@ export class SyncDirectoriesCommand {
 
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly syncDirectoriesForUserProfileCommand: SyncDirectoriesForUserProfileCommand,
@@ -81,6 +85,7 @@ export class SyncDirectoriesCommand {
       traceEvent(`Run directories sync`);
       this.logger.log({ ...logContext, msg: `Run directories sync` });
       await this.syncDirectoriesForUserProfileCommand.run(userProfileTypeId);
+      await this.cacheManager.del(folderPathsCacheKey(userProfile.id));
       traceEvent('directories sync completed');
       this.logger.log({ ...logContext, msg: `Directories sync completed` });
     } else {

@@ -1,11 +1,17 @@
 import assert from 'node:assert';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable } from '@nestjs/common';
+import { Cache } from 'cache-manager';
 import { and, eq, sql } from 'drizzle-orm';
 import { Directory, DirectoryType, DRIZZLE, DrizzleDatabase, directories } from '~/db';
+import { folderPathsCacheKey } from './get-folder-paths.query';
 
 @Injectable()
 export class UpsertDirectoryCommand {
-  public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
+  public constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   public async run({
     parentId,
@@ -48,6 +54,7 @@ export class UpsertDirectoryCommand {
       ),
     });
     assert.ok(newDirectory, `Could not create new directory`);
+    await this.cacheManager.del(folderPathsCacheKey(userProfileId));
     return newDirectory;
   }
 }
