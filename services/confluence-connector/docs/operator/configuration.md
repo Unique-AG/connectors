@@ -314,22 +314,7 @@ The Helm chart ships these values by default.
 
 The connector exposes standard host metrics (CPU, memory, event loop) and HTTP API metrics.
 
-### Connector Metrics
-
-The connector registers custom metrics with the `cfc_` prefix:
-
-| Metric | Type | Description |
-|---|---|---|
-| `cfc_sync_duration_seconds` | Histogram | Duration of sync cycles (labels: `tenant`, `result`) |
-| `cfc_scan_duration_seconds` | Histogram | Duration of the Confluence page discovery phase (labels: `tenant`) |
-| `cfc_pages_processed_total` | Counter | Pages processed during ingestion (labels: `tenant`, `result`) |
-| `cfc_attachments_processed_total` | Counter | Attachments processed during ingestion (labels: `tenant`, `result`) |
-| `cfc_content_deleted_total` | Counter | Content items deleted from Unique (labels: `tenant`, `result`) |
-| `cfc_file_diff_events_total` | Counter | File change detection events (labels: `tenant`, `diff_result_type`) |
-| `cfc_attachment_upload_duration_seconds` | Histogram | Duration of a single attachment upload to Unique (labels: `tenant`) |
-| `cfc_confluence_api_request_duration_seconds` | Histogram | Confluence API request latency (labels: `tenant`, `endpoint`, `result`) |
-| `cfc_confluence_api_throttle_events_total` | Counter | Confluence API rate-limit throttling events (labels: `tenant`) |
-| `cfc_confluence_api_errors_total` | Counter | Confluence API error responses (labels: `tenant`, `http_status_class`) |
+Unique API metrics and custom connector metrics will be documented in a future update.
 
 ### Grafana Dashboard
 
