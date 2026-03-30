@@ -1071,6 +1071,16 @@ describe('SharepointSynchronizationService', () => {
     expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledWith(siteConfig.siteId);
   });
 
+  it('does not initialize root scope when getSiteInfo fails', async () => {
+    mockGraphApiService.getSiteInfo = vi.fn().mockRejectedValue(new Error('Site not found'));
+
+    const result = await service.synchronize();
+
+    expect(result.status).toBe('success');
+    expect(mockScopeManagementService.initializeRootScope).not.toHaveBeenCalled();
+    expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
+  });
+
   it('ensures unique scopeIds and logs errors for duplicates', async () => {
     const site1 = createMockSiteConfig({
       siteId: new Smeared('site-1', false),
