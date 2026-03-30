@@ -7,6 +7,7 @@ import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { ConfigDiagnosticsModule } from './config/config-diagnostics.module';
+import { healthConfig } from './config/health.config';
 import { proxyConfig } from './config/proxy.config';
 import {
   AppConfig,
@@ -24,7 +25,7 @@ import { Redacted } from './utils/redacted';
     ConfigModule.forRoot({
       isGlobal: true,
       ignoreEnvFile: true,
-      load: [appConfig, sharepointConfig, processingConfig, uniqueConfig, proxyConfig],
+      load: [appConfig, sharepointConfig, processingConfig, uniqueConfig, proxyConfig, healthConfig],
     }),
     ProxyModule,
     ConfigDiagnosticsModule,
