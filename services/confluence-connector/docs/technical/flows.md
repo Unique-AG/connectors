@@ -92,7 +92,7 @@ sequenceDiagram
     rect rgb(200, 235, 200)
         Note over Connector,Unique: Processing Phase
         loop For each Confluence space
-            Connector->>Unique: POST file diff<br/>(pages + attachments per space)
+            Connector->>Unique: POST /v2/content/file-diff<br/>(pages + attachments per space)
             Unique->>Connector: newFiles, updatedFiles,<br/>deletedFiles, movedFiles
             Note over Connector: Safety checks:<br/>abort if accidental full deletion<br/>(movedFiles are not processed)
         end
@@ -320,7 +320,7 @@ If any step fails, the stream is destroyed and the error is logged. Other attach
 
 Deleted items identified by the file diff are processed after ingestion:
 
-1. Build content keys from `{partialKey}/{id}` for each deleted item
+1. Build content keys for each deleted item
 2. Resolve keys to content IDs
 3. Delete content by IDs
 
@@ -342,7 +342,7 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 |---|---|---|
 | Sync already in progress | Overlapping cron triggers or long-running sync | Skip the cycle entirely (re-entrancy guard) |
 | Root scope not found | Misconfigured `scopeId` or scope deleted | Abort the entire sync cycle |
-| Accidental full deletion detected | Bug in page fetching or key format change | Abort the entire tenant sync cycle (see [Safety Checks](#safety-checks)) |
+| Accidental full deletion detected | Bug in page fetching or key format change | Abort the entire tenant sync cycle |
 | Page fetch failure | Page deleted between discovery and content fetch, transient API error | Log error, skip the page, continue other pages |
 | Page not found | Page deleted between discovery and content fetch | Log warning, skip the page |
 | Page with empty body | Page has no content (e.g., newly created) | Log, skip the page |
