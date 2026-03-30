@@ -71,7 +71,7 @@ export class IngestEmailCommand {
   }): Promise<MessageIngestionResult | 'failed'> {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        return await this.ingestEmail({ userProfileId, messageId, filters });
+        return await this.processEmail({ userProfileId, messageId, filters });
       } catch (error) {
         if (error instanceof Bottleneck.BottleneckError) {
           throw error;
@@ -101,7 +101,7 @@ export class IngestEmailCommand {
   }
 
   @Span()
-  private async ingestEmail({
+  private async processEmail({
     userProfileId,
     messageId,
     filters,
