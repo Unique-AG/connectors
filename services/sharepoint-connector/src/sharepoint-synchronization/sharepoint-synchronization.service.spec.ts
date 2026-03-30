@@ -26,7 +26,7 @@ describe('SharepointSynchronizationService', () => {
   let mockScopeManagementService: {
     initializeRootScope: ReturnType<typeof vi.fn>;
     batchCreateScopes: ReturnType<typeof vi.fn>;
-    deleteRootScopeRecursively: ReturnType<typeof vi.fn>;
+    resetRootScope: ReturnType<typeof vi.fn>;
     deleteOrphanedScopes: ReturnType<typeof vi.fn>;
   };
   let mockSubsiteDiscoveryService: {
@@ -135,7 +135,7 @@ describe('SharepointSynchronizationService', () => {
         isInitialSync: false,
       }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
-      deleteRootScopeRecursively: vi.fn().mockResolvedValue(undefined),
+      resetRootScope: vi.fn().mockResolvedValue(undefined),
       deleteOrphanedScopes: vi.fn().mockResolvedValue(undefined),
     };
 

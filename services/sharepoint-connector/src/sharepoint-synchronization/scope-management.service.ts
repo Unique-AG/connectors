@@ -120,33 +120,30 @@ export class ScopeManagementService {
     return { serviceUserId: userId, rootPath, isInitialSync };
   }
 
-  public async deleteRootScopeRecursively(scopeId: string): Promise<void> {
+  public async resetRootScope(scopeId: string): Promise<void> {
     const logPrefix = `[RootScopeId: ${scopeId}]`;
-    this.logger.log(`${logPrefix} Deleting root scope recursively`);
+    this.logger.log(`${logPrefix} Resetting root scope (deleting children, clearing externalId)`);
 
     try {
-      const result = await this.uniqueScopesService.deleteScope(scopeId, { recursive: true });
+      const children = await this.uniqueScopesService.listChildrenScopes(scopeId);
+      this.logger.log(`${logPrefix} Found ${children.length} child scopes to delete`);
 
-      if (result.successFolders.length > 0) {
-        this.logger.log(
-          `${logPrefix} Successfully deleted ${result.successFolders.length} folders`,
+      for (const child of children) {
+        const result = await this.uniqueScopesService.deleteScope(child.id, { recursive: true });
+
+        assert.strictEqual(
+          result.failedFolders.length,
+          0,
+          `Failed to fully delete child scope ${child.id}: ` +
+            `${result.failedFolders.length} folders could not be removed`,
         );
       }
 
-      if (result.failedFolders.length > 0) {
-        this.logger.warn({
-          msg: `${logPrefix} Failed to delete ${result.failedFolders.length} folders`,
-          failedFolders: result.failedFolders.map((f) => ({
-            id: f.id,
-            name: f.name,
-            path: createSmeared(f.path),
-            reason: f.failReason,
-          })),
-        });
-      }
+      await this.uniqueScopesService.updateScopeExternalId(scopeId, null);
+      this.logger.log(`${logPrefix} Cleared externalId on root scope`);
     } catch (error) {
       this.logger.error({
-        msg: `${logPrefix} Failed to delete root scope recursively`,
+        msg: `${logPrefix} Failed to reset root scope`,
         error: sanitizeError(error),
       });
       throw error;
