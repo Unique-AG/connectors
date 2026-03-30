@@ -15,8 +15,8 @@ import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
 import { MailSubscriptionController } from './mail-subscription.controller';
 import { SubscriptionModule } from './subscriptions/subscription.module';
 import {
+  DeleteInboxDataTool,
   ReconnectInboxTool,
-  RemoveInboxConnectionTool,
   VerifyInboxConnectionTool,
 } from './subscriptions/tools';
 import {
@@ -40,8 +40,8 @@ const TOOLS = [
   ListFoldersTool,
   SyncProgressTool,
   VerifyInboxConnectionTool,
+  DeleteInboxDataTool,
   ReconnectInboxTool,
-  RemoveInboxConnectionTool,
   SearchEmailsTool,
   OpenEmailTool,
   ListCategoriesTool,

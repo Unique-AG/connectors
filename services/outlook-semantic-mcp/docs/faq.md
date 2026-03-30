@@ -37,7 +37,7 @@
   - [How do I filter search results to a specific folder?](#How-do-I-filter-search-results-to-a-specific-folder)
   - [Can I attach files when creating a draft email?](#Can-I-attach-files-when-creating-a-draft-email)
   - [What does reconnect_inbox do?](#What-does-reconnect_inbox-do)
-  - [What does remove_inbox_connection do?](#What-does-remove_inbox_connection-do)
+  - [What does delete_inbox_data do?](#What-does-delete_inbox_data-do)
 - [Data Privacy & Storage](#Data-Privacy-&-Storage)
   - [Does the MCP server store my emails?](#Does-the-MCP-server-store-my-emails)
   - [Where is my email content stored?](#Where-is-my-email-content-stored)
@@ -90,7 +90,7 @@
 | Draft Creation | `create_draft_email` |
 | Contact Lookup | `lookup_contacts` |
 | Mailbox Utilities | `list_categories`, `list_folders` |
-| Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `remove_inbox_connection` |
+| Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data` |
 | Sync Monitoring | `sync_progress` |
 
 An additional 4 tools are available only when the server is running in debug mode (`MCP_DEBUG_MODE=enabled`): `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`. These are intended for development and troubleshooting and are not exposed in production deployments.
@@ -333,9 +333,9 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 **See also:** [Subscription Management](./technical/subscription-management.md) — [Tools — reconnect_inbox](./technical/tools.md#reconnect_inbox)
 
-### What does `remove_inbox_connection` do?
+### What does `delete_inbox_data` do?
 
-**Answer:** `remove_inbox_connection` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Subscription Management — remove_inbox_connection](./technical/subscription-management.md#remove_inbox_connection) for the full list of what is removed.
+**Answer:** `delete_inbox_data` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Subscription Management — delete_inbox_data](./technical/subscription-management.md#delete_inbox_data) for the full list of what is removed.
 
 ## Data Privacy & Storage
 
@@ -380,7 +380,7 @@ Access to the email content itself requires access to the Unique knowledge base,
 
 ### What happens to my email data when I disconnect?
 
-**Answer:** Calling `remove_inbox_connection`:
+**Answer:** Calling `delete_inbox_data`:
 
 - Deletes the Microsoft Graph subscription (stops future email sync)
 - Removes the per-user root scopes from the Unique knowledge base, which also removes all ingested email content for that user

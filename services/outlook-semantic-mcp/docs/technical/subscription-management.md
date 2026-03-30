@@ -46,7 +46,7 @@ Safe to call at any time — it is idempotent:
 
 Calling `reconnect_inbox` triggers a full sync when a new subscription is created. If the subscription is `already_active` or `expiring_soon`, no full sync is triggered.
 
-## `remove_inbox_connection`
+## `delete_inbox_data`
 
 Removes the mailbox connection entirely:
 
@@ -73,5 +73,5 @@ Microsoft Graph sends lifecycle notifications when a subscription's state change
 - [Directory Sync](./directory-sync.md) - Folder sync that also depends on an active connection
 - [Full Sync](./full-sync.md) - Historical batch ingestion triggered on subscription creation
 - [Flows](./flows.md#Subscription-Creation-and-Renewal-Lifecycle) - Subscription lifecycle sequence diagram
-- [Tools](./tools.md#verify_inbox_connection) - `verify_inbox_connection`, `reconnect_inbox`, `remove_inbox_connection` tool reference
+- [Tools](./tools.md#verify_inbox_connection) - `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data` tool reference
 - [Configuration](../operator/configuration.md) - `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` and related env vars

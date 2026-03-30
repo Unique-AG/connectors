@@ -21,12 +21,12 @@ import {
 } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { findBestMatch } from '~/utils/find-best-match';
+import { stripChunkTags } from '~/utils/strip-chunk-tags';
 import {
   buildSearchFilter,
   type SearchCondition,
   SearchEmailsInputSchema,
 } from './search-conditions.dto';
-import { stripChunkTags } from '~/utils/strip-chunk-tags';
 
 export interface SearchEmailResult {
   id: string;

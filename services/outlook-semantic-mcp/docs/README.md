@@ -85,7 +85,7 @@ All permissions are **Delegated** (not Application): `User.Read`, `Mail.ReadWrit
 
 - Check mailbox connection and webhook subscription status via `verify_inbox_connection` (returns: active, expiring_soon, expired, not_configured)
 - Reconnect a mailbox after token expiry or webhook failure via `reconnect_inbox`
-- Remove a mailbox connection entirely via `remove_inbox_connection`
+- Permanently delete synced inbox data and stop ingestion via `delete_inbox_data`
 - Microsoft Graph webhook subscriptions created automatically on connection and renewed before expiration
 
 **Full Sync (Historical Batch Ingestion)**

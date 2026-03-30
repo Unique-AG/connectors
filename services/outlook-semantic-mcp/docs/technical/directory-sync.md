@@ -71,7 +71,7 @@ The `deltaLink` from each Graph delta response is stored in the `directories_syn
 
 ## Relation to Subscription Management
 
-Directory sync runs as long as the user has an active inbox connection. When `remove_inbox_connection` is called, directory sync data and the associated root scopes are removed from the Unique knowledge base along with the subscription.
+Directory sync runs as long as the user has an active inbox connection. When `delete_inbox_data` is called, directory sync data and the associated root scopes are removed from the Unique knowledge base along with the subscription.
 
 ## Related Documentation
 

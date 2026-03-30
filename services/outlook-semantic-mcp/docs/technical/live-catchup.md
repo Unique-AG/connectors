@@ -106,7 +106,7 @@ For subscription-level failures (e.g. `subscriptionRemoved`), see [Subscription 
 
 ## Related Documentation
 
-- [Subscription Management](./subscription-management.md) - Subscription lifecycle, `reconnect_inbox`, `remove_inbox_connection`
+- [Subscription Management](./subscription-management.md) - Subscription lifecycle, `reconnect_inbox`, `delete_inbox_data`
 - [Directory Sync](./directory-sync.md) - Folder sync and email delete detection
 - [Full Sync](./full-sync.md) - Historical batch ingestion and watermark initialisation
 - [Flows](./flows.md#Live-Catch-Up:-Webhook-Driven-Email-Ingestion) - Live catch-up sequence diagram
