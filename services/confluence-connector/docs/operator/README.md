@@ -98,7 +98,7 @@ In cluster-internal mode, Zitadel token validation is not needed. The connector 
 | `{data-center-host}` | 443 | HTTPS | Outbound |
 | Unique Ingestion Service | 443 / internal | HTTPS / HTTP | Outbound / Internal |
 | Unique Scope Management Service | 443 / internal | HTTPS / HTTP | Outbound / Internal |
-| Zitadel IdP | 443 | HTTPS | Outbound |
+| Zitadel IdP | 443 | HTTPS | Outbound (external mode only) |
 | DNS | 53 | UDP / TCP | Outbound |
 
 ## Deployment Checklist
@@ -130,6 +130,7 @@ In cluster-internal mode, Zitadel token validation is not needed. The connector 
 - [ ] Tenant configuration YAML file created with all required fields
 - [ ] Secrets created in Kubernetes (OAuth client secret, PAT, or Zitadel credentials)
 - [ ] Helm chart deployed
+- [ ] Confluence labels applied to pages that should be synced
 
 ### 5. Verification
 
