@@ -8,6 +8,7 @@ import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
 import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
+  CONTENT_UPSERT_LOG_SAFE_KEYS,
   CONTENT_UPSERT_MUTATION,
   ContentUpsertMutationInput,
   ContentUpsertMutationResult,
@@ -60,7 +61,7 @@ export class UniqueFileIngestionService {
     const result = await this.ingestionClient.request<
       ContentUpsertMutationResult,
       ContentUpsertMutationInput
-    >(CONTENT_UPSERT_MUTATION, variables);
+    >(CONTENT_UPSERT_MUTATION, variables, { logSafeKeys: CONTENT_UPSERT_LOG_SAFE_KEYS });
 
     assert.ok(result?.contentUpsert, 'Invalid response from Unique API content registration');
     return result.contentUpsert;
@@ -94,7 +95,7 @@ export class UniqueFileIngestionService {
     const result = await this.ingestionClient.request<
       ContentUpsertMutationResult,
       ContentUpsertMutationInput
-    >(CONTENT_UPSERT_MUTATION, variables);
+    >(CONTENT_UPSERT_MUTATION, variables, { logSafeKeys: CONTENT_UPSERT_LOG_SAFE_KEYS });
 
     assert.ok(result?.contentUpsert?.id, 'Invalid response from Unique API ingestion finalization');
     return { id: result.contentUpsert.id };

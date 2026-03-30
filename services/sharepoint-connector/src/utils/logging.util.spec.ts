@@ -1,8 +1,9 @@
 import { ConfigService } from '@nestjs/config';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type { Config } from '../config';
+import { LogsDiagnosticDataPolicy } from '../config/app.config';
 import {
-  shouldConcealLogs,
+  shouldDiscloseLogs,
   smear,
   smearSiteIdFromPath,
   smearSiteNameFromPath,
@@ -143,36 +144,64 @@ describe('logging utilities', () => {
     });
   });
 
-  describe('concealLogs', () => {
-    it('returns true when policy is "conceal"', () => {
-      const mockConfigService = {
-        get: (_key: string, _options: { infer: true }) => 'conceal' as const,
-      } as ConfigService<Config, true>;
-      expect(shouldConcealLogs(mockConfigService)).toBe(true);
+  describe('shouldDiscloseLogs', () => {
+    beforeEach(() => {
+      delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
     });
 
-    it('returns false when policy is "disclose"', () => {
-      const mockConfigService = {
-        get: (_key: string, _options: { infer: true }) => 'disclose' as const,
-      } as ConfigService<Config, true>;
-      expect(shouldConcealLogs(mockConfigService)).toBe(false);
+    describe('without ConfigService (reads process.env)', () => {
+      it('returns false when env is CONCEAL', () => {
+        process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.CONCEAL;
+        expect(shouldDiscloseLogs()).toBe(false);
+      });
+
+      it('returns true when env is DISCLOSE', () => {
+        process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.DISCLOSE;
+        expect(shouldDiscloseLogs()).toBe(true);
+      });
+
+      it('returns false when env is not set (conceal by default)', () => {
+        delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
+        expect(shouldDiscloseLogs()).toBe(false);
+      });
+
+      it('returns false when env is an invalid value', () => {
+        process.env.LOGS_DIAGNOSTICS_DATA_POLICY = 'invalid-value';
+        expect(shouldDiscloseLogs()).toBe(false);
+      });
     });
 
-    it('calls config service with correct parameters', () => {
-      let capturedKey: string | undefined;
-      let capturedOptions: { infer: true } | undefined;
+    describe('with ConfigService', () => {
+      it('returns true when policy is "disclose"', () => {
+        const mockConfigService = {
+          get: (_key: string, _options: { infer: true }) => 'disclose' as const,
+        } as ConfigService<Config, true>;
+        expect(shouldDiscloseLogs(mockConfigService)).toBe(true);
+      });
 
-      const mockConfigService = {
-        get: (key: string, options: { infer: true }) => {
-          capturedKey = key;
-          capturedOptions = options;
-          return 'conceal' as const;
-        },
-      } as ConfigService<Config, true>;
+      it('returns false when policy is "conceal"', () => {
+        const mockConfigService = {
+          get: (_key: string, _options: { infer: true }) => 'conceal' as const,
+        } as ConfigService<Config, true>;
+        expect(shouldDiscloseLogs(mockConfigService)).toBe(false);
+      });
 
-      shouldConcealLogs(mockConfigService);
-      expect(capturedKey).toBe('app.logsDiagnosticsDataPolicy');
-      expect(capturedOptions).toEqual({ infer: true });
+      it('reads from config service with correct parameters', () => {
+        let capturedKey: string | undefined;
+        let capturedOptions: { infer: true } | undefined;
+
+        const mockConfigService = {
+          get: (key: string, options: { infer: true }) => {
+            capturedKey = key;
+            capturedOptions = options;
+            return 'conceal' as const;
+          },
+        } as ConfigService<Config, true>;
+
+        shouldDiscloseLogs(mockConfigService);
+        expect(capturedKey).toBe('app.logsDiagnosticsDataPolicy');
+        expect(capturedOptions).toEqual({ infer: true });
+      });
     });
   });
 });

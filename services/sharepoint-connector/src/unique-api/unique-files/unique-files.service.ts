@@ -8,8 +8,11 @@ import {
   ADD_ACCESSES_MUTATION,
   AddAccessesMutationInput,
   AddAccessesMutationResult,
+  CONTENT_DELETE_BY_IDS_LOG_SAFE_KEYS,
   CONTENT_DELETE_BY_IDS_MUTATION,
+  CONTENT_DELETE_LOG_SAFE_KEYS,
   CONTENT_DELETE_MUTATION,
+  CONTENT_UPDATE_LOG_SAFE_KEYS,
   CONTENT_UPDATE_MUTATION,
   ContentDeleteByContentIdsMutationInput,
   ContentDeleteByContentIdsMutationResult,
@@ -17,7 +20,10 @@ import {
   ContentDeleteMutationResult,
   ContentUpdateMutationInput,
   ContentUpdateMutationResult,
+  FILE_ACCESSES_LOG_SAFE_KEYS,
+  PAGINATED_CONTENT_COUNT_LOG_SAFE_KEYS,
   PAGINATED_CONTENT_COUNT_QUERY,
+  PAGINATED_CONTENT_LOG_SAFE_KEYS,
   PAGINATED_CONTENT_QUERY,
   PaginatedContentCountQueryInput,
   PaginatedContentCountQueryResult,
@@ -56,11 +62,15 @@ export class UniqueFilesService {
     const result = await this.ingestionClient.request<
       ContentUpdateMutationResult,
       ContentUpdateMutationInput
-    >(CONTENT_UPDATE_MUTATION, {
-      contentId,
-      ownerId: newOwnerId,
-      input: { url: newUrl },
-    });
+    >(
+      CONTENT_UPDATE_MUTATION,
+      {
+        contentId,
+        ownerId: newOwnerId,
+        input: { url: newUrl },
+      },
+      { logSafeKeys: CONTENT_UPDATE_LOG_SAFE_KEYS },
+    );
 
     return result.contentUpdate;
   }
@@ -72,9 +82,13 @@ export class UniqueFilesService {
     const result = await this.ingestionClient.request<
       ContentDeleteMutationResult,
       ContentDeleteMutationInput
-    >(CONTENT_DELETE_MUTATION, {
-      contentDeleteId: contentId,
-    });
+    >(
+      CONTENT_DELETE_MUTATION,
+      {
+        contentDeleteId: contentId,
+      },
+      { logSafeKeys: CONTENT_DELETE_LOG_SAFE_KEYS },
+    );
 
     return result.contentDelete;
   }
@@ -90,15 +104,19 @@ export class UniqueFilesService {
       const batchResult = await this.ingestionClient.request<
         PaginatedContentQueryResult,
         PaginatedContentQueryInput
-      >(PAGINATED_CONTENT_QUERY, {
-        skip: 0,
-        take: CONTENT_BATCH_SIZE,
-        where: {
-          key: {
-            startsWith: `${siteId.value}/`,
+      >(
+        PAGINATED_CONTENT_QUERY,
+        {
+          skip: 0,
+          take: CONTENT_BATCH_SIZE,
+          where: {
+            key: {
+              startsWith: `${siteId.value}/`,
+            },
           },
         },
-      });
+        { logSafeKeys: PAGINATED_CONTENT_LOG_SAFE_KEYS },
+      );
 
       const fileIds = batchResult.paginatedContent.nodes.map((f) => f.id);
 
@@ -112,9 +130,13 @@ export class UniqueFilesService {
         await this.ingestionClient.request<
           ContentDeleteByContentIdsMutationResult,
           ContentDeleteByContentIdsMutationInput
-        >(CONTENT_DELETE_BY_IDS_MUTATION, {
-          contentIds: deleteBatch,
-        });
+        >(
+          CONTENT_DELETE_BY_IDS_MUTATION,
+          {
+            contentIds: deleteBatch,
+          },
+          { logSafeKeys: CONTENT_DELETE_BY_IDS_LOG_SAFE_KEYS },
+        );
 
         totalDeleted += deleteBatch.length;
         this.logger.debug(
@@ -142,15 +164,19 @@ export class UniqueFilesService {
       const batchResult = await this.ingestionClient.request<
         PaginatedContentQueryResult,
         PaginatedContentQueryInput
-      >(PAGINATED_CONTENT_QUERY, {
-        skip,
-        take: CONTENT_BATCH_SIZE,
-        where: {
-          key: {
-            in: keys,
+      >(
+        PAGINATED_CONTENT_QUERY,
+        {
+          skip,
+          take: CONTENT_BATCH_SIZE,
+          where: {
+            key: {
+              in: keys,
+            },
           },
         },
-      });
+        { logSafeKeys: PAGINATED_CONTENT_LOG_SAFE_KEYS },
+      );
       files.push(...batchResult.paginatedContent.nodes);
       batchCount = batchResult.paginatedContent.nodes.length;
       skip += CONTENT_BATCH_SIZE;
@@ -171,15 +197,19 @@ export class UniqueFilesService {
       const batchResult = await this.ingestionClient.request<
         PaginatedContentQueryResult,
         PaginatedContentQueryInput
-      >(PAGINATED_CONTENT_QUERY, {
-        skip,
-        take: CONTENT_BATCH_SIZE,
-        where: {
-          key: {
-            startsWith: `${siteId.value}/`,
+      >(
+        PAGINATED_CONTENT_QUERY,
+        {
+          skip,
+          take: CONTENT_BATCH_SIZE,
+          where: {
+            key: {
+              startsWith: `${siteId.value}/`,
+            },
           },
         },
-      });
+        { logSafeKeys: PAGINATED_CONTENT_LOG_SAFE_KEYS },
+      );
       files.push(...batchResult.paginatedContent.nodes);
       batchCount = batchResult.paginatedContent.nodes.length;
       skip += CONTENT_BATCH_SIZE;
@@ -195,13 +225,17 @@ export class UniqueFilesService {
     const result = await this.ingestionClient.request<
       PaginatedContentCountQueryResult,
       PaginatedContentCountQueryInput
-    >(PAGINATED_CONTENT_COUNT_QUERY, {
-      where: {
-        key: {
-          startsWith: `${siteId.value}/`,
+    >(
+      PAGINATED_CONTENT_COUNT_QUERY,
+      {
+        where: {
+          key: {
+            startsWith: `${siteId.value}/`,
+          },
         },
       },
-    });
+      { logSafeKeys: PAGINATED_CONTENT_COUNT_LOG_SAFE_KEYS },
+    );
 
     return result.paginatedContent.totalCount;
   }
@@ -230,6 +264,7 @@ export class UniqueFilesService {
             scopeId,
             fileAccesses: batch,
           },
+          { logSafeKeys: FILE_ACCESSES_LOG_SAFE_KEYS },
         );
         successCount += batch.length;
       } catch (error) {
@@ -254,6 +289,7 @@ export class UniqueFilesService {
                 scopeId,
                 fileAccesses: [permission],
               },
+              { logSafeKeys: FILE_ACCESSES_LOG_SAFE_KEYS },
             );
             successCount += 1;
           } catch (singleError) {
@@ -288,10 +324,14 @@ export class UniqueFilesService {
         await this.ingestionClient.request<
           RemoveAccessesMutationResult,
           RemoveAccessesMutationInput
-        >(REMOVE_ACCESSES_MUTATION, {
-          scopeId,
-          fileAccesses: batch,
-        });
+        >(
+          REMOVE_ACCESSES_MUTATION,
+          {
+            scopeId,
+            fileAccesses: batch,
+          },
+          { logSafeKeys: FILE_ACCESSES_LOG_SAFE_KEYS },
+        );
         successCount += batch.length;
       } catch (error) {
         const statusCode = getErrorCodeFromGraphqlRequest(error);
@@ -312,10 +352,14 @@ export class UniqueFilesService {
             await this.ingestionClient.request<
               RemoveAccessesMutationResult,
               RemoveAccessesMutationInput
-            >(REMOVE_ACCESSES_MUTATION, {
-              scopeId,
-              fileAccesses: [permission],
-            });
+            >(
+              REMOVE_ACCESSES_MUTATION,
+              {
+                scopeId,
+                fileAccesses: [permission],
+              },
+              { logSafeKeys: FILE_ACCESSES_LOG_SAFE_KEYS },
+            );
             successCount += 1;
           } catch (singleError) {
             this.logger.error({
