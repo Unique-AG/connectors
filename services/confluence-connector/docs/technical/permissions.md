@@ -24,10 +24,6 @@ The Confluence Connector requires specific permissions to access the Confluence 
 
 ## Confluence Cloud Permissions
 
-### Authentication Model
-
-Confluence Cloud uses OAuth 2.0 two-legged (client credentials) authentication via the centralized Atlassian identity endpoint (`https://api.atlassian.com/oauth/token`). The token request sends `grant_type`, `client_id`, and `client_secret` as a JSON body. No explicit OAuth scopes are included in the token request; the access token inherits the permissions of the service account configured in the Atlassian Admin Console.
-
 ### Required API Access
 
 The Cloud API client calls the following endpoints through the Atlassian API gateway (`https://api.atlassian.com/ex/confluence/<cloudId>`):
@@ -41,33 +37,11 @@ The Cloud API client calls the following endpoints through the Atlassian API gat
 
 All endpoints use the `GET` method and require read access only.
 
-### CQL Query Expand Parameters
-
-The connector requests the following expand fields on search queries:
-
-| Expand Field | Purpose |
-|---|---|
-| `metadata.labels` | Read page labels to determine sync eligibility |
-| `version` | Read version timestamps for file diff comparison |
-| `space` | Read space key, ID, and name for scope management |
-| `children.attachment` | Inline attachments per page up to the Confluence-imposed limit (typically 25; when attachments are enabled) |
-| `children.attachment.version` | Read attachment version timestamps (when attachments are enabled) |
-| `children.attachment.extensions` | Read attachment media type and file size (when attachments are enabled) |
-| `body.storage` | Read page HTML content for ingestion (single page fetch only) |
-
 ### Space Type Filter
 
 The Cloud client filters by `space.type=global OR space.type=collaboration`. See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on space type filtering. The OAuth integration must have access to spaces of both types to discover all labeled pages.
 
 ## Confluence Data Center Permissions
-
-### Authentication Models
-
-Data Center supports two authentication methods:
-
-**OAuth 2.0 (2LO):** Client credentials flow against the instance's own token endpoint (`<baseUrl>/rest/oauth2/latest/token`). The token request sends `grant_type`, `client_id`, `client_secret`, and `scope=READ` as a URL-encoded form body. The `READ` scope explicitly limits the service account to read-only access.
-
-**Personal Access Token (PAT) -- not recommended, Data Center below 10.1 only:** A static bearer token associated with a Data Center user account. The token inherits the permissions of the user who created it. The PAT inherits the user's instance-level permissions. PATs do not expire automatically and must be manually rotated. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead.
 
 ### Required API Access
 
@@ -86,110 +60,45 @@ All endpoints use the `GET` method and require read access only.
 
 The Data Center client filters by `space.type=global` only (`collaboration` is a Cloud-only space type). See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on space type filtering. The service account has instance-wide read access; space type filtering is applied client-side via CQL.
 
-## Unique Platform Permissions
-
-The connector performs the following operations against the Unique platform API, grouped by service domain.
-
-### User Operations
-
-| API Operation | Purpose |
-|---|---|
-| `users.getCurrentId()` | Retrieve the service user's own ID for self-granting scope access |
-
-### Scope Operations
-
-| API Operation | Purpose |
-|---|---|
-| `scopes.createAccesses(scopeId, accesses)` | Grant `MANAGE`, `READ`, and `WRITE` access to the service user on the root scope; grant `READ` access on parent scopes in the hierarchy |
-| `scopes.getById(scopeId)` | Read the root scope and traverse parent scopes to build the scope path |
-| `scopes.createFromPaths(paths, options)` | Create child scopes for each Confluence space (one scope per space key, with `inheritAccess: true`) |
-| `scopes.updateExternalId(scopeId, externalId)` | Set the external ID on newly created space scopes (format: `confc:<tenantName>:<spaceKey>`) |
-
-### Ingestion Operations
-
-| API Operation | Purpose |
-|---|---|
-| `ingestion.registerContent(request)` | Register a page or attachment for ingestion (returns `writeUrl` and `readUrl`) |
-| `ingestion.finalizeIngestion(request)` | Finalize ingestion after content upload |
-| `ingestion.performFileDiff(items, partialKey, sourceKind, baseUrl)` | Compute per-space file diff to detect new, updated, and deleted items |
-
-### File Operations
-
-| API Operation | Purpose |
-|---|---|
-| `files.getByKeys(contentKeys)` | Resolve content keys to file IDs for deletion |
-| `files.deleteByIds(contentIds)` | Delete files that are no longer discovered (label removed or page deleted) |
-| `files.getCountByKeyPrefix(partialKey)` | Count total files for a space key prefix to validate against accidental full deletion |
-
-### Required Service User Capabilities
-
-The Unique service user (whether authenticated via `cluster_local` headers or `external` Zitadel credentials) must have sufficient privileges to:
-
-1. Read its own user ID
-2. Create and manage scope access entries (MANAGE, READ, WRITE)
-3. Read scope details and traverse scope hierarchies
-4. Create scopes from paths and update their external IDs
-5. Register content, upload files, and finalize ingestion
-6. Query and delete files by key
-
-See the [Authentication Guide](../operator/authentication.md) for setup instructions.
-
 ## Permission Justification
 
-### Confluence: Read-Only Access
+### Confluence Cloud: Read-Only Access
 
 **Justification:** The connector only reads content from Confluence. It never creates, updates, or deletes pages or attachments. All Confluence API calls use the `GET` method.
 
 **Why read-only is sufficient:**
+
 - CQL search is a read operation
-- Page content fetch (`body.storage`) is a read operation
+- Page content fetch is a read operation
 - Attachment listing and download are read operations
 - No write operations are performed against Confluence
 
-### Data Center: Explicit READ Scope
+### Confluence Data Center: Explicit READ Scope
 
 **Justification:** The Data Center OAuth 2.0 token request explicitly includes `scope=READ`, limiting the service account to read-only operations even if the application link grants broader permissions.
 
-### Unique: Self-Granting Scope Access
+**Why not broader scopes?**
 
-**Justification:** The connector grants itself `MANAGE`, `READ`, and `WRITE` access on the root scope at the start of each sync cycle. This is necessary because the service user needs to manage child scopes (create, set external IDs) and ingest content into those scopes.
+- The connector only reads content -- no write access is needed
+- Explicit `READ` scope enforces least privilege at the token level
+- Reduces risk if the application link is misconfigured with broader permissions
 
-**Why MANAGE access?**
-- Creating child scopes under the root scope requires management permission
-- Updating external IDs on scopes requires management permission
+### Unique Platform: Scope Management and Ingestion
 
-**Why WRITE access?**
-- Registering and finalizing content ingestion requires write permission on the target scope
+**Justification:** The connector creates scopes and ingests content into the Unique platform. The service user requires sufficient privileges to manage scopes and perform content ingestion.
 
-**Why READ access on parent scopes?**
-- The connector traverses the scope hierarchy upward from the root scope to build the full scope path, which requires read access on each ancestor scope
+**Why needed?**
 
-## Rate Limits
+- The connector creates child scopes for each Confluence space
+- Content ingestion requires registering, uploading, and finalizing content
+- File deletion requires querying and removing previously ingested content
 
-### Confluence API Rate Limiting
-
-The connector enforces client-side rate limiting via the `apiRateLimitPerMinute` configuration parameter, implemented using a Bottleneck token-bucket limiter. The reservoir refills every 60 seconds.
-
-| Configuration | Description | Location |
-|---|---|---|
-| `confluence.apiRateLimitPerMinute` | Maximum Confluence API requests per minute (required, no default) | Tenant config YAML |
-
-Atlassian Cloud enforces its own server-side rate limits. When the connector exceeds the server limit, the HTTP client's built-in retry interceptor handles retries.
-
-Data Center rate limits depend on the instance's configuration and available resources. Operators should set `apiRateLimitPerMinute` according to their instance's capacity.
-
-### Unique API Rate Limiting
-
-The connector also rate-limits requests to the Unique platform API:
-
-| Configuration | Default | Description |
-|---|---|---|
-| `unique.apiRateLimitPerMinute` | 100 | Maximum Unique API requests per minute |
+See the [Authentication Guide](../operator/authentication.md) for setup instructions.
 
 ## Related Documentation
 
 - [Authentication](../operator/authentication.md) - Confluence and Unique authentication setup
-- [Architecture](./architecture.md) - System components and module structure
+- [Architecture](./architecture.md) - System components and infrastructure
 - [Flows](./flows.md) - Content sync and file diff flow details
 
 ## Standard References
