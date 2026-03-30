@@ -13,10 +13,15 @@ export type FullSyncResult =
   | { status: 'failure'; step: SyncStep }
   | { status: 'skipped'; reason: string };
 
+export interface SiteResultEntry {
+  siteId: string;
+  result: SiteSyncResult;
+}
+
 export interface SyncRecord {
   timestamp: Date;
   fullResult: FullSyncResult;
-  siteResults: Array<{ siteId: string; result: SiteSyncResult }>;
+  siteResults: SiteResultEntry[];
 }
 
 @Injectable()

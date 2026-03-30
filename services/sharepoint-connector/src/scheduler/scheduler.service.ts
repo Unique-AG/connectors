@@ -3,8 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { Config } from '../config';
+import { SyncStep } from '../constants/sync-step.enum';
+import { SyncStatusStore } from '../health/sync-status.store';
 import { SharepointSynchronizationService } from '../sharepoint-synchronization/sharepoint-synchronization.service';
 import { sanitizeError } from '../utils/normalize-error';
+
 @Injectable()
 export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
@@ -14,6 +17,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly sharepointScanner: SharepointSynchronizationService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly configService: ConfigService<Config, true>,
+    private readonly syncStatusStore: SyncStatusStore,
   ) {}
 
   public onModuleInit() {
@@ -49,12 +53,24 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     try {
       this.logger.log('Scheduler triggered');
 
-      const result = await this.sharepointScanner.synchronize();
+      const { fullResult, siteResults } = await this.sharepointScanner.synchronize();
 
-      if (result.status !== 'skipped' || result.reason !== 'scan_in_progress') {
+      if (fullResult.status !== 'skipped' || fullResult.reason !== 'scan_in_progress') {
+        this.syncStatusStore.record({
+          timestamp: new Date(),
+          fullResult,
+          siteResults,
+        });
         this.logger.log('SharePoint scan ended');
       }
     } catch (error) {
+      // siteResults is empty because an unexpected throw from synchronize() means the run
+      // crashed before it could produce any per-site results.
+      this.syncStatusStore.record({
+        timestamp: new Date(),
+        fullResult: { status: 'failure', step: SyncStep.Unknown },
+        siteResults: [],
+      });
       this.logger.error({
         msg: 'An unexpected error occurred during the scheduled scan',
         error: sanitizeError(error),
