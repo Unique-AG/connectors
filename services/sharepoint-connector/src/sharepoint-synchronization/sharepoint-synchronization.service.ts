@@ -245,7 +245,7 @@ export class SharepointSynchronizationService {
       ({ siteName, managedPath } = await this.graphApiService.getSiteInfo(siteConfig.siteId));
     } catch (error) {
       this.logger.error({
-        msg: `${logPrefix} Failed to get site name`,
+        msg: `${logPrefix} Failed to get site info`,
         error: sanitizeError(error),
       });
       return { failureStep: SyncStep.SiteNameFetch };
