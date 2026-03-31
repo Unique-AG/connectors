@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
-import { SyncStatusStore } from '../health/sync-status.store';
+import { HealthModule } from '../health/health.module';
 import { SharepointSynchronizationModule } from '../sharepoint-synchronization/sharepoint-synchronization.module';
 import { SchedulerService } from './scheduler.service';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), SharepointSynchronizationModule],
-  providers: [SchedulerService, SyncStatusStore],
+  imports: [ScheduleModule.forRoot(), SharepointSynchronizationModule, HealthModule],
+  providers: [SchedulerService],
 })
 export class SchedulerModule {}

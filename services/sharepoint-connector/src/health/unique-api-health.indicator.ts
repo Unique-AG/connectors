@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HealthCheckError, HealthIndicator, HealthIndicatorResult } from '@nestjs/terminus';
+import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
 import { fetch as undiciFetch, Dispatcher } from 'undici';
 
 import { Config } from '../config';
@@ -20,7 +20,7 @@ interface PingResult {
  * (Bottleneck) so health checks are never queued behind sync traffic.
  */
 @Injectable()
-export class UniqueApiHealthIndicator extends HealthIndicator {
+export class UniqueApiHealthIndicator {
   private readonly timeoutMs: number;
   private readonly ingestionUrl: string;
   private readonly scopeManagementUrl: string;
@@ -29,14 +29,15 @@ export class UniqueApiHealthIndicator extends HealthIndicator {
     private readonly configService: ConfigService<Config, true>,
     private readonly proxyService: ProxyService,
     private readonly uniqueAuthService: UniqueAuthService,
+    private readonly healthIndicatorService: HealthIndicatorService,
   ) {
-    super();
     this.timeoutMs = configService.get('health.connectivityTimeoutMs', { infer: true });
     this.ingestionUrl = `${configService.get('unique.ingestionServiceBaseUrl', { infer: true })}/graphql`;
     this.scopeManagementUrl = `${configService.get('unique.scopeManagementServiceBaseUrl', { infer: true })}/graphql`;
   }
 
   async check(key: string): Promise<HealthIndicatorResult> {
+    const indicator = this.healthIndicatorService.check(key);
     const dispatcher = this.proxyService.getDispatcher({ mode: 'for-external-only' });
     const authHeaders = await this.getAuthHeaders();
 
@@ -60,13 +61,10 @@ export class UniqueApiHealthIndicator extends HealthIndicator {
     const isUp = ingestionResult.reachable && scopeManagementResult.reachable;
 
     if (!isUp) {
-      throw new HealthCheckError(
-        'Unique API health check failed',
-        this.getStatus(key, false, details),
-      );
+      return indicator.down(details);
     }
 
-    return this.getStatus(key, true, details);
+    return indicator.up(details);
   }
 
   private async getAuthHeaders(): Promise<Record<string, string>> {

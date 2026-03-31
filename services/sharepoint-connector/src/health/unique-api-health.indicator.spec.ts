@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { HealthCheckError } from '@nestjs/terminus';
+import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -54,6 +54,13 @@ describe('UniqueApiHealthIndicator', () => {
         ...stub(),
         getToken: vi.fn().mockResolvedValue('test-token'),
       }))
+      .mock(HealthIndicatorService)
+      .impl(() => ({
+        check: (key: string) => ({
+          up: (data?: Record<string, unknown>) => ({ [key]: { status: 'up', ...data } }),
+          down: (data?: Record<string, unknown>) => ({ [key]: { status: 'down', ...data } }),
+        }),
+      }))
       .compile();
 
     indicator = unit;
@@ -80,20 +87,16 @@ describe('UniqueApiHealthIndicator', () => {
       .mockRejectedValueOnce(connError)
       .mockResolvedValueOnce(new Response('{"data":{"__typename":"Query"}}', { status: 200 }));
 
-    try {
-      await indicator.check('uniqueApi');
-      expect.unreachable('expected HealthCheckError');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HealthCheckError);
-      expect((error as HealthCheckError).causes).toEqual({
-        uniqueApi: {
-          status: 'down',
-          ingestion: 'unreachable',
-          ingestionError: 'ECONNREFUSED',
-          scopeManagement: 'reachable',
-        },
-      });
-    }
+    const result = await indicator.check('uniqueApi');
+
+    expect(result).toEqual({
+      uniqueApi: {
+        status: 'down',
+        ingestion: 'unreachable',
+        ingestionError: 'ECONNREFUSED',
+        scopeManagement: 'reachable',
+      },
+    });
   });
 
   it('reports down when scope management is down and ingestion is up', async () => {
@@ -102,40 +105,32 @@ describe('UniqueApiHealthIndicator', () => {
       .mockResolvedValueOnce(new Response('{"data":{"__typename":"Query"}}', { status: 200 }))
       .mockRejectedValueOnce(dnsError);
 
-    try {
-      await indicator.check('uniqueApi');
-      expect.unreachable('expected HealthCheckError');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HealthCheckError);
-      expect((error as HealthCheckError).causes).toEqual({
-        uniqueApi: {
-          status: 'down',
-          ingestion: 'reachable',
-          scopeManagement: 'unreachable',
-          scopeManagementError: 'ENOTFOUND',
-        },
-      });
-    }
+    const result = await indicator.check('uniqueApi');
+
+    expect(result).toEqual({
+      uniqueApi: {
+        status: 'down',
+        ingestion: 'reachable',
+        scopeManagement: 'unreachable',
+        scopeManagementError: 'ENOTFOUND',
+      },
+    });
   });
 
   it('reports down with HTTP_401 when auth fails', async () => {
     mockFetch.mockResolvedValue(new Response('Unauthorized', { status: 401 }));
 
-    try {
-      await indicator.check('uniqueApi');
-      expect.unreachable('expected HealthCheckError');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HealthCheckError);
-      expect((error as HealthCheckError).causes).toEqual({
-        uniqueApi: {
-          status: 'down',
-          ingestion: 'unreachable',
-          ingestionError: 'HTTP_401',
-          scopeManagement: 'unreachable',
-          scopeManagementError: 'HTTP_401',
-        },
-      });
-    }
+    const result = await indicator.check('uniqueApi');
+
+    expect(result).toEqual({
+      uniqueApi: {
+        status: 'down',
+        ingestion: 'unreachable',
+        ingestionError: 'HTTP_401',
+        scopeManagement: 'unreachable',
+        scopeManagementError: 'HTTP_401',
+      },
+    });
   });
 
   it('reports down when both endpoints are down', async () => {
@@ -145,21 +140,17 @@ describe('UniqueApiHealthIndicator', () => {
       .mockRejectedValueOnce(connError)
       .mockRejectedValueOnce(dnsError);
 
-    try {
-      await indicator.check('uniqueApi');
-      expect.unreachable('expected HealthCheckError');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HealthCheckError);
-      expect((error as HealthCheckError).causes).toEqual({
-        uniqueApi: {
-          status: 'down',
-          ingestion: 'unreachable',
-          ingestionError: 'ECONNREFUSED',
-          scopeManagement: 'unreachable',
-          scopeManagementError: 'ENOTFOUND',
-        },
-      });
-    }
+    const result = await indicator.check('uniqueApi');
+
+    expect(result).toEqual({
+      uniqueApi: {
+        status: 'down',
+        ingestion: 'unreachable',
+        ingestionError: 'ECONNREFUSED',
+        scopeManagement: 'unreachable',
+        scopeManagementError: 'ENOTFOUND',
+      },
+    });
   });
 
   it('sends POST with __typename query, auth headers, and proxy dispatcher', async () => {
@@ -212,6 +203,13 @@ describe('UniqueApiHealthIndicator', () => {
       .impl((stub) => ({
         ...stub(),
         getToken: vi.fn(),
+      }))
+      .mock(HealthIndicatorService)
+      .impl(() => ({
+        check: (key: string) => ({
+          up: (data?: Record<string, unknown>) => ({ [key]: { status: 'up', ...data } }),
+          down: (data?: Record<string, unknown>) => ({ [key]: { status: 'down', ...data } }),
+        }),
       }))
       .compile();
 

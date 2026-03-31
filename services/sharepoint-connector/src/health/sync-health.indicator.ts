@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HealthCheckError, HealthIndicator, HealthIndicatorResult } from '@nestjs/terminus';
+import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
 
 import { Config } from '../config';
 import { SyncStatusStore } from './sync-status.store';
@@ -11,14 +11,14 @@ interface SiteStats {
 }
 
 @Injectable()
-export class SyncHealthIndicator extends HealthIndicator {
+export class SyncHealthIndicator {
   private readonly threshold: number;
 
   constructor(
     private readonly store: SyncStatusStore,
+    private readonly healthIndicatorService: HealthIndicatorService,
     configService: ConfigService<Config, true>,
   ) {
-    super();
     this.threshold = configService.get('health.syncSiteFailureThreshold', { infer: true });
   }
 
@@ -29,6 +29,7 @@ export class SyncHealthIndicator extends HealthIndicator {
       return {};
     }
 
+    const indicator = this.healthIndicatorService.check(key);
     const latest = this.store.getLatest()!;
     const sites = new Map<string, SiteStats>();
 
@@ -60,15 +61,12 @@ export class SyncHealthIndicator extends HealthIndicator {
     // If every record is a full-sync failure and no per-site data exists, we still know
     // the connector is unhealthy even though we can't attribute it to specific sites.
     if (allFullSyncFailures && sites.size === 0) {
-      throw new HealthCheckError(
-        'Sync check failed',
-        this.getStatus(key, false, {
-          lastSyncAt: latest.timestamp.toISOString(),
-          threshold: this.threshold,
-          failingSites: [],
-          sites: {},
-        }),
-      );
+      return indicator.down({
+        lastSyncAt: latest.timestamp.toISOString(),
+        threshold: this.threshold,
+        failingSites: [],
+        sites: {},
+      });
     }
 
     const sitesRecord: Record<string, SiteStats> = Object.fromEntries(sites);
@@ -77,18 +75,15 @@ export class SyncHealthIndicator extends HealthIndicator {
       .map(([siteId]) => siteId);
 
     if (failingSites.length > 0) {
-      throw new HealthCheckError(
-        'Sync check failed',
-        this.getStatus(key, false, {
-          lastSyncAt: latest.timestamp.toISOString(),
-          threshold: this.threshold,
-          failingSites,
-          sites: sitesRecord,
-        }),
-      );
+      return indicator.down({
+        lastSyncAt: latest.timestamp.toISOString(),
+        threshold: this.threshold,
+        failingSites,
+        sites: sitesRecord,
+      });
     }
 
-    return this.getStatus(key, true, {
+    return indicator.up({
       lastSyncAt: latest.timestamp.toISOString(),
       recentSyncs: records.length,
       sites: sitesRecord,

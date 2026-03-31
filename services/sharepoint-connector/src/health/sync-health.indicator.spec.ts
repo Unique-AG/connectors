@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { HealthCheckError } from '@nestjs/terminus';
+import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -34,6 +34,13 @@ describe('SyncHealthIndicator', () => {
         ...stub(),
         getRecords: vi.fn(() => []),
         getLatest: vi.fn(() => undefined),
+      }))
+      .mock(HealthIndicatorService)
+      .impl(() => ({
+        check: (key: string) => ({
+          up: (data?: Record<string, unknown>) => ({ [key]: { status: 'up', ...data } }),
+          down: (data?: Record<string, unknown>) => ({ [key]: { status: 'down', ...data } }),
+        }),
       }))
       .compile();
 
@@ -80,7 +87,7 @@ describe('SyncHealthIndicator', () => {
     });
   });
 
-  it('throws down when one site exceeds threshold while others are healthy', () => {
+  it('returns down when one site exceeds threshold while others are healthy', () => {
     const records = [
       makeSyncRecord({
         siteResults: [
@@ -98,25 +105,20 @@ describe('SyncHealthIndicator', () => {
     vi.mocked(store.getRecords).mockReturnValue(records);
     vi.mocked(store.getLatest).mockReturnValue(records[1]);
 
-    expect(() => indicator.check('sync')).toThrow(HealthCheckError);
+    const result = indicator.check('sync');
 
-    try {
-      indicator.check('sync');
-    } catch (error) {
-      const hce = error as HealthCheckError;
-      expect(hce.causes).toEqual({
-        sync: {
-          status: 'down',
-          lastSyncAt: '2026-03-18T10:15:00.000Z',
-          threshold: 0.5,
-          failingSites: ['site-bbb'],
-          sites: {
-            'site-aaa': { failures: 0, total: 2 },
-            'site-bbb': { failures: 2, total: 2 },
-          },
+    expect(result).toEqual({
+      sync: {
+        status: 'down',
+        lastSyncAt: '2026-03-18T10:15:00.000Z',
+        threshold: 0.5,
+        failingSites: ['site-bbb'],
+        sites: {
+          'site-aaa': { failures: 0, total: 2 },
+          'site-bbb': { failures: 2, total: 2 },
         },
-      });
-    }
+      },
+    });
   });
 
   it('computes denominator from appearances, not total syncs', () => {
@@ -202,22 +204,17 @@ describe('SyncHealthIndicator', () => {
     vi.mocked(store.getRecords).mockReturnValue(records);
     vi.mocked(store.getLatest).mockReturnValue(records[1]);
 
-    expect(() => indicator.check('sync')).toThrow(HealthCheckError);
+    const result = indicator.check('sync');
 
-    try {
-      indicator.check('sync');
-    } catch (error) {
-      const hce = error as HealthCheckError;
-      expect(hce.causes).toEqual({
-        sync: {
-          status: 'down',
-          lastSyncAt: '2026-03-18T10:15:00.000Z',
-          threshold: 0.5,
-          failingSites: [],
-          sites: {},
-        },
-      });
-    }
+    expect(result).toEqual({
+      sync: {
+        status: 'down',
+        lastSyncAt: '2026-03-18T10:15:00.000Z',
+        threshold: 0.5,
+        failingSites: [],
+        sites: {},
+      },
+    });
   });
 
   it('reports down when full sync failures push known sites over threshold', () => {
@@ -239,24 +236,19 @@ describe('SyncHealthIndicator', () => {
     vi.mocked(store.getRecords).mockReturnValue(records);
     vi.mocked(store.getLatest).mockReturnValue(records[2]);
 
-    expect(() => indicator.check('sync')).toThrow(HealthCheckError);
+    const result = indicator.check('sync');
 
-    try {
-      indicator.check('sync');
-    } catch (error) {
-      const hce = error as HealthCheckError;
-      expect(hce.causes).toEqual({
-        sync: {
-          status: 'down',
-          lastSyncAt: '2026-03-18T10:15:00.000Z',
-          threshold: 0.5,
-          failingSites: ['site-aaa'],
-          sites: {
-            'site-aaa': { failures: 2, total: 3 },
-          },
+    expect(result).toEqual({
+      sync: {
+        status: 'down',
+        lastSyncAt: '2026-03-18T10:15:00.000Z',
+        threshold: 0.5,
+        failingSites: ['site-aaa'],
+        sites: {
+          'site-aaa': { failures: 2, total: 3 },
         },
-      });
-    }
+      },
+    });
   });
 
   it('treats exact threshold ratio as healthy (up)', () => {

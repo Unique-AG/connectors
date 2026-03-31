@@ -1,5 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import { HealthCheckError } from '@nestjs/terminus';
+import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,6 +40,13 @@ describe('ConnectivityHealthIndicator', () => {
       .impl((stub) => ({
         ...stub(),
         getDispatcher: vi.fn(() => mockDispatcher),
+      }))
+      .mock(HealthIndicatorService)
+      .impl(() => ({
+        check: (key: string) => ({
+          up: (data?: Record<string, unknown>) => ({ [key]: { status: 'up', ...data } }),
+          down: (data?: Record<string, unknown>) => ({ [key]: { status: 'down', ...data } }),
+        }),
       }))
       .compile();
 
@@ -83,20 +90,16 @@ describe('ConnectivityHealthIndicator', () => {
       .mockRejectedValueOnce(dnsError)
       .mockResolvedValueOnce(new Response());
 
-    try {
-      await indicator.check('connectivity');
-      expect.unreachable('expected HealthCheckError');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HealthCheckError);
-      expect((error as HealthCheckError).causes).toEqual({
-        connectivity: {
-          status: 'down',
-          graph: 'unreachable',
-          graphError: 'ENOTFOUND',
-          sharepoint: [{ tenant: 'default', status: 'reachable' }],
-        },
-      });
-    }
+    const result = await indicator.check('connectivity');
+
+    expect(result).toEqual({
+      connectivity: {
+        status: 'down',
+        graph: 'unreachable',
+        graphError: 'ENOTFOUND',
+        sharepoint: [{ tenant: 'default', status: 'reachable' }],
+      },
+    });
   });
 
   it('reports down with error in sharepoint array when SharePoint is unreachable', async () => {
@@ -105,19 +108,15 @@ describe('ConnectivityHealthIndicator', () => {
       .mockResolvedValueOnce(new Response())
       .mockRejectedValueOnce(timeoutError);
 
-    try {
-      await indicator.check('connectivity');
-      expect.unreachable('expected HealthCheckError');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HealthCheckError);
-      expect((error as HealthCheckError).causes).toEqual({
-        connectivity: {
-          status: 'down',
-          graph: 'reachable',
-          sharepoint: [{ tenant: 'default', status: 'unreachable', error: 'ETIMEDOUT' }],
-        },
-      });
-    }
+    const result = await indicator.check('connectivity');
+
+    expect(result).toEqual({
+      connectivity: {
+        status: 'down',
+        graph: 'reachable',
+        sharepoint: [{ tenant: 'default', status: 'unreachable', error: 'ETIMEDOUT' }],
+      },
+    });
   });
 
   it('reports down when both Graph and SharePoint are unreachable', async () => {
@@ -127,20 +126,16 @@ describe('ConnectivityHealthIndicator', () => {
       .mockRejectedValueOnce(dnsError)
       .mockRejectedValueOnce(connError);
 
-    try {
-      await indicator.check('connectivity');
-      expect.unreachable('expected HealthCheckError');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HealthCheckError);
-      expect((error as HealthCheckError).causes).toEqual({
-        connectivity: {
-          status: 'down',
-          graph: 'unreachable',
-          graphError: 'ENOTFOUND',
-          sharepoint: [{ tenant: 'default', status: 'unreachable', error: 'ECONNREFUSED' }],
-        },
-      });
-    }
+    const result = await indicator.check('connectivity');
+
+    expect(result).toEqual({
+      connectivity: {
+        status: 'down',
+        graph: 'unreachable',
+        graphError: 'ENOTFOUND',
+        sharepoint: [{ tenant: 'default', status: 'unreachable', error: 'ECONNREFUSED' }],
+      },
+    });
   });
 
   it('falls back to UNKNOWN when error has no code', async () => {
@@ -148,20 +143,16 @@ describe('ConnectivityHealthIndicator', () => {
       .mockRejectedValueOnce(new Error('unexpected'))
       .mockResolvedValueOnce(new Response());
 
-    try {
-      await indicator.check('connectivity');
-      expect.unreachable('expected HealthCheckError');
-    } catch (error) {
-      expect(error).toBeInstanceOf(HealthCheckError);
-      expect((error as HealthCheckError).causes).toEqual({
-        connectivity: {
-          status: 'down',
-          graph: 'unreachable',
-          graphError: 'UNKNOWN',
-          sharepoint: [{ tenant: 'default', status: 'reachable' }],
-        },
-      });
-    }
+    const result = await indicator.check('connectivity');
+
+    expect(result).toEqual({
+      connectivity: {
+        status: 'down',
+        graph: 'unreachable',
+        graphError: 'UNKNOWN',
+        sharepoint: [{ tenant: 'default', status: 'reachable' }],
+      },
+    });
   });
 
   it('treats non-2xx HTTP responses as reachable', async () => {

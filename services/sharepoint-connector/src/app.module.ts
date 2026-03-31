@@ -16,6 +16,7 @@ import {
   sharepointConfig,
   uniqueConfig,
 } from './config/tenant-config-loader';
+import { HealthModule } from './health/health.module';
 import { ProxyModule } from './proxy';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { Redacted } from './utils/redacted';
@@ -63,6 +64,7 @@ import { Redacted } from './utils/redacted';
         },
       },
     }),
+    HealthModule,
     SchedulerModule,
   ],
   controllers: [],

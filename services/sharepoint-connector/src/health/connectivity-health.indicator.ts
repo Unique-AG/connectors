@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HealthCheckError, HealthIndicator, HealthIndicatorResult } from '@nestjs/terminus';
+import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
 import { fetch as undiciFetch, Dispatcher } from 'undici';
 
 import { Config } from '../config';
@@ -28,20 +28,21 @@ interface PingResult {
  * response as they are considered sensitive.
  */
 @Injectable()
-export class ConnectivityHealthIndicator extends HealthIndicator {
+export class ConnectivityHealthIndicator {
   private readonly timeoutMs: number;
   private readonly sharepointBaseUrl: string;
 
   constructor(
     configService: ConfigService<Config, true>,
     private readonly proxyService: ProxyService,
+    private readonly healthIndicatorService: HealthIndicatorService,
   ) {
-    super();
     this.timeoutMs = configService.get('health.connectivityTimeoutMs', { infer: true });
     this.sharepointBaseUrl = configService.get('sharepoint.baseUrl', { infer: true });
   }
 
   async check(key: string): Promise<HealthIndicatorResult> {
+    const indicator = this.healthIndicatorService.check(key);
     const dispatcher: Dispatcher = this.proxyService.getDispatcher({ mode: 'always' });
 
     const [graphResult, sharepointResult] = await Promise.all([
@@ -71,13 +72,10 @@ export class ConnectivityHealthIndicator extends HealthIndicator {
     const isUp = graphResult.reachable && sharepointResult.reachable;
 
     if (!isUp) {
-      throw new HealthCheckError(
-        'Connectivity check failed',
-        this.getStatus(key, false, details),
-      );
+      return indicator.down(details);
     }
 
-    return this.getStatus(key, true, details);
+    return indicator.up(details);
   }
 
   private async ping(url: string, dispatcher: Dispatcher): Promise<PingResult> {
