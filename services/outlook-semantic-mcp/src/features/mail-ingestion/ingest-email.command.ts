@@ -132,6 +132,9 @@ export class IngestEmailCommand {
       userProfileId: userProfile.id,
       messageId,
     });
+    const fileKey = getUniqueKeyForMessage(userProfile.email, graphMessage);
+    const files = await this.uniqueApi.files.getByKeys([fileKey]);
+    const file = files.at(0);
 
     if (filters) {
       const skipResult = shouldSkipEmail(graphMessage, filters, { userProfileId });
@@ -145,13 +148,12 @@ export class IngestEmailCommand {
           matchedPattern,
           msg: 'Email skipped by filter',
         });
+        if (file) {
+          await this.uniqueApi.files.delete(file.id);
+        }
         return 'skipped';
       }
     }
-
-    const fileKey = getUniqueKeyForMessage(userProfile.email, graphMessage);
-    const files = await this.uniqueApi.files.getByKeys([fileKey]);
-    const file = files.at(0);
 
     let parentDirectory = await this.db.query.directories.findFirst({
       where: eq(directories.providerDirectoryId, graphMessage.parentFolderId),
