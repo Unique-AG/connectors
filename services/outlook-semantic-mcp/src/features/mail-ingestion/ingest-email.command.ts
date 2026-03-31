@@ -209,6 +209,8 @@ export class IngestEmailCommand {
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
+    // If you move an entire folder in another folder the lastModifiedDateTime of the emails
+    // will not change and right now on unique we do not support re embedding via metadata update.
     const emailMovedFolders =
       isNonNullish(file) && file.metadata?.emailProviderFolderPath !== currentFolderPath;
 
