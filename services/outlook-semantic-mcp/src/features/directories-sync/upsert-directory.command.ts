@@ -41,6 +41,8 @@ export class UpsertDirectoryCommand {
           set: {
             parentId: sql.raw(`excluded.${directories.parentId.name}`),
             displayName: sql.raw(`excluded.${directories.displayName.name}`),
+            parentChangeDetectedAt: sql`CASE WHEN excluded.parent_id IS DISTINCT FROM directories.parent_id OR excluded.display_name IS DISTINCT FROM directories.display_name THEN NOW() ELSE directories.parent_change_detected_at END`,
+            directoryMovementResyncCursor: sql`CASE WHEN excluded.parent_id IS DISTINCT FROM directories.parent_id OR excluded.display_name IS DISTINCT FROM directories.display_name THEN NULL ELSE directories.directory_movement_resync_cursor END`,
           },
         });
 
