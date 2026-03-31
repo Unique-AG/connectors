@@ -1,5 +1,13 @@
 import { relations } from 'drizzle-orm';
-import { AnyPgColumn, boolean, pgEnum, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import {
+  AnyPgColumn,
+  boolean,
+  pgEnum,
+  pgTable,
+  timestamp,
+  unique,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';

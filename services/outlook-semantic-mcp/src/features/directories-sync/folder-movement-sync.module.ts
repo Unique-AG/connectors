@@ -8,7 +8,11 @@ import { FolderMovementSyncSchedulerService } from './folder-movement-sync-sched
 
 @Module({
   imports: [DrizzleModule, MsGraphModule, MailIngestionModule],
-  providers: [FolderMovementSyncCommand, FolderMovementSyncListener, FolderMovementSyncSchedulerService],
+  providers: [
+    FolderMovementSyncCommand,
+    FolderMovementSyncListener,
+    FolderMovementSyncSchedulerService,
+  ],
   exports: [FolderMovementSyncCommand],
 })
 export class FolderMovementSyncModule {}

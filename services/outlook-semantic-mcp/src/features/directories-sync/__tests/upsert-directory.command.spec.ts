@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { UpsertDirectoryCommand } from './upsert-directory.command';
+import { UpsertDirectoryCommand } from '../upsert-directory.command';
 
 const USER_PROFILE_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 

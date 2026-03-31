@@ -1,25 +1,31 @@
-import { GraphError } from '@microsoft/microsoft-graph-client';
+import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { asc, eq, sql } from 'drizzle-orm';
-import Bottleneck from 'bottleneck';
+import { and, asc, eq, isNotNull, SQL, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { errors } from 'undici';
-import { DRIZZLE, DrizzleDatabase, directories, directoriesSync } from '~/db';
+import { isNullish } from 'remeda';
+import z from 'zod/v4';
+import { DRIZZLE, DrizzleDatabase, directories, directoriesSync, inboxConfigurations } from '~/db';
+import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceAttrs } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import z from 'zod/v4';
+import { isWithinCooldown } from '~/utils/is-within-cooldown';
+import { IngestEmailCommand } from '../mail-ingestion/ingest-email.command';
 
 const folderMovementMessagePageSchema = z.object({
   value: z.array(z.object({ id: z.string() })),
   '@odata.nextLink': z.string().optional(),
 });
-import { IngestEmailCommand } from '../mail-ingestion/ingest-email.command';
-import { isWithinCooldown } from '~/utils/is-within-cooldown';
 
 export const FOLDER_MOVEMENT_SYNC_RUNNING_HEARTBEAT_MINUTES = 20;
 export const FOLDER_MOVEMENT_SYNC_FAILED_RETRY_MINUTES = 20;
 
 export type FolderMovementSyncResult = 'completed' | 'skipped' | 'failed';
+
+type DirectorySyncSelect = typeof directoriesSync.$inferSelect;
+
+export type DirectorySyncUpdate = Partial<{
+  [K in Exclude<keyof DirectorySyncSelect, 'userProfileId'>]: DirectorySyncSelect[K] | SQL<unknown>;
+}>;
 
 @Injectable()
 export class FolderMovementSyncCommand {
@@ -44,33 +50,18 @@ export class FolderMovementSyncCommand {
     try {
       await this.processMarkedFolders(userProfileId);
 
-      await this.db
-        .update(directoriesSync)
-        .set({
-          folderMovementSyncState: 'ready',
-          folderMovementSyncHeartbeatAt: sql`NOW()`,
-        })
-        .where(eq(directoriesSync.userProfileId, userProfileId))
-        .execute();
-
+      await this.updateDirectorySyncByUserProfile(userProfileId, {
+        folderMovementSyncState: 'ready',
+        folderMovementSyncHeartbeatAt: sql`NOW()`,
+      });
       this.logger.log({ userProfileId, msg: 'Folder movement sync completed' });
       return 'completed';
     } catch (error) {
-      const isRateLimit =
-        (error instanceof GraphError && error.statusCode === 429) ||
-        (error instanceof errors.ResponseError && error.statusCode === 429) ||
-        error instanceof Bottleneck.BottleneckError;
-
-      if (isRateLimit) {
-        throw error;
-      }
-
       this.logger.error({ err: error, userProfileId, msg: 'Folder movement sync failed' });
-      await this.db
-        .update(directoriesSync)
-        .set({ folderMovementSyncState: 'failed' })
-        .where(eq(directoriesSync.userProfileId, userProfileId))
-        .execute();
+      await this.updateDirectorySyncByUserProfile(userProfileId, {
+        folderMovementSyncState: 'failed',
+        folderMovementSyncHeartbeatAt: sql`NOW()`,
+      });
       return 'failed';
     }
   }
@@ -123,40 +114,42 @@ export class FolderMovementSyncCommand {
     let totalProcessed = 0;
 
     while (true) {
-      const folder = await this.db
+      const row = await this.db
         .select({
-          id: directories.id,
+          directoryId: directories.id,
           providerDirectoryId: directories.providerDirectoryId,
           directoryMovementResyncCursor: directories.directoryMovementResyncCursor,
+          filters: inboxConfigurations.filters,
         })
         .from(directories)
+        .innerJoin(
+          inboxConfigurations,
+          eq(inboxConfigurations.userProfileId, directories.userProfileId),
+        )
         .where(
-          sql`${directories.userProfileId} = ${userProfileId} AND ${directories.parentChangeDetectedAt} IS NOT NULL`,
+          and(
+            eq(directories.userProfileId, userProfileId),
+            isNotNull(directories.parentChangeDetectedAt),
+          ),
         )
         .orderBy(asc(directories.parentChangeDetectedAt))
         .limit(1)
         .then((rows) => rows[0]);
 
-      if (!folder) {
-        break;
+      if (!row) {
+        return;
       }
+      const filters = inboxConfigurationMailFilters.parse(row.filters);
+      const { directoryId, providerDirectoryId, directoryMovementResyncCursor } = row;
 
-      const { id: directoryId, providerDirectoryId, directoryMovementResyncCursor } = folder;
-
-      let raw: unknown;
-      if (directoryMovementResyncCursor) {
-        raw = await client.api(directoryMovementResyncCursor).get();
-      } else {
-        raw = await client
-          .api(`me/mailFolders/${providerDirectoryId}/messages`)
-          .header('Prefer', 'IdType="ImmutableId"')
-          .select('id')
-          .top(100)
-          .orderby('id')
-          .get();
-      }
-
-      const response = folderMovementMessagePageSchema.parse(raw);
+      const response = await this.fetchPage({
+        client,
+        userProfileId,
+        directoryId,
+        providerDirectoryId,
+        ignoredBefore: filters.ignoredBefore,
+        nextLink: directoryMovementResyncCursor,
+      });
 
       for (const email of response.value) {
         const result = await this.ingestEmailCommand.run({ userProfileId, messageId: email.id });
@@ -168,29 +161,102 @@ export class FolderMovementSyncCommand {
             msg: 'Email ingestion failed during folder movement sync, continuing',
           });
         }
-        totalProcessed++;
-      }
 
-      if (!response['@odata.nextLink']) {
-        await this.db
-          .update(directories)
-          .set({
-            parentChangeDetectedAt: null,
-            directoryMovementResyncCursor: null,
-          })
-          .where(eq(directories.id, directoryId))
-          .execute();
-      } else {
-        await this.db
-          .update(directories)
-          .set({ directoryMovementResyncCursor: response['@odata.nextLink'] })
-          .where(eq(directories.id, directoryId))
-          .execute();
+        await this.updateDirectorySyncByUserProfile(userProfileId, {
+          folderMovementSyncHeartbeatAt: sql`NOW()`,
+        });
 
-        if (totalProcessed >= 100) {
-          break;
+        if (result === 'failed' || result === 'ingested') {
+          totalProcessed++;
         }
       }
+      const fieldsToUpdate = {
+        // This field is optional
+        parentChangeDetectedAt: null as null | undefined,
+        directoryMovementResyncCursor: response['@odata.nextLink'] ?? null,
+      };
+      if (!isNullish(fieldsToUpdate.directoryMovementResyncCursor)) {
+        delete fieldsToUpdate.parentChangeDetectedAt;
+      }
+
+      await this.db
+        .update(directories)
+        .set(fieldsToUpdate)
+        .where(eq(directories.id, directoryId))
+        .execute();
+
+      if (totalProcessed >= 100) {
+        return;
+      }
     }
+  }
+
+  private async fetchPage({
+    client,
+    ignoredBefore,
+    providerDirectoryId,
+    userProfileId,
+    directoryId,
+    nextLink,
+  }: {
+    nextLink: string | null;
+    client: Client;
+    providerDirectoryId: string;
+    userProfileId: string;
+    directoryId: string;
+    ignoredBefore: Date;
+  }) {
+    let raw: unknown;
+    if (!nextLink) {
+      raw = await this.fetchFirstPage(client, {
+        providerDirectoryId,
+        ignoredBefore: ignoredBefore,
+      });
+      return folderMovementMessagePageSchema.parse(raw);
+    }
+
+    try {
+      raw = await client.api(nextLink).get();
+      return folderMovementMessagePageSchema.parse(raw);
+    } catch (error) {
+      if (!(error instanceof GraphError && error.statusCode === 410)) {
+        throw error;
+      }
+      this.logger.warn({
+        userProfileId,
+        directoryId,
+        msg: 'Graph API cursor expired (410), restarting folder from first page',
+      });
+      raw = await this.fetchFirstPage(client, {
+        providerDirectoryId,
+        ignoredBefore,
+      });
+      return folderMovementMessagePageSchema.parse(raw);
+    }
+  }
+
+  private async fetchFirstPage(
+    client: Client,
+    { ignoredBefore, providerDirectoryId }: { providerDirectoryId: string; ignoredBefore: Date },
+  ): Promise<unknown> {
+    return client
+      .api(`me/mailFolders/${providerDirectoryId}/messages`)
+      .header('Prefer', 'IdType="ImmutableId"')
+      .select('id')
+      .filter(`createdDateTime ge ${ignoredBefore.toISOString()}`)
+      .orderby('createdDateTime desc')
+      .top(100)
+      .get();
+  }
+
+  private async updateDirectorySyncByUserProfile(
+    userProfileId: string,
+    data: DirectorySyncUpdate,
+  ): Promise<void> {
+    await this.db
+      .update(directoriesSync)
+      .set(data)
+      .where(eq(directoriesSync.userProfileId, userProfileId))
+      .execute();
   }
 }

@@ -1,4 +1,8 @@
-import { defaultNackErrorHandler, RabbitPayload, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
+import {
+  defaultNackErrorHandler,
+  RabbitPayload,
+  RabbitSubscribe,
+} from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
@@ -13,8 +17,8 @@ export class FolderMovementSyncListener {
 
   @RabbitSubscribe({
     exchange: MAIN_EXCHANGE.name,
-    queue: 'unique.outlook-semantic-mcp.folder-movement',
-    routingKey: ['unique.outlook-semantic-mcp.folder-movement.*'],
+    queue: 'unique.outlook-semantic-mcp.sync',
+    routingKey: ['unique.outlook-semantic-mcp.sync.folder-movement'],
     createQueueIfNotExists: true,
     queueOptions: { deadLetterExchange: DEAD_EXCHANGE.name },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),

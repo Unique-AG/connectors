@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import Bottleneck from 'bottleneck';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FolderMovementSyncCommand } from './folder-movement-sync.command';
+import { FolderMovementSyncCommand } from '../folder-movement-sync.command';
 
 vi.mock('~/features/tracing.utils', () => ({
   traceAttrs: vi.fn(),
@@ -43,11 +43,13 @@ function makeGraphResponse(messages: ReturnType<typeof makeMessage>[], nextLink?
   };
 }
 
-function makeFolder(overrides: Partial<{
-  id: string;
-  providerDirectoryId: string;
-  directoryMovementResyncCursor: string | null;
-}> = {}) {
+function makeFolder(
+  overrides: Partial<{
+    id: string;
+    providerDirectoryId: string;
+    directoryMovementResyncCursor: string | null;
+  }> = {},
+) {
   return {
     id: FOLDER_ID,
     providerDirectoryId: PROVIDER_FOLDER_ID,
@@ -115,9 +117,7 @@ function createMockDb({
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          for: vi.fn().mockReturnValue({
-            then: vi.fn((cb: (rows: any[]) => any) => cb(lockRow ? [lockRow] : [])),
-          }),
+          for: vi.fn().mockResolvedValue(lockRow ? [lockRow] : []),
         }),
       }),
     }),
@@ -141,11 +141,9 @@ function createMockDb({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
           orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockReturnValue({
-              then: vi.fn((cb: (rows: any[]) => any) => {
-                const folder = folders[folderCallIndex++];
-                return cb(folder ? [folder] : []);
-              }),
+            limit: vi.fn().mockImplementation(() => {
+              const folder = folders[folderCallIndex++];
+              return Promise.resolve(folder ? [folder] : []);
             }),
           }),
         }),
@@ -249,7 +247,10 @@ describe('FolderMovementSyncCommand', () => {
 
     // Folder markers cleared
     expect(db.__dbUpdate.set).toHaveBeenCalledWith(
-      expect.objectContaining({ parentChangeDetectedAt: null, directoryMovementResyncCursor: null }),
+      expect.objectContaining({
+        parentChangeDetectedAt: null,
+        directoryMovementResyncCursor: null,
+      }),
     );
 
     // Final state set to 'ready'
@@ -356,9 +357,7 @@ describe('FolderMovementSyncCommand', () => {
     const messages = [makeMessage('msg-a'), makeMessage('msg-b')];
     graphApi.get.mockResolvedValueOnce(makeGraphResponse(messages));
 
-    ingestEmailCommand.run
-      .mockResolvedValueOnce('failed')
-      .mockResolvedValueOnce('ingested');
+    ingestEmailCommand.run.mockResolvedValueOnce('failed').mockResolvedValueOnce('ingested');
 
     const folder = makeFolder();
     const db = createMockDb({

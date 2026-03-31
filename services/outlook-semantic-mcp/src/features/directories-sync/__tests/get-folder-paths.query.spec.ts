@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { folderPathsCacheKey, GetFolderPathsQuery } from './get-folder-paths.query';
+import { folderPathsCacheKey, GetFolderPathsQuery } from '../get-folder-paths.query';
 
 interface MockDirectory {
   id: string;

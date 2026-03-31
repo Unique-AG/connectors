@@ -2,17 +2,17 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, eq, isNotNull, lt, or } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, directories, directoriesSync } from '~/db';
 import { getThreshold } from '~/utils/get-threshold';
 import {
-  FOLDER_MOVEMENT_SYNC_RUNNING_HEARTBEAT_MINUTES,
   FOLDER_MOVEMENT_SYNC_FAILED_RETRY_MINUTES,
+  FOLDER_MOVEMENT_SYNC_RUNNING_HEARTBEAT_MINUTES,
 } from './folder-movement-sync.command';
+import { FolderMovementSyncEventDto } from './folder-movement-sync-event.dto';
 
 const FOLDER_MOVEMENT_SYNC_CRON_SCHEDULE = '*/5 * * * *';
-import { FolderMovementSyncEventDto } from './folder-movement-sync-event.dto';
 
 @Injectable()
 export class FolderMovementSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -76,16 +76,22 @@ export class FolderMovementSyncSchedulerService implements OnModuleInit, OnModul
         or(
           and(
             eq(directoriesSync.folderMovementSyncState, 'failed'),
-            lt(
-              directoriesSync.folderMovementSyncHeartbeatAt,
-              getThreshold(FOLDER_MOVEMENT_SYNC_FAILED_RETRY_MINUTES),
+            or(
+              isNull(directoriesSync.folderMovementSyncHeartbeatAt),
+              lt(
+                directoriesSync.folderMovementSyncHeartbeatAt,
+                getThreshold(FOLDER_MOVEMENT_SYNC_FAILED_RETRY_MINUTES),
+              ),
             ),
           ),
           and(
             eq(directoriesSync.folderMovementSyncState, 'running'),
-            lt(
-              directoriesSync.folderMovementSyncHeartbeatAt,
-              getThreshold(FOLDER_MOVEMENT_SYNC_RUNNING_HEARTBEAT_MINUTES),
+            or(
+              isNull(directoriesSync.folderMovementSyncHeartbeatAt),
+              lt(
+                directoriesSync.folderMovementSyncHeartbeatAt,
+                getThreshold(FOLDER_MOVEMENT_SYNC_RUNNING_HEARTBEAT_MINUTES),
+              ),
             ),
           ),
         ),
@@ -109,7 +115,7 @@ export class FolderMovementSyncSchedulerService implements OnModuleInit, OnModul
 
     for (const userProfileId of userIds) {
       const event = FolderMovementSyncEventDto.parse({
-        type: 'unique.outlook-semantic-mcp.folder-movement.process',
+        type: 'unique.outlook-semantic-mcp.sync.folder-movement',
         payload: { userProfileId },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);

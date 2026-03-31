@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SyncDirectoriesForUserProfileCommand } from './sync-directories-for-user-profile.command';
+import { SyncDirectoriesForUserProfileCommand } from '../sync-directories-for-user-profile.command';
 
 const USER_PROFILE_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 const USER_EMAIL = 'test@example.com';
@@ -97,7 +97,9 @@ describe('cascadeMovementMarkToDescendants', () => {
 
     const sqlArg = db.execute.mock.calls[0]?.[0];
     const sqlString: string = sqlArg?.queryChunks
-      ? sqlArg.queryChunks.map((chunk: any) => (typeof chunk === 'string' ? chunk : String(chunk.value ?? ''))).join('')
+      ? sqlArg.queryChunks
+          .map((chunk: any) => (typeof chunk === 'string' ? chunk : String(chunk.value ?? '')))
+          .join('')
       : String(sqlArg);
 
     expect(sqlString).toMatch(/WITH RECURSIVE/i);
