@@ -4,11 +4,10 @@ import { DirectoriesSyncModule } from '~/features/directories-sync/directories-s
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { LiveCatchUpCommand } from './live-catch-up.command';
 import { LiveCatchUpListener } from './live-catch-up.listener';
-import { RecoverLiveCatchupCommand } from './recover-live-catchup.command';
 
 @Module({
   imports: [DrizzleModule, MsGraphModule, DirectoriesSyncModule],
-  providers: [LiveCatchUpCommand, LiveCatchUpListener, RecoverLiveCatchupCommand],
+  providers: [LiveCatchUpCommand, LiveCatchUpListener],
   exports: [LiveCatchUpCommand],
 })
 export class LiveCatchUpModule {}

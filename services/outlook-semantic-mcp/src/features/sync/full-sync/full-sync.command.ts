@@ -12,15 +12,16 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
+import { isWithinCooldown } from '~/utils/is-within-cooldown';
 
 type InboxConfig = typeof inboxConfigurations.$inferSelect;
 
 export const START_FULL_SYNC_LINK = 'SYNC_STARTED:__EMPTY_DELTA__';
 
 const READY_COOLDOWN_MINUTES = 5;
-export const STALE_HEARTBEAT_MINUTES = 20;
+export const RUNNING_HEARTBEAT_MINUTES = 20;
 export const WAITING_FOR_INGESTION_HEARTBEAT_MINUTES = 5;
-export const WAITING_FOR_FAILED_HEARTBEAT_MINUTES = 20;
+export const FAILED_HEARTBEAT_MINUTES = 20;
 const MAX_ON_GOING_INGESTION_IN_PROGRESS = 10;
 
 export type FullSyncResult =
@@ -216,35 +217,26 @@ export class FullSyncCommand {
   ): { action: 'skip'; reason: string } | { action: 'proceed' } {
     switch (row.fullSyncState) {
       case 'ready':
-        if (this.isWithinCooldown(row.fullSyncLastRunAt, READY_COOLDOWN_MINUTES)) {
+        if (isWithinCooldown(row.fullSyncLastRunAt, READY_COOLDOWN_MINUTES)) {
           return { action: 'skip', reason: 'ran-recently' };
         }
         return { action: 'proceed' };
       case 'waiting-for-ingestion':
         return { action: 'proceed' };
       case 'running':
-        if (this.isWithinCooldown(row.fullSyncHeartbeatAt, STALE_HEARTBEAT_MINUTES)) {
+        if (isWithinCooldown(row.fullSyncHeartbeatAt, RUNNING_HEARTBEAT_MINUTES)) {
           return { action: 'skip', reason: 'already-running' };
         }
         this.logger.warn({ msg: 'Recovering stale running sync (heartbeat too old)' });
         return { action: 'proceed' };
       case 'failed':
-        if (this.isWithinCooldown(row.fullSyncHeartbeatAt, WAITING_FOR_FAILED_HEARTBEAT_MINUTES)) {
+        if (isWithinCooldown(row.fullSyncHeartbeatAt, FAILED_HEARTBEAT_MINUTES)) {
           return { action: 'skip', reason: 'recovery-retried-to-early' };
         }
         return { action: 'proceed' };
       case 'paused':
         return { action: 'skip', reason: 'paused' };
     }
-  }
-
-  private isWithinCooldown(timestamp: Date | null, cooldownMinutes: number): boolean {
-    if (isNullish(timestamp)) {
-      return false;
-    }
-    const cooldownThreshold = new Date();
-    cooldownThreshold.setMinutes(cooldownThreshold.getMinutes() - cooldownMinutes);
-    return timestamp > cooldownThreshold;
   }
 
   private async fetchAndSaveExpectedTotal(

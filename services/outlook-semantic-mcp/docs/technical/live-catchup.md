@@ -3,7 +3,7 @@
 
 # Live Catch-Up
 
-Live catch-up is the real-time email ingestion pipeline. It receives Microsoft Graph change notifications the moment new mail arrives and processes them inline to meet Microsoft's strict 10-second response deadline.
+Live catch-up is the real-time email ingestion pipeline. It receives Microsoft Graph change notifications the moment new mail arrives. The webhook is acknowledged immediately via RabbitMQ to meet Microsoft's strict 10-second response deadline; email fetching and ingestion happen inline in the consumer.
 
 > **Operator summary:** Live catch-up runs automatically. States: `ready` → `running` → `ready`. If it fails, the recovery scheduler resets it within 5 minutes. If no activity occurs for 4 hours (e.g. missed webhook), the recovery scheduler also retriggers it. The watermark (a timestamp marking the most recent email processed) is used to fetch only newer emails.
 

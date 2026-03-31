@@ -3,7 +3,6 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
-import { partition } from 'remeda';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { traceEvent } from '~/features/tracing.utils';
@@ -12,7 +11,7 @@ import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 import {
   FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES,
   READY_LIVE_CATCHUP_THRESHOLD_MINUTES,
-  STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES,
+  RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES,
 } from './live-catch-up/live-catch-up.command';
 
 const RECOVERY_CRON_SCHEDULE = '*/5 * * * *';
@@ -113,7 +112,7 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
             eq(inboxConfigurations.liveCatchUpState, 'running'),
             lt(
               inboxConfigurations.liveCatchUpHeartbeatAt,
-              getThreshold(STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES),
+              getThreshold(RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES),
             ),
           ),
         ),
@@ -123,48 +122,10 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
       return;
     }
 
-    const [readyLiveCatchups, stuckLiveCathups] = partition(
-      stuckConfigs,
-      (item) => item.liveCatchUpState === 'ready',
-    );
-    await this.publishStuckLiveCathups(stuckLiveCathups);
-    await this.publishReadyLiveCathups(readyLiveCatchups);
+    await this.rerunLiveCatchups(stuckConfigs);
   }
 
-  private async publishStuckLiveCathups(
-    stuckLiveCathups: { userProfileId: string }[],
-  ): Promise<void> {
-    if (!stuckLiveCathups.length) {
-      this.logger.log({ msg: 'No stuck live catch-ups found' });
-      return;
-    }
-
-    traceEvent('live-catch-up stuck recovery triggered', {
-      count: stuckLiveCathups.length,
-      userProfileIds: stuckLiveCathups.map((c) => c.userProfileId),
-    });
-
-    this.logger.log({
-      msg: 'Found stuck live catch-up configurations',
-      count: stuckLiveCathups.length,
-    });
-
-    for (const { userProfileId } of stuckLiveCathups) {
-      this.logger.log({
-        msg: 'Publishing live catch-up recovery event',
-        userProfileId,
-      });
-      const event = LiveCatchUpEventDto.parse({
-        type: 'unique.outlook-semantic-mcp.live-catch-up.recovery',
-        payload: { userProfileId },
-      });
-      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
-    }
-  }
-
-  private async publishReadyLiveCathups(
-    readyLiveCatchups: { subscriptionId: string }[],
-  ): Promise<void> {
+  private async rerunLiveCatchups(readyLiveCatchups: { subscriptionId: string }[]): Promise<void> {
     if (!readyLiveCatchups.length) {
       this.logger.log({
         msg: 'No live catch-ups which did not run for a long time',

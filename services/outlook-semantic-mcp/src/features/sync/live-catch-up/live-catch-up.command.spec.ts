@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveCatchUpCommand, READY_LIVE_CATCHUP_THRESHOLD_MINUTES, STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES } from './live-catch-up.command';
+import { LiveCatchUpCommand } from './live-catch-up.command';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -384,7 +384,7 @@ describe('LiveCatchUpCommand', () => {
     ];
     graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
     ingestEmailCommand.run
-      .mockResolvedValueOnce('failed')   // msg-1 fails
+      .mockResolvedValueOnce('failed') // msg-1 fails
       .mockResolvedValueOnce('ingested'); // msg-2 succeeds
 
     const db = createMockDb({
@@ -668,7 +668,7 @@ describe('LiveCatchUpCommand', () => {
   it('continues flush ingestion even when an individual message fails', async () => {
     graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
     ingestEmailCommand.run
-      .mockResolvedValueOnce('failed')   // webhook-1 fails in flush
+      .mockResolvedValueOnce('failed') // webhook-1 fails in flush
       .mockResolvedValueOnce('ingested'); // webhook-2 succeeds
 
     const db = createMockDb({

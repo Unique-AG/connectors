@@ -7,15 +7,19 @@ import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { sqlArray } from '~/utils/sql-array';
-import { InboxConfigurationMailFilters, inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import {
+  InboxConfigurationMailFilters,
+  inboxConfigurationMailFilters,
+} from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { IngestEmailCommand } from '../../mail-ingestion/ingest-email.command';
 import {
   LiveCatchUpGraphMessage,
   LiveCatchUpGraphMessageFields,
   liveCatchUpGraphMessageResponseSchema,
 } from '../../mail-ingestion/dtos/microsoft-graph.dtos';
+import { isWithinCooldown } from '~/utils/is-within-cooldown';
 
-export const STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
+export const RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES = 20;
 export const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
 export const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 60 * 4;
 
@@ -106,7 +110,10 @@ export class LiveCatchUpCommand {
   private async acquireLock(
     userProfileId: string,
     messageIds: string[],
-  ): Promise<{ status: 'proceed'; watermark: Date; filters: InboxConfigurationMailFilters } | { status: 'skip' }> {
+  ): Promise<
+    | { status: 'proceed'; watermark: Date; filters: InboxConfigurationMailFilters }
+    | { status: 'skip' }
+  > {
     return this.db.transaction(async (tx) => {
       const inboxConfig = await tx
         .select({
@@ -125,12 +132,6 @@ export class LiveCatchUpCommand {
         return { status: 'skip' };
       }
 
-      const isWithinCooldown = (thresholdMinutes: number): boolean => {
-        if (!inboxConfig.liveCatchUpHeartbeatAt) return false;
-        const threshold = new Date(Date.now() - thresholdMinutes * 60 * 1000);
-        return inboxConfig.liveCatchUpHeartbeatAt > threshold;
-      };
-
       // This function is defined here because it needs the transaction context
       const addMessagesToPendingMessages = async (): Promise<void> => {
         if (messageIds.length === 0) {
@@ -146,21 +147,16 @@ export class LiveCatchUpCommand {
           .execute();
       };
 
-      if (inboxConfig.liveCatchUpState === 'running' && isWithinCooldown(STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES)) {
+      if (
+        inboxConfig.liveCatchUpState === 'running' &&
+        isWithinCooldown(inboxConfig.liveCatchUpHeartbeatAt, RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES)
+      ) {
         // We buffer the messages because once the process finishes it will flush the messages.
         await addMessagesToPendingMessages();
         this.logger.log({
           userProfileId,
           bufferedCount: messageIds.length,
           msg: `Live catch-up already running, buffered message IDs count: ${messageIds.length}`,
-        });
-        return { status: 'skip' };
-      }
-
-      if (inboxConfig.liveCatchUpState === 'ready' && isWithinCooldown(READY_LIVE_CATCHUP_THRESHOLD_MINUTES)) {
-        this.logger.log({
-          userProfileId,
-          msg: 'Live catch-up is ready with recent heartbeat, skipping',
         });
         return { status: 'skip' };
       }
@@ -243,7 +239,11 @@ export class LiveCatchUpCommand {
         });
 
         if (result === 'failed') {
-          this.logger.warn({ userProfileId, messageId: email.id, msg: 'Email ingestion failed, continuing' });
+          this.logger.warn({
+            userProfileId,
+            messageId: email.id,
+            msg: 'Email ingestion failed, continuing',
+          });
         }
 
         await this.updateWatermarks({ email, userProfileId });
@@ -285,7 +285,7 @@ export class LiveCatchUpCommand {
     filters: InboxConfigurationMailFilters;
     alreadyProcessedIds: Set<string>;
   }): Promise<number> {
-    return await this.db.transaction(async (tx) => {
+    const idsToFlush = await this.db.transaction(async (tx) => {
       const row = await tx
         .select({ pendingLiveMessageIds: inboxConfigurations.pendingLiveMessageIds })
         .from(inboxConfigurations)
@@ -294,7 +294,7 @@ export class LiveCatchUpCommand {
         .then((rows) => rows[0]);
 
       if (!row) {
-        return 0;
+        return [];
       }
 
       const idsToFlush = row.pendingLiveMessageIds.filter((id) => !alreadyProcessedIds.has(id));
@@ -305,23 +305,30 @@ export class LiveCatchUpCommand {
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .execute();
 
-      if (idsToFlush.length === 0) {
-        this.logger.debug({ msg: `No messages to flush buffered messages is empty` });
-        return 0;
-      }
-
-      this.logger.debug({
-        msg: `Flushing buffered messages while running: ${idsToFlush.length}`,
-      });
-      for (const messageId of idsToFlush) {
-        const result = await this.ingestEmailCommand.run({ userProfileId, messageId, filters });
-        if (result === 'failed') {
-          this.logger.warn({ userProfileId, messageId, msg: 'Email ingestion failed during flush, continuing' });
-        }
-      }
-
-      return idsToFlush.length;
+      return idsToFlush;
     });
+    if (idsToFlush.length === 0) {
+      return 0;
+    }
+
+    this.logger.debug({
+      msg: `Flushing buffered messages while running: ${idsToFlush.length}`,
+    });
+    // We flush the ids's outside because.
+    // 1. We will keep the lock for a long time if we run this inside since it has exponential backoff
+    // 2. This is a failsafe normally we already processed all the messages via querity for last updated at.
+    for (const messageId of idsToFlush) {
+      const result = await this.ingestEmailCommand.run({ userProfileId, messageId, filters });
+      if (result === 'failed') {
+        this.logger.warn({
+          userProfileId,
+          messageId,
+          msg: 'Email ingestion failed during flush, continuing',
+        });
+      }
+    }
+
+    return idsToFlush.length;
   }
 
   private async updateWatermarks({
