@@ -161,18 +161,6 @@ export class LiveCatchUpCommand {
         return { status: 'skip' };
       }
 
-      if (
-        inboxConfig.liveCatchUpState === 'ready' &&
-        isWithinCooldown(inboxConfig.liveCatchUpHeartbeatAt, READY_LIVE_CATCHUP_THRESHOLD_MINUTES)
-      ) {
-        await addMessagesToPendingMessages();
-        this.logger.log({
-          userProfileId,
-          msg: 'Live catch-up in cooldown (ready), skipping',
-        });
-        return { status: 'skip' };
-      }
-
       if (!inboxConfig.newestLastModifiedDateTime) {
         // We buffer the messages to ensure we do not lose any message, and next live update will ensure it included this messages.
         // This case should can only happen if a live update catches the lock before the full sync basically the following case.
