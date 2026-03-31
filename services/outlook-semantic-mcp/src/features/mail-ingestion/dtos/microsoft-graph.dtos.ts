@@ -192,3 +192,23 @@ export const fullSyncGraphMessageResponseSchema = z.object({
   value: z.array(fullSyncGraphMessage),
   '@odata.nextLink': z.string().optional(),
 });
+
+const liveCatchUpGraphMessage = graphMessageSchema.pick({
+  id: true,
+  createdDateTime: true,
+  lastModifiedDateTime: true,
+});
+
+export type LiveCatchUpGraphMessage = z.infer<typeof liveCatchUpGraphMessage>;
+
+export const LiveCatchUpGraphMessageFields = asAllOptions<keyof LiveCatchUpGraphMessage>()([
+  `id`,
+  `createdDateTime`,
+  `lastModifiedDateTime`,
+]);
+
+export const liveCatchUpGraphMessageResponseSchema = z.object({
+  '@odata.context': z.string().optional(),
+  value: z.array(liveCatchUpGraphMessage),
+  '@odata.nextLink': z.string().optional(),
+});

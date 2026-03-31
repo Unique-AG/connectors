@@ -9,10 +9,12 @@ import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/
 import { traceEvent } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
 import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
+import {
+  FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES,
+  READY_LIVE_CATCHUP_THRESHOLD_MINUTES,
+  STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES,
+} from './live-catch-up/live-catch-up.command';
 
-const STUCK_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
-const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
-const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 60 * 4;
 const RECOVERY_CRON_SCHEDULE = '*/5 * * * *';
 
 @Injectable()
