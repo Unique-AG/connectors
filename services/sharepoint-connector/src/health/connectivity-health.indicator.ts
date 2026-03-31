@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { fetch as undiciFetch, Dispatcher } from 'undici';
-
+import { Dispatcher, fetch as undiciFetch } from 'undici';
 import { Config } from '../config';
 import { ProxyService } from '../proxy/proxy.service';
 
@@ -32,7 +31,7 @@ export class ConnectivityHealthIndicator {
   private readonly timeoutMs: number;
   private readonly sharepointBaseUrl: string;
 
-  constructor(
+  public constructor(
     configService: ConfigService<Config, true>,
     private readonly proxyService: ProxyService,
     private readonly healthIndicatorService: HealthIndicatorService,
@@ -41,7 +40,7 @@ export class ConnectivityHealthIndicator {
     this.sharepointBaseUrl = configService.get('sharepoint.baseUrl', { infer: true });
   }
 
-  async check(key: string): Promise<HealthIndicatorResult> {
+  public async check(key: string): Promise<HealthIndicatorResult> {
     const indicator = this.healthIndicatorService.check(key);
     const dispatcher: Dispatcher = this.proxyService.getDispatcher({ mode: 'always' });
 

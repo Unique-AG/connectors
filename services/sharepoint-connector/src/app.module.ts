@@ -26,7 +26,14 @@ import { Redacted } from './utils/redacted';
     ConfigModule.forRoot({
       isGlobal: true,
       ignoreEnvFile: true,
-      load: [appConfig, sharepointConfig, processingConfig, uniqueConfig, proxyConfig, healthConfig],
+      load: [
+        appConfig,
+        sharepointConfig,
+        processingConfig,
+        uniqueConfig,
+        proxyConfig,
+        healthConfig,
+      ],
     }),
     ProxyModule,
     ConfigDiagnosticsModule,

@@ -2,7 +2,6 @@ import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { ProxyService } from '../proxy/proxy.service';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
 import { UniqueApiHealthIndicator } from './unique-api-health.indicator';
@@ -33,9 +32,15 @@ describe('UniqueApiHealthIndicator', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'health.connectivityTimeoutMs') return TIMEOUT_MS;
-          if (key === 'unique.ingestionServiceBaseUrl') return INGESTION_BASE_URL;
-          if (key === 'unique.scopeManagementServiceBaseUrl') return SCOPE_MANAGEMENT_BASE_URL;
+          if (key === 'health.connectivityTimeoutMs') {
+            return TIMEOUT_MS;
+          }
+          if (key === 'unique.ingestionServiceBaseUrl') {
+            return INGESTION_BASE_URL;
+          }
+          if (key === 'unique.scopeManagementServiceBaseUrl') {
+            return SCOPE_MANAGEMENT_BASE_URL;
+          }
           if (key === 'unique') {
             return {
               serviceAuthMode: 'external' as const,
@@ -136,9 +141,7 @@ describe('UniqueApiHealthIndicator', () => {
   it('reports down when both endpoints are down', async () => {
     const connError = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
     const dnsError = Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' });
-    mockFetch
-      .mockRejectedValueOnce(connError)
-      .mockRejectedValueOnce(dnsError);
+    mockFetch.mockRejectedValueOnce(connError).mockRejectedValueOnce(dnsError);
 
     const result = await indicator.check('uniqueApi');
 
@@ -182,9 +185,15 @@ describe('UniqueApiHealthIndicator', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'health.connectivityTimeoutMs') return TIMEOUT_MS;
-          if (key === 'unique.ingestionServiceBaseUrl') return INGESTION_BASE_URL;
-          if (key === 'unique.scopeManagementServiceBaseUrl') return SCOPE_MANAGEMENT_BASE_URL;
+          if (key === 'health.connectivityTimeoutMs') {
+            return TIMEOUT_MS;
+          }
+          if (key === 'unique.ingestionServiceBaseUrl') {
+            return INGESTION_BASE_URL;
+          }
+          if (key === 'unique.scopeManagementServiceBaseUrl') {
+            return SCOPE_MANAGEMENT_BASE_URL;
+          }
           if (key === 'unique') {
             return {
               serviceAuthMode: 'cluster_local' as const,
@@ -220,7 +229,11 @@ describe('UniqueApiHealthIndicator', () => {
     expect(mockFetch).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
-        headers: { 'Content-Type': 'application/json', 'x-service-id': 'sharepoint-connector', 'x-custom': 'value' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-service-id': 'sharepoint-connector',
+          'x-custom': 'value',
+        },
       }),
     );
   });

@@ -10,7 +10,12 @@ import { UniqueApiHealthIndicator } from './unique-api-health.indicator';
 @Module({
   imports: [TerminusModule, UniqueApiModule],
   controllers: [HealthController],
-  providers: [SyncStatusStore, SyncHealthIndicator, ConnectivityHealthIndicator, UniqueApiHealthIndicator],
+  providers: [
+    SyncStatusStore,
+    SyncHealthIndicator,
+    ConnectivityHealthIndicator,
+    UniqueApiHealthIndicator,
+  ],
   exports: [SyncStatusStore],
 })
 export class HealthModule {}

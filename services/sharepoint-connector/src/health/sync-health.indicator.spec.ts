@@ -1,13 +1,32 @@
 import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
-import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { Config } from '../config';
 import { SyncStep } from '../constants/sync-step.enum';
 import { SyncHealthIndicator } from './sync-health.indicator';
 import { SyncRecord, SyncStatusStore } from './sync-status.store';
 
+const HISTORY_SIZE = 10;
 const THRESHOLD = 0.5;
+
+const configService = {
+  get: (key: string) => {
+    if (key === 'health.syncHistorySize') {
+      return HISTORY_SIZE;
+    }
+    if (key === 'health.syncSiteFailureThreshold') {
+      return THRESHOLD;
+    }
+    return undefined;
+  },
+} as unknown as ConfigService<Config, true>;
+
+const healthIndicatorService = {
+  check: (key: string) => ({
+    up: (data?: Record<string, unknown>) => ({ [key]: { status: 'up', ...data } }),
+    down: (data?: Record<string, unknown>) => ({ [key]: { status: 'down', ...data } }),
+  }),
+} as unknown as HealthIndicatorService;
 
 function makeSyncRecord(overrides: Partial<SyncRecord> = {}): SyncRecord {
   return {
@@ -22,30 +41,9 @@ describe('SyncHealthIndicator', () => {
   let indicator: SyncHealthIndicator;
   let store: SyncStatusStore;
 
-  beforeEach(async () => {
-    const { unit, unitRef } = await TestBed.solitary(SyncHealthIndicator)
-      .mock(ConfigService)
-      .impl((stub) => ({
-        ...stub(),
-        get: vi.fn(() => THRESHOLD),
-      }))
-      .mock(SyncStatusStore)
-      .impl((stub) => ({
-        ...stub(),
-        getRecords: vi.fn(() => []),
-        getLatest: vi.fn(() => undefined),
-      }))
-      .mock(HealthIndicatorService)
-      .impl(() => ({
-        check: (key: string) => ({
-          up: (data?: Record<string, unknown>) => ({ [key]: { status: 'up', ...data } }),
-          down: (data?: Record<string, unknown>) => ({ [key]: { status: 'down', ...data } }),
-        }),
-      }))
-      .compile();
-
-    indicator = unit;
-    store = unitRef.get(SyncStatusStore);
+  beforeEach(() => {
+    store = new SyncStatusStore(configService);
+    indicator = new SyncHealthIndicator(store, healthIndicatorService, configService);
   });
 
   it('returns empty object when no sync records exist', () => {
@@ -55,22 +53,22 @@ describe('SyncHealthIndicator', () => {
   });
 
   it('returns up when all sites are below threshold', () => {
-    const records = [
+    store.record(
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'success' } },
           { siteId: 'site-bbb', result: { status: 'success' } },
         ],
       }),
+    );
+    store.record(
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'success' } },
           { siteId: 'site-bbb', result: { status: 'failure', step: SyncStep.ContentSync } },
         ],
       }),
-    ];
-    vi.mocked(store.getRecords).mockReturnValue(records);
-    vi.mocked(store.getLatest).mockReturnValue(records[1]);
+    );
 
     const result = indicator.check('sync');
 
@@ -88,22 +86,22 @@ describe('SyncHealthIndicator', () => {
   });
 
   it('returns down when one site exceeds threshold while others are healthy', () => {
-    const records = [
+    store.record(
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'success' } },
           { siteId: 'site-bbb', result: { status: 'failure', step: SyncStep.PermissionsSync } },
         ],
       }),
+    );
+    store.record(
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'success' } },
           { siteId: 'site-bbb', result: { status: 'failure', step: SyncStep.ContentSync } },
         ],
       }),
-    ];
-    vi.mocked(store.getRecords).mockReturnValue(records);
-    vi.mocked(store.getLatest).mockReturnValue(records[1]);
+    );
 
     const result = indicator.check('sync');
 
@@ -122,27 +120,29 @@ describe('SyncHealthIndicator', () => {
   });
 
   it('computes denominator from appearances, not total syncs', () => {
-    const records = [
+    store.record(
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'success' } },
           { siteId: 'site-bbb', result: { status: 'success' } },
         ],
       }),
+    );
+    store.record(
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'failure', step: SyncStep.ContentSync } },
         ],
       }),
+    );
+    store.record(
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'success' } },
           { siteId: 'site-bbb', result: { status: 'success' } },
         ],
       }),
-    ];
-    vi.mocked(store.getRecords).mockReturnValue(records);
-    vi.mocked(store.getLatest).mockReturnValue(records[2]);
+    );
 
     const result = indicator.check('sync');
 
@@ -160,20 +160,20 @@ describe('SyncHealthIndicator', () => {
   });
 
   it('counts full sync failure with empty siteResults as failure for all known sites', () => {
-    const records = [
+    store.record(
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'success' } },
           { siteId: 'site-bbb', result: { status: 'success' } },
         ],
       }),
+    );
+    store.record(
       makeSyncRecord({
         fullResult: { status: 'failure', step: SyncStep.SitesConfigLoading },
         siteResults: [],
       }),
-    ];
-    vi.mocked(store.getRecords).mockReturnValue(records);
-    vi.mocked(store.getLatest).mockReturnValue(records[1]);
+    );
 
     const result = indicator.check('sync');
 
@@ -191,18 +191,18 @@ describe('SyncHealthIndicator', () => {
   });
 
   it('reports down when all records are full sync failures with no site data', () => {
-    const records = [
+    store.record(
       makeSyncRecord({
         fullResult: { status: 'failure', step: SyncStep.SitesConfigLoading },
         siteResults: [],
       }),
+    );
+    store.record(
       makeSyncRecord({
         fullResult: { status: 'failure', step: SyncStep.Unknown },
         siteResults: [],
       }),
-    ];
-    vi.mocked(store.getRecords).mockReturnValue(records);
-    vi.mocked(store.getLatest).mockReturnValue(records[1]);
+    );
 
     const result = indicator.check('sync');
 
@@ -218,23 +218,23 @@ describe('SyncHealthIndicator', () => {
   });
 
   it('reports down when full sync failures push known sites over threshold', () => {
-    const records = [
+    store.record(
       makeSyncRecord({
-        siteResults: [
-          { siteId: 'site-aaa', result: { status: 'success' } },
-        ],
+        siteResults: [{ siteId: 'site-aaa', result: { status: 'success' } }],
       }),
-      makeSyncRecord({
-        fullResult: { status: 'failure', step: SyncStep.SitesConfigLoading },
-        siteResults: [],
-      }),
+    );
+    store.record(
       makeSyncRecord({
         fullResult: { status: 'failure', step: SyncStep.SitesConfigLoading },
         siteResults: [],
       }),
-    ];
-    vi.mocked(store.getRecords).mockReturnValue(records);
-    vi.mocked(store.getLatest).mockReturnValue(records[2]);
+    );
+    store.record(
+      makeSyncRecord({
+        fullResult: { status: 'failure', step: SyncStep.SitesConfigLoading },
+        siteResults: [],
+      }),
+    );
 
     const result = indicator.check('sync');
 
@@ -252,20 +252,18 @@ describe('SyncHealthIndicator', () => {
   });
 
   it('treats exact threshold ratio as healthy (up)', () => {
-    const records = [
+    store.record(
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'failure', step: SyncStep.ContentSync } },
         ],
       }),
+    );
+    store.record(
       makeSyncRecord({
-        siteResults: [
-          { siteId: 'site-aaa', result: { status: 'success' } },
-        ],
+        siteResults: [{ siteId: 'site-aaa', result: { status: 'success' } }],
       }),
-    ];
-    vi.mocked(store.getRecords).mockReturnValue(records);
-    vi.mocked(store.getLatest).mockReturnValue(records[1]);
+    );
 
     const result = indicator.check('sync');
 

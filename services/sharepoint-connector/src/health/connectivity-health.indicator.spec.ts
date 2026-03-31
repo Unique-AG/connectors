@@ -2,7 +2,6 @@ import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { ProxyService } from '../proxy/proxy.service';
 import { ConnectivityHealthIndicator } from './connectivity-health.indicator';
 
@@ -31,8 +30,12 @@ describe('ConnectivityHealthIndicator', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'health.connectivityTimeoutMs') return TIMEOUT_MS;
-          if (key === 'sharepoint.baseUrl') return BASE_URL;
+          if (key === 'health.connectivityTimeoutMs') {
+            return TIMEOUT_MS;
+          }
+          if (key === 'sharepoint.baseUrl') {
+            return BASE_URL;
+          }
           return undefined;
         }),
       }))
@@ -86,9 +89,7 @@ describe('ConnectivityHealthIndicator', () => {
 
   it('reports down with graphError when Graph is unreachable', async () => {
     const dnsError = Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' });
-    mockFetch
-      .mockRejectedValueOnce(dnsError)
-      .mockResolvedValueOnce(new Response());
+    mockFetch.mockRejectedValueOnce(dnsError).mockResolvedValueOnce(new Response());
 
     const result = await indicator.check('connectivity');
 
@@ -104,9 +105,7 @@ describe('ConnectivityHealthIndicator', () => {
 
   it('reports down with error in sharepoint array when SharePoint is unreachable', async () => {
     const timeoutError = Object.assign(new Error('connect ETIMEDOUT'), { code: 'ETIMEDOUT' });
-    mockFetch
-      .mockResolvedValueOnce(new Response())
-      .mockRejectedValueOnce(timeoutError);
+    mockFetch.mockResolvedValueOnce(new Response()).mockRejectedValueOnce(timeoutError);
 
     const result = await indicator.check('connectivity');
 
@@ -122,9 +121,7 @@ describe('ConnectivityHealthIndicator', () => {
   it('reports down when both Graph and SharePoint are unreachable', async () => {
     const dnsError = Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' });
     const connError = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
-    mockFetch
-      .mockRejectedValueOnce(dnsError)
-      .mockRejectedValueOnce(connError);
+    mockFetch.mockRejectedValueOnce(dnsError).mockRejectedValueOnce(connError);
 
     const result = await indicator.check('connectivity');
 
@@ -139,9 +136,7 @@ describe('ConnectivityHealthIndicator', () => {
   });
 
   it('falls back to UNKNOWN when error has no code', async () => {
-    mockFetch
-      .mockRejectedValueOnce(new Error('unexpected'))
-      .mockResolvedValueOnce(new Response());
+    mockFetch.mockRejectedValueOnce(new Error('unexpected')).mockResolvedValueOnce(new Response());
 
     const result = await indicator.check('connectivity');
 

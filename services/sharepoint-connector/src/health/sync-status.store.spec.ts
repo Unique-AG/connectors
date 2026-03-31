@@ -1,7 +1,7 @@
+import * as assert from 'node:assert';
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { SyncStep } from '../constants/sync-step.enum';
 import { FullSyncResult, SyncRecord, SyncStatusStore } from './sync-status.store';
 
@@ -65,7 +65,9 @@ describe('SyncStatusStore', () => {
         makeSyncRecord({ timestamp: new Date(`2025-01-0${i + 1}`) }),
       );
 
-      for (const r of records) store.record(r);
+      for (const r of records) {
+        store.record(r);
+      }
 
       expect(store.getRecords()).toHaveLength(HISTORY_SIZE);
       expect(store.getRecords()).toEqual(records.slice(1));
@@ -90,10 +92,11 @@ describe('SyncStatusStore', () => {
 
       store.record(record);
 
-      const stored = store.getLatest()!;
+      const stored = store.getLatest();
+      assert.ok(stored);
       expect(stored.fullResult).toEqual({ status: 'failure', step: SyncStep.ContentSync });
       expect(stored.siteResults).toHaveLength(3);
-      expect(stored.siteResults[1].result).toEqual({
+      expect(stored.siteResults[1]?.result).toEqual({
         status: 'failure',
         step: SyncStep.PermissionsSync,
       });
@@ -120,7 +123,9 @@ describe('SyncStatusStore', () => {
         }),
       );
 
-      for (const r of records) store.record(r);
+      for (const r of records) {
+        store.record(r);
+      }
 
       expect(store.getLatest()).toBe(records[4]);
     });

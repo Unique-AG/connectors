@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-
+import { isNullish } from 'remeda';
 import { Config } from '../config';
 import { SyncStatusStore } from './sync-status.store';
 
@@ -14,7 +14,7 @@ interface SiteStats {
 export class SyncHealthIndicator {
   private readonly threshold: number;
 
-  constructor(
+  public constructor(
     private readonly store: SyncStatusStore,
     private readonly healthIndicatorService: HealthIndicatorService,
     configService: ConfigService<Config, true>,
@@ -22,15 +22,15 @@ export class SyncHealthIndicator {
     this.threshold = configService.get('health.syncSiteFailureThreshold', { infer: true });
   }
 
-  check(key: string): HealthIndicatorResult {
+  public check(key: string): HealthIndicatorResult {
     const records = this.store.getRecords();
+    const latest = this.store.getLatest();
 
-    if (records.length === 0) {
+    if (isNullish(latest)) {
       return {};
     }
 
     const indicator = this.healthIndicatorService.check(key);
-    const latest = this.store.getLatest()!;
     const sites = new Map<string, SiteStats>();
 
     // First pass: accumulate per-site stats from records that have site-level detail.

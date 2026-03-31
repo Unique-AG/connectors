@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { fetch as undiciFetch, Dispatcher } from 'undici';
-
+import { Dispatcher, fetch as undiciFetch } from 'undici';
 import { Config } from '../config';
 import { ProxyService } from '../proxy/proxy.service';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
@@ -25,7 +24,7 @@ export class UniqueApiHealthIndicator {
   private readonly ingestionUrl: string;
   private readonly scopeManagementUrl: string;
 
-  constructor(
+  public constructor(
     private readonly configService: ConfigService<Config, true>,
     private readonly proxyService: ProxyService,
     private readonly uniqueAuthService: UniqueAuthService,
@@ -36,7 +35,7 @@ export class UniqueApiHealthIndicator {
     this.scopeManagementUrl = `${configService.get('unique.scopeManagementServiceBaseUrl', { infer: true })}/graphql`;
   }
 
-  async check(key: string): Promise<HealthIndicatorResult> {
+  public async check(key: string): Promise<HealthIndicatorResult> {
     const indicator = this.healthIndicatorService.check(key);
     const dispatcher = this.proxyService.getDispatcher({ mode: 'for-external-only' });
     const authHeaders = await this.getAuthHeaders();
