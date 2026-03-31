@@ -308,7 +308,7 @@ describe('FolderMovementSyncCommand', () => {
     expect(result).toBe('completed');
 
     // api() was called with the cursor URL
-    const client = graphClientFactory.createClientForUser.mock.results[0].value;
+    const client = graphClientFactory.createClientForUser.mock.results[0]?.value;
     expect(client.api).toHaveBeenCalledWith(CURSOR);
 
     // Folder markers cleared after exhausting the page

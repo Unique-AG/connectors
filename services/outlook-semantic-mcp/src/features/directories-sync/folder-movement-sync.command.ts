@@ -17,6 +17,7 @@ import { IngestEmailCommand } from '../mail-ingestion/ingest-email.command';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
 
 export const FOLDER_MOVEMENT_SYNC_RUNNING_HEARTBEAT_MINUTES = 20;
+export const FOLDER_MOVEMENT_SYNC_FAILED_RETRY_MINUTES = 20;
 
 export type FolderMovementSyncResult = 'completed' | 'skipped' | 'failed';
 

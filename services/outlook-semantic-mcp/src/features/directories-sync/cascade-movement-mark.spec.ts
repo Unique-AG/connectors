@@ -95,8 +95,8 @@ describe('cascadeMovementMarkToDescendants', () => {
 
     expect(db.execute).toHaveBeenCalledOnce();
 
-    const sqlArg = db.execute.mock.calls[0][0];
-    const sqlString: string = sqlArg.queryChunks
+    const sqlArg = db.execute.mock.calls[0]?.[0];
+    const sqlString: string = sqlArg?.queryChunks
       ? sqlArg.queryChunks.map((chunk: any) => (typeof chunk === 'string' ? chunk : String(chunk.value ?? ''))).join('')
       : String(sqlArg);
 
@@ -112,9 +112,9 @@ describe('cascadeMovementMarkToDescendants', () => {
 
     expect(db.execute).toHaveBeenCalledOnce();
 
-    const sqlArg = db.execute.mock.calls[0][0];
+    const sqlArg = db.execute.mock.calls[0]?.[0];
     // Drizzle sql`` template tag stores interpolated values directly in queryChunks
-    const chunks: unknown[] = sqlArg.queryChunks ?? [];
+    const chunks: unknown[] = sqlArg?.queryChunks ?? [];
     expect(chunks).toContain(USER_PROFILE_ID);
   });
 
@@ -125,8 +125,8 @@ describe('cascadeMovementMarkToDescendants', () => {
 
     expect(db.execute).toHaveBeenCalledOnce();
 
-    const sqlArg = db.execute.mock.calls[0][0];
-    const chunks: unknown[] = sqlArg.queryChunks ?? [];
+    const sqlArg = db.execute.mock.calls[0]?.[0];
+    const chunks: unknown[] = sqlArg?.queryChunks ?? [];
     expect(chunks).toContain(USER_PROFILE_ID);
   });
 });

@@ -116,7 +116,7 @@ describe('UpsertDirectoryCommand', () => {
       updateOnConflict: true,
     });
 
-    const setArg = db._insertChain.onConflictDoUpdate.mock.calls[0][0].set;
+    const setArg = db._insertChain.onConflictDoUpdate.mock.calls[0]?.[0].set;
     expect(setArg).toHaveProperty('parentChangeDetectedAt');
     expect(setArg).toHaveProperty('directoryMovementResyncCursor');
   });

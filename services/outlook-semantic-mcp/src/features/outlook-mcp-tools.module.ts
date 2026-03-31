@@ -6,6 +6,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { OpenEmailTool, SearchEmailsTool, SearchModule } from './content';
 import { DirectoriesSyncModule } from './directories-sync/directories-sync.module';
+import { FolderMovementSyncModule } from './directories-sync/folder-movement-sync.module';
 import { ListFoldersTool } from './directories-sync/tools';
 import { EmailManagementModule } from './email-management/email-management.module';
 import { CreateDraftEmailTool } from './email-management/tools/create-draft-email.tool';
@@ -64,6 +65,7 @@ const TOOLS = [
     LiveCatchUpModule,
     MailIngestionModule,
     DirectoriesSyncModule,
+    FolderMovementSyncModule,
     SearchModule,
     UniqueApiFeatureModule,
     SyncRecoveryModule,
