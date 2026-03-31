@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { AnyPgColumn, boolean, pgEnum, pgTable, unique, varchar } from 'drizzle-orm/pg-core';
+import { AnyPgColumn, boolean, pgEnum, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
@@ -55,6 +55,8 @@ export const directories = pgTable(
       onUpdate: 'cascade',
     }),
     ignoreForSync: boolean(`ignore_for_sync`).default(false).notNull(),
+    parentChangeDetectedAt: timestamp(`parent_change_detected_at`),
+    directoryMovementResyncCursor: varchar(`directory_movement_resync_cursor`),
     // References
     userProfileId: varchar(`user_profile_id`)
       .notNull()

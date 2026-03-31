@@ -12,6 +12,8 @@ export const directoriesSync = pgTable('directories_sync', {
   lastDeltaSyncRanAt: timestamp(`last_delta_sync_ran_at`),
   lastDeltaChangeDetectedAt: timestamp(`last_delta_change_detected_at`),
   lastDirectorySyncRanAt: timestamp(`last_directory_sync_ran_at`),
+  folderMovementSyncState: varchar(`folder_movement_sync_state`),
+  folderMovementSyncHeartbeatAt: timestamp(`folder_movement_sync_heartbeat_at`),
 
   // References
   userProfileId: varchar(`user_profile_id`)
