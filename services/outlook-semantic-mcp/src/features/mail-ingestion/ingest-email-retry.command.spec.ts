@@ -16,7 +16,7 @@ const USER_PROFILE_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 const MESSAGE_ID = 'message_01jxk5r1s2fq9att23mp4z5ef2';
 
 function createCommand() {
-  // Construct with all dependencies as undefined — ingestEmail is spied out, so they are never used.
+  // Construct with all dependencies as undefined — processEmail is spied out, so they are never used.
   const command = new IngestEmailCommand(
     undefined as any,
     undefined as any,
@@ -39,53 +39,53 @@ describe('IngestEmailCommand retry logic', () => {
     vi.clearAllMocks();
   });
 
-  it('calls ingestEmail up to 3 times on repeated failure and returns failed', async () => {
+  it('calls processEmail up to 3 times on repeated failure and returns failed', async () => {
     const command = createCommand();
-    vi.spyOn(command as any, 'ingestEmail').mockRejectedValue(new Error('transient error'));
+    vi.spyOn(command as any, 'processEmail').mockRejectedValue(new Error('transient error'));
 
     const result = await command.run({ userProfileId: USER_PROFILE_ID, messageId: MESSAGE_ID });
 
     expect(result).toBe('failed');
-    expect((command as any).ingestEmail).toHaveBeenCalledTimes(3);
+    expect((command as any).processEmail).toHaveBeenCalledTimes(3);
   });
 
   it('returns the result immediately on first success', async () => {
     const command = createCommand();
-    vi.spyOn(command as any, 'ingestEmail').mockResolvedValue('ingested');
+    vi.spyOn(command as any, 'processEmail').mockResolvedValue('ingested');
 
     const result = await command.run({ userProfileId: USER_PROFILE_ID, messageId: MESSAGE_ID });
 
     expect(result).toBe('ingested');
-    expect((command as any).ingestEmail).toHaveBeenCalledTimes(1);
+    expect((command as any).processEmail).toHaveBeenCalledTimes(1);
   });
 
   it('returns the result on second attempt after one failure', async () => {
     const command = createCommand();
-    vi.spyOn(command as any, 'ingestEmail')
+    vi.spyOn(command as any, 'processEmail')
       .mockRejectedValueOnce(new Error('transient error'))
       .mockResolvedValueOnce('metadata-updated');
 
     const result = await command.run({ userProfileId: USER_PROFILE_ID, messageId: MESSAGE_ID });
 
     expect(result).toBe('metadata-updated');
-    expect((command as any).ingestEmail).toHaveBeenCalledTimes(2);
+    expect((command as any).processEmail).toHaveBeenCalledTimes(2);
   });
 
-  it('re-throws BottleneckError immediately without retrying', async () => {
+  it('re-throws BottleneckError after exhausting retries', async () => {
     const command = createCommand();
     const bottleneckError = new Bottleneck.BottleneckError('rate limiter stopped');
-    vi.spyOn(command as any, 'ingestEmail').mockRejectedValue(bottleneckError);
+    vi.spyOn(command as any, 'processEmail').mockRejectedValue(bottleneckError);
 
     await expect(
       command.run({ userProfileId: USER_PROFILE_ID, messageId: MESSAGE_ID }),
     ).rejects.toThrow(Bottleneck.BottleneckError);
 
-    expect((command as any).ingestEmail).toHaveBeenCalledTimes(1);
+    expect((command as any).processEmail).toHaveBeenCalledTimes(3);
   });
 
   it('applies exponential backoff between retry attempts', async () => {
     const command = createCommand();
-    vi.spyOn(command as any, 'ingestEmail').mockRejectedValue(new Error('transient error'));
+    vi.spyOn(command as any, 'processEmail').mockRejectedValue(new Error('transient error'));
     const sleepSpy = vi.spyOn(command as any, 'sleep').mockResolvedValue(undefined);
 
     await command.run({ userProfileId: USER_PROFILE_ID, messageId: MESSAGE_ID });

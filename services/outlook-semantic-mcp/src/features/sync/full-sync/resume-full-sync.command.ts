@@ -35,7 +35,7 @@ export class ResumeFullSyncCommand {
 
     if ((result.rowCount ?? 0) > 0) {
       const event = FullSyncEventDto.parse({
-        type: 'unique.outlook-semantic-mcp.full-sync.retrigger',
+        type: 'unique.outlook-semantic-mcp.sync.full-sync',
         payload: { userProfileId },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
