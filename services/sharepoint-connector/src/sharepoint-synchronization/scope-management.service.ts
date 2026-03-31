@@ -128,6 +128,9 @@ export class ScopeManagementService {
       const children = await this.uniqueScopesService.listChildrenScopes(scopeId);
       this.logger.log(`${logPrefix} Found ${children.length} child scopes to delete`);
 
+      // Children are deleted sequentially and the method throws on the first failure.
+      // This is intentional: on transient errors the operation can be safely resumed
+      // because already-deleted children won't be returned by listChildrenScopes.
       for (const child of children) {
         const result = await this.uniqueScopesService.deleteScope(child.id, { recursive: true });
 
