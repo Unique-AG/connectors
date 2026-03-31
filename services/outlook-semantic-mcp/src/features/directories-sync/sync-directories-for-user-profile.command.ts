@@ -1,7 +1,7 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { createSmeared } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, count, eq, inArray, not } from 'drizzle-orm';
+import { and, count, eq, inArray, not, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { prop } from 'remeda';
 import {
@@ -96,6 +96,14 @@ export class SyncDirectoriesForUserProfileCommand {
     traceEvent('directories upserted');
     this.logger.log({ userProfileId: userProfile.id, userEmail, msg: `Directories upserted` });
 
+    await this.cascadeMovementMarkToDescendants({ userProfileId: userProfile.id });
+    traceEvent('movement mark cascaded to descendants');
+    this.logger.log({
+      userProfileId: userProfile.id,
+      userEmail,
+      msg: `Movement mark cascaded to descendants`,
+    });
+
     await this.removeExtraDirectories({
       userProfileId: userProfile.id,
       providerUserId: userProfile.providerUserId,
@@ -114,6 +122,35 @@ export class SyncDirectoriesForUserProfileCommand {
       userEmail,
       msg: `Directories sync completed`,
     });
+  }
+
+  private async cascadeMovementMarkToDescendants({
+    userProfileId,
+  }: {
+    userProfileId: string;
+  }): Promise<void> {
+    await this.db.execute(
+      sql`WITH RECURSIVE moved_dirs AS (
+        SELECT id FROM directories
+        WHERE user_profile_id = ${userProfileId}
+          AND parent_change_detected_at IS NOT NULL
+
+        UNION ALL
+
+        SELECT d.id
+        FROM directories d
+        INNER JOIN moved_dirs m ON d.parent_id = m.id
+        WHERE d.user_profile_id = ${userProfileId}
+          AND d.parent_change_detected_at IS NULL
+      )
+      UPDATE directories
+      SET
+        parent_change_detected_at = NOW(),
+        directory_movement_resync_cursor = NULL
+      WHERE id IN (SELECT id FROM moved_dirs)
+        AND user_profile_id = ${userProfileId}
+        AND parent_change_detected_at IS NULL`,
+    );
   }
 
   private async upsertDirectories({
