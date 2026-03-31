@@ -209,7 +209,7 @@ export class IngestEmailCommand {
       return 'metadata-updated';
     }
 
-    await this.ingestEmail({
+    await this.uploadEmail({
       fileKey,
       metadata,
       rootScopeId: rootScope.id,
@@ -222,7 +222,7 @@ export class IngestEmailCommand {
   }
 
   @Span()
-  private async ingestEmail({
+  private async uploadEmail({
     client,
     rootScopeId,
     graphMessage,
