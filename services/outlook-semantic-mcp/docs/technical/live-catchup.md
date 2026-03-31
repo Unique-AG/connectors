@@ -3,13 +3,13 @@
 
 # Live Catch-Up
 
-Live catch-up is the real-time email ingestion pipeline. It receives Microsoft Graph change notifications the moment new mail arrives and processes them asynchronously via RabbitMQ to meet Microsoft's strict 10-second response deadline.
+Live catch-up is the real-time email ingestion pipeline. It receives Microsoft Graph change notifications the moment new mail arrives and processes them inline to meet Microsoft's strict 10-second response deadline.
 
 > **Operator summary:** Live catch-up runs automatically. States: `ready` → `running` → `ready`. If it fails, the recovery scheduler resets it within 5 minutes. If no activity occurs for 4 hours (e.g. missed webhook), the recovery scheduler also retriggers it. The watermark (a timestamp marking the most recent email processed) is used to fetch only newer emails.
 
 ## How It Works
 
-Live catch-up operates in two stages: a **notification stage** (fast, synchronous) and an **ingestion stage** (async, RabbitMQ-driven).
+Live catch-up operates in two stages: a **notification stage** (fast, synchronous) and an **ingestion stage** (inline, within the same consumer execution).
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -30,19 +30,20 @@ sequenceDiagram
     Controller->>AMQP: Publish live-catch-up.execute (subscriptionId, messageIds[])
     Controller->>MSGraph: 202 Accepted
 
-    Note over AMQP,UniqueKB: Stage 2 — Ingestion (async)
+    Note over AMQP,UniqueKB: Stage 2 — Ingestion (inline)
     AMQP->>Consumer: Deliver message
     Consumer->>DB: Acquire lock on inbox_configurations row
 
-    alt liveCatchUpState = running OR watermark not yet set
+    alt liveCatchUpState = running (recent heartbeat) OR watermark not yet set
         Consumer->>DB: Buffer messageIds in pendingLiveMessageIds
-    else liveCatchUpState = ready
+    else liveCatchUpState = ready (stale heartbeat) OR failed OR running (stale heartbeat)
         Consumer->>DB: Set liveCatchUpState = running
         Consumer->>MSGraph: GET /me/messages?$filter=lastModifiedDateTime ge {watermark}
         MSGraph->>Consumer: New/modified messages since watermark
-        Consumer->>AMQP: Publish mail-event per message to ingestion queue
-        AMQP->>UniqueKB: Ingestion consumer uploads each email
-        Consumer->>DB: Update newestLastModifiedDateTime watermark
+        loop For each message
+            Consumer->>UniqueKB: Ingest email directly (IngestEmailCommand)
+            Consumer->>DB: Update newestLastModifiedDateTime watermark
+        end
         Consumer->>DB: Flush pendingLiveMessageIds, set liveCatchUpState = ready
     end
 ```
@@ -54,19 +55,20 @@ sequenceDiagram
 - Remaining message IDs are grouped by `subscriptionId` and published to RabbitMQ as a single batch
 - `202 Accepted` is returned immediately — no email fetching happens in this stage
 
-**Stage 2 — Ingestion (asynchronous):**
+**Stage 2 — Ingestion (inline):**
 
 - The consumer acquires a row-level lock on `inbox_configurations` to prevent concurrent processing
 - It uses `newestLastModifiedDateTime` (the watermark) as the lower bound for a Graph query, ensuring only new or recently modified emails are fetched
-- The consumer acts as a **producer** for the ingestion queue — it publishes one `mail-event` message per email to RabbitMQ, which are then consumed and uploaded to the Unique knowledge base
-- After ingestion, the watermark is advanced and any buffered pending messages are flushed
+- For each email returned, the consumer calls `IngestEmailCommand` directly — no intermediate queue is involved
+- The watermark is advanced after every individual message
+- After processing all fetched emails, any buffered pending messages are flushed the same way
 
 ## Live Catch-Up States
 
 | State | Meaning |
 |-------|---------|
 | `ready` | Idle — ready to process the next notification |
-| `running` | Actively fetching from Graph and publishing to the ingestion queue |
+| `running` | Actively fetching from Graph and ingesting messages inline |
 | `failed` | An unhandled error occurred during processing |
 
 **State transitions:**
@@ -78,7 +80,7 @@ sequenceDiagram
 
 **Pending message buffer:**
 
-When `liveCatchUpState = running`, new incoming notifications are appended to `pendingLiveMessageIds` instead of being dropped. After the active consumer finishes, it flushes the buffer in a separate database transaction. This ensures no notifications are lost during high-frequency mail delivery.
+When `liveCatchUpState = running` with a recent heartbeat, new incoming notifications are appended to `pendingLiveMessageIds` instead of being dropped. After the active consumer finishes, it flushes the buffer by ingesting each pending ID directly. This ensures no notifications are lost during high-frequency mail delivery.
 
 **Watermark not yet set:**
 
@@ -90,7 +92,7 @@ Live catch-up and full sync run **concurrently** after a user connects:
 
 - Live catch-up buffers notifications until full sync has initialized the watermarks (`newestLastModifiedDateTime`). After that, both pipelines ingest in parallel.
 - Once full sync initializes `newestLastModifiedDateTime`, live catch-up takes ownership of that watermark and updates it on every notification.
-- Live catch-up ingestion activity contributes to the Unique KB queue alongside full sync, which can extend the time full sync spends in `waiting-for-ingestion`.
+- Live catch-up ingestion activity (calling the Unique KB ingestion API directly) contributes to the in-progress count that full sync monitors during `waiting-for-ingestion`.
 
 ## Recovery
 

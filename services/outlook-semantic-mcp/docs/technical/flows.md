@@ -121,13 +121,13 @@ sequenceDiagram
 
 ## Live Catch-Up: Webhook-Driven Email Ingestion
 
-When a new email arrives in the user's Outlook mailbox, Microsoft Graph sends a webhook notification. The server enqueues the notification in RabbitMQ and returns `202 Accepted` immediately, then processes it asynchronously.
+When a new email arrives in the user's Outlook mailbox, Microsoft Graph sends a webhook notification. The server enqueues the notification in RabbitMQ and returns `202 Accepted` immediately. The consumer then fetches and ingests new messages inline within the same execution.
 
 For the detailed sequence diagram and full technical description, see [Live Catch-Up](./live-catchup.md).
 
 **Key points:**
 
-- Microsoft requires a response within 10 seconds (Microsoft limit, not configurable). The server enqueues the notification immediately and returns `202 Accepted` — actual email processing happens asynchronously.
+- Microsoft requires a response within 10 seconds (Microsoft limit, not configurable). The server enqueues the notification immediately and returns `202 Accepted` — actual email fetching and ingestion happen inline in the consumer, after the webhook response is already sent.
 - Buffering applies when another live catch-up consumer is already processing, or when the watermark has not been set yet (full sync has not started). Messages are flushed once the blocker clears.
 - The watermark (`newestLastModifiedDateTime`) is **initialized by full sync** the first time it runs and **maintained by live catch-up** on every subsequent notification.
 - `deleted` change notifications are discarded. Deletions are handled by [directory sync](./directory-sync.md) and by detecting emails moved to ignored folders.

@@ -69,7 +69,7 @@ See [Tools Reference](./tools.md) for the full list and behavior details.
 After a user connects, two concurrent pipelines keep the knowledge base in sync with the user's mailbox:
 
 - **Full Sync** — Fetches historical emails (within configured time frame and filters) from Microsoft Graph in paginated batches and uploads them to the Unique knowledge base. Runs once after connection and is resumable across restarts. See [Full Sync](./full-sync.md).
-- **Live Catch-Up** — Receives Microsoft Graph webhook notifications when new mail arrives, enqueues them via RabbitMQ for asynchronous processing, then fetches and ingests new messages. See [Live Catch-Up](./live-catchup.md).
+- **Live Catch-Up** — Receives Microsoft Graph webhook notifications when new mail arrives. The webhook trigger is queued via RabbitMQ (to meet Microsoft's 10-second response deadline), then the consumer acquires a lock, queries Graph for new messages, and ingests each one directly. See [Live Catch-Up](./live-catchup.md).
 - **Directory Sync** — Keeps the local folder structure in sync with Outlook via Graph delta queries, enabling folder-based search filtering and detecting when emails move to excluded folders. See [Directory Sync](./directory-sync.md).
 
 Both email pipelines run concurrently. Live catch-up buffers notifications until full sync initializes a watermark, after which both ingest independently.

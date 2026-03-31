@@ -159,7 +159,7 @@ The scheduler publishes a `full-sync.retrigger` event which the full sync consum
 Full sync and live catch-up run **concurrently** after a user connects. They are independent pipelines that both contribute to the Unique knowledge base ingestion queue.
 
 - **Watermark initialisation**: Full sync initializes `newestLastModifiedDateTime` (the watermark) at the start of the first sync run. Once initialized, live catch-up can use it for delta queries and both pipelines ingest in parallel.
-- **Impact on `waiting-for-ingestion`**: When full sync finishes uploading all its batches, it enters `waiting-for-ingestion` and waits for the Unique KB to confirm that almost all queued messages are processed. Because live catch-up is uploading its own batches to the same ingestion queue, full sync may remain in `waiting-for-ingestion` longer when live catch-up activity is high.
+- **Impact on `waiting-for-ingestion`**: When full sync finishes uploading all its batches, it enters `waiting-for-ingestion` and waits for the Unique KB to confirm that almost all queued messages are processed. Because live catch-up ingests emails inline via the same Unique KB ingestion pipeline, its activity contributes to the in-progress count that full sync monitors — full sync may remain in `waiting-for-ingestion` longer when live catch-up activity is high.
 - **Watermark ownership**: Once full sync has initialized the watermarks, live catch-up takes ownership of `newestLastModifiedDateTime` and updates it on every notification going forward.
 
 ## Related Documentation

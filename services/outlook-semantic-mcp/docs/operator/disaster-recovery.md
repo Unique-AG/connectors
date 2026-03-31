@@ -31,8 +31,7 @@ The documentation does not provide fixed RTO targets because recovery time varie
 - **Number of connected users** — each user's mailbox is re-synced independently. The service processes users concurrently but enforces a batch limit of 50 messages per cycle per user before yielding to others (hardcoded service limit).
 - **Mailbox size** — full sync fetches emails in pages of 100 from Microsoft Graph (service-configured page size), processing them sequentially. Large mailboxes (100,000+ emails) take proportionally longer.
 - **Microsoft Graph API rate limits** — Microsoft enforces a global limit of 130,000 requests per 10 seconds per app across all tenants; additional per-mailbox and per-service limits may apply (Microsoft limit, not configurable). Re-syncing many users simultaneously may approach these limits. There is no built-in staggering; operators should coordinate with users to stagger their `restart_full_sync` calls in batches to avoid throttling. See [Microsoft Graph throttling](https://learn.microsoft.com/en-us/graph/throttling).
-- **Ingestion concurrency** — the RabbitMQ consumer prefetch count is set to 10, limiting in-flight messages per consumer (hardcoded service limit).
-- **Ingestion worker capacity** — the MCP server publishes emails to RabbitMQ but the actual upload to the Unique Knowledge Base is performed by the ingestion worker (a separate service). If the ingestion worker is under-provisioned or scaled down, messages queue up and full sync stalls in `waiting-for-ingestion`. Ensure the ingestion worker has sufficient replicas and resources during recovery.
+- **Ingestion worker capacity** — full sync uploads email batches to the Unique Knowledge Base via the ingestion worker (a separate service). If the ingestion worker is under-provisioned or scaled down, messages queue up and full sync stalls in `waiting-for-ingestion`. Live catch-up ingests emails inline (not via the ingestion worker queue), so it is not affected by ingestion worker capacity. Ensure the ingestion worker has sufficient replicas and resources during recovery.
 - **Infrastructure provisioning** — if PostgreSQL or RabbitMQ must be provisioned from scratch rather than restored from backup, lead time depends on the platform. Clients using managed database services rather than Kubernetes-native solutions (e.g. CNPG) should account for provider-specific provisioning and configuration time.
 
 ### Backup recommendations
@@ -40,7 +39,7 @@ The documentation does not provide fixed RTO targets because recovery time varie
 | Component | Recommendation | Rationale |
 |---|---|---|
 | **PostgreSQL** | Regular backups strongly recommended. Use your platform's backup solution (managed service snapshots, `pg_dump`, or WAL archiving). | Contains OAuth tokens, webhook subscriptions, and all sync state. Without a backup, all users must re-authenticate and full sync restarts from scratch. |
-| **RabbitMQ** | Backup not required. | Queues are durable but carry only transient sync trigger events. The 2-minute full-sync recovery scheduler and 15-minute live catch-up cron re-create any lost events after reconnection. |
+| **RabbitMQ** | Backup not required. | Queues carry only transient sync trigger events. Live catch-up email ingestion happens inline (not via RabbitMQ), so RabbitMQ loss only affects trigger delivery, not per-email ingestion. The 2-minute full-sync recovery scheduler and 5-minute live catch-up cron re-create any lost trigger events after reconnection. |
 | **Unique Knowledge Base** | Managed by the Unique platform. | Backup and restore are the responsibility of the Unique platform operator. |
 
 **Risk if no PostgreSQL backup exists:** every user must re-authenticate via OAuth and a full re-sync runs for each user. Existing emails in the Knowledge Base are not lost (re-ingestion is idempotent — only API call overhead, no duplicate data), but recovery time scales linearly with user count and mailbox size. For large deployments this can be significant, compounded by the shared Microsoft Graph API rate limit.
@@ -131,7 +130,7 @@ The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, a
 RabbitMQ carries in-flight sync trigger events between the service and its internal workers. Total loss means:
 
 - Any full sync in progress at the time of failure is stalled. The sync state in the database is intact but the trigger event that drives the next batch is gone.
-- Live catch-up events (incoming webhook notifications from Microsoft Graph) queued in RabbitMQ at the time of failure are lost.
+- Live catch-up trigger events (incoming webhook notifications from Microsoft Graph) that were in-flight in RabbitMQ at the time of failure are lost. Any in-progress catch-up run at the time of failure continues inline and completes normally (it does not depend on RabbitMQ for per-email ingestion).
 - The local database and Unique Knowledge Base are **not** affected.
 - No re-authentication is required.
 
@@ -151,7 +150,7 @@ RabbitMQ carries in-flight sync trigger events between the service and its inter
 
 5. Each user can monitor their own recovery progress with `sync_progress`. The sync is complete when `fullSyncState` transitions to `"ready"` and `state` is `"finished"`.
 
-6. Live catch-up resumes automatically once the service reconnects to RabbitMQ. Any emails received during the outage window that were not captured by webhook notifications will be picked up by `restart_full_sync` in step 4.
+6. Live catch-up resumes automatically once the service reconnects to RabbitMQ — trigger events can be published again and the 5-minute recovery scheduler will retrigger any catch-ups that missed notifications. No additional user action is needed for live catch-up specifically. Any emails received during the outage window that were not captured by webhook notifications will also be picked up by `restart_full_sync` in step 4.
 
 7. Once all affected users have called `restart_full_sync`, disable debug mode by removing or unsetting `MCP_DEBUG_MODE` in the Helm values and redeploying (requires a pod restart). Debug mode should not remain enabled in production.
 
