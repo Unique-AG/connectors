@@ -7,12 +7,12 @@ import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { traceEvent } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
-import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 import {
   FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES,
   READY_LIVE_CATCHUP_THRESHOLD_MINUTES,
   RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES,
 } from './live-catch-up/live-catch-up.command';
+import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 
 const RECOVERY_CRON_SCHEDULE = '*/5 * * * *';
 

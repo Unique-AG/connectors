@@ -9,10 +9,10 @@ import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directo
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
-import { isWithinCooldown } from '~/utils/is-within-cooldown';
 
 type InboxConfig = typeof inboxConfigurations.$inferSelect;
 

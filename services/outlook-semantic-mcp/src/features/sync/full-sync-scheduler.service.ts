@@ -7,8 +7,8 @@ import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { getThreshold } from '~/utils/get-threshold';
 import {
-  RUNNING_HEARTBEAT_MINUTES,
   FAILED_HEARTBEAT_MINUTES,
+  RUNNING_HEARTBEAT_MINUTES,
   WAITING_FOR_INGESTION_HEARTBEAT_MINUTES,
 } from './full-sync/full-sync.command';
 import { FullSyncEventDto } from './full-sync/full-sync-event.dto';

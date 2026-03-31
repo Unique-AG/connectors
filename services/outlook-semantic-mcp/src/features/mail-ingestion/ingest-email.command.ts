@@ -1,13 +1,14 @@
 import assert from 'node:assert';
 import { ContentMetadata, UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
 import { createSmeared } from '@unique-ag/utils';
-import { Client } from '@microsoft/microsoft-graph-client';
+import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Bottleneck from 'bottleneck';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish, omit } from 'remeda';
+import { errors } from 'undici';
 import { UniqueConfigNamespaced } from '~/config';
 import { DirectoryType, DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/db';
 import { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
@@ -73,7 +74,10 @@ export class IngestEmailCommand {
       try {
         return await this.processEmail({ userProfileId, messageId, filters });
       } catch (error) {
-        if (error instanceof Bottleneck.BottleneckError) {
+        const isMicrosoftRateLimit = error instanceof GraphError && error.statusCode === 429;
+        const isUniqueRateLimit = error instanceof errors.ResponseError && error.statusCode === 429;
+        const isBottleneckRateLimit = error instanceof Bottleneck.BottleneckError;
+        if (isBottleneckRateLimit || isMicrosoftRateLimit || isUniqueRateLimit) {
           throw error;
         }
         this.logger.warn({

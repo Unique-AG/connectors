@@ -2,22 +2,22 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
-import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
-import { traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { sqlArray } from '~/utils/sql-array';
 import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
-import { IngestEmailCommand } from '../../mail-ingestion/ingest-email.command';
+import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
+import { traceAttrs, traceEvent } from '~/features/tracing.utils';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { isWithinCooldown } from '~/utils/is-within-cooldown';
+import { sqlArray } from '~/utils/sql-array';
 import {
   LiveCatchUpGraphMessage,
   LiveCatchUpGraphMessageFields,
   liveCatchUpGraphMessageResponseSchema,
 } from '../../mail-ingestion/dtos/microsoft-graph.dtos';
-import { isWithinCooldown } from '~/utils/is-within-cooldown';
+import { IngestEmailCommand } from '../../mail-ingestion/ingest-email.command';
 
 export const RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES = 20;
 export const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
