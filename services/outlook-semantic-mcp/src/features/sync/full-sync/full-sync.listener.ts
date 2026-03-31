@@ -17,8 +17,8 @@ export class FullSyncListener {
 
   @RabbitSubscribe({
     exchange: MAIN_EXCHANGE.name,
-    queue: 'unique.outlook-semantic-mcp.full-sync',
-    routingKey: ['unique.outlook-semantic-mcp.full-sync.*'],
+    queue: 'unique.outlook-semantic-mcp.sync',
+    routingKey: ['unique.outlook-semantic-mcp.sync.full-sync'],
     createQueueIfNotExists: true,
     queueOptions: { deadLetterExchange: DEAD_EXCHANGE.name },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
