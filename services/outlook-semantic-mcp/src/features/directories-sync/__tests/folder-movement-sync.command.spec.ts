@@ -45,15 +45,16 @@ function makeGraphResponse(messages: ReturnType<typeof makeMessage>[], nextLink?
 
 function makeFolder(
   overrides: Partial<{
-    id: string;
+    directoryId: string;
     providerDirectoryId: string;
     directoryMovementResyncCursor: string | null;
   }> = {},
 ) {
   return {
-    id: FOLDER_ID,
+    directoryId: FOLDER_ID,
     providerDirectoryId: PROVIDER_FOLDER_ID,
     directoryMovementResyncCursor: null,
+    filters: { ignoredBefore: '2020-01-01T00:00:00.000Z' },
     ...overrides,
   };
 }
@@ -66,6 +67,7 @@ function createMockGraphApi() {
   const api: Record<string, any> = {
     header: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
+    filter: vi.fn().mockReturnThis(),
     top: vi.fn().mockReturnThis(),
     orderby: vi.fn().mockReturnThis(),
     get: vi.fn(),
@@ -139,11 +141,13 @@ function createMockDb({
     transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(tx)),
     select: vi.fn().mockImplementation(() => ({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockReturnValue({
-            limit: vi.fn().mockImplementation(() => {
-              const folder = folders[folderCallIndex++];
-              return Promise.resolve(folder ? [folder] : []);
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockImplementation(() => {
+                const folder = folders[folderCallIndex++];
+                return Promise.resolve(folder ? [folder] : []);
+              }),
             }),
           }),
         }),
@@ -337,7 +341,7 @@ describe('FolderMovementSyncCommand', () => {
     expect(allSetCalls.some((s) => s.folderMovementSyncState === 'failed')).toBe(true);
   });
 
-  it('rethrows rate limit errors from ingestEmailCommand.run', async () => {
+  it('sets state to failed when ingestEmailCommand.run throws a rate limit error', async () => {
     const folder = makeFolder();
     const db = createMockDb({
       lockRow: { folderMovementSyncState: null, folderMovementSyncHeartbeatAt: null },
@@ -350,7 +354,11 @@ describe('FolderMovementSyncCommand', () => {
 
     const command = createCommand({ graphApi, ingestEmailCommand, db });
 
-    await expect(command.run(USER_PROFILE_ID)).rejects.toThrow(Bottleneck.BottleneckError);
+    const result = await command.run(USER_PROFILE_ID);
+
+    expect(result).toBe('failed');
+    const allSetCalls: any[] = db.__dbUpdate.set.mock.calls.map((c: any[]) => c[0]);
+    expect(allSetCalls.some((s) => s.folderMovementSyncState === 'failed')).toBe(true);
   });
 
   it('logs and continues when ingestEmailCommand.run returns failed', async () => {
