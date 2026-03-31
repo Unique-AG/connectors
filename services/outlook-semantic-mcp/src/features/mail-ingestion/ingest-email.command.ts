@@ -74,12 +74,18 @@ export class IngestEmailCommand {
       try {
         return await this.processEmail({ userProfileId, messageId, filters });
       } catch (error) {
-        const isMicrosoftRateLimit = error instanceof GraphError && error.statusCode === 429;
-        const isUniqueRateLimit = error instanceof errors.ResponseError && error.statusCode === 429;
-        const isBottleneckRateLimit = error instanceof Bottleneck.BottleneckError;
-        if (isBottleneckRateLimit || isMicrosoftRateLimit || isUniqueRateLimit) {
-          throw error;
+        if (attempt >= MAX_RETRIES) {
+          // On last attempt we decide if we need to rethrow the error.
+          const isMicrosoftRateLimit = error instanceof GraphError && error.statusCode === 429;
+          const isUniqueRateLimit =
+            error instanceof errors.ResponseError && error.statusCode === 429;
+          const isBottleneckRateLimit = error instanceof Bottleneck.BottleneckError;
+          // If it's a rate limit error we can stop the process of ingestion because trying again will not fix the issue
+          if (isBottleneckRateLimit || isMicrosoftRateLimit || isUniqueRateLimit) {
+            throw error;
+          }
         }
+
         this.logger.warn({
           err: error,
           userProfileId,
