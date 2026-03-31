@@ -5,7 +5,7 @@
 
 Live catch-up is the real-time email ingestion pipeline. It receives Microsoft Graph change notifications the moment new mail arrives. The webhook is acknowledged immediately via RabbitMQ to meet Microsoft's strict 10-second response deadline; email fetching and ingestion happen inline in the consumer.
 
-> **Operator summary:** Live catch-up runs automatically. States: `ready` → `running` → `ready`. If it fails, the recovery scheduler resets it within 5 minutes. If no activity occurs for 4 hours (e.g. missed webhook), the recovery scheduler also retriggers it. The watermark (a timestamp marking the most recent email processed) is used to fetch only newer emails.
+> **Operator summary:** Live catch-up runs automatically. States: `ready` → `running` → `ready`. If it fails, the recovery scheduler retriggers it within 5 minutes. If no activity occurs for 4 hours (e.g. missed webhook), the recovery scheduler also retriggers it. The watermark (a timestamp marking the most recent email processed) is used to fetch only newer emails.
 
 ## How It Works
 
@@ -36,7 +36,7 @@ sequenceDiagram
 
     alt liveCatchUpState = running (recent heartbeat) OR watermark not yet set
         Consumer->>DB: Buffer messageIds in pendingLiveMessageIds
-    else liveCatchUpState = ready (stale heartbeat) OR failed OR running (stale heartbeat)
+    else liveCatchUpState = ready OR failed OR running (stale heartbeat)
         Consumer->>DB: Set liveCatchUpState = running
         Consumer->>MSGraph: GET /me/messages?$filter=lastModifiedDateTime ge {watermark}
         MSGraph->>Consumer: New/modified messages since watermark
@@ -76,7 +76,7 @@ sequenceDiagram
 - `ready` → `running`: Consumer acquires lock and watermark is set
 - `running` → `ready`: Processing complete, pending messages flushed
 - `running` / `ready` → `failed`: Unhandled error during execution
-- `failed` → `ready`: Recovery scheduler resets state and retriggers (every 5 minutes)
+- `failed` → `running` → `ready`: Recovery scheduler retriggers (every 5 minutes); state transitions to `running` via normal lock acquisition, then to `ready` on completion
 
 **Pending message buffer:**
 
@@ -101,8 +101,8 @@ A background scheduler runs every **5 minutes** and checks for live catch-ups th
 | Condition | Threshold | Action |
 |-----------|-----------|--------|
 | `liveCatchUpState = ready`, heartbeat stale | 4 hours | Retrigger — Microsoft does not always send webhooks for events such as category changes |
-| `liveCatchUpState = failed`, heartbeat stale | 5 minutes | Reset to `ready` and retrigger |
-| `liveCatchUpState = running`, heartbeat stale | 5 minutes | Reset to `ready` and retrigger |
+| `liveCatchUpState = failed`, heartbeat stale | 5 minutes | Retrigger |
+| `liveCatchUpState = running`, heartbeat stale | 5 minutes | Retrigger |
 
 For subscription-level failures (e.g. `subscriptionRemoved`), see [Subscription Management](./subscription-management.md#Recovery).
 
