@@ -50,8 +50,10 @@ function isGraphqlClientError(error: unknown): error is GraphqlClientErrorShape 
   return (
     error instanceof Error &&
     'response' in error &&
+    (error as Record<string, unknown>).response !== null &&
     typeof (error as Record<string, unknown>).response === 'object' &&
     'request' in error &&
+    (error as Record<string, unknown>).request !== null &&
     typeof (error as Record<string, unknown>).request === 'object'
   );
 }

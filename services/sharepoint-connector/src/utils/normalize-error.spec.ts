@@ -212,4 +212,16 @@ describe('sanitizeError', () => {
     expect(result.graphqlErrors).toBeUndefined();
     expect(result.statusCode).toBe(500);
   });
+
+  it('falls back to serializing error when GraphQL response is null', () => {
+    const error = new Error('msg') as Error & { response: null; request: object };
+    error.response = null;
+    error.request = { query: 'query {}', variables: {} };
+
+    const result = sanitizeError(error) as Record<string, unknown>;
+
+    expect(result.message).toBe('msg');
+    expect(result).not.toHaveProperty('graphqlErrors');
+    expect(result).not.toHaveProperty('statusCode');
+  });
 });
