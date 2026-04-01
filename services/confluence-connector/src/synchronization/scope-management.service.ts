@@ -2,11 +2,7 @@ import assert from 'node:assert';
 import type { Scope, UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
-import {
-  buildExternalId,
-  type ParsedExternalId,
-  parseExternalId,
-} from '../constants/ingestion.constants';
+import { buildExternalId, type ParsedExternalId, parseExternalId } from '../constants/external-id';
 
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildExternalId, parseExternalId } from '../ingestion.constants';
+import { buildExternalId, parseExternalId } from '../external-id';
 
 describe('parseExternalId', () => {
   it('parses a valid external id with all four segments', () => {
