@@ -1,3 +1,4 @@
+import { createMock } from '@golevelup/ts-vitest';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-auth';
@@ -31,12 +32,10 @@ vi.mock('../../config/tenant-config-loader', () => ({
 vi.mock('../../auth/confluence-auth/confluence-auth.factory');
 vi.mock('../../confluence-api/confluence-api-client.factory');
 
-const mockProxyService = {
-  getDispatcher: vi.fn().mockReturnValue({}),
-} as unknown as ProxyService;
+const mockProxyService = createMock<ProxyService>();
 
 function createMockTenantConfig(): TenantConfig {
-  return {
+  return createMock<TenantConfig>({
     confluence: {
       instanceType: 'cloud',
       baseUrl: 'https://confluence.example.com',
@@ -54,12 +53,12 @@ function createMockTenantConfig(): TenantConfig {
     },
     ingestion: {
       scopeId: 'scope-1',
-      storeInternally: 'enabled',
-      useV1KeyFormat: 'disabled',
+      storeInternally: true,
+      useV1KeyFormat: false,
       attachments: { enabled: false, allowedExtensions: [], maxFileSizeMb: 10 },
     },
     processing: {},
-  } as unknown as TenantConfig;
+  });
 }
 
 function createMockAuth(): ConfluenceAuth {

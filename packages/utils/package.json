@@ -45,6 +45,11 @@
       "default": "./dist/zod.js"
     }
   },
+  "typesVersions": {
+    "*": {
+      "zod": ["./src/zod.ts"]
+    }
+  },
   "peerDependenciesMeta": {
     "zod": {
       "optional": true

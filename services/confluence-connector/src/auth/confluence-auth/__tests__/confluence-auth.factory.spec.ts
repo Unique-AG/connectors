@@ -1,3 +1,4 @@
+import { createMock } from '@golevelup/ts-vitest';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthMode, type ConfluenceConfig } from '../../../config';
 import type { TenantConfig } from '../../../config/tenant-config-loader';
@@ -21,9 +22,7 @@ vi.mock('../strategies/pat-auth.strategy', () => ({
   })),
 }));
 
-const mockProxyService = {
-  getDispatcher: vi.fn().mockReturnValue({}),
-} as unknown as ProxyService;
+const mockProxyService = createMock<ProxyService>();
 
 function createFactory(): ConfluenceAuthFactory {
   return new ConfluenceAuthFactory(mockProxyService);

@@ -1,7 +1,7 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { isEmptyish } from 'remeda';
 import { z } from 'zod';
-import { parseJsonEnvironmentVariable } from '../utils/config.util';
+import { json } from '@unique-ag/utils/zod';
 import {
   coercedPositiveIntSchema,
   redactedNonEmptyStringSchema,
@@ -14,9 +14,7 @@ import {
 
 const portSchema = coercedPositiveIntSchema.max(65535);
 
-const proxyHeadersSchema = parseJsonEnvironmentVariable('PROXY_HEADERS').pipe(
-  z.record(z.string(), z.string()),
-);
+const proxyHeadersSchema = json(z.record(z.string(), z.string()));
 
 const baseProxyFields = {
   host: requiredStringSchema.describe('Proxy server hostname'),
