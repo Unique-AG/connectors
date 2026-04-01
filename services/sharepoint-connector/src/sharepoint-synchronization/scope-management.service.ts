@@ -138,8 +138,8 @@ export class ScopeManagementService {
           msg: `${logPrefix} Failed to delete ${result.failedFolders.length} folders`,
           failedFolders: result.failedFolders.map((f) => ({
             id: f.id,
-            name: f.name,
-            path: createSmeared(f.path),
+            name: createSmeared(f.name),
+            path: smearPath(createSmeared(f.path)),
             reason: f.failReason,
           })),
         });
