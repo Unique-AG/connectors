@@ -1,7 +1,7 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { json } from '@unique-ag/utils/zod';
 import { isEmptyish } from 'remeda';
 import { z } from 'zod';
-import { json } from '@unique-ag/utils/zod';
 import {
   coercedPositiveIntSchema,
   redactedNonEmptyStringSchema,

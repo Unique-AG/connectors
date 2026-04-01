@@ -1,5 +1,5 @@
-import { createMock } from '@golevelup/ts-vitest';
 import { UniqueApiClient } from '@unique-ag/unique-api';
+import { createMock } from '@golevelup/ts-vitest';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-auth';
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
