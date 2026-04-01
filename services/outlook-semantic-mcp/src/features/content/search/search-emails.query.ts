@@ -4,7 +4,7 @@ import { asAllOptions } from '@unique-ag/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNull, join, map, pipe, sortBy } from 'remeda';
+import { isNonNull, join, map, omit, pipe, prop, sortBy } from 'remeda';
 import * as z from 'zod';
 import {
   type Directory,
@@ -92,10 +92,11 @@ export class SearchEmailsQuery {
 
     type DeduplicatedResult = Omit<SearchEmailResult, 'text'> & {
       textParts: { order: number; text: string }[];
+      index: number;
     };
 
     const resultsDeduplicated = searchResults.reduce<Record<string, DeduplicatedResult>>(
-      (acc, item) => {
+      (acc, item, index) => {
         const metadata = item.metadata as MessageMetadata | undefined;
         const itemRef = acc[item.id] ?? {
           title: item.title ?? '',
@@ -107,6 +108,7 @@ export class SearchEmailsQuery {
           from: metadata?.fromEmailAddress ?? '',
           receivedDateTime: metadata?.receivedDateTime ?? '',
           textParts: [],
+          index,
         };
         itemRef.textParts.push({ order: item.order, text: item.text });
         acc[item.id] = itemRef;
@@ -115,19 +117,23 @@ export class SearchEmailsQuery {
       {},
     );
 
-    const results: SearchEmailResult[] = Object.values(resultsDeduplicated).map(
-      ({ textParts, ...result }) => {
+    const results: SearchEmailResult[] = pipe(
+      Object.values(resultsDeduplicated),
+      sortBy((item) => item.index),
+      map(({ textParts, ...searchResult }) => {
+        const text = pipe(
+          textParts,
+          sortBy(prop('order')),
+          // We keep the chunk tags on the first chunk but remove them from others.
+          map((item, index) => (index === 0 ? item.text : stripChunkTags(item.text))),
+          join('\n'),
+        );
+
         return {
-          ...result,
-          text: pipe(
-            textParts,
-            sortBy((item) => item.order),
-            // We keep the chunk tags on the first chunk but remove them from others.
-            map((item, index) => (index === 0 ? item.text : stripChunkTags(item.text))),
-            join('\n'),
-          ),
+          ...omit(searchResult, ['index']),
+          text,
         };
-      },
+      }),
     );
 
     return { results, searchSummary };

@@ -92,6 +92,11 @@ export class LiveCatchUpCommand {
         fromPendingFlush: flushedCount,
         msg: 'Live catch-up completed',
       });
+      await this.db
+        .update(inboxConfigurations)
+        .set({ liveCatchUpState: 'ready', liveCatchUpHeartbeatAt: sql`NOW()` })
+        .where(eq(inboxConfigurations.userProfileId, userProfileId))
+        .execute();
     } catch (error) {
       this.logger.error({
         err: error,
@@ -101,7 +106,7 @@ export class LiveCatchUpCommand {
       });
       await this.db
         .update(inboxConfigurations)
-        .set({ liveCatchUpState: 'failed' })
+        .set({ liveCatchUpState: 'failed', liveCatchUpHeartbeatAt: sql`NOW()` })
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .execute();
     }
@@ -141,6 +146,8 @@ export class LiveCatchUpCommand {
         await tx
           .update(inboxConfigurations)
           .set({
+            // Note: array_cat -> maintains the order of the array so if we change the function we should ensure ordering
+            // because the flushing operation depends on the array to have the same order.
             pendingLiveMessageIds: sql`array_cat(${inboxConfigurations.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
           })
           .where(eq(inboxConfigurations.userProfileId, userProfileId))
@@ -180,6 +187,8 @@ export class LiveCatchUpCommand {
         .set({
           ...(messageIds.length > 0
             ? {
+                // Note: array_cat -> maintains the order of the array so if we change the function we should ensure ordering
+                // because the flushing operation depends on the array to have the same order.
                 pendingLiveMessageIds: sql`array_cat(${inboxConfigurations.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
               }
             : {}),
@@ -285,28 +294,12 @@ export class LiveCatchUpCommand {
     filters: InboxConfigurationMailFilters;
     alreadyProcessedIds: Set<string>;
   }): Promise<number> {
-    const idsToFlush = await this.db.transaction(async (tx) => {
-      const row = await tx
-        .select({ pendingLiveMessageIds: inboxConfigurations.pendingLiveMessageIds })
-        .from(inboxConfigurations)
-        .where(eq(inboxConfigurations.userProfileId, userProfileId))
-        .for('update')
-        .then((rows) => rows[0]);
+    const idsToFlush = await this.db
+      .select({ pendingLiveMessageIds: inboxConfigurations.pendingLiveMessageIds })
+      .from(inboxConfigurations)
+      .where(eq(inboxConfigurations.userProfileId, userProfileId))
+      .then((rows) => rows?.[0]?.pendingLiveMessageIds ?? []);
 
-      if (!row) {
-        return [];
-      }
-
-      const idsToFlush = row.pendingLiveMessageIds.filter((id) => !alreadyProcessedIds.has(id));
-
-      await tx
-        .update(inboxConfigurations)
-        .set({ pendingLiveMessageIds: [], liveCatchUpState: 'ready' })
-        .where(eq(inboxConfigurations.userProfileId, userProfileId))
-        .execute();
-
-      return idsToFlush;
-    });
     if (idsToFlush.length === 0) {
       return 0;
     }
@@ -314,18 +307,34 @@ export class LiveCatchUpCommand {
     this.logger.debug({
       msg: `Flushing buffered messages while running: ${idsToFlush.length}`,
     });
-    // We flush the ids's outside because.
-    // 1. We will keep the lock for a long time if we run this inside since it has exponential backoff
-    // 2. This is a failsafe normally we already processed all the messages via querity for last updated at.
-    for (const messageId of idsToFlush) {
-      const result = await this.ingestEmailCommand.run({ userProfileId, messageId, filters });
-      if (result === 'failed') {
-        this.logger.warn({
-          userProfileId,
-          messageId,
-          msg: 'Email ingestion failed during flush, continuing',
-        });
+
+    let index = 0;
+
+    try {
+      for (; index < idsToFlush.length; index++) {
+        const messageId = idsToFlush[index];
+        if (!messageId || alreadyProcessedIds.has(messageId)) {
+          continue;
+        }
+        const result = await this.ingestEmailCommand.run({ userProfileId, messageId, filters });
+        if (result === 'failed') {
+          this.logger.warn({
+            userProfileId,
+            messageId,
+            msg: 'Email ingestion failed during flush, continuing',
+          });
+        }
       }
+    } finally {
+      // We do this on finally because we want to cleanup what we processed if this.ingestEmailCommand.run throws.
+      // index is the JS 0-based position of the element that threw (or idsToFlush.length on normal completion).
+      // PG arrays are 1-indexed, so arr[index+1:] drops the first `index` elements and keeps the rest.
+      await this.db
+        .update(inboxConfigurations)
+        .set({
+          pendingLiveMessageIds: sql`${inboxConfigurations.pendingLiveMessageIds}[${index + 1}:]`,
+        })
+        .where(eq(inboxConfigurations.userProfileId, userProfileId));
     }
 
     return idsToFlush.length;

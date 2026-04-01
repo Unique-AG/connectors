@@ -107,7 +107,7 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
 
     for (const { userProfileId } of configs) {
       const event = FullSyncEventDto.parse({
-        type: 'unique.outlook-semantic-mcp.sync.full-sync',
+        type: 'unique.outlook-semantic-mcp.full-sync.retrigger',
         payload: { userProfileId },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);

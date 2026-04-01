@@ -80,8 +80,6 @@ function createMockDb({
   };
   flushResult?: { pendingLiveMessageIds: string[] };
 }) {
-  let transactionCallCount = 0;
-
   function createMockTx(selectRows: any[]) {
     const txExecuteFn = vi.fn().mockResolvedValue(undefined);
     const txSelect = {
@@ -107,7 +105,6 @@ function createMockDb({
   }
 
   const lockTx = createMockTx(lockResult ? [lockResult] : []);
-  const flushTx = createMockTx(flushResult ? [flushResult] : [{ pendingLiveMessageIds: [] }]);
 
   const dbExecuteFn = vi.fn().mockResolvedValue(undefined);
   const db = {
@@ -116,12 +113,13 @@ function createMockDb({
         findFirst: vi.fn().mockResolvedValue(subscription),
       },
     },
-    transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => {
-      transactionCallCount++;
-      if (transactionCallCount === 1) {
-        return cb(lockTx);
-      }
-      return cb(flushTx);
+    transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(lockTx)),
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi
+          .fn()
+          .mockResolvedValue(flushResult ? [flushResult] : [{ pendingLiveMessageIds: [] }]),
+      }),
     }),
     update: vi.fn().mockReturnValue({
       set: vi.fn().mockReturnValue({
@@ -131,7 +129,6 @@ function createMockDb({
       }),
     }),
     __lockTx: lockTx,
-    __flushTx: flushTx,
     __dbExecuteFn: dbExecuteFn,
   };
 
@@ -227,7 +224,9 @@ describe('LiveCatchUpCommand', () => {
     expect(graphApi.get).toHaveBeenCalled();
   });
 
-  it('skips when ready with recent heartbeat (cooldown)', async () => {
+  it('runs when ready with recent heartbeat (cooldown)', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
     const db = createMockDb({
       subscription: { userProfileId: USER_PROFILE_ID },
       lockResult: {
@@ -236,13 +235,14 @@ describe('LiveCatchUpCommand', () => {
         liveCatchUpHeartbeatAt: RECENT_HEARTBEAT,
         filters: DEFAULT_FILTERS,
       },
+      flushResult: { pendingLiveMessageIds: ['webhook-id'] },
     });
     const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
 
-    expect(graphApi.get).not.toHaveBeenCalled();
-    expect(ingestEmailCommand.run).not.toHaveBeenCalled();
+    expect(graphApi.get).toHaveBeenCalled();
+    expect(ingestEmailCommand.run).toHaveBeenCalled();
   });
 
   it('proceeds when ready with stale heartbeat', async () => {
@@ -345,11 +345,9 @@ describe('LiveCatchUpCommand', () => {
       expect.objectContaining({ userProfileId: USER_PROFILE_ID, messageId: 'msg-2' }),
     );
 
-    // State set to 'ready' via flush transaction
-    const flushUpdate = db.__flushTx.__txUpdate;
-    expect(flushUpdate.set).toHaveBeenCalledWith(
-      expect.objectContaining({ liveCatchUpState: 'ready' }),
-    );
+    // State set to 'ready'
+    const setMock = db.update.mock.results[0]?.value?.set;
+    expect(setMock).toHaveBeenCalledWith(expect.objectContaining({ liveCatchUpState: 'ready' }));
   });
 
   it('follows nextLink to fetch multiple batches', async () => {
@@ -609,10 +607,9 @@ describe('LiveCatchUpCommand', () => {
     const ingestedIds = ingestEmailCommand.run.mock.calls.map((call: any[]) => call[0].messageId);
     expect(ingestedIds).toEqual(['msg-1', 'flush-1', 'flush-2']);
 
-    // Flush transaction clears pendingLiveMessageIds and sets state to ready
-    expect(db.__flushTx.__txUpdate.set).toHaveBeenCalledWith(
-      expect.objectContaining({ pendingLiveMessageIds: [], liveCatchUpState: 'ready' }),
-    );
+    // State set to 'ready'
+    const setMock = db.update.mock.results[0]?.value?.set;
+    expect(setMock).toHaveBeenCalledWith(expect.objectContaining({ liveCatchUpState: 'ready' }));
   });
 
   it('flush skips IDs already processed during the run', async () => {
@@ -659,10 +656,9 @@ describe('LiveCatchUpCommand', () => {
     // No ingest calls at all
     expect(ingestEmailCommand.run).not.toHaveBeenCalled();
 
-    // State still set to ready via flush transaction
-    expect(db.__flushTx.__txUpdate.set).toHaveBeenCalledWith(
-      expect.objectContaining({ liveCatchUpState: 'ready' }),
-    );
+    // State still set to ready
+    const setMock = db.update.mock.results[0]?.value?.set;
+    expect(setMock).toHaveBeenCalledWith(expect.objectContaining({ liveCatchUpState: 'ready' }));
   });
 
   it('continues flush ingestion even when an individual message fails', async () => {

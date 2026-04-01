@@ -1,6 +1,6 @@
 export const stripChunkTags = (text: string): string => {
   // To minimize errors in removing chunk tags we always remove the
-  // exact tags from the begining of the document always.
+  // exact tags from the begining of the document.
   return text
     .trim()
     .replace(/^<\|document\|>[\s\S]*?<\|\/document\|>\n?/g, '')

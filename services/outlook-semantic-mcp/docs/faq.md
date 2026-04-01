@@ -209,7 +209,10 @@ When the filters are updated and the service is redeployed, all user inbox confi
 
 Full sync states: `ready`, `running`, `waiting-for-ingestion`, `paused`, `failed`. See [Full Sync — Sync States](./technical/full-sync.md#Sync-States) for the complete state reference.
 
-Both pipelines run concurrently after connection. Full sync uploads batches via the Unique KB ingestion API. Live catch-up ingests each email inline using the same Unique KB API, which contributes to the in-progress count that full sync monitors during `waiting-for-ingestion`.
+Both pipelines run concurrently after connection. 
+Full sync uploads batches via the Unique KB ingestion API and checks if Unique KB ingested majority of the documents before continuing.
+Live catch-up uploads batches via the Unique KB ingestion API but it does not wait for Unique KB to ingest this process makes Full sync wait longer because
+it contributes to the in-progress count that full sync monitors during `waiting-for-ingestion`.
 
 **See also:** [Full Sync](./technical/full-sync.md) — [Live Catch-Up](./technical/live-catchup.md)
 
@@ -223,7 +226,7 @@ Search results are incomplete while `fullSyncState` is `running` or `waiting-for
 
 ### Why is my full sync stuck in `waiting-for-ingestion`?
 
-**Answer:** Full sync enters `waiting-for-ingestion` after uploading all email batches and waits for the Unique knowledge base to confirm that almost all queued messages are processed. Because live catch-up ingests emails directly to the Unique KB inline, it contributes to the in-progress count that full sync monitors. High live catch-up activity can extend the time full sync spends in this state. This is normal behavior.
+**Answer:** Full sync enters `waiting-for-ingestion` after uploading all email batches and waits for the Unique knowledge base to confirm that majority of queued messages are processed. Because live catch-up ingests emails directly to the Unique KB inline, it contributes to the in-progress count that full sync monitors. High live catch-up activity can extend the time full sync spends in this state. This is normal behavior.
 
 If the sync has been in `waiting-for-ingestion` with a stale heartbeat for more than 5 minutes, the recovery scheduler will automatically re-trigger the ingestion check.
 
@@ -448,7 +451,7 @@ Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredCon
 
 ### Why is RabbitMQ required?
 
-**Answer:** Microsoft requires webhook endpoints to respond within 10 seconds (Microsoft limit, not configurable). Processing a live catch-up notification involves acquiring database locks, querying Microsoft Graph, and uploading emails to the knowledge base — which can take longer. RabbitMQ decouples receipt from processing: the webhook controller enqueues the notification and returns `202 Accepted` immediately. The consumer then handles email fetching and ingestion inline, after the response has already been sent. RabbitMQ is also used for full sync inter-batch orchestration and other internal events.
+**Answer:** Microsoft requires webhook endpoints to respond within 10 seconds (Microsoft limit, not configurable). Processing a live catch-up notification involves acquiring database locks, querying Microsoft Graph, and uploading emails to the knowledge base — which can take longer. RabbitMQ decouples receipt from processing: the webhook controller enqueues the notification and returns `202 Accepted` immediately. The consumer then handles email fetching and ingestion, after the response has already been sent. RabbitMQ is also used for full sync inter-batch orchestration and other internal events.
 
 **See also:** [Live Catch-Up](./technical/live-catchup.md) — [Architecture](./technical/architecture.md)
 
@@ -458,7 +461,7 @@ Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredCon
 
 Full sync relies on RabbitMQ for inter-batch orchestration — without RabbitMQ, in-progress full syncs complete their current batch but no new batches are triggered. See [Disaster Recovery — Scenario 2](./operator/disaster-recovery.md#Scenario-2:-RabbitMQ-Loss) for details.
 
-Live catch-up trigger delivery stalls while RabbitMQ is unavailable, but any in-progress catch-up run continues inline and completes normally (per-email ingestion does not use RabbitMQ). Once RabbitMQ recovers, the 5-minute recovery scheduler re-triggers processing, which picks up missed messages by querying from the last watermark.
+Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, eigher the first notification from MsGraph or the 4-hour catch-up cron re-triggers processing, which picks up missed messages by querying from the last watermark.
 
 ### What happens if PostgreSQL is unavailable?
 
@@ -477,7 +480,8 @@ Live catch-up trigger delivery stalls while RabbitMQ is unavailable, but any in-
 **Answer:** Recovery depends on which component was lost:
 
 - **Local PostgreSQL DB loss** — all stored OAuth tokens and sync state are gone; every user must re-authenticate via `reconnect_inbox`.
-- **RabbitMQ loss** — in-progress full syncs stall after the current batch; live catch-up trigger delivery is blocked but any in-progress run completes inline. No re-authentication is needed. Live catch-up resumes automatically once RabbitMQ is restored; each affected user must call `restart_full_sync` from their own MCP session (debug mode required).
+- **RabbitMQ loss** — in-progress full syncs stall after the current batch; live catch-up trigger delivery is blocked but any in-progress run completes. No re-authentication is needed. Live catch-up resumes automatically or when the first MsGraph notification arrives once RabbitMQ
+is restored.
 - **Unique Knowledge Base loss** — ingested email content must be re-ingested; each affected user must call `restart_full_sync` from their own MCP session (debug mode required). No re-authentication is needed.
 
 **See also:** [Disaster Recovery Runbook](./operator/disaster-recovery.md)

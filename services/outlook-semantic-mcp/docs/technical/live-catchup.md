@@ -9,7 +9,7 @@ Live catch-up is the real-time email ingestion pipeline. It receives Microsoft G
 
 ## How It Works
 
-Live catch-up operates in two stages: a **notification stage** (fast, synchronous) and an **ingestion stage** (inline, within the same consumer execution).
+Live catch-up operates in two stages: a **notification stage** (fast, synchronous) and an **ingestion stage** (within the same consumer execution).
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -30,7 +30,7 @@ sequenceDiagram
     Controller->>AMQP: Publish live-catch-up.execute (subscriptionId, messageIds[])
     Controller->>MSGraph: 202 Accepted
 
-    Note over AMQP,UniqueKB: Stage 2 — Ingestion (inline)
+    Note over AMQP,UniqueKB: Stage 2 — Ingestion
     AMQP->>Consumer: Deliver message
     Consumer->>DB: Acquire lock on inbox_configurations row
 
@@ -55,7 +55,7 @@ sequenceDiagram
 - Remaining message IDs are grouped by `subscriptionId` and published to RabbitMQ as a single batch
 - `202 Accepted` is returned immediately — no email fetching happens in this stage
 
-**Stage 2 — Ingestion (inline):**
+**Stage 2 — Ingestion:**
 
 - The consumer acquires a row-level lock on `inbox_configurations` to prevent concurrent processing
 - It uses `newestLastModifiedDateTime` (the watermark) as the lower bound for a Graph query, ensuring only new or recently modified emails are fetched

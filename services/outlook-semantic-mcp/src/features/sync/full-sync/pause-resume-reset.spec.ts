@@ -133,9 +133,9 @@ describe('ResumeFullSyncCommand', () => {
     expect(amqp.publish).toHaveBeenCalledOnce();
     expect(amqp.publish).toHaveBeenCalledWith(
       expect.any(String),
-      'unique.outlook-semantic-mcp.sync.full-sync',
+      'unique.outlook-semantic-mcp.full-sync.retrigger',
       expect.objectContaining({
-        type: 'unique.outlook-semantic-mcp.sync.full-sync',
+        type: 'unique.outlook-semantic-mcp.full-sync.retrigger',
         payload: { userProfileId: USER_PROFILE_ID },
       }),
     );

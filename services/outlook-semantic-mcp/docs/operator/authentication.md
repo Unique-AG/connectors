@@ -241,14 +241,14 @@ Passed to Microsoft as the `clientState` field when creating Graph subscriptions
 
 - **Live catch-up stops** — all incoming email notifications are rejected until subscriptions are recreated.
 - **Full sync is unaffected** — it pulls directly from Microsoft Graph and does not use webhooks.
-- **Emails received during the gap will not be ingested into the Knowledge Base** until subscriptions are recreated. Once a user calls `reconnect_inbox` and the next live catch-up runs (triggered by a new notification or the 15-minute cron), it queries from the last watermark and picks up any emails missed during the gap.
+- **Emails received during the gap will not be ingested into the Knowledge Base** until subscriptions are recreated. Once a user calls `reconnect_inbox` and the next live catch-up runs (triggered by a new notification or the 4-hour inactivity scheduler), it queries from the last watermark and picks up any emails missed during the gap.
 
 **How to rotate:**
 
 1. Generate a new secret: `openssl rand -hex 64`
 2. Update the Kubernetes secret and redeploy the service
 3. All users must call `reconnect_inbox` to recreate their subscriptions with the new secret
-4. Emails arriving during the gap will not be ingested until `reconnect_inbox` is called. After that, live catch-up picks them up automatically on the next notification or 15-minute cron cycle (it queries from the last watermark)
+4. Emails arriving during the gap will not be ingested until `reconnect_inbox` is called. After that, live catch-up picks them up automatically on the next notification or the 4-hour inactivity scheduler (it queries from the last watermark)
 
 Plan this as a maintenance window — there is no zero-downtime rotation path.
 
