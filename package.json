@@ -17,7 +17,7 @@
     "style": "biome check .",
     "style:fix": "biome check . --write",
     "check-types": "turbo check-types",
-    "check-all": "pnpm style && pnpm check-types && pnpm test && syncpack list-mismatches",
+    "check-all": "pnpm style && pnpm check-types && pnpm test && syncpack lint",
     "fix-all": "pnpm style:fix && syncpack fix-mismatches",
     "syncpack": "syncpack",
     "quality": "./scripts/lint.sh",
@@ -28,12 +28,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.11",
-    "rimraf": "^6.0.1",
+    "rimraf": "6.0.1",
     "syncpack": "14.0.0-alpha.19",
-    "turbo": "^2.6.0",
-    "typescript": "^5.9.2",
-    "unplugin-swc": "^1.5.7",
-    "vitest": "^3.2.4"
+    "turbo": "2.6.0",
+    "typescript": "5.9.2",
+    "unplugin-swc": "1.5.7",
+    "vitest": "3.2.4"
   },
   "engines": {
     "node": "24"
