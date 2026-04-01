@@ -101,7 +101,8 @@ describe('sanitizeGraphqlVariables', () => {
     expect(result?.skip).toBe(0);
     expect(result?.take).toBe(100);
     const where = result?.where as Record<string, Record<string, string>>;
-    expect(where.externalId.startsWith).toContain('*');
+    expect(where.externalId).toBeDefined();
+    expect(where.externalId?.startsWith).toContain('*');
   });
 
   it('smears all leaves when no logSafeKeys are provided', () => {
@@ -138,11 +139,12 @@ describe('sanitizeGraphqlVariables', () => {
     ]);
 
     const accesses = result?.scopeAccesses as Array<Record<string, string>>;
-    expect(accesses[0].accessType).toBe('READ');
-    expect(accesses[0].entityType).toBe('USER');
-    expect(accesses[0].entityId).toContain('*');
-    expect(accesses[1].accessType).toBe('WRITE');
-    expect(accesses[1].entityId).toContain('*');
+    expect(accesses).toHaveLength(2);
+    expect(accesses.at(0)?.accessType).toBe('READ');
+    expect(accesses.at(0)?.entityType).toBe('USER');
+    expect(accesses.at(0)?.entityId).toContain('*');
+    expect(accesses.at(1)?.accessType).toBe('WRITE');
+    expect(accesses.at(1)?.entityId).toContain('*');
   });
 
   it('returns an empty object for empty variables', () => {
@@ -173,11 +175,14 @@ describe('sanitizeGraphqlVariables', () => {
     };
     const result = sanitizeGraphqlVariables(variables, ['groups.members.role']);
 
-    const groups = result?.groups as Array<Record<string, Array<Record<string, string>>>>;
-    expect(groups[0].members[0].role).toBe('admin');
-    expect(groups[0].members[0].entityId).toContain('*');
-    expect(groups[0].members[1].role).toBe('viewer');
-    expect(groups[0].members[1].entityId).toContain('*');
+    const groups = result?.groups as Array<Record<string, unknown>>;
+    expect(groups).toHaveLength(1);
+    const members = groups.at(0)?.members as Array<Record<string, string>>;
+    expect(members).toHaveLength(2);
+    expect(members.at(0)?.role).toBe('admin');
+    expect(members.at(0)?.entityId).toContain('*');
+    expect(members.at(1)?.role).toBe('viewer');
+    expect(members.at(1)?.entityId).toContain('*');
   });
 
   it('handles query-style variables (no mutation)', () => {
@@ -191,7 +196,7 @@ describe('sanitizeGraphqlVariables', () => {
     expect(result?.skip).toBe(0);
     expect(result?.take).toBe(50);
     const where = result?.where as Record<string, Record<string, string>>;
-    expect(where.scopeId.equals).toBe('scope-1');
+    expect(where.scopeId?.equals).toBe('scope-1');
   });
 
   it('matches the ContentUpsert use case end-to-end', () => {

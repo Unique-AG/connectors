@@ -67,8 +67,7 @@ function isGraphqlClientError(error: unknown): error is GraphqlClientErrorShape 
 export function sanitizeError(error: unknown): object {
   if (isGraphqlClientError(error)) {
     const jsonDumpStart = error.message.indexOf(': {"response":');
-    const baseMessage =
-      jsonDumpStart >= 0 ? error.message.slice(0, jsonDumpStart) : error.message;
+    const baseMessage = jsonDumpStart >= 0 ? error.message.slice(0, jsonDumpStart) : error.message;
 
     return {
       name: error.name,
