@@ -131,22 +131,6 @@ export class IngestEmailCommand {
       messageId,
     });
 
-    if (filters) {
-      const skipResult = shouldSkipEmail(graphMessage, filters, { userProfileId });
-      if (skipResult.skip) {
-        const { reason, matchedPattern } = skipResult;
-        traceEvent('email skipped by filter', { reason, matchedPattern, userProfileId });
-        this.logger.log({
-          messageId,
-          userProfileId,
-          reason,
-          matchedPattern,
-          msg: 'Email skipped by filter',
-        });
-        return 'skipped';
-      }
-    }
-
     const metadata = getMetadataFromMessage(graphMessage);
     const fileKey = getUniqueKeyForMessage(userProfile.email, graphMessage);
     const files = await this.uniqueApi.files.getByKeys([fileKey]);
@@ -164,6 +148,26 @@ export class IngestEmailCommand {
       parentDirectoryId: graphMessage.parentFolderId,
     };
     traceAttrs(logContext);
+
+    if (filters) {
+      const skipResult = shouldSkipEmail(graphMessage, filters, { userProfileId });
+      if (skipResult.skip) {
+        if (file) {
+          await this.uniqueApi.files.delete(file.id);
+        }
+
+        const { reason, matchedPattern } = skipResult;
+        traceEvent('email skipped by filter', { reason, matchedPattern, userProfileId });
+        this.logger.log({
+          messageId,
+          userProfileId,
+          reason,
+          matchedPattern,
+          msg: 'Email skipped by filter',
+        });
+        return 'skipped';
+      }
+    }
 
     if (isNullish(parentDirectory)) {
       this.logger.warn({ ...logContext, msg: `New directory detected during emails sync.` });
