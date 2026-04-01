@@ -52,16 +52,18 @@ export class ConfluenceSynchronizationService {
       );
 
       if (pagesToFetch.length > 0 || attachmentsToIngest.length > 0) {
-        const spaceKeys = [
-          ...new Set([
-            ...pagesToFetch.map((p) => p.spaceKey),
-            // add attachments space keys in for completion and possible edge cases
-            ...attachmentsToIngest.map((a) => a.spaceKey),
-          ]),
-        ];
+        const spaceKeyToSpaceId = new Map<string, string>();
+        for (const page of pagesToFetch) {
+          spaceKeyToSpaceId.set(page.spaceKey, page.spaceId);
+        }
+        for (const attachment of attachmentsToIngest) {
+          spaceKeyToSpaceId.set(attachment.spaceKey, attachment.spaceId);
+        }
+        const spaceKeys = [...spaceKeyToSpaceId.keys()];
         const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(
           rootScopePath,
           spaceKeys,
+          spaceKeyToSpaceId,
         );
 
         const concurrency = tenant.config.processing.concurrency;

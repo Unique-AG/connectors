@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
-import { EXTERNAL_ID_PREFIX } from '../constants/ingestion.constants';
+import { buildExternalId } from '../constants/ingestion.constants';
 
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
@@ -52,6 +52,7 @@ export class ScopeManagementService {
   public async ensureSpaceScopes(
     rootScopePath: string,
     spaceKeys: string[],
+    spaceKeyToSpaceId: Map<string, string>,
   ): Promise<Map<string, string>> {
     const paths = spaceKeys.map((key) => `${rootScopePath}/${key}`);
     const createdScopes = await this.uniqueApiClient.scopes.createFromPaths(paths, {
@@ -64,8 +65,11 @@ export class ScopeManagementService {
       const scope = createdScopes[index];
       assert.ok(scope, `Failed to create scope for space: ${spaceKey}`);
 
-      if (!scope.externalId) {
-        const externalId = `${EXTERNAL_ID_PREFIX}${this.tenantName}:${spaceKey}`;
+      const spaceId = spaceKeyToSpaceId.get(spaceKey);
+      assert.ok(spaceId, `No spaceId found for spaceKey: ${spaceKey}`);
+
+      const externalId = buildExternalId(this.tenantName, spaceId, spaceKey);
+      if (scope.externalId !== externalId) {
         await this.uniqueApiClient.scopes.updateExternalId(scope.id, externalId);
       }
 

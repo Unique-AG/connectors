@@ -363,9 +363,11 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockScopeManagementService.ensureSpaceScopes).toHaveBeenCalledWith('/Confluence', [
-        'SP2',
-      ]);
+      expect(mockScopeManagementService.ensureSpaceScopes).toHaveBeenCalledWith(
+        '/Confluence',
+        ['SP2'],
+        new Map([['SP2', 'space-2']]),
+      );
       expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(attachment, 'scope-2');
     });
 

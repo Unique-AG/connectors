@@ -122,7 +122,11 @@ describe('ScopeManagementService', () => {
       ]);
       scopes.updateExternalId.mockResolvedValue(undefined);
 
-      const result = await service.ensureSpaceScopes(rootScopePath, ['ENG', 'MKT']);
+      const spaceKeyToSpaceId = new Map([
+        ['ENG', 'eng-space-id'],
+        ['MKT', 'mkt-space-id'],
+      ]);
+      const result = await service.ensureSpaceScopes(rootScopePath, ['ENG', 'MKT'], spaceKeyToSpaceId);
 
       expect(result).toEqual(
         new Map([
@@ -133,8 +137,46 @@ describe('ScopeManagementService', () => {
       expect(scopes.createFromPaths).toHaveBeenCalledWith(['/Confluence/ENG', '/Confluence/MKT'], {
         inheritAccess: true,
       });
-      expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-eng', `confc:${TENANT_NAME}:ENG`);
-      expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-mkt', `confc:${TENANT_NAME}:MKT`);
+      expect(scopes.updateExternalId).toHaveBeenCalledWith(
+        'scope-eng',
+        `confc:${TENANT_NAME}:eng-space-id:ENG`,
+      );
+      expect(scopes.updateExternalId).toHaveBeenCalledWith(
+        'scope-mkt',
+        `confc:${TENANT_NAME}:mkt-space-id:MKT`,
+      );
+    });
+
+    it('skips updateExternalId when scope already has the correct externalId', async () => {
+      const { service, scopes } = makeService();
+      const rootScopePath = await initializeService(service, scopes);
+
+      scopes.createFromPaths.mockResolvedValueOnce([
+        { id: 'scope-eng', name: 'ENG', externalId: `confc:${TENANT_NAME}:eng-space-id:ENG` },
+      ]);
+
+      const spaceKeyToSpaceId = new Map([['ENG', 'eng-space-id']]);
+      await service.ensureSpaceScopes(rootScopePath, ['ENG'], spaceKeyToSpaceId);
+
+      expect(scopes.updateExternalId).not.toHaveBeenCalled();
+    });
+
+    it('migrates old-format externalId to new format', async () => {
+      const { service, scopes } = makeService();
+      const rootScopePath = await initializeService(service, scopes);
+
+      scopes.createFromPaths.mockResolvedValueOnce([
+        { id: 'scope-eng', name: 'ENG', externalId: `confc:${TENANT_NAME}:ENG` },
+      ]);
+      scopes.updateExternalId.mockResolvedValue(undefined);
+
+      const spaceKeyToSpaceId = new Map([['ENG', 'eng-space-id']]);
+      await service.ensureSpaceScopes(rootScopePath, ['ENG'], spaceKeyToSpaceId);
+
+      expect(scopes.updateExternalId).toHaveBeenCalledWith(
+        'scope-eng',
+        `confc:${TENANT_NAME}:eng-space-id:ENG`,
+      );
     });
   });
 });
