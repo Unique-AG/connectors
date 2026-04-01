@@ -400,7 +400,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "rate(cfc_confluence_api_request_duration_seconds_sum{job=~\"$job\", tenant=~\"$tenant\"}[1m]) / rate(cfc_confluence_api_request_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m])",
+          "expr": "(rate(cfc_confluence_api_request_duration_seconds_sum{job=~\"$job\", tenant=~\"$tenant\"}[1m]) / rate(cfc_confluence_api_request_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m])) and increase(cfc_confluence_api_request_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\"}[1m]) > 0",
           "legendFormat": "{{tenant}} — {{endpoint}}",
           "refId": "A"
         }
@@ -479,7 +479,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "rate(confluence_connector_unique_api_request_duration_ms_sum{job=~\"$job\"}[1m]) / rate(confluence_connector_unique_api_request_duration_ms_count{job=~\"$job\"}[1m])",
+          "expr": "(rate(confluence_connector_unique_api_request_duration_ms_sum{job=~\"$job\"}[1m]) / rate(confluence_connector_unique_api_request_duration_ms_count{job=~\"$job\"}[1m])) and increase(confluence_connector_unique_api_request_duration_ms_count{job=~\"$job\"}[1m]) > 0",
           "legendFormat": "{{operation}}",
           "refId": "A"
         }

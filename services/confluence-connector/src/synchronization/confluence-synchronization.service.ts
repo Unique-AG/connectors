@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
 import type { Metrics } from '../metrics';
@@ -28,12 +29,15 @@ export class ConfluenceSynchronizationService {
     const tenant = getCurrentTenant();
 
     if (tenant.isScanning) {
-      this.logger.log({ tenantName: tenant.name, msg: 'Sync already in progress, skipping' });
+      this.logger.log({
+        tenantName: tenant.name,
+        msg: 'Sync already in progress, skipping',
+      });
       return;
     }
 
     tenant.isScanning = true;
-    const startTime = performance.now();
+    const startTime = Date.now();
     let syncResult: 'success' | 'failure' = 'success';
 
     try {
@@ -41,12 +45,14 @@ export class ConfluenceSynchronizationService {
 
       const rootScopePath = await this.scopeManagementService.initialize();
 
-      const scanStartTime = performance.now();
+      const scanStartTime = Date.now();
       const { pages: discoveredPages, attachments: discoveredAttachments } =
         await this.scanner.discoverPages();
-      const scanDurationSeconds = (performance.now() - scanStartTime) / 1000;
-      this.metrics.recordScanDuration(scanDurationSeconds);
-      this.logger.log({ count: discoveredPages.length, msg: 'Discovery completed' });
+      this.metrics.recordScanDuration(elapsedSeconds(scanStartTime));
+      this.logger.log({
+        count: discoveredPages.length,
+        msg: 'Discovery completed',
+      });
 
       const diffResult = await this.fileDiffService.computeDiff(
         discoveredPages,
@@ -93,8 +99,7 @@ export class ConfluenceSynchronizationService {
       this.logger.error({ err: error, msg: 'Sync failed' });
     } finally {
       tenant.isScanning = false;
-      const durationSeconds = (performance.now() - startTime) / 1000;
-      this.metrics.recordSyncDuration(durationSeconds, syncResult);
+      this.metrics.recordSyncDuration(elapsedSeconds(startTime), syncResult);
     }
   }
 
@@ -114,7 +119,7 @@ export class ConfluenceSynchronizationService {
     let ingested = 0;
     const total = pages.length;
 
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       pages.map((page) =>
         limit(async () => {
           const fetched = await this.contentFetcher.fetchPageContent(page);
@@ -129,20 +134,27 @@ export class ConfluenceSynchronizationService {
         }).finally(() => {
           processed++;
           if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
-            this.logger.log({ processed, total, msg: 'Page ingestion in progress' });
+            this.logger.log({
+              processed,
+              total,
+              msg: 'Page ingestion in progress',
+            });
           }
         }),
       ),
     );
 
-    const failed = results.filter((r) => r.status === 'rejected').length;
+    const failed = pages.length - ingested;
 
     this.metrics.recordPagesProcessed(ingested, 'success');
-    if (failed > 0) {
-      this.metrics.recordPagesProcessed(failed, 'failure');
-    }
+    this.metrics.recordPagesProcessed(failed, 'failure');
 
-    this.logger.log({ total: pages.length, ingested, failed, msg: 'Page ingestion summary' });
+    this.logger.log({
+      total: pages.length,
+      ingested,
+      failed,
+      msg: 'Page ingestion summary',
+    });
   }
 
   private async ingestAttachments(
@@ -160,7 +172,7 @@ export class ConfluenceSynchronizationService {
 
     let ingested = 0;
 
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       attachments.map((attachment) =>
         limit(async () => {
           const scopeId = spaceScopes.get(attachment.spaceKey);
@@ -170,18 +182,19 @@ export class ConfluenceSynchronizationService {
         }).finally(() => {
           processed++;
           if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
-            this.logger.log({ processed, total, msg: 'Attachment ingestion in progress' });
+            this.logger.log({
+              processed,
+              total,
+              msg: 'Attachment ingestion in progress',
+            });
           }
         }),
       ),
     );
 
-    const failed = results.filter((r) => r.status === 'rejected').length;
-
+    const failed = attachments.length - ingested;
     this.metrics.recordAttachmentsProcessed(ingested, 'success');
-    if (failed > 0) {
-      this.metrics.recordAttachmentsProcessed(failed, 'failure');
-    }
+    this.metrics.recordAttachmentsProcessed(failed, 'failure');
 
     this.logger.log({
       total: attachments.length,

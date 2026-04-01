@@ -1,8 +1,8 @@
+import { getHttpStatusCodeClass } from '@unique-ag/utils';
 import { Injectable } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
-import { getCurrentTenant, tenantStorage } from '../tenant';
-import { getHttpStatusCodeClass } from './utils';
+import { getCurrentTenant } from '../tenant';
 
 @Injectable()
 export class Metrics {
@@ -57,7 +57,7 @@ export class Metrics {
       {
         description: 'Request latency for Confluence API calls',
         advice: {
-          explicitBucketBoundaries: [0.1, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20],
+          explicitBucketBoundaries: [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30],
         },
       },
     );
@@ -79,7 +79,10 @@ export class Metrics {
   }
 
   public recordSyncDuration(durationSeconds: number, result: 'success' | 'failure'): void {
-    this.syncDuration.record(durationSeconds, { tenant: this.tenantName, result });
+    this.syncDuration.record(durationSeconds, {
+      tenant: this.tenantName,
+      result,
+    });
   }
 
   public recordScanDuration(durationSeconds: number): void {
@@ -102,11 +105,16 @@ export class Metrics {
     count: number,
     diffResultType: 'new' | 'updated' | 'deleted' | 'moved',
   ): void {
-    this.fileDiffEvents.add(count, { tenant: this.tenantName, diff_result_type: diffResultType });
+    this.fileDiffEvents.add(count, {
+      tenant: this.tenantName,
+      diff_result_type: diffResultType,
+    });
   }
 
   public recordAttachmentUploadDuration(durationSeconds: number): void {
-    this.attachmentUploadDuration.record(durationSeconds, { tenant: this.tenantName });
+    this.attachmentUploadDuration.record(durationSeconds, {
+      tenant: this.tenantName,
+    });
   }
 
   public recordApiRequestDuration(
@@ -129,9 +137,15 @@ export class Metrics {
   }
 
   public recordApiThrottleEvent(): void {
-    // Usually fires inside a tenant context, but after a reservoir refresh
-    // Bottleneck may drain queued jobs from a timer with no tenant context - as indicated by bugbot
-    const tenant = tenantStorage.getStore()?.name ?? 'unknown';
+    // Bottleneck's reservoir-refresh timer can fire `depleted` outside any AsyncLocalStorage
+    // context, so the tenantName getter (which asserts) may throw here.
+    // Adding this to meet bugbot's criteria, as in practice I was never able to reproduce that issue.
+    let tenant: string;
+    try {
+      tenant = this.tenantName;
+    } catch {
+      tenant = 'unknown';
+    }
     this.confluenceApiThrottleEvents.add(1, { tenant });
   }
 

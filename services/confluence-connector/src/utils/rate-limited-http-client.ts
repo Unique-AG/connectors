@@ -1,4 +1,5 @@
 import type { Readable } from 'node:stream';
+import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
@@ -23,8 +24,10 @@ function normalizeEndpoint(url: string): string {
     if (!match) {
       return path;
     }
+    // Safe to replace broadly here — apiPath only contains segments after /rest/api/ or /api/v2/,
+    // where numeric segments are content/attachment IDs (typically 5+ digits, sometimes prefixed with "att").
     const apiPath = path.slice(match.index);
-    return apiPath.replaceAll(/\/[0-9a-f-]{8,}/gi, '/{id}').replaceAll(/\/(att)?\d{2,}/g, '/{id}');
+    return apiPath.replaceAll(/\/[0-9a-f-]{8,}/gi, '/{id}').replaceAll(/\/(att)?\d{4,}/g, '/{id}');
   } catch {
     return 'unknown';
   }
@@ -71,7 +74,7 @@ export class RateLimitedHttpClient {
     headers: Record<string, string>,
   ): Promise<Dispatcher.ResponseData['body']> {
     return this.limiter.schedule(async () => {
-      const startTime = performance.now();
+      const startTime = Date.now();
       const endpoint = normalizeEndpoint(url);
       let statusCode: number | undefined;
 
@@ -100,8 +103,7 @@ export class RateLimitedHttpClient {
     endpoint: string,
     result: 'success' | 'error',
   ): void {
-    const durationSeconds = (performance.now() - startTime) / 1000;
-    this.metrics.recordApiRequestDuration(durationSeconds, endpoint, result);
+    this.metrics.recordApiRequestDuration(elapsedSeconds(startTime), endpoint, result);
   }
 
   private setupThrottlingMonitoring(): void {
