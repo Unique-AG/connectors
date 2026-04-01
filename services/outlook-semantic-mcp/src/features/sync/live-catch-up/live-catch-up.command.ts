@@ -309,6 +309,7 @@ export class LiveCatchUpCommand {
     });
 
     let index = 0;
+    let processedMessages = 0;
 
     try {
       for (; index < idsToFlush.length; index++) {
@@ -316,6 +317,7 @@ export class LiveCatchUpCommand {
         if (!messageId || alreadyProcessedIds.has(messageId)) {
           continue;
         }
+        processedMessages++;
         const result = await this.ingestEmailCommand.run({ userProfileId, messageId, filters });
         if (result === 'failed') {
           this.logger.warn({
@@ -337,7 +339,7 @@ export class LiveCatchUpCommand {
         .where(eq(inboxConfigurations.userProfileId, userProfileId));
     }
 
-    return idsToFlush.length;
+    return processedMessages;
   }
 
   private async updateWatermarks({
