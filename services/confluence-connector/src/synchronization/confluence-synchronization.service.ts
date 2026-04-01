@@ -40,6 +40,11 @@ export class ConfluenceSynchronizationService {
         await this.scanner.discoverPages();
       this.logger.log({ count: discoveredPages.length, msg: 'Discovery completed' });
 
+      const allSpaceKeyToSpaceId = this.buildSpaceKeyToSpaceIdMap(
+        discoveredPages,
+        discoveredAttachments,
+      );
+
       const diffResult = await this.fileDiffService.computeDiff(
         discoveredPages,
         discoveredAttachments,
@@ -52,18 +57,14 @@ export class ConfluenceSynchronizationService {
       );
 
       if (pagesToFetch.length > 0 || attachmentsToIngest.length > 0) {
-        const spaceKeyToSpaceId = new Map<string, string>();
-        for (const page of pagesToFetch) {
-          spaceKeyToSpaceId.set(page.spaceKey, page.spaceId);
-        }
-        for (const attachment of attachmentsToIngest) {
-          spaceKeyToSpaceId.set(attachment.spaceKey, attachment.spaceId);
-        }
-        const spaceKeys = [...spaceKeyToSpaceId.keys()];
+        const spaceKeys = [...new Set([
+          ...pagesToFetch.map((p) => p.spaceKey),
+          ...attachmentsToIngest.map((a) => a.spaceKey),
+        ])];
         const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(
           rootScopePath,
           spaceKeys,
-          spaceKeyToSpaceId,
+          allSpaceKeyToSpaceId,
         );
 
         const concurrency = tenant.config.processing.concurrency;
@@ -80,6 +81,10 @@ export class ConfluenceSynchronizationService {
           msg: 'Deleted content processed',
         });
       }
+
+      await this.scopeManagementService.cleanupRemovedSpaces(
+        new Set(allSpaceKeyToSpaceId.keys()),
+      );
 
       this.logger.log({ msg: 'Sync work done' });
     } catch (error) {
@@ -156,6 +161,20 @@ export class ConfluenceSynchronizationService {
     );
 
     this.logSettledResults(results, 'Attachment ingestion summary');
+  }
+
+  private buildSpaceKeyToSpaceIdMap(
+    pages: DiscoveredPage[],
+    attachments: DiscoveredAttachment[],
+  ): Map<string, string> {
+    const map = new Map<string, string>();
+    for (const page of pages) {
+      map.set(page.spaceKey, page.spaceId);
+    }
+    for (const attachment of attachments) {
+      map.set(attachment.spaceKey, attachment.spaceId);
+    }
+    return map;
   }
 
   private logSettledResults(results: PromiseSettledResult<void>[], msg: string): void {

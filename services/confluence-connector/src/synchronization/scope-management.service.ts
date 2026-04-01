@@ -82,7 +82,6 @@ export class ScopeManagementService {
 
   public async cleanupRemovedSpaces(
     discoveredSpaceKeys: Set<string>,
-    useV1KeyFormat: boolean,
   ): Promise<void> {
     const children = await this.uniqueApiClient.scopes.listChildren(this.ingestionConfig.scopeId);
 
@@ -116,7 +115,9 @@ export class ScopeManagementService {
 
       try {
         const basePartialKey = `${parsed.spaceId}_${parsed.spaceKey}`;
-        const partialKey = useV1KeyFormat ? basePartialKey : `${this.tenantName}/${basePartialKey}`;
+        const partialKey = this.ingestionConfig.useV1KeyFormat
+          ? basePartialKey
+          : `${this.tenantName}/${basePartialKey}`;
 
         const deletedFileCount = await this.uniqueApiClient.files.deleteByKeyPrefix(partialKey);
         await this.uniqueApiClient.scopes.delete(scope.id);
