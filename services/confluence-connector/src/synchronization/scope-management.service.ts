@@ -80,9 +80,7 @@ export class ScopeManagementService {
     return result;
   }
 
-  public async cleanupRemovedSpaces(
-    discoveredSpaceKeys: Set<string>,
-  ): Promise<void> {
+  public async cleanupRemovedSpaces(discoveredSpaceKeys: Set<string>): Promise<void> {
     const children = await this.uniqueApiClient.scopes.listChildren(this.ingestionConfig.scopeId);
 
     const orphanedScopes = children.filter((child) => {

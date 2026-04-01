@@ -57,10 +57,12 @@ export class ConfluenceSynchronizationService {
       );
 
       if (pagesToFetch.length > 0 || attachmentsToIngest.length > 0) {
-        const spaceKeys = [...new Set([
-          ...pagesToFetch.map((p) => p.spaceKey),
-          ...attachmentsToIngest.map((a) => a.spaceKey),
-        ])];
+        const spaceKeys = [
+          ...new Set([
+            ...pagesToFetch.map((p) => p.spaceKey),
+            ...attachmentsToIngest.map((a) => a.spaceKey),
+          ]),
+        ];
         const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(
           rootScopePath,
           spaceKeys,
@@ -82,9 +84,7 @@ export class ConfluenceSynchronizationService {
         });
       }
 
-      await this.scopeManagementService.cleanupRemovedSpaces(
-        new Set(allSpaceKeyToSpaceId.keys()),
-      );
+      await this.scopeManagementService.cleanupRemovedSpaces(new Set(allSpaceKeyToSpaceId.keys()));
 
       this.logger.log({ msg: 'Sync work done' });
     } catch (error) {
