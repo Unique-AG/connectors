@@ -11,7 +11,6 @@ const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string
 export interface CreateDraftEmailInput {
   subject: string;
   content: string;
-  contentType: 'html' | 'text';
   toRecipients: Array<{ name?: string; email: string }>;
   ccRecipients?: Array<{ name?: string; email: string }>;
   attachments?: {
@@ -82,7 +81,8 @@ export class CreateDraftEmailCommand {
     const body: Record<string, unknown> = {
       subject: input.subject,
       body: {
-        contentType: input.contentType === 'html' ? 'HTML' : 'Text',
+        // We defalt to HTML because plain text is considered to be valid html from outlook api.
+        contentType: 'HTML',
         content: input.content,
       },
       toRecipients: input.toRecipients.map((r) => ({
