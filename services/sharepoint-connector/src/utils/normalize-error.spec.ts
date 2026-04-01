@@ -212,4 +212,26 @@ describe('sanitizeError', () => {
     expect(result.graphqlErrors).toBeUndefined();
     expect(result.statusCode).toBe(500);
   });
+
+  it('falls back to serialization when response is null', () => {
+    const error = new Error('boom') as Error & { response: null; request: object };
+    error.response = null;
+    error.request = { query: 'query {}' };
+
+    const result = sanitizeError(error) as Record<string, unknown>;
+
+    expect(result.message).toBe('boom');
+    expect(result).not.toHaveProperty('graphqlErrors');
+  });
+
+  it('falls back to serialization when request is null', () => {
+    const error = new Error('boom') as Error & { response: object; request: null };
+    error.response = { status: 500 };
+    error.request = null;
+
+    const result = sanitizeError(error) as Record<string, unknown>;
+
+    expect(result.message).toBe('boom');
+    expect(result).not.toHaveProperty('graphqlErrors');
+  });
 });

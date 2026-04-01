@@ -1,3 +1,4 @@
+import { isObjectType } from 'remeda';
 import { serializeError } from 'serialize-error-cjs';
 
 export function normalizeError(error: unknown): Error {
@@ -47,13 +48,13 @@ interface GraphqlClientErrorShape extends Error {
 }
 
 function isGraphqlClientError(error: unknown): error is GraphqlClientErrorShape {
-  return (
-    error instanceof Error &&
-    'response' in error &&
-    typeof (error as Record<string, unknown>).response === 'object' &&
-    'request' in error &&
-    typeof (error as Record<string, unknown>).request === 'object'
-  );
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  // Error type doesn't have any extra properties and here we are checking if they are actually here
+  // and of type we expect, so we have to hard type-cast so TypeScript doesn't complain.
+  const record = error as unknown as Record<string, unknown>;
+  return isObjectType(record.response) && isObjectType(record.request);
 }
 
 /**
