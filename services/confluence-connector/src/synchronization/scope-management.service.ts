@@ -1,8 +1,12 @@
 import assert from 'node:assert';
-import type { UniqueApiClient } from '@unique-ag/unique-api';
+import type { Scope, UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
-import { buildExternalId, parseExternalId } from '../constants/ingestion.constants';
+import {
+  buildExternalId,
+  type ParsedExternalId,
+  parseExternalId,
+} from '../constants/ingestion.constants';
 
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
@@ -83,34 +87,18 @@ export class ScopeManagementService {
   public async cleanupRemovedSpaces(discoveredSpaceKeys: Set<string>): Promise<void> {
     const children = await this.uniqueApiClient.scopes.listChildren(this.ingestionConfig.scopeId);
 
-    const orphanedScopes = children.filter((child) => {
-      const parsed = parseExternalId(child.externalId ?? undefined);
-      if (!parsed) {
-        this.logger.error({
-          scopeId: child.id,
-          scopeName: child.name,
-          externalId: child.externalId,
-          msg: 'Scope has missing or unparseable externalId, skipping cleanup',
-        });
-        return false;
-      }
-      return !discoveredSpaceKeys.has(parsed.spaceKey);
-    });
+    const orphaned = this.identifyOrphanedScopes(children, discoveredSpaceKeys);
 
-    if (orphanedScopes.length === 0) {
-      this.logger.debug({ msg: 'No orphaned space scopes to clean up' });
+    if (orphaned.length === 0) {
       return;
     }
 
     this.logger.log({
-      count: orphanedScopes.length,
+      count: orphaned.length,
       msg: 'Cleaning up orphaned space scopes',
     });
 
-    for (const scope of orphanedScopes) {
-      const parsed = parseExternalId(scope.externalId ?? undefined);
-      assert.ok(parsed, `externalId was already validated for scope ${scope.id}`);
-
+    for (const { scope, parsed } of orphaned) {
       try {
         const basePartialKey = `${parsed.spaceId}_${parsed.spaceKey}`;
         const partialKey = this.ingestionConfig.useV1KeyFormat
@@ -136,5 +124,30 @@ export class ScopeManagementService {
         });
       }
     }
+  }
+
+  private identifyOrphanedScopes(
+    children: Scope[],
+    discoveredSpaceKeys: Set<string>,
+  ): Array<{ scope: Scope; parsed: ParsedExternalId }> {
+    const result: Array<{ scope: Scope; parsed: ParsedExternalId }> = [];
+
+    for (const child of children) {
+      const parsed = parseExternalId(child.externalId ?? undefined);
+      if (!parsed) {
+        this.logger.error({
+          scopeId: child.id,
+          scopeName: child.name,
+          externalId: child.externalId,
+          msg: 'Scope has missing or unparseable externalId, skipping cleanup',
+        });
+        continue;
+      }
+      if (!discoveredSpaceKeys.has(parsed.spaceKey)) {
+        result.push({ scope: child, parsed });
+      }
+    }
+
+    return result;
   }
 }
