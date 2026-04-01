@@ -44,7 +44,7 @@
     "@unique-ag/probe": "workspace:*",
     "bottleneck": "2.19.5",
     "cron": "4.3.5",
-    "graphql": "~16.11.0",
+    "graphql": "16.11.0",
     "graphql-request": "7.2.0",
     "js-yaml": "4.1.0",
     "nestjs-otel": "7.0.1",
