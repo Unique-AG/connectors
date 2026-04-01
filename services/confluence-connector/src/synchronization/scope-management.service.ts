@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
-import { buildExternalId } from '../constants/ingestion.constants';
+import { buildExternalId, parseExternalId } from '../constants/ingestion.constants';
 
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
@@ -78,5 +78,64 @@ export class ScopeManagementService {
 
     this.logger.debug({ spaceKeys, count: spaceKeys.length, msg: 'Space scopes resolved' });
     return result;
+  }
+
+  public async cleanupRemovedSpaces(
+    discoveredSpaceKeys: Set<string>,
+    useV1KeyFormat: boolean,
+  ): Promise<void> {
+    const children = await this.uniqueApiClient.scopes.listChildren(this.ingestionConfig.scopeId);
+
+    const orphanedScopes = children.filter((child) => {
+      const parsed = parseExternalId(child.externalId ?? undefined);
+      if (!parsed) {
+        this.logger.error({
+          scopeId: child.id,
+          scopeName: child.name,
+          externalId: child.externalId,
+          msg: 'Scope has missing or unparseable externalId, skipping cleanup',
+        });
+        return false;
+      }
+      return !discoveredSpaceKeys.has(parsed.spaceKey);
+    });
+
+    if (orphanedScopes.length === 0) {
+      this.logger.debug({ msg: 'No orphaned space scopes to clean up' });
+      return;
+    }
+
+    this.logger.log({
+      count: orphanedScopes.length,
+      msg: 'Cleaning up orphaned space scopes',
+    });
+
+    for (const scope of orphanedScopes) {
+      const parsed = parseExternalId(scope.externalId ?? undefined);
+      assert.ok(parsed, `externalId was already validated for scope ${scope.id}`);
+
+      try {
+        const basePartialKey = `${parsed.spaceId}_${parsed.spaceKey}`;
+        const partialKey = useV1KeyFormat ? basePartialKey : `${this.tenantName}/${basePartialKey}`;
+
+        const deletedFileCount = await this.uniqueApiClient.files.deleteByKeyPrefix(partialKey);
+        await this.uniqueApiClient.scopes.delete(scope.id);
+
+        this.logger.log({
+          scopeId: scope.id,
+          spaceKey: parsed.spaceKey,
+          spaceId: parsed.spaceId,
+          deletedFileCount,
+          msg: 'Deleted orphaned space scope and its files',
+        });
+      } catch (error) {
+        this.logger.error({
+          scopeId: scope.id,
+          spaceKey: parsed.spaceKey,
+          error,
+          msg: 'Failed to clean up orphaned space scope',
+        });
+      }
+    }
   }
 }
