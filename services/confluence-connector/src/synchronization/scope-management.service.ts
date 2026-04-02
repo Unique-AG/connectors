@@ -2,7 +2,12 @@ import assert from 'node:assert';
 import type { Scope, UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
-import { buildExternalId, type ParsedExternalId, parseExternalId } from '../constants/external-id';
+import {
+  buildExternalId,
+  buildPartialKey,
+  type ParsedExternalId,
+  parseExternalId,
+} from '../utils/key-format';
 
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
@@ -103,10 +108,12 @@ export class ScopeManagementService {
 
     for (const { scope, parsed } of orphaned) {
       try {
-        const basePartialKey = `${parsed.spaceId}_${parsed.spaceKey}`;
-        const partialKey = this.ingestionConfig.useV1KeyFormat
-          ? basePartialKey
-          : `${this.tenantName}/${basePartialKey}`;
+        const partialKey = buildPartialKey(
+          this.tenantName,
+          parsed.spaceId,
+          parsed.spaceKey,
+          this.ingestionConfig.useV1KeyFormat,
+        );
 
         const deletedFileCount = await this.uniqueApiClient.files.deleteByKeyPrefix(partialKey);
         await this.uniqueApiClient.scopes.delete(scope.id);
@@ -138,7 +145,7 @@ export class ScopeManagementService {
     for (const child of children) {
       const parsed = parseExternalId(child.externalId ?? undefined);
       if (!parsed) {
-        this.logger.error({
+        this.logger.warn({
           scopeId: child.id,
           scopeName: child.name,
           externalId: child.externalId,

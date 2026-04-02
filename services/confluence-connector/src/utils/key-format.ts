@@ -29,3 +29,13 @@ export function parseExternalId(externalId: string | undefined): ParsedExternalI
 export function buildExternalId(tenantName: string, spaceId: string, spaceKey: string): string {
   return `${EXTERNAL_ID_PREFIX}${tenantName}:${spaceId}:${spaceKey}`;
 }
+
+export function buildPartialKey(
+  tenantName: string,
+  spaceId: string,
+  spaceKey: string,
+  useV1KeyFormat: boolean,
+): string {
+  const base = `${spaceId}_${spaceKey}`;
+  return useV1KeyFormat ? base : `${tenantName}/${base}`;
+}

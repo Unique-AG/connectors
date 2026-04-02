@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildExternalId, parseExternalId } from '../external-id';
+import { buildExternalId, buildPartialKey, parseExternalId } from '../key-format';
 
 describe('parseExternalId', () => {
   it('parses a valid external id with all four segments', () => {
@@ -49,5 +49,19 @@ describe('buildExternalId', () => {
       spaceId: 'abc-456',
       spaceKey: 'MKT',
     });
+  });
+});
+
+describe('buildPartialKey', () => {
+  it('returns base key without tenant prefix for V1 format', () => {
+    const result = buildPartialKey('my-tenant', 'space-123', 'ENG', true);
+
+    expect(result).toBe('space-123_ENG');
+  });
+
+  it('returns key with tenant prefix for V2 format', () => {
+    const result = buildPartialKey('my-tenant', 'space-123', 'ENG', false);
+
+    expect(result).toBe('my-tenant/space-123_ENG');
   });
 });

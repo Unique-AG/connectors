@@ -60,6 +60,7 @@ export class ConfluenceSynchronizationService {
         const spaceKeys = [
           ...new Set([
             ...pagesToFetch.map((p) => p.spaceKey),
+            // include attachment space keys for completeness and possible edge cases
             ...attachmentsToIngest.map((a) => a.spaceKey),
           ]),
         ];
