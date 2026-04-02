@@ -16,6 +16,7 @@ import {
   OWNER_TYPE,
   SOURCE_OWNER_TYPE,
 } from '../constants/ingestion.constants';
+import { buildPartialKey } from '../utils/key-format';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 export class IngestionService {
@@ -46,8 +47,13 @@ export class IngestionService {
     let contentId: string | undefined;
     try {
       const htmlBuffer = Buffer.from(page.body, 'utf-8');
-      const baseKey = `${page.spaceId}_${page.spaceKey}/${page.id}`;
-      const key = this.config.ingestion.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
+      const partialKey = buildPartialKey(
+        this.tenantName,
+        page.spaceId,
+        page.spaceKey,
+        this.config.ingestion.useV1KeyFormat,
+      );
+      const key = `${partialKey}/${page.id}`;
 
       const registrationRequest = this.buildPageRegistrationRequest(
         page,
@@ -93,8 +99,13 @@ export class IngestionService {
     let stream: Readable | undefined;
     let contentId: string | undefined;
     try {
-      const baseKey = `${attachment.spaceId}_${attachment.spaceKey}/${attachment.pageId}::${attachment.id}`;
-      const key = this.config.ingestion.useV1KeyFormat ? baseKey : `${this.tenantName}/${baseKey}`;
+      const partialKey = buildPartialKey(
+        this.tenantName,
+        attachment.spaceId,
+        attachment.spaceKey,
+        this.config.ingestion.useV1KeyFormat,
+      );
+      const key = `${partialKey}/${attachment.pageId}::${attachment.id}`;
 
       const registrationRequest = this.buildAttachmentRegistrationRequest(attachment, key, scopeId);
       const registrationResponse =

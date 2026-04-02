@@ -35,6 +35,7 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 const mockScopeManagementService = {
   initialize: vi.fn().mockResolvedValue('/Confluence'),
   ensureSpaceScopes: vi.fn().mockResolvedValue(new Map([['SP', 'scope-1']])),
+  cleanupRemovedSpaces: vi.fn().mockResolvedValue(undefined),
 } as unknown as ScopeManagementService;
 
 function createService(
@@ -363,10 +364,50 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(mockScopeManagementService.ensureSpaceScopes).toHaveBeenCalledWith('/Confluence', [
-        'SP2',
-      ]);
+      expect(mockScopeManagementService.ensureSpaceScopes).toHaveBeenCalledWith(
+        '/Confluence',
+        ['SP2'],
+        new Map([['SP2', 'space-2']]),
+      );
       expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(attachment, 'scope-2');
+    });
+
+    it('calls cleanupRemovedSpaces with discovered spaceKeys from pages and attachments', async () => {
+      const attachment: DiscoveredAttachment = {
+        id: 'att-1',
+        title: 'report.pdf',
+        mediaType: 'application/pdf',
+        fileSize: 1024,
+        downloadPath: '/download/attachments/1/report.pdf',
+        versionTimestamp: '2026-02-01T00:00:00.000Z',
+        pageId: '1',
+        spaceId: 'space-2',
+        spaceKey: 'SP2',
+        spaceName: 'Space 2',
+        webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP2/pages/1/attachments/att-1`,
+      };
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: discoveredPagesFixture,
+        attachments: [attachment],
+      });
+      vi.mocked(mockScopeManagementService.ensureSpaceScopes).mockResolvedValue(
+        new Map([
+          ['SP', 'scope-1'],
+          ['SP2', 'scope-2'],
+        ]),
+      );
+
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(mockScopeManagementService.cleanupRemovedSpaces).toHaveBeenCalledWith(
+        new Set(['SP', 'SP2']),
+      );
+    });
+
+    it('calls cleanupRemovedSpaces with page-only spaceKeys when no attachments exist', async () => {
+      await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(mockScopeManagementService.cleanupRemovedSpaces).toHaveBeenCalledWith(new Set(['SP']));
     });
 
     it('skips ingestion when fetchPageContent returns null', async () => {

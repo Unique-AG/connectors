@@ -11,8 +11,6 @@ export type EnabledDisabledMode = (typeof EnabledDisabledMode)[keyof typeof Enab
 
 export type IngestionMode = (typeof IngestionMode)[keyof typeof IngestionMode];
 
-export const EXTERNAL_ID_PREFIX = 'confc:' as const;
-
 export const IngestionSourceKind = {
   Cloud: 'ATLASSIAN_CONFLUENCE_CLOUD',
   DataCenter: 'ATLASSIAN_CONFLUENCE_ONPREM',
