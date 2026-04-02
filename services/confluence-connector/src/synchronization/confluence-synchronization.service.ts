@@ -1,6 +1,8 @@
 import assert from 'node:assert';
+import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
+import type { Metrics } from '../metrics';
 import { getCurrentTenant } from '../tenant';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
@@ -20,25 +22,37 @@ export class ConfluenceSynchronizationService {
     private readonly fileDiffService: FileDiffService,
     private readonly ingestionService: IngestionService,
     private readonly scopeManagementService: ScopeManagementService,
+    private readonly metrics: Metrics,
   ) {}
 
   public async synchronize(): Promise<void> {
     const tenant = getCurrentTenant();
 
     if (tenant.isScanning) {
-      this.logger.log({ tenantName: tenant.name, msg: 'Sync already in progress, skipping' });
+      this.logger.log({
+        tenantName: tenant.name,
+        msg: 'Sync already in progress, skipping',
+      });
       return;
     }
 
     tenant.isScanning = true;
+    const startTime = Date.now();
+    let syncResult: 'success' | 'failure' = 'success';
+
     try {
       this.logger.log({ tenantName: tenant.name, msg: 'Starting sync' });
 
       const rootScopePath = await this.scopeManagementService.initialize();
 
+      const scanStartTime = Date.now();
       const { pages: discoveredPages, attachments: discoveredAttachments } =
         await this.scanner.discoverPages();
-      this.logger.log({ count: discoveredPages.length, msg: 'Discovery completed' });
+      this.metrics.recordScanDuration(elapsedSeconds(scanStartTime));
+      this.logger.log({
+        count: discoveredPages.length,
+        msg: 'Discovery completed',
+      });
 
       const diffResult = await this.fileDiffService.computeDiff(
         discoveredPages,
@@ -81,9 +95,11 @@ export class ConfluenceSynchronizationService {
 
       this.logger.log({ msg: 'Sync work done' });
     } catch (error) {
+      syncResult = 'failure';
       this.logger.error({ err: error, msg: 'Sync failed' });
     } finally {
       tenant.isScanning = false;
+      this.metrics.recordSyncDuration(elapsedSeconds(startTime), syncResult);
     }
   }
 
@@ -100,9 +116,10 @@ export class ConfluenceSynchronizationService {
     }
 
     let processed = 0;
+    let ingested = 0;
     const total = pages.length;
 
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       pages.map((page) =>
         limit(async () => {
           const fetched = await this.contentFetcher.fetchPageContent(page);
@@ -113,16 +130,31 @@ export class ConfluenceSynchronizationService {
           const scopeId = spaceScopes.get(page.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
           await this.ingestionService.ingestPage(fetched, scopeId);
+          ingested++;
         }).finally(() => {
           processed++;
           if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
-            this.logger.log({ processed, total, msg: 'Page ingestion in progress' });
+            this.logger.log({
+              processed,
+              total,
+              msg: 'Page ingestion in progress',
+            });
           }
         }),
       ),
     );
 
-    this.logSettledResults(results, 'Page ingestion summary');
+    const failed = pages.length - ingested;
+
+    this.metrics.recordPagesProcessed(ingested, 'success');
+    this.metrics.recordPagesProcessed(failed, 'failure');
+
+    this.logger.log({
+      total: pages.length,
+      ingested,
+      failed,
+      msg: 'Page ingestion summary',
+    });
   }
 
   private async ingestAttachments(
@@ -138,27 +170,37 @@ export class ConfluenceSynchronizationService {
     let processed = 0;
     const total = attachments.length;
 
-    const results = await Promise.allSettled(
+    let ingested = 0;
+
+    await Promise.allSettled(
       attachments.map((attachment) =>
         limit(async () => {
           const scopeId = spaceScopes.get(attachment.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${attachment.spaceKey}`);
           await this.ingestionService.ingestAttachment(attachment, scopeId);
+          ingested++;
         }).finally(() => {
           processed++;
           if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
-            this.logger.log({ processed, total, msg: 'Attachment ingestion in progress' });
+            this.logger.log({
+              processed,
+              total,
+              msg: 'Attachment ingestion in progress',
+            });
           }
         }),
       ),
     );
 
-    this.logSettledResults(results, 'Attachment ingestion summary');
-  }
+    const failed = attachments.length - ingested;
+    this.metrics.recordAttachmentsProcessed(ingested, 'success');
+    this.metrics.recordAttachmentsProcessed(failed, 'failure');
 
-  private logSettledResults(results: PromiseSettledResult<void>[], msg: string): void {
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
-    this.logger.log({ total: results.length, succeeded, failed, msg });
+    this.logger.log({
+      total: attachments.length,
+      ingested,
+      failed,
+      msg: 'Attachment ingestion summary',
+    });
   }
 }
