@@ -1,3 +1,4 @@
+import { isObjectType } from 'remeda';
 import { serializeError } from 'serialize-error-cjs';
 
 export function normalizeError(error: unknown): Error {
@@ -31,6 +32,56 @@ export function normalizeError(error: unknown): Error {
   }
 }
 
+interface GraphqlClientErrorShape extends Error {
+  response: {
+    errors?: Array<{
+      message: string;
+      path?: (string | number)[];
+      extensions?: Record<string, unknown>;
+    }>;
+    status?: number;
+  };
+  request: {
+    query?: string;
+    variables?: Record<string, unknown>;
+  };
+}
+
+function isGraphqlClientError(error: unknown): error is GraphqlClientErrorShape {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  // Error type doesn't have any extra properties and here we are checking if they are actually here
+  // and of type we expect, so we have to hard type-cast so TypeScript doesn't complain.
+  const record = error as unknown as Record<string, unknown>;
+  return isObjectType(record.response) && isObjectType(record.request);
+}
+
+/**
+ * Serialises an error for structured logging.
+ *
+ * For `graphql-request` `ClientError` instances the full request payload
+ * (query + raw variables) that the library embeds in `message` / `stack` is
+ * stripped and replaced with structured `graphqlErrors` and `statusCode`
+ * fields, so unsanitised variables never reach the logs.
+ */
 export function sanitizeError(error: unknown): object {
+  if (isGraphqlClientError(error)) {
+    const jsonDumpStart = error.message.indexOf(': {"response":');
+    const baseMessage = jsonDumpStart >= 0 ? error.message.slice(0, jsonDumpStart) : error.message;
+
+    return {
+      name: error.name,
+      message: baseMessage,
+      stack: error.stack?.replace(error.message, baseMessage),
+      graphqlErrors: error.response.errors?.map((e) => ({
+        message: e.message,
+        path: e.path,
+        code: e.extensions?.code,
+      })),
+      statusCode: error.response.status,
+    };
+  }
+
   return serializeError(normalizeError(error));
 }

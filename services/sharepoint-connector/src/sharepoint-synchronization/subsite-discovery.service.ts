@@ -39,7 +39,7 @@ export class SubsiteDiscoveryService {
 
       if (excludeSiteIds.has(site.id)) {
         this.logger.warn(
-          `Skipping subsite ${site.id} and its descendants — it is already configured as a standalone site`,
+          `Skipping subsite ${createSmeared(site.id)} and its descendants — it is already configured as a standalone site`,
         );
         continue;
       }

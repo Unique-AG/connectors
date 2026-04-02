@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { regexes } from 'zod';
 import type { Config } from '../config';
+import { LogsDiagnosticDataPolicy } from '../config/app.config';
 export const EXTERNAL_ID_PREFIX = 'spc:' as const;
 export const PENDING_DELETE_PREFIX = 'spc:pending-delete:' as const;
 
@@ -59,6 +60,20 @@ export function smearSiteIdFromPath(path: string): string {
   });
 }
 
-export function shouldConcealLogs(configService: ConfigService<Config, true>): boolean {
-  return configService.get('app.logsDiagnosticsDataPolicy', { infer: true }) === 'conceal';
+/**
+ * Returns `true` when the logging policy allows full disclosure of diagnostic
+ * data (i.e. no smearing).
+ *
+ * When a `ConfigService` is provided the value is read through the validated
+ * NestJS config layer; otherwise it falls back to reading `process.env`
+ * directly (useful in pure utility functions that have no DI context).
+ */
+export function shouldDiscloseLogs(configService?: ConfigService<Config, true>): boolean {
+  if (configService) {
+    return (
+      configService.get('app.logsDiagnosticsDataPolicy', { infer: true }) ===
+      LogsDiagnosticDataPolicy.DISCLOSE
+    );
+  }
+  return process.env.LOGS_DIAGNOSTICS_DATA_POLICY === LogsDiagnosticDataPolicy.DISCLOSE;
 }

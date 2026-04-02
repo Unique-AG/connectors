@@ -1,4 +1,5 @@
 import { gql } from 'graphql-request';
+import type { VariableLogPolicy } from '../../utils/sanitize-graphql-variables';
 import type { UniqueFile, UniqueFileAccessInput } from './unique-files.types';
 
 export interface ContentUpdateMutationInput {
@@ -16,6 +17,8 @@ export interface ContentUpdateMutationResult {
     ownerType: string;
   };
 }
+
+export const CONTENT_UPDATE_LOG_SAFE_KEYS: VariableLogPolicy = ['contentId', 'ownerId'];
 
 export const CONTENT_UPDATE_MUTATION = gql`
   mutation ContentUpdate($contentId: String!, $ownerId: String, $input: ContentUpdateInput!) {
@@ -35,6 +38,8 @@ export interface ContentDeleteMutationResult {
   contentDelete: boolean;
 }
 
+export const CONTENT_DELETE_LOG_SAFE_KEYS: VariableLogPolicy = ['contentDeleteId'];
+
 export const CONTENT_DELETE_MUTATION = gql`
   mutation ContentDelete($contentDeleteId: String!) {
     contentDelete(id: $contentDeleteId)
@@ -50,6 +55,8 @@ export interface ContentDeleteByContentIdsMutationResult {
     id: string;
   }[];
 }
+
+export const CONTENT_DELETE_BY_IDS_LOG_SAFE_KEYS: VariableLogPolicy = ['contentIds'];
 
 export const CONTENT_DELETE_BY_IDS_MUTATION = gql`
   mutation ContentDeleteByContentIds($contentIds: [String!]!) {
@@ -76,6 +83,8 @@ export interface PaginatedContentQueryResult {
     totalCount: number;
   };
 }
+
+export const PAGINATED_CONTENT_LOG_SAFE_KEYS: VariableLogPolicy = ['skip', 'take'];
 
 export const PAGINATED_CONTENT_QUERY = gql`
   query PaginatedContent($skip: Int!, $take: Int!, $where: ContentWhereInput) {
@@ -109,6 +118,8 @@ export interface PaginatedContentCountQueryResult {
 
 // The GraphQL API doesn't have an optimization for count-only queries, so we pass 0 for both
 // skip and take to avoid fetching any items while still getting the total count.
+export const PAGINATED_CONTENT_COUNT_LOG_SAFE_KEYS: VariableLogPolicy = [];
+
 export const PAGINATED_CONTENT_COUNT_QUERY = gql`
   query PaginatedContentCount($where: ContentWhereInput) {
     paginatedContent(where: $where, skip: 0, take: 0) {
@@ -125,6 +136,12 @@ export interface AddAccessesMutationInput {
 export interface AddAccessesMutationResult {
   createFileAccessesForContents: boolean;
 }
+
+export const FILE_ACCESSES_LOG_SAFE_KEYS: VariableLogPolicy = [
+  'scopeId',
+  'fileAccesses.accessType',
+  'fileAccesses.entityType',
+];
 
 export const ADD_ACCESSES_MUTATION = gql`
   mutation CreateFileAccessesForContents($scopeId: String!, $fileAccesses: [FileAccessContentChangeDto!]!) {

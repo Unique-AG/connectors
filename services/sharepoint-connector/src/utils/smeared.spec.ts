@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { LogsDiagnosticDataPolicy } from '../config/app.config';
-import { createSmeared, isSmearingActive, Smeared } from './smeared';
+import { createSmeared, Smeared } from './smeared';
 
 describe('Smeared', () => {
   describe('constructor and getters', () => {
@@ -141,36 +141,6 @@ describe('Smeared', () => {
       const smeared = createSmeared('test-value');
 
       expect(smeared.active).toBe(true);
-    });
-  });
-
-  describe('isSmearingActive() helper', () => {
-    beforeEach(() => {
-      delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
-    });
-
-    it('returns true when env is CONCEAL', () => {
-      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.CONCEAL;
-
-      expect(isSmearingActive()).toBe(true);
-    });
-
-    it('returns false when env is DISCLOSE', () => {
-      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.DISCLOSE;
-
-      expect(isSmearingActive()).toBe(false);
-    });
-
-    it('returns true when env is not set', () => {
-      delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
-
-      expect(isSmearingActive()).toBe(true);
-    });
-
-    it('returns true when env is invalid value', () => {
-      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = 'invalid-value';
-
-      expect(isSmearingActive()).toBe(true);
     });
   });
 
