@@ -85,7 +85,7 @@ export class UniqueScopesService {
 
   public async updateScopeExternalId(
     scopeId: string,
-    externalId: Smeared,
+    externalId: Smeared | null,
   ): Promise<{ id: string; externalId: string | null }> {
     const result = await this.scopeManagementClient.request<
       UpdateScopeMutationResult,
@@ -94,7 +94,7 @@ export class UniqueScopesService {
       UPDATE_SCOPE_MUTATION,
       {
         id: scopeId,
-        input: { externalId: externalId.value },
+        input: { externalId: externalId?.value ?? null },
       },
       { logSafeKeys: UPDATE_SCOPE_LOG_SAFE_KEYS },
     );

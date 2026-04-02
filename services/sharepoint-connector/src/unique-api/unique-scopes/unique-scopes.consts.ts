@@ -150,7 +150,7 @@ export const PAGINATED_SCOPE_QUERY = gql`
 export interface UpdateScopeMutationInput {
   id: string;
   input: {
-    externalId?: string;
+    externalId?: string | null;
     // There's a typo in Unique API: "parrent" instead of "parent"
     parrentScope?: {
       connect: {
