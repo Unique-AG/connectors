@@ -1071,6 +1071,37 @@ describe('SharepointSynchronizationService', () => {
     expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledWith(siteConfig.siteId);
   });
 
+  it('does not initialize root scope when getSiteInfo fails', async () => {
+    mockGraphApiService.getSiteInfo = vi.fn().mockRejectedValue(new Error('Site not found'));
+
+    const result = await service.synchronize();
+
+    expect(result.status).toBe('success');
+    expect(mockGraphApiService.getSiteInfo).toHaveBeenCalled();
+    expect(mockScopeManagementService.initializeRootScope).not.toHaveBeenCalled();
+    expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
+  });
+
+  it('calls getSiteInfo before initializeRootScope', async () => {
+    const callOrder: string[] = [];
+    mockGraphApiService.getSiteInfo = vi.fn().mockImplementation(async () => {
+      callOrder.push('getSiteInfo');
+      return { siteName: new Smeared('test-site-name', false), managedPath: 'sites' };
+    });
+    mockScopeManagementService.initializeRootScope = vi.fn().mockImplementation(async () => {
+      callOrder.push('initializeRootScope');
+      return {
+        serviceUserId: 'user-123',
+        rootPath: new Smeared('/test-root', false),
+        isInitialSync: false,
+      };
+    });
+
+    await service.synchronize();
+
+    expect(callOrder).toEqual(['getSiteInfo', 'initializeRootScope']);
+  });
+
   it('ensures unique scopeIds and logs errors for duplicates', async () => {
     const site1 = createMockSiteConfig({
       siteId: new Smeared('site-1', false),
