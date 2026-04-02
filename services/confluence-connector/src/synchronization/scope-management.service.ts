@@ -81,6 +81,13 @@ export class ScopeManagementService {
   }
 
   public async cleanupRemovedSpaces(discoveredSpaceKeys: Set<string>): Promise<void> {
+    if (discoveredSpaceKeys.size === 0) {
+      this.logger.warn({
+        msg: 'Skipping space cleanup because discovery returned zero spaces. This could indicate a Confluence API issue.',
+      });
+      return;
+    }
+
     const children = await this.uniqueApiClient.scopes.listChildren(this.ingestionConfig.scopeId);
 
     const orphaned = this.identifyOrphanedScopes(children, discoveredSpaceKeys);
@@ -115,7 +122,7 @@ export class ScopeManagementService {
         this.logger.error({
           scopeId: scope.id,
           spaceKey: parsed.spaceKey,
-          error,
+          err: error,
           msg: 'Failed to clean up orphaned space scope',
         });
       }

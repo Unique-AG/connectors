@@ -200,6 +200,14 @@ describe('ScopeManagementService', () => {
   });
 
   describe('cleanupRemovedSpaces', () => {
+    it('skips cleanup when discovery returned zero spaces', async () => {
+      const { service, scopes } = makeService();
+
+      await service.cleanupRemovedSpaces(new Set());
+
+      expect(scopes.listChildren).not.toHaveBeenCalled();
+    });
+
     const orphanedScope = {
       id: 'scope-old',
       name: 'OLD',
@@ -240,7 +248,7 @@ describe('ScopeManagementService', () => {
       const scopeWithoutExtId = { id: 'scope-no-ext', name: 'NO_EXT', externalId: null };
       scopes.listChildren.mockResolvedValue([scopeWithoutExtId]);
 
-      await service.cleanupRemovedSpaces(new Set());
+      await service.cleanupRemovedSpaces(new Set(['UNRELATED']));
 
       expect(files.deleteByKeyPrefix).not.toHaveBeenCalled();
       expect(scopes.delete).not.toHaveBeenCalled();
@@ -255,7 +263,7 @@ describe('ScopeManagementService', () => {
       };
       scopes.listChildren.mockResolvedValue([scopeWithOldFormat]);
 
-      await service.cleanupRemovedSpaces(new Set());
+      await service.cleanupRemovedSpaces(new Set(['UNRELATED']));
 
       expect(files.deleteByKeyPrefix).not.toHaveBeenCalled();
       expect(scopes.delete).not.toHaveBeenCalled();
@@ -273,7 +281,7 @@ describe('ScopeManagementService', () => {
         .mockRejectedValueOnce(new Error('API failure'))
         .mockResolvedValueOnce(3);
 
-      await service.cleanupRemovedSpaces(new Set());
+      await service.cleanupRemovedSpaces(new Set(['UNRELATED']));
 
       expect(files.deleteByKeyPrefix).toHaveBeenCalledTimes(2);
       expect(scopes.delete).toHaveBeenCalledWith('scope-second');
@@ -295,7 +303,7 @@ describe('ScopeManagementService', () => {
       scopes.listChildren.mockResolvedValue([orphanedScope]);
       files.deleteByKeyPrefix.mockResolvedValue(2);
 
-      await service.cleanupRemovedSpaces(new Set());
+      await service.cleanupRemovedSpaces(new Set(['UNRELATED']));
 
       expect(files.deleteByKeyPrefix).toHaveBeenCalledWith('old-space-id_OLD');
     });
@@ -305,7 +313,7 @@ describe('ScopeManagementService', () => {
       scopes.listChildren.mockResolvedValue([orphanedScope]);
       files.deleteByKeyPrefix.mockResolvedValue(2);
 
-      await service.cleanupRemovedSpaces(new Set());
+      await service.cleanupRemovedSpaces(new Set(['UNRELATED']));
 
       expect(files.deleteByKeyPrefix).toHaveBeenCalledWith(`${TENANT_NAME}/old-space-id_OLD`);
     });
