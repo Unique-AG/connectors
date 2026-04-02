@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
+import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import {
   InboxConfigurationMailFilters,
@@ -31,6 +32,7 @@ export class LiveCatchUpCommand {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly ingestEmailCommand: IngestEmailCommand,
     private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -40,8 +42,8 @@ export class LiveCatchUpCommand {
     messageIds = [],
   }: {
     subscriptionId: string;
-    messageIds?: string[];
-  }): Promise<void> {
+    messageIds: string[];
+  }): Promise<'skipped' | 'completed' | 'failed'> {
     traceAttrs({ subscriptionId });
     this.logger.log({
       subscriptionId,
@@ -56,7 +58,7 @@ export class LiveCatchUpCommand {
 
     if (!subscription) {
       this.logger.warn({ subscriptionId, msg: 'Subscription not found, skipping' });
-      return;
+      return 'skipped';
     }
 
     const { userProfileId } = subscription;
@@ -64,7 +66,7 @@ export class LiveCatchUpCommand {
 
     const lockResult = await this.acquireLock(userProfileId, messageIds);
     if (lockResult.status === 'skip') {
-      return;
+      return 'skipped';
     }
 
     const { watermark, filters } = lockResult;
@@ -78,18 +80,19 @@ export class LiveCatchUpCommand {
         filters,
       });
 
-      const flushedCount = await this.flushPendingMessages({
+      const messagesToFlush = messageIds.filter((messageId) => !processedIds.has(messageId));
+      await this.flushMessagesNotCoughtLiveCatchup({
         userProfileId,
         filters,
-        alreadyProcessedIds: processedIds,
+        messageIds: messageIds.filter((messageId) => !processedIds.has(messageId)),
       });
 
       this.logger.log({
         userProfileId,
         subscriptionId,
-        totalProcessed: processedIds.size + flushedCount,
+        totalProcessed: processedIds.size + messagesToFlush.length,
         fromBatches: processedIds.size,
-        fromPendingFlush: flushedCount,
+        fromPendingFlush: messagesToFlush.length,
         msg: 'Live catch-up completed',
       });
       await this.db
@@ -97,6 +100,7 @@ export class LiveCatchUpCommand {
         .set({ liveCatchUpState: 'ready', liveCatchUpHeartbeatAt: sql`NOW()` })
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .execute();
+      return 'completed';
     } catch (error) {
       this.logger.error({
         err: error,
@@ -109,6 +113,7 @@ export class LiveCatchUpCommand {
         .set({ liveCatchUpState: 'failed', liveCatchUpHeartbeatAt: sql`NOW()` })
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .execute();
+      return 'failed';
     }
   }
 
@@ -146,8 +151,6 @@ export class LiveCatchUpCommand {
         await tx
           .update(inboxConfigurations)
           .set({
-            // Note: array_cat -> maintains the order of the array so if we change the function we should ensure ordering
-            // because the flushing operation depends on the array to have the same order.
             pendingLiveMessageIds: sql`array_cat(${inboxConfigurations.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
           })
           .where(eq(inboxConfigurations.userProfileId, userProfileId))
@@ -185,13 +188,6 @@ export class LiveCatchUpCommand {
       await tx
         .update(inboxConfigurations)
         .set({
-          ...(messageIds.length > 0
-            ? {
-                // Note: array_cat -> maintains the order of the array so if we change the function we should ensure ordering
-                // because the flushing operation depends on the array to have the same order.
-                pendingLiveMessageIds: sql`array_cat(${inboxConfigurations.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
-              }
-            : {}),
           liveCatchUpState: 'running',
           liveCatchUpHeartbeatAt: sql`NOW()`,
         })
@@ -220,6 +216,13 @@ export class LiveCatchUpCommand {
     const processedIds = new Set<string>();
     let batchNumber = 0;
 
+    // We overlap with x minutes to ensure we get all changes because Microsoft has a highly
+    // distributed system and they rely on eventual concistency, this is not ideal but the
+    // other approach is equaly as bad as the current one because -> we would need to watch
+    // every folder than each time a new folder appears we need to subscribe to changes to
+    // that specific folder.
+    watermark.setMinutes(watermark.getMinutes() - this.config.liveCatchupOverlappingWindowMinutes);
+
     let emailsRaw = await client
       .api('me/messages')
       .header('Prefer', 'IdType="ImmutableId"')
@@ -231,6 +234,16 @@ export class LiveCatchUpCommand {
       .top(200)
       .get();
     let emailResponse = liveCatchUpGraphMessageResponseSchema.parse(emailsRaw);
+    console.log(`__STATS`, {
+      ts: watermark.toISOString(),
+      itemsLeng: emailResponse.value.length,
+      first: new Date(
+        Math.min(...emailResponse.value.map((it) => new Date(it.lastModifiedDateTime).getTime())),
+      ).toISOString(),
+      last: new Date(
+        Math.max(...emailResponse.value.map((it) => new Date(it.lastModifiedDateTime).getTime())),
+      ).toISOString(),
+    });
 
     while (true) {
       batchNumber++;
@@ -285,61 +298,33 @@ export class LiveCatchUpCommand {
     return processedIds;
   }
 
-  private async flushPendingMessages({
+  private async flushMessagesNotCoughtLiveCatchup({
     userProfileId,
     filters,
-    alreadyProcessedIds,
+    messageIds,
   }: {
     userProfileId: string;
     filters: InboxConfigurationMailFilters;
-    alreadyProcessedIds: Set<string>;
-  }): Promise<number> {
-    const idsToFlush = await this.db
-      .select({ pendingLiveMessageIds: inboxConfigurations.pendingLiveMessageIds })
-      .from(inboxConfigurations)
-      .where(eq(inboxConfigurations.userProfileId, userProfileId))
-      .then((rows) => rows?.[0]?.pendingLiveMessageIds ?? []);
-
-    if (idsToFlush.length === 0) {
-      return 0;
+    messageIds: string[];
+  }): Promise<void> {
+    if (messageIds.length === 0) {
+      return;
     }
 
     this.logger.debug({
-      msg: `Flushing buffered messages while running: ${idsToFlush.length}`,
+      msg: `Flushing left over messages: ${messageIds.length}`,
     });
 
-    let index = 0;
-    let processedMessages = 0;
-
-    try {
-      for (; index < idsToFlush.length; index++) {
-        const messageId = idsToFlush[index];
-        if (!messageId || alreadyProcessedIds.has(messageId)) {
-          continue;
-        }
-        processedMessages++;
-        const result = await this.ingestEmailCommand.run({ userProfileId, messageId, filters });
-        if (result === 'failed') {
-          this.logger.warn({
-            userProfileId,
-            messageId,
-            msg: 'Email ingestion failed during flush, continuing',
-          });
-        }
+    for (const messageId of messageIds) {
+      const result = await this.ingestEmailCommand.run({ userProfileId, messageId, filters });
+      if (result === 'failed') {
+        this.logger.warn({
+          userProfileId,
+          messageId,
+          msg: 'Email ingestion failed during flush, continuing',
+        });
       }
-    } finally {
-      // We do this on finally because we want to cleanup what we processed if this.ingestEmailCommand.run throws.
-      // index is the JS 0-based position of the element that threw (or idsToFlush.length on normal completion).
-      // PG arrays are 1-indexed, so arr[index+1:] drops the first `index` elements and keeps the rest.
-      await this.db
-        .update(inboxConfigurations)
-        .set({
-          pendingLiveMessageIds: sql`${inboxConfigurations.pendingLiveMessageIds}[${index + 1}:]`,
-        })
-        .where(eq(inboxConfigurations.userProfileId, userProfileId));
     }
-
-    return processedMessages;
   }
 
   private async updateWatermarks({

@@ -145,6 +145,7 @@ mcpConfig:
     # -- Optional. Whether to buffer logs before writing. To override:
     # bufferLogs: enabled
     # Or set env var directly: APP_BUFFER_LOGS=enabled
+    liveCatchupOverlappingWindowMinutes: 5
 
   # -- Optional log settings. To override:
   # logs:

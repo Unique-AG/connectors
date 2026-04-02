@@ -154,6 +154,7 @@ function createCommand({
     createMockGraphClientFactory(graphApi) as any,
     ingestEmailCommand as any,
     syncDirectories as any,
+    { liveCatchupOverlappingMinutes: 5 } as any,
     db as any,
   );
 }
