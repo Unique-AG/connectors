@@ -13,6 +13,7 @@ import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
+import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 
 type InboxConfig = typeof inboxConfigurations.$inferSelect;
 
@@ -45,6 +46,15 @@ export class FullSyncCommand {
 
   @Span()
   public async run(userProfileId: string): Promise<FullSyncResult> {
+    return await withRetryAttempts({
+      fn: () => this.runFullSync(userProfileId),
+      onError: rethrowRateLimitError,
+      getResultFailure: (error) => ({ status: 'failed', error }),
+    });
+  }
+
+  @Span()
+  public async runFullSync(userProfileId: string): Promise<FullSyncResult> {
     traceAttrs({ userProfileId });
     this.logger.log({ userProfileId, msg: 'Full sync triggered' });
 

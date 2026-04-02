@@ -24,6 +24,7 @@ import {
   graphMessagesResponseSchema,
 } from '../../process-email/dtos/microsoft-graph.dtos';
 import { ProcessEmailCommand } from '../../process-email/process-email.command';
+import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 
 export const RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES = 20;
 export const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
@@ -42,7 +43,19 @@ export class LiveCatchUpCommand {
   ) {}
 
   @Span()
-  public async run({
+  public async run(input: {
+    liveCatchupOverlappingWindow: number;
+    subscriptionId: string;
+  }): Promise<void> {
+    await withRetryAttempts({
+      fn: () => this.runLiveCatchup(input),
+      onError: rethrowRateLimitError,
+      getResultFailure: () => 'failed',
+    });
+  }
+
+  @Span()
+  public async runLiveCatchup({
     subscriptionId,
     liveCatchupOverlappingWindow,
   }: {

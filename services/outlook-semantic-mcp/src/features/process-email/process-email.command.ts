@@ -26,9 +26,7 @@ import { UpsertDirectoryCommand } from '../directories-sync/upsert-directory.com
 import { GraphMessage } from './dtos/microsoft-graph.dtos';
 import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
 import { shouldSkipEmail } from './utils/should-skip-email';
-
-const MAX_RETRIES = 3;
-const BASE_BACKOFF_MS = 500;
+import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 
 export type MessageIngestionResult =
   | 'ingested'
@@ -73,48 +71,26 @@ export class ProcessEmailCommand {
     private readonly upsertDirectoryCommand: UpsertDirectoryCommand,
   ) {}
 
+  @Span()
   public async run(input: ProcessEmailCommandInput): Promise<MessageIngestionResult | 'failed'> {
-    const logContext = {
-      messageId: input.graphMessage.id,
-      internetId: input.graphMessage.internetMessageId ?? undefined,
-      userProfileId: input.user.profileId,
-      providerUserId: input.user.providerId,
-      userEmail: input.user.email.toString(),
-    };
-    // Do this retry attempts matter now ? maybe we should do it upper ? because here we read nothing so
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        return await this.processEmail({ ...input, baseLogContext: logContext });
-      } catch (error) {
-        // If it's the last attempt and we are rate limited we throw the error again.
-        if (attempt >= MAX_RETRIES && isRateLimitError(error)) {
-          throw error;
-        }
-
-        this.logger.warn({
-          ...logContext,
-          err: error,
-          attempt,
-          msg: `Ingestion attempt ${attempt}/${MAX_RETRIES} failed`,
-        });
-        if (attempt < MAX_RETRIES) {
-          await this.sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
-        }
-      }
-    }
-    this.logger.error({
-      ...logContext,
-      msg: `Ingestion failed after ${MAX_RETRIES} retries`,
+    return await withRetryAttempts({
+      fn: () => {
+        const logContext = {
+          messageId: input.graphMessage.id,
+          internetId: input.graphMessage.internetMessageId ?? undefined,
+          userProfileId: input.user.profileId,
+          providerUserId: input.user.providerId,
+          userEmail: input.user.email.toString(),
+        };
+        return this.runProcessEmail({ ...input, baseLogContext: logContext });
+      },
+      onError: rethrowRateLimitError,
+      getResultFailure: () => 'failed',
     });
-    return 'failed';
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   @Span()
-  private async processEmail({
+  private async runProcessEmail({
     graphMessage,
     file,
     fileKey,
