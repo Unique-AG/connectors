@@ -12,7 +12,7 @@ vi.mock('../../mail-ingestion/utils/should-skip-email', () => ({
   shouldSkipEmail: vi.fn().mockReturnValue({ skip: false }),
 }));
 
-import { shouldSkipEmail } from '../../mail-ingestion/utils/should-skip-email';
+import { shouldSkipEmail } from '../../process-email/utils/should-skip-email';
 
 // ---------------------------------------------------------------------------
 // Helpers

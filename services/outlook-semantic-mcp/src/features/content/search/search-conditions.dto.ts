@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
 import { first } from 'remeda';
 import { z } from 'zod';
-import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
+import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { clampToValidDate } from '~/utils/clamp-to-valid-date';
 
 export const CONTAINS_ANY_OPERATOR = 'containsAny' as const;

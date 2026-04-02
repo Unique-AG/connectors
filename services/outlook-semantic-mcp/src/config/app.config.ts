@@ -43,7 +43,7 @@ const ConfigSchema = z
       // 2. 2-3 minutes you will get almost all messages it's a very low chance to lose anything
       // 3.   5 minutes you are 99% you get everything if there are big outages you will probably lose some messages but the change is quite low
       .min(2)
-      .prefault(5)
+      .prefault(3)
       .describe('How many minutes should each live catchup run overlap the previous one'),
   })
   .transform((c) => ({

@@ -14,7 +14,7 @@ import {
   SystemDirectoryType,
   userProfiles,
 } from '~/db';
-import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
+import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import {
   getRootScopeExternalId,
   getRootScopeExternalIdForUser,

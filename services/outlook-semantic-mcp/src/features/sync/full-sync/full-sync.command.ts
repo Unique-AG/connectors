@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
@@ -48,11 +48,29 @@ export class FullSyncCommand {
     traceAttrs({ userProfileId });
     this.logger.log({ userProfileId, msg: 'Full sync triggered' });
 
-    const lockResult = await this.acquireLockAndDecide(userProfileId);
+    const userProfile = await this.db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userProfileId),
+    });
+    if (!userProfile) {
+      return { status: 'skipped', reason: `User profile not found for: ${userProfileId}` };
+    }
+    const userProfileEmail = userProfile.email;
+    if (!userProfileEmail) {
+      return {
+        status: 'skipped',
+        reason: `User profile with id: ${userProfile.id} does not have an email`,
+      };
+    }
+
+    const lockResult = await this.acquireLockAndDecide(userProfile.id);
 
     if (lockResult.action === 'skip') {
       traceEvent('full sync skipped', { reason: lockResult.reason });
-      this.logger.log({ userProfileId, reason: lockResult.reason, msg: 'Full sync skipped' });
+      this.logger.log({
+        userProfileId: userProfile.id,
+        reason: lockResult.reason,
+        msg: 'Full sync skipped',
+      });
       return { status: 'skipped', reason: lockResult.reason };
     }
 
@@ -63,7 +81,7 @@ export class FullSyncCommand {
     // and we will push them through the queue then here we should check what happens in our scope.
     if (['waiting-for-ingestion', 'running'].includes(previousState)) {
       const ingestionVerificationResult = await this.verifyIngestionStatus({
-        userProfileId,
+        userProfileId: userProfile.id,
         version,
       });
 
@@ -74,41 +92,49 @@ export class FullSyncCommand {
 
     try {
       if (lockResult.shouldFetchCount) {
-        await this.fetchAndSaveExpectedTotal(userProfileId, version, filters);
+        await this.fetchAndSaveExpectedTotal(userProfile.id, version, filters);
       }
-      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfileId));
+      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
 
       const batchResult = await this.processFullSyncBatchCommand.run({
-        userProfileId,
+        userProfile: { ...userProfile, email: userProfileEmail },
         version,
       });
 
       switch (batchResult.outcome) {
         case 'version-mismatch':
         case 'missing-full-sync-next-link':
-          this.logger.log({ userProfileId, version, msg: `Exiting: ${batchResult.outcome}` });
+          this.logger.log({
+            userProfileId: userProfile.id,
+            version,
+            msg: `Exiting: ${batchResult.outcome}`,
+          });
           return { status: 'skipped', reason: 'version-mismatch' };
 
         case 'batch-uploaded': {
           const newStateSaved = await this.transitionState(
-            userProfileId,
+            userProfile.id,
             version,
             'waiting-for-ingestion',
           );
           if (!newStateSaved) {
             this.logger.warn({
-              userProfileId,
+              userProfileId: userProfile.id,
               version,
               msg: 'Version mismatch after batch upload',
             });
             return { status: 'skipped', reason: 'version-mismatch' };
           }
-          this.logger.log({ userProfileId, version, msg: 'Batch uploaded, waiting for ingestion' });
+          this.logger.log({
+            userProfileId: userProfile.id,
+            version,
+            msg: 'Batch uploaded, waiting for ingestion',
+          });
           return { status: 'waiting-for-ingestion' };
         }
 
         case 'completed': {
-          const updated = await this.updateByVersionCommand.run(userProfileId, version, {
+          const updated = await this.updateByVersionCommand.run(userProfile.id, version, {
             fullSyncState: 'ready',
             fullSyncLastRunAt: new Date(),
             fullSyncNextLink: null,
@@ -117,13 +143,13 @@ export class FullSyncCommand {
           });
           if (!updated) {
             this.logger.warn({
-              userProfileId,
+              userProfileId: userProfile.id,
               version,
               msg: 'Version mismatch on completion update',
             });
             return { status: 'skipped', reason: 'version-mismatch' };
           }
-          this.logger.log({ userProfileId, version, msg: 'Full sync completed' });
+          this.logger.log({ userProfileId: userProfile.id, version, msg: 'Full sync completed' });
           return { status: 'completed' };
         }
 
@@ -184,7 +210,8 @@ export class FullSyncCommand {
         updateSet.fullSyncScheduledForIngestion = 0;
         updateSet.fullSyncFailedToUploadForIngestion = 0;
         updateSet.fullSyncExpectedTotal = null;
-        updateSet.oldestCreatedDateTime = null;
+        updateSet.oldestReceivedEmailDateTime = null;
+        updateSet.newestReceivedEmailDateTime = null;
         updateSet.newestLastModifiedDateTime = row.newestLastModifiedDateTime ?? now;
       }
 
@@ -249,7 +276,7 @@ export class FullSyncCommand {
       const filters = inboxConfigurationMailFilters.parse(filtersRaw);
       const count = (await client
         .api('me/messages/$count')
-        .filter(`createdDateTime gt ${filters.ignoredBefore.toISOString()}`)
+        .filter(`receivedDateTime ge ${filters.ignoredBefore.toISOString()}`)
         .header('Prefer', 'IdType="ImmutableId"')
         .header('ConsistencyLevel', 'eventual')
         .get()) as number;
