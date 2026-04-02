@@ -199,7 +199,7 @@ export class SharepointSynchronizationService {
     const logPrefix = `[Site: ${siteConfig.siteId}]`;
 
     this.logger.log(
-      `${logPrefix} Processing site marked for deletion (ScopeId: ${siteConfig.scopeId})`,
+      `${logPrefix} Processing deleted site - resetting root scope (ScopeId: ${siteConfig.scopeId})`,
     );
 
     try {
@@ -213,12 +213,12 @@ export class SharepointSynchronizationService {
       }
 
       await this.uniqueFilesService.deleteFilesBySiteId(siteConfig.siteId);
-      await this.scopeManagementService.deleteRootScopeRecursively(siteConfig.scopeId);
+      await this.scopeManagementService.resetRootScope(siteConfig.scopeId);
 
-      this.logger.log(`${logPrefix} Successfully processed deletion`);
+      this.logger.log(`${logPrefix} Successfully reset root scope`);
     } catch (error) {
       this.logger.error({
-        msg: `${logPrefix} Failed to process site deletion. Continuing with other sites`,
+        msg: `${logPrefix} Failed to reset root scope. Continuing with other sites`,
         scopeId: siteConfig.scopeId,
         error: sanitizeError(error),
       });
