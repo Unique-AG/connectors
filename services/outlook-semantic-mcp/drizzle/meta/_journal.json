@@ -169,6 +169,13 @@
       "when": 1774252892415,
       "tag": "0023_sharp_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1775132757155,
+      "tag": "0024_petite_masque",
+      "breakpoints": true
     }
   ]
 }

@@ -27,7 +27,7 @@ import { ProcessEmailCommand } from '../../process-email/process-email.command';
 
 export const RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES = 20;
 export const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
-export const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 60 * 4;
+export const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 30;
 
 @Injectable()
 export class LiveCatchUpCommand {
@@ -48,7 +48,7 @@ export class LiveCatchUpCommand {
   }: {
     liveCatchupOverlappingWindow: number;
     subscriptionId: string;
-  }): Promise<'skipped' | 'completed' | 'failed'> {
+  }): Promise<void> {
     traceAttrs({ subscriptionId });
     this.logger.log({
       subscriptionId,
@@ -65,14 +65,14 @@ export class LiveCatchUpCommand {
       .innerJoin(userProfiles, eq(subscriptions.userProfileId, userProfiles.id))
       .then((rows) => rows[0]);
     if (!userProfile) {
-      return 'skipped';
+      return;
     }
 
     assert.ok(userProfile.userEmail, `Missing email for: ${userProfile.userProfileId}`);
 
     const lockResult = await this.acquireLock(userProfile.userProfileId);
     if (lockResult.status === 'skip') {
-      return 'skipped';
+      return;
     }
 
     const { watermark, filters } = lockResult;
@@ -106,7 +106,6 @@ export class LiveCatchUpCommand {
         .set({ liveCatchUpState: 'ready', liveCatchUpHeartbeatAt: sql`NOW()` })
         .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
         .execute();
-      return 'completed';
     } catch (error) {
       this.logger.error({
         err: error,
@@ -119,7 +118,6 @@ export class LiveCatchUpCommand {
         .set({ liveCatchUpState: 'failed', liveCatchUpHeartbeatAt: sql`NOW()` })
         .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
         .execute();
-      return 'failed';
     }
   }
 

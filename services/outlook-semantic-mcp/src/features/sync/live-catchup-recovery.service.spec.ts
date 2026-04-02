@@ -83,7 +83,7 @@ describe('LiveCatchupRecoveryService', () => {
         'unique.outlook-semantic-mcp.live-catch-up.execute',
         expect.objectContaining({
           type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
-          payload: { subscriptionId: SUBSCRIPTION_ID_1, messageIds: [] },
+          payload: { subscriptionId: SUBSCRIPTION_ID_1 },
         }),
       );
       expect(traceEvent).toHaveBeenCalledWith('live-catch-up stuck recovery triggered', {

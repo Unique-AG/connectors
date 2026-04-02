@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
+import z from 'zod';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { traceEvent } from '~/features/tracing.utils';
@@ -47,7 +48,8 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
 
   private setupCronJob(): void {
     const job = new CronJob(RECOVERY_CRON_SCHEDULE, () => {
-      void this.runRecoveryScan();
+      this.runRecoveryScan();
+      this.runReadyLiveCatchupsWhichDidNotRunRecently();
     });
 
     this.schedulerRegistry.addCronJob('live-catchup-recovery', job);
@@ -74,6 +76,25 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
     }
   }
 
+  public async runReadyLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
+    if (this.isShuttingDown) {
+      this.logger.log({
+        msg: 'Skipping live catchup recovery scan due to shutdown',
+      });
+      return;
+    }
+
+    try {
+      this.logger.log({ msg: 'Live catchup recovery scan triggered' });
+      await this.rerunReadyLiveCatchupsWhichDidNotRunRecently();
+    } catch (err) {
+      this.logger.error({
+        msg: 'An unexpected error occurred during live catchup recovery scan',
+        err,
+      });
+    }
+  }
+
   private async recoverStuckLiveCatchUps(): Promise<void> {
     const stuckConfigs = await this.db
       .select({
@@ -91,16 +112,6 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
       )
       .where(
         or(
-          and(
-            // Normally we should not do anything about the ready state since we get webhook notifications
-            // but because microsoft does not trigger this webhook if a user updates the categories to be
-            // on the safe side we trigger every 4 hours if the user did not receive any emails
-            eq(inboxConfigurations.liveCatchUpState, 'ready'),
-            lt(
-              inboxConfigurations.liveCatchUpHeartbeatAt,
-              getThreshold(READY_LIVE_CATCHUP_THRESHOLD_MINUTES),
-            ),
-          ),
           and(
             eq(inboxConfigurations.liveCatchUpState, 'failed'),
             lt(
@@ -122,11 +133,59 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
       return;
     }
 
-    await this.rerunLiveCatchups(stuckConfigs);
+    await this.rerunLiveCatchups(
+      stuckConfigs.map((subscriptionId) =>
+        LiveCatchUpEventDto.parse({
+          type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
+          payload: { subscriptionId },
+        }),
+      ),
+    );
   }
 
-  private async rerunLiveCatchups(readyLiveCatchups: { subscriptionId: string }[]): Promise<void> {
-    if (!readyLiveCatchups.length) {
+  private async rerunReadyLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
+    const stuckConfigs = await this.db
+      .select({
+        userProfileId: inboxConfigurations.userProfileId,
+        subscriptionId: subscriptions.subscriptionId,
+        liveCatchUpState: inboxConfigurations.liveCatchUpState,
+      })
+      .from(inboxConfigurations)
+      .innerJoin(
+        subscriptions,
+        and(
+          eq(subscriptions.userProfileId, inboxConfigurations.userProfileId),
+          gt(subscriptions.expiresAt, sql`NOW()`),
+        ),
+      )
+      .where(
+        or(
+          and(
+            eq(inboxConfigurations.liveCatchUpState, 'ready'),
+            lt(
+              inboxConfigurations.liveCatchUpHeartbeatAt,
+              getThreshold(READY_LIVE_CATCHUP_THRESHOLD_MINUTES),
+            ),
+          ),
+        ),
+      );
+
+    if (stuckConfigs.length === 0) {
+      return;
+    }
+
+    await this.rerunLiveCatchups(
+      stuckConfigs.map((subscriptionId) =>
+        LiveCatchUpEventDto.parse({
+          type: 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck',
+          payload: { subscriptionId },
+        }),
+      ),
+    );
+  }
+
+  private async rerunLiveCatchups(events: z.infer<typeof LiveCatchUpEventDto>[]): Promise<void> {
+    if (!events.length) {
       this.logger.log({
         msg: 'No live catch-ups which did not run for a long time',
       });
@@ -134,23 +193,19 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
     }
 
     traceEvent('live-catch-up stuck recovery triggered', {
-      count: readyLiveCatchups.length,
-      subscriptionIds: readyLiveCatchups.map((c) => c.subscriptionId),
+      count: events.length,
+      subscriptionIds: events.map((subscription) => subscription.payload.subscriptionId),
     });
 
     this.logger.log({
       msg: 'Found ready live catch-up configurations',
-      count: readyLiveCatchups.length,
+      count: events.length,
     });
 
-    for (const { subscriptionId } of readyLiveCatchups) {
+    for (const event of events) {
       this.logger.log({
-        msg: 'Publishing live catch-up recovery event',
-        subscriptionId,
-      });
-      const event = LiveCatchUpEventDto.parse({
-        type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
-        payload: { subscriptionId, messageIds: [] },
+        msg: `Publishing live catch-up: ${event.type}`,
+        subscriptionId: event.payload.subscriptionId,
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
     }

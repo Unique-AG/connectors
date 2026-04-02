@@ -30,9 +30,22 @@ export class LiveCatchUpListener {
   public async onLiveCatchUpEvent(@RabbitPayload() payload: unknown): Promise<void> {
     const event = LiveCatchUpEventDto.parse(payload);
     this.logger.log({ msg: 'Live catch-up event received', type: event.type });
-    await this.liveCatchUpCommand.run({
-      ...event.payload,
-      liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
-    });
+    switch (event.type) {
+      case 'unique.outlook-semantic-mcp.live-catch-up.execute': {
+        return await this.liveCatchUpCommand.run({
+          ...event.payload,
+          liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
+        });
+      }
+      case 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck': {
+        return await this.liveCatchUpCommand.run({
+          ...event.payload,
+          liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
+        });
+      }
+      default: {
+        this.logger.error({ msg: `Unsuported live catchup event type: ${JSON.stringify(event)}` });
+      }
+    }
   }
 }
