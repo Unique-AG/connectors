@@ -1,35 +1,20 @@
 import { createHash } from 'node:crypto';
-import { isNonNullish } from 'remeda';
 import { GraphMessage } from '../dtos/microsoft-graph.dtos';
+import assert from 'node:assert';
 
 export const getUniqueKeyForMessage = (
   userEmail: string,
-  message: Pick<
-    GraphMessage,
-    'internetMessageId' | 'id' | 'uniqueBody' | 'toRecipients' | 'from' | 'subject'
-  >,
+  message: Pick<GraphMessage, 'id'>,
 ): string => {
   // We hash the email to obfuscate it in the UI and in any other logs.
   const emailInSha256 = createHash('sha256').update(userEmail.trim()).digest('hex');
-  // The following things were considered when composing the key.
-  // 1. We do not use id of the message because it changes when you archive an email.
-  // 2. For draft emails the Fingerprint is not useful cause it changes but we tested it and
-  //    draft emails have the internetMessageId attached as soon as they are created.
-  if (message.internetMessageId) {
-    return `User:${emailInSha256}|InternetMessageId:${message.internetMessageId}`;
-  }
-
-  const toRecipients =
-    message.toRecipients?.map((item) => item.emailAddress?.address).filter(isNonNullish) ?? [];
-
-  const fingerprint = [
-    ['from', message.from?.emailAddress],
-    ['to', toRecipients.sort().join(',')],
-    ['subject', message.subject?.trim() ?? ''],
-    ['uniqueBody', message.uniqueBody?.content?.toString() ?? ''],
-  ]
-    .map((item) => item.join(':'))
-    .join(`|`);
-
-  return `User:${emailInSha256}|Fingerprint:${createHash('sha256').update(fingerprint).digest('hex')}`;
+  assert.ok(message.id, `Cannot create uniquer file key message.id is required`);
+  // We use message.id (the Graph API immutable ID) rather than internetMessageId because
+  // internetMessageId is an SMTP header shared across all copies of a message — if a user
+  // sends an email to themselves, both the sent copy and the received copy have the same
+  // internetMessageId, making it unsuitable as a unique key. message.id is stable across
+  // folder moves within the primary mailbox (e.g. Inbox → Archive folder), but note that
+  // the archive mailbox is a separate mailbox in Exchange Online and messages there have
+  // different IDs.
+  return `MessageId:${message.id}|User:${emailInSha256}`;
 };

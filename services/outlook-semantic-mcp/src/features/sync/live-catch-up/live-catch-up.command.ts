@@ -234,16 +234,6 @@ export class LiveCatchUpCommand {
       .top(200)
       .get();
     let emailResponse = liveCatchUpGraphMessageResponseSchema.parse(emailsRaw);
-    console.log(`__STATS`, {
-      ts: watermark.toISOString(),
-      itemsLeng: emailResponse.value.length,
-      first: new Date(
-        Math.min(...emailResponse.value.map((it) => new Date(it.lastModifiedDateTime).getTime())),
-      ).toISOString(),
-      last: new Date(
-        Math.max(...emailResponse.value.map((it) => new Date(it.lastModifiedDateTime).getTime())),
-      ).toISOString(),
-    });
 
     while (true) {
       batchNumber++;
