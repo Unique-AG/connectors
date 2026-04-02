@@ -36,7 +36,7 @@ jobs:
           PNPM_VERSION=$(jq -r '.packageManager | split("@")[1]' package.json)
           echo "version=$PNPM_VERSION" >> $GITHUB_OUTPUT
 
-      - uses: pnpm/action-setup@a15d269cd4658e1107c09f1fabf4cbd7bd1f308a # v4.4.0
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: ${{ steps.pnpm-version.outputs.version }}
           run_install: false
