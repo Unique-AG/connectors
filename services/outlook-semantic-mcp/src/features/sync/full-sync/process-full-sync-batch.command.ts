@@ -119,7 +119,7 @@ export class ProcessFullSyncBatchCommand {
     // to be pausable, resumable, and fair across users:
     //
     //  1. Fetch a page using `nextLink` (or initial query). On 410 (expired link): fall back
-    //     to a fresh query filtered by `oldestCreatedDateTime`, reset `batchIndex`.
+    //     to a fresh query filtered by `oldestReceivedEmailDateTime`, reset `batchIndex`.
     //
     //  2. Iterate from `batchIndex` (resume point). For each message: skip, ingest, or record
     //     failure. Persist `batchIndex`, watermarks, and counters after every message for crash

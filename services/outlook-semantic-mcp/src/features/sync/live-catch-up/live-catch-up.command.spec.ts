@@ -139,6 +139,10 @@ function createMockSyncDirectoriesCommand() {
   return { run: vi.fn() };
 }
 
+function createMockMetricService() {
+  return { getCounter: vi.fn().mockReturnValue({ add: vi.fn() }) };
+}
+
 function createCommand({
   graphApi,
   ingestEmailCommand,
@@ -156,6 +160,7 @@ function createCommand({
     syncDirectories as any,
     createMockUniqueApi() as any,
     db as any,
+    createMockMetricService() as any,
   );
 }
 

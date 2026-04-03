@@ -95,8 +95,8 @@ function createMockFindConfigByVersion(config?: {
   fullSyncNextLink: string | null;
   fullSyncBatchIndex: number;
   filters: Record<string, unknown>;
-  oldestCreatedDateTime?: Date | null;
-  newestCreatedDateTime?: Date | null;
+  oldestReceivedEmailDateTime?: Date | null;
+  newestReceivedEmailDateTime?: Date | null;
 }) {
   const defaultConfig = config ?? {
     fullSyncNextLink: START_FULL_SYNC_LINK,
@@ -110,8 +110,8 @@ function createMockFindConfigByVersion(config?: {
       ignoredSenders: [],
       ignoredContents: [],
     },
-    oldestCreatedDateTime: null,
-    newestCreatedDateTime: null,
+    oldestReceivedEmailDateTime: null,
+    newestReceivedEmailDateTime: null,
   };
   return { run: vi.fn().mockResolvedValue(defaultConfig) };
 }

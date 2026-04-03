@@ -28,7 +28,7 @@ function createMockAmqp() {
   return { publish: vi.fn().mockResolvedValue(undefined) };
 }
 
-function createMockDb({ liveCatchUpRows = [] as Array<{ subscriptionId: string }> } = {}) {
+function createMockDb({ liveCatchUpRows = [] as Array<string> } = {}) {
   const makeSelectChain = (rows: unknown[]) => ({
     from: vi.fn().mockReturnValue({
       innerJoin: vi.fn().mockReturnValue({
@@ -71,7 +71,7 @@ describe('LiveCatchupSchedulerService', () => {
     it('publishes an execute event and emits trace event for a stuck live catch-up', async () => {
       const amqp = createMockAmqp();
       const db = createMockDb({
-        liveCatchUpRows: [{ subscriptionId: SUBSCRIPTION_ID_1 }],
+        liveCatchUpRows: [SUBSCRIPTION_ID_1],
       });
       const service = createService({ amqp, db });
 
@@ -95,10 +95,7 @@ describe('LiveCatchupSchedulerService', () => {
     it('publishes execute events and traces for each stuck live catch-up config', async () => {
       const amqp = createMockAmqp();
       const db = createMockDb({
-        liveCatchUpRows: [
-          { subscriptionId: SUBSCRIPTION_ID_1 },
-          { subscriptionId: SUBSCRIPTION_ID_2 },
-        ],
+        liveCatchUpRows: [SUBSCRIPTION_ID_1, SUBSCRIPTION_ID_2],
       });
       const service = createService({ amqp, db });
 
