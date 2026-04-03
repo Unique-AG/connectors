@@ -40,7 +40,7 @@ export class LiveCatchUpListener {
       case 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck': {
         return await this.liveCatchUpCommand.run({
           ...event.payload,
-          liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
+          liveCatchupOverlappingWindow: this.config.liveCatchupRecheckOverlappingWindowMinutes,
         });
       }
       default: {

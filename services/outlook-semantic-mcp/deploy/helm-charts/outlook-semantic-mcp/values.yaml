@@ -142,10 +142,15 @@ mcpConfig:
     #    1. Debugging tools
     #    2. Extra debugging data in tool responses.
     mcpDebugMode: disabled
-    # -- Optional. Whether to buffer logs before writing. To override:
-    # bufferLogs: enabled
-    # Or set env var directly: APP_BUFFER_LOGS=enabled
+    # -- Optional. Overlapping window in minutes for standard live catch-up sync runs. Office 365
+    # uses eventual consistency, so messages can appear with a delayed updatedAt timestamp after
+    # the actual event. Re-querying an overlapping window ensures late-arriving messages are not
+    # missed. Minimum: 2. To override set env var directly: LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES=5
     liveCatchupOverlappingWindowMinutes: 5
+    # -- Optional. Overlapping window in minutes for live catch-up ready-recheck runs. Uses a larger
+    # window than the standard run to account for higher latency during recheck scenarios.
+    # Minimum: 10. To override set env var directly: LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES=10
+    liveCatchupRecheckOverlappingWindowMinutes: 10
 
   # -- Optional log settings. To override:
   # logs:
