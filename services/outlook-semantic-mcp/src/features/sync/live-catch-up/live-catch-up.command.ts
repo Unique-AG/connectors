@@ -2,9 +2,10 @@ import { UniqueApiClient, UniqueFile } from '@unique-ag/unique-api';
 import { createSmeared, Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Attributes, Counter } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
-import { Span } from 'nestjs-otel';
-import { assert } from 'vitest';
+import { MetricService, Span } from 'nestjs-otel';
+import assert from 'node:assert';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions, userProfiles } from '~/db';
 import {
   InboxConfigurationMailFilters,
@@ -33,6 +34,7 @@ export const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 30;
 @Injectable()
 export class LiveCatchUpCommand {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly messagesProcessed: Counter<Attributes>;
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
@@ -40,7 +42,12 @@ export class LiveCatchUpCommand {
     private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-  ) {}
+    metricService: MetricService,
+  ) {
+    this.messagesProcessed = metricService.getCounter('live_catchup_messagest_total', {
+      description: 'Total messages processed during full sync',
+    });
+  }
 
   @Span()
   public async run(input: {
@@ -203,6 +210,11 @@ export class LiveCatchUpCommand {
   }): Promise<Set<string>> {
     const processedIds = new Set<string>();
     let batchNumber = 0;
+    const logContext = {
+      userProfileId: user.profileId,
+      providerUserId: user.providerId,
+      userEmail: user.email.toString(),
+    };
 
     watermark.setMinutes(watermark.getMinutes() - liveCatchupOverlappingWindow);
 
@@ -234,6 +246,14 @@ export class LiveCatchUpCommand {
         acc[file.key] = file;
         return acc;
       }, {});
+      const perOutcomeStats: Record<string, number> = {};
+
+      this.logger.debug({
+        ...logContext,
+        msg: `Processing batch`,
+        batchSize: batch.length,
+        numberOfFilesFoundInUnique: uniqueFiles.length,
+      });
 
       for (const graphMessage of batch) {
         const fileKey = getUniqueKeyForMessage({
@@ -248,20 +268,15 @@ export class LiveCatchUpCommand {
           filters,
           graphMessage,
         });
-
-        if (result === 'failed') {
-          this.logger.warn({
-            userProfileId: user.profileId,
-            messageId: graphMessage.id,
-            msg: 'Email ingestion failed, continuing',
-          });
-        }
-
+        const key = `totalMessages_${result}`;
+        perOutcomeStats[key] = (perOutcomeStats[key] ?? 0) + 1;
+        this.messagesProcessed.add(1, { outcome: result });
         await this.updateWatermarks({ email: graphMessage, userProfileId: user.profileId });
         processedIds.add(graphMessage.id);
       }
 
       this.logger.log({
+        ...perOutcomeStats,
         userProfileId: user.profileId,
         batchNumber,
         batchSize: batch.length,

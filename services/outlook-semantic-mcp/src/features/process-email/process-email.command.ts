@@ -75,39 +75,29 @@ export class ProcessEmailCommand {
   public async run(input: ProcessEmailCommandInput): Promise<MessageIngestionResult | 'failed'> {
     return await withRetryAttempts({
       fn: () => {
-        const logContext = {
-          messageId: input.graphMessage.id,
-          internetId: input.graphMessage.internetMessageId ?? undefined,
-          userProfileId: input.user.profileId,
-          providerUserId: input.user.providerId,
-          userEmail: input.user.email.toString(),
-        };
-        return this.runProcessEmail({ ...input, baseLogContext: logContext });
+        return this.runProcessEmail(input);
       },
       onError: rethrowRateLimitError,
-      getResultFailure: () => 'failed',
+      getResultFailure: (error) => {
+        this.logger.warn({
+          ...createLogContext(input),
+          msg: `Failed to process message: ${input.graphMessage.id} ${input.file ? `with unique file key: ${input.file.key}` : `without unique file`}`,
+          err: error,
+        });
+        return 'failed';
+      },
     });
   }
 
   @Span()
-  private async runProcessEmail({
-    graphMessage,
-    file,
-    fileKey,
-    user,
-    filters,
-    client,
-    baseLogContext,
-  }: ProcessEmailCommandInput & {
-    baseLogContext: BaseLogContext;
-  }): Promise<MessageIngestionResult> {
+  private async runProcessEmail(input: ProcessEmailCommandInput): Promise<MessageIngestionResult> {
+    const logContext = createLogContext(input);
+    const { graphMessage, file, fileKey, user, filters, client } = input;
     const metadata = getMetadataFromMessage(graphMessage);
 
     let parentDirectory = await this.db.query.directories.findFirst({
       where: eq(directories.providerDirectoryId, graphMessage.parentFolderId),
     });
-
-    const logContext = clone(baseLogContext);
 
     if (filters) {
       const skipResult = shouldSkipEmail(graphMessage, filters, {
@@ -171,8 +161,6 @@ export class ProcessEmailCommand {
       getRootScopeExternalIdForUser(user.providerId),
     );
     assert.ok(rootScope, `Parent scope id`);
-
-    // const client = this.graphClientFactory.createClientForUser(context.userProfileId);
 
     if (isNonNullish(file) && metadata.sentDateTime === file.metadata?.sentDateTime) {
       if (metadata.lastModifiedDateTime === file.metadata?.lastModifiedDateTime) {
@@ -350,3 +338,11 @@ export class ProcessEmailCommand {
     }
   }
 }
+
+const createLogContext = (input: ProcessEmailCommandInput): BaseLogContext => ({
+  messageId: input.graphMessage.id,
+  internetId: input.graphMessage.internetMessageId ?? undefined,
+  userProfileId: input.user.profileId,
+  providerUserId: input.user.providerId,
+  userEmail: input.user.email.toString(),
+});

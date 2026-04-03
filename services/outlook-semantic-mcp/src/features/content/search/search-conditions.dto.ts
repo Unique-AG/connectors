@@ -110,9 +110,9 @@ export const SearchConditionSchema = z
     ).optional(),
     hasAttachments: SingularConditionFieldSchema(
       z
-        .boolean()
+        .enum(['true', 'false'])
         .describe(
-          'Whether the email has attachments, e.g. true or false. Recommended operator: equals, notEquals.',
+          `Whether the email has attachments, e.g. 'true' or 'false'. This value is a string not a boolean. Recommended operator: equals, notEquals.`,
         ),
     ).optional(),
     categories: SingularConditionFieldSchema(

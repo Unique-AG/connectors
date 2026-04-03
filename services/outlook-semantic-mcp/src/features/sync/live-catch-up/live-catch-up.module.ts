@@ -6,9 +6,17 @@ import { ProcessEmailModule } from '~/features/process-email/process-email.modul
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { LiveCatchUpCommand } from './live-catch-up.command';
 import { LiveCatchUpListener } from './live-catch-up.listener';
+import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule, DirectoriesSyncModule, ProcessEmailModule, ConfigModule],
+  imports: [
+    DrizzleModule,
+    MsGraphModule,
+    DirectoriesSyncModule,
+    ProcessEmailModule,
+    ConfigModule,
+    UniqueApiFeatureModule,
+  ],
   providers: [LiveCatchUpCommand, LiveCatchUpListener],
   exports: [LiveCatchUpCommand],
 })

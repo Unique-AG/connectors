@@ -1,5 +1,6 @@
-import { filter, isNonNullish, map, pipe } from 'remeda';
+import { filter, isNonNullish, map, pick, pipe } from 'remeda';
 import { GraphMessage } from '../dtos/microsoft-graph.dtos';
+import { asAllOptions } from '@unique-ag/utils';
 
 // We should never user `.` in metadata search because Qdrant thinks this is a subobject
 export interface MessageMetadata {
@@ -20,9 +21,9 @@ export interface MessageMetadata {
   ccRecipientsEmailAddresses: string[];
   ccRecipientsNames: string[];
   categories: string[];
-  isRead: boolean;
-  isDraft: boolean;
-  hasAttachments: boolean;
+  isRead: 'true' | 'false';
+  isDraft: 'true' | 'false';
+  hasAttachments: 'true' | 'false';
   importance: string;
   inferenceClassification: string;
   webLink: string;
@@ -61,6 +62,8 @@ const extractFromEmailArray = (
   return filterOutNilOrEmptyValues(input?.map((item) => item.emailAddress?.[prop]));
 };
 
+const booleanToString = (value: boolean | null | undefined) => (value ? 'true' : 'false');
+
 export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata => {
   return {
     id: message.id,
@@ -80,12 +83,43 @@ export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata =
     ccRecipientsEmailAddresses: extractFromEmailArray(message.ccRecipients, 'address'),
     ccRecipientsNames: extractFromEmailArray(message.ccRecipients, 'name'),
     categories: filterOutNilOrEmptyValues(message.categories),
-    isRead: message.isRead ?? false,
-    isDraft: message.isDraft ?? false,
+    isRead: booleanToString(message.isRead),
+    isDraft: booleanToString(message.isDraft),
+    hasAttachments: booleanToString(message.hasAttachments),
     webLink: message.webLink ?? '',
-    hasAttachments: message.hasAttachments ?? false,
     importance: message.importance ?? '',
     inferenceClassification: message.inferenceClassification ?? '',
     flagStatus: message.flag?.flagStatus ?? '',
   };
 };
+
+export const extractMetadataKeys = (data: Record<string, unknown>) =>
+  pick(
+    data,
+    asAllOptions<keyof MessageMetadata>()([
+      `id`,
+      `subject`,
+      `internetMessageId`,
+      `conversationId`,
+      `parentFolderId`,
+      `sentDateTime`,
+      `lastModifiedDateTime`,
+      `fromEmailAddress`,
+      `fromName`,
+      `senderEmailAddress`,
+      `senderName`,
+      `toRecipientsEmailAddresses`,
+      `toRecipientsNames`,
+      `receivedDateTime`,
+      `ccRecipientsEmailAddresses`,
+      `ccRecipientsNames`,
+      `categories`,
+      `isRead`,
+      `isDraft`,
+      `webLink`,
+      `hasAttachments`,
+      `importance`,
+      `inferenceClassification`,
+      `flagStatus`,
+    ]),
+  );
