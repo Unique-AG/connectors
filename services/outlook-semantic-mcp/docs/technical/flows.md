@@ -109,6 +109,11 @@ sequenceDiagram
     MSGraph->>OutlookMCP: POST /mail-subscription/lifecycle (subscriptionRemoved)
     OutlookMCP->>OutlookMCP: Validate clientState secret
     OutlookMCP->>DB: Delete subscription and inbox_configurations records
+
+    Note over AMQP,DB: Change notifications lost — Microsoft signals missed events
+    MSGraph->>OutlookMCP: POST /mail-subscription/lifecycle (missed)
+    OutlookMCP->>OutlookMCP: Validate clientState secret
+    OutlookMCP->>OutlookMCP: Trigger live catch-up run from watermark
 ```
 
 **Subscription states:**
@@ -122,7 +127,7 @@ sequenceDiagram
 
 **Key points:**
 
-- Microsoft sends lifecycle notifications before a subscription expires (`reauthorizationRequired`) and when it removes one (`subscriptionRemoved`).
+- Microsoft sends lifecycle notifications before a subscription expires (`reauthorizationRequired`), when it removes one (`subscriptionRemoved`), and when change notifications were lost (`missed`).
 - All lifecycle notifications are validated against the `MICROSOFT_WEBHOOK_SECRET` via the `clientState` field.
 - `reconnect_inbox` is idempotent: it creates a new subscription only if none exists or the existing one has expired. If the subscription is `already_active` or `expiring_soon`, no changes are made.
 
@@ -143,7 +148,7 @@ After a subscription is created, the server automatically begins ingesting the u
 
 **Key points:**
 
-- Full sync is triggered automatically when a subscription is created — users do not need to invoke it manually.
+- Full sync is triggered asynchronously: subscription creation publishes a `subscription-created` event to RabbitMQ, which the server consumes to begin the sync — users do not need to invoke it manually.
 - The sync is resumable: the Graph pagination cursor is persisted so a crash or restart picks up where it left off.
 - Stale syncs (no heartbeat for 20+ minutes) are automatically restarted by the sync recovery module.
 - `ignoredBefore` is applied as a Graph API query filter. `ignoredSenders` and `ignoredContents` are applied in-memory after each batch is fetched.
@@ -156,7 +161,7 @@ The server continuously syncs the user's Outlook folder structure from Microsoft
 **Key points:**
 
 - Directory sync runs on a 5-minute schedule using Graph delta queries, plus on-demand at the start of each full sync and live catch-up execution.
-- Folders such as Deleted Items and Junk Email are excluded from sync (`ignoreForSync = true`). When an email is moved to an excluded folder, it is removed from the knowledge base.
+- System folders such as Deleted Items, Junk Email, Recoverable Items Deletions, and Conversation History are excluded from sync (`ignoreForSync = true`). When an email is moved to an excluded folder, it is removed from the knowledge base.
 - The `list_folders` tool returns the folder tree synced here. The folder IDs it returns can be passed in the `conditions[].directories` field of `search_emails` to narrow results to a specific mailbox folder.
 
 ## Email Draft Creation Flow
@@ -172,7 +177,7 @@ sequenceDiagram
     participant MSGraph as Microsoft Graph API
 
     MCPClient->>OutlookMCP: create_draft_email (subject, body, recipients, attachments)
-    OutlookMCP->>MSGraph: POST /me/messages (subject, body, toRecipients, ccRecipients)
+    OutlookMCP->>MSGraph: POST /me/messages (subject, body as HTML, toRecipients, ccRecipients)
     MSGraph->>OutlookMCP: Draft created (draftId, webLink)
 
     opt Attachments provided

@@ -18,5 +18,6 @@ This section contains detailed technical documentation for developers and archit
 | [Flows](./flows.md)                                     | Sequence diagrams for OAuth connection, email sync, and subscription lifecycle |
 | [Permissions](./permissions.md)                         | Microsoft Graph permissions with least-privilege justification                 |
 | [Security](./security.md)                               | Encryption, OAuth 2.1 with PKCE, token rotation, and threat model              |
+| [Subscription Management](./subscription-management.md) | Subscription lifecycle, renewal, status, and failure handling                  |
 | [Tools](./tools.md)                                     | Full reference for all 10 MCP tools (plus 4 debug-mode tools)                  |
 | [FAQ](../faq.md)                                        | Frequently asked questions                                                     |

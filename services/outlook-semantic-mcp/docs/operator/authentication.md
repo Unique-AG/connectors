@@ -93,7 +93,7 @@ module "outlook_semantic_mcp_app" {
 
 ## Required Permissions
 
-All five permissions (`User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`) are **delegated** and **do not require admin consent**.
+All permissions are delegated and do not require admin consent.
 
 For the complete permissions reference with justifications for each permission, see [Permissions](../technical/permissions.md).
 

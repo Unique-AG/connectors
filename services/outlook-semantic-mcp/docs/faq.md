@@ -105,7 +105,7 @@ An additional 4 tools are available only when the server is running in debug mod
 
 ### Do any permissions require admin consent?
 
-**Answer:** No. All five permissions (`User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`) are **delegated and do not require admin consent**. Users can connect and grant consent themselves without IT involvement.
+**Answer:** No. All permissions are delegated and do not require admin consent. Users can connect and grant consent themselves without IT involvement.
 
 **See also:** [Permissions](./technical/permissions.md) for the full reference with least-privilege justification.
 

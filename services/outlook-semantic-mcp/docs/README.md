@@ -54,7 +54,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Permissions
 
-All permissions are **Delegated** (not Application): `User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`. None require admin consent. For details, see [Permissions](technical/permissions.md).
+All permissions are delegated and require no admin consent. See [Permissions](./technical/permissions.md) for details.
 
 ## Features
 
@@ -92,7 +92,7 @@ All permissions are **Delegated** (not Application): `User.Read`, `Mail.ReadWrit
 
 - After connecting, the server automatically begins a full sync to ingest emails within the operator-configured time frame and filters (see [Configuration](./operator/configuration.md))
 - Sync progress can be monitored via the `sync_progress` tool, which reports the current state, counters, and date range being processed
-- `sync_progress` returns a top-level `state` (`running`, `finished`, `error`) and a detailed `fullSyncState` (`ready`, `running`, `paused`, `waiting-for-ingestion`, `failed`), along with the number of emails ingested, the date window being processed, and a warning if results may be incomplete
+- `sync_progress` returns a top-level `state` (`running`, `finished`, `error`) and a detailed `fullSyncState` (`ready`, `running`, `waiting-for-ingestion`, `paused`, `failed`), along with the number of emails ingested, the date window being processed, and a warning if results may be incomplete
 
 **Live Catch-Up (Real-Time Webhook-Driven)**
 
@@ -230,7 +230,7 @@ See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) 
 | **Delegated permissions only** | Requires user sign-in; application-only access is not supported |
 | **Single app registration per deployment** | Each server deployment uses one Entra ID app registration (multi-tenant capable) |
 
-See [Authentication Architecture](./technical/architecture.md) for details.
+See [Architecture — Authentication](./technical/architecture.md#Authentication) for details.
 
 ### Operational Constraints
 
