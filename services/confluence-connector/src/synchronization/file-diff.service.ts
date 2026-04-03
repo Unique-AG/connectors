@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common';
 import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind } from '../constants/ingestion.constants';
+import type { Metrics } from '../metrics';
 import type { DiscoveredAttachment, DiscoveredPage, FileDiffResult } from './sync.types';
 
 export class FileDiffService {
@@ -14,6 +15,7 @@ export class FileDiffService {
     private readonly tenantName: string,
     private readonly useV1KeyFormat: boolean,
     private readonly uniqueApiClient: UniqueApiClient,
+    private readonly metrics: Metrics,
   ) {}
 
   public async computeDiff(
@@ -81,7 +83,24 @@ export class FileDiffService {
       msg: 'File diff completed',
     });
 
+    this.recordDiffMetrics(result);
+
     return result;
+  }
+
+  private recordDiffMetrics(result: FileDiffResult): void {
+    if (result.newItemIds.length > 0) {
+      this.metrics.recordFileDiffEvents(result.newItemIds.length, 'new');
+    }
+    if (result.updatedItemIds.length > 0) {
+      this.metrics.recordFileDiffEvents(result.updatedItemIds.length, 'updated');
+    }
+    if (result.deletedItems.length > 0) {
+      this.metrics.recordFileDiffEvents(result.deletedItems.length, 'deleted');
+    }
+    if (result.movedItemIds.length > 0) {
+      this.metrics.recordFileDiffEvents(result.movedItemIds.length, 'moved');
+    }
   }
 
   private buildPageDiffItems(pages: DiscoveredPage[]): FileDiffItem[] {

@@ -14,7 +14,7 @@
     "check-types": "tsc --noEmit"
   },
   "devDependencies": {
-    "typescript": "^5.9.2"
+    "typescript": "5.9.2"
   },
   "peerDependencies": {
     "@nestjs/common": "^10 || ^11",

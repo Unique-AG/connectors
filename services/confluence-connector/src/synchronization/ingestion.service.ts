@@ -5,7 +5,7 @@ import type {
   IngestionFinalizationRequest,
   UniqueApiClient,
 } from '@unique-ag/unique-api';
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { request } from 'undici';
 import type { TenantConfig } from '../config';
@@ -16,6 +16,7 @@ import {
   OWNER_TYPE,
   SOURCE_OWNER_TYPE,
 } from '../constants/ingestion.constants';
+import type { Metrics } from '../metrics';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 export class IngestionService {
@@ -28,6 +29,7 @@ export class IngestionService {
     private readonly tenantName: string,
     private readonly uniqueApiClient: UniqueApiClient,
     private readonly confluenceApiClient: ConfluenceApiClient,
+    private readonly metrics: Metrics,
   ) {
     this.sourceKind = getSourceKind(this.config.confluence.instanceType);
     this.sourceName = this.config.confluence.baseUrl;
@@ -107,7 +109,9 @@ export class IngestionService {
         attachment.pageId,
         attachment.downloadPath,
       );
+      const uploadStartTime = Date.now();
       await this.uploadStream(uploadUrl, stream, attachment.mediaType, attachment.fileSize);
+      this.metrics.recordAttachmentUploadDuration(elapsedSeconds(uploadStartTime));
 
       const finalizationRequest = this.buildFinalizationRequest(
         registrationRequest,
@@ -175,6 +179,11 @@ export class IngestionService {
         deletedCount,
         msg: 'Content deleted',
       });
+
+      // TODO: recordContentDeleted is disabled until deleteByIds returns accurate success/failure
+      // counts. Currently deleteByIds counts items sent, not items confirmed deleted by the API,
+      // and on failure we don't know how many were partially deleted. Follow-up: fix deleteByIds
+      // in @unique-ag/unique-api to return { deleted, failed } based on the mutation response.
       return deletedCount;
     } catch (error) {
       this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
