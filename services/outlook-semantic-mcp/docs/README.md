@@ -23,7 +23,7 @@
 
 The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 10 MCP tools (plus 4 additional debug-mode tools).
 
-**Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./technical/full-sync.md#Inbox-Filters)) into the Unique knowledge base in the background.
+**Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./operator/configuration.md)) into the Unique knowledge base in the background.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
@@ -90,7 +90,7 @@ All permissions are **Delegated** (not Application): `User.Read`, `Mail.ReadWrit
 
 **Full Sync (Historical Batch Ingestion)**
 
-- After connecting, the server automatically begins a full sync to ingest emails within the operator-configured time frame and filters (see [Inbox Filters](./technical/full-sync.md#Inbox-Filters))
+- After connecting, the server automatically begins a full sync to ingest emails within the operator-configured time frame and filters (see [Configuration](./operator/configuration.md))
 - Sync progress can be monitored via the `sync_progress` tool, which reports the current state, counters, and date range being processed
 - `sync_progress` returns a top-level `state` (`running`, `finished`, `error`) and a detailed `fullSyncState` (`ready`, `running`, `paused`, `waiting-for-ingestion`, `failed`), along with the number of emails ingested, the date window being processed, and a warning if results may be incomplete
 
@@ -176,9 +176,9 @@ See [Subscription Creation and Renewal Lifecycle](./technical/flows.md#Subscript
 
 Email ingestion uses two concurrent pipelines:
 
-- **Full Sync** — After connection, the server automatically fetches the user's historical emails (within the configured time frame and filters) from Microsoft Graph in paginated batches and uploads them to the Unique knowledge base. The sync is resumable across restarts and initializes a watermark for live catch-up. See [Full Sync](./technical/full-sync.md) for details.
+- **Full Sync** — After connection, the server automatically fetches the user's historical emails (within the configured time frame and filters) from Microsoft Graph in paginated batches and uploads them to the Unique knowledge base. The sync is resumable across restarts and initializes a watermark for live catch-up. See [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) for details.
 
-- **Live Catch-Up** — Microsoft Graph sends webhook notifications when new mail arrives. The server enqueues them via RabbitMQ (to meet Microsoft's 10-second response deadline) and processes them asynchronously, fetching new messages since the last watermark and uploading them to the knowledge base. See [Live Catch-Up](./technical/live-catchup.md) for details.
+- **Live Catch-Up** — Microsoft Graph sends webhook notifications when new mail arrives. The server enqueues them via RabbitMQ (to meet Microsoft's 10-second response deadline) and processes them asynchronously, fetching new messages since the last watermark and uploading them to the knowledge base. See [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) for details.
 
 Both pipelines run concurrently after connection. Live catch-up buffers notifications until full sync initializes the watermark, after which both ingest independently.
 

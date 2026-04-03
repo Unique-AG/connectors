@@ -135,7 +135,7 @@ When a new email arrives in the user's Outlook mailbox, Microsoft Graph sends a 
 - Microsoft requires a response within 10 seconds (Microsoft limit, not configurable). The server enqueues the notification immediately and returns `202 Accepted` — actual email fetching and ingestion happen inline in the consumer, after the webhook response is already sent.
 - Buffering applies when another live catch-up consumer is already processing, or when the watermark has not been set yet (full sync has not started). Messages are flushed once the blocker clears.
 - The watermark (`newestLastModifiedDateTime`) is **initialized by full sync** the first time it runs and **maintained by live catch-up** on every subsequent notification.
-- `deleted` change notifications are discarded. Deletions are handled by [directory sync](./directory-sync.md) and by detecting emails moved to ignored folders.
+- `deleted` change notifications are discarded. Deletions are handled by [directory sync](#Directory-Sync-Flow) and by detecting emails moved to ignored folders.
 
 ## Full Sync: Historical Email Ingestion
 
