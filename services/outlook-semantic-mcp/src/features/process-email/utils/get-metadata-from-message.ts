@@ -1,6 +1,6 @@
+import { asAllOptions } from '@unique-ag/utils';
 import { filter, isNonNullish, map, pick, pipe } from 'remeda';
 import { GraphMessage } from '../dtos/microsoft-graph.dtos';
-import { asAllOptions } from '@unique-ag/utils';
 
 // We should never user `.` in metadata search because Qdrant thinks this is a subobject
 export interface MessageMetadata {

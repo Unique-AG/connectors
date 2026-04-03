@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { UniqueApiClient, UniqueFile } from '@unique-ag/unique-api';
 import { createSmeared, Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
@@ -5,7 +6,6 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes, Counter } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
 import { MetricService, Span } from 'nestjs-otel';
-import assert from 'node:assert';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions, userProfiles } from '~/db';
 import {
   InboxConfigurationMailFilters,
