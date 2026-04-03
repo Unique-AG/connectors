@@ -22,11 +22,11 @@ import { UploadFileForIngestionCommand } from '~/unique/upload-file-for-ingestio
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { Nullish } from '~/utils/nullish';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
+import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { UpsertDirectoryCommand } from '../directories-sync/upsert-directory.command';
 import { GraphMessage } from './dtos/microsoft-graph.dtos';
 import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
 import { shouldSkipEmail } from './utils/should-skip-email';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 
 export type MessageIngestionResult =
   | 'ingested'

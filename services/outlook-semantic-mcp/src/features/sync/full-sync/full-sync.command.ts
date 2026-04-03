@@ -10,10 +10,10 @@ import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
+import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 
 type InboxConfig = typeof inboxConfigurations.$inferSelect;
 

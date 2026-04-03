@@ -1,6 +1,6 @@
 import assert from 'node:assert';
-import { sleep } from './sleep';
 import { isRateLimitError } from './is-rate-limit-error';
+import { sleep } from './sleep';
 
 type PromiseFn<T> = () => Promise<T>;
 

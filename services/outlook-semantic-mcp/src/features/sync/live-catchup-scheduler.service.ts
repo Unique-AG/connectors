@@ -18,7 +18,7 @@ import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 const RECOVERY_CRON_SCHEDULE = '*/5 * * * *';
 
 @Injectable()
-export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy {
+export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
   private isShuttingDown = false;
 
@@ -33,7 +33,7 @@ export class LiveCatchupRecoveryService implements OnModuleInit, OnModuleDestroy
   }
 
   public onModuleDestroy() {
-    this.logger.log({ msg: 'LiveCatchupRecoveryService is shutting down...' });
+    this.logger.log({ msg: 'LiveCatchupSchedulerService is shutting down...' });
     this.isShuttingDown = true;
     try {
       const job = this.schedulerRegistry.getCronJob('live-catchup-recovery');

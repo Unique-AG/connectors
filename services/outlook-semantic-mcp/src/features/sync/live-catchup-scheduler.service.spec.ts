@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveCatchupRecoveryService } from './live-catchup-recovery.service';
+import { LiveCatchupSchedulerService } from './live-catchup-scheduler.service';
 
 vi.mock('~/features/tracing.utils', () => ({ traceEvent: vi.fn() }));
 
@@ -44,14 +44,14 @@ function createMockDb({ liveCatchUpRows = [] as Array<{ subscriptionId: string }
 
 function createService({ amqp = createMockAmqp(), db = createMockDb() } = {}) {
   const schedulerRegistry = createMockSchedulerRegistry();
-  return new LiveCatchupRecoveryService(schedulerRegistry as any, amqp as any, db as any);
+  return new LiveCatchupSchedulerService(schedulerRegistry as any, amqp as any, db as any);
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('LiveCatchupRecoveryService', () => {
+describe('LiveCatchupSchedulerService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

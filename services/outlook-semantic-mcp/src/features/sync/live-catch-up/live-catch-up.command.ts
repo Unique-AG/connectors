@@ -18,13 +18,13 @@ import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { greatestFrom } from '~/utils/greatest-from';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
+import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import {
   GraphMessage,
   GraphMessageFields,
   graphMessagesResponseSchema,
 } from '../../process-email/dtos/microsoft-graph.dtos';
 import { ProcessEmailCommand } from '../../process-email/process-email.command';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 
 export const RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES = 20;
 export const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
