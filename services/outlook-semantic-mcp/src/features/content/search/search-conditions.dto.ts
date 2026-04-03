@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
 import { first } from 'remeda';
 import { z } from 'zod';
-import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
+import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { clampToValidDate } from '~/utils/clamp-to-valid-date';
 
 export const CONTAINS_ANY_OPERATOR = 'containsAny' as const;
@@ -110,9 +110,9 @@ export const SearchConditionSchema = z
     ).optional(),
     hasAttachments: SingularConditionFieldSchema(
       z
-        .boolean()
+        .enum(['true', 'false'])
         .describe(
-          'Whether the email has attachments, e.g. true or false. Recommended operator: equals, notEquals.',
+          `Whether the email has attachments, e.g. 'true' or 'false'. This value is a string not a boolean. Recommended operator: equals, notEquals.`,
         ),
     ).optional(),
     categories: SingularConditionFieldSchema(

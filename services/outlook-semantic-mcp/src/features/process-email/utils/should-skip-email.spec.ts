@@ -27,7 +27,7 @@ describe('shouldSkipEmail', () => {
   describe('ignoredBefore', () => {
     it('skips when createdDateTime is before ignoredBefore', () => {
       const result = shouldSkipEmail(
-        { createdDateTime: '2019-06-01T00:00:00Z' },
+        { receivedDateTime: '2019-06-01T00:00:00Z' },
         baseFilters(),
         context,
       );
@@ -36,7 +36,7 @@ describe('shouldSkipEmail', () => {
 
     it('does not skip when createdDateTime is after ignoredBefore', () => {
       const result = shouldSkipEmail(
-        { createdDateTime: '2021-01-01T00:00:00Z' },
+        { receivedDateTime: '2021-01-01T00:00:00Z' },
         baseFilters(),
         context,
       );

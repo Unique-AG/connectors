@@ -20,7 +20,7 @@ The Outlook Semantic MCP Server exposes 10 MCP tools available to all users, plu
 | [`list_folders`](#list_folders) | Mailbox Utilities | Yes (refreshes folder cache) | No |
 | [`verify_inbox_connection`](#verify_inbox_connection) | Subscription Management | No | No |
 | [`reconnect_inbox`](#reconnect_inbox) | Subscription Management | Yes | No |
-| [`remove_inbox_connection`](#remove_inbox_connection) | Subscription Management | Yes | No |
+| [`delete_inbox_data`](#delete_inbox_data) | Subscription Management | Yes | No |
 | [`sync_progress`](#sync_progress) | Sync Monitoring | No | No |
 | [`run_full_sync`](#run_full_sync) | Full Sync Control (debug only) | Yes | **Yes** |
 | [`pause_full_sync`](#pause_full_sync) | Full Sync Control (debug only) | Yes | **Yes** |
@@ -38,7 +38,7 @@ The Outlook Semantic MCP Server exposes 10 MCP tools available to all users, plu
 | `create_draft_email` | Creates a draft message in the user's Outlook mailbox via Microsoft Graph |
 | `list_folders` | Refreshes the folder cache in the internal database by re-fetching the folder tree from Microsoft Graph |
 | `reconnect_inbox` | Creates or renews the Microsoft Graph webhook subscription and writes the subscription record to the internal database |
-| `remove_inbox_connection` | Cancels the Microsoft Graph webhook subscription and deletes the subscription record, folder cache, and root scope from the internal database |
+| `delete_inbox_data` | Cancels the Microsoft Graph webhook subscription and deletes the subscription record, folder cache, root scope, and all ingested email content from the Unique knowledge base |
 | `run_full_sync` | Triggers ingestion of all mailbox emails into the Unique knowledge base and updates sync state in the internal database |
 | `pause_full_sync` | Updates the sync state to `paused` in the internal database |
 | `resume_full_sync` | Updates the sync state to resume ingestion in the internal database |
@@ -341,8 +341,6 @@ Check the status of the inbox connection and Microsoft Graph webhook subscriptio
 | `expired` | Subscription has lapsed | Call `reconnect_inbox` |
 | `not_configured` | No subscription exists | Call `reconnect_inbox` |
 
-See [Subscription Management](./subscription-management.md#Subscription-Status) for the full subscription status reference.
-
 ---
 
 ### `reconnect_inbox`
@@ -373,9 +371,9 @@ Re-establish the Microsoft Outlook inbox subscription when expired or not config
 
 ---
 
-### `remove_inbox_connection`
+### `delete_inbox_data`
 
-Remove the inbox connection and cease ingesting emails. Deletes the Microsoft Graph webhook subscription.
+Permanently delete all synced email data from Unique and cancel the Microsoft Graph subscription. This stops future email ingestion and removes all previously ingested email content for your inbox from the Unique knowledge base.
 
 **Input parameters:** None
 
@@ -394,8 +392,8 @@ Remove the inbox connection and cease ingesting emails. Deletes the Microsoft Gr
 
 **Usage notes:**
 
-- After removal, no new emails will be ingested. Because the root scope is removed, all previously ingested email content for that user is also removed from the Unique knowledge base.
-- To resume ingestion, call `reconnect_inbox`.
+- This is a destructive operation: all previously ingested email content for the user is permanently removed from the Unique knowledge base, and no new emails will be ingested.
+- To resume ingestion after deletion, call `reconnect_inbox`.
 
 ---
 
@@ -415,7 +413,7 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
   message: string;
   userEmail: string;
   syncStats?: {
-    fullSyncState: "ready" | "running" | "paused" | "waiting-for-ingestion" | "failed";
+    fullSyncState: "ready" | "running" | "waiting-for-ingestion" | "paused" | "failed";
     liveCatchUpState: "ready" | "running" | "failed";
     runAt: string | null;           // last completion time
     startedAt: string | null;       // last start time
@@ -429,8 +427,8 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
       ignoredContents: string[];
     };
     dateWindow: {
-      newestCreatedDateTime: string | null;
-      oldestCreatedDateTime: string | null;
+      newestReceivedEmailDateTime: string | null;
+      oldestReceivedEmailDateTime: string | null;
       newestLastModifiedDateTime: string | null;
     };
   } | null;

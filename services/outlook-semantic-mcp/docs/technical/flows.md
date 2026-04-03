@@ -109,38 +109,46 @@ sequenceDiagram
     MSGraph->>OutlookMCP: POST /mail-subscription/lifecycle (subscriptionRemoved)
     OutlookMCP->>OutlookMCP: Validate clientState secret
     OutlookMCP->>DB: Delete subscription and inbox_configurations records
+
+    Note over AMQP,DB: Change notifications lost — Microsoft signals missed events
+    MSGraph->>OutlookMCP: POST /mail-subscription/lifecycle (missed)
+    OutlookMCP->>OutlookMCP: Validate clientState secret
+    OutlookMCP->>OutlookMCP: Trigger live catch-up run from watermark
 ```
 
-**Subscription states:** See [Subscription Management — Subscription Status](./subscription-management.md#Subscription-Status) for the full status reference.
+**Subscription states:**
+
+| Status | Meaning | Action |
+|--------|---------|--------|
+| `active` | Subscription valid, more than 15 minutes until expiry | None required |
+| `expiring_soon` | Less than 15 minutes until expiry | Renewal is automatic; no action needed |
+| `expired` | Subscription has lapsed | Call `reconnect_inbox` |
+| `not_configured` | No subscription exists | Call `reconnect_inbox` |
 
 **Key points:**
 
-- Microsoft sends lifecycle notifications before a subscription expires (`reauthorizationRequired`) and when it removes one (`subscriptionRemoved`).
+- Microsoft sends lifecycle notifications before a subscription expires (`reauthorizationRequired`), when it removes one (`subscriptionRemoved`), and when change notifications were lost (`missed`).
 - All lifecycle notifications are validated against the `MICROSOFT_WEBHOOK_SECRET` via the `clientState` field.
 - `reconnect_inbox` is idempotent: it creates a new subscription only if none exists or the existing one has expired. If the subscription is `already_active` or `expiring_soon`, no changes are made.
 
 ## Live Catch-Up: Webhook-Driven Email Ingestion
 
-When a new email arrives in the user's Outlook mailbox, Microsoft Graph sends a webhook notification. The server enqueues the notification in RabbitMQ and returns `202 Accepted` immediately, then processes it asynchronously.
-
-For the detailed sequence diagram and full technical description, see [Live Catch-Up](./live-catchup.md).
+When a new email arrives in the user's Outlook mailbox, Microsoft Graph sends a webhook notification. The server enqueues the notification in RabbitMQ and returns `202 Accepted` immediately. The consumer then fetches and ingests new messages inline within the same execution.
 
 **Key points:**
 
-- Microsoft requires a response within 10 seconds (Microsoft limit, not configurable). The server enqueues the notification immediately and returns `202 Accepted` — actual email processing happens asynchronously.
+- Microsoft requires a response within 10 seconds (Microsoft limit, not configurable). The server enqueues the notification immediately and returns `202 Accepted` — actual email fetching and ingestion happen inline in the consumer, after the webhook response is already sent.
 - Buffering applies when another live catch-up consumer is already processing, or when the watermark has not been set yet (full sync has not started). Messages are flushed once the blocker clears.
 - The watermark (`newestLastModifiedDateTime`) is **initialized by full sync** the first time it runs and **maintained by live catch-up** on every subsequent notification.
-- `deleted` change notifications are discarded. Deletions are handled by [directory sync](./directory-sync.md) and by detecting emails moved to ignored folders.
+- `deleted` change notifications are discarded. Deletions are handled by [directory sync](#Directory-Sync-Flow) and by detecting emails moved to ignored folders.
 
 ## Full Sync: Historical Email Ingestion
 
 After a subscription is created, the server automatically begins ingesting the user's historical emails. It fetches messages from Microsoft Graph in paginated batches (newest first), applies the configured mail filters, and uploads them to the Unique Knowledge Base. The sync is resumable across restarts and initializes the watermark that live catch-up depends on.
 
-For the detailed sequence diagram and full technical description, see [Full Sync](./full-sync.md).
-
 **Key points:**
 
-- Full sync is triggered automatically when a subscription is created — users do not need to invoke it manually.
+- Full sync is triggered asynchronously: subscription creation publishes a `subscription-created` event to RabbitMQ, which the server consumes to begin the sync — users do not need to invoke it manually.
 - The sync is resumable: the Graph pagination cursor is persisted so a crash or restart picks up where it left off.
 - Stale syncs (no heartbeat for 20+ minutes) are automatically restarted by the sync recovery module.
 - `ignoredBefore` is applied as a Graph API query filter. `ignoredSenders` and `ignoredContents` are applied in-memory after each batch is fetched.
@@ -150,12 +158,10 @@ For the detailed sequence diagram and full technical description, see [Full Sync
 
 The server continuously syncs the user's Outlook folder structure from Microsoft Graph. This serves two purposes: enabling folder-based search filtering via the `list_folders` tool, and tracking email movement between folders to handle "deleted" emails without relying on delete notifications.
 
-For the detailed sequence diagram and full technical description, see [Directory Sync](./directory-sync.md).
-
 **Key points:**
 
 - Directory sync runs on a 5-minute schedule using Graph delta queries, plus on-demand at the start of each full sync and live catch-up execution.
-- Folders such as Deleted Items and Junk Email are excluded from sync (`ignoreForSync = true`). When an email is moved to an excluded folder, it is removed from the knowledge base.
+- System folders such as Deleted Items, Junk Email, Recoverable Items Deletions, and Conversation History are excluded from sync (`ignoreForSync = true`). When an email is moved to an excluded folder, it is removed from the knowledge base.
 - The `list_folders` tool returns the folder tree synced here. The folder IDs it returns can be passed in the `conditions[].directories` field of `search_emails` to narrow results to a specific mailbox folder.
 
 ## Email Draft Creation Flow
@@ -171,7 +177,7 @@ sequenceDiagram
     participant MSGraph as Microsoft Graph API
 
     MCPClient->>OutlookMCP: create_draft_email (subject, body, recipients, attachments)
-    OutlookMCP->>MSGraph: POST /me/messages (subject, body, toRecipients, ccRecipients)
+    OutlookMCP->>MSGraph: POST /me/messages (subject, body as HTML, toRecipients, ccRecipients)
     MSGraph->>OutlookMCP: Draft created (draftId, webLink)
 
     opt Attachments provided
@@ -193,6 +199,4 @@ sequenceDiagram
 ## Related Documentation
 
 - [Architecture](./architecture.md) - System components and module descriptions
-- [Full Sync](./full-sync.md) - Full sync mechanics, states, and filters in detail
-- [Live Catch-Up](./live-catchup.md) - Webhook-driven sync, subscription lifecycle, and directory sync in detail
 - [Security](./security.md) - Token encryption, PKCE, and token rotation

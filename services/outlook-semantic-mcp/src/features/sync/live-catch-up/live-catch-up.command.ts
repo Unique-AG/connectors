@@ -1,114 +1,160 @@
-import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
+import assert from 'node:assert';
+import { UniqueApiClient, UniqueFile } from '@unique-ag/unique-api';
+import { createSmeared, Smeared } from '@unique-ag/utils';
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Attributes, Counter } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
-import { Span } from 'nestjs-otel';
-import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
+import { MetricService, Span } from 'nestjs-otel';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions, userProfiles } from '~/db';
+import {
+  InboxConfigurationMailFilters,
+  inboxConfigurationMailFilters,
+} from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
+import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { sqlArray } from '~/utils/sql-array';
-import { MessageEventDto } from '../../mail-ingestion/dtos/message-event.dto';
+import { greatestFrom } from '~/utils/greatest-from';
+import { isWithinCooldown } from '~/utils/is-within-cooldown';
+import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import {
-  FullSyncGraphMessage,
-  FullSyncGraphMessageFields,
-  fullSyncGraphMessageResponseSchema,
-} from '../../mail-ingestion/dtos/microsoft-graph.dtos';
+  GraphMessage,
+  GraphMessageFields,
+  graphMessagesResponseSchema,
+} from '../../process-email/dtos/microsoft-graph.dtos';
+import { ProcessEmailCommand } from '../../process-email/process-email.command';
+
+export const RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES = 20;
+export const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
+export const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 30;
 
 @Injectable()
 export class LiveCatchUpCommand {
   private readonly logger = new Logger(this.constructor.name);
+  private readonly messagesProcessed: Counter<Attributes>;
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
-    private readonly amqp: AmqpConnection,
+    private readonly processEmailCommand: ProcessEmailCommand,
     private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
+    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-  ) {}
+    metricService: MetricService,
+  ) {
+    this.messagesProcessed = metricService.getCounter('live_catchup_messagest_total', {
+      description: 'Total messages processed during full sync',
+    });
+  }
 
   @Span()
-  public async run({
-    subscriptionId,
-    messageIds = [],
-  }: {
+  public async run(input: {
+    liveCatchupOverlappingWindow: number;
     subscriptionId: string;
-    messageIds?: string[];
+  }): Promise<void> {
+    await withRetryAttempts({
+      fn: () => this.runLiveCatchup(input),
+      onError: rethrowRateLimitError,
+      getResultFailure: () => 'failed',
+    });
+  }
+
+  @Span()
+  public async runLiveCatchup({
+    subscriptionId,
+    liveCatchupOverlappingWindow,
+  }: {
+    liveCatchupOverlappingWindow: number;
+    subscriptionId: string;
   }): Promise<void> {
     traceAttrs({ subscriptionId });
     this.logger.log({
       subscriptionId,
-      webhookMessageIds: messageIds.length,
       msg: 'Live catch-up triggered',
     });
 
-    const subscription = await this.db.query.subscriptions.findFirst({
-      columns: { userProfileId: true },
-      where: eq(subscriptions.subscriptionId, subscriptionId),
-    });
-
-    if (!subscription) {
-      this.logger.warn({ subscriptionId, msg: 'Subscription not found, skipping' });
+    const userProfile = await this.db
+      .select({
+        userProfileId: userProfiles.id,
+        userEmail: userProfiles.email,
+        providerUserId: userProfiles.providerUserId,
+      })
+      .from(subscriptions)
+      .innerJoin(userProfiles, eq(subscriptions.userProfileId, userProfiles.id))
+      .where(eq(subscriptions.subscriptionId, subscriptionId))
+      .then((rows) => rows[0]);
+    if (!userProfile) {
       return;
     }
 
-    const { userProfileId } = subscription;
-    traceAttrs({ userProfileId });
+    assert.ok(userProfile.userEmail, `Missing email for: ${userProfile.userProfileId}`);
 
-    const lockResult = await this.acquireLock(userProfileId, messageIds);
+    const lockResult = await this.acquireLock(userProfile.userProfileId);
     if (lockResult.status === 'skip') {
       return;
     }
 
-    const { watermark } = lockResult;
+    const { watermark, filters } = lockResult;
 
     try {
-      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfileId));
+      await this.syncDirectoriesCommand.run(
+        convertUserProfileIdToTypeId(userProfile.userProfileId),
+      );
 
-      const { totalScheduled, scheduledIds } = await this.fetchAndScheduleBatches({
-        userProfileId,
-        subscriptionId,
+      const client = this.graphClientFactory.createClientForUser(userProfile.userProfileId);
+
+      await this.processMessages({
+        user: {
+          email: createSmeared(userProfile.userEmail),
+          profileId: userProfile.userProfileId,
+          providerId: userProfile.providerUserId,
+        },
+        liveCatchupOverlappingWindow,
+        client,
         watermark,
-      });
-
-      const flushedCount = await this.flushPendingMessages({
-        userProfileId,
-        subscriptionId,
-        alreadyScheduledIds: scheduledIds,
+        filters,
       });
 
       this.logger.log({
-        userProfileId,
+        userProfileId: userProfile.userProfileId,
         subscriptionId,
-        totalScheduled: totalScheduled + flushedCount,
-        fromBatches: totalScheduled,
-        fromPendingFlush: flushedCount,
         msg: 'Live catch-up completed',
       });
+      await this.db
+        .update(inboxConfigurations)
+        .set({ liveCatchUpState: 'ready', liveCatchUpHeartbeatAt: sql`NOW()` })
+        .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
+        .execute();
     } catch (error) {
       this.logger.error({
         err: error,
         msg: 'Failed to execute live catch-up',
-        userProfileId,
+        userProfileId: userProfile.userProfileId,
         subscriptionId,
       });
       await this.db
         .update(inboxConfigurations)
-        .set({ liveCatchUpState: 'failed' })
-        .where(eq(inboxConfigurations.userProfileId, userProfileId))
+        .set({ liveCatchUpState: 'failed', liveCatchUpHeartbeatAt: sql`NOW()` })
+        .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
         .execute();
     }
   }
 
   private async acquireLock(
     userProfileId: string,
-    messageIds: string[],
-  ): Promise<{ status: 'proceed'; watermark: Date } | { status: 'skip' }> {
+  ): Promise<
+    | { status: 'proceed'; watermark: Date; filters: InboxConfigurationMailFilters }
+    | { status: 'skip' }
+  > {
     return this.db.transaction(async (tx) => {
       const inboxConfig = await tx
         .select({
           liveCatchUpState: inboxConfigurations.liveCatchUpState,
           newestLastModifiedDateTime: inboxConfigurations.newestLastModifiedDateTime,
+          liveCatchUpHeartbeatAt: inboxConfigurations.liveCatchUpHeartbeatAt,
+          filters: inboxConfigurations.filters,
         })
         .from(inboxConfigurations)
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
@@ -120,92 +166,70 @@ export class LiveCatchUpCommand {
         return { status: 'skip' };
       }
 
-      // This function is defined here because it needs the transaction context
-      const addMessagesToPendingMessages = async (): Promise<void> => {
-        if (messageIds.length === 0) {
-          return;
-        }
-
-        await tx
-          .update(inboxConfigurations)
-          .set({
-            pendingLiveMessageIds: sql`array_cat(${inboxConfigurations.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
-          })
-          .where(eq(inboxConfigurations.userProfileId, userProfileId))
-          .execute();
-      };
-
-      if (inboxConfig.liveCatchUpState === 'running') {
-        // We buffer the messages because once the process finishes it will flush the messages.
-        await addMessagesToPendingMessages();
-        this.logger.log({
-          userProfileId,
-          bufferedCount: messageIds.length,
-          msg: `Live catch-up already running, buffered message IDs count: ${messageIds.length}`,
-        });
-        return { status: 'skip' };
-      }
-
-      if (!inboxConfig.newestLastModifiedDateTime) {
-        // We buffer the messages to ensure we do not lose any message, and next live update will ensure it included this messages.
-        // This case should can only happen if a live update catches the lock before the full sync basically the following case.
-        // We subscribe to microsoft + trigger event for full sync.
-        // Microsoft triggers live update:
-        // Live update catches the lock before full sync catches the lock.
-        await addMessagesToPendingMessages();
-        this.logger.log({
-          userProfileId,
-          msg: `No watermark yet (full sync not started), skipping, buffered message IDs count: ${messageIds.length}`,
-        });
+      if (
+        inboxConfig.liveCatchUpState === 'running' &&
+        isWithinCooldown(inboxConfig.liveCatchUpHeartbeatAt, RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES)
+      ) {
+        this.logger.log({ userProfileId, msg: `Live catch-up already running. Skipping` });
         return { status: 'skip' };
       }
 
       await tx
         .update(inboxConfigurations)
         .set({
-          ...(messageIds.length > 0
-            ? {
-                pendingLiveMessageIds: sql`array_cat(${inboxConfigurations.pendingLiveMessageIds}, ${sqlArray(messageIds)})`,
-              }
-            : {}),
           liveCatchUpState: 'running',
           liveCatchUpHeartbeatAt: sql`NOW()`,
         })
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
         .execute();
 
+      const filters = inboxConfigurationMailFilters.parse(inboxConfig.filters);
       return {
         status: 'proceed',
         watermark: inboxConfig.newestLastModifiedDateTime,
+        filters,
       };
     });
   }
 
-  private async fetchAndScheduleBatches({
-    userProfileId,
-    subscriptionId,
+  private async processMessages({
+    user,
+    client,
     watermark,
+    filters,
+    liveCatchupOverlappingWindow,
   }: {
-    userProfileId: string;
-    subscriptionId: string;
+    user: {
+      email: Smeared;
+      profileId: string;
+      providerId: string;
+    };
+    liveCatchupOverlappingWindow: number;
+    client: Client;
     watermark: Date;
-  }): Promise<{ totalScheduled: number; scheduledIds: Set<string> }> {
-    const client = this.graphClientFactory.createClientForUser(userProfileId);
-    let totalScheduled = 0;
-    const scheduledIds = new Set<string>();
+    filters: InboxConfigurationMailFilters;
+  }): Promise<Set<string>> {
+    const processedIds = new Set<string>();
     let batchNumber = 0;
+    const logContext = {
+      userProfileId: user.profileId,
+      providerUserId: user.providerId,
+      userEmail: user.email.toString(),
+    };
+
+    watermark.setMinutes(watermark.getMinutes() - liveCatchupOverlappingWindow);
 
     let emailsRaw = await client
       .api('me/messages')
       .header('Prefer', 'IdType="ImmutableId"')
-      .select(FullSyncGraphMessageFields)
+      .select(GraphMessageFields)
       // We cannot combine a createdDateTime filter with orderby on lastModifiedDateTime on the
       // Microsoft side (InefficientFilter). The ignoredBefore check is applied in-memory below.
       .filter(`lastModifiedDateTime ge ${watermark.toISOString()}`)
       .orderby('lastModifiedDateTime asc')
       .top(200)
       .get();
-    let emailResponse = fullSyncGraphMessageResponseSchema.parse(emailsRaw);
+    let emailResponse = graphMessagesResponseSchema.parse(emailsRaw);
 
     while (true) {
       batchNumber++;
@@ -215,25 +239,50 @@ export class LiveCatchUpCommand {
         break;
       }
 
-      const batchScheduledIds = await this.publishBatch({
-        batch,
-        subscriptionId,
+      const fileKeys = batch.map((item) =>
+        getUniqueKeyForMessage({ userEmail: user.email.value, messageId: item.id }),
+      );
+      const uniqueFiles = await this.uniqueApi.files.getByKeys(fileKeys);
+      const uniqueFilesHashMap = uniqueFiles.reduce<Record<string, UniqueFile>>((acc, file) => {
+        acc[file.key] = file;
+        return acc;
+      }, {});
+      const perOutcomeStats: Record<string, number> = {};
+
+      this.logger.debug({
+        ...logContext,
+        msg: `Processing batch`,
+        batchSize: batch.length,
+        numberOfFilesFoundInUnique: uniqueFiles.length,
       });
-      for (const id of batchScheduledIds) {
-        scheduledIds.add(id);
+
+      for (const graphMessage of batch) {
+        const fileKey = getUniqueKeyForMessage({
+          userEmail: user.email.value,
+          messageId: graphMessage.id,
+        });
+        const result = await this.processEmailCommand.run({
+          user,
+          client,
+          file: uniqueFilesHashMap[fileKey] ?? null,
+          fileKey,
+          filters,
+          graphMessage,
+        });
+        const key = `totalMessages_${result}`;
+        perOutcomeStats[key] = (perOutcomeStats[key] ?? 0) + 1;
+        this.messagesProcessed.add(1, { outcome: result });
+        await this.updateWatermarks({ email: graphMessage, userProfileId: user.profileId });
+        processedIds.add(graphMessage.id);
       }
-      totalScheduled += batchScheduledIds.length;
 
       this.logger.log({
-        userProfileId,
+        ...perOutcomeStats,
+        userProfileId: user.profileId,
         batchNumber,
         batchSize: batch.length,
-        scheduled: batchScheduledIds.length,
-        totalScheduled,
         msg: 'Batch processed',
       });
-
-      await this.updateWatermarks({ batch, userProfileId });
 
       if (!emailResponse['@odata.nextLink']) {
         break;
@@ -243,123 +292,38 @@ export class LiveCatchUpCommand {
         .api(emailResponse['@odata.nextLink'])
         .header('Prefer', 'IdType="ImmutableId"')
         .get();
-      emailResponse = fullSyncGraphMessageResponseSchema.parse(emailsRaw);
+      emailResponse = graphMessagesResponseSchema.parse(emailsRaw);
     }
 
     traceEvent('live catch-up batches completed', {
-      totalScheduled,
+      processedCount: processedIds.size,
       batchCount: batchNumber,
     });
 
-    return { totalScheduled, scheduledIds };
-  }
-
-  private async publishBatch({
-    batch,
-    subscriptionId,
-  }: {
-    batch: FullSyncGraphMessage[];
-    subscriptionId: string;
-  }): Promise<string[]> {
-    const publishedIds: string[] = [];
-    let publishedEvents = 0;
-
-    for (const email of batch) {
-      publishedEvents++;
-      const event = MessageEventDto.encode({
-        type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
-        payload: { subscriptionId, messageId: email.id },
-      });
-      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
-      publishedIds.push(email.id);
-    }
-
-    this.logger.debug({
-      subscriptionId,
-      msg: `PublishBatch - Published Messages: ${publishedEvents}`,
-    });
-
-    return publishedIds;
-  }
-
-  private async publishMessages({
-    messageIds,
-    subscriptionId,
-  }: {
-    messageIds: string[];
-    subscriptionId: string;
-  }): Promise<number> {
-    for (const messageId of messageIds) {
-      const event = MessageEventDto.encode({
-        type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
-        payload: { subscriptionId, messageId },
-      });
-      await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
-    }
-
-    return messageIds.length;
-  }
-
-  private async flushPendingMessages({
-    userProfileId,
-    subscriptionId,
-    alreadyScheduledIds,
-  }: {
-    userProfileId: string;
-    subscriptionId: string;
-    alreadyScheduledIds: Set<string>;
-  }): Promise<number> {
-    return await this.db.transaction(async (tx) => {
-      const row = await tx
-        .select({ pendingLiveMessageIds: inboxConfigurations.pendingLiveMessageIds })
-        .from(inboxConfigurations)
-        .where(eq(inboxConfigurations.userProfileId, userProfileId))
-        .for('update')
-        .then((rows) => rows[0]);
-
-      if (!row) {
-        return 0;
-      }
-
-      const idsToFlush = row.pendingLiveMessageIds.filter((id) => !alreadyScheduledIds.has(id));
-
-      await tx
-        .update(inboxConfigurations)
-        .set({ pendingLiveMessageIds: [], liveCatchUpState: 'ready' })
-        .where(eq(inboxConfigurations.userProfileId, userProfileId))
-        .execute();
-
-      if (idsToFlush.length > 0) {
-        this.logger.debug({
-          msg: `Flushing buffered messages while running: ${idsToFlush.length}`,
-        });
-        await this.publishMessages({ messageIds: idsToFlush, subscriptionId });
-      } else {
-        this.logger.debug({ msg: `No messages to flush buffered messages is empty` });
-      }
-
-      return idsToFlush.length;
-    });
+    return processedIds;
   }
 
   private async updateWatermarks({
-    batch,
+    email,
     userProfileId,
   }: {
-    batch: FullSyncGraphMessage[];
+    email: GraphMessage;
     userProfileId: string;
   }): Promise<void> {
-    const createdDates = batch.map((e) => new Date(e.createdDateTime));
-    const modifiedDates = batch.map((e) => new Date(e.lastModifiedDateTime));
-
-    const batchNewestCreated = new Date(Math.max(...createdDates.map((d) => d.getTime())));
-    const batchNewestModified = new Date(Math.max(...modifiedDates.map((d) => d.getTime())));
+    const receivedDateTime = new Date(email.receivedDateTime);
+    const lastModifiedDateTime = new Date(email.lastModifiedDateTime);
 
     await this.db
       .update(inboxConfigurations)
       .set({
-        newestCreatedDateTime: sql`GREATEST(COALESCE(${inboxConfigurations.newestCreatedDateTime}, '-infinity'::timestamptz), ${batchNewestCreated})`,
-        newestLastModifiedDateTime: sql`GREATEST(COALESCE(${inboxConfigurations.newestLastModifiedDateTime}, '-infinity'::timestamptz), ${batchNewestModified})`,
+        newestReceivedEmailDateTime: greatestFrom(
+          inboxConfigurations.newestReceivedEmailDateTime,
+          receivedDateTime,
+        ),
+        newestLastModifiedDateTime: greatestFrom(
+          inboxConfigurations.newestLastModifiedDateTime,
+          lastModifiedDateTime,
+        ),
         liveCatchUpHeartbeatAt: sql`NOW()`,
       })
       .where(eq(inboxConfigurations.userProfileId, userProfileId))

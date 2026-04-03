@@ -50,8 +50,8 @@ export const GetFullSyncStatsResponse = z.object({
         .number()
         .describe('Messages that failed upload after 3 retries.'),
       dateWindow: z.object({
-        newestCreatedDateTime: z.string().nullable(),
-        oldestCreatedDateTime: z.string().nullable(),
+        newestReceivedEmailDateTime: z.string().nullable(),
+        oldestReceivedEmailDateTime: z.string().nullable(),
         newestLastModifiedDateTime: z.string().nullable(),
       }),
     })
@@ -154,8 +154,8 @@ export class GetFullSyncStatsQuery {
         ignoredContents: filters.ignoredContents.map((r) => r.toString()),
       },
       dateWindow: {
-        newestCreatedDateTime: inboxConfig.newestCreatedDateTime?.toISOString() ?? null,
-        oldestCreatedDateTime: inboxConfig.oldestCreatedDateTime?.toISOString() ?? null,
+        newestReceivedEmailDateTime: inboxConfig.newestReceivedEmailDateTime?.toISOString() ?? null,
+        oldestReceivedEmailDateTime: inboxConfig.oldestReceivedEmailDateTime?.toISOString() ?? null,
         newestLastModifiedDateTime: inboxConfig.newestLastModifiedDateTime?.toISOString() ?? null,
       },
     };

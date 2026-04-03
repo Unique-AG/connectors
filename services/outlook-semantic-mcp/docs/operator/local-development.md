@@ -27,12 +27,12 @@ git clone git@github.com:Unique-AG/connectors.git
 cd services/outlook-semantic-mcp
 pnpm install
 
-# Start infrastructure
-docker compose -f docker-compose.prod.yaml up -d
-
-# Configure environment
+# Configure environment (must come before docker compose — docker-compose.prod.yaml reads .env automatically)
 cp .env.example .env
 # Edit .env with your values (see below)
+
+# Start infrastructure
+docker compose -f docker-compose.prod.yaml up -d
 
 # Run migrations
 pnpm db:migrate

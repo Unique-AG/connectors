@@ -84,7 +84,7 @@ The MCP model requires **self-service user connections** where each user:
 
 1. Connects their own account
 2. Controls what data they share
-3. Can disconnect at any time via `remove_inbox_connection`
+3. Can permanently delete their synced inbox data at any time via `delete_inbox_data`
 
 Application permissions would require tenant administrators to create Application Access Policies for each user via PowerShell — impractical for self-service MCP connections. See [Microsoft Entra ID - Authentication flows](https://learn.microsoft.com/en-us/entra/identity-platform/msal-authentication-flows) for details.
 

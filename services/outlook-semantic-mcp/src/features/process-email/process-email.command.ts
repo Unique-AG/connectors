@@ -1,40 +1,32 @@
 import assert from 'node:assert';
-import { ContentMetadata, UniqueApiClient, UniqueOwnerType } from '@unique-ag/unique-api';
-import { createSmeared } from '@unique-ag/utils';
+import {
+  ContentMetadata,
+  UniqueApiClient,
+  UniqueFile,
+  UniqueOwnerType,
+} from '@unique-ag/unique-api';
+import { Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNullish, isNullish, omit } from 'remeda';
+import { clone, isNonNullish, isNullish, omit } from 'remeda';
 import { UniqueConfigNamespaced } from '~/config';
-import { DirectoryType, DRIZZLE, DrizzleDatabase, directories, userProfiles } from '~/db';
+import { DRIZZLE, DrizzleDatabase, directories } from '~/db';
 import { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UploadFileForIngestionCommand } from '~/unique/upload-file-for-ingestion.command';
+import { isRateLimitError } from '~/utils/is-rate-limit-error';
+import { Nullish } from '~/utils/nullish';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
+import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { UpsertDirectoryCommand } from '../directories-sync/upsert-directory.command';
 import { GraphMessage } from './dtos/microsoft-graph.dtos';
-import { GetMessageDetailsQuery } from './get-message-details.query';
 import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
-import { getUniqueKeyForMessage } from './utils/get-unique-key-for-message';
 import { shouldSkipEmail } from './utils/should-skip-email';
-
-type LogContext = Partial<{
-  messageId: string;
-  userProfileId: string;
-  userEmail: string;
-  uniqueFileId: string;
-  key: string;
-  parentDirectoryId: string;
-  parentDirectoryIgnoredForSync: boolean;
-  parentDirectoryType: DirectoryType;
-  uniqueContentId: string;
-  uniqueWriteUrl: string;
-}>;
 
 export type MessageIngestionResult =
   | 'ingested'
@@ -42,74 +34,93 @@ export type MessageIngestionResult =
   | 'skipped-content-unchanged-already-ingested'
   | 'metadata-updated';
 
+interface UserContext {
+  email: Smeared;
+  // user_profile.id in our database
+  profileId: string;
+  // provider_user_id in our daabase
+  providerId: string;
+}
+
+export interface ProcessEmailCommandInput {
+  client: Client;
+  graphMessage: GraphMessage;
+  fileKey: string;
+  file: Nullish<UniqueFile>;
+  user: UserContext;
+  filters: InboxConfigurationMailFilters;
+}
+
+interface BaseLogContext extends Record<string, string | undefined | boolean> {
+  messageId: string;
+  internetId: string | undefined;
+  userProfileId: string;
+  providerUserId: string;
+  userEmail: string;
+}
+
 @Injectable()
-export class IngestEmailCommand {
+export class ProcessEmailCommand {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     private readonly configService: ConfigService<UniqueConfigNamespaced, true>,
-    private readonly graphClientFactory: GraphClientFactory,
-    private readonly getMessageDetailsQuery: GetMessageDetailsQuery,
     private readonly uploadFileForIngestionCommand: UploadFileForIngestionCommand,
     private readonly upsertDirectoryCommand: UpsertDirectoryCommand,
   ) {}
 
   @Span()
-  public async run({
-    userProfileId,
-    messageId,
-    filters,
-  }: {
-    userProfileId: string;
-    messageId: string;
-    filters?: InboxConfigurationMailFilters;
-  }): Promise<MessageIngestionResult> {
-    traceAttrs({ userProfileId: userProfileId, messageId: messageId });
-    const userProfile = await this.db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, userProfileId),
-    });
-    assert.ok(userProfile, `User Profile missing for id: ${userProfileId}`);
-    assert.ok(userProfile.email, `User Profile email missing for: ${userProfile.id}`);
-    const graphMessage = await this.getMessageDetailsQuery.run({
-      userProfileId: userProfile.id,
-      messageId,
-    });
-
-    if (filters) {
-      const skipResult = shouldSkipEmail(graphMessage, filters, { userProfileId });
-      if (skipResult.skip) {
-        const { reason, matchedPattern } = skipResult;
-        traceEvent('email skipped by filter', { reason, matchedPattern, userProfileId });
-        this.logger.log({
-          messageId,
-          userProfileId,
-          reason,
-          matchedPattern,
-          msg: 'Email skipped by filter',
+  public async run(input: ProcessEmailCommandInput): Promise<MessageIngestionResult | 'failed'> {
+    return await withRetryAttempts({
+      fn: () => {
+        return this.runProcessEmail(input);
+      },
+      onError: rethrowRateLimitError,
+      getResultFailure: (error) => {
+        this.logger.warn({
+          ...createLogContext(input),
+          msg: `Failed to process message: ${input.graphMessage.id} ${input.file ? `with unique file key: ${input.file.key}` : `without unique file`}`,
+          err: error,
         });
-        return 'skipped';
-      }
-    }
+        return 'failed';
+      },
+    });
+  }
 
+  @Span()
+  private async runProcessEmail(input: ProcessEmailCommandInput): Promise<MessageIngestionResult> {
+    const logContext = createLogContext(input);
+    const { graphMessage, file, fileKey, user, filters, client } = input;
     const metadata = getMetadataFromMessage(graphMessage);
-    const fileKey = getUniqueKeyForMessage(userProfile.email, graphMessage);
-    const files = await this.uniqueApi.files.getByKeys([fileKey]);
-    const file = files.at(0);
 
     let parentDirectory = await this.db.query.directories.findFirst({
       where: eq(directories.providerDirectoryId, graphMessage.parentFolderId),
     });
-    const logContext: LogContext = {
-      messageId,
-      userProfileId,
-      userEmail: createSmeared(userProfile.email).toString(),
-      key: fileKey,
-      uniqueFileId: file?.id,
-      parentDirectoryId: graphMessage.parentFolderId,
-    };
-    traceAttrs(logContext);
+
+    if (filters) {
+      const skipResult = shouldSkipEmail(graphMessage, filters, {
+        userProfileId: user.profileId,
+      });
+      if (skipResult.skip) {
+        if (file) {
+          await this.deleteWithoutRetry(file.id, {
+            ...logContext,
+            additionalFailureMessage: `Deleting file skipped by filters failed`,
+          });
+        }
+
+        const { reason, matchedPattern } = skipResult;
+        const event = {
+          name: 'Email skipped by filter',
+          props: { ...logContext, reason, matchedPattern },
+        };
+        traceEvent(event.name, event.props);
+        this.logger.log({ ...event.props, msg: event.name });
+        return 'skipped';
+      }
+    }
 
     if (isNullish(parentDirectory)) {
       this.logger.warn({ ...logContext, msg: `New directory detected during emails sync.` });
@@ -117,7 +128,7 @@ export class IngestEmailCommand {
       // which will force the directory sync scheduler to run a full sync.
       parentDirectory = await this.upsertDirectoryCommand.run({
         parentId: null,
-        userProfileId,
+        userProfileId: user.profileId,
         updateOnConflict: false,
         directory: {
           id: graphMessage.parentFolderId,
@@ -129,23 +140,27 @@ export class IngestEmailCommand {
 
     logContext.parentDirectoryIgnoredForSync = parentDirectory.ignoreForSync ?? false;
     logContext.parentDirectoryType = parentDirectory.internalType;
-    traceAttrs(logContext);
+    traceAttrs({
+      parentDirectoryIgnoredForSync: parentDirectory.ignoreForSync ?? false,
+      parentDirectoryType: parentDirectory.internalType,
+    });
 
     if (parentDirectory.ignoreForSync) {
       this.logger.log({ ...logContext, msg: `Parent directory ignored for sync` });
       if (isNonNullish(file)) {
         this.logger.debug({ ...logContext, msg: `Delete file from unique` });
-        await this.uniqueApi.files.delete(file.id);
+        await this.deleteWithoutRetry(file.id, {
+          ...logContext,
+          additionalFailureMessage: `Deleting content from skipped foler failed`,
+        });
       }
       return 'skipped';
     }
 
     const rootScope = await this.uniqueApi.scopes.getByExternalId(
-      getRootScopeExternalIdForUser(userProfile.providerUserId),
+      getRootScopeExternalIdForUser(user.providerId),
     );
     assert.ok(rootScope, `Parent scope id`);
-
-    const client = this.graphClientFactory.createClientForUser(userProfileId);
 
     if (isNonNullish(file) && metadata.sentDateTime === file.metadata?.sentDateTime) {
       if (metadata.lastModifiedDateTime === file.metadata?.lastModifiedDateTime) {
@@ -165,12 +180,11 @@ export class IngestEmailCommand {
       return 'metadata-updated';
     }
 
-    await this.ingestEmail({
+    await this.uploadEmailForIngestion({
       fileKey,
       metadata,
       rootScopeId: rootScope.id,
       graphMessage,
-      messageId,
       client,
       logContext,
     });
@@ -178,28 +192,33 @@ export class IngestEmailCommand {
   }
 
   @Span()
-  private async ingestEmail({
+  private async uploadEmailForIngestion({
     client,
     rootScopeId,
     graphMessage,
     metadata,
-    messageId,
     fileKey,
-    logContext,
+    logContext: logContextRaw,
   }: {
     client: Client;
     rootScopeId: string;
     graphMessage: GraphMessage;
-    messageId: string;
     fileKey: string;
     metadata: MessageMetadata;
-    logContext: LogContext;
+    logContext: {
+      userProfileId: string;
+      providerUserId: string;
+      userEmail: string;
+    };
   }): Promise<void> {
-    this.logger.log({ ...logContext, msg: `File Ingestion Started` });
-    traceEvent(`File Ingestion Started`);
+    // We will update the log context while we run.
+    const logContext = clone(logContextRaw) as Record<string, string>;
+    this.logger.debug({ ...logContext, msg: `Email Ingestion Started` });
+    traceEvent(`Email Ingestion Started`);
+
     const createContentRequest = {
       key: fileKey,
-      title: `${graphMessage.subject ?? '__empty-title__'} - ${graphMessage.id}.eml`,
+      title: `${graphMessage.subject || ''}.eml`,
       mimeType: `message/rfc822`,
       // We pass byteSize as 1 because if we do not pass it the register content request will
       // create the content but the content will not be visible in Knowledge base.
@@ -214,14 +233,16 @@ export class IngestEmailCommand {
       sourceName: INGESTION_SOURCE_NAME,
       storeInternally: this.configService.get('unique.storeInternally', { infer: true }),
     };
+
     this.logger.debug({ ...logContext, msg: `Register content: Started` });
     const content = await this.uniqueApi.ingestion.registerContent(createContentRequest);
     logContext.uniqueContentId = content.id;
+    traceEvent(`Content registered`, logContext);
     this.logger.debug({ ...logContext, msg: `Register content: Finished` });
 
     try {
       this.logger.debug({ ...logContext, msg: `File Upload: Started` });
-      const emailBuffer = await this.getEmlFile({ messageId, client });
+      const emailBuffer = await this.getEmlFile({ messageId: graphMessage.id, client });
       await this.uploadFileForIngestionCommand.run({
         uploadUrl: content.writeUrl,
         content: emailBuffer,
@@ -241,17 +262,14 @@ export class IngestEmailCommand {
     } catch (error) {
       this.logger.warn({
         ...logContext,
+        err: error,
         msg: `Cleaning up registered content after ingestion failure`,
       });
-      try {
-        await this.uniqueApi.files.delete(content.id);
-      } catch (cleanupError) {
-        this.logger.error({
-          ...logContext,
-          err: cleanupError,
-          msg: `Failed to clean up registered content`,
-        });
-      }
+      await this.deleteWithoutRetry(content.id, {
+        ...logContext,
+        additionalFailureMessage: `Delete registered content after ingestion failure failed`,
+      });
+      traceEvent('Email Ingestion Failed');
       throw error;
     }
   }
@@ -301,4 +319,30 @@ export class IngestEmailCommand {
     }
     return Buffer.concat(chunks);
   }
+
+  private async deleteWithoutRetry(
+    contentId: string,
+    logContext: Record<string, string | undefined | boolean>,
+  ): Promise<void> {
+    try {
+      await this.uniqueApi.files.delete(contentId);
+    } catch (err) {
+      if (isRateLimitError(err)) {
+        throw err;
+      }
+      this.logger.warn({
+        ...logContext,
+        err,
+        msg: `Failed to delete content with id: ${contentId}`,
+      });
+    }
+  }
 }
+
+const createLogContext = (input: ProcessEmailCommandInput): BaseLogContext => ({
+  messageId: input.graphMessage.id,
+  internetId: input.graphMessage.internetMessageId ?? undefined,
+  userProfileId: input.user.profileId,
+  providerUserId: input.user.providerId,
+  userEmail: input.user.email.toString(),
+});

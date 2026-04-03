@@ -3,12 +3,12 @@ import {
   RabbitPayload,
   RabbitSubscribe,
 } from '@golevelup/nestjs-rabbitmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
+import { AppConfig, appConfig } from '~/config';
 import { LiveCatchUpCommand } from './live-catch-up.command';
 import { LiveCatchUpEventDto } from './live-catch-up-event.dto';
-import { RecoverLiveCatchupCommand } from './recover-live-catchup.command';
 
 @Injectable()
 export class LiveCatchUpListener {
@@ -16,7 +16,7 @@ export class LiveCatchUpListener {
 
   public constructor(
     private readonly liveCatchUpCommand: LiveCatchUpCommand,
-    private readonly recoverLiveCatchupCommand: RecoverLiveCatchupCommand,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
   ) {}
 
   @RabbitSubscribe({
@@ -30,12 +30,22 @@ export class LiveCatchUpListener {
   public async onLiveCatchUpEvent(@RabbitPayload() payload: unknown): Promise<void> {
     const event = LiveCatchUpEventDto.parse(payload);
     this.logger.log({ msg: 'Live catch-up event received', type: event.type });
-
     switch (event.type) {
-      case 'unique.outlook-semantic-mcp.live-catch-up.execute':
-        return await this.liveCatchUpCommand.run(event.payload);
-      case 'unique.outlook-semantic-mcp.live-catch-up.recovery':
-        return await this.recoverLiveCatchupCommand.run(event.payload);
+      case 'unique.outlook-semantic-mcp.live-catch-up.execute': {
+        return await this.liveCatchUpCommand.run({
+          ...event.payload,
+          liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
+        });
+      }
+      case 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck': {
+        return await this.liveCatchUpCommand.run({
+          ...event.payload,
+          liveCatchupOverlappingWindow: this.config.liveCatchupRecheckOverlappingWindowMinutes,
+        });
+      }
+      default: {
+        this.logger.error({ msg: `Unsuported live catchup event type: ${JSON.stringify(event)}` });
+      }
     }
   }
 }
