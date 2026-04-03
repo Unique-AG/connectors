@@ -111,7 +111,14 @@ sequenceDiagram
     OutlookMCP->>DB: Delete subscription and inbox_configurations records
 ```
 
-**Subscription states:** See [Subscription Management — Subscription Status](./subscription-management.md#Subscription-Status) for the full status reference.
+**Subscription states:**
+
+| Status | Meaning | Action |
+|--------|---------|--------|
+| `active` | Subscription valid, more than 15 minutes until expiry | None required |
+| `expiring_soon` | Less than 15 minutes until expiry | Renewal is automatic; no action needed |
+| `expired` | Subscription has lapsed | Call `reconnect_inbox` |
+| `not_configured` | No subscription exists | Call `reconnect_inbox` |
 
 **Key points:**
 
@@ -122,8 +129,6 @@ sequenceDiagram
 ## Live Catch-Up: Webhook-Driven Email Ingestion
 
 When a new email arrives in the user's Outlook mailbox, Microsoft Graph sends a webhook notification. The server enqueues the notification in RabbitMQ and returns `202 Accepted` immediately. The consumer then fetches and ingests new messages inline within the same execution.
-
-For the detailed sequence diagram and full technical description, see [Live Catch-Up](./live-catchup.md).
 
 **Key points:**
 
@@ -136,8 +141,6 @@ For the detailed sequence diagram and full technical description, see [Live Catc
 
 After a subscription is created, the server automatically begins ingesting the user's historical emails. It fetches messages from Microsoft Graph in paginated batches (newest first), applies the configured mail filters, and uploads them to the Unique Knowledge Base. The sync is resumable across restarts and initializes the watermark that live catch-up depends on.
 
-For the detailed sequence diagram and full technical description, see [Full Sync](./full-sync.md).
-
 **Key points:**
 
 - Full sync is triggered automatically when a subscription is created — users do not need to invoke it manually.
@@ -149,8 +152,6 @@ For the detailed sequence diagram and full technical description, see [Full Sync
 ## Directory Sync Flow
 
 The server continuously syncs the user's Outlook folder structure from Microsoft Graph. This serves two purposes: enabling folder-based search filtering via the `list_folders` tool, and tracking email movement between folders to handle "deleted" emails without relying on delete notifications.
-
-For the detailed sequence diagram and full technical description, see [Directory Sync](./directory-sync.md).
 
 **Key points:**
 
@@ -193,6 +194,4 @@ sequenceDiagram
 ## Related Documentation
 
 - [Architecture](./architecture.md) - System components and module descriptions
-- [Full Sync](./full-sync.md) - Full sync mechanics, states, and filters in detail
-- [Live Catch-Up](./live-catchup.md) - Webhook-driven sync, subscription lifecycle, and directory sync in detail
 - [Security](./security.md) - Token encryption, PKCE, and token rotation
