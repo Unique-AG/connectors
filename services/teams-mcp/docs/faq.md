@@ -313,6 +313,67 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 - [Authentication Architecture - MCP OAuth (Internal)](./technical/architecture.md#mcp-oauth-internal)
 - [MCP Authorization](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization) - MCP protocol authorization spec
 
+## Data Sync
+
+### Why can't historical transcripts be synced?
+
+**Answer:** Microsoft Graph does not provide a way to list transcripts across all past meetings using delegated permissions. The only cross-meeting transcript listing API is `getAllTranscripts`:
+
+```
+GET /users/{userId}/onlineMeetings/getAllTranscripts(meetingOrganizerUserId='{userId}',startDateTime=...)
+```
+
+This API requires **application permissions** (`OnlineMeetingTranscript.Read.All`). Microsoft explicitly marks delegated (user) permissions as **Not supported** for this endpoint.
+
+Teams MCP uses delegated permissions so users can connect their own Microsoft account without IT administrator involvement. With delegated permissions the only supported path is `GET /users/{userId}/onlineMeetings/{meetingId}/transcripts`, which requires knowing the meeting ID in advance — making bulk historical enumeration impossible.
+
+As a result, Teams MCP can only capture transcripts for meetings that occur **after** the user connects. Any meetings that took place before the subscription was created are inaccessible.
+
+**Additional historical limits (even with application permissions):**
+
+- One-time meetings expire 60 days after their scheduled time; the transcript API returns an error for expired meetings.
+- Recording/transcript files are deleted after the tenant's expiration policy window (Microsoft default: 120 days).
+
+**See also:**
+
+- [onlineMeeting: getAllTranscripts — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/onlinemeeting-getalltranscripts)
+- [Limits and specifications for Microsoft Teams — Meeting expiration](https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams)
+- [Microsoft Graph Constraints](./README.md#microsoft-graph-api-constraints)
+
+### Why is there no delta sync?
+
+**Answer:** Microsoft Graph does expose delta APIs for transcripts and recordings — `callTranscript: delta` and `callRecording: delta` — which support both full initial sync and incremental sync (returning only items added since a `$deltaToken`). However, these APIs require **application permissions**. Microsoft explicitly marks delegated permissions as **Not supported**:
+
+| Permission type | Support |
+|---|---|
+| Delegated (work or school account) | **Not supported** |
+| Delegated (personal Microsoft account) | **Not supported** |
+| Application | `OnlineMeetingTranscript.Read.All` |
+
+Because Teams MCP uses delegated permissions, delta sync is unavailable. The service instead relies on real-time webhook notifications (change notifications), which deliver new transcript events as they occur. This covers all meetings going forward but cannot recover transcripts missed due to a subscription gap.
+
+Switching to application permissions would unlock delta sync, but would require tenant administrators to configure [Application Access Policies](https://learn.microsoft.com/en-us/graph/cloud-communication-online-meeting-application-access-policy) via PowerShell for each individual user — defeating the self-service connection model.
+
+**See also:**
+
+- [callTranscript: delta — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/calltranscript-delta)
+- [callRecording: delta — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/callrecording-delta)
+- [Microsoft Graph Constraints](./README.md#microsoft-graph-api-constraints)
+
+### What happens if I miss transcripts during a subscription gap?
+
+**Answer:** They are permanently lost. Microsoft Graph only delivers webhook notifications for transcripts created while a subscription is active. If a subscription expires (or is deleted and recreated), any transcripts produced during the gap will never generate a notification.
+
+This is a fundamental limitation of the change notification model combined with the unavailability of delta sync under delegated permissions. There is no catch-up or replay mechanism.
+
+To minimise the risk:
+
+- Ensure the renewal cron runs reliably (default: 3 AM UTC daily).
+- Monitor for `subscription_renewal_failed` log events — a failed renewal is the most common cause of gaps.
+- Use subscription **renewal** (PATCH) rather than recreation (DELETE + POST). See [Why are subscriptions renewed instead of recreated?](./faq.md#why-are-subscriptions-renewed-instead-of-recreated)
+
+**See also:** [Subscription Lifecycle](./technical/flows.md#subscription-lifecycle)
+
 ## Subscriptions & Processing
 
 ### Why do subscriptions expire?
@@ -328,7 +389,12 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 - User revoked app consent
 - Network issues reaching Microsoft
 
-**See also:** [Subscription Lifecycle](./technical/flows.md#subscription-lifecycle)
+Any transcripts produced between the failed renewal and the user reconnecting are **permanently lost** — there is no backfill or catch-up mechanism once a subscription lapses.
+
+**See also:**
+
+- [Subscription Lifecycle](./technical/flows.md#subscription-lifecycle)
+- [What happens if I miss transcripts during a subscription gap?](./faq.md#what-happens-if-i-miss-transcripts-during-a-subscription-gap)
 
 ### Why aren't transcripts appearing in Unique?
 
@@ -383,6 +449,14 @@ This ensures we meet Microsoft's strict timeout requirements while processing tr
 **Answer:** The request is rejected with 401 Unauthorized. Microsoft will retry the notification. If validation consistently fails, Microsoft may stop sending notifications for that subscription.
 
 **See also:** [Webhook Validation](./technical/security.md#webhook-validation)
+
+### What happens to messages that fail processing?
+
+**Answer:** Failed transcript processing messages are nacked and routed to a Dead Letter Exchange (DLX). Messages accumulate there indefinitely — there is no automatic TTL or retry from the DLQ.
+
+An operator must inspect the DLQ manually (e.g., via the RabbitMQ management UI) to decide whether to republish a message for retry or discard it. Because there is no delta sync available, a message in the DLQ represents the only copy of that webhook notification — if discarded without successful processing, the transcript will not be ingested.
+
+**See also:** [Why use RabbitMQ for webhook processing?](./faq.md#why-use-rabbitmq-for-webhook-processing)
 
 ## Deployment
 
@@ -485,6 +559,14 @@ This ensures we meet Microsoft's strict timeout requirements while processing tr
 - [Microsoft Entra ID Documentation](https://learn.microsoft.com/en-us/entra/identity/)
 
 ## Multi-Tenant
+
+### Can a user connect multiple Microsoft tenants?
+
+**Answer:** Not in a single session. One OAuth login covers exactly one Microsoft tenant. If a user belongs to multiple tenants (e.g., their home tenant plus a guest tenant), they must authenticate separately for each tenant they want to capture meetings from.
+
+Each tenant authentication creates an independent user profile in Teams MCP. Transcripts from each tenant are ingested separately under the identity used to connect that tenant.
+
+**See also:** [Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture)
 
 ### Can one deployment serve multiple Microsoft tenants?
 
