@@ -83,6 +83,7 @@ export class LiveCatchUpCommand {
       })
       .from(subscriptions)
       .innerJoin(userProfiles, eq(subscriptions.userProfileId, userProfiles.id))
+      .where(eq(subscriptions.subscriptionId, subscriptionId))
       .then((rows) => rows[0]);
     if (!userProfile) {
       return;
