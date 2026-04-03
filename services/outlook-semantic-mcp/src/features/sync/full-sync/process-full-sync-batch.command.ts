@@ -228,7 +228,7 @@ export class ProcessFullSyncBatchCommand {
         iterationInfo.batchIndex++;
         const receivedDateTime = new Date(message.receivedDateTime);
         updateObject.newestReceivedEmailDateTime = greatestFrom(
-          inboxConfigurations.newestLastModifiedDateTime,
+          inboxConfigurations.newestReceivedEmailDateTime,
           receivedDateTime,
         );
         updateObject.oldestReceivedEmailDateTime = leastFrom(

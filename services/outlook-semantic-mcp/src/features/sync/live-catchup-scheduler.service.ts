@@ -134,7 +134,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     }
 
     await this.rerunLiveCatchups(
-      stuckConfigs.map((subscriptionId) =>
+      stuckConfigs.map(({ subscriptionId }) =>
         LiveCatchUpEventDto.parse({
           type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
           payload: { subscriptionId },
