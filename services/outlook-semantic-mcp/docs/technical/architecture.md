@@ -66,13 +66,15 @@ See [Tools Reference](./tools.md) for the full list and behavior details.
 
 ### Sync Pipeline
 
-After a user connects, two concurrent pipelines keep the knowledge base in sync with the user's mailbox:
+After a user connects, the following pipelines keep the knowledge base in sync with the user's mailbox. See [Flows](./flows.md) for sequence diagrams.
 
-- **Full Sync** — Fetches historical emails (within configured time frame and filters) from Microsoft Graph in paginated batches and uploads them to the Unique knowledge base. Runs once after connection and is resumable across restarts. See [Full Sync](./full-sync.md).
-- **Live Catch-Up** — Receives Microsoft Graph webhook notifications when new mail arrives. The webhook trigger is queued via RabbitMQ (to meet Microsoft's 10-second response deadline), then the consumer acquires a lock, queries Graph for new messages, and ingests each one directly. See [Live Catch-Up](./live-catchup.md).
-- **Directory Sync** — Keeps the local folder structure in sync with Outlook via Graph delta queries, enabling folder-based search filtering and detecting when emails move to excluded folders. See [Directory Sync](./directory-sync.md).
+**Full Sync** — triggers automatically after connection; fetches historical emails in paginated batches (newest first); applies `DEFAULT_MAIL_FILTERS`; resumable via persisted Graph cursor; initializes the watermark that live catch-up depends on.
 
-Both email pipelines run concurrently. Live catch-up buffers notifications until full sync initializes a watermark, after which both ingest independently.
+**Live Catch-Up** — webhook-driven; acknowledged immediately via RabbitMQ, processed async in the consumer; queries Graph for messages since the watermark; watermark defaults to `now()` on inbox creation so notifications are never buffered.
+
+**Directory Sync** — runs on a 5-minute delta query schedule; keeps local folder tree in sync with Outlook; powers `list_folders` and folder-based search filtering; detects email deletion by tracking moves to excluded folders (e.g. Deleted Items).
+
+**Subscription Management** — Graph webhook subscription created automatically on connect; renewed via Microsoft lifecycle notifications (`reauthorizationRequired`). If `subscriptionRemoved`, user calls `reconnect_inbox`; `verify_inbox_connection` reports status (`active`, `expiring_soon`, `expired`, `not_configured`).
 
 ### Data Storage (PostgreSQL)
 
