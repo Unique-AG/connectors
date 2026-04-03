@@ -130,6 +130,43 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
+  packages/mcp-kit:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.25.2
+        version: 1.25.2(hono@4.11.3)(zod@4.1.5)
+      '@nestjs/common':
+        specifier: ^10 || ^11
+        version: 11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^10 || ^11
+        version: 11.1.6(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.6)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/testing':
+        specifier: ^10 || ^11
+        version: 11.1.6(@nestjs/common@11.1.6(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(@nestjs/platform-express@11.1.6)
+      reflect-metadata:
+        specifier: ^0.2.0
+        version: 0.2.2
+      remeda:
+        specifier: ^2.32.0
+        version: 2.32.0
+      rxjs:
+        specifier: ^7.0.0
+        version: 7.8.2
+      zod:
+        specifier: ^4.1.5
+        version: 4.1.5
+    devDependencies:
+      '@types/node':
+        specifier: ^22.13.14
+        version: 22.16.5
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@22.16.5)(jiti@2.5.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.1)
+
   packages/mcp-oauth:
     dependencies:
       '@nestjs/schedule':
@@ -3483,9 +3520,6 @@ packages:
   '@types/mysql@2.15.27':
     resolution: {integrity: sha512-YfWiV16IY0OeBfBCk8+hXKmdTKrKlwKN1MNKAPBu5JYxLwBEZl7QzeEpGnlZb3VMGJrrGmB84gXiH+ofs/TezA==}
 
-  '@types/node@22.13.17':
-    resolution: {integrity: sha512-nAJuQXoyPj04uLgu+obZcSmsfOenUg6DxPKogeUy6yNCFwWaj5sBF8/G/pNo8EtBJjAfSVgfIlugR/BCOleO+g==}
-
   '@types/node@22.16.5':
     resolution: {integrity: sha512-bJFoMATwIGaxxx8VJPeM8TonI8t579oRvgAuT8zFugJsJZgzqv0Fu8Mhp68iecjzG7cnN3mO2dJQ5uUM2EFrgQ==}
 
@@ -6666,9 +6700,6 @@ packages:
   unbzip2-stream@1.4.3:
     resolution: {integrity: sha512-mlExGW4w71ebDJviH16lQLtZS32VKqsSfk80GCfUlwT/4/hNRFsoscrF/c++9xinkMzECL1uL9DDwXqFWkruPg==}
 
-  undici-types@6.20.0:
-    resolution: {integrity: sha512-Ny6QZ2Nju20vw1SRHe3d9jVu6gJ+4e3+MMpqu7pqE5HT6WsTSlce++GQmK5UXS8mzV8DSYHrQH+Xrf2jVcuKNg==}
-
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
@@ -9264,7 +9295,7 @@ snapshots:
   '@types/jsonwebtoken@9.0.10':
     dependencies:
       '@types/ms': 2.1.0
-      '@types/node': 22.13.17
+      '@types/node': 22.16.5
 
   '@types/luxon@3.7.1': {}
 
@@ -9281,10 +9312,6 @@ snapshots:
   '@types/mysql@2.15.27':
     dependencies:
       '@types/node': 22.16.5
-
-  '@types/node@22.13.17':
-    dependencies:
-      undici-types: 6.20.0
 
   '@types/node@22.16.5':
     dependencies:
@@ -12798,8 +12825,6 @@ snapshots:
     dependencies:
       buffer: 5.7.1
       through: 2.3.8
-
-  undici-types@6.20.0: {}
 
   undici-types@6.21.0: {}
 

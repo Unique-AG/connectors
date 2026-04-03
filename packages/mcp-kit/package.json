@@ -1,0 +1,84 @@
+{
+  "name": "@unique-ag/mcp-kit",
+  "description": "NestJS framework for building MCP servers with full FastMCP feature parity",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./errors": {
+      "types": "./src/errors/index.ts",
+      "import": "./dist/errors/index.js",
+      "require": "./dist/errors/index.js"
+    },
+    "./types": {
+      "types": "./src/types/index.ts",
+      "import": "./dist/types/index.js",
+      "require": "./dist/types/index.js"
+    },
+    "./brands": {
+      "types": "./src/types/brands.ts",
+      "import": "./dist/types/brands.js",
+      "require": "./dist/types/brands.js"
+    },
+    "./session": {
+      "types": "./src/session/index.ts",
+      "import": "./dist/session/index.js",
+      "require": "./dist/session/index.js"
+    },
+    "./auth": {
+      "types": "./src/auth/index.ts",
+      "import": "./dist/auth/index.js",
+      "require": "./dist/auth/index.js"
+    },
+    "./connection": {
+      "types": "./src/connection/index.ts",
+      "import": "./dist/connection/index.js",
+      "require": "./dist/connection/index.js"
+    },
+    "./filters": {
+      "types": "./src/filters/index.ts",
+      "import": "./dist/filters/index.js",
+      "require": "./dist/filters/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check . --write",
+    "format": "biome format .",
+    "format:fix": "biome format . --write",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.25.2",
+    "remeda": "^2.32.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^10 || ^11",
+    "@nestjs/core": "^10 || ^11",
+    "@nestjs/testing": "^10 || ^11",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@nestjs/testing": {
+      "optional": true
+    }
+  }
+}
