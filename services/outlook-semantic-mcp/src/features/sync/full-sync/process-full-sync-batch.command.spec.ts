@@ -591,6 +591,17 @@ describe('ProcessFullSyncBatchCommand', () => {
         VERSION,
         expect.objectContaining({ fullSyncScheduledForIngestion: expect.anything() }),
       );
+      // Ensure wrong counters are not incremented
+      expect(updateCommand.run).not.toHaveBeenCalledWith(
+        USER_PROFILE_ID,
+        VERSION,
+        expect.objectContaining({ fullSyncSkipped: expect.anything() }),
+      );
+      expect(updateCommand.run).not.toHaveBeenCalledWith(
+        USER_PROFILE_ID,
+        VERSION,
+        expect.objectContaining({ fullSyncFailedToUploadForIngestion: expect.anything() }),
+      );
     });
 
     it('increments skipped counter when message is filtered', async () => {
@@ -607,6 +618,17 @@ describe('ProcessFullSyncBatchCommand', () => {
         USER_PROFILE_ID,
         VERSION,
         expect.objectContaining({ fullSyncSkipped: expect.anything() }),
+      );
+      // Ensure wrong counters are not incremented
+      expect(updateCommand.run).not.toHaveBeenCalledWith(
+        USER_PROFILE_ID,
+        VERSION,
+        expect.objectContaining({ fullSyncScheduledForIngestion: expect.anything() }),
+      );
+      expect(updateCommand.run).not.toHaveBeenCalledWith(
+        USER_PROFILE_ID,
+        VERSION,
+        expect.objectContaining({ fullSyncFailedToUploadForIngestion: expect.anything() }),
       );
     });
 
@@ -625,6 +647,17 @@ describe('ProcessFullSyncBatchCommand', () => {
         USER_PROFILE_ID,
         VERSION,
         expect.objectContaining({ fullSyncFailedToUploadForIngestion: expect.anything() }),
+      );
+      // Ensure wrong counters are not incremented
+      expect(updateCommand.run).not.toHaveBeenCalledWith(
+        USER_PROFILE_ID,
+        VERSION,
+        expect.objectContaining({ fullSyncScheduledForIngestion: expect.anything() }),
+      );
+      expect(updateCommand.run).not.toHaveBeenCalledWith(
+        USER_PROFILE_ID,
+        VERSION,
+        expect.objectContaining({ fullSyncSkipped: expect.anything() }),
       );
     });
   });

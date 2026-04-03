@@ -8,7 +8,8 @@ import { LiveCatchUpCommand } from './live-catch-up.command';
 
 const SUBSCRIPTION_ID = 'sub-001';
 const USER_PROFILE_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
-const WATERMARK = new Date('2024-06-01T00:00:00Z');
+const WATERMARK_ISO = '2024-06-01T00:00:00.000Z';
+const WATERMARK = new Date(WATERMARK_ISO);
 const IGNORED_BEFORE = '2024-01-01T00:00:00.000Z';
 const DEFAULT_FILTERS = { ignoredBefore: IGNORED_BEFORE, ignoredSenders: [], ignoredContents: [] };
 
@@ -179,6 +180,8 @@ describe('LiveCatchUpCommand', () => {
     graphApi = createMockGraphApi();
     ingestEmailCommand = createMockIngestEmailCommand();
     syncDirectories = createMockSyncDirectoriesCommand();
+    // Reset shared WATERMARK to prevent cross-test contamination from in-place mutation
+    WATERMARK.setTime(new Date(WATERMARK_ISO).getTime());
     vi.clearAllMocks();
   });
 
@@ -458,7 +461,7 @@ describe('LiveCatchUpCommand', () => {
     );
   });
 
-  it('uses the watermark in the filter expression', async () => {
+  it('applies the overlapping window to the watermark in the filter expression', async () => {
     graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
 
     const db = createMockDb({
@@ -478,8 +481,12 @@ describe('LiveCatchUpCommand', () => {
 
     await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
+    // Compute expected watermark independently from the original constant (not the mutated object)
+    const expectedWatermark = new Date(WATERMARK_ISO);
+    expectedWatermark.setMinutes(expectedWatermark.getMinutes() - 5);
+
     expect(graphApi.filter).toHaveBeenCalledWith(
-      `lastModifiedDateTime ge ${WATERMARK.toISOString()}`,
+      `lastModifiedDateTime ge ${expectedWatermark.toISOString()}`,
     );
   });
 });
