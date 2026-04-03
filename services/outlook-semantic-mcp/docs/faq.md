@@ -211,7 +211,7 @@ Full sync states: `ready`, `running`, `waiting-for-ingestion`, `paused`, `failed
 
 Both pipelines run concurrently after connection.
 Full sync uploads batches via the Unique KB ingestion API and checks if Unique KB ingested majority of the documents before continuing.
-Live catch-up uploads batches via the Unique KB ingestion API but it does not wait for Unique KB to ingest this process makes Full sync wait longer because
+Live catch-up uploads batches via the Unique KB ingestion API but does not wait for Unique KB to ingest them. This process makes full sync wait longer because
 it contributes to the in-progress count that full sync monitors during `waiting-for-ingestion`.
 
 **See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Flows](./technical/flows.md)

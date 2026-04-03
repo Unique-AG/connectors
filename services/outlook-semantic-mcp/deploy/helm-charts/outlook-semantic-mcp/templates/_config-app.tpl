@@ -5,7 +5,11 @@ DEFAULT_MAIL_FILTERS: {{ .defaultMailFilters | quote }}
 MCP_DEBUG_MODE: {{ .app.mcpDebugMode | quote }}
 {{- if .app.bufferLogs }}
 APP_BUFFER_LOGS: {{ .app.bufferLogs | quote }}
+{{- end }}
+{{- if .app.liveCatchupOverlappingWindowMinutes }}
 LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES: {{ .app.liveCatchupOverlappingWindowMinutes | quote }}
+{{- end }}
+{{- if .app.liveCatchupRecheckOverlappingWindowMinutes }}
 LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES: {{ .app.liveCatchupRecheckOverlappingWindowMinutes | quote }}
 {{- end }}
 {{- end }}

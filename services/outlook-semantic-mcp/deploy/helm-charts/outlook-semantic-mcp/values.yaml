@@ -182,19 +182,15 @@ mcpConfig:
     # -- Extra headers to send with requests to Unique API services (JSON string)
     # For cluster_local mode: '{"x-company-id": "...", "x-user-id": "..."}'
     serviceExtraHeaders: {}
-    # For external mode:
-    # serviceExtraHeaders:
-    #   authorization: "Bearer ..."
-    #   x-app-id: "..."
-    #   x-user-id: "..."
-    #   x-company-id: "..."
+    # Note: external mode does NOT use serviceExtraHeaders.
+    # It authenticates via Zitadel OAuth (see zitadel section below).
 
     # -- Base URL for Unique ingestion service
     # example: http://node-ingestion.finance-gpt:8091
     ingestionServiceBaseUrl: unset_default_value
 
     # -- Base URL for Unique scope management
-    # example: http://node-ingestion.finance-gpt:8091
+    # example: http://node-scope-management.finance-gpt:8094
     scopeManagementServiceBaseUrl: unset_default_value
 
     # -- Optional. Whether to store emails internally in the Unique knowledge base. To override:
