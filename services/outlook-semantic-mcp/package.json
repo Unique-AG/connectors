@@ -72,7 +72,7 @@
     "safe-regex2": "5.0.0",
     "serialize-error-cjs": "0.2.0",
     "typeid-js": "1.2.0",
-    "undici": "7.18.2",
+    "undici": "7.24.0",
     "zod": "4.1.5"
   },
   "devDependencies": {
