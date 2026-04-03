@@ -97,13 +97,11 @@ function createMockDb({
     transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(tx)),
     query: {
       userProfiles: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({
-            id: USER_PROFILE_ID,
-            email: 'test@example.com',
-            providerUserId: null,
-          }),
+        findFirst: vi.fn().mockResolvedValue({
+          id: USER_PROFILE_ID,
+          email: 'test@example.com',
+          providerUserId: null,
+        }),
       },
     },
     __tx: tx,
