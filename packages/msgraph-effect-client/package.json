@@ -1,0 +1,29 @@
+{
+  "name": "@unique-ag/msgraph-effect-client",
+  "description": "Fully typed Microsoft Graph API client built on Effect-TS",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "biome check .",
+    "lint:fix": "biome check . --write",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "4.0.0-beta.41"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.14",
+    "typescript": "^5.9.2"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  }
+}
