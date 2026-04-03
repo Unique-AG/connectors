@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.4.0...sharepoint-connector@2.4.1) (2026-04-03)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** reset root scope instead of deleting it on site deletion ([#419](https://github.com/Unique-AG/connectors/issues/419)) ([c161ba7](https://github.com/Unique-AG/connectors/commit/c161ba735e78f2953221cc2076dfad128afc7ba1))
+* **sharepoint-connector:** validate siteId before claiming root scope ([#411](https://github.com/Unique-AG/connectors/issues/411)) ([d451575](https://github.com/Unique-AG/connectors/commit/d451575482bbcf2f7d6fb9d24d14cd2646bed46e))
+
 ## [2.4.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.3.1...sharepoint-connector@2.4.0) (2026-03-25)
 
 
