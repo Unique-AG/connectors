@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.0.0-alpha.5](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.4...confluence-connector@2.0.0-alpha.5) (2026-04-03)
+
+
+### Features
+
+* **confluence-connector:** add metrics and Grafana dashboard ([#395](https://github.com/Unique-AG/connectors/issues/395)) ([cb765d5](https://github.com/Unique-AG/connectors/commit/cb765d5a6897073cc566eed3a6a7e6676e625ef1))
+
+
+### Bug Fixes
+
+* **confluence-connector:** allow deletion guard to pass when new files are being added ([#368](https://github.com/Unique-AG/connectors/issues/368)) ([b57683c](https://github.com/Unique-AG/connectors/commit/b57683c27d13c32c847758cb77be52c65a00dcfa))
+* **confluence-connector:** clean up registered content after failed upload or finalization ([#381](https://github.com/Unique-AG/connectors/issues/381)) ([b78cebb](https://github.com/Unique-AG/connectors/commit/b78cebb2017726f653901392a2561b618399d6a1))
+
 ## [2.0.0-alpha.4](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.3...confluence-connector@2.0.0-alpha.4) (2026-03-17)
 
 
