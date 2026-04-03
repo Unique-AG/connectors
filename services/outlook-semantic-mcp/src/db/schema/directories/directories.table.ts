@@ -3,6 +3,7 @@ import { AnyPgColumn, boolean, pgEnum, pgTable, unique, varchar } from 'drizzle-
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
+import { asAllOptions } from '@unique-ag/utils';
 
 const directoryTypes = [
   // Outlook system directories
@@ -32,6 +33,21 @@ export type SystemDirectoryType = Exclude<
   DirectoryType,
   'User Defined Directory' | 'Unknown Directory: Created during email ingestion'
 >;
+
+export const systemDirectories = asAllOptions<SystemDirectoryType>()([
+  'Archive',
+  'Deleted Items',
+  'Drafts',
+  'Inbox',
+  'Junk Email',
+  'Outbox',
+  'Sent Items',
+  'Conversation History',
+  'Recoverable Items Deletions',
+  'Clutter',
+  // We cast to a string array because we use this array to check if systemDirectories.includes(currentBestItem.internalType)
+  // This check will fail because internalType can be outside of SystemDirectoryType, because of this we cast the array to string[]
+]) as string[];
 
 export const SystemDirectoriesIgnoredForSync: DirectoryType[] = [
   'Deleted Items',

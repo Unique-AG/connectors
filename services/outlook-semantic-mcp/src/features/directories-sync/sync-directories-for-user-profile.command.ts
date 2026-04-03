@@ -1,7 +1,7 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { createSmeared } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, count, eq, inArray, not } from 'drizzle-orm';
+import { and, count, eq, inArray, not, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { prop } from 'remeda';
 import {
@@ -11,6 +11,7 @@ import {
   directories,
   directoriesSync,
   SystemDirectoriesIgnoredForSync,
+  systemDirectories,
 } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
@@ -60,17 +61,22 @@ export class SyncDirectoriesForUserProfileCommand {
       userProviderUserId: userProfile.providerUserId,
     });
 
-    const totalDirectories = await this.db
+    const totalSystemDirectories = await this.db
       .select({ count: count() })
       .from(directories)
-      .where(eq(directories.userProfileId, userProfile.id))
+      .where(
+        and(
+          eq(directories.userProfileId, userProfile.id),
+          inArray(sql`${directories.internalType}::text`, systemDirectories),
+        ),
+      )
       .execute();
 
-    const existingDirectoryCount = totalDirectories.at(0)?.count ?? 0;
-    traceAttrs({ existingDirectoryCount: existingDirectoryCount });
+    const systemDirectoriesCount = totalSystemDirectories.at(0)?.count ?? 0;
+    traceAttrs({ existingDirectoryCount: systemDirectoriesCount });
 
     // We only sync the system directories once.
-    if (!totalDirectories.length || existingDirectoryCount === 0) {
+    if (systemDirectoriesCount !== systemDirectories.length) {
       traceEvent('syncing system directories');
       this.logger.log({
         userProfileId: userProfile.id,
