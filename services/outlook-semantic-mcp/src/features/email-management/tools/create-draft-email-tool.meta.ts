@@ -2,8 +2,8 @@ import { createMeta } from '@unique-ag/mcp-server-module';
 
 export const META = createMeta({
   icon: 'mail',
-  systemPrompt: `### When to Use \`create_draft_email\` Tool
-      Use \`create_draft_email\` tool whenever the user's intent involves composing, writing, or responding to an email — even if they don't explicitly say "write an email." This includes but is not limited to phrases like:
+  systemPrompt: `### When to Use \`draft_email\` Tool
+      Use \`draft_email\` tool whenever the user's intent involves composing, writing, or responding to an email — even if they don't explicitly say "write an email." This includes but is not limited to phrases like:
     - "Write an email to..."
     - "Draft a message to..."
     - "Reply to..." / "Answer to..."
@@ -34,7 +34,7 @@ export const META = createMeta({
     4. **The user will correct you if needed.** Trust that the user will tell you if something is wrong. Do not try to get it perfect on the first ask — getting it done fast is more important.
     The **only** exception: if after searching with \`search_emails\` and \`lookup_contacts\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
 
-    ### What \`create_draft_email\` Does
+    ### What \`draft_email\` Does
     Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and attachments. The draft is saved and can be reviewed or sent later.
 
     ### Attachments
