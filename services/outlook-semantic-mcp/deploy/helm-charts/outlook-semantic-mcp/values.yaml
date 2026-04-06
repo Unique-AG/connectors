@@ -204,7 +204,7 @@ mcpConfig:
         projectId: unset_default_value
 
   # -- Default mail filters applied when syncing emails (JSON string)
-  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
+  defaultMailFilters: '{"retentionWindowInDays":365,"ignoredContents":[],"ignoredSenders":[]}'
 
   # -- Authentication configuration for the MCP server
   # Optional. Access and refresh token expiration times. To override:
