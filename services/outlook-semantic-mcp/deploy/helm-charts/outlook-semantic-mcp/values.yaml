@@ -10,7 +10,7 @@ server:
         pnpm run db:migrate
   env:
     LOG_LEVEL: info
-    MAX_HEAP_MB: 1920
+    MAX_HEAP_MB: 850
     NODE_ENV: production
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
@@ -32,7 +32,7 @@ server:
     - outlook-semantic-mcp-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/outlook-semantic-mcp
-    tag: 0.2.15 # x-release-please-version
+    tag: 0.2.17 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
@@ -138,11 +138,24 @@ mcpConfig:
     # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
     # example: https://outlook.mcp.unique.app
     selfUrl: unset_default_value
-    # Debug mode for the mcp server
+    # -- Debug mode for the MCP server. Set to "enabled" to expose:
+    #    1. Debugging tools
+    #    2. Extra debugging data in tool responses.
     mcpDebugMode: disabled
+    # -- Optional. Overlapping window in minutes for standard live catch-up sync runs. Office 365
+    # uses eventual consistency, so messages can appear with a delayed updatedAt timestamp after
+    # the actual event. Re-querying an overlapping window ensures late-arriving messages are not
+    # missed. Minimum: 2. To override set env var directly: LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES=5
+    liveCatchupOverlappingWindowMinutes: 5
+    # -- Optional. Overlapping window in minutes for live catch-up ready-recheck runs. Uses a larger
+    # window than the standard run to account for higher latency during recheck scenarios.
+    # Minimum: 10. To override set env var directly: LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES=10
+    liveCatchupRecheckOverlappingWindowMinutes: 10
 
-  logs:
-    diagnosticsDataPolicy: conceal
+  # -- Optional log settings. To override:
+  # logs:
+  #   diagnosticsDataPolicy: conceal
+  # Or set env var directly: LOGS_DIAGNOSTICS_DATA_POLICY=conceal
 
   # -- Microsoft Graph API configuration
   microsoft:
@@ -153,6 +166,9 @@ mcpConfig:
     # Optional - defaults to SELF_URL if not provided.
     # example: https://outlook.mcp.unique.app
     # publicWebhookUrl: ""
+    # -- Optional. Hour of day in UTC when scheduled subscription expirations should occur (0-23). To override:
+    # subscriptionExpirationTimeHoursUTC: 3
+    # Or set env var directly: MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC=3
     # clientSecret is loaded from a secret, see server.envVars
     # webhookSecret is loaded from a secret, see server.envVars
 
@@ -166,20 +182,20 @@ mcpConfig:
     # -- Extra headers to send with requests to Unique API services (JSON string)
     # For cluster_local mode: '{"x-company-id": "...", "x-user-id": "..."}'
     serviceExtraHeaders: {}
-    # For external mode:
-    # serviceExtraHeaders:
-    #   authorization: "Bearer ..."
-    #   x-app-id: "..."
-    #   x-user-id: "..."
-    #   x-company-id: "..."
+    # Note: external mode does NOT use serviceExtraHeaders.
+    # It authenticates via Zitadel OAuth (see zitadel section below).
 
     # -- Base URL for Unique ingestion service
     # example: http://node-ingestion.finance-gpt:8091
     ingestionServiceBaseUrl: unset_default_value
 
     # -- Base URL for Unique scope management
-    # example: http://node-ingestion.finance-gpt:8091
+    # example: http://node-scope-management.finance-gpt:8094
     scopeManagementServiceBaseUrl: unset_default_value
+
+    # -- Optional. Whether to store emails internally in the Unique knowledge base. To override:
+    # storeInternally: enabled
+    # Or set env var directly: UNIQUE_STORE_INTERNALLY=enabled
 
     # Zitadel config
     zitadel:
@@ -191,12 +207,14 @@ mcpConfig:
   defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
 
   # -- Authentication configuration for the MCP server
-  auth:
-    # -- Access token expiration time in seconds
-    accessTokenExpiresInSeconds: 60
-    # -- Refresh token expiration time in seconds (default: 30 days)
-    refreshTokenExpiresInSeconds: 2592000
-    # hmacSecret is loaded from a secret, see server.envVars
+  # Optional. Access and refresh token expiration times. To override:
+  # auth:
+  #   accessTokenExpiresInSeconds: 60          # zod default: 60
+  #   refreshTokenExpiresInSeconds: 2592000    # zod default: 2592000 (30 days)
+  # Or set env vars directly:
+  #   AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS=60
+  #   AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS=2592000
+  # hmacSecret is loaded from a secret, see server.envVars
 
   # Note: The following secrets must be provided via server.envVars:
   # - DATABASE_URL: PostgreSQL connection string

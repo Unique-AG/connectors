@@ -41,7 +41,9 @@ describe('ConfluenceApiClient (auth integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.acquireToken.mockResolvedValue(MOCK_TOKEN);
-    client = new DataCenterConfluenceApiClient(mockConfig, mockAuth as never, mockHttpClient);
+    client = new DataCenterConfluenceApiClient(mockConfig, mockAuth as never, mockHttpClient, {
+      attachmentsEnabled: false,
+    });
   });
 
   describe('auth header injection', () => {

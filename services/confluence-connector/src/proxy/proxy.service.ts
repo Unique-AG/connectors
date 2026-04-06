@@ -10,6 +10,10 @@ import {
   type TlsProxyConfig,
 } from '../config';
 
+// The caller (TenantRegistry) decides the mode per request based on each tenant's serviceAuthMode.
+// With the current config it's technically possible for one tenant to use cluster_local while
+// another uses external. Rather than baking that logic into ProxyService (which is pure
+// infrastructure), we keep the decision at the call site so every combination works.
 export type ProxyMode = 'always' | 'never';
 
 export interface GetDispatcherOptions {

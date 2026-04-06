@@ -8,19 +8,24 @@ import { LiveCatchUpCommand } from './live-catch-up.command';
 
 const SUBSCRIPTION_ID = 'sub-001';
 const USER_PROFILE_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
-const WATERMARK = new Date('2024-06-01T00:00:00Z');
+const WATERMARK_ISO = '2024-06-01T00:00:00.000Z';
+const WATERMARK = new Date(WATERMARK_ISO);
 const IGNORED_BEFORE = '2024-01-01T00:00:00.000Z';
 const DEFAULT_FILTERS = { ignoredBefore: IGNORED_BEFORE, ignoredSenders: [], ignoredContents: [] };
+
+// A recent heartbeat (within all cooldown windows)
+const RECENT_HEARTBEAT = new Date(Date.now() - 1 * 60 * 1000); // 1 minute ago
+// A stale heartbeat (older than all cooldown thresholds)
+const STALE_HEARTBEAT = new Date(Date.now() - 999 * 60 * 1000); // ~16 hours ago
 
 function makeEmail(id: string, created: string, modified: string) {
   return {
     id,
-    internetMessageId: `<${id}@example.com>`,
     createdDateTime: created,
     lastModifiedDateTime: modified,
-    from: { emailAddress: { address: 'sender@example.com', name: 'Sender' } },
-    subject: `Email ${id}`,
-    uniqueBody: { contentType: 'text' as const, content: `Body of ${id}` },
+    receivedDateTime: created,
+    parentFolderId: 'folder-id',
+    webLink: 'https://outlook.office.com/mail/id',
   };
 }
 
@@ -55,35 +60,34 @@ function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGrap
   };
 }
 
-function createMockAmqp() {
-  return { publish: vi.fn().mockResolvedValue(undefined) };
+function createMockIngestEmailCommand() {
+  return { run: vi.fn().mockResolvedValue('ingested') };
+}
+
+function createMockUniqueApi() {
+  return {
+    files: { getByKeys: vi.fn().mockResolvedValue([]) },
+  };
 }
 
 /**
  * Creates a mock DB that supports:
- * - `db.query.subscriptions.findFirst()` for subscription lookup
- * - `db.transaction(cb)` with a mock tx supporting select...from...where...for('update')...then()
- * - `db.update().set().where().execute()` for state transitions and watermark updates
- *
- * The `db.transaction` mock handles two calls: the first uses `lockResult` for the
- * acquireLock transaction, and the second uses `flushResult` for flushPendingMessages.
+ * - `db.select().from().innerJoin().then()` for user profile lookup
+ * - `db.transaction(cb)` for acquireLock
+ * - `db.update().set().where().execute()` for watermark updates and state transitions
  */
 function createMockDb({
   subscription,
   lockResult,
-  flushResult,
 }: {
-  subscription?: { userProfileId: string } | undefined;
+  subscription?: { userProfileId: string; userEmail: string; providerUserId: string } | undefined;
   lockResult?: {
     liveCatchUpState: string;
     newestLastModifiedDateTime: Date | null;
+    liveCatchUpHeartbeatAt: Date | null;
     filters: Record<string, unknown>;
-    pendingLiveMessageIds: string[];
   };
-  flushResult?: { pendingLiveMessageIds: string[] };
 }) {
-  let transactionCallCount = 0;
-
   function createMockTx(selectRows: any[]) {
     const txExecuteFn = vi.fn().mockResolvedValue(undefined);
     const txSelect = {
@@ -109,22 +113,17 @@ function createMockDb({
   }
 
   const lockTx = createMockTx(lockResult ? [lockResult] : []);
-  const flushTx = createMockTx(flushResult ? [flushResult] : [{ pendingLiveMessageIds: [] }]);
 
   const dbExecuteFn = vi.fn().mockResolvedValue(undefined);
   const db = {
-    query: {
-      subscriptions: {
-        findFirst: vi.fn().mockResolvedValue(subscription),
-      },
-    },
-    transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => {
-      transactionCallCount++;
-      if (transactionCallCount === 1) {
-        return cb(lockTx);
-      }
-      return cb(flushTx);
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(subscription ? [subscription] : []),
+        }),
+      }),
     }),
+    transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(lockTx)),
     update: vi.fn().mockReturnValue({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -133,7 +132,6 @@ function createMockDb({
       }),
     }),
     __lockTx: lockTx,
-    __flushTx: flushTx,
     __dbExecuteFn: dbExecuteFn,
   };
 
@@ -144,22 +142,28 @@ function createMockSyncDirectoriesCommand() {
   return { run: vi.fn() };
 }
 
+function createMockMetricService() {
+  return { getCounter: vi.fn().mockReturnValue({ add: vi.fn() }) };
+}
+
 function createCommand({
   graphApi,
-  amqp,
+  ingestEmailCommand,
   db,
   syncDirectories,
 }: {
   graphApi: ReturnType<typeof createMockGraphApi>;
-  amqp: ReturnType<typeof createMockAmqp>;
+  ingestEmailCommand: ReturnType<typeof createMockIngestEmailCommand>;
   syncDirectories: ReturnType<typeof createMockSyncDirectoriesCommand>;
   db: ReturnType<typeof createMockDb>;
 }): LiveCatchUpCommand {
   return new LiveCatchUpCommand(
     createMockGraphClientFactory(graphApi) as any,
-    amqp as any,
+    ingestEmailCommand as any,
     syncDirectories as any,
+    createMockUniqueApi() as any,
     db as any,
+    createMockMetricService() as any,
   );
 }
 
@@ -169,81 +173,165 @@ function createCommand({
 
 describe('LiveCatchUpCommand', () => {
   let graphApi: ReturnType<typeof createMockGraphApi>;
-  let amqp: ReturnType<typeof createMockAmqp>;
+  let ingestEmailCommand: ReturnType<typeof createMockIngestEmailCommand>;
   let syncDirectories: ReturnType<typeof createMockSyncDirectoriesCommand>;
 
   beforeEach(() => {
     graphApi = createMockGraphApi();
-    amqp = createMockAmqp();
+    ingestEmailCommand = createMockIngestEmailCommand();
     syncDirectories = createMockSyncDirectoriesCommand();
+    // Reset shared WATERMARK to prevent cross-test contamination from in-place mutation
+    WATERMARK.setTime(new Date(WATERMARK_ISO).getTime());
     vi.clearAllMocks();
   });
 
   it('skips when subscription is not found', async () => {
     const db = createMockDb({ subscription: undefined, lockResult: undefined });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
 
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
     expect(db.transaction).not.toHaveBeenCalled();
     expect(graphApi.get).not.toHaveBeenCalled();
-    expect(amqp.publish).not.toHaveBeenCalled();
+    expect(ingestEmailCommand.run).not.toHaveBeenCalled();
   });
 
-  it('skips when lock is already held (liveCatchUpState is running)', async () => {
+  it('skips when lock is already running with recent heartbeat', async () => {
     const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
       lockResult: {
         liveCatchUpState: 'running',
         newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: RECENT_HEARTBEAT,
         filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
 
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
-    // Transaction was called (to attempt lock), but no graph call made
     expect(db.transaction).toHaveBeenCalled();
     expect(graphApi.get).not.toHaveBeenCalled();
-    expect(amqp.publish).not.toHaveBeenCalled();
+    expect(ingestEmailCommand.run).not.toHaveBeenCalled();
   });
 
-  it('skips when no watermark exists (full sync not started)', async () => {
+  it('proceeds when lock is running with stale heartbeat (stuck recovery)', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
     const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
       lockResult: {
-        liveCatchUpState: 'ready',
-        newestLastModifiedDateTime: null,
+        liveCatchUpState: 'running',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
         filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
 
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
-    expect(db.transaction).toHaveBeenCalled();
-    expect(graphApi.get).not.toHaveBeenCalled();
-    expect(amqp.publish).not.toHaveBeenCalled();
+    // Proceeded — graph was queried
+    expect(graphApi.get).toHaveBeenCalled();
+  });
+
+  it('runs when ready with recent heartbeat', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: RECENT_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(graphApi.get).toHaveBeenCalled();
+  });
+
+  it('proceeds when ready with stale heartbeat', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(graphApi.get).toHaveBeenCalled();
+  });
+
+  it('always proceeds when state is failed', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
+      lockResult: {
+        liveCatchUpState: 'failed',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: RECENT_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    // Proceeded despite recent heartbeat — failed state always proceeds
+    expect(graphApi.get).toHaveBeenCalled();
   });
 
   it('skips when inbox config row is missing inside transaction', async () => {
     const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
-      lockResult: undefined, // no rows returned from FOR UPDATE
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
+      lockResult: undefined,
     });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
 
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
     expect(db.transaction).toHaveBeenCalled();
     expect(graphApi.get).not.toHaveBeenCalled();
-    expect(amqp.publish).not.toHaveBeenCalled();
+    expect(ingestEmailCommand.run).not.toHaveBeenCalled();
   });
 
-  it('fetches a batch and sets state to ready', async () => {
+  it('calls ingestEmailCommand.run for each fetched email', async () => {
     const emails = [
       makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
       makeEmail('msg-2', '2024-06-02T00:00:00Z', '2024-06-02T01:00:00Z'),
@@ -251,26 +339,38 @@ describe('LiveCatchUpCommand', () => {
     graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
 
     const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
         filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
 
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
-    // Both emails published
-    expect(amqp.publish).toHaveBeenCalledTimes(2);
-
-    // State set to 'ready' via flush transaction
-    const flushUpdate = db.__flushTx.__txUpdate;
-    expect(flushUpdate.set).toHaveBeenCalledWith(
-      expect.objectContaining({ liveCatchUpState: 'ready' }),
+    expect(ingestEmailCommand.run).toHaveBeenCalledTimes(2);
+    expect(ingestEmailCommand.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        graphMessage: expect.objectContaining({ id: 'msg-1' }),
+        user: expect.objectContaining({ profileId: USER_PROFILE_ID }),
+      }),
     );
+    expect(ingestEmailCommand.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        graphMessage: expect.objectContaining({ id: 'msg-2' }),
+      }),
+    );
+
+    // State set to 'ready'
+    const setMock = db.update.mock.results[0]?.value?.set;
+    expect(setMock).toHaveBeenCalledWith(expect.objectContaining({ liveCatchUpState: 'ready' }));
   });
 
   it('follows nextLink to fetch multiple batches', async () => {
@@ -282,308 +382,111 @@ describe('LiveCatchUpCommand', () => {
       .mockResolvedValueOnce(makeGraphResponse(batch2));
 
     const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
         filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
 
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
-    expect(amqp.publish).toHaveBeenCalledTimes(2);
+    expect(ingestEmailCommand.run).toHaveBeenCalledTimes(2);
     expect(graphApi.get).toHaveBeenCalledTimes(2);
   });
 
-  it('deduplicates webhook messageIds covered by batching', async () => {
+  it('continues processing when ingestEmailCommand.run returns failed', async () => {
     const emails = [
       makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
       makeEmail('msg-2', '2024-06-02T00:00:00Z', '2024-06-02T01:00:00Z'),
     ];
     graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
+    ingestEmailCommand.run
+      .mockResolvedValueOnce('failed') // msg-1 fails
+      .mockResolvedValueOnce('ingested'); // msg-2 succeeds
 
     const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
         filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
-      },
-      // acquireLock stores all 3 webhook IDs in pendingLiveMessageIds;
-      // flush reads them back and publishes only msg-3 (msg-1 & msg-2 are in scheduledIds)
-      flushResult: { pendingLiveMessageIds: ['msg-1', 'msg-2', 'msg-3'] },
-    });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
-
-    // msg-1 and msg-2 are in the batch, msg-3 is webhook-only
-    await command.run({
-      subscriptionId: SUBSCRIPTION_ID,
-      messageIds: ['msg-1', 'msg-2', 'msg-3'],
-    });
-
-    // 2 from batch + 1 remaining webhook ID = 3 total publishes
-    expect(amqp.publish).toHaveBeenCalledTimes(3);
-
-    // Verify the webhook-only ID was published
-    const publishedMessageIds = amqp.publish.mock.calls.map((call: any[]) => {
-      const event = call[2] as { payload: { messageId: string } };
-      return event.payload.messageId;
-    });
-    expect(publishedMessageIds).toContain('msg-3');
-  });
-
-  it('publishes remaining webhook IDs not covered by batching', async () => {
-    // Empty batch — no emails from Graph
-    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
-
-    const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
-      lockResult: {
-        liveCatchUpState: 'ready',
-        newestLastModifiedDateTime: WATERMARK,
-        filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
-      },
-      // acquireLock stores the webhook IDs in pendingLiveMessageIds;
-      // flush publishes both since the batch scheduled nothing
-      flushResult: { pendingLiveMessageIds: ['webhook-1', 'webhook-2'] },
-    });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
-
-    await command.run({
-      subscriptionId: SUBSCRIPTION_ID,
-      messageIds: ['webhook-1', 'webhook-2'],
-    });
-
-    // Only the 2 webhook IDs should be published
-    expect(amqp.publish).toHaveBeenCalledTimes(2);
-    const publishedMessageIds = amqp.publish.mock.calls.map((call: any[]) => {
-      const event = call[2] as { payload: { messageId: string } };
-      return event.payload.messageId;
-    });
-    expect(publishedMessageIds).toEqual(['webhook-1', 'webhook-2']);
-  });
-
-  it('does not double-publish when all webhook IDs are covered by batch', async () => {
-    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
-    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
-
-    const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
-      lockResult: {
-        liveCatchUpState: 'ready',
-        newestLastModifiedDateTime: WATERMARK,
-        filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
 
-    await command.run({
-      subscriptionId: SUBSCRIPTION_ID,
-      messageIds: ['msg-1'],
-    });
+    // Should NOT throw
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
-    // Only 1 publish from the batch — webhook msg-1 is deduplicated
-    expect(amqp.publish).toHaveBeenCalledTimes(1);
+    // Both emails were attempted
+    expect(ingestEmailCommand.run).toHaveBeenCalledTimes(2);
   });
 
   it('sets state to failed on error', async () => {
     graphApi.get.mockRejectedValueOnce(new Error('Graph API error'));
 
     const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
         filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
 
     // Should NOT throw
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
-    // State set to 'failed'
     const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]?.value.set;
     expect(lastUpdateSetCall).toHaveBeenCalledWith(
       expect.objectContaining({ liveCatchUpState: 'failed' }),
     );
   });
 
-  it('uses the watermark in the filter expression', async () => {
+  it('applies the overlapping window to the watermark in the filter expression', async () => {
     graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
 
     const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
       lockResult: {
         liveCatchUpState: 'ready',
         newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
         filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
       },
     });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
 
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    // Compute expected watermark independently from the original constant (not the mutated object)
+    const expectedWatermark = new Date(WATERMARK_ISO);
+    expectedWatermark.setMinutes(expectedWatermark.getMinutes() - 5);
 
     expect(graphApi.filter).toHaveBeenCalledWith(
-      `lastModifiedDateTime ge ${WATERMARK.toISOString()}`,
-    );
-  });
-
-  // ---------------------------------------------------------------------------
-  // Live catch-up buffering
-  // ---------------------------------------------------------------------------
-
-  it('buffers message IDs when live catch-up is already running', async () => {
-    const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
-      lockResult: {
-        liveCatchUpState: 'running',
-        newestLastModifiedDateTime: WATERMARK,
-        filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
-      },
-    });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
-
-    await command.run({
-      subscriptionId: SUBSCRIPTION_ID,
-      messageIds: ['msg-a', 'msg-b'],
-    });
-
-    // The array_cat update was called inside the lock transaction
-    expect(db.__lockTx.update).toHaveBeenCalled();
-    expect(db.__lockTx.__txUpdate.set).toHaveBeenCalled();
-
-    // No graph call or publish — returns early after buffering
-    expect(graphApi.get).not.toHaveBeenCalled();
-    expect(amqp.publish).not.toHaveBeenCalled();
-  });
-
-  it('does not re-publish pending messages already covered by the batch', async () => {
-    const emails = [
-      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
-      makeEmail('msg-2', '2024-06-02T00:00:00Z', '2024-06-02T01:00:00Z'),
-    ];
-    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
-
-    const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
-      lockResult: {
-        liveCatchUpState: 'ready',
-        newestLastModifiedDateTime: WATERMARK,
-        filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
-      },
-      // msg-1 was previously buffered in pendingLiveMessageIds; the batch covers it,
-      // so flush deduplicates it (alreadyScheduledIds contains msg-1 and msg-2)
-      flushResult: { pendingLiveMessageIds: ['msg-1'] },
-    });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
-
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
-
-    // Batch publishes both msg-1 and msg-2; flush skips msg-1 (already scheduled)
-    const publishedMessageIds = amqp.publish.mock.calls.map((call: any[]) => {
-      const event = call[2] as { payload: { messageId: string } };
-      return event.payload.messageId;
-    });
-    expect(publishedMessageIds).toHaveLength(2);
-    expect(publishedMessageIds).toContain('msg-1');
-    expect(publishedMessageIds).toContain('msg-2');
-    // msg-1 published exactly once — not re-published from flush
-    expect(publishedMessageIds.filter((id: string) => id === 'msg-1')).toHaveLength(1);
-  });
-
-  it('flushes pending messages not already scheduled', async () => {
-    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
-    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
-
-    const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
-      lockResult: {
-        liveCatchUpState: 'ready',
-        newestLastModifiedDateTime: WATERMARK,
-        filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
-      },
-      flushResult: { pendingLiveMessageIds: ['flush-1', 'flush-2'] },
-    });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
-
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
-
-    // msg-1 from batch + flush-1 and flush-2 from pending flush = 3 publishes
-    expect(amqp.publish).toHaveBeenCalledTimes(3);
-    const publishedMessageIds = amqp.publish.mock.calls.map((call: any[]) => {
-      const event = call[2] as { payload: { messageId: string } };
-      return event.payload.messageId;
-    });
-    expect(publishedMessageIds).toEqual(['msg-1', 'flush-1', 'flush-2']);
-
-    // Flush transaction clears pendingLiveMessageIds and sets state to ready
-    expect(db.__flushTx.__txUpdate.set).toHaveBeenCalledWith(
-      expect.objectContaining({ pendingLiveMessageIds: [], liveCatchUpState: 'ready' }),
-    );
-  });
-
-  it('flush skips IDs already scheduled during the run', async () => {
-    const emails = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
-    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
-
-    const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
-      lockResult: {
-        liveCatchUpState: 'ready',
-        newestLastModifiedDateTime: WATERMARK,
-        filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
-      },
-      flushResult: { pendingLiveMessageIds: ['msg-1', 'flush-1'] },
-    });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
-
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
-
-    // msg-1 from batch + flush-1 from flush (msg-1 not re-published by flush) = 2 publishes
-    expect(amqp.publish).toHaveBeenCalledTimes(2);
-    const publishedMessageIds = amqp.publish.mock.calls.map((call: any[]) => {
-      const event = call[2] as { payload: { messageId: string } };
-      return event.payload.messageId;
-    });
-    expect(publishedMessageIds).toEqual(['msg-1', 'flush-1']);
-  });
-
-  it('flush is a no-op when no pending IDs exist', async () => {
-    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
-
-    const db = createMockDb({
-      subscription: { userProfileId: USER_PROFILE_ID },
-      lockResult: {
-        liveCatchUpState: 'ready',
-        newestLastModifiedDateTime: WATERMARK,
-        filters: DEFAULT_FILTERS,
-        pendingLiveMessageIds: [],
-      },
-      flushResult: { pendingLiveMessageIds: [] },
-    });
-    const command = createCommand({ graphApi, amqp, db, syncDirectories });
-
-    await command.run({ subscriptionId: SUBSCRIPTION_ID, messageIds: [] });
-
-    // No publishes at all — empty batch and empty pending
-    expect(amqp.publish).not.toHaveBeenCalled();
-
-    // State still set to ready via flush transaction
-    expect(db.__flushTx.__txUpdate.set).toHaveBeenCalledWith(
-      expect.objectContaining({ liveCatchUpState: 'ready' }),
+      `lastModifiedDateTime ge ${expectedWatermark.toISOString()}`,
     );
   });
 });

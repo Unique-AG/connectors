@@ -78,7 +78,7 @@ export class SearchEmailsTool {
       return {
         success: true,
         syncWarning:
-          'Search results may be inaccurate. Ingestion Statistics could not be fetched. Your inbox is a unknown state try to use the tools `remove_inbox_connection` and `reconnect_inbox` to get it into a proper state',
+          'Search results may be inaccurate. Ingestion Statistics could not be fetched. Your inbox is a unknown state try to use the tools `delete_inbox_data` and `reconnect_inbox` to get it into a proper state',
         results,
         searchSummary,
       };

@@ -9,6 +9,7 @@ import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
 import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
+import { Metrics } from '../metrics';
 import { ProxyService } from '../proxy';
 import { ConfluenceContentFetcher } from '../synchronization/confluence-content-fetcher';
 import { ConfluencePageScanner } from '../synchronization/confluence-page-scanner';
@@ -31,6 +32,7 @@ export class TenantRegistry implements OnModuleInit {
     @Inject(UNIQUE_API_CLIENT_FACTORY) private readonly uniqueApiFactory: UniqueApiClientFactory,
     private readonly serviceRegistry: ServiceRegistry,
     private readonly proxyService: ProxyService,
+    private readonly metrics: Metrics,
   ) {}
 
   public onModuleInit(): void {
@@ -51,9 +53,11 @@ export class TenantRegistry implements OnModuleInit {
           ConfluenceAuth,
           this.confluenceAuthFactory.createAuthStrategy(config.confluence),
         );
-        const apiClient = this.confluenceApiClientFactory.create(config.confluence, {
-          attachmentsEnabled: config.ingestion.attachments.enabled,
-        });
+        const apiClient = this.confluenceApiClientFactory.create(
+          config.confluence,
+          { attachmentsEnabled: config.ingestion.attachments.enabled },
+          this.metrics,
+        );
         this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
 
         const scanner = new ConfluencePageScanner(
@@ -101,6 +105,7 @@ export class TenantRegistry implements OnModuleInit {
           tenantName,
           config.ingestion.useV1KeyFormat,
           uniqueClient,
+          this.metrics,
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
 
@@ -112,6 +117,7 @@ export class TenantRegistry implements OnModuleInit {
           tenantName,
           uniqueClient,
           apiClient,
+          this.metrics,
           blobUploadDispatcher,
         );
         this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
@@ -122,6 +128,7 @@ export class TenantRegistry implements OnModuleInit {
           fileDiffService,
           ingestionService,
           scopeManagementService,
+          this.metrics,
         );
         this.serviceRegistry.register(
           tenantName,
@@ -129,6 +136,7 @@ export class TenantRegistry implements OnModuleInit {
           confluenceSynchronizationService,
         );
 
+        this.metrics.initializeCounters();
         this.logger.log({ tenantName, msg: 'Tenant registered' });
       });
     }

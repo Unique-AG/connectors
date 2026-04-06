@@ -1,8 +1,37 @@
 import type { Readable } from 'node:stream';
+import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
+import type { Metrics } from '../metrics';
 import { handleErrorStatus } from './http-util';
+
+const API_PATH_START = /\/(rest\/api|api\/v2)\//;
+
+/**
+ * Extracts a short, normalized endpoint from a full Confluence URL.
+ * Keeps only the path starting from `/rest/api/` or `/api/v2/`, strips query params,
+ * and replaces numeric/UUID segments with `{id}`.
+ * With this we try to reduce entropy for metrics
+ *
+ * `/ex/confluence/{uuid}/wiki/rest/api/content/12345` → `/rest/api/content/{id}`
+ * `/rest/api/content/search?cql=...` → `/rest/api/content/search`
+ */
+function normalizeEndpoint(url: string): string {
+  try {
+    const path = new URL(url).pathname;
+    const match = API_PATH_START.exec(path);
+    if (!match) {
+      return path;
+    }
+    // Safe to replace broadly here — apiPath only contains segments after /rest/api/ or /api/v2/,
+    // where numeric segments are content/attachment IDs (typically 5+ digits, sometimes prefixed with "att").
+    const apiPath = path.slice(match.index);
+    return apiPath.replaceAll(/\/[0-9a-f-]{8,}/gi, '/{id}').replaceAll(/\/(att)?\d{4,}/g, '/{id}');
+  } catch {
+    return 'unknown';
+  }
+}
 
 // TODO: extract to shared utils package (bottleneck as optional peer dep)
 export class RateLimitedHttpClient {
@@ -10,7 +39,11 @@ export class RateLimitedHttpClient {
   private readonly limiter: Bottleneck;
   private readonly dispatcher: Dispatcher;
 
-  public constructor(ratePerMinute: number, dispatcher?: Dispatcher) {
+  public constructor(
+    ratePerMinute: number,
+    private readonly metrics: Metrics,
+    dispatcher?: Dispatcher,
+  ) {
     this.dispatcher = (dispatcher ?? new Agent()).compose([
       interceptors.redirect({ maxRedirections: 10 }),
       interceptors.retry(),
@@ -42,22 +75,42 @@ export class RateLimitedHttpClient {
     headers: Record<string, string>,
   ): Promise<Dispatcher.ResponseData['body']> {
     return this.limiter.schedule(async () => {
-      const response = await request(url, {
-        method: 'GET',
-        headers,
-        dispatcher: this.dispatcher,
-      });
+      const startTime = Date.now();
+      const endpoint = normalizeEndpoint(url);
+      let statusCode: number | undefined;
 
-      await handleErrorStatus(response.statusCode, response.body, url);
-      return response.body;
+      try {
+        const response = await request(url, {
+          method: 'GET',
+          headers,
+          dispatcher: this.dispatcher,
+        });
+
+        statusCode = response.statusCode;
+        await handleErrorStatus(response.statusCode, response.body, url);
+
+        this.recordRequestDuration(startTime, endpoint, 'success');
+        return response.body;
+      } catch (error) {
+        this.recordRequestDuration(startTime, endpoint, 'error');
+        this.metrics.recordApiError(statusCode);
+        throw error;
+      }
     });
   }
 
+  private recordRequestDuration(
+    startTime: number,
+    endpoint: string,
+    result: 'success' | 'error',
+  ): void {
+    this.metrics.recordApiRequestDuration(elapsedSeconds(startTime), endpoint, result);
+  }
+
   private setupThrottlingMonitoring(): void {
-    this.limiter.on('depleted', (empty) => {
-      if (empty) {
-        this.logger.log({ msg: 'Rate limit reservoir depleted - queuing requests' });
-      }
+    this.limiter.on('depleted', () => {
+      this.logger.log({ msg: 'Rate limit reservoir depleted - queuing requests' });
+      this.metrics.recordApiThrottleEvent();
     });
 
     this.limiter.on('dropped', () => {

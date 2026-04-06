@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common';
 import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind } from '../constants/ingestion.constants';
+import type { Metrics } from '../metrics';
 import type { DiscoveredAttachment, DiscoveredPage, FileDiffResult } from './sync.types';
 
 export class FileDiffService {
@@ -14,6 +15,7 @@ export class FileDiffService {
     private readonly tenantName: string,
     private readonly useV1KeyFormat: boolean,
     private readonly uniqueApiClient: UniqueApiClient,
+    private readonly metrics: Metrics,
   ) {}
 
   public async computeDiff(
@@ -81,7 +83,24 @@ export class FileDiffService {
       msg: 'File diff completed',
     });
 
+    this.recordDiffMetrics(result);
+
     return result;
+  }
+
+  private recordDiffMetrics(result: FileDiffResult): void {
+    if (result.newItemIds.length > 0) {
+      this.metrics.recordFileDiffEvents(result.newItemIds.length, 'new');
+    }
+    if (result.updatedItemIds.length > 0) {
+      this.metrics.recordFileDiffEvents(result.updatedItemIds.length, 'updated');
+    }
+    if (result.deletedItems.length > 0) {
+      this.metrics.recordFileDiffEvents(result.deletedItems.length, 'deleted');
+    }
+    if (result.movedItemIds.length > 0) {
+      this.metrics.recordFileDiffEvents(result.movedItemIds.length, 'moved');
+    }
   }
 
   private buildPageDiffItems(pages: DiscoveredPage[]): FileDiffItem[] {
@@ -130,21 +149,37 @@ export class FileDiffService {
 
     // If the file diff indicated we should delete all files even when we submitted some files to
     // the diff, it most probably means that we have some kind of bug in file diff or something
-    // unexpected changed in the logic (e.g. key format change). We should not proceed with the
-    // sync to avoid costly re-ingestions. If user actually wants to delete all files from a space,
-    // they should leave one page labeled for synchronization.
+    // unexpected changed in the logic (e.g. key format change). However, if the new files have
+    // completely different keys than the deleted files, this is a legitimate content replacement
+    // scenario (e.g. old pages were deleted and new ones created) — not a key format bug.
     const totalFilesInUnique = await this.uniqueApiClient.files.getCountByKeyPrefix(partialKey);
     if (diffResponse.deletedFiles.length === totalFilesInUnique) {
-      this.logger.error({
+      const submittedKeys = new Set(submittedItems.map((item) => item.key));
+      const deletedKeysOverlap = diffResponse.deletedFiles.some((key) => submittedKeys.has(key));
+
+      if (diffResponse.newFiles.length === 0 || deletedKeysOverlap) {
+        this.logger.error({
+          submittedCount: submittedItems.length,
+          deletedCount: diffResponse.deletedFiles.length,
+          newCount: diffResponse.newFiles.length,
+          deletedKeysOverlap,
+          totalFilesInUnique,
+          partialKey,
+          msg: 'File diff would delete all files stored in Unique. Aborting to prevent accidental full deletion.',
+        });
+        assert.fail(
+          `File diff would delete all ${diffResponse.deletedFiles.length} files stored in Unique for partialKey "${partialKey}". Aborting sync to prevent accidental full deletion.`,
+        );
+      }
+
+      this.logger.warn({
         submittedCount: submittedItems.length,
         deletedCount: diffResponse.deletedFiles.length,
+        newCount: diffResponse.newFiles.length,
         totalFilesInUnique,
         partialKey,
-        msg: 'File diff would delete all files stored in Unique. Aborting to prevent accidental full deletion.',
+        msg: `File diff will delete all ${diffResponse.deletedFiles.length} existing files and add ${diffResponse.newFiles.length} new files. Proceeding because new files do not overlap with deleted keys.`,
       });
-      assert.fail(
-        `File diff would delete all ${diffResponse.deletedFiles.length} files stored in Unique for partialKey "${partialKey}". Aborting sync to prevent accidental full deletion.`,
-      );
     }
   }
 }
