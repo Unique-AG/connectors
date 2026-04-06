@@ -225,10 +225,4 @@ export class ConfluenceSynchronizationService {
     }
     return map;
   }
-
-  private logSettledResults(results: PromiseSettledResult<void>[], msg: string): void {
-    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
-    this.logger.log({ total: results.length, succeeded, failed, msg });
-  }
 }
