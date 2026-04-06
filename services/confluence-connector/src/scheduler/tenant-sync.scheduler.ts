@@ -27,6 +27,12 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       })
       .then(() => {
         this.scheduleActiveTenantSyncs();
+      })
+      .catch((error: unknown) => {
+        this.logger.error({
+          err: error,
+          msg: 'Failed to schedule tenant syncs during startup',
+        });
       });
   }
 
