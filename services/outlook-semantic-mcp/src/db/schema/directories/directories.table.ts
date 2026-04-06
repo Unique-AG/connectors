@@ -1,9 +1,9 @@
+import { asAllOptions } from '@unique-ag/utils';
 import { relations } from 'drizzle-orm';
 import { AnyPgColumn, boolean, pgEnum, pgTable, unique, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
-import { asAllOptions } from '@unique-ag/utils';
 
 const directoryTypes = [
   // Outlook system directories
