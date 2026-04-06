@@ -5,7 +5,10 @@ import { omit } from 'remeda';
 import z from 'zod';
 import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
-import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import {
+  computeIgnoredBefore,
+  inboxConfigurationMailFilters,
+} from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../../user-utils/get-user-profile.query';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
@@ -36,7 +39,8 @@ export const GetFullSyncStatsResponse = z.object({
       runAt: z.string().nullable(),
       startedAt: z.string().nullable(),
       filters: z.object({
-        ignoredBefore: z.string().nullable(),
+        retentionWindowInDays: z.number(),
+        ignoredBefore: z.string(),
         ignoredSenders: z.array(z.string()),
         ignoredContents: z.array(z.string()),
       }),
@@ -149,7 +153,8 @@ export class GetFullSyncStatsQuery {
       scheduledForIngestion: inboxConfig.fullSyncScheduledForIngestion,
       failedToUploadForIngestion: inboxConfig.fullSyncFailedToUploadForIngestion,
       filters: {
-        ignoredBefore: filters.ignoredBefore.toISOString() ?? null,
+        retentionWindowInDays: filters.retentionWindowInDays,
+        ignoredBefore: computeIgnoredBefore(filters.retentionWindowInDays).toISOString(),
         ignoredSenders: filters.ignoredSenders.map((r) => r.toString()),
         ignoredContents: filters.ignoredContents.map((r) => r.toString()),
       },

@@ -4,7 +4,10 @@ import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
-import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import {
+  computeIgnoredBefore,
+  inboxConfigurationMailFilters,
+} from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -286,7 +289,9 @@ export class FullSyncCommand {
       const filters = inboxConfigurationMailFilters.parse(filtersRaw);
       const count = (await client
         .api('me/messages/$count')
-        .filter(`receivedDateTime ge ${filters.ignoredBefore.toISOString()}`)
+        .filter(
+          `receivedDateTime ge ${computeIgnoredBefore(filters.retentionWindowInDays).toISOString()}`,
+        )
         .header('Prefer', 'IdType="ImmutableId"')
         .header('ConsistencyLevel', 'eventual')
         .get()) as number;

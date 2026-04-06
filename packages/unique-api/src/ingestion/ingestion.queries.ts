@@ -21,6 +21,7 @@ export interface ContentUpsertMutationInput {
     fileAccess?: FileAccessKey[];
     ingestionConfig?: IngestionConfig;
     metadata?: Record<string, unknown>;
+    expiresAt?: string;
   };
   fileUrl?: string;
   chatId?: string;
@@ -47,6 +48,7 @@ export const CONTENT_UPSERT_MUTATION = gql`
     $sourceKind: String
     $storeInternally: Boolean
     $baseUrl: String
+    $expiresAt: String
   ) {
     contentUpsert(
       input: $input
@@ -58,6 +60,7 @@ export const CONTENT_UPSERT_MUTATION = gql`
       sourceKind: $sourceKind
       storeInternally: $storeInternally
       baseUrl: $baseUrl
+      expiresAt: $expiresAt
     ) {
       id
       key

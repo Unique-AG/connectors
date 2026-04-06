@@ -140,11 +140,11 @@ mcpConfig:
       x-company-id: "<your-company-id>"
       x-user-id: "<your-service-account-user-id>"
 
-  # IMPORTANT: `ignoredBefore` is mandatory — the application will not start without it.
-  # Adjust it to control how far back the initial email sync goes. Setting this date far
-  # in the past can cause very large initial syncs for users with large mailboxes,
-  # potentially taking hours and consuming significant Microsoft Graph API quota.
-  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
+  # IMPORTANT: `retentionWindowInDays` is mandatory — the application will not start without it.
+  # Adjust it to control how far back the initial email sync goes. Setting a large value can
+  # cause very large initial syncs for users with large mailboxes, potentially taking hours
+  # and consuming significant Microsoft Graph API quota.
+  defaultMailFilters: '{"retentionWindowInDays":365,"ignoredContents":[],"ignoredSenders":[]}'
 ```
 
 **PostgreSQL backups:** Strongly recommended. Without a backup, all users must re-authenticate and full sync restarts from scratch. See [Disaster Recovery — Backup Recommendations](./disaster-recovery.md#Backup-recommendations).

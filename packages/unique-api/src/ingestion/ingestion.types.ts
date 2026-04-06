@@ -33,6 +33,7 @@ export interface ContentRegistrationRequest {
   fileAccess?: FileAccessKey[];
   metadata: ContentMetadata;
   storeInternally: boolean;
+  expiresAt?: Date;
 }
 
 export interface IngestionFinalizationRequest {
@@ -50,6 +51,7 @@ export interface IngestionFinalizationRequest {
   baseUrl?: string;
   metadata?: ContentMetadata;
   storeInternally: boolean;
+  expiresAt?: Date;
 }
 
 export interface IngestionApiResponse {

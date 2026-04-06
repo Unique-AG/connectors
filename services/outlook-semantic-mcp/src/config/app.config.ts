@@ -23,7 +23,7 @@ const ConfigSchema = z
       .describe('The log level at which the services outputs (pino).'),
     selfUrl: stringToURL().describe('The URL of the MCP Server. Used for OAuth callbacks.'),
     defaultMailFilters: json(inboxConfigurationMailFilters).describe(
-      'Default mail filters applied when syncing emails (e.g. {"ignoredBefore":"2024-01-01", "ignoredSenders": [], "ignoredContents": [] }). ',
+      'Default mail filters applied when syncing emails (e.g. {"retentionWindowInDays":365, "ignoredSenders": [], "ignoredContents": [] }). ',
     ),
     mcpDebugMode: enabledDisabledBoolean(
       `Enables debug mode. In debug mode tools responses contain debugging data.`,

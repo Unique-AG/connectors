@@ -4,8 +4,14 @@ import { shouldSkipEmail } from './should-skip-email';
 
 vi.mock('~/features/tracing.utils', () => ({ traceEvent: vi.fn() }));
 
+function daysAgoISO(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString();
+}
+
 const baseFilters = (): InboxConfigurationMailFilters => ({
-  ignoredBefore: new Date('2020-01-01T00:00:00Z'),
+  retentionWindowInDays: 30,
   ignoredSenders: [],
   ignoredContents: [],
 });
@@ -24,26 +30,18 @@ describe('shouldSkipEmail', () => {
     });
   });
 
-  describe('ignoredBefore', () => {
-    it('skips when createdDateTime is before ignoredBefore', () => {
-      const result = shouldSkipEmail(
-        { receivedDateTime: '2019-06-01T00:00:00Z' },
-        baseFilters(),
-        context,
-      );
-      expect(result).toEqual({ skip: true, reason: 'ignoredBefore' });
+  describe('retentionWindowInDays', () => {
+    it('skips when receivedDateTime is older than the retention window', () => {
+      const result = shouldSkipEmail({ receivedDateTime: daysAgoISO(60) }, baseFilters(), context);
+      expect(result).toEqual({ skip: true, reason: 'receivedDateTime' });
     });
 
-    it('does not skip when createdDateTime is after ignoredBefore', () => {
-      const result = shouldSkipEmail(
-        { receivedDateTime: '2021-01-01T00:00:00Z' },
-        baseFilters(),
-        context,
-      );
+    it('does not skip when receivedDateTime is within the retention window', () => {
+      const result = shouldSkipEmail({ receivedDateTime: daysAgoISO(1) }, baseFilters(), context);
       expect(result).toEqual({ skip: false });
     });
 
-    it('does not skip when createdDateTime is absent', () => {
+    it('does not skip when receivedDateTime is absent', () => {
       const result = shouldSkipEmail({}, baseFilters(), context);
       expect(result).toEqual({ skip: false });
     });

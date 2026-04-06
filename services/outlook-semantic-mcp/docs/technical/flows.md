@@ -151,7 +151,7 @@ After a subscription is created, the server automatically begins ingesting the u
 - Full sync is triggered asynchronously: subscription creation publishes a `subscription-created` event to RabbitMQ, which the server consumes to begin the sync — users do not need to invoke it manually.
 - The sync is resumable: the Graph pagination cursor is persisted so a crash or restart picks up where it left off.
 - Stale syncs (no heartbeat for 20+ minutes) are automatically restarted by the sync recovery module.
-- `ignoredBefore` is applied as a Graph API query filter. `ignoredSenders` and `ignoredContents` are applied in-memory after each batch is fetched.
+- The retention window (`retentionWindowInDays`) is applied as a Graph API query filter (computed daily as `today - retentionWindowInDays`). `ignoredSenders` and `ignoredContents` are applied in-memory after each batch is fetched.
 - Full sync **initializes** the watermark (`newestLastModifiedDateTime`). Once initialized, live catch-up takes ownership and updates it on every subsequent notification.
 
 ## Directory Sync Flow

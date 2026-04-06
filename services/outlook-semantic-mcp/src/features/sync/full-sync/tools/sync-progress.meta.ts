@@ -40,8 +40,7 @@ export const META = createMeta({
   ### Active filters
   Always show this section so the user understands which emails will be synchronized for search.
 
-  **Ignoring emails before:** {ignoredBefore formatted as "Mon DD, YYYY"}, or _none_ if null.
-  Emails with a received date before this date are permanently excluded from search — they will never appear in results.
+  **Retention window:** {syncStats.filters.retentionWindowInDays} days — only emails received on or after {syncStats.filters.ignoredBefore formatted as "Mon DD, YYYY"} are synced and searchable. Emails older than this date are excluded from search and will automatically expire from the Knowledge Base.
 
   **Ignored senders** — each entry is a JavaScript regex in \`/pattern/flags\` format matched against the sender's email address. Emails from matching senders are excluded.
   If the list is empty, show: _No sender filters active — all senders are included._
