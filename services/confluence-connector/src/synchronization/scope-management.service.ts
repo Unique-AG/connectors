@@ -15,21 +15,21 @@ export interface RootScopeInitResult {
 
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
-  private cachedInstanceTypeIdentifier: InstanceIdentifier | null = null;
+  private cachedInstanceIdentifier: InstanceIdentifier | null = null;
 
   public constructor(
     private readonly ingestionConfig: IngestionConfig,
     private readonly tenantName: string,
     private readonly confluenceApiClient: ConfluenceApiClient,
     private readonly uniqueApiClient: UniqueApiClient,
-  ) { }
+  ) {}
 
   private async getInstanceIdentifier(): Promise<InstanceIdentifier> {
-    if (this.cachedInstanceTypeIdentifier) {
-      return this.cachedInstanceTypeIdentifier;
+    if (this.cachedInstanceIdentifier) {
+      return this.cachedInstanceIdentifier;
     }
     const identifier = await this.confluenceApiClient.resolveInstanceIdentifier();
-    this.cachedInstanceTypeIdentifier = identifier;
+    this.cachedInstanceIdentifier = identifier;
     return identifier;
   }
 
