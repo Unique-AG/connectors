@@ -34,7 +34,7 @@
     "@nestjs/cache-manager": "3.0.1",
     "@nestjs/common": "11.1.6",
     "@nestjs/config": "4.0.2",
-    "@nestjs/core": "11.1.6",
+    "@nestjs/core": "11.1.18",
     "@nestjs/event-emitter": "3.0.1",
     "@nestjs/platform-express": "11.1.6",
     "@nestjs/schedule": "6.1.0",
