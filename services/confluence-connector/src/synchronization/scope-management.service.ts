@@ -1,9 +1,12 @@
 import assert from 'node:assert';
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
-import type { ConfluenceApiClient, InstanceIdentifier } from '../confluence-api/confluence-api-client';
 import type { IngestionConfig } from '../config/ingestion.schema';
-import { EXTERNAL_ID_PREFIX, buildRootScopeExternalId } from '../constants/ingestion.constants';
+import type {
+  ConfluenceApiClient,
+  InstanceIdentifier,
+} from '../confluence-api/confluence-api-client';
+import { buildRootScopeExternalId, EXTERNAL_ID_PREFIX } from '../constants/ingestion.constants';
 
 export interface RootScopeInitResult {
   rootScopePath: string;

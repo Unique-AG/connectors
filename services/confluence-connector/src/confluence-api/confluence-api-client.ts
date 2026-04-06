@@ -1,7 +1,10 @@
 import type { Readable } from 'node:stream';
 import type { ConfluencePage } from './types/confluence-api.types';
 
-export type InstanceIdentifier = { type: 'cloud' | 'data-center'; id: string };
+export interface InstanceIdentifier {
+  type: 'cloud' | 'data-center';
+  id: string;
+}
 
 export interface ApiClientOptions {
   attachmentsEnabled: boolean;

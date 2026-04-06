@@ -1,7 +1,7 @@
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConfluenceApiClient } from '../../confluence-api/confluence-api-client';
 import type { IngestionConfig } from '../../config/ingestion.schema';
+import type { ConfluenceApiClient } from '../../confluence-api/confluence-api-client';
 import { ScopeManagementService } from '../scope-management.service';
 
 const TENANT_NAME = 'dogfood-cloud';
@@ -23,9 +23,7 @@ function makeService() {
   const uniqueApiClient = { scopes, users } as unknown as UniqueApiClient;
 
   const confluenceApi = {
-    resolveInstanceIdentifier: vi
-      .fn()
-      .mockResolvedValue({ type: 'cloud', id: INSTANCE_ID }),
+    resolveInstanceIdentifier: vi.fn().mockResolvedValue({ type: 'cloud', id: INSTANCE_ID }),
   };
 
   const ingestionConfig = {
