@@ -39,6 +39,7 @@ export class ScopeManagementService {
       msg: 'Requesting current user ID from Unique API',
     });
     const userId = await this.uniqueApiClient.users.getCurrentId();
+    assert.ok(userId, 'User ID must be available');
 
     // Grant access to root scope before reading it (service account needs permission to query scopes)
     await this.uniqueApiClient.scopes.createAccesses(this.ingestionConfig.scopeId, [
@@ -57,7 +58,11 @@ export class ScopeManagementService {
     if (!rootScope.externalId) {
       isInitialSync = true;
       try {
-        await this.uniqueApiClient.scopes.updateExternalId(rootScope.id, expectedExternalId);
+        const updatedScope = await this.uniqueApiClient.scopes.updateExternalId(
+          rootScope.id,
+          expectedExternalId,
+        );
+        rootScope.externalId = updatedScope.externalId;
         this.logger.log({
           scopeId: rootScope.id,
           externalId: expectedExternalId,
