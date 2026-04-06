@@ -207,17 +207,8 @@ export class TenantRegistry implements OnModuleInit {
     return this.tenants.size;
   }
 
-  public async processDeletedTenants(): Promise<void> {
-    for (const tenant of this.deletedTenants.values()) {
-      try {
-        await this.run(tenant, async () => {
-          const cleanupService = this.serviceRegistry.getService(TenantDeleteService);
-          await cleanupService.deleteTenantContent();
-        });
-      } catch (error) {
-        this.logger.error({ tenantName: tenant.name, err: error, msg: 'Tenant cleanup failed' });
-      }
-    }
+  public getDeletedTenants(): TenantContext[] {
+    return [...this.deletedTenants.values()];
   }
 
   private buildUniqueAuthConfig(

@@ -388,69 +388,24 @@ describe('TenantRegistry', () => {
     });
   });
 
-  describe('processDeletedTenants', () => {
-    it('completes without errors when no deleted tenants exist', async () => {
+  describe('getDeletedTenants', () => {
+    it('returns empty array when no deleted tenants exist', () => {
       const { registry } = createRegistry([
         { name: 'active-tenant', config: createMockTenantConfig() },
       ]);
 
-      await registry.processDeletedTenants();
-
-      expect(mockLogger.error).not.toHaveBeenCalled();
+      expect(registry.getDeletedTenants()).toEqual([]);
     });
 
-    it('delegates cleanup to TenantDeleteService for each deleted tenant', async () => {
-      const deletedConfig = createMockTenantConfig();
-      const { registry, serviceRegistry } = createRegistry(
+    it('returns deleted tenant contexts', () => {
+      const { registry } = createRegistry(
         [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: deletedConfig }],
+        [{ name: 'deleted-tenant', config: createMockTenantConfig() }],
       );
 
-      const deletedTenant = { name: 'deleted-tenant', config: deletedConfig, isScanning: false };
-      const cleanupService = tenantStorage.run(deletedTenant, () =>
-        serviceRegistry.getService(TenantDeleteService),
-      );
-      const cleanupSpy = vi
-        .spyOn(cleanupService, 'deleteTenantContent')
-        .mockResolvedValue(undefined);
-
-      await registry.processDeletedTenants();
-
-      expect(cleanupSpy).toHaveBeenCalledOnce();
-    });
-
-    it('continues processing remaining tenants when one fails', async () => {
-      const configA = createMockTenantConfig();
-      const configB = createMockTenantConfig();
-      const { registry, serviceRegistry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [
-          { name: 'fail-tenant', config: configA },
-          { name: 'ok-tenant', config: configB },
-        ],
-      );
-
-      const failTenant = { name: 'fail-tenant', config: configA, isScanning: false };
-      const failCleanup = tenantStorage.run(failTenant, () =>
-        serviceRegistry.getService(TenantDeleteService),
-      );
-      vi.spyOn(failCleanup, 'deleteTenantContent').mockRejectedValue(new Error('API error'));
-
-      const okTenant = { name: 'ok-tenant', config: configB, isScanning: false };
-      const okCleanup = tenantStorage.run(okTenant, () =>
-        serviceRegistry.getService(TenantDeleteService),
-      );
-      const okSpy = vi.spyOn(okCleanup, 'deleteTenantContent').mockResolvedValue(undefined);
-
-      await registry.processDeletedTenants();
-
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'fail-tenant',
-          msg: 'Tenant cleanup failed',
-        }),
-      );
-      expect(okSpy).toHaveBeenCalledOnce();
+      const deleted = registry.getDeletedTenants();
+      expect(deleted).toHaveLength(1);
+      expect(deleted[0]?.name).toBe('deleted-tenant');
     });
 
     it('registers TenantDeleteService for deleted tenants', () => {

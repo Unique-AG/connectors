@@ -3,7 +3,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import type { TenantContext } from '../tenant';
-import { ServiceRegistry, TenantRegistry } from '../tenant';
+import { ServiceRegistry, TenantDeleteService, TenantRegistry } from '../tenant';
 
 @Injectable()
 export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
@@ -17,23 +17,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   public onModuleInit(): void {
-    void this.tenantRegistry
-      .processDeletedTenants()
-      .catch((error: unknown) => {
-        this.logger.error({
-          err: error,
-          msg: 'Failed to process deleted tenants, proceeding with sync scheduling',
-        });
-      })
-      .then(() => {
-        this.scheduleActiveTenantSyncs();
-      })
-      .catch((error: unknown) => {
-        this.logger.error({
-          err: error,
-          msg: 'Failed to schedule tenant syncs during startup',
-        });
-      });
+    this.scheduleActiveTenantSyncs();
   }
 
   public onModuleDestroy(): void {
@@ -84,14 +68,29 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  private async processDeletedTenants(): Promise<void> {
+    for (const tenant of this.tenantRegistry.getDeletedTenants()) {
+      try {
+        await this.tenantRegistry.run(tenant, async () => {
+          const cleanupService = this.serviceRegistry.getService(TenantDeleteService);
+          await cleanupService.deleteTenantContent();
+        });
+      } catch (error) {
+        this.logger.error({ tenantName: tenant.name, err: error, msg: 'Tenant cleanup failed' });
+      }
+    }
+  }
+
   private async syncTenant(tenant: TenantContext): Promise<void> {
+    if (this.isShuttingDown) {
+      this.logger.log({ msg: 'Skipping sync due to shutdown' });
+      return;
+    }
+
+    await this.processDeletedTenants();
+
     await this.tenantRegistry.run(tenant, async () => {
       const syncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
-
-      if (this.isShuttingDown) {
-        this.logger.log({ msg: 'Skipping sync due to shutdown' });
-        return;
-      }
 
       try {
         await syncService.synchronize();
