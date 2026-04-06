@@ -54,7 +54,7 @@ export class ScopeManagementService {
     const expectedExternalId = buildRootScopeExternalId(instanceId.type, instanceId.id);
     let isInitialSync = false;
 
-    if (rootScope.externalId === null) {
+    if (!rootScope.externalId) {
       isInitialSync = true;
       try {
         await this.uniqueApiClient.scopes.updateExternalId(rootScope.id, expectedExternalId);
@@ -67,7 +67,7 @@ export class ScopeManagementService {
         this.logger.warn({
           scopeId: rootScope.id,
           externalId: expectedExternalId,
-          error,
+          err: error,
           msg: 'Failed to claim root scope ownership',
         });
       }
