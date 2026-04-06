@@ -35,10 +35,10 @@ export class VerifyInboxConnectionTool {
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
   @Tool({
-    name: 'verify_inbox_connection',
+    name: 'os_mcp_verify_inbox_connection',
     title: 'Verify Inbox Connection',
     description:
-      'Check the status of the inbox connection for Microsoft Outlook emails. Returns whether ingestion is active, expiring soon, expired, or not configured. If status is `expired` or `not_configured`, call `reconnect_inbox` to restore email ingestion.',
+      'Check the status of the inbox connection for Microsoft Outlook emails. Returns whether ingestion is active, expiring soon, expired, or not configured. If status is `expired` or `not_configured`, call `os_mcp_reconnect_inbox` to restore email ingestion.',
     parameters: VerifyInboxConnectionInputSchema,
     outputSchema: VerifyInboxConnectionOutputSchema,
     annotations: {
@@ -73,7 +73,7 @@ export class VerifyInboxConnectionTool {
       return {
         status: 'not_configured' as SubscriptionStatus,
         message:
-          'Inbox connection is not configured. Use reconnect_inbox to begin ingesting emails.',
+          'Inbox connection is not configured. Use os_mcp_reconnect_inbox to begin ingesting emails.',
         subscription: null,
       };
     }
@@ -94,7 +94,7 @@ export class VerifyInboxConnectionTool {
     if (diffFromNow < 0) {
       status = 'expired';
       message =
-        'Inbox connection subscription has expired. Use reconnect_inbox to restart ingestion.';
+        'Inbox connection subscription has expired. Use os_mcp_reconnect_inbox to restart ingestion.';
     } else if (minutesUntilExpiration <= 15) {
       status = 'expiring_soon';
       message = `Inbox connection is active but expiring in ${minutesUntilExpiration} minutes. It will be automatically renewed.`;

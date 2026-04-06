@@ -9,7 +9,7 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 const META = createMeta({
   icon: 'play',
   systemPrompt:
-    "Triggers a full re-sync of the user's Outlook inbox. Use this when the user reports missing emails, stale search results, or after a long period of inactivity. After triggering, call `sync_progress` to monitor ingestion status.",
+    "Triggers a full re-sync of the user's Outlook inbox. Use this when the user reports missing emails, stale search results, or after a long period of inactivity. After triggering, call `os_mcp_sync_progress` to monitor ingestion status.",
 });
 
 const InputSchema = z.object({});
@@ -26,10 +26,10 @@ export class RunFullSyncTool {
   public constructor(private readonly fullSyncCommand: FullSyncCommand) {}
 
   @Tool({
-    name: 'run_full_sync',
+    name: 'os_mcp_run_full_sync',
     title: 'Run Full Sync',
     description:
-      'Trigger a full re-sync of the Outlook mailbox into the knowledge base. Skips if a sync was run recently. Use `sync_progress` to monitor ingestion status after triggering.',
+      'Trigger a full re-sync of the Outlook mailbox into the knowledge base. Skips if a sync was run recently. Use `os_mcp_sync_progress` to monitor ingestion status after triggering.',
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {

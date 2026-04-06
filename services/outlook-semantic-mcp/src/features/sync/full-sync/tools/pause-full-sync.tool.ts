@@ -28,10 +28,10 @@ export class PauseFullSyncTool {
   ) {}
 
   @Tool({
-    name: 'pause_full_sync',
+    name: 'os_mcp_pause_full_sync',
     title: 'Pause Full Sync',
     description:
-      'Pause an in-progress full sync. The current batch finishes, then the sync stops. Use `resume_full_sync` to continue later.',
+      'Pause an in-progress full sync. The current batch finishes, then the sync stops. Use `os_mcp_resume_full_sync` to continue later.',
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {
@@ -59,7 +59,10 @@ export class PauseFullSyncTool {
     const result = await this.pauseFullSyncCommand.run(userProfileTypeId.toString());
 
     if (result.status === 'paused') {
-      return { success: true, message: 'Full sync paused. Use `resume_full_sync` to continue.' };
+      return {
+        success: true,
+        message: 'Full sync paused. Use `os_mcp_resume_full_sync` to continue.',
+      };
     }
 
     if (result.status === 'not-found') {

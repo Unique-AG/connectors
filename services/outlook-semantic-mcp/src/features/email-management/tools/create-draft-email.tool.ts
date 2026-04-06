@@ -97,8 +97,8 @@ export class CreateDraftEmailTool {
   ) {}
 
   @Tool({
-    name: 'draft_email',
-    title: 'Draft Email',
+    name: 'os_mcp_create_draft_email',
+    title: 'Create Draft Email',
     description:
       'Creates a draft email in the connected Outlook mailbox with the given subject, body, recipients, and optional attachments. The draft is saved but not sent.',
     parameters: CreateDraftEmailInputSchema,

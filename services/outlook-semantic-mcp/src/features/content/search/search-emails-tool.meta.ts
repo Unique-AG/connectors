@@ -7,14 +7,14 @@ export const META = createMeta({
   By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
   After returning results, inform the user that they can narrow the search to a specific folder if needed.
 
-  To filter by folder, pass its name directly to the \`directories\` parameter — no need to call \`list_folders\` for well-known folders.
+  To filter by folder, pass its name directly to the \`directories\` parameter — no need to call \`os_mcp_list_folders\` for well-known folders.
   Use these exact names: "Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History".
   Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized — searching through them will not return results.
-  For custom user-defined folders, call \`list_folders\` first to get the folder ID.
+  For custom user-defined folders, call \`os_mcp_list_folders\` first to get the folder ID.
 
   If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.`,
   toolFormatInformation: `## Email Display Rules
-  ALWAYS follow these rules when displaying results from \`search_emails\` or when referencing information extracted from emails.
+  ALWAYS follow these rules when displaying results from \`os_mcp_search_emails\` or when referencing information extracted from emails.
   ### Format for listing emails
   When listing multiple emails, format each as a compact block — NEVER use a markdown table:
   📩 **{Subject}** [open]({outlookWebLink if non-empty, otherwise https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem})

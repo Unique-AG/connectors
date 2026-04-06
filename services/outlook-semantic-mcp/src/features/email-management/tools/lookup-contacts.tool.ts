@@ -23,7 +23,7 @@ export class LookupContactsTool {
   ) {}
 
   @Tool({
-    name: 'lookup_contacts',
+    name: 'os_mcp_lookup_contacts',
     title: 'Lookup Contacts',
     description:
       'Searches for contacts by name across the Microsoft People API and the connected Outlook inbox. Returns matching contacts with their name, email address, and source.',

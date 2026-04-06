@@ -2,8 +2,8 @@ import { createMeta } from '@unique-ag/mcp-server-module';
 
 export const META = createMeta({
   icon: 'mail',
-  systemPrompt: `### When to Use \`draft_email\` Tool
-      Use \`draft_email\` tool whenever the user's intent involves composing, writing, or responding to an email — even if they don't explicitly say "write an email." This includes but is not limited to phrases like:
+  systemPrompt: `### When to Use \`os_mcp_create_draft_email\` Tool
+      Use \`os_mcp_create_draft_email\` tool whenever the user's intent involves composing, writing, or responding to an email — even if they don't explicitly say "write an email." This includes but is not limited to phrases like:
     - "Write an email to..."
     - "Draft a message to..."
     - "Reply to..." / "Answer to..."
@@ -20,10 +20,10 @@ export const META = createMeta({
     **Do not ask the user for confirmation before searching.** Act immediately.
     Before drafting, you **must** resolve the recipient's email address:
     1. **Explicit address provided**: If the user gave you an email address directly, use it.
-    2. **No address provided — search immediately**: If the user refers to a person by name, role, or organization but did not provide an email address, **immediately** call the \`search_emails\` tool. Do NOT ask the user whether you should search. Do NOT present a plan or options. Do NOT ask for confirmation. Just search.
-    3. **Ambiguous results**: If \`search_emails\` returns multiple possible matches, present them to the user and ask which one to use.
-    4. **No results from search_emails**: If \`search_emails\` returns no relevant results, call \`lookup_contacts\` as a last resort to find the recipient's email address.
-    5. **Still no results**: Only if both \`search_emails\` and \`lookup_contacts\` return no relevant results, ask the user to provide the email address manually.
+    2. **No address provided — search immediately**: If the user refers to a person by name, role, or organization but did not provide an email address, **immediately** call the \`os_mcp_search_emails\` tool. Do NOT ask the user whether you should search. Do NOT present a plan or options. Do NOT ask for confirmation. Just search.
+    3. **Ambiguous results**: If \`os_mcp_search_emails\` returns multiple possible matches, present them to the user and ask which one to use.
+    4. **No results from os_mcp_search_emails**: If \`os_mcp_search_emails\` returns no relevant results, call \`os_mcp_lookup_contacts\` as a last resort to find the recipient's email address.
+    5. **Still no results**: Only if both \`os_mcp_search_emails\` and \`os_mcp_lookup_contacts\` return no relevant results, ask the user to provide the email address manually.
     Never guess or fabricate an email address. Never skip step 2. Never ask for permission to search — just do it.
 
     ### Drafting Behavior
@@ -32,9 +32,9 @@ export const META = createMeta({
     2. **Infer everything you can** from the user's message — tone, intent, level of formality, content. Use reasonable defaults for anything not specified.
     3. **Draft a single email right away** and present it using the format specified below.
     4. **The user will correct you if needed.** Trust that the user will tell you if something is wrong. Do not try to get it perfect on the first ask — getting it done fast is more important.
-    The **only** exception: if after searching with \`search_emails\` and \`lookup_contacts\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
+    The **only** exception: if after searching with \`os_mcp_search_emails\` and \`os_mcp_lookup_contacts\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
 
-    ### What \`draft_email\` Does
+    ### What \`os_mcp_create_draft_email\` Does
     Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and attachments. The draft is saved and can be reviewed or sent later.
 
     ### Attachments

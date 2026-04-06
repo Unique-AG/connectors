@@ -94,7 +94,7 @@ export class GetFullSyncStatsQuery {
         state: 'error',
         syncStats: null,
         ingestionStats: null,
-        message: `Your inbox is disconnected. Use \`reconnect_inbox\` tool to reconnect`,
+        message: `Your inbox is disconnected. Use \`os_mcp_reconnect_inbox\` tool to reconnect`,
       };
     }
     if (inboxConfig.fullSyncState === 'failed') {
@@ -103,7 +103,7 @@ export class GetFullSyncStatsQuery {
         state: 'error',
         syncStats: null,
         ingestionStats: null,
-        message: `Full sync failed. Use \`run_full_sync\` tool to sync your inbox`,
+        message: `Full sync failed. Use \`os_mcp_run_full_sync\` tool to sync your inbox`,
       };
     }
     if (inboxConfig.liveCatchUpState === 'failed') {
@@ -112,7 +112,7 @@ export class GetFullSyncStatsQuery {
         state: 'error',
         syncStats: null,
         ingestionStats: null,
-        message: `Live catch-up failed. Use \`run_full_sync\` tool to sync your inbox`,
+        message: `Live catch-up failed. Use \`os_mcp_run_full_sync\` tool to sync your inbox`,
       };
     }
     const ingestionResult = await this.getScopeIngestionStats.run(userProfile.id);

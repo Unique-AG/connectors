@@ -29,7 +29,7 @@ export class ReconnectInboxTool {
   public constructor(private readonly subscriptionCreate: SubscriptionCreateService) {}
 
   @Tool({
-    name: 'reconnect_inbox',
+    name: 'os_mcp_reconnect_inbox',
     title: 'Reconnect Inbox',
     description:
       'Re-establish the Microsoft Outlook inbox subscription when disconnected or expired.',

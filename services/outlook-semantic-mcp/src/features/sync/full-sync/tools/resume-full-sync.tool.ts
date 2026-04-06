@@ -28,10 +28,10 @@ export class ResumeFullSyncTool {
   ) {}
 
   @Tool({
-    name: 'resume_full_sync',
+    name: 'os_mcp_resume_full_sync',
     title: 'Resume Full Sync',
     description:
-      'Resume a paused full sync. The sync continues from where it left off. Use `sync_progress` to monitor progress.',
+      'Resume a paused full sync. The sync continues from where it left off. Use `os_mcp_sync_progress` to monitor progress.',
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {
@@ -61,7 +61,7 @@ export class ResumeFullSyncTool {
     if (result.status === 'resumed') {
       return {
         success: true,
-        message: 'Full sync resumed. Use `sync_progress` to monitor progress.',
+        message: 'Full sync resumed. Use `os_mcp_sync_progress` to monitor progress.',
       };
     }
 
