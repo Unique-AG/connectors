@@ -46,6 +46,79 @@ describe('DataCenterConfluenceApiClient', () => {
     });
   });
 
+  describe('resolveInstanceIdentifier', () => {
+    it('calls the applinks manifest endpoint with empty auth headers', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: 'dc-instance-uuid',
+        name: 'My Confluence',
+      });
+
+      await client.resolveInstanceIdentifier();
+
+      expect(mockHttpClient.rateLimitedRequest).toHaveBeenCalledWith(
+        `${BASE_URL}/rest/applinks/1.0/manifest`,
+        {},
+      );
+    });
+
+    it('returns data-center type with id from manifest response', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: 'dc-instance-uuid',
+        name: 'My Confluence',
+      });
+
+      const result = await client.resolveInstanceIdentifier();
+
+      expect(result).toEqual({ type: 'data-center', id: 'dc-instance-uuid' });
+    });
+
+    it('throws when manifest response is missing the id field', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        name: 'My Confluence',
+      });
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('throws when manifest response id is not a string', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: 12345,
+      });
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('throws when manifest response id is an empty string', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: '',
+      });
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('throws when manifest response is null', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(null);
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('propagates HTTP errors from the manifest request', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockRejectedValueOnce(
+        new Error('Error response from https://dc.example.com/rest/applinks/1.0/manifest: 500'),
+      );
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow('500');
+    });
+  });
+
   describe('searchPagesByLabel', () => {
     it('constructs CQL with both labels and only space.type=global filter', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({

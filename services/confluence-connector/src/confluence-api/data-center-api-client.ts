@@ -3,7 +3,11 @@ import { chunk, isNullish, uniqueBy } from 'remeda';
 import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
-import { type ApiClientOptions, ConfluenceApiClient } from './confluence-api-client';
+import {
+  type ApiClientOptions,
+  ConfluenceApiClient,
+  type InstanceIdentifier,
+} from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
 import {
   type ConfluencePage,
@@ -27,6 +31,24 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
   ) {
     super();
     this.attachmentExpand = options.attachmentsEnabled ? ATTACHMENT_EXPAND : '';
+  }
+
+  public async resolveInstanceIdentifier(): Promise<InstanceIdentifier> {
+    const url = `${this.config.baseUrl}/rest/applinks/1.0/manifest`;
+    const response = await this.httpClient.rateLimitedRequest(url, {});
+
+    const id =
+      typeof response === 'object' && response !== null && 'id' in response
+        ? (response as Record<string, unknown>).id
+        : undefined;
+
+    if (typeof id !== 'string' || id.length === 0) {
+      throw new Error(
+        `Confluence Data Center manifest at ${url} did not contain a valid "id" field`,
+      );
+    }
+
+    return { type: 'data-center', id };
   }
 
   public async searchPagesByLabel(): Promise<ConfluencePage[]> {
