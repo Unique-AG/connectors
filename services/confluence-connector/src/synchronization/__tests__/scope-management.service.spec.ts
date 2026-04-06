@@ -1,6 +1,7 @@
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestionConfig } from '../../config/ingestion.schema';
+import type { Metrics } from '../../metrics';
 import { ScopeManagementService } from '../scope-management.service';
 
 const TENANT_NAME = 'dogfood-cloud';
@@ -18,6 +19,10 @@ interface MockDeps {
   };
   files: {
     deleteByKeyPrefix: ReturnType<typeof vi.fn>;
+  };
+  metrics: {
+    recordOrphanedScopesCleaned: ReturnType<typeof vi.fn>;
+    recordOrphanedFilesCleaned: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -46,10 +51,21 @@ function makeService(options?: { useV1KeyFormat?: boolean }): MockDeps {
     useV1KeyFormat: options?.useV1KeyFormat ?? false,
   } as unknown as IngestionConfig;
 
+  const metrics = {
+    recordOrphanedScopesCleaned: vi.fn(),
+    recordOrphanedFilesCleaned: vi.fn(),
+  };
+
   return {
-    service: new ScopeManagementService(ingestionConfig, TENANT_NAME, uniqueApiClient),
+    service: new ScopeManagementService(
+      ingestionConfig,
+      TENANT_NAME,
+      uniqueApiClient,
+      metrics as unknown as Metrics,
+    ),
     scopes,
     files,
+    metrics,
   };
 }
 
@@ -221,7 +237,7 @@ describe('ScopeManagementService', () => {
     };
 
     it('deletes files and scope for orphaned spaces', async () => {
-      const { service, scopes, files } = makeService();
+      const { service, scopes, files, metrics } = makeService();
       scopes.listChildren.mockResolvedValue([orphanedScope, activeScope]);
       files.deleteByKeyPrefix.mockResolvedValue(5);
 
@@ -231,6 +247,8 @@ describe('ScopeManagementService', () => {
       expect(scopes.delete).toHaveBeenCalledWith('scope-old');
       expect(files.deleteByKeyPrefix).toHaveBeenCalledTimes(1);
       expect(scopes.delete).toHaveBeenCalledTimes(1);
+      expect(metrics.recordOrphanedScopesCleaned).toHaveBeenCalledWith(1, 'success');
+      expect(metrics.recordOrphanedFilesCleaned).toHaveBeenCalledWith(5);
     });
 
     it('skips spaces that are still discovered', async () => {
@@ -270,7 +288,7 @@ describe('ScopeManagementService', () => {
     });
 
     it('handles per-space errors without blocking other cleanups', async () => {
-      const { service, scopes, files } = makeService();
+      const { service, scopes, files, metrics } = makeService();
       const secondOrphan = {
         id: 'scope-second',
         name: 'SECOND',
@@ -286,6 +304,9 @@ describe('ScopeManagementService', () => {
       expect(files.deleteByKeyPrefix).toHaveBeenCalledTimes(2);
       expect(scopes.delete).toHaveBeenCalledWith('scope-second');
       expect(scopes.delete).toHaveBeenCalledTimes(1);
+      expect(metrics.recordOrphanedScopesCleaned).toHaveBeenCalledWith(1, 'failure');
+      expect(metrics.recordOrphanedScopesCleaned).toHaveBeenCalledWith(1, 'success');
+      expect(metrics.recordOrphanedFilesCleaned).toHaveBeenCalledWith(3);
     });
 
     it('does nothing when no orphaned scopes exist', async () => {

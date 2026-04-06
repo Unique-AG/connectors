@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import type { Scope, UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
+import type { Metrics } from '../metrics';
 import {
   buildExternalId,
   buildPartialKey,
@@ -15,6 +16,7 @@ export class ScopeManagementService {
     private readonly ingestionConfig: IngestionConfig,
     private readonly tenantName: string,
     private readonly uniqueApiClient: UniqueApiClient,
+    private readonly metrics: Metrics,
   ) {}
 
   public async initialize(): Promise<string> {
@@ -118,6 +120,9 @@ export class ScopeManagementService {
         const deletedFileCount = await this.uniqueApiClient.files.deleteByKeyPrefix(partialKey);
         await this.uniqueApiClient.scopes.delete(scope.id);
 
+        this.metrics.recordOrphanedScopesCleaned(1, 'success');
+        this.metrics.recordOrphanedFilesCleaned(deletedFileCount);
+
         this.logger.log({
           scopeId: scope.id,
           spaceKey: parsed.spaceKey,
@@ -126,6 +131,8 @@ export class ScopeManagementService {
           msg: 'Deleted orphaned space scope and its files',
         });
       } catch (error) {
+        this.metrics.recordOrphanedScopesCleaned(1, 'failure');
+
         this.logger.error({
           scopeId: scope.id,
           spaceKey: parsed.spaceKey,
