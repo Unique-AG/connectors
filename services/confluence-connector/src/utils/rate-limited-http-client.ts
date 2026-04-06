@@ -42,8 +42,9 @@ export class RateLimitedHttpClient {
   public constructor(
     ratePerMinute: number,
     private readonly metrics: Metrics,
+    dispatcher?: Dispatcher,
   ) {
-    this.dispatcher = new Agent().compose([
+    this.dispatcher = (dispatcher ?? new Agent()).compose([
       interceptors.redirect({ maxRedirections: 10 }),
       interceptors.retry(),
     ]);

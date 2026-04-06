@@ -453,6 +453,9 @@ importers:
         specifier: 4.1.5
         version: 4.1.5
     devDependencies:
+      '@golevelup/ts-vitest':
+        specifier: 4.0.0
+        version: 4.0.0
       '@nestjs/cli':
         specifier: 11.0.10
         version: 11.0.10(@swc/cli@0.7.8(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
@@ -1920,6 +1923,9 @@ packages:
       '@nestjs/core': ^11.1.3
       reflect-metadata: ^0.2.2
       rxjs: ^7.8.1
+
+  '@golevelup/ts-vitest@4.0.0':
+    resolution: {integrity: sha512-TNIhtox9zWfxlww0ql91l/k2zDthN4owg5qDieRHtjIwIvuoUlXLiwqAb/ifkRr8K+jZLRIC9QrKN/J7TBghlQ==}
 
   '@graphql-typed-document-node/core@3.2.0':
     resolution: {integrity: sha512-mB9oAsNCm9aM3/SOv4YtBMqZbYj10R7dkq8byBqxGY/ncFwhf2oQzMV+LCRlWoDSEBJ3COiR1yeDvMtsoOsuFQ==}
@@ -7342,6 +7348,8 @@ snapshots:
       lodash: 4.17.21
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
+
+  '@golevelup/ts-vitest@4.0.0': {}
 
   '@graphql-typed-document-node/core@3.2.0(graphql@16.11.0)':
     dependencies:

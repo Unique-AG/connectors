@@ -26,3 +26,8 @@ export const envRequiredSecretSchema = envResolvableStringSchema
   .transform((val) => new Redacted(val));
 
 export const envRequiredPlainSchema = envResolvableStringSchema.pipe(z.string().nonempty());
+
+export const redactedNonEmptyStringSchema = z
+  .string()
+  .nonempty()
+  .transform((val) => new Redacted(val));

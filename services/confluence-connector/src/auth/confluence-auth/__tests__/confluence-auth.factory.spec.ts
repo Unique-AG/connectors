@@ -1,6 +1,8 @@
+import { createMock } from '@golevelup/ts-vitest';
 import { describe, expect, it, vi } from 'vitest';
 import { AuthMode, type ConfluenceConfig } from '../../../config';
 import type { TenantConfig } from '../../../config/tenant-config-loader';
+import type { ProxyService } from '../../../proxy';
 import type { TenantContext } from '../../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../../tenant/tenant-context.storage';
 import { Redacted } from '../../../utils/redacted';
@@ -20,8 +22,10 @@ vi.mock('../strategies/pat-auth.strategy', () => ({
   })),
 }));
 
+const mockProxyService = createMock<ProxyService>();
+
 function createFactory(): ConfluenceAuthFactory {
-  return new ConfluenceAuthFactory();
+  return new ConfluenceAuthFactory(mockProxyService);
 }
 
 const baseFields = {
@@ -56,7 +60,7 @@ describe('ConfluenceAuthFactory', () => {
       const token = await auth.acquireToken();
 
       expect(token).toBe('oauth-token');
-      expect(OAuth2LoAuthStrategy).toHaveBeenCalledWith(config.auth, config);
+      expect(OAuth2LoAuthStrategy).toHaveBeenCalledWith(config.auth, config, expect.anything());
     });
 
     it('creates auth for PAT data-center config', async () => {

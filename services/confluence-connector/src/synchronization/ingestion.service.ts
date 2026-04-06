@@ -7,7 +7,7 @@ import type {
 } from '@unique-ag/unique-api';
 import { createSmeared, elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
-import { request } from 'undici';
+import { type Dispatcher, request } from 'undici';
 import type { TenantConfig } from '../config';
 import type { ConfluenceApiClient } from '../confluence-api';
 import {
@@ -23,6 +23,7 @@ export class IngestionService {
   private readonly logger = new Logger(IngestionService.name);
   private readonly sourceKind: string;
   private readonly sourceName: string;
+  private readonly dispatcher: Dispatcher | undefined;
 
   public constructor(
     private readonly config: TenantConfig,
@@ -30,7 +31,9 @@ export class IngestionService {
     private readonly uniqueApiClient: UniqueApiClient,
     private readonly confluenceApiClient: ConfluenceApiClient,
     private readonly metrics: Metrics,
+    dispatcher?: Dispatcher,
   ) {
+    this.dispatcher = dispatcher;
     this.sourceKind = getSourceKind(this.config.confluence.instanceType);
     this.sourceName = this.config.confluence.baseUrl;
   }
@@ -274,6 +277,7 @@ export class IngestionService {
         'x-ms-blob-type': 'BlockBlob',
       },
       body: buffer,
+      dispatcher: this.dispatcher,
     });
 
     assert.ok(statusCode >= 200 && statusCode < 300, `Upload failed with status ${statusCode}`);
@@ -293,6 +297,7 @@ export class IngestionService {
         'x-ms-blob-type': 'BlockBlob',
       },
       body: stream,
+      dispatcher: this.dispatcher,
     });
 
     assert.ok(statusCode >= 200 && statusCode < 300, `Upload failed with status ${statusCode}`);

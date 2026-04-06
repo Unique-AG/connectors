@@ -40,3 +40,7 @@ connectorConfig:
             - docx
             - xlsx
           maxFileSizeMb: 100
+
+proxyConfig:
+  enabled: true
+  authMode: none
