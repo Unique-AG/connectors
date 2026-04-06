@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { MetadataFilter, type UniqueApiClient, UniqueQLOperator } from '@unique-ag/unique-api';
-import { asAllOptions } from '@unique-ag/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -11,7 +10,7 @@ import {
   DRIZZLE,
   type DrizzleDatabase,
   directories,
-  SystemDirectoryType,
+  systemDirectories,
   userProfiles,
 } from '~/db';
 import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
@@ -243,18 +242,3 @@ export class SearchEmailsQuery {
     return { resolvedIds, unrecognized };
   }
 }
-
-const systemDirectories = asAllOptions<SystemDirectoryType>()([
-  'Archive',
-  'Deleted Items',
-  'Drafts',
-  'Inbox',
-  'Junk Email',
-  'Outbox',
-  'Sent Items',
-  'Conversation History',
-  'Recoverable Items Deletions',
-  'Clutter',
-  // We cast to a string array because we use this array to check if systemDirectories.includes(currentBestItem.internalType)
-  // This check will fail because internalType can be outside of SystemDirectoryType, because of this we cast the array to string[]
-]) as string[];

@@ -35,7 +35,7 @@ export class RestartFullSyncTool {
   ) {}
 
   @Tool({
-    name: 'restart_full_sync',
+    name: 'os_mcp_restart_full_sync',
     title: 'Restart Full Sync',
     description:
       'Restart the full sync from scratch. All progress is reset and the sync starts over.',

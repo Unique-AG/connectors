@@ -101,10 +101,10 @@ export const SearchConditionSchema = z
         .array(z.string())
         .describe(
           `Folder ID(s) or system directory name(s) to filter by. ` +
-            `For well-known Outlook system folders pass the exact display name directly — no need to call \`list_folders\`: ` +
+            `For well-known Outlook system folders pass the exact display name directly — no need to call \`os_mcp_list_folders\`: ` +
             `"Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History". ` +
             `Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized and will not return results. ` +
-            `For custom user-defined folders, pass the folder ID obtained from \`list_folders\`. ` +
+            `For custom user-defined folders, pass the folder ID obtained from \`os_mcp_list_folders\`. ` +
             `Example IDs: ["${EXAMPLE_FOLDER_IDS.first}", "${EXAMPLE_FOLDER_IDS.second}"]. Recommended operators: in or notIn.`,
         ),
     ).optional(),
@@ -119,7 +119,7 @@ export const SearchConditionSchema = z
       z
         .string()
         .describe(
-          `Category label(s) to filter by, e.g. "Important". Categories can be found using \`list_categories\` tool. Recommended operators: equals or contains.`,
+          `Category label(s) to filter by, e.g. "Important". Categories can be found using \`os_mcp_list_categories\` tool. Recommended operators: equals or contains.`,
         ),
     )
       .or(
@@ -127,7 +127,7 @@ export const SearchConditionSchema = z
           z
             .array(z.string())
             .describe(
-              `Category label(s) to filter by, e.g. ["Important", "Project-X"]. Categories can be found using \`list_categories\` tool. Recommended operators: in or notIn.`,
+              `Category label(s) to filter by, e.g. ["Important", "Project-X"]. Categories can be found using \`os_mcp_list_categories\` tool. Recommended operators: in or notIn.`,
             ),
         ),
       )

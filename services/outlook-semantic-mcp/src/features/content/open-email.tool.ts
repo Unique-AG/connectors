@@ -13,7 +13,7 @@ const OpenEmailByIdInputSchema = z.object({
   id: z
     .string()
     .describe(
-      'The content ID returned by the search_emails tool, e.g. "cont_zwgng9aoz0gbo6qxgnwese7g".',
+      'The content ID returned by the os_mcp_search_emails tool, e.g. "cont_zwgng9aoz0gbo6qxgnwese7g".',
     ),
 });
 
@@ -47,9 +47,10 @@ export class OpenEmailTool {
   ) {}
 
   @Tool({
-    name: 'open_email_by_id',
+    name: 'os_mcp_open_email_by_id',
     title: 'Open Email by ID',
-    description: 'Retrieve the full content of an email by its ID returned from search_emails.',
+    description:
+      'Retrieve the full content of an email by its ID returned from os_mcp_search_emails.',
     parameters: OpenEmailByIdInputSchema,
     outputSchema: OpenEmailByIdOutputSchema,
     annotations: {

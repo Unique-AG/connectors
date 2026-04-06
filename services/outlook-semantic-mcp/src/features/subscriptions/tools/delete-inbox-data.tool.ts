@@ -30,7 +30,7 @@ export class DeleteInboxDataTool {
   ) {}
 
   @Tool({
-    name: 'delete_inbox_data',
+    name: 'os_mcp_delete_inbox_data',
     title: 'Delete Inbox Data',
     description:
       'Permanently delete all synced email data from Unique and cancel the Microsoft Graph subscription. This stops future email ingestion and removes all previously ingested email content for your inbox from the Unique knowledge base.',

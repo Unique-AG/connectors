@@ -40,10 +40,10 @@ export class SearchEmailsTool {
   ) {}
 
   @Tool({
-    name: 'search_emails',
+    name: 'os_mcp_search_emails',
     title: 'Search Emails',
     description:
-      "Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by folder, call `list_folders` first to obtain valid folder ids. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` with the result's id. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete.",
+      "Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by folder, call `os_mcp_list_folders` first to obtain valid folder ids. To filter by category, call `os_mcp_list_categories` first to obtain valid category names. To read the full body of a result, call `os_mcp_open_email_by_id` with the result's id. If the response includes a `syncWarning`, call `os_mcp_` to check ingestion status — results may be incomplete.",
     parameters: SearchEmailsInputSchema,
     outputSchema: SearchEmailsOutputSchema,
     annotations: {
@@ -78,7 +78,7 @@ export class SearchEmailsTool {
       return {
         success: true,
         syncWarning:
-          'Search results may be inaccurate. Ingestion Statistics could not be fetched. Your inbox is a unknown state try to use the tools `delete_inbox_data` and `reconnect_inbox` to get it into a proper state',
+          'Search results may be inaccurate. Ingestion Statistics could not be fetched. Your inbox is a unknown state try to use the tools `os_mcp_delete_inbox_data` and `os_mcp_reconnect_inbox` to get it into a proper state',
         results,
         searchSummary,
       };
