@@ -1,4 +1,3 @@
-import { asAllOptions } from '@unique-ag/utils';
 import { relations } from 'drizzle-orm';
 import { AnyPgColumn, boolean, pgEnum, pgTable, unique, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
