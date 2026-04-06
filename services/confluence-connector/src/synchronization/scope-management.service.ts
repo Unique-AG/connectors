@@ -24,7 +24,7 @@ export class ScopeManagementService {
     private readonly uniqueApiClient: UniqueApiClient,
   ) {}
 
-  private async resolveAndCacheInstanceId(): Promise<InstanceIdentifier> {
+  private async getInstanceIdentifier(): Promise<InstanceIdentifier> {
     if (this.cachedInstanceIdentifier) {
       return this.cachedInstanceIdentifier;
     }
@@ -51,7 +51,7 @@ export class ScopeManagementService {
     const rootScope = await this.uniqueApiClient.scopes.getById(this.ingestionConfig.scopeId);
     assert.ok(rootScope, `Root scope with ID ${this.ingestionConfig.scopeId} not found`);
 
-    const instanceId = await this.resolveAndCacheInstanceId();
+    const instanceId = await this.getInstanceIdentifier();
     const expectedExternalId = buildRootScopeExternalId(instanceId.type, instanceId.id);
     let isInitialSync = false;
 

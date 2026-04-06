@@ -232,7 +232,7 @@ describe('ScopeManagementService', () => {
       });
       scopes.updateExternalId.mockResolvedValueOnce({
         id: ROOT_SCOPE_ID,
-        externalId: 'confc:dc:dc-instance-456',
+        externalId: 'confc:data-center:dc-instance-456',
       });
 
       const result = await service.initialize();
@@ -240,7 +240,7 @@ describe('ScopeManagementService', () => {
       expect(result.isInitialSync).toBe(true);
       expect(scopes.updateExternalId).toHaveBeenCalledWith(
         ROOT_SCOPE_ID,
-        'confc:dc:dc-instance-456',
+        'confc:data-center:dc-instance-456',
       );
     });
   });

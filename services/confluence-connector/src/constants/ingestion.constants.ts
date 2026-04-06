@@ -28,7 +28,7 @@ export function buildRootScopeExternalId(
   instanceType: 'cloud' | 'data-center',
   instanceId: string,
 ): string {
-  const typeTag = instanceType === 'cloud' ? 'cloud' : 'dc';
+  const typeTag = instanceType === 'cloud' ? 'cloud' : 'data-center';
   return `${EXTERNAL_ID_PREFIX}${typeTag}:${instanceId}`;
 }
 

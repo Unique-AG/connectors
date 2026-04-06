@@ -6,9 +6,9 @@ describe('buildRootScopeExternalId', () => {
     expect(buildRootScopeExternalId('cloud', 'abc-123')).toBe('confc:cloud:abc-123');
   });
 
-  it('returns confc:dc:<id> for data-center instances', () => {
+  it('returns confc:data-center:<id> for data-center instances', () => {
     expect(buildRootScopeExternalId('data-center', '92b23664-16d8-3ab3-9ba5-f3a45b057487')).toBe(
-      'confc:dc:92b23664-16d8-3ab3-9ba5-f3a45b057487',
+      'confc:data-center:92b23664-16d8-3ab3-9ba5-f3a45b057487',
     );
   });
 });
