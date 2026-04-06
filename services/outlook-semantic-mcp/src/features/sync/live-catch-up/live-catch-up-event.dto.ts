@@ -1,16 +1,16 @@
 import z from 'zod/v4';
 
-const LiveCatchUpExecuteEvent = z.object({
+export const LiveCatchUpExecutEventDto = z.object({
   type: z.literal('unique.outlook-semantic-mcp.live-catch-up.execute'),
-  payload: z.object({ subscriptionId: z.string(), messageIds: z.array(z.string()) }),
+  payload: z.object({ subscriptionId: z.string() }),
 });
 
-const LiveCatchUpRecoveryEvent = z.object({
-  type: z.literal('unique.outlook-semantic-mcp.live-catch-up.recovery'),
-  payload: z.object({ userProfileId: z.string() }),
+export const LiveCatchUpReadyRecheckEventDto = z.object({
+  type: z.literal('unique.outlook-semantic-mcp.live-catch-up.ready-recheck'),
+  payload: z.object({ subscriptionId: z.string() }),
 });
 
 export const LiveCatchUpEventDto = z.discriminatedUnion('type', [
-  LiveCatchUpExecuteEvent,
-  LiveCatchUpRecoveryEvent,
+  LiveCatchUpExecutEventDto,
+  LiveCatchUpReadyRecheckEventDto,
 ]);

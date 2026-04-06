@@ -23,7 +23,7 @@
 
 The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 10 MCP tools (plus 4 additional debug-mode tools).
 
-**Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./technical/full-sync.md#Inbox-Filters)) into the Unique knowledge base in the background.
+**Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./operator/configuration.md)) into the Unique knowledge base in the background.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
@@ -54,7 +54,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Permissions
 
-All permissions are **Delegated** (not Application): `User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`. None require admin consent. For details, see [Permissions](technical/permissions.md).
+All permissions are delegated and require no admin consent. See [Permissions](./technical/permissions.md) for details.
 
 ## Features
 
@@ -85,14 +85,14 @@ All permissions are **Delegated** (not Application): `User.Read`, `Mail.ReadWrit
 
 - Check mailbox connection and webhook subscription status via `verify_inbox_connection` (returns: active, expiring_soon, expired, not_configured)
 - Reconnect a mailbox after token expiry or webhook failure via `reconnect_inbox`
-- Remove a mailbox connection entirely via `remove_inbox_connection`
+- Permanently delete synced inbox data and stop ingestion via `delete_inbox_data`
 - Microsoft Graph webhook subscriptions created automatically on connection and renewed before expiration
 
 **Full Sync (Historical Batch Ingestion)**
 
-- After connecting, the server automatically begins a full sync to ingest emails within the operator-configured time frame and filters (see [Inbox Filters](./technical/full-sync.md#Inbox-Filters))
+- After connecting, the server automatically begins a full sync to ingest emails within the operator-configured time frame and filters (see [Configuration](./operator/configuration.md))
 - Sync progress can be monitored via the `sync_progress` tool, which reports the current state, counters, and date range being processed
-- `sync_progress` returns a top-level `state` (`running`, `finished`, `error`) and a detailed `fullSyncState` (`ready`, `running`, `paused`, `waiting-for-ingestion`, `failed`), along with the number of emails ingested, the date window being processed, and a warning if results may be incomplete
+- `sync_progress` returns a top-level `state` (`running`, `finished`, `error`) and a detailed `fullSyncState` (`ready`, `running`, `waiting-for-ingestion`, `paused`, `failed`), along with the number of emails ingested, the date window being processed, and a warning if results may be incomplete
 
 **Live Catch-Up (Real-Time Webhook-Driven)**
 
@@ -176,9 +176,9 @@ See [Subscription Creation and Renewal Lifecycle](./technical/flows.md#Subscript
 
 Email ingestion uses two concurrent pipelines:
 
-- **Full Sync** — After connection, the server automatically fetches the user's historical emails (within the configured time frame and filters) from Microsoft Graph in paginated batches and uploads them to the Unique knowledge base. The sync is resumable across restarts and initializes a watermark for live catch-up. See [Full Sync](./technical/full-sync.md) for details.
+- **Full Sync** — After connection, the server automatically fetches the user's historical emails (within the configured time frame and filters) from Microsoft Graph in paginated batches and uploads them to the Unique knowledge base. The sync is resumable across restarts and initializes a watermark for live catch-up. See [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) for details.
 
-- **Live Catch-Up** — Microsoft Graph sends webhook notifications when new mail arrives. The server enqueues them via RabbitMQ (to meet Microsoft's 10-second response deadline) and processes them asynchronously, fetching new messages since the last watermark and uploading them to the knowledge base. See [Live Catch-Up](./technical/live-catchup.md) for details.
+- **Live Catch-Up** — Microsoft Graph sends webhook notifications when new mail arrives. The server enqueues them via RabbitMQ (to meet Microsoft's 10-second response deadline) and processes them asynchronously, fetching new messages since the last watermark and uploading them to the knowledge base. See [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) for details.
 
 Both pipelines run concurrently after connection. Live catch-up buffers notifications until full sync initializes the watermark, after which both ingest independently.
 
@@ -230,7 +230,7 @@ See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) 
 | **Delegated permissions only** | Requires user sign-in; application-only access is not supported |
 | **Single app registration per deployment** | Each server deployment uses one Entra ID app registration (multi-tenant capable) |
 
-See [Authentication Architecture](./technical/architecture.md) for details.
+See [Architecture — Authentication](./technical/architecture.md#Authentication) for details.
 
 ### Operational Constraints
 

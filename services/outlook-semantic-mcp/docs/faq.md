@@ -37,7 +37,7 @@
   - [How do I filter search results to a specific folder?](#How-do-I-filter-search-results-to-a-specific-folder)
   - [Can I attach files when creating a draft email?](#Can-I-attach-files-when-creating-a-draft-email)
   - [What does reconnect_inbox do?](#What-does-reconnect_inbox-do)
-  - [What does remove_inbox_connection do?](#What-does-remove_inbox_connection-do)
+  - [What does delete_inbox_data do?](#What-does-delete_inbox_data-do)
 - [Data Privacy & Storage](#Data-Privacy-&-Storage)
   - [Does the MCP server store my emails?](#Does-the-MCP-server-store-my-emails)
   - [Where is my email content stored?](#Where-is-my-email-content-stored)
@@ -90,7 +90,7 @@
 | Draft Creation | `create_draft_email` |
 | Contact Lookup | `lookup_contacts` |
 | Mailbox Utilities | `list_categories`, `list_folders` |
-| Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `remove_inbox_connection` |
+| Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data` |
 | Sync Monitoring | `sync_progress` |
 
 An additional 4 tools are available only when the server is running in debug mode (`MCP_DEBUG_MODE=enabled`): `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`. These are intended for development and troubleshooting and are not exposed in production deployments.
@@ -99,13 +99,13 @@ An additional 4 tools are available only when the server is running in debug mod
 
 ### Do I need to do anything after connecting?
 
-**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [Inbox Filters](./technical/full-sync.md#Inbox-Filters)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
+**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [DEFAULT_MAIL_FILTERS](./operator/configuration.md)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
 
 ## Authentication & Permissions
 
 ### Do any permissions require admin consent?
 
-**Answer:** No. All five permissions (`User.Read`, `Mail.ReadWrite`, `MailboxSettings.Read`, `People.Read`, `offline_access`) are **delegated and do not require admin consent**. Users can connect and grant consent themselves without IT involvement.
+**Answer:** No. All permissions are delegated and do not require admin consent. Users can connect and grant consent themselves without IT involvement.
 
 **See also:** [Permissions](./technical/permissions.md) for the full reference with least-privilege justification.
 
@@ -189,7 +189,7 @@ This must match exactly — including protocol, domain, and path — in both the
 
 **Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `ignoredBefore` (ISO 8601 date cutoff — required, the application will not start without it), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
 
-When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Inbox Filters](./technical/full-sync.md#Inbox-Filters) for the full filter reference.
+When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Configuration](./operator/configuration.md) for the full filter reference.
 
 **See also:** [Configuration](./operator/configuration.md)
 
@@ -203,15 +203,18 @@ When the filters are updated and the service is redeployed, all user inbox confi
 |-|-----------|---------------|
 | Purpose | Ingest emails within the configured time frame and filters | Ingest new emails in real time |
 | Trigger | Automatic after connection | Microsoft Graph webhook notification |
-| Transport | Direct Graph API (paginated) | RabbitMQ (asynchronous) |
+| Transport | Direct Graph API (paginated) | Direct (inline, synchronous per-message) |
 | State | `ready` / `running` / `waiting-for-ingestion` / `paused` / `failed` | `ready` / `running` / `failed` |
 | Resumable | Yes — via `fullSyncNextLink` cursor | N/A (each notification is independent) |
 
-Full sync states: `ready`, `running`, `waiting-for-ingestion`, `paused`, `failed`. See [Full Sync — Sync States](./technical/full-sync.md#Sync-States) for the complete state reference.
+Full sync states: `ready`, `running`, `waiting-for-ingestion`, `paused`, `failed`. See [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) for more detail.
 
-Both pipelines run concurrently after connection and both contribute to the Unique knowledge base ingestion queue.
+Both pipelines run concurrently after connection.
+Full sync uploads batches via the Unique KB ingestion API and checks if Unique KB ingested majority of the documents before continuing.
+Live catch-up uploads batches via the Unique KB ingestion API but does not wait for Unique KB to ingest them. This process makes full sync wait longer because
+it contributes to the in-progress count that full sync monitors during `waiting-for-ingestion`.
 
-**See also:** [Full Sync](./technical/full-sync.md) — [Live Catch-Up](./technical/live-catchup.md)
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Flows](./technical/flows.md)
 
 ### How do I check sync progress?
 
@@ -223,11 +226,11 @@ Search results are incomplete while `fullSyncState` is `running` or `waiting-for
 
 ### Why is my full sync stuck in `waiting-for-ingestion`?
 
-**Answer:** Full sync enters `waiting-for-ingestion` after uploading all email batches and waits for the Unique knowledge base to confirm that almost all queued messages are processed. Because live catch-up uploads its own batches to the same ingestion queue, high live catch-up activity extends the time full sync spends in this state. This is normal behavior.
+**Answer:** Full sync enters `waiting-for-ingestion` after uploading all email batches and waits for the Unique knowledge base to confirm that majority of queued messages are processed. Because live catch-up ingests emails directly to the Unique KB inline, it contributes to the in-progress count that full sync monitors. High live catch-up activity can extend the time full sync spends in this state. This is normal behavior.
 
 If the sync has been in `waiting-for-ingestion` with a stale heartbeat for more than 5 minutes, the recovery scheduler will automatically re-trigger the ingestion check.
 
-**See also:** [Stale Sync Recovery](./technical/full-sync.md#Stale-Sync-Recovery)
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline)
 
 ### Why is my full sync stuck in `running`?
 
@@ -239,7 +242,7 @@ If the sync has been in `waiting-for-ingestion` with a stale heartbeat for more 
 
 If the heartbeat is stale for more than 20 minutes, the recovery scheduler automatically retriggers the sync. Check `sync_progress` for the current counters to verify the sync is making progress.
 
-**See also:** [Stale Sync Recovery](./technical/full-sync.md#Stale-Sync-Recovery)
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline)
 
 ### What happens if full sync is interrupted (restart, crash)?
 
@@ -247,7 +250,7 @@ If the heartbeat is stale for more than 20 minutes, the recovery scheduler autom
 
 If the cursor has expired (HTTP 410), the sync falls back to a fresh query filtered from the oldest recorded creation date.
 
-**See also:** [How Batching Works](./technical/full-sync.md#How-Batching-Works)
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline)
 
 ### Why are new emails not appearing in search results?
 
@@ -256,21 +259,20 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 1. **Active subscription** — verify via `verify_inbox_connection`. If the subscription is `expired` or `not_configured`, call `reconnect_inbox`.
 2. **Live catch-up state** — check `sync_progress` for `liveCatchUpState`. If `failed`, the recovery scheduler will reset it within 5 minutes.
 3. **Inbox filters** — the email may match an `ignoredSenders` or `ignoredContents` filter.
-4. **Watermarks not initialized** — if full sync has not yet initialized the watermarks, live catch-up buffers incoming notifications until they are. Check if `fullSyncState` is `running`.
 
-**See also:** [Live Catch-Up](./technical/live-catchup.md) — [Subscription Management](./technical/subscription-management.md)
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Flows](./technical/flows.md)
 
 ### What happens to emails sent during full sync?
 
-**Answer:** Live catch-up runs concurrently with full sync. New emails are processed by live catch-up once full sync has initialized the watermarks. Notifications received before that point are buffered and flushed once ready.
+**Answer:** Live catch-up runs concurrently with full sync. New emails are processed by live catch-up immediately — the watermark is always initialized on inbox creation, so notifications are never buffered.
 
-**See also:** [Full Sync — Relation to Live Catch-Up](./technical/full-sync.md#Relation-to-Live-Catch-Up) — [Live Catch-Up — Relation to Full Sync](./technical/live-catchup.md#Relation-to-Full-Sync)
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline)
 
 ### Why are deleted emails still appearing in search results?
 
 **Answer:** Email deletion detection is handled asynchronously via two mechanisms: individual email deletions are detected when Microsoft moves the email to Deleted Items (an ignored folder), and entire folder deletions are detected by directory sync on its 5-minute delta cycle. There may be a brief delay between deletion and removal from search results.
 
-**See also:** [Directory Sync](./technical/directory-sync.md) for the full deletion detection mechanism — [Live Catch-Up](./technical/live-catchup.md)
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Flows](./technical/flows.md)
 
 ## Tool Usage
 
@@ -331,11 +333,11 @@ If one or more attachments fail to upload, the draft is still created and the fa
 - New emails stopped appearing in search results
 - The user's Microsoft refresh token has been renewed after a period of inactivity
 
-**See also:** [Subscription Management](./technical/subscription-management.md) — [Tools — reconnect_inbox](./technical/tools.md#reconnect_inbox)
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Tools — reconnect_inbox](./technical/tools.md#reconnect_inbox)
 
-### What does `remove_inbox_connection` do?
+### What does `delete_inbox_data` do?
 
-**Answer:** `remove_inbox_connection` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Subscription Management — remove_inbox_connection](./technical/subscription-management.md#remove_inbox_connection) for the full list of what is removed.
+**Answer:** `delete_inbox_data` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Flows — Subscription Lifecycle](./technical/flows.md#Subscription-Creation-and-Renewal-Lifecycle) for details.
 
 ## Data Privacy & Storage
 
@@ -380,7 +382,7 @@ Access to the email content itself requires access to the Unique knowledge base,
 
 ### What happens to my email data when I disconnect?
 
-**Answer:** Calling `remove_inbox_connection`:
+**Answer:** Calling `delete_inbox_data`:
 
 - Deletes the Microsoft Graph subscription (stops future email sync)
 - Removes the per-user root scopes from the Unique knowledge base, which also removes all ingested email content for that user
@@ -416,7 +418,7 @@ Access to the email content itself requires access to the Unique knowledge base,
 
 Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredContents`) are never ingested.
 
-**See also:** [Inbox Filters](./technical/full-sync.md#Inbox-Filters)
+**See also:** [Configuration](./operator/configuration.md)
 
 ## Security
 
@@ -448,16 +450,17 @@ Emails excluded by inbox filters (`ignoredBefore`, `ignoredSenders`, `ignoredCon
 
 ### Why is RabbitMQ required?
 
-**Answer:** Microsoft requires webhook endpoints to respond within 10 seconds (Microsoft limit, not configurable). Processing a live catch-up notification involves acquiring database locks, querying Microsoft Graph, and uploading emails to the knowledge base — which can take longer. RabbitMQ decouples receipt from processing: the webhook controller enqueues the notification and returns `202 Accepted` immediately, while the consumer processes it asynchronously.
+**Answer:** Microsoft requires webhook endpoints to respond within 10 seconds (Microsoft limit, not configurable). Processing a live catch-up notification involves acquiring database locks, querying Microsoft Graph, and uploading emails to the knowledge base — which can take longer. RabbitMQ decouples receipt from processing: the webhook controller enqueues the notification and returns `202 Accepted` immediately. The consumer then handles email fetching and ingestion, after the response has already been sent. RabbitMQ is also used for full sync inter-batch orchestration and other internal events.
 
-**See also:** [Live Catch-Up](./technical/live-catchup.md) — [Architecture](./technical/architecture.md)
+**See also:** [Architecture](./technical/architecture.md)
 
 ### What happens if RabbitMQ is unavailable?
 
-**Answer:** Webhook notifications cannot be published to the queue. The webhook controller will fail to enqueue them and return an error to Microsoft. Microsoft will retry the notification. The server will resume processing once RabbitMQ is available and Microsoft retries, but notifications that exceed Microsoft's retry window may be lost.
+**Answer:** Webhook trigger notifications cannot be published to the queue. The webhook controller will fail to enqueue them and return an error to Microsoft. Microsoft will retry the notification. The server will resume processing once RabbitMQ is available and Microsoft retries, but notifications that exceed Microsoft's retry window may be lost.
 
-Full sync fetches emails directly from Microsoft Graph, but relies on RabbitMQ for inter-batch orchestration — without RabbitMQ, in-progress full syncs complete their current batch but no new batches are triggered. See [Disaster Recovery — Scenario 2](./operator/disaster-recovery.md#Scenario-2:-RabbitMQ-Loss) for details.
-Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, the 15-minute catch-up cron re-triggers processing, which picks up missed messages by querying from the last watermark.
+Full sync relies on RabbitMQ for inter-batch orchestration — without RabbitMQ, in-progress full syncs complete their current batch but no new batches are triggered. See [Disaster Recovery — Scenario 2](./operator/disaster-recovery.md#Scenario-2:-RabbitMQ-Loss) for details.
+
+Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, eigher the first notification from MsGraph or the 4-hour catch-up cron re-triggers processing, which picks up missed messages by querying from the last watermark.
 
 ### What happens if PostgreSQL is unavailable?
 
@@ -476,7 +479,8 @@ Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, the 
 **Answer:** Recovery depends on which component was lost:
 
 - **Local PostgreSQL DB loss** — all stored OAuth tokens and sync state are gone; every user must re-authenticate via `reconnect_inbox`.
-- **RabbitMQ loss** — both in-progress full syncs and live catch-up are stalled; no re-authentication is needed. Live catch-up resumes automatically once RabbitMQ is restored but messages waiting in the queue are lost; each affected user must call `restart_full_sync` from their own MCP session (debug mode required).
+- **RabbitMQ loss** — in-progress full syncs stall after the current batch; live catch-up trigger delivery is blocked but any in-progress run completes. No re-authentication is needed. Live catch-up resumes automatically or when the first MsGraph notification arrives once RabbitMQ
+is restored.
 - **Unique Knowledge Base loss** — ingested email content must be re-ingested; each affected user must call `restart_full_sync` from their own MCP session (debug mode required). No re-authentication is needed.
 
 **See also:** [Disaster Recovery Runbook](./operator/disaster-recovery.md)
@@ -488,8 +492,4 @@ Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, the 
 - [Permissions](./technical/permissions.md) — Required scopes and least-privilege justification
 - [Security](./technical/security.md) — Encryption, PKCE, token rotation, and threat model
 - [Tools](./technical/tools.md) — Full reference for all MCP tools
-- [Full Sync](./technical/full-sync.md) — Historical batch ingestion mechanics
-- [Live Catch-Up](./technical/live-catchup.md) — Webhook-driven real-time ingestion
-- [Subscription Management](./technical/subscription-management.md) — Subscription lifecycle
-- [Directory Sync](./technical/directory-sync.md) — Folder sync and delete detection
 - [Operator Guide](./operator/README.md) — Deployment and operations

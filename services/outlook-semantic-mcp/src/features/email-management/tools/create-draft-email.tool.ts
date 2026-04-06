@@ -16,11 +16,6 @@ const CreateDraftEmailInputSchema = z.object({
     .describe(
       'The body content of the draft email. Must match the format declared in contentType: raw HTML markup when "html", plain text when "text".',
     ),
-  contentType: z
-    .enum(['html', 'text'])
-    .describe(
-      'The format of the email body content. Use "html" for rich HTML content or "text" for plain text.',
-    ),
   toRecipients: z
     .array(
       z.object({

@@ -8,7 +8,7 @@ interface EmailInput {
   from?: { emailAddress?: { address?: string } | null } | null;
   subject?: string | null;
   uniqueBody?: { content?: string } | null;
-  createdDateTime?: string;
+  receivedDateTime?: string;
 }
 
 type SkipResult =
@@ -25,8 +25,8 @@ export function shouldSkipEmail(
   context: { userProfileId: string },
 ): SkipResult {
   try {
-    if (filters.ignoredBefore && email.createdDateTime) {
-      if (new Date(email.createdDateTime) < filters.ignoredBefore) {
+    if (filters.ignoredBefore && email.receivedDateTime) {
+      if (new Date(email.receivedDateTime) < filters.ignoredBefore) {
         return { skip: true, reason: 'ignoredBefore' };
       }
     }

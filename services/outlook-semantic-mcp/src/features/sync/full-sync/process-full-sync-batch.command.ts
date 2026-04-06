@@ -1,30 +1,35 @@
 import assert from 'node:assert';
+import { UniqueApiClient, UniqueFile } from '@unique-ag/unique-api';
+import { createSmeared } from '@unique-ag/utils';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
-import Bottleneck from 'bottleneck';
 import { sql } from 'drizzle-orm';
 import { MetricService, Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import z from 'zod';
-import { inboxConfigurations } from '~/db';
+import { inboxConfigurations, UserProfile } from '~/db';
 import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { greatestFrom } from '~/utils/greatest-from';
+import { leastFrom } from '~/utils/least-from';
+import { NonNullishProps } from '~/utils/non-nullish-props';
 import { recordInHistogram } from '~/utils/record-in-histogram';
 import {
-  FullSyncBatchGraphMessage,
-  FullSyncBatchGraphMessageFields,
-  fullSyncBatchGraphMessageResponseSchema,
-} from '../../mail-ingestion/dtos/microsoft-graph.dtos';
+  GraphMessageFields,
+  graphMessagesResponseSchema,
+} from '../../process-email/dtos/microsoft-graph.dtos';
 import {
-  IngestEmailCommand,
   MessageIngestionResult,
-} from '../../mail-ingestion/ingest-email.command';
-import { shouldSkipEmail } from '../../mail-ingestion/utils/should-skip-email';
+  ProcessEmailCommand,
+  ProcessEmailCommandInput,
+} from '../../process-email/process-email.command';
 import { FindInboxConfigByVersionQuery } from './find-inbox-config-by-version.query';
 import { START_FULL_SYNC_LINK } from './full-sync.command';
 import {
@@ -41,8 +46,6 @@ export type BatchResult =
 const GRAPH_PAGE_LIMIT = 100;
 // We aim to upload 100 messages and we do not want to upload twice as much when a couple failed.
 const MAX_MESSAGES_PROCESSED_PAGE_LIMIT = GRAPH_PAGE_LIMIT - 50;
-const MAX_RETRIES = 3;
-const BASE_BACKOFF_MS = 500;
 
 type PossibleIngestionResults = MessageIngestionResult | 'failed';
 
@@ -56,9 +59,10 @@ export class ProcessFullSyncBatchCommand {
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
-    private readonly ingestEmailCommand: IngestEmailCommand,
+    private readonly processEmailCommand: ProcessEmailCommand,
     private readonly updateByVersionCommand: UpdateInboxConfigByVersionCommand,
     private readonly findConfigByVersion: FindInboxConfigByVersionQuery,
+    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     metricService: MetricService,
   ) {
     this.graphPageDuration = metricService.getHistogram('full_sync_graph_page_duration_seconds', {
@@ -74,32 +78,36 @@ export class ProcessFullSyncBatchCommand {
 
   @Span()
   public async run({
-    userProfileId,
+    userProfile,
     version,
   }: {
-    userProfileId: string;
+    userProfile: NonNullishProps<UserProfile, 'email'>;
     version: string;
   }): Promise<BatchResult> {
-    traceAttrs({ userProfileId, version });
+    traceAttrs({ userProfileId: userProfile.id, version });
 
-    this.logger.log({ userProfileId, version, msg: 'Starting batch processing' });
+    this.logger.log({ userProfileId: userProfile.id, version, msg: 'Starting batch processing' });
 
-    const config = await this.findConfigByVersion.run(userProfileId, version);
+    const config = await this.findConfigByVersion.run(userProfile.id, version);
     if (isNullish(config)) {
-      this.logger.log({ userProfileId, version, msg: 'Version mismatch on config load' });
+      this.logger.log({
+        userProfileId: userProfile.id,
+        version,
+        msg: 'Version mismatch on config load',
+      });
       return { outcome: 'version-mismatch' };
     }
     if (!config.fullSyncNextLink) {
-      this.logger.log({ userProfileId, version, msg: 'Missing fullSyncNextLink' });
+      this.logger.log({ userProfileId: userProfile.id, version, msg: 'Missing fullSyncNextLink' });
       return { outcome: 'missing-full-sync-next-link' };
     }
 
     const { fullSyncNextLink, fullSyncBatchIndex } = config;
     const filters = inboxConfigurationMailFilters.parse(config.filters);
-    const client = this.graphClientFactory.createClientForUser(userProfileId);
+    const client = this.graphClientFactory.createClientForUser(userProfile.id);
 
     this.logger.log({
-      userProfileId,
+      userProfileId: userProfile.id,
       version,
       resumeFromIndex: fullSyncBatchIndex,
       isFirstPage: fullSyncNextLink === START_FULL_SYNC_LINK,
@@ -111,7 +119,7 @@ export class ProcessFullSyncBatchCommand {
     // to be pausable, resumable, and fair across users:
     //
     //  1. Fetch a page using `nextLink` (or initial query). On 410 (expired link): fall back
-    //     to a fresh query filtered by `oldestCreatedDateTime`, reset `batchIndex`.
+    //     to a fresh query filtered by `oldestReceivedEmailDateTime`, reset `batchIndex`.
     //
     //  2. Iterate from `batchIndex` (resume point). For each message: skip, ingest, or record
     //     failure. Persist `batchIndex`, watermarks, and counters after every message for crash
@@ -130,7 +138,7 @@ export class ProcessFullSyncBatchCommand {
 
     // We need this intermediate object so that typescript does not complain because { nextLink: string | null }.
     const iterationInfo = {
-      userProfileId,
+      userProfileId: userProfile.id,
       version,
       batchIndex: config.fullSyncBatchIndex,
       uploaded: 0,
@@ -148,7 +156,7 @@ export class ProcessFullSyncBatchCommand {
         client,
         nextLink: iterationInfo.nextLink,
         filters,
-        userProfileId,
+        userProfileId: iterationInfo.userProfileId,
         version,
       });
 
@@ -171,16 +179,38 @@ export class ProcessFullSyncBatchCommand {
         break;
       }
 
+      const messages = page.slice(iterationInfo.batchIndex);
+
       this.logger.log({
         ...iterationInfo,
         msg: 'Graph API page fetched',
       });
 
-      for (const message of page.slice(iterationInfo.batchIndex)) {
+      const fileKeys = messages.map((item) =>
+        getUniqueKeyForMessage({ userEmail: userProfile.email, messageId: item.id }),
+      );
+      const uniqueFiles = await this.uniqueApi.files.getByKeys(fileKeys);
+      const uniqueFilesHashMap = uniqueFiles.reduce<Record<string, UniqueFile>>((acc, file) => {
+        acc[file.key] = file;
+        return acc;
+      }, {});
+
+      for (const message of messages) {
+        const fileKey = getUniqueKeyForMessage({
+          userEmail: userProfile.email,
+          messageId: message.id,
+        });
         const processMessageResult = await this.processMessage({
-          message,
+          user: {
+            profileId: userProfile.id,
+            providerId: userProfile.providerUserId,
+            email: createSmeared(userProfile.email),
+          },
+          client,
+          file: uniqueFilesHashMap[fileKey] ?? null,
+          fileKey,
           filters,
-          userProfileId,
+          graphMessage: message,
         });
 
         const updateObject: InboxConfigVersionedUpdate = {};
@@ -196,13 +226,24 @@ export class ProcessFullSyncBatchCommand {
         }
 
         iterationInfo.batchIndex++;
-        updateObject.newestCreatedDateTime = sql`GREATEST(${inboxConfigurations.newestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
-        updateObject.oldestCreatedDateTime = sql`LEAST(${inboxConfigurations.oldestCreatedDateTime}, ${new Date(message.createdDateTime)})`;
-        const isIndexSaved = await this.updateByVersionCommand.run(userProfileId, version, {
-          ...updateObject,
-          fullSyncBatchIndex: iterationInfo.batchIndex,
-          fullSyncHeartbeatAt: sql`NOW()`,
-        });
+        const receivedDateTime = new Date(message.receivedDateTime);
+        updateObject.newestReceivedEmailDateTime = greatestFrom(
+          inboxConfigurations.newestReceivedEmailDateTime,
+          receivedDateTime,
+        );
+        updateObject.oldestReceivedEmailDateTime = leastFrom(
+          inboxConfigurations.oldestReceivedEmailDateTime,
+          receivedDateTime,
+        );
+        const isIndexSaved = await this.updateByVersionCommand.run(
+          iterationInfo.userProfileId,
+          version,
+          {
+            ...updateObject,
+            fullSyncBatchIndex: iterationInfo.batchIndex,
+            fullSyncHeartbeatAt: sql`NOW()`,
+          },
+        );
         if (!isIndexSaved) {
           return { outcome: 'version-mismatch' };
         }
@@ -211,10 +252,14 @@ export class ProcessFullSyncBatchCommand {
       iterationInfo.batchIndex = 0;
       iterationInfo.nextLink = nextPageLink ?? null;
 
-      const indexesSaved = await this.updateByVersionCommand.run(userProfileId, version, {
-        fullSyncBatchIndex: iterationInfo.batchIndex,
-        fullSyncNextLink: iterationInfo.nextLink,
-      });
+      const indexesSaved = await this.updateByVersionCommand.run(
+        iterationInfo.userProfileId,
+        version,
+        {
+          fullSyncBatchIndex: iterationInfo.batchIndex,
+          fullSyncNextLink: iterationInfo.nextLink,
+        },
+      );
       if (!indexesSaved) {
         return { outcome: 'version-mismatch' };
       }
@@ -251,13 +296,13 @@ export class ProcessFullSyncBatchCommand {
     | {
         status: 'proceed';
         resetBatchIndex: boolean;
-        data: z.infer<typeof fullSyncBatchGraphMessageResponseSchema>;
+        data: z.infer<typeof graphMessagesResponseSchema>;
       }
     | {
         status: 'version-mismatch';
       }
   > {
-    const conditions = [`createdDateTime gt ${filters.ignoredBefore.toISOString()}`];
+    const conditions = [`receivedDateTime ge ${filters.ignoredBefore.toISOString()}`];
 
     if (nextLink === START_FULL_SYNC_LINK) {
       const raw = await recordInHistogram({
@@ -268,7 +313,7 @@ export class ProcessFullSyncBatchCommand {
       return {
         status: 'proceed',
         resetBatchIndex: false,
-        data: fullSyncBatchGraphMessageResponseSchema.parse(raw),
+        data: graphMessagesResponseSchema.parse(raw),
       };
     }
 
@@ -281,7 +326,7 @@ export class ProcessFullSyncBatchCommand {
       return {
         status: 'proceed',
         resetBatchIndex: false,
-        data: fullSyncBatchGraphMessageResponseSchema.parse(raw),
+        data: graphMessagesResponseSchema.parse(raw),
       };
     } catch (error) {
       const isExpiredNextLink = error instanceof GraphError && error.statusCode === 410;
@@ -301,10 +346,10 @@ export class ProcessFullSyncBatchCommand {
       return { status: 'version-mismatch' };
     }
     assert.ok(
-      freshConfig.oldestCreatedDateTime,
+      freshConfig.oldestReceivedEmailDateTime,
       `Created date time is null durring expired next link`,
     );
-    conditions.push(`createdDateTime le ${freshConfig.oldestCreatedDateTime.toISOString()}`);
+    conditions.push(`receivedDateTime le ${freshConfig.oldestReceivedEmailDateTime.toISOString()}`);
     const raw = await recordInHistogram({
       histogram: this.graphPageDuration,
       attributes: { page_type: 'next' },
@@ -313,7 +358,7 @@ export class ProcessFullSyncBatchCommand {
     return {
       status: 'proceed',
       resetBatchIndex: true,
-      data: fullSyncBatchGraphMessageResponseSchema.parse(raw),
+      data: graphMessagesResponseSchema.parse(raw),
     };
   }
 
@@ -321,33 +366,21 @@ export class ProcessFullSyncBatchCommand {
     return client
       .api('me/messages')
       .header('Prefer', 'IdType="ImmutableId"')
-      .select(FullSyncBatchGraphMessageFields)
+      .select(GraphMessageFields)
       .filter(conditions.join(' and '))
-      .orderby('createdDateTime desc')
+      .orderby('receivedDateTime desc')
       .top(GRAPH_PAGE_LIMIT)
       .get();
   }
 
   @Span()
-  private async processMessage({
-    message,
-    filters,
-    userProfileId,
-  }: {
-    message: FullSyncBatchGraphMessage;
-    filters: InboxConfigurationMailFilters;
-    userProfileId: string;
-  }): Promise<'ingested' | 'skipped' | 'failed'> {
-    const skipResult = shouldSkipEmail(message, filters, { userProfileId });
-    if (skipResult.skip) {
-      this.messagesProcessed.add(1, { outcome: 'skipped' });
-      return 'skipped';
-    }
-
+  private async processMessage(
+    input: ProcessEmailCommandInput,
+  ): Promise<'ingested' | 'skipped' | 'failed'> {
     const ingestionResult = await recordInHistogram({
       histogram: this.ingestionDuration,
       attributes: (result) => ({ outcome: result === 'failed' ? 'failure' : 'success' }),
-      fn: () => this.ingestWithRetries(userProfileId, message.id),
+      fn: () => this.processEmailCommand.run(input),
     });
 
     const mapToOurResult: Record<PossibleIngestionResults, 'ingested' | 'skipped' | 'failed'> = {
@@ -360,8 +393,8 @@ export class ProcessFullSyncBatchCommand {
 
     if (ingestionResult === 'failed') {
       this.logger.warn({
-        userProfileId,
-        messageId: message.id,
+        userProfileId: input.user.profileId,
+        messageId: input.graphMessage.id,
         msg: 'Message ingestion failed after retries',
       });
     }
@@ -369,46 +402,5 @@ export class ProcessFullSyncBatchCommand {
     this.messagesProcessed.add(1, { outcome });
 
     return outcome;
-  }
-
-  private async ingestWithRetries(
-    userProfileId: string,
-    messageId: string,
-  ): Promise<MessageIngestionResult | 'failed'> {
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        return await this.ingestEmailCommand.run({ userProfileId, messageId });
-      } catch (error) {
-        // Bottleneck errors mean the rate limiter is overwhelmed or stopped.
-        // Retrying is pointless — re-throw so the sync transitions to failed
-        // state and the scheduler can pick it up later.
-        if (error instanceof Bottleneck.BottleneckError) {
-          throw error;
-        }
-
-        this.logger.warn({
-          err: error,
-          userProfileId,
-          messageId,
-          attempt,
-          msg: `Ingestion attempt ${attempt}/${MAX_RETRIES} failed`,
-        });
-
-        if (attempt < MAX_RETRIES) {
-          await this.sleep(BASE_BACKOFF_MS * 2 ** (attempt - 1));
-        }
-      }
-    }
-
-    this.logger.error({
-      userProfileId,
-      messageId,
-      msg: `Ingestion failed after ${MAX_RETRIES} retries`,
-    });
-    return 'failed';
-  }
-
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

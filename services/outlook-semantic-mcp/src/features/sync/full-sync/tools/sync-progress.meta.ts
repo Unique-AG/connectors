@@ -3,10 +3,10 @@ import { createMeta } from '@unique-ag/mcp-server-module';
 export const META = createMeta({
   icon: 'status',
   systemPrompt:
-    'Returns the current sync progress including inbox configuration, date windows, counters (expectedTotal, skippedMessages, scheduledForIngestion, failedToUploadForIngestion), and ingestion statistics. Use this to monitor sync state and ingestion progress.',
+    'Returns the current sync status: whether historical email scan and live sync are active, how many emails are available in search vs. still being indexed, and what filters are applied.',
   toolFormatInformation: `## Sync Progress Display Rules
 
-  Open with a status line, then show the sync state and ingestion as compact sections. Omit any field that is \`null\`.
+  Open with a status line, then answer the two questions the user cares about: is historical sync still running, and is live sync active. Then show search availability and active filters. Omit any field that is \`null\`.
 
   **Status line** — based on top-level \`state\`:
   - \`finished\` → ✅ **Sync complete**
@@ -15,37 +15,42 @@ export const META = createMeta({
 
   If \`message\` is present and non-empty, show it as a blockquote below the status line.
 
-  **Sync State** — Full sync: {syncStats.fullSyncState}, Live catch-up: {syncStats.liveCatchUpState}
-  - \`fullSyncState\` values: \`ready\` (initial fetch done), \`running\` (in progress), \`failed\` (error), \`paused\` (user paused), \`waiting-for-ingestion\` (draining ingestion queue)
-  - \`liveCatchUpState\` values: \`ready\` (up to date), \`running\` (processing new emails), \`failed\` (error)
+  **Historical email sync** — Is Outlook scanning old emails from your history? (\`syncStats.fullSyncState\`)
+  - \`running\` or \`waiting-for-ingestion\` → 🔄 Scanning email history{syncStats.expectedTotal ? \` — {syncStats.expectedTotal} emails expected in total\` : ''}
+  - \`ready\` → ✅ Historical scan complete
+  - \`paused\` → ⏸ Historical scan paused
+  - \`failed\` → ❌ Historical scan failed
 
-  **Counters** — show as a compact table or list:
-  - Expected total: {syncStats.expectedTotal} (omit if null — count was unavailable)
-  - Skipped: {syncStats.skippedMessages} (filtered out by rules)
-  - Scheduled for ingestion: {syncStats.scheduledForIngestion} (uploaded successfully)
-  - Failed to upload: {syncStats.failedToUploadForIngestion} (failed after retries)
+  **Live sync** — Are new emails synchronizing? (\`syncStats.liveCatchUpState\`)
+  - \`running\` → 🔄 Live sync active — new emails are being picked up
+  - \`ready\` → ✅ Live sync up to date
+  - \`failed\` → ❌ Live sync failed
 
-  **Date Window** — Newest created: {syncStats.dateWindow.newestCreatedDateTime}, Newest modified: {syncStats.dateWindow.newestLastModifiedDateTime}
+  **Email search availability** — How many emails can you search right now?
+  If \`ingestionStats.state\` is \`error\`: ❌ _Search index unavailable: {ingestionStats.message}_
+  Otherwise:
+  - ✅ Available in search: {ingestionStats.finished}
+  - ⏳ Still being indexed: {ingestionStats.inProgress} (will appear in search once done)
+  - ❌ Failed to index: {ingestionStats.failed} (omit line if 0)
+  If \`ingestionStats.failed\` > 0, append: ⚠️ _{ingestionStats.failed} email(s) could not be indexed and won't appear in search._
+  Note: emails are indexed from newest to oldest, so recent emails become searchable first.
 
-  **Ingestion** — if \`ingestionStats.state\` is \`error\`, show: ❌ _Ingestion unavailable: {ingestionStats.message}_
-  Otherwise (\`ingestionStats.state\` is \`finished\` or \`running\`):
-  ({ingestionStats.state}) — finished / in progress / failed: {ingestionStats.finished} / {ingestionStats.inProgress} / {ingestionStats.failed} — Emails are ingested from newest to oldest.
-  If \`ingestionStats.failed\` > 0, append: ⚠️ _{ingestionStats.failed} email(s) failed ingestion._
+  **Emails scheduled for indexing** — Received between {syncStats.dateWindow.oldestReceivedEmailDateTime} and {syncStats.dateWindow.newestReceivedEmailDateTime}. Most recently modified: {syncStats.dateWindow.newestLastModifiedDateTime}. Omit any date that is null.
 
   ### Active filters
-  Always show the active filters section so the user understands what is being ingested.
+  Always show this section so the user understands which emails will be synchronized for search.
 
   **Ignoring emails before:** {ignoredBefore formatted as "Mon DD, YYYY"}, or _none_ if null.
-  Emails received before this date are never ingested — they are permanently excluded from search.
+  Emails with a received date before this date are permanently excluded from search — they will never appear in results.
 
-  **Ignored senders** — each entry is a JavaScript regex in \`/pattern/flags\` format matched against the sender's email address. Emails from matching senders are excluded from ingestion.
-  If the list is empty, show: _No sender filters active — all senders are ingested._
+  **Ignored senders** — each entry is a JavaScript regex in \`/pattern/flags\` format matched against the sender's email address. Emails from matching senders are excluded.
+  If the list is empty, show: _No sender filters active — all senders are included._
   Otherwise list each pattern and give a plain-English explanation of what it matches, e.g.:
   - \`/noreply@.*/i\` — excludes any sender whose address contains "noreply@" (case-insensitive)
   - \`/@newsletter\\.example\\.com$/i\` — excludes senders from the domain "newsletter.example.com"
 
-  **Ignored contents** — each entry is a JavaScript regex matched against the email subject and body. Emails where either field matches are excluded from ingestion.
-  If the list is empty, show: _No content filters active — all content is ingested._
+  **Ignored contents** — each entry is a JavaScript regex matched against the email subject and body. Emails where either field matches are excluded.
+  If the list is empty, show: _No content filters active — all content is included._
   Otherwise list each pattern with a plain-English explanation, e.g.:
   - \`/unsubscribe/i\` — excludes emails whose subject or body contains the word "unsubscribe"
   - \`/^\\[JIRA\\]/\` — excludes emails whose subject starts with "[JIRA]"

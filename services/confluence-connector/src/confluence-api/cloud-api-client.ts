@@ -29,7 +29,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     private readonly config: CloudConfig,
     private readonly confluenceAuth: ConfluenceAuth,
     private readonly httpClient: RateLimitedHttpClient,
-    private readonly options: ApiClientOptions = { attachmentsEnabled: false },
+    private readonly options: ApiClientOptions,
   ) {
     super();
     this.apiBaseUrl = `${ATLASSIAN_API_BASE}/${config.cloudId}`;

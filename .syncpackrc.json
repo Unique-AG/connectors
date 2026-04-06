@@ -1,5 +1,13 @@
 {
   "$schema": "./node_modules/syncpack/schema.json",
+  "semverGroups": [
+    {
+      "label": "Enforce exact versions for all non-peer dependencies",
+      "range": "",
+      "packages": ["**"],
+      "dependencyTypes": ["dev", "prod"]
+    }
+  ],
   "versionGroups": [
     {
       "label": "Peer Dependencies - Allow range patterns",

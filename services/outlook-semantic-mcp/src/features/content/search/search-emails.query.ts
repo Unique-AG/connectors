@@ -4,7 +4,7 @@ import { asAllOptions } from '@unique-ag/utils';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNull } from 'remeda';
+import { isNonNull, join, map, omit, pipe, prop, sortBy } from 'remeda';
 import * as z from 'zod';
 import {
   type Directory,
@@ -14,13 +14,14 @@ import {
   SystemDirectoryType,
   userProfiles,
 } from '~/db';
-import { MessageMetadata } from '~/features/mail-ingestion/utils/get-metadata-from-message';
+import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import {
   getRootScopeExternalId,
   getRootScopeExternalIdForUser,
 } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { findBestMatch } from '~/utils/find-best-match';
+import { stripChunkTags } from '~/utils/strip-chunk-tags';
 import {
   buildSearchFilter,
   type SearchCondition,
@@ -33,6 +34,7 @@ export interface SearchEmailResult {
   folderId: string;
   title: string;
   from: string;
+  outlookWebLink: string;
   receivedDateTime: string | null;
   text: string;
   url: string | undefined;
@@ -81,27 +83,58 @@ export class SearchEmailsQuery {
     if (uniqueQlMetadataFilter) {
       metaDataFilter.and.push(uniqueQlMetadataFilter);
     }
-    const searchResult = await this.uniqueApi.content.search({
+    const searchResults = await this.uniqueApi.content.search({
       prompt: input.search,
       metaDataFilter,
       limit: input.limit,
       scoreThreshold: 0,
     });
 
-    const results = searchResult.map((item) => {
-      const metadata = item.metadata as MessageMetadata | undefined;
-      return {
-        title: item.title ?? '',
-        id: item.id,
-        text: item.text,
-        url: item.url ?? undefined,
-        outlookWebLink: metadata?.webLink ?? '',
-        emailId: metadata?.id ?? '',
-        folderId: metadata?.parentFolderId ?? '',
-        from: metadata?.fromEmailAddress ?? '',
-        receivedDateTime: metadata?.receivedDateTime ?? '',
-      };
-    });
+    type DeduplicatedResult = Omit<SearchEmailResult, 'text'> & {
+      textParts: { order: number; text: string }[];
+      index: number;
+    };
+
+    const resultsDeduplicated = searchResults.reduce<Record<string, DeduplicatedResult>>(
+      (acc, item, index) => {
+        const metadata = item.metadata as MessageMetadata | undefined;
+        const itemRef = acc[item.id] ?? {
+          title: item.title ?? '',
+          id: item.id,
+          url: item.url ?? undefined,
+          outlookWebLink: metadata?.webLink ?? '',
+          emailId: metadata?.id ?? '',
+          folderId: metadata?.parentFolderId ?? '',
+          from: metadata?.fromEmailAddress ?? '',
+          receivedDateTime: metadata?.receivedDateTime ?? '',
+          textParts: [],
+          index,
+        };
+        itemRef.textParts.push({ order: item.order, text: item.text });
+        acc[item.id] = itemRef;
+        return acc;
+      },
+      {},
+    );
+
+    const results: SearchEmailResult[] = pipe(
+      Object.values(resultsDeduplicated),
+      sortBy((item) => item.index),
+      map(({ textParts, ...searchResult }) => {
+        const text = pipe(
+          textParts,
+          sortBy(prop('order')),
+          // We keep the chunk tags on the first chunk but remove them from others.
+          map((item, index) => (index === 0 ? item.text : stripChunkTags(item.text))),
+          join('\n'),
+        );
+
+        return {
+          ...omit(searchResult, ['index']),
+          text,
+        };
+      }),
+    );
 
     return { results, searchSummary };
   }

@@ -1,4 +1,4 @@
-import { relations, sql } from 'drizzle-orm';
+import { relations } from 'drizzle-orm';
 import {
   integer,
   jsonb,
@@ -57,12 +57,11 @@ export const inboxConfigurations = pgTable('inbox_configurations', {
   // Live catchup specific columns
   liveCatchUpState: liveCatchUpState(`live_catch_up_state`).notNull().default('ready'),
   liveCatchUpHeartbeatAt: timestamp(`live_catch_up_heartbeat_at`).notNull().defaultNow(),
-  pendingLiveMessageIds: text(`pending_live_message_ids`).array().notNull().default(sql`'{}'`),
 
   // Date watermarks for sync coordination
-  newestCreatedDateTime: timestamp(`newest_created_date_time`),
-  oldestCreatedDateTime: timestamp(`oldest_created_date_time`),
-  newestLastModifiedDateTime: timestamp(`newest_last_modified_date_time`),
+  oldestReceivedEmailDateTime: timestamp(`oldest_received_email_date_time`),
+  newestReceivedEmailDateTime: timestamp(`newest_received_email_date_time`),
+  newestLastModifiedDateTime: timestamp(`newest_last_modified_date_time`).notNull().defaultNow(),
 
   ...timestamps,
 });
