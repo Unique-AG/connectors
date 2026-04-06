@@ -318,22 +318,56 @@ describe('tenant-config-loader', () => {
       expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
     });
 
-    it('excludes deleted tenants without validating config', async () => {
+    it('excludes deleted tenants from active results and collects them separately', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
-      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
-      const deletedConfig = { status: 'deleted', confluence: 'totally-invalid' };
+      const { globSync, readFileSync, getTenantConfigs, getDeletedTenantConfigs } =
+        await loadModule();
       setupFsMocks(globSync, readFileSync, [
         { path: '/config/active-tenant-config.yaml', config: makeCloudOauth2loConfig() },
-        { path: '/config/removed-tenant-config.yaml', config: deletedConfig },
+        {
+          path: '/config/removed-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'deleted' }),
+        },
       ]);
 
       const result = getTenantConfigs();
+      const deleted = getDeletedTenantConfigs();
 
       expect(result).toHaveLength(1);
       expect(assertFirstElement(result).name).toBe('active');
+      expect(deleted).toHaveLength(1);
+      expect(assertFirstElement(deleted).name).toBe('removed');
     });
 
-    it('throws when all tenants are inactive or deleted', async () => {
+    it('validates config for deleted tenants', async () => {
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      const deletedConfig = { status: 'deleted', confluence: 'totally-invalid' };
+      setupFsMocks(globSync, readFileSync, [
+        { path: '/config/removed-tenant-config.yaml', config: deletedConfig },
+      ]);
+
+      expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
+    });
+
+    it('does not throw when all active tenants are gone but deleted tenants exist', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getTenantConfigs, getDeletedTenantConfigs } =
+        await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        {
+          path: '/config/alpha-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'deleted' }),
+        },
+      ]);
+
+      const result = getTenantConfigs();
+      const deleted = getDeletedTenantConfigs();
+
+      expect(result).toHaveLength(0);
+      expect(deleted).toHaveLength(1);
+    });
+
+    it('throws when all tenants are inactive', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupFsMocks(globSync, readFileSync, [
@@ -341,11 +375,10 @@ describe('tenant-config-loader', () => {
           path: '/config/alpha-tenant-config.yaml',
           config: makeCloudOauth2loConfig({ status: 'inactive' }),
         },
-        { path: '/config/beta-tenant-config.yaml', config: { status: 'deleted' } },
       ]);
 
       expect(() => getTenantConfigs()).toThrow(
-        'No active tenant configurations found. At least one tenant must have status "active".',
+        'No tenant configurations found. At least one tenant must have status "active" or "deleted".',
       );
     });
   });
@@ -642,6 +675,24 @@ describe('tenant-config-loader', () => {
       expect(firstCall).toBe(secondCall);
       expect(globSync).toHaveBeenCalledTimes(1);
       expect(readFileSync).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns cached deleted configs on second call', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getDeletedTenantConfigs } = await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        { path: '/config/active-tenant-config.yaml', config: makeCloudOauth2loConfig() },
+        {
+          path: '/config/removed-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'deleted' }),
+        },
+      ]);
+
+      const firstCall = getDeletedTenantConfigs();
+      const secondCall = getDeletedTenantConfigs();
+
+      expect(firstCall).toBe(secondCall);
+      expect(globSync).toHaveBeenCalledTimes(1);
     });
   });
 });

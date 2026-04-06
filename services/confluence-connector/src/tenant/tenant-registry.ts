@@ -7,7 +7,12 @@ import {
 } from '@unique-ag/unique-api';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
-import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
+import {
+  getDeletedTenantConfigs,
+  getTenantConfigs,
+  UniqueAuthMode,
+  type UniqueConfig,
+} from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
 import { Metrics } from '../metrics';
 import { ProxyService } from '../proxy';
@@ -25,6 +30,7 @@ import { tenantStorage } from './tenant-context.storage';
 export class TenantRegistry implements OnModuleInit {
   private readonly logger = new Logger(TenantRegistry.name);
   private readonly tenants = new Map<string, TenantContext>();
+  private readonly deletedTenants = new Map<string, TenantContext>();
 
   public constructor(
     private readonly confluenceAuthFactory: ConfluenceAuthFactory,
@@ -140,6 +146,42 @@ export class TenantRegistry implements OnModuleInit {
         this.logger.log({ tenantName, msg: 'Tenant registered' });
       });
     }
+
+    const deletedTenantConfigs = getDeletedTenantConfigs();
+    for (const { name: tenantName, config } of deletedTenantConfigs) {
+      const tenant: TenantContext = {
+        name: tenantName,
+        config,
+        isScanning: false,
+      };
+      this.deletedTenants.set(tenantName, tenant);
+
+      tenantStorage.run(tenant, () => {
+        const isExternal = config.unique.serviceAuthMode === UniqueAuthMode.External;
+        const uniqueApiDispatcher = this.proxyService.getDispatcher({
+          mode: isExternal ? 'always' : 'never',
+        });
+        const uniqueClient = this.uniqueApiFactory.create({
+          auth: this.buildUniqueAuthConfig(config.unique),
+          dispatcher: uniqueApiDispatcher,
+          ingestion: {
+            baseUrl: config.unique.ingestionServiceBaseUrl,
+            rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
+          },
+          scopeManagement: {
+            baseUrl: config.unique.scopeManagementServiceBaseUrl,
+            rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
+          },
+          metadata: {
+            clientName: 'confluence-connector',
+            tenantKey: tenantName,
+          },
+        });
+
+        this.serviceRegistry.register(tenantName, UniqueApiClient, uniqueClient);
+        this.logger.log({ tenantName, msg: 'Deleted tenant registered for cleanup' });
+      });
+    }
   }
 
   public run<R>(tenant: TenantContext, fn: () => R): R {
@@ -154,6 +196,10 @@ export class TenantRegistry implements OnModuleInit {
 
   public getAllTenants(): TenantContext[] {
     return [...this.tenants.values()];
+  }
+
+  public getDeletedTenants(): TenantContext[] {
+    return [...this.deletedTenants.values()];
   }
 
   public get tenantCount(): number {
