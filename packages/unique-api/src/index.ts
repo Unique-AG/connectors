@@ -8,7 +8,7 @@ export type {
   SearchResult as PublicSearchResult,
   SearchResultItem,
 } from './content/search-content.dto';
-export { SearchType, UniqueQLOperator } from './content/search-content.dto';
+export { UniqueQLOperator } from './content/search-content.dto';
 export type { UniqueContentFacade } from './content/unique-content.facade';
 export type { UniqueApiMetrics } from './core/observability';
 export {
@@ -58,4 +58,4 @@ export {
   UniqueApiClient,
   UniqueOwnerType,
 } from './types';
-export type { SimpleUser } from './users/users.types';
+export type { SimpleUser, UserWithCompany } from './users/users.types';

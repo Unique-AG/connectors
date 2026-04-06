@@ -15,7 +15,9 @@ The SharePoint Connector requires specific permissions to access Microsoft Graph
 | Microsoft Graph | `Sites.Selected` | Application | Access to specifically granted sites |
 | Microsoft Graph | `Lists.SelectedOperations.Selected` | Application | Access to specifically granted document libraries |
 
-**Note:** Use `Sites.Selected` for site-level access or `Lists.SelectedOperations.Selected` for more granular library-level access.
+**Note:** Use `Sites.Selected` for site-level access or `Lists.SelectedOperations.Selected` for more granular library-level access. Both can be enabled simultaneously for mixed access scenarios.
+
+**Important:** These two permissions are **not interchangeable**. If library-level grants were issued (via `Grant-PnPAzureADAppSitePermission -List`) but the app registration only has `Sites.Selected`, requests to those libraries will return **403 Forbidden**. The app registration must include `Lists.SelectedOperations.Selected` to honour library-level grants.
 
 ### Permission Sync (Optional)
 
@@ -33,14 +35,16 @@ These APIs are used for fetching SharePoint content:
 
 | API Endpoint | Method | Use Case | Permission |
 |--------------|--------|----------|------------|
-| `/sites/{siteId}` | GET | Fetch site metadata | `Sites.Selected` |
-| `/sites/{siteId}/drives` | GET | Fetch document libraries | `Sites.Selected` |
-| `/drives/{driveId}/items/{itemId}/children` | GET | Fetch folder children | `Sites.Selected` |
-| `/drives/{driveId}/items/{itemId}/content` | GET | Download file content | `Sites.Selected` |
+| `/sites/{siteId}` | GET | Fetch site metadata | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/drives` | GET | Fetch document libraries | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/drives/{driveId}/items/{itemId}/children` | GET | Fetch folder children | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/drives/{driveId}/items/{itemId}/content` | GET | Download file content | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
 | `/sites/{siteId}/lists` | GET | Find SitePages list | `Sites.Selected` |
-| `/sites/{siteId}/lists/{listId}/items` | GET | List ASPX pages | `Sites.Selected` |
-| `/sites/{siteId}/lists/{listId}/items/{itemId}` | GET | Get ASPX page content | `Sites.Selected` |
+| `/sites/{siteId}/lists/{listId}/items` | GET | List ASPX pages | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/lists/{listId}/items/{itemId}` | GET | Get ASPX page content | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
 | `/sites/{siteId}/sites` | GET | Discover child subsites | `Sites.Selected` |
+
+Either permission covers the endpoints above. A library-level grant via `Lists.SelectedOperations.Selected` also provides access to basic site information (metadata, drives listing) for the site that hosts the granted library.
 
 ### Permission Mode
 
@@ -48,8 +52,8 @@ These APIs are used when permission sync is enabled:
 
 | API Endpoint | Method | Use Case | Permission |
 |--------------|--------|----------|------------|
-| `/drives/{driveId}/items/{itemId}/permissions` | GET | Fetch file/folder permissions | `Sites.Selected` |
-| `/sites/{siteId}/lists/{listId}/items/{itemId}/permissions` | GET | Fetch ASPX page permissions (beta) | `Sites.Selected` |
+| `/drives/{driveId}/items/{itemId}/permissions` | GET | Fetch file/folder permissions | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/lists/{listId}/items/{itemId}/permissions` | GET | Fetch ASPX page permissions (beta) | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
 | `/groups/{groupId}/members` | GET | Read Entra ID group members | `GroupMember.Read.All`, `User.ReadBasic.All` |
 | `/groups/{groupId}/owners` | GET | Read Entra ID group owners | `GroupMember.Read.All`, `User.ReadBasic.All` |
 

@@ -1,5 +1,73 @@
 # Changelog
 
+## [0.2.17](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.16...outlook-semantic-mcp@0.2.17) (2026-04-03)
+
+
+### Features
+
+* **outlook-semantic-mcp:** refactor live catch-up recovery, tune prefetch count ([#406](https://github.com/Unique-AG/connectors/issues/406)) ([358aeef](https://github.com/Unique-AG/connectors/commit/358aeef141cb6f18f8dc87a15e855dff483a15b1))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** live-catchup improvements and search improvements UN-18240 ([#417](https://github.com/Unique-AG/connectors/issues/417)) ([88143fe](https://github.com/Unique-AG/connectors/commit/88143fe5d8182629d000b5eaca32cd3a0c3a904d))
+* **outlook-semantic-mcp:** UN-17418  check why we need content length up front ([#408](https://github.com/Unique-AG/connectors/issues/408)) ([56d5bd5](https://github.com/Unique-AG/connectors/commit/56d5bd58d6d84e4eab5ca9942892eecaf8d28b3e))
+
+## [0.2.16](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.15...outlook-semantic-mcp@0.2.16) (2026-03-25)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,main:** cleanup helm templates, expose all configurable vars ([#387](https://github.com/Unique-AG/connectors/issues/387)) ([d6d5a98](https://github.com/Unique-AG/connectors/commit/d6d5a9873d703856ae510a38d7def755212b9841))
+* **outlook-semantic-mcp:** renamed inbox_configuration to inbox_configurations table ([#388](https://github.com/Unique-AG/connectors/issues/388)) ([97868f1](https://github.com/Unique-AG/connectors/commit/97868f1cfe49ae4c0cb2f631f8c0cf901a121abc))
+
+## [0.2.15](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.14...outlook-semantic-mcp@0.2.15) (2026-03-23)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,unique-api:** change expected attachment uri ([#392](https://github.com/Unique-AG/connectors/issues/392)) ([83a8db7](https://github.com/Unique-AG/connectors/commit/83a8db78c857bb351c76bd9b1348f304a2c43667))
+
+## [0.2.14](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.13...outlook-semantic-mcp@0.2.14) (2026-03-20)
+
+
+### Features
+
+* **outlook-semantic-mcp,unique-api:** replace base64 attachments with content ID-based attachments ([#380](https://github.com/Unique-AG/connectors/issues/380)) ([329cea1](https://github.com/Unique-AG/connectors/commit/329cea13ceb23e6fd428f9be8bbf743d9e6c2a0b))
+
+## [0.2.13](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.12...outlook-semantic-mcp@0.2.13) (2026-03-20)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** email sync total + add user email to sync progress ([#384](https://github.com/Unique-AG/connectors/issues/384)) ([b418066](https://github.com/Unique-AG/connectors/commit/b418066f43584020d25a6df6f6ece259901ec3ed))
+
+## [0.2.12](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.11...outlook-semantic-mcp@0.2.12) (2026-03-20)
+
+
+### Features
+
+* **outlook-semantic-mcp,deps:** improve full sync to not overwhelm ingestion, to allow users to sync in parallel ([#382](https://github.com/Unique-AG/connectors/issues/382)) ([2f2466e](https://github.com/Unique-AG/connectors/commit/2f2466ec7b665e21cc91470576daa62e2af32f6d))
+
+## [0.2.11](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.10...outlook-semantic-mcp@0.2.11) (2026-03-18)
+
+
+### Features
+
+* **outlook-semantic-mcp:** add lookup_contacts tool ([#377](https://github.com/Unique-AG/connectors/issues/377)) ([5aafbc6](https://github.com/Unique-AG/connectors/commit/5aafbc68b6545aaba32b9ce62343e6123cc1bc93))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** implemented UN-16563 tools audit ([#375](https://github.com/Unique-AG/connectors/issues/375)) ([d42c3bb](https://github.com/Unique-AG/connectors/commit/d42c3bbd7bbf60b21b090ad72075a1b0615062ca))
+
+## [0.2.10](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.9...outlook-semantic-mcp@0.2.10) (2026-03-16)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,unique-api:** split sync into full sync and live catch-up with resume and buffering ([#360](https://github.com/Unique-AG/connectors/issues/360)) ([c6ee0bb](https://github.com/Unique-AG/connectors/commit/c6ee0bb4f9c1ba986f827ae6b4fa663f7c4b9ab7))
+
 ## [0.2.9](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.8...outlook-semantic-mcp@0.2.9) (2026-03-12)
 
 

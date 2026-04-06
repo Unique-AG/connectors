@@ -9,6 +9,7 @@ import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { context, trace } from '@opentelemetry/api';
 import { Cache } from 'cache-manager';
 import { MetricService, OpenTelemetryModule } from 'nestjs-otel';
@@ -57,6 +58,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         uniqueConfig,
       ],
     }),
+    ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({
       inject: [appConfig.KEY],
       useFactory: (config: AppConfig) => {

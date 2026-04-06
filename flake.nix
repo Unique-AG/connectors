@@ -99,12 +99,6 @@
             echo "Connectors dev environment loaded"
             echo "Node.js: $(node --version)"
             echo "pnpm: $(pnpm --version)"
-
-            # Switch to zsh for interactive sessions
-            if [[ $- == *i* ]]; then
-              export SHELL=${pkgs.zsh}/bin/zsh
-              exec $SHELL
-            fi
           '';
         };
       }

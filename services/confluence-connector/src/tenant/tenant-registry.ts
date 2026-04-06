@@ -14,6 +14,8 @@ import {
   type UniqueConfig,
 } from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
+import { Metrics } from '../metrics';
+import { ProxyService } from '../proxy';
 import { ConfluenceContentFetcher } from '../synchronization/confluence-content-fetcher';
 import { ConfluencePageScanner } from '../synchronization/confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
@@ -36,6 +38,8 @@ export class TenantRegistry implements OnModuleInit {
     private readonly confluenceApiClientFactory: ConfluenceApiClientFactory,
     @Inject(UNIQUE_API_CLIENT_FACTORY) private readonly uniqueApiFactory: UniqueApiClientFactory,
     private readonly serviceRegistry: ServiceRegistry,
+    private readonly proxyService: ProxyService,
+    private readonly metrics: Metrics,
   ) {}
 
   public onModuleInit(): void {
@@ -56,17 +60,31 @@ export class TenantRegistry implements OnModuleInit {
           ConfluenceAuth,
           this.confluenceAuthFactory.createAuthStrategy(config.confluence),
         );
-        const apiClient = this.confluenceApiClientFactory.create(config.confluence);
+        const apiClient = this.confluenceApiClientFactory.create(
+          config.confluence,
+          { attachmentsEnabled: config.ingestion.attachments.enabled },
+          this.metrics,
+        );
         this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
 
-        const scanner = new ConfluencePageScanner(config.confluence, config.processing, apiClient);
+        const scanner = new ConfluencePageScanner(
+          config.confluence,
+          config.processing,
+          apiClient,
+          config.ingestion.attachments,
+        );
         this.serviceRegistry.register(tenantName, ConfluencePageScanner, scanner);
 
         const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient);
         this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
 
+        const isExternal = config.unique.serviceAuthMode === UniqueAuthMode.External;
+        const uniqueApiDispatcher = this.proxyService.getDispatcher({
+          mode: isExternal ? 'always' : 'never',
+        });
         const uniqueClient = this.uniqueApiFactory.create({
           auth: this.buildUniqueAuthConfig(config.unique),
+          dispatcher: uniqueApiDispatcher,
           ingestion: {
             baseUrl: config.unique.ingestionServiceBaseUrl,
             rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
@@ -94,10 +112,21 @@ export class TenantRegistry implements OnModuleInit {
           tenantName,
           config.ingestion.useV1KeyFormat,
           uniqueClient,
+          this.metrics,
         );
         this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
 
-        const ingestionService = new IngestionService(config, tenantName, uniqueClient);
+        const blobUploadDispatcher = this.proxyService.getDispatcher({
+          mode: isExternal ? 'always' : 'never',
+        });
+        const ingestionService = new IngestionService(
+          config,
+          tenantName,
+          uniqueClient,
+          apiClient,
+          this.metrics,
+          blobUploadDispatcher,
+        );
         this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
 
         const confluenceSynchronizationService = new ConfluenceSynchronizationService(
@@ -106,6 +135,7 @@ export class TenantRegistry implements OnModuleInit {
           fileDiffService,
           ingestionService,
           scopeManagementService,
+          this.metrics,
         );
         this.serviceRegistry.register(
           tenantName,
@@ -113,6 +143,7 @@ export class TenantRegistry implements OnModuleInit {
           confluenceSynchronizationService,
         );
 
+        this.metrics.initializeCounters();
         this.logger.log({ tenantName, msg: 'Tenant registered' });
       });
     }
@@ -140,7 +171,11 @@ export class TenantRegistry implements OnModuleInit {
         });
         this.serviceRegistry.register(tenantName, UniqueApiClient, uniqueClient);
 
-        const cleanupService = new TenantDeleteService(tenantName, config.ingestion, uniqueClient);
+        const cleanupService = new TenantDeleteService(
+          tenantName,
+          config.ingestion.scopeId,
+          uniqueClient,
+        );
         this.serviceRegistry.register(tenantName, TenantDeleteService, cleanupService);
 
         this.logger.log({ tenantName, msg: 'Deleted tenant registered for cleanup' });

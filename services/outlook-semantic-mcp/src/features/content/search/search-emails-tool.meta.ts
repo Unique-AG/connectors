@@ -2,12 +2,15 @@ import { createMeta } from '@unique-ag/mcp-server-module';
 
 export const META = createMeta({
   icon: 'search',
-  systemPrompt: `Searches ingested Outlook emails semantically. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns matched passages from emails with metadata. Call list_folders first to get folder IDs for directory filtering.
+  systemPrompt: `Searches ingested Outlook emails semantically. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns matched passages from emails with metadata.
 
-  Per default ALWAYS search in the inbox only.
+  By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
+  After returning results, inform the user that they can narrow the search to a specific folder if needed.
 
-  Use the ID of that folder for the "directories" parameter.
-  But ALWAYS ask at the end if other folders should be considered for the search.
+  To filter by folder, pass its name directly to the \`directories\` parameter — no need to call \`list_folders\` for well-known folders.
+  Use these exact names: "Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History".
+  Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized — searching through them will not return results.
+  For custom user-defined folders, call \`list_folders\` first to get the folder ID.
 
   If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.`,
   toolFormatInformation: `## Email Display Rules

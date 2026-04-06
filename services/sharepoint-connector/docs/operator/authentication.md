@@ -453,10 +453,15 @@ When using permission sync, the app principal must be able to read site group me
 **Causes:**
 - `Sites.Selected` or `Lists.SelectedOperations.Selected` permission not granted for the site/library
 - Admin consent not completed
+- **Permission scope mismatch:** The app registration has `Sites.Selected` but the admin granted **library-level** access (via `-List` parameter). Library-level grants require `Lists.SelectedOperations.Selected` on the app registration — `Sites.Selected` alone does not cover them and will return 403.
 
 **Resolution:**
-1. Grant site or library access via PowerShell
-2. Complete admin consent in Azure Portal
+1. Verify the app registration includes the correct permission for the type of grant issued:
+   - Site-level grants → `Sites.Selected`
+   - Library-level grants → `Lists.SelectedOperations.Selected`
+   - Mixed → both permissions (recommended default)
+2. Grant site or library access via PowerShell
+3. Complete admin consent in Azure Portal
 
 ### TLS Certificate Validation Errors
 

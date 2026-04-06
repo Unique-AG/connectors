@@ -36,14 +36,22 @@ export class ConfluenceContentFetcher {
 
     const body = fullPage.body?.storage?.value || '';
     if (!body) {
-      this.logger.log({ pageId: page.id, title: page.title, msg: 'Page has no body, skipping' });
+      this.logger.log({
+        pageId: page.id,
+        title: page.title,
+        msg: 'Page has no body, skipping',
+      });
       return null;
     }
 
     const confluenceLabels = this.extractLabels(fullPage.metadata.labels.results);
     const metadata = confluenceLabels.length > 0 ? { confluenceLabels } : undefined;
 
-    this.logger.debug({ pageId: page.id, title: page.title, msg: 'Page content fetched' });
+    this.logger.debug({
+      pageId: page.id,
+      title: page.title,
+      msg: 'Page content fetched',
+    });
 
     return {
       id: page.id,

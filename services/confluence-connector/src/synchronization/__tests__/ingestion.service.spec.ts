@@ -1,10 +1,22 @@
+import { Readable } from 'node:stream';
 import type { IngestionApiResponse, UniqueApiClient } from '@unique-ag/unique-api';
 import { Smeared } from '@unique-ag/utils';
+
+vi.mock('@unique-ag/utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@unique-ag/utils')>();
+  return {
+    ...actual,
+    createSmeared: (value: string) => new actual.Smeared(value, false),
+  };
+});
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantConfig } from '../../config';
+import type { ConfluenceApiClient } from '../../confluence-api';
+import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
 import { CONFLUENCE_BASE_URL } from '../__mocks__/sync.fixtures';
 import { IngestionService } from '../ingestion.service';
-import type { FetchedPage } from '../sync.types';
+import type { DiscoveredAttachment, FetchedPage } from '../sync.types';
 
 const mockLogger = vi.hoisted(() => ({
   log: vi.fn(),
@@ -65,9 +77,19 @@ function makeRegistrationResponse(
   };
 }
 
+function makeMockStream(): Readable {
+  return new Readable({
+    read() {
+      this.push(Buffer.from('binary-data'));
+      this.push(null);
+    },
+  });
+}
+
 function makeService(): {
   service: IngestionService;
   uniqueApiClient: UniqueApiClient;
+  confluenceApiClient: ConfluenceApiClient;
 } {
   const uniqueApiClient = {
     ingestion: {
@@ -79,6 +101,10 @@ function makeService(): {
       deleteByIds: vi.fn().mockResolvedValue(0),
     },
   } as unknown as UniqueApiClient;
+
+  const confluenceApiClient = {
+    getAttachmentDownloadStream: vi.fn().mockResolvedValue(makeMockStream()),
+  } as unknown as ConfluenceApiClient;
 
   const tenantConfig = {
     confluence: {
@@ -96,8 +122,15 @@ function makeService(): {
   } as unknown as TenantConfig;
 
   return {
-    service: new IngestionService(tenantConfig, TENANT_NAME, uniqueApiClient),
+    service: new IngestionService(
+      tenantConfig,
+      TENANT_NAME,
+      uniqueApiClient,
+      confluenceApiClient,
+      createNoopMetrics(),
+    ),
     uniqueApiClient,
+    confluenceApiClient,
   };
 }
 
@@ -189,30 +222,34 @@ describe('IngestionService', () => {
     ] as never);
     vi.mocked(uniqueApiClient.files.deleteByIds).mockResolvedValue(2);
 
-    await service.deleteContentByKeys(['k1', 'k2']);
+    const result = await service.deleteContentByKeys(['k1', 'k2']);
 
+    expect(result).toBe(2);
     expect(uniqueApiClient.files.getByKeys).toHaveBeenCalledWith(['k1', 'k2']);
     expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['content-1', 'content-2']);
   });
 
-  it('logs and returns when no content is found for delete keys', async () => {
+  it('logs warning and returns 0 when no content is found for delete keys', async () => {
     const { service, uniqueApiClient } = makeService();
     vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([]);
 
-    await service.deleteContentByKeys(['missing-key']);
+    const result = await service.deleteContentByKeys(['missing-key']);
 
+    expect(result).toBe(0);
     expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
-    expect(mockLogger.log).toHaveBeenCalledWith({
+    expect(mockLogger.warn).toHaveBeenCalledWith({
       keyCount: 1,
       msg: 'No content found for keys, nothing to delete',
     });
   });
 
-  it('logs delete errors and continues', async () => {
+  it('logs delete errors and returns 0', async () => {
     const { service, uniqueApiClient } = makeService();
     vi.mocked(uniqueApiClient.files.getByKeys).mockRejectedValue(new Error('delete failed'));
 
-    await service.deleteContentByKeys(['k1']);
+    const result = await service.deleteContentByKeys(['k1']);
+
+    expect(result).toBe(0);
 
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -223,13 +260,75 @@ describe('IngestionService', () => {
     );
   });
 
-  it('returns early for empty delete input', async () => {
+  it('returns 0 for empty delete input', async () => {
     const { service, uniqueApiClient } = makeService();
 
-    await service.deleteContentByKeys([]);
+    const result = await service.deleteContentByKeys([]);
 
+    expect(result).toBe(0);
     expect(uniqueApiClient.files.getByKeys).not.toHaveBeenCalled();
     expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
+  });
+
+  describe('cleanup after failed page ingestion', () => {
+    it('deletes registered content when page upload fails', async () => {
+      const { service, uniqueApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 500 });
+
+      await service.ingestPage(pageFixture, 'space-scope-1');
+
+      expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contentId: 'id-1',
+          msg: 'Deleted orphaned content after failed ingestion',
+        }),
+      );
+    });
+
+    it('deletes registered content when page finalization fails', async () => {
+      const { service, uniqueApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+      vi.mocked(uniqueApiClient.ingestion.finalizeIngestion).mockRejectedValue(
+        new Error('finalize failed'),
+      );
+
+      await service.ingestPage(pageFixture, 'space-scope-1');
+
+      expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contentId: 'id-1',
+          msg: 'Deleted orphaned content after failed ingestion',
+        }),
+      );
+    });
+
+    it('does not attempt cleanup when page registration fails', async () => {
+      const { service, uniqueApiClient } = makeService();
+      vi.mocked(uniqueApiClient.ingestion.registerContent).mockRejectedValue(
+        new Error('register failed'),
+      );
+
+      await service.ingestPage(pageFixture, 'space-scope-1');
+
+      expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
+    });
+
+    it('continues pipeline when cleanup delete fails', async () => {
+      const { service, uniqueApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 500 });
+      vi.mocked(uniqueApiClient.files.deleteByIds).mockRejectedValue(new Error('network error'));
+
+      await service.ingestPage(pageFixture, 'space-scope-1');
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contentId: 'id-1',
+          msg: 'Failed to clean up orphaned content after failed ingestion',
+        }),
+      );
+    });
   });
 
   it('rewrites writeUrl to in-cluster ingestion endpoint in cluster_local mode', async () => {
@@ -254,7 +353,17 @@ describe('IngestionService', () => {
       files: { getByKeys: vi.fn(), deleteByIds: vi.fn() },
     } as unknown as UniqueApiClient;
 
-    const service = new IngestionService(clusterLocalConfig, TENANT_NAME, uniqueApiClient);
+    const confluenceApiClient = {
+      getAttachmentDownloadStream: vi.fn(),
+    } as unknown as ConfluenceApiClient;
+
+    const service = new IngestionService(
+      clusterLocalConfig,
+      TENANT_NAME,
+      uniqueApiClient,
+      confluenceApiClient,
+      createNoopMetrics(),
+    );
     mockRequest.mockResolvedValueOnce({ statusCode: 201 });
 
     await service.ingestPage(pageFixture, 'space-scope-1');
@@ -275,5 +384,223 @@ describe('IngestionService', () => {
       'https://blob.example.com/write',
       expect.objectContaining({ method: 'PUT' }),
     );
+  });
+
+  describe('ingestAttachment', () => {
+    const attachmentFixture: DiscoveredAttachment = {
+      id: 'att-100',
+      title: 'diagram.png',
+      mediaType: 'image/png',
+      fileSize: 2048,
+      downloadPath: '/download/attachments/42/diagram.png',
+      versionTimestamp: '2026-03-01T00:00:00.000Z',
+      pageId: '42',
+      spaceId: 'space-1',
+      spaceKey: 'SP',
+      spaceName: 'Space',
+      webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/42/attachments/att-100`,
+    };
+
+    it('skips zero-byte attachments', async () => {
+      const { service, uniqueApiClient } = makeService();
+
+      await service.ingestAttachment({ ...attachmentFixture, fileSize: 0 }, 'space-scope-1');
+
+      expect(uniqueApiClient.ingestion.registerContent).not.toHaveBeenCalled();
+      expect(mockLogger.log).toHaveBeenCalledWith({
+        attachmentId: 'att-100',
+        title: new Smeared('diagram.png', false),
+        msg: 'Skipping zero-byte attachment',
+      });
+    });
+
+    it('registers, streams download, uploads, and finalizes attachment ingestion', async () => {
+      const { service, uniqueApiClient, confluenceApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+
+      await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+      expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: `${TENANT_NAME}/space-1_SP/42::att-100`,
+          title: 'diagram.png',
+          mimeType: 'image/png',
+          byteSize: 2048,
+          scopeId: 'space-scope-1',
+          sourceKind: 'ATLASSIAN_CONFLUENCE_CLOUD',
+          sourceName: CONFLUENCE_BASE_URL,
+          metadata: expect.objectContaining({
+            spaceKey: 'SP',
+            spaceName: 'Space',
+          }),
+        }),
+      );
+
+      expect(confluenceApiClient.getAttachmentDownloadStream).toHaveBeenCalledWith(
+        'att-100',
+        '42',
+        '/download/attachments/42/diagram.png',
+      );
+
+      expect(mockRequest).toHaveBeenCalledWith(
+        'https://blob.example.com/write',
+        expect.objectContaining({
+          method: 'PUT',
+          headers: expect.objectContaining({
+            'Content-Type': 'image/png',
+            'Content-Length': '2048',
+            'x-ms-blob-type': 'BlockBlob',
+          }),
+        }),
+      );
+
+      expect(uniqueApiClient.ingestion.finalizeIngestion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: `${TENANT_NAME}/space-1_SP/42::att-100`,
+          fileUrl: 'https://blob.example.com/read',
+        }),
+      );
+    });
+
+    it('logs and skips when attachment registration fails', async () => {
+      const { service, uniqueApiClient } = makeService();
+      vi.mocked(uniqueApiClient.ingestion.registerContent).mockRejectedValue(
+        new Error('register failed'),
+      );
+
+      await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+      expect(uniqueApiClient.ingestion.finalizeIngestion).not.toHaveBeenCalled();
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachmentId: 'att-100',
+          title: new Smeared('diagram.png', false),
+          err: expect.anything(),
+          msg: 'Failed to ingest attachment, skipping',
+        }),
+      );
+    });
+
+    it('logs and skips when download stream fails', async () => {
+      const { service, uniqueApiClient, confluenceApiClient } = makeService();
+      vi.mocked(confluenceApiClient.getAttachmentDownloadStream).mockRejectedValue(
+        new Error('download failed'),
+      );
+
+      await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+      expect(mockRequest).not.toHaveBeenCalled();
+      expect(uniqueApiClient.ingestion.finalizeIngestion).not.toHaveBeenCalled();
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachmentId: 'att-100',
+          msg: 'Failed to ingest attachment, skipping',
+        }),
+      );
+    });
+
+    it('logs and skips when upload fails', async () => {
+      const { service, uniqueApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 500 });
+
+      await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+      expect(uniqueApiClient.ingestion.finalizeIngestion).not.toHaveBeenCalled();
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attachmentId: 'att-100',
+          msg: 'Failed to ingest attachment, skipping',
+        }),
+      );
+    });
+
+    describe('cleanup after failed attachment ingestion', () => {
+      it('deletes registered content when attachment upload fails', async () => {
+        const { service, uniqueApiClient } = makeService();
+        mockRequest.mockResolvedValueOnce({ statusCode: 500 });
+
+        await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+        expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            contentId: 'id-1',
+            msg: 'Deleted orphaned content after failed ingestion',
+          }),
+        );
+      });
+
+      it('deletes registered content when attachment finalization fails', async () => {
+        const { service, uniqueApiClient } = makeService();
+        mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+        vi.mocked(uniqueApiClient.ingestion.finalizeIngestion).mockRejectedValue(
+          new Error('finalize failed'),
+        );
+
+        await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+        expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            contentId: 'id-1',
+            msg: 'Deleted orphaned content after failed ingestion',
+          }),
+        );
+      });
+
+      it('does not attempt cleanup when attachment registration fails', async () => {
+        const { service, uniqueApiClient } = makeService();
+        vi.mocked(uniqueApiClient.ingestion.registerContent).mockRejectedValue(
+          new Error('register failed'),
+        );
+
+        await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+        expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
+      });
+    });
+
+    it('rewrites writeUrl in cluster_local mode for attachment ingestion', async () => {
+      const clusterLocalConfig = {
+        confluence: { instanceType: 'cloud', baseUrl: CONFLUENCE_BASE_URL },
+        unique: {
+          serviceAuthMode: 'cluster_local',
+          ingestionServiceBaseUrl: 'http://node-ingestion:8091',
+        },
+        ingestion: { storeInternally: true, useV1KeyFormat: false },
+      } as unknown as TenantConfig;
+
+      const uniqueApiClient = {
+        ingestion: {
+          registerContent: vi.fn().mockResolvedValue(
+            makeRegistrationResponse({
+              writeUrl: 'https://gateway.qa.unique.app/ingestion/scoped/upload?key=encrypted-key',
+            }),
+          ),
+          finalizeIngestion: vi.fn().mockResolvedValue({ id: 'id-1' }),
+        },
+        files: { getByKeys: vi.fn(), deleteByIds: vi.fn() },
+      } as unknown as UniqueApiClient;
+
+      const confluenceApiClient = {
+        getAttachmentDownloadStream: vi.fn().mockResolvedValue(makeMockStream()),
+      } as unknown as ConfluenceApiClient;
+
+      const service = new IngestionService(
+        clusterLocalConfig,
+        TENANT_NAME,
+        uniqueApiClient,
+        confluenceApiClient,
+        createNoopMetrics(),
+      );
+      mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+
+      await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+      expect(mockRequest).toHaveBeenCalledWith(
+        'http://node-ingestion:8091/scoped/upload?key=encrypted-key',
+        expect.objectContaining({ method: 'PUT' }),
+      );
+    });
   });
 });

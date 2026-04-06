@@ -1,9 +1,12 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
+import { createMock } from '@golevelup/ts-vitest';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-auth';
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
 import { getDeletedTenantConfigs, getTenantConfigs } from '../../config/tenant-config-loader';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../../confluence-api';
+import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
+import type { ProxyService } from '../../proxy';
 import { ServiceRegistry } from '../service-registry';
 import { tenantStorage } from '../tenant-context.storage';
 import { TenantDeleteService } from '../tenant-delete.service';
@@ -32,8 +35,10 @@ vi.mock('../../config/tenant-config-loader', () => ({
 vi.mock('../../auth/confluence-auth/confluence-auth.factory');
 vi.mock('../../confluence-api/confluence-api-client.factory');
 
+const mockProxyService = createMock<ProxyService>();
+
 function createMockTenantConfig(): TenantConfig {
-  return {
+  return createMock<TenantConfig>({
     confluence: {
       instanceType: 'cloud',
       baseUrl: 'https://confluence.example.com',
@@ -53,9 +58,10 @@ function createMockTenantConfig(): TenantConfig {
       scopeId: 'scope-1',
       storeInternally: true,
       useV1KeyFormat: false,
+      attachments: { enabled: false, allowedExtensions: [], maxFileSizeMb: 10 },
     },
     processing: {},
-  } as unknown as TenantConfig;
+  });
 }
 
 function createMockAuth(): ConfluenceAuth {
@@ -97,10 +103,13 @@ function createRegistry(
   vi.mocked(getTenantConfigs).mockReturnValue(configs);
   vi.mocked(getDeletedTenantConfigs).mockReturnValue(deletedTenants);
 
-  const mockFactory = new ConfluenceAuthFactory();
+  const mockFactory = new ConfluenceAuthFactory(mockProxyService);
   vi.mocked(mockFactory.createAuthStrategy).mockImplementation(() => createMockAuth());
 
-  const mockApiClientFactory = new ConfluenceApiClientFactory({} as ServiceRegistry);
+  const mockApiClientFactory = new ConfluenceApiClientFactory(
+    {} as ServiceRegistry,
+    mockProxyService,
+  );
   vi.mocked(mockApiClientFactory.create).mockImplementation(() => ({}) as never);
 
   const mockUniqueApiFactory = {
@@ -113,6 +122,8 @@ function createRegistry(
     mockApiClientFactory,
     mockUniqueApiFactory,
     serviceRegistry,
+    mockProxyService,
+    createNoopMetrics(),
   );
   registry.onModuleInit();
   return { registry, serviceRegistry, mockUniqueApiFactory };
@@ -148,10 +159,13 @@ describe('TenantRegistry', () => {
         { name: 'tenant-b', config: configB },
       ]);
 
-      const mockFactory = new ConfluenceAuthFactory();
+      const mockFactory = new ConfluenceAuthFactory(mockProxyService);
       vi.mocked(mockFactory.createAuthStrategy).mockReturnValue(createMockAuth());
 
-      const mockApiClientFactory = new ConfluenceApiClientFactory({} as ServiceRegistry);
+      const mockApiClientFactory = new ConfluenceApiClientFactory(
+        {} as ServiceRegistry,
+        mockProxyService,
+      );
       vi.mocked(mockApiClientFactory.create).mockReturnValue({} as never);
 
       const mockUniqueApiFactory = { create: vi.fn().mockReturnValue(createMockUniqueApiClient()) };
@@ -162,6 +176,8 @@ describe('TenantRegistry', () => {
         mockApiClientFactory,
         mockUniqueApiFactory,
         serviceRegistry,
+        mockProxyService,
+        createNoopMetrics(),
       );
       registry.onModuleInit();
 
@@ -205,10 +221,13 @@ describe('TenantRegistry', () => {
         { name: 'tenant-b', config: configB },
       ]);
 
-      const mockFactory = new ConfluenceAuthFactory();
+      const mockFactory = new ConfluenceAuthFactory(mockProxyService);
       vi.mocked(mockFactory.createAuthStrategy).mockReturnValue(createMockAuth());
 
-      const mockApiClientFactory = new ConfluenceApiClientFactory({} as ServiceRegistry);
+      const mockApiClientFactory = new ConfluenceApiClientFactory(
+        {} as ServiceRegistry,
+        mockProxyService,
+      );
       vi.mocked(mockApiClientFactory.create).mockReturnValue({} as never);
 
       const mockUniqueApiFactory = { create: vi.fn().mockReturnValue(createMockUniqueApiClient()) };
@@ -219,11 +238,21 @@ describe('TenantRegistry', () => {
         mockApiClientFactory,
         mockUniqueApiFactory,
         serviceRegistry,
+        mockProxyService,
+        createNoopMetrics(),
       );
       registry.onModuleInit();
 
-      expect(mockApiClientFactory.create).toHaveBeenCalledWith(configA.confluence);
-      expect(mockApiClientFactory.create).toHaveBeenCalledWith(configB.confluence);
+      expect(mockApiClientFactory.create).toHaveBeenCalledWith(
+        configA.confluence,
+        { attachmentsEnabled: false },
+        expect.anything(),
+      );
+      expect(mockApiClientFactory.create).toHaveBeenCalledWith(
+        configB.confluence,
+        { attachmentsEnabled: false },
+        expect.anything(),
+      );
     });
 
     it('registers ConfluenceAuth, UniqueApiClient, and ConfluenceApiClient in ServiceRegistry for each tenant', () => {
@@ -317,18 +346,15 @@ describe('TenantRegistry', () => {
 
   describe('onModuleInit with deleted tenants', () => {
     it('registers deleted tenants with only UniqueApiClient', () => {
-      const deletedTenants: NamedTenantConfig[] = [
-        { name: 'deleted-tenant', config: createMockTenantConfig() },
-      ];
-
+      const deletedConfig = createMockTenantConfig();
       const { serviceRegistry, mockUniqueApiFactory } = createRegistry(
         [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        deletedTenants,
+        [{ name: 'deleted-tenant', config: deletedConfig }],
       );
 
       const deletedTenant = {
         name: 'deleted-tenant',
-        config: deletedTenants[0].config,
+        config: deletedConfig,
         isScanning: false,
       };
       tenantStorage.run(deletedTenant, () => {

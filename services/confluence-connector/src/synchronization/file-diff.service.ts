@@ -4,7 +4,8 @@ import { Logger } from '@nestjs/common';
 import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind } from '../constants/ingestion.constants';
-import type { DiscoveredPage, FileDiffResult } from './sync.types';
+import type { Metrics } from '../metrics';
+import type { DiscoveredAttachment, DiscoveredPage, FileDiffResult } from './sync.types';
 
 export class FileDiffService {
   private readonly logger = new Logger(FileDiffService.name);
@@ -14,27 +15,47 @@ export class FileDiffService {
     private readonly tenantName: string,
     private readonly useV1KeyFormat: boolean,
     private readonly uniqueApiClient: UniqueApiClient,
+    private readonly metrics: Metrics,
   ) {}
 
-  public async computeDiff(discoveredPages: DiscoveredPage[]): Promise<FileDiffResult> {
-    this.logger.log({ pageCount: discoveredPages.length, msg: 'Performing file diff' });
+  public async computeDiff(
+    discoveredPages: DiscoveredPage[],
+    discoveredAttachments: DiscoveredAttachment[],
+  ): Promise<FileDiffResult> {
+    this.logger.log({
+      pageCount: discoveredPages.length,
+      attachmentCount: discoveredAttachments.length,
+      msg: 'Performing file diff',
+    });
 
     const pagesBySpace = groupBy(discoveredPages, (page) => page.spaceKey);
+    const attachmentsBySpace = groupBy(discoveredAttachments, (attachment) => attachment.spaceKey);
+    // Attachment spaces are typically a subset of page spaces, but we include both for safety.
+    const allSpaceKeys = new Set([
+      ...Object.keys(pagesBySpace),
+      ...Object.keys(attachmentsBySpace),
+    ]);
     const sourceKind = getSourceKind(this.confluenceConfig.instanceType);
 
     const result: FileDiffResult = {
-      newPageIds: [],
-      updatedPageIds: [],
-      deletedPageIds: [],
-      movedPageIds: [],
+      newItemIds: [],
+      updatedItemIds: [],
+      deletedItems: [],
+      movedItemIds: [],
     };
 
-    for (const [spaceKey, pages] of Object.entries(pagesBySpace)) {
-      const fileDiffItems = this.buildFileDiffItems(pages);
-      const firstPage = pages[0];
-      assert.ok(firstPage, `Expected at least one page for space "${spaceKey}"`);
+    for (const spaceKey of allSpaceKeys) {
+      const pages = pagesBySpace[spaceKey] ?? [];
+      const attachments = attachmentsBySpace[spaceKey] ?? [];
 
-      const basePartialKey = `${firstPage.spaceId}_${spaceKey}`;
+      const pageItems = this.buildPageDiffItems(pages);
+      const attachmentItems = this.buildAttachmentDiffItems(attachments);
+      const fileDiffItems = [...pageItems, ...attachmentItems];
+
+      const firstItem = pages[0] ?? attachments[0];
+      assert.ok(firstItem, `Expected at least one page or attachment for space "${spaceKey}"`);
+
+      const basePartialKey = `${firstItem.spaceId}_${spaceKey}`;
       const partialKey = this.useV1KeyFormat
         ? basePartialKey
         : `${this.tenantName}/${basePartialKey}`;
@@ -48,28 +69,53 @@ export class FileDiffService {
 
       await this.validateNoAccidentalFullDeletion(fileDiffItems, diffResponse, partialKey);
 
-      result.newPageIds.push(...diffResponse.newFiles);
-      result.updatedPageIds.push(...diffResponse.updatedFiles);
-      result.deletedPageIds.push(...diffResponse.deletedFiles);
-      result.movedPageIds.push(...diffResponse.movedFiles);
+      result.newItemIds.push(...diffResponse.newFiles);
+      result.updatedItemIds.push(...diffResponse.updatedFiles);
+      result.deletedItems.push(...diffResponse.deletedFiles.map((id) => ({ id, partialKey })));
+      result.movedItemIds.push(...diffResponse.movedFiles);
     }
 
     this.logger.log({
-      new: result.newPageIds.length,
-      updated: result.updatedPageIds.length,
-      deleted: result.deletedPageIds.length,
-      moved: result.movedPageIds.length,
+      newItems: result.newItemIds.length,
+      updatedItems: result.updatedItemIds.length,
+      deletedItems: result.deletedItems.length,
+      movedItems: result.movedItemIds.length,
       msg: 'File diff completed',
     });
+
+    this.recordDiffMetrics(result);
 
     return result;
   }
 
-  private buildFileDiffItems(pages: DiscoveredPage[]): FileDiffItem[] {
+  private recordDiffMetrics(result: FileDiffResult): void {
+    if (result.newItemIds.length > 0) {
+      this.metrics.recordFileDiffEvents(result.newItemIds.length, 'new');
+    }
+    if (result.updatedItemIds.length > 0) {
+      this.metrics.recordFileDiffEvents(result.updatedItemIds.length, 'updated');
+    }
+    if (result.deletedItems.length > 0) {
+      this.metrics.recordFileDiffEvents(result.deletedItems.length, 'deleted');
+    }
+    if (result.movedItemIds.length > 0) {
+      this.metrics.recordFileDiffEvents(result.movedItemIds.length, 'moved');
+    }
+  }
+
+  private buildPageDiffItems(pages: DiscoveredPage[]): FileDiffItem[] {
     return pages.map((page) => ({
       key: page.id,
       url: page.webUrl,
       updatedAt: page.versionTimestamp,
+    }));
+  }
+
+  private buildAttachmentDiffItems(attachments: DiscoveredAttachment[]): FileDiffItem[] {
+    return attachments.map((attachment) => ({
+      key: `${attachment.pageId}::${attachment.id}`,
+      url: attachment.webUrl,
+      updatedAt: attachment.versionTimestamp ?? '',
     }));
   }
 
@@ -103,21 +149,37 @@ export class FileDiffService {
 
     // If the file diff indicated we should delete all files even when we submitted some files to
     // the diff, it most probably means that we have some kind of bug in file diff or something
-    // unexpected changed in the logic (e.g. key format change). We should not proceed with the
-    // sync to avoid costly re-ingestions. If user actually wants to delete all files from a space,
-    // they should leave one page labeled for synchronization.
+    // unexpected changed in the logic (e.g. key format change). However, if the new files have
+    // completely different keys than the deleted files, this is a legitimate content replacement
+    // scenario (e.g. old pages were deleted and new ones created) — not a key format bug.
     const totalFilesInUnique = await this.uniqueApiClient.files.getCountByKeyPrefix(partialKey);
     if (diffResponse.deletedFiles.length === totalFilesInUnique) {
-      this.logger.error({
+      const submittedKeys = new Set(submittedItems.map((item) => item.key));
+      const deletedKeysOverlap = diffResponse.deletedFiles.some((key) => submittedKeys.has(key));
+
+      if (diffResponse.newFiles.length === 0 || deletedKeysOverlap) {
+        this.logger.error({
+          submittedCount: submittedItems.length,
+          deletedCount: diffResponse.deletedFiles.length,
+          newCount: diffResponse.newFiles.length,
+          deletedKeysOverlap,
+          totalFilesInUnique,
+          partialKey,
+          msg: 'File diff would delete all files stored in Unique. Aborting to prevent accidental full deletion.',
+        });
+        assert.fail(
+          `File diff would delete all ${diffResponse.deletedFiles.length} files stored in Unique for partialKey "${partialKey}". Aborting sync to prevent accidental full deletion.`,
+        );
+      }
+
+      this.logger.warn({
         submittedCount: submittedItems.length,
         deletedCount: diffResponse.deletedFiles.length,
+        newCount: diffResponse.newFiles.length,
         totalFilesInUnique,
         partialKey,
-        msg: 'File diff would delete all files stored in Unique. Aborting to prevent accidental full deletion.',
+        msg: `File diff will delete all ${diffResponse.deletedFiles.length} existing files and add ${diffResponse.newFiles.length} new files. Proceeding because new files do not overlap with deleted keys.`,
       });
-      assert.fail(
-        `File diff would delete all ${diffResponse.deletedFiles.length} files stored in Unique for partialKey "${partialKey}". Aborting sync to prevent accidental full deletion.`,
-      );
     }
   }
 }

@@ -131,6 +131,7 @@ Reference: [Confluence — Fixing Cilium Network Policies](https://unique-ch.atl
 | `finance-gpt` / `node-ingestion` | 8080 (TCP) | Ingestion API |
 | `confluence.qa.unique.app` | 443 (TCP) | Data Center Confluence API + OAuth token |
 | `api.atlassian.com` | 443 (TCP) | Cloud Confluence API + OAuth token |
+| `api.media.atlassian.com` | 443 (TCP) | Cloud file attachment downloads |
 | `*.atlassian.net` | 443 (TCP) | Cloud Confluence base URL |
 
 ### Required ingress rules

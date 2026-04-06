@@ -1,59 +1,33 @@
 import { type Scope, UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
-import type { IngestionConfig } from '../config/ingestion.schema';
 
 export class TenantDeleteService {
   private readonly logger = new Logger(TenantDeleteService.name);
 
   public constructor(
     private readonly tenantName: string,
-    private readonly ingestionConfig: IngestionConfig,
+    private readonly scopeId: string,
     private readonly uniqueClient: UniqueApiClient,
   ) {}
 
   public async deleteTenantContent(): Promise<void> {
-    const { scopeId, useV1KeyFormat } = this.ingestionConfig;
-
-    const rootScope = await this.uniqueClient.scopes.getById(scopeId);
+    const rootScope = await this.uniqueClient.scopes.getById(this.scopeId);
     if (!rootScope) {
       this.logger.log({
         tenantName: this.tenantName,
-        msg: `Root scope ${scopeId} not found, skipping`,
+        msg: `Root scope ${this.scopeId} not found, skipping`,
       });
       return;
     }
 
-    const childScopes = await this.uniqueClient.scopes.listChildren(scopeId);
-
-    // For V1 tenants, content is owned by child scopes (flat hierarchy), so no child scopes = no content.
-    // For V2 tenants, content is keyed by tenant name prefix, so we check the count directly.
-    let hasContent = childScopes.length > 0;
-    if (!useV1KeyFormat && !hasContent) {
-      const contentCount = await this.uniqueClient.files.getCountByKeyPrefix(this.tenantName);
-      hasContent = contentCount > 0;
-    }
-
-    if (childScopes.length === 0 && !hasContent) {
+    const childScopes = await this.uniqueClient.scopes.listChildren(this.scopeId);
+    if (childScopes.length === 0) {
       this.logger.log({ tenantName: this.tenantName, msg: 'Already cleaned up, skipping' });
       return;
     }
 
-    if (useV1KeyFormat) {
-      await this.deleteContentByScopes(childScopes);
-    } else {
-      await this.deleteContentByKeyPrefix();
-    }
-
+    await this.deleteContentByScopes(childScopes);
     await this.deleteChildScopes(childScopes);
-  }
-
-  private async deleteContentByKeyPrefix(): Promise<void> {
-    const deletedCount = await this.uniqueClient.files.deleteByKeyPrefix(this.tenantName);
-    this.logger.log({
-      tenantName: this.tenantName,
-      deletedCount,
-      msg: 'Content deleted by key prefix',
-    });
   }
 
   private async deleteContentByScopes(scopes: Scope[]): Promise<void> {

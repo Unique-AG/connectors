@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.3.1...sharepoint-connector@2.4.0) (2026-03-25)
+
+
+### Features
+
+* **sharepoint-connector:** add admin_consent_url output to entra module ([#400](https://github.com/Unique-AG/connectors/issues/400)) ([926004a](https://github.com/Unique-AG/connectors/commit/926004ace055685f75a6bc842cc16761f1283fe2))
+* **sharepoint-connector:** add Lists.SelectedOperations.Selected permission support ([#397](https://github.com/Unique-AG/connectors/issues/397)) ([9b36401](https://github.com/Unique-AG/connectors/commit/9b364010b67928dfd7884e6d1a840f61ff1612d2))
+
 ## [2.3.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.3.0...sharepoint-connector@2.3.1) (2026-03-13)
 
 

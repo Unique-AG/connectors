@@ -10,19 +10,19 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
+  Inject,
   InternalServerErrorException,
   Logger,
   Post,
   UseInterceptors,
 } from '@nestjs/common';
-import { partition } from 'remeda';
+import { eq } from 'drizzle-orm';
+import { partition, unique } from 'remeda';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
+import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { traceAttrs, traceError, traceEvent } from '~/features/tracing.utils';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
-import { FullSyncCommand } from './full-sync/full-sync.command';
-import { MessageEventDto } from './mail-ingestion/dtos/message-event.dto';
-import { IngestionPriority } from './mail-ingestion/utils/ingestion-queue.utils';
 import {
   ChangeNotificationCollectionDto,
   LifecycleChangeNotificationCollectionDto,
@@ -31,6 +31,8 @@ import {
 import { SubscriptionReauthorizeService } from './subscriptions/subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscriptions/subscription-remove.service';
 import { MailSubscriptionUtilsService } from './subscriptions/subscription-utils.service';
+import { FullSyncCommand } from './sync/full-sync/full-sync.command';
+import { LiveCatchUpEventDto } from './sync/live-catch-up/live-catch-up-event.dto';
 
 @Controller('mail-subscription')
 export class MailSubscriptionController {
@@ -42,6 +44,7 @@ export class MailSubscriptionController {
     private readonly utils: MailSubscriptionUtilsService,
     private readonly amqpConnection: AmqpConnection,
     private readonly fullSyncCommand: FullSyncCommand,
+    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
   @Post('lifecycle')
@@ -76,6 +79,13 @@ export class MailSubscriptionController {
             return this.subscriptionReauthorize.enqueueReauthorizationRequired(
               notification.subscriptionId,
             );
+          }
+          case 'missed': {
+            const payload = LiveCatchUpEventDto.parse({
+              type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
+              payload: { subscriptionId: notification.subscriptionId },
+            });
+            return this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload);
           }
 
           default: {
@@ -152,22 +162,65 @@ export class MailSubscriptionController {
       return;
     }
 
+    const subscriptionIds: string[] = [];
     for (const notification of notificationsToProcess) {
-      assert.ok(
-        notification.resourceData,
-        `Missing resource data from notification: ${JSON.stringify(notification)}`,
-      );
-      const payload = await MessageEventDto.encodeAsync({
-        type: 'unique.outlook-semantic-mcp.mail-event.live-change-notification-received',
-        payload: {
+      const isTrusted = this.utils.isWebhookTrustedViaState(notification.clientState);
+      if (!isTrusted) {
+        traceEvent('change notification invalid');
+        this.logger.warn({
+          msg: 'Discarding change notification due to invalid authentication state',
+          changeNotification: notification,
+        });
+        continue;
+      }
+      const messageId = notification.resourceData?.id;
+      if (!messageId) {
+        this.logger.warn({
+          msg: 'Discarding notification with missing resource data',
           subscriptionId: notification.subscriptionId,
-          messageId: notification.resourceData.id,
+        });
+        continue;
+      }
+      subscriptionIds.push(notification.subscriptionId);
+    }
+
+    const publishResult = await Promise.allSettled(
+      unique(subscriptionIds).map((subscriptionId) => {
+        const payload = LiveCatchUpEventDto.parse({
+          type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
+          payload: { subscriptionId },
+        });
+        this.logger.log({ msg: 'Publishing live catch-up event', subscriptionId });
+        return this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload);
+      }),
+    );
+    const successful = publishResult.filter((result) => result.status === 'fulfilled');
+    const failed = publishResult.filter((result) => result.status === 'rejected');
+    traceEvent('notifications published', {
+      successful: successful.length,
+      failed: failed.length,
+    });
+    this.logger.log({
+      msg: 'Successfully processed all notifications from Microsoft Graph',
+      successful: successful.length,
+      failed: failed.length,
+    });
+
+    // NOTE: if we fail any, we reject this webhook as microsoft will send this again later
+    if (failed.length > 0) {
+      failed.forEach((fail) => {
+        this.logger.warn({
+          msg: 'Failed to publish live catch-up event to message queue',
+          err: fail.reason,
+        });
+        traceError(fail.reason);
+      });
+      throw new InternalServerErrorException(
+        { errors: failed.map((v) => v.reason) },
+        {
+          description: `internal publishing of ${failed.length} messages failed`,
         },
-      });
-      this.logger.log({ msg: 'published', payload });
-      await this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload, {
-        priority: IngestionPriority.High,
-      });
+      );
     }
   }
 
@@ -187,7 +240,12 @@ export class MailSubscriptionController {
 
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-created': {
-        return await this.fullSyncCommand.run(event.subscriptionId);
+        const subscription = await this.db.query.subscriptions.findFirst({
+          columns: { userProfileId: true },
+          where: eq(subscriptions.subscriptionId, event.subscriptionId),
+        });
+        assert.ok(subscription, `Subscription missing for: ${event.subscriptionId}`);
+        return await this.fullSyncCommand.run(subscription.userProfileId);
       }
       case 'unique.outlook-semantic-mcp.mail.lifecycle-notification.subscription-removed': {
         return this.subscriptionRemove.remove(event.subscriptionId);

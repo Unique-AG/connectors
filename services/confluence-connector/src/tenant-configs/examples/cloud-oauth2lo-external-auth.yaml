@@ -35,7 +35,7 @@ unique:
 processing:
   concurrency: 1
   scanIntervalCron: "*/15 * * * *"
-  # maxPagesToScan: 100 # Uncomment to limit pages scanned (useful for testing)
+  # maxItemsToScan: 100 # Uncomment to limit items scanned (useful for testing)
 
 ingestion:
   ingestionMode: flat
