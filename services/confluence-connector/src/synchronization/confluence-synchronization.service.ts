@@ -43,7 +43,7 @@ export class ConfluenceSynchronizationService {
     try {
       this.logger.log({ tenantName: tenant.name, msg: 'Starting sync' });
 
-      const rootScopePath = await this.scopeManagementService.initialize();
+      const { rootScopePath } = await this.scopeManagementService.initialize();
 
       const scanStartTime = Date.now();
       const { pages: discoveredPages, attachments: discoveredAttachments } =

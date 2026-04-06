@@ -1,18 +1,36 @@
 import assert from 'node:assert';
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
+import type { ConfluenceApiClient, InstanceIdentifier } from '../confluence-api/confluence-api-client';
 import type { IngestionConfig } from '../config/ingestion.schema';
-import { EXTERNAL_ID_PREFIX } from '../constants/ingestion.constants';
+import { EXTERNAL_ID_PREFIX, buildRootScopeExternalId } from '../constants/ingestion.constants';
+
+export interface RootScopeInitResult {
+  rootScopePath: string;
+  isInitialSync: boolean;
+}
 
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
+  private cachedInstanceIdentifier: InstanceIdentifier | null = null;
+
   public constructor(
     private readonly ingestionConfig: IngestionConfig,
     private readonly tenantName: string,
+    private readonly confluenceApiClient: ConfluenceApiClient,
     private readonly uniqueApiClient: UniqueApiClient,
   ) {}
 
-  public async initialize(): Promise<string> {
+  private async resolveAndCacheInstanceId(): Promise<InstanceIdentifier> {
+    if (this.cachedInstanceIdentifier) {
+      return this.cachedInstanceIdentifier;
+    }
+    const identifier = await this.confluenceApiClient.resolveInstanceIdentifier();
+    this.cachedInstanceIdentifier = identifier;
+    return identifier;
+  }
+
+  public async initialize(): Promise<RootScopeInitResult> {
     this.logger.log({
       tenantName: this.tenantName,
       msg: 'Requesting current user ID from Unique API',
@@ -28,6 +46,34 @@ export class ScopeManagementService {
 
     const rootScope = await this.uniqueApiClient.scopes.getById(this.ingestionConfig.scopeId);
     assert.ok(rootScope, `Root scope with ID ${this.ingestionConfig.scopeId} not found`);
+
+    const instanceId = await this.resolveAndCacheInstanceId();
+    const expectedExternalId = buildRootScopeExternalId(instanceId.type, instanceId.id);
+    let isInitialSync = false;
+
+    if (rootScope.externalId === null) {
+      isInitialSync = true;
+      try {
+        await this.uniqueApiClient.scopes.updateExternalId(rootScope.id, expectedExternalId);
+        this.logger.log({
+          scopeId: rootScope.id,
+          externalId: expectedExternalId,
+          msg: 'Claimed root scope ownership',
+        });
+      } catch (error) {
+        this.logger.warn({
+          scopeId: rootScope.id,
+          externalId: expectedExternalId,
+          error,
+          msg: 'Failed to claim root scope ownership',
+        });
+      }
+    } else {
+      assert.ok(
+        rootScope.externalId === expectedExternalId,
+        `Root scope ownership mismatch: expected ${expectedExternalId}, found ${rootScope.externalId}`,
+      );
+    }
 
     const pathSegments = [rootScope.name];
     let currentScope = rootScope;
@@ -46,7 +92,7 @@ export class ScopeManagementService {
 
     const rootScopePath = `/${pathSegments.join('/')}`;
     this.logger.log({ rootScopePath, msg: 'Scope management initialized' });
-    return rootScopePath;
+    return { rootScopePath, isInitialSync };
   }
 
   public async ensureSpaceScopes(
