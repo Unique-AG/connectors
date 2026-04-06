@@ -52,5 +52,12 @@
     "typeid-js": {
       "optional": true
     }
+  },
+  "typesVersions": {
+    "*": {
+      "zod": [
+        "./src/zod.ts"
+      ]
+    }
   }
 }
