@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import type { Readable } from 'node:stream';
 import { chunk, isNullish, uniqueBy } from 'remeda';
 import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
@@ -42,11 +43,10 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
         ? (response as Record<string, unknown>).id
         : undefined;
 
-    if (typeof id !== 'string' || id.length === 0) {
-      throw new Error(
-        `Confluence Data Center manifest at ${url} did not contain a valid "id" field`,
-      );
-    }
+    assert.ok(
+      typeof id === 'string' && id.length > 0,
+      `Confluence Data Center manifest at ${url} did not contain a valid "id" field`,
+    );
 
     return { type: 'data-center', id };
   }
