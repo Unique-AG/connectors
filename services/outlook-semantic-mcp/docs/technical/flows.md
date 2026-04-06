@@ -138,13 +138,12 @@ When a new email arrives in the user's Outlook mailbox, Microsoft Graph sends a 
 **Key points:**
 
 - Microsoft requires a response within 10 seconds (Microsoft limit, not configurable). The server enqueues the notification immediately and returns `202 Accepted` — actual email fetching and ingestion happen inline in the consumer, after the webhook response is already sent.
-- Buffering applies when another live catch-up consumer is already processing, or when the watermark has not been set yet (full sync has not started). Messages are flushed once the blocker clears.
-- The watermark (`newestLastModifiedDateTime`) is **initialized by full sync** the first time it runs and **maintained by live catch-up** on every subsequent notification.
+- The watermark (`newestLastModifiedDateTime`) is set and maintained by live catch-up on every notification, independently of full sync.
 - `deleted` change notifications are discarded. Deletions are handled by [directory sync](#Directory-Sync-Flow) and by detecting emails moved to ignored folders.
 
 ## Full Sync: Historical Email Ingestion
 
-After a subscription is created, the server automatically begins ingesting the user's historical emails. It fetches messages from Microsoft Graph in paginated batches (newest first), applies the configured mail filters, and uploads them to the Unique Knowledge Base. The sync is resumable across restarts and initializes the watermark that live catch-up depends on.
+After a subscription is created, the server automatically begins ingesting the user's historical emails. It fetches messages from Microsoft Graph in paginated batches (newest first), applies the configured mail filters, and uploads them to the Unique Knowledge Base. The sync is resumable across restarts.
 
 **Key points:**
 
@@ -152,7 +151,6 @@ After a subscription is created, the server automatically begins ingesting the u
 - The sync is resumable: the Graph pagination cursor is persisted so a crash or restart picks up where it left off.
 - Stale syncs (no heartbeat for 20+ minutes) are automatically restarted by the sync recovery module.
 - `ignoredBefore` is applied as a Graph API query filter. `ignoredSenders` and `ignoredContents` are applied in-memory after each batch is fetched.
-- Full sync **initializes** the watermark (`newestLastModifiedDateTime`). Once initialized, live catch-up takes ownership and updates it on every subsequent notification.
 
 ## Directory Sync Flow
 
