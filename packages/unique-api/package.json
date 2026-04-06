@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@nestjs/common": "11.1.6",
-    "@nestjs/core": "11.1.6",
+    "@nestjs/core": "11.1.18",
     "@nestjs/testing": "11.1.6",
     "@opentelemetry/api": "1.9.0",
     "@suites/di.nestjs": "3.0.1",
