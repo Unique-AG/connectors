@@ -154,8 +154,13 @@ export class TenantRegistry implements OnModuleInit {
       this.deletedTenants.set(tenantName, tenant);
 
       tenantStorage.run(tenant, () => {
+        const isExternal = config.unique.serviceAuthMode === UniqueAuthMode.External;
+        const uniqueApiDispatcher = this.proxyService.getDispatcher({
+          mode: isExternal ? 'always' : 'never',
+        });
         const uniqueClient = this.uniqueApiFactory.create({
           auth: this.buildUniqueAuthConfig(config.unique),
+          dispatcher: uniqueApiDispatcher,
           ingestion: {
             baseUrl: config.unique.ingestionServiceBaseUrl,
             rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
@@ -175,6 +180,7 @@ export class TenantRegistry implements OnModuleInit {
           tenantName,
           config.ingestion.scopeId,
           uniqueClient,
+          this.metrics,
         );
         this.serviceRegistry.register(tenantName, TenantDeleteService, cleanupService);
 

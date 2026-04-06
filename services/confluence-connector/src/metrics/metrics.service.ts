@@ -16,6 +16,9 @@ export class Metrics {
   private readonly confluenceApiRequestDuration: Histogram;
   private readonly confluenceApiThrottleEvents: Counter;
   private readonly confluenceApiErrors: Counter;
+  private readonly cleanupDuration: Histogram;
+  private readonly cleanupContentDeleted: Counter;
+  private readonly cleanupScopesDeleted: Counter;
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
@@ -71,6 +74,18 @@ export class Metrics {
 
     this.confluenceApiErrors = metricService.getCounter('cfc_confluence_api_errors_total', {
       description: 'Number of Confluence API error responses',
+    });
+
+    this.cleanupDuration = metricService.getHistogram('cfc_cleanup_duration_seconds', {
+      description: 'Duration of deleted tenant content cleanup',
+    });
+
+    this.cleanupContentDeleted = metricService.getCounter('cfc_cleanup_content_deleted_total', {
+      description: 'Number of content items deleted during tenant cleanup',
+    });
+
+    this.cleanupScopesDeleted = metricService.getCounter('cfc_cleanup_scopes_deleted_total', {
+      description: 'Number of scopes deleted during tenant cleanup',
     });
   }
 
@@ -134,6 +149,18 @@ export class Metrics {
       tenant: this.tenantName,
       http_status_class: statusCode ? getHttpStatusCodeClass(statusCode) : 'unknown',
     });
+  }
+
+  public recordCleanupDuration(durationSeconds: number, result: 'success' | 'failure'): void {
+    this.cleanupDuration.record(durationSeconds, { tenant: this.tenantName, result });
+  }
+
+  public recordCleanupContentDeleted(count: number): void {
+    this.cleanupContentDeleted.add(count, { tenant: this.tenantName });
+  }
+
+  public recordCleanupScopesDeleted(count: number): void {
+    this.cleanupScopesDeleted.add(count, { tenant: this.tenantName });
   }
 
   public recordApiThrottleEvent(): void {

@@ -22,6 +22,9 @@ export function createNoopMetrics(): Metrics {
     recordApiRequestDuration: noop,
     recordApiError: noop,
     recordApiThrottleEvent: noop,
+    recordCleanupDuration: noop,
+    recordCleanupContentDeleted: noop,
+    recordCleanupScopesDeleted: noop,
     initializeCounters: noop,
   };
 
