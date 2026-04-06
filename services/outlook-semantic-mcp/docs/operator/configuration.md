@@ -160,7 +160,7 @@ mcpConfig:
       x-company-id: "<your-company-id>"
       x-user-id: "<your-zitadel-service-user-id>"
 
-  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
+  defaultMailFilters: '{"retentionWindowInDays":365,"ignoredContents":[],"ignoredSenders":[]}'
 
 ingress:
   enabled: true
@@ -269,20 +269,29 @@ The `DEFAULT_MAIL_FILTERS` value controls which emails are synced during the ini
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `ignoredBefore` | ISO date string | Skip emails received before this date. Useful to limit the scope of the initial sync. |
+| `retentionWindowInDays` | Positive integer | Number of days to retain emails. The effective cutoff rolls forward daily as `today - retentionWindowInDays`. Emails older than this window are excluded from sync and stamped with an `expiresAt` date for automatic expiry in the Knowledge Base. |
 | `ignoredSenders` | Array of regex patterns | Regex patterns in `/pattern/flags` format tested against the sender's email address. Emails matching any pattern are excluded from sync. |
 | `ignoredContents` | Array of regex patterns | Regex patterns in `/pattern/flags` format tested against both the email subject and body. Emails matching any pattern are excluded from sync. |
 
 Patterns for `ignoredSenders` and `ignoredContents` must be in `/pattern/flags` format (e.g. `/^noreply@example\.com$/i`, `/unsubscribe/i`). Patterns are validated against ReDoS attacks on ingestion — invalid or unsafe patterns are rejected.
 
+### Choosing a Retention Window
+
+We recommend setting `retentionWindowInDays` between **95 and 180 days** for most deployments. The right value depends on your mail volume and use-case needs:
+
+- **High mail volume** (hundreds of emails per user per day): use a shorter window (closer to 95 days). A large window combined with high volume floods the Knowledge Base with content, degrades search quality, and increases ingestion costs.
+- **Low mail volume** or deep-search requirements: a longer window (up to 180 days or beyond) is viable.
+
+Values above 180 days are not recommended unless mail volume is low and the operational cost of a large Knowledge Base is acceptable.
+
 ### Example
 
 ```yaml
 mcpConfig:
-  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":["/unsubscribe/i"],"ignoredSenders":["/^noreply@example\\.com$/i"]}'
+  defaultMailFilters: '{"retentionWindowInDays":180,"ignoredContents":["/unsubscribe/i"],"ignoredSenders":["/^noreply@example\\.com$/i"]}'
 ```
 
-The default value (`ignoredBefore: 2025-06-06`, empty arrays for the rest) limits the initial sync to emails received after June 6, 2025 with no sender or content exclusions.
+The example uses 180 days. Adjust based on your organization's mail volume and search needs.
 
 ## Database Configuration
 

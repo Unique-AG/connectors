@@ -187,6 +187,7 @@ export class ProcessEmailCommand {
       graphMessage,
       client,
       logContext,
+      filters,
     });
     return 'ingested';
   }
@@ -199,6 +200,7 @@ export class ProcessEmailCommand {
     metadata,
     fileKey,
     logContext: logContextRaw,
+    filters,
   }: {
     client: Client;
     rootScopeId: string;
@@ -210,6 +212,7 @@ export class ProcessEmailCommand {
       providerUserId: string;
       userEmail: string;
     };
+    filters: InboxConfigurationMailFilters;
   }): Promise<void> {
     // We will update the log context while we run.
     const logContext = clone(logContextRaw) as Record<string, string>;
@@ -232,6 +235,10 @@ export class ProcessEmailCommand {
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       storeInternally: this.configService.get('unique.storeInternally', { infer: true }),
+      expiresAt: new Date(
+        new Date(graphMessage.receivedDateTime).getTime() +
+          filters.retentionWindowInDays * 24 * 60 * 60 * 1000,
+      ),
     };
 
     this.logger.debug({ ...logContext, msg: `Register content: Started` });

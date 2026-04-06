@@ -153,7 +153,7 @@ function makeRow(
     fullSyncLastRunAt: null as Date | null,
     fullSyncExpectedTotal: null as number | null,
     newestLastModifiedDateTime: null as Date | null,
-    filters: { ignoredBefore: '2020-01-01T00:00:00.000Z' } as Record<string, unknown>,
+    filters: { retentionWindowInDays: 365 } as Record<string, unknown>,
     ...overrides,
   };
 }

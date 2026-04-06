@@ -10,8 +10,7 @@ const SUBSCRIPTION_ID = 'sub-001';
 const USER_PROFILE_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 const WATERMARK_ISO = '2024-06-01T00:00:00.000Z';
 const WATERMARK = new Date(WATERMARK_ISO);
-const IGNORED_BEFORE = '2024-01-01T00:00:00.000Z';
-const DEFAULT_FILTERS = { ignoredBefore: IGNORED_BEFORE, ignoredSenders: [], ignoredContents: [] };
+const DEFAULT_FILTERS = { retentionWindowInDays: 365, ignoredSenders: [], ignoredContents: [] };
 
 // A recent heartbeat (within all cooldown windows)
 const RECENT_HEARTBEAT = new Date(Date.now() - 1 * 60 * 1000); // 1 minute ago

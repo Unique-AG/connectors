@@ -250,7 +250,7 @@
         },
         "defaultMailFilters": {
           "type": "string",
-          "description": "Default mail filters applied when syncing emails (JSON string). Example: '{\"ignoredBefore\":\"2025-06-06\",\"ignoredContents\":[],\"ignoredSenders\":[]}'"
+          "description": "Default mail filters applied when syncing emails (JSON string). Example: '{\"retentionWindowInDays\":365,\"ignoredContents\":[],\"ignoredSenders\":[]}'"
         },
         "auth": {
           "type": "object",

@@ -10,6 +10,7 @@ import { isNullish } from 'remeda';
 import z from 'zod';
 import { inboxConfigurations, UserProfile } from '~/db';
 import {
+  computeIgnoredBefore,
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
@@ -302,7 +303,9 @@ export class ProcessFullSyncBatchCommand {
         status: 'version-mismatch';
       }
   > {
-    const conditions = [`receivedDateTime ge ${filters.ignoredBefore.toISOString()}`];
+    const conditions = [
+      `receivedDateTime ge ${computeIgnoredBefore(filters.retentionWindowInDays).toISOString()}`,
+    ];
 
     if (nextLink === START_FULL_SYNC_LINK) {
       const raw = await recordInHistogram({

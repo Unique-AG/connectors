@@ -422,7 +422,7 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
     scheduledForIngestion: number;  // successfully uploaded
     failedToUploadForIngestion: number;
     filters: {
-      ignoredBefore: string | null;
+      retentionWindowInDays: number;
       ignoredSenders: string[];
       ignoredContents: string[];
     };

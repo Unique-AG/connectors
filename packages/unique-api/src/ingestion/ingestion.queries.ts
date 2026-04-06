@@ -21,6 +21,7 @@ export interface ContentUpsertMutationInput {
     fileAccess?: FileAccessKey[];
     ingestionConfig?: IngestionConfig;
     metadata?: Record<string, unknown>;
+    expiresAt?: string;
   };
   fileUrl?: string;
   chatId?: string;

@@ -28,18 +28,25 @@ const regexPattern = z.string().transform((pattern, ctx) => {
 });
 
 export const inboxConfigurationMailFilters = z.object({
-  ignoredBefore: z.coerce.date(),
+  retentionWindowInDays: z.number().int().positive(),
   ignoredSenders: z.array(regexPattern).optional().default([]),
   ignoredContents: z.array(regexPattern).optional().default([]),
 });
 
 export type InboxConfigurationMailFilters = z.infer<typeof inboxConfigurationMailFilters>;
 
+export function computeIgnoredBefore(days: number): Date {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 export function serializeMailFilters(
   filters: InboxConfigurationMailFilters,
 ): Record<string, unknown> {
   return {
-    ignoredBefore: filters.ignoredBefore.toISOString(),
+    retentionWindowInDays: filters.retentionWindowInDays,
     ignoredSenders: filters.ignoredSenders.map((reg) => reg.toString()),
     ignoredContents: filters.ignoredContents.map((reg) => reg.toString()),
   };
