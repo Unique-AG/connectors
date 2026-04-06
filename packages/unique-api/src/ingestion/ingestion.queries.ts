@@ -48,7 +48,6 @@ export const CONTENT_UPSERT_MUTATION = gql`
     $sourceKind: String
     $storeInternally: Boolean
     $baseUrl: String
-    $expiresAt: String
   ) {
     contentUpsert(
       input: $input
@@ -60,7 +59,6 @@ export const CONTENT_UPSERT_MUTATION = gql`
       sourceKind: $sourceKind
       storeInternally: $storeInternally
       baseUrl: $baseUrl
-      expiresAt: $expiresAt
     ) {
       id
       key
