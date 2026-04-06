@@ -24,6 +24,14 @@ export function getSourceKind(instanceType: 'cloud' | 'data-center'): IngestionS
   return instanceType === 'cloud' ? IngestionSourceKind.Cloud : IngestionSourceKind.DataCenter;
 }
 
+export function buildRootScopeExternalId(
+  instanceType: 'cloud' | 'data-center',
+  instanceId: string,
+): string {
+  const typeTag = instanceType === 'cloud' ? 'cloud' : 'dc';
+  return `${EXTERNAL_ID_PREFIX}${typeTag}:${instanceId}`;
+}
+
 export const INGESTION_MIME_TYPE = 'text/html' as const;
 export const OWNER_TYPE = 'SCOPE' as const;
 export const SOURCE_OWNER_TYPE = 'COMPANY' as const;
