@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "@nestjs/common": "11.1.6",
-    "@nestjs/core": "11.1.6",
+    "@nestjs/core": "11.1.18",
     "@nestjs/testing": "11.1.6",
     "@suites/di.nestjs": "3.0.1",
     "@suites/doubles.vitest": "3.0.1",
