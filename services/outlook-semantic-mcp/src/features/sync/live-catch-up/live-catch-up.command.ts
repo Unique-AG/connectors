@@ -103,7 +103,7 @@ export class LiveCatchUpCommand {
       const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
 
       const runResult = await this.runLiveCatchupWithLock({
-        watermark: lockResult.watermark,
+        watermark: new Date(lockResult.watermark),
         filters: lockResult.filters,
         user: {
           email: userProfile.userEmail,
