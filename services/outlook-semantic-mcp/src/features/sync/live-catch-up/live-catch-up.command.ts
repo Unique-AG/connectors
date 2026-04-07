@@ -6,14 +6,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes, Counter } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
 import { MetricService, Span } from 'nestjs-otel';
-import {
-  DRIZZLE,
-  DrizzleDatabase,
-  inboxConfigurations,
-  subscriptions,
-  UserProfile,
-  userProfiles,
-} from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions, userProfiles } from '~/db';
 import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
@@ -103,7 +96,12 @@ export class LiveCatchUpCommand {
       return;
     }
 
+    // We run maximum 3 rounds to avoid an infinite loop here.
     for (let round = 0; round < 3; round++) {
+      // If we got webhooks while we were running we will run once more but with a smaller overlapping window
+      // because we have some fresh data which appeared while we were running.
+      const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
+
       const runResult = await this.runLiveCatchupWithLock({
         watermark: lockResult.watermark,
         filters: lockResult.filters,
@@ -113,7 +111,7 @@ export class LiveCatchUpCommand {
           providerId: userProfile.providerUserId,
         },
         subscriptionId,
-        liveCatchupOverlappingWindow,
+        liveCatchupOverlappingWindow: overlappingWindowInMinutes,
       });
 
       if (runResult.status === 'failed') {
@@ -134,6 +132,7 @@ export class LiveCatchUpCommand {
       if (shouldStopNextRound) {
         return;
       }
+      console.log(`___SECOND_ROUND_RUNNING`);
     }
   }
 

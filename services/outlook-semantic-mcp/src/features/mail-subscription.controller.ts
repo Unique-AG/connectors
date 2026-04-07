@@ -192,7 +192,7 @@ export class MailSubscriptionController {
           type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
           payload: {
             subscriptionId,
-            notificationReceivedAt,
+            notificationReceivedAt: notificationReceivedAt.toISOString(),
           },
         });
         this.logger.log({

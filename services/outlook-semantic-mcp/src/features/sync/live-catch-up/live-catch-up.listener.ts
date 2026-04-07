@@ -4,15 +4,15 @@ import {
   RabbitSubscribe,
 } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { eq, inArray } from 'drizzle-orm';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { AppConfig, appConfig } from '~/config';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
+import { greatestFrom } from '~/utils/greatest-from';
+import { Nullish } from '~/utils/nullish';
 import { LiveCatchUpCommand } from './live-catch-up.command';
 import { LiveCatchUpEventDto } from './live-catch-up-event.dto';
-import { Nullish } from '~/utils/nullish';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
-import { eq, inArray } from 'drizzle-orm';
-import { greatestFrom } from '~/utils/greatest-from';
 
 @Injectable()
 export class LiveCatchUpListener {
