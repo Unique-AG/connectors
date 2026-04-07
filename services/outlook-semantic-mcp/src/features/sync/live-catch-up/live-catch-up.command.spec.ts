@@ -121,6 +121,7 @@ function createMockDb({
         innerJoin: vi.fn().mockReturnValue({
           where: vi.fn().mockResolvedValue(subscription ? [subscription] : []),
         }),
+        where: vi.fn().mockResolvedValue([]),
       }),
     }),
     transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(lockTx)),

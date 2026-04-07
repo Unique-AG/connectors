@@ -96,50 +96,51 @@ export class LiveCatchUpCommand {
       return;
     }
 
-    const { watermark, filters } = lockResult;
+    let finalStatus: 'ready' | 'failed' = 'ready';
 
-    try {
-      await this.syncDirectoriesCommand.run(
-        convertUserProfileIdToTypeId(userProfile.userProfileId),
-      );
+    // We run maximum 3 rounds to avoid an infinite loop here.
+    for (let round = 0; round < 3; round++) {
+      finalStatus = 'ready';
+      // If we got webhooks while we were running we will run once more but with a smaller overlapping window
+      // because we have some fresh data which appeared while we were running.
+      const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
 
-      const client = this.graphClientFactory.createClientForUser(userProfile.userProfileId);
-
-      await this.processMessages({
+      const runResult = await this.runLiveCatchupWithLock({
+        watermark: lockResult.watermark,
+        filters: lockResult.filters,
         user: {
-          email: createSmeared(userProfile.userEmail),
+          email: userProfile.userEmail,
           profileId: userProfile.userProfileId,
           providerId: userProfile.providerUserId,
         },
-        liveCatchupOverlappingWindow,
-        client,
-        watermark,
-        filters,
+        subscriptionId,
+        liveCatchupOverlappingWindow: overlappingWindowInMinutes,
       });
 
-      this.logger.log({
-        userProfileId: userProfile.userProfileId,
-        subscriptionId,
-        msg: 'Live catch-up completed',
-      });
-      await this.db
-        .update(inboxConfigurations)
-        .set({ liveCatchUpState: 'ready', liveCatchUpHeartbeatAt: sql`NOW()` })
+      if (runResult.status === 'failed') {
+        finalStatus = 'failed';
+        break;
+      }
+
+      const inboxConfiguration = await this.db
+        .select({ lastWebhookReceivedAt: inboxConfigurations.lastWebhookReceivedAt })
+        .from(inboxConfigurations)
         .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
-        .execute();
-    } catch (error) {
-      this.logger.error({
-        err: error,
-        msg: 'Failed to execute live catch-up',
-        userProfileId: userProfile.userProfileId,
-        subscriptionId,
-      });
-      await this.db
-        .update(inboxConfigurations)
-        .set({ liveCatchUpState: 'failed', liveCatchUpHeartbeatAt: sql`NOW()` })
-        .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
-        .execute();
+        .then((rows) => rows[0]);
+
+      if (
+        !inboxConfiguration?.lastWebhookReceivedAt ||
+        inboxConfiguration.lastWebhookReceivedAt < runResult.batchProcessingStartedAt
+      ) {
+        break;
+      }
     }
+
+    await this.db
+      .update(inboxConfigurations)
+      .set({ liveCatchUpState: finalStatus, liveCatchUpHeartbeatAt: sql`NOW()` })
+      .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
+      .execute();
   }
 
   private async acquireLock(
@@ -192,6 +193,46 @@ export class LiveCatchUpCommand {
     });
   }
 
+  private async runLiveCatchupWithLock({
+    watermark,
+    user,
+    subscriptionId,
+    filters,
+    liveCatchupOverlappingWindow,
+  }: {
+    watermark: Date;
+    filters: InboxConfigurationMailFilters;
+    user: { profileId: string; providerId: string; email: string };
+    subscriptionId: string;
+    liveCatchupOverlappingWindow: number;
+  }): Promise<{ status: 'success'; batchProcessingStartedAt: Date } | { status: 'failed' }> {
+    const logProps = Object.freeze({ userProfileId: user.profileId, subscriptionId });
+
+    try {
+      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(user.profileId));
+
+      const client = this.graphClientFactory.createClientForUser(user.profileId);
+
+      const { batchProcessingStartedAt } = await this.processMessages({
+        user: {
+          email: createSmeared(user.email),
+          profileId: user.profileId,
+          providerId: user.providerId,
+        },
+        liveCatchupOverlappingWindow,
+        client,
+        watermark,
+        filters,
+      });
+
+      this.logger.log({ ...logProps, msg: 'Live catch-up completed' });
+      return { status: 'success', batchProcessingStartedAt };
+    } catch (error) {
+      this.logger.error({ ...logProps, err: error, msg: 'Failed to execute live catch-up' });
+      return { status: 'failed' };
+    }
+  }
+
   private async processMessages({
     user,
     client,
@@ -208,7 +249,7 @@ export class LiveCatchUpCommand {
     client: Client;
     watermark: Date;
     filters: InboxConfigurationMailFilters;
-  }): Promise<Set<string>> {
+  }): Promise<{ batchProcessingStartedAt: Date }> {
     const processedIds = new Set<string>();
     let batchNumber = 0;
     const logContext = {
@@ -216,16 +257,20 @@ export class LiveCatchUpCommand {
       providerUserId: user.providerId,
       userEmail: user.email.toString(),
     };
+    // We clone it because we modify it.
+    const lastModifiedDateTime = new Date(watermark);
+    lastModifiedDateTime.setMinutes(
+      lastModifiedDateTime.getMinutes() - liveCatchupOverlappingWindow,
+    );
 
-    watermark.setMinutes(watermark.getMinutes() - liveCatchupOverlappingWindow);
-
+    const batchProcessingStartedAt = new Date();
     let emailsRaw = await client
       .api('me/messages')
       .header('Prefer', 'IdType="ImmutableId"')
       .select(GraphMessageFields)
       // We cannot combine a createdDateTime filter with orderby on lastModifiedDateTime on the
       // Microsoft side (InefficientFilter). The ignoredBefore check is applied in-memory below.
-      .filter(`lastModifiedDateTime ge ${watermark.toISOString()}`)
+      .filter(`lastModifiedDateTime ge ${lastModifiedDateTime.toISOString()}`)
       .orderby('lastModifiedDateTime asc')
       .top(200)
       .get();
@@ -300,7 +345,7 @@ export class LiveCatchUpCommand {
       batchCount: batchNumber,
     });
 
-    return processedIds;
+    return { batchProcessingStartedAt };
   }
 
   private async updateWatermarks({

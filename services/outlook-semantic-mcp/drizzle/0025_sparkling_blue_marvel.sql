@@ -1,0 +1,1 @@
+ALTER TABLE "inbox_configurations" ADD COLUMN "last_webhook_received_at" timestamp;
