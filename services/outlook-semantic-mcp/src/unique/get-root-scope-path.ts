@@ -1,4 +1,4 @@
-export const getRootScopePath = () => `/__Outlook`;
+export const getRootScopePath = () => `/__Outlook MCP`;
 
 export const getRootScopeExternalId = () => `/__Outlook MCP`;
 
