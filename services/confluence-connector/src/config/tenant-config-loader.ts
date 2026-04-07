@@ -36,12 +36,12 @@ export type TenantConfig = z.infer<typeof TenantConfigSchema>;
 export interface NamedTenantConfig {
   name: string;
   config: TenantConfig;
+  status: 'active' | 'deleted';
 }
 
 const logger = new Logger('TenantConfigLoader');
 
 let cachedConfigs: NamedTenantConfig[] | null = null;
-let cachedDeletedConfigs: NamedTenantConfig[] | null = null;
 
 export function getTenantConfigs(): NamedTenantConfig[] {
   if (cachedConfigs) {
@@ -50,18 +50,8 @@ export function getTenantConfigs(): NamedTenantConfig[] {
 
   const tenantConfigPathPattern = process.env.TENANT_CONFIG_PATH_PATTERN;
   assert.ok(tenantConfigPathPattern, 'TENANT_CONFIG_PATH_PATTERN environment variable is not set');
-  const { activeTenants, deletedTenants } = loadTenantConfigs(tenantConfigPathPattern);
-  cachedConfigs = activeTenants;
-  cachedDeletedConfigs = deletedTenants;
+  cachedConfigs = loadTenantConfigs(tenantConfigPathPattern);
   return cachedConfigs;
-}
-
-export function getDeletedTenantConfigs(): NamedTenantConfig[] {
-  if (cachedDeletedConfigs) {
-    return cachedDeletedConfigs;
-  }
-  getTenantConfigs();
-  return cachedDeletedConfigs ?? [];
 }
 
 function extractTenantName(filePath: string): string {
@@ -89,12 +79,7 @@ function validateTenantNames(entries: { name: string; path: string }[]): void {
   }
 }
 
-interface TenantConfigsByStatus {
-  activeTenants: NamedTenantConfig[];
-  deletedTenants: NamedTenantConfig[];
-}
-
-function loadTenantConfigs(pathPattern: string): TenantConfigsByStatus {
+function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
   const files = globSync(pathPattern);
   assert.ok(
     files.length > 0,
@@ -108,8 +93,7 @@ function loadTenantConfigs(pathPattern: string): TenantConfigsByStatus {
 
   validateTenantNames(entries);
 
-  const activeTenants: NamedTenantConfig[] = [];
-  const deletedTenants: NamedTenantConfig[] = [];
+  const tenants: NamedTenantConfig[] = [];
 
   for (const entry of entries) {
     try {
@@ -123,17 +107,12 @@ function loadTenantConfigs(pathPattern: string): TenantConfigsByStatus {
       const { status } = TenantStatusSchema.parse(rawConfig);
       const config = TenantConfigSchema.parse(rawConfig);
 
-      if (status === TenantStatus.Deleted) {
-        deletedTenants.push({ name: entry.name, config });
-        continue;
-      }
-
       if (status === TenantStatus.Inactive) {
         logger.log({ tenantName: entry.name, msg: `Tenant '${entry.name}' is inactive, skipping` });
         continue;
       }
 
-      activeTenants.push({ name: entry.name, config });
+      tenants.push({ name: entry.name, config, status });
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(
@@ -146,9 +125,9 @@ function loadTenantConfigs(pathPattern: string): TenantConfigsByStatus {
   }
 
   assert.ok(
-    activeTenants.length > 0,
-    'No active tenant configurations found. At least one tenant must have status "active".',
+    tenants.length > 0,
+    'No tenant configurations found. At least one tenant must have status "active" or "deleted".',
   );
 
-  return { activeTenants, deletedTenants };
+  return tenants;
 }

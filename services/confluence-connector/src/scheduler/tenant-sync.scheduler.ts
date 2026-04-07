@@ -17,7 +17,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   public onModuleInit(): void {
-    this.scheduleActiveTenantSyncs();
+    this.scheduleTenantJobs();
   }
 
   public onModuleDestroy(): void {
@@ -33,19 +33,19 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private scheduleActiveTenantSyncs(): void {
+  private scheduleTenantJobs(): void {
     if (this.isShuttingDown) {
-      this.logger.log({ msg: 'Shutdown in progress, skipping sync scheduling' });
+      this.logger.log({ msg: 'Shutdown in progress, skipping job scheduling' });
       return;
     }
 
     if (this.tenantRegistry.tenantCount === 0) {
-      this.logger.warn({ msg: 'No tenants registered — no sync jobs will be scheduled' });
+      this.logger.warn({ msg: 'No tenants registered — no jobs will be scheduled' });
       return;
     }
 
     for (const tenant of this.tenantRegistry.getAllTenants()) {
-      this.logger.log({ tenantName: tenant.name, msg: 'Triggering initial sync' });
+      this.logger.log({ tenantName: tenant.name, msg: 'Triggering initial job' });
       void this.syncTenant(tenant);
       this.registerCronJob(tenant);
     }
@@ -63,40 +63,42 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     this.tenantRegistry.run(tenant, () => {
       this.logger.log({
         tenantName: tenant.name,
-        msg: `Scheduled sync with cron: ${cronExpression}`,
+        msg: `Scheduled job with cron: ${cronExpression}`,
       });
     });
   }
 
-  private async processDeletedTenants(): Promise<void> {
-    for (const tenant of this.tenantRegistry.getDeletedTenants()) {
-      try {
-        await this.tenantRegistry.run(tenant, async () => {
-          const cleanupService = this.serviceRegistry.getService(TenantDeleteService);
-          await cleanupService.deleteTenantContent();
-        });
-      } catch (error) {
-        this.logger.error({ tenantName: tenant.name, err: error, msg: 'Tenant cleanup failed' });
-      }
-    }
-  }
-
   private async syncTenant(tenant: TenantContext): Promise<void> {
     if (this.isShuttingDown) {
-      this.logger.log({ msg: 'Skipping sync due to shutdown' });
+      this.logger.log({ msg: 'Skipping job due to shutdown' });
       return;
     }
 
-    await this.processDeletedTenants();
+    if (tenant.isScanning) {
+      this.logger.log({ tenantName: tenant.name, msg: 'Job already in progress, skipping' });
+      return;
+    }
 
-    await this.tenantRegistry.run(tenant, async () => {
-      const syncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
+    tenant.isScanning = true;
+    try {
+      await this.tenantRegistry.run(tenant, async () => {
+        if (tenant.status === 'deleted') {
+          const deleteService = this.serviceRegistry.getService(TenantDeleteService);
+          await deleteService.deleteTenantContent();
+          return;
+        }
 
-      try {
+        const syncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
         await syncService.synchronize();
-      } catch (error) {
-        this.logger.error({ err: error, msg: 'Unexpected sync error' });
-      }
-    });
+      });
+    } catch (error) {
+      this.logger.error({
+        tenantName: tenant.name,
+        err: error,
+        msg: 'Unexpected error in tenant job',
+      });
+    } finally {
+      tenant.isScanning = false;
+    }
   }
 }

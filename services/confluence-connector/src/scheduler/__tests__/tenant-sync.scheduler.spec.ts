@@ -31,6 +31,7 @@ function createMockSyncService() {
 function createMockTenant(name: string, overrides: Partial<TenantContext> = {}): TenantContext {
   return {
     name,
+    status: 'active',
     config: {
       processing: { scanIntervalCron: '*/5 * * * *' },
     },
@@ -52,13 +53,9 @@ function createMockDeleteService() {
   return { deleteTenantContent: vi.fn().mockResolvedValue(undefined) };
 }
 
-function createMockTenantRegistry(
-  tenants: TenantContext[],
-  deletedTenants: TenantContext[] = [],
-): TenantRegistry {
+function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
   return {
     getAllTenants: vi.fn().mockReturnValue(tenants),
-    getDeletedTenants: vi.fn().mockReturnValue(deletedTenants),
     tenantCount: tenants.length,
     run: vi
       .fn()
@@ -68,24 +65,22 @@ function createMockTenantRegistry(
   } as unknown as TenantRegistry;
 }
 
-function createMockServiceRegistry(
-  tenants: TenantContext[],
-  deletedTenants: TenantContext[] = [],
-): ServiceRegistry {
+function createMockServiceRegistry(tenants: TenantContext[]): ServiceRegistry {
   const serviceRegistry = new ServiceRegistry();
   for (const tenant of tenants) {
-    serviceRegistry.register(
-      tenant.name,
-      ConfluenceSynchronizationService,
-      createMockSyncService() as unknown as ConfluenceSynchronizationService,
-    );
-  }
-  for (const tenant of deletedTenants) {
-    serviceRegistry.register(
-      tenant.name,
-      TenantDeleteService,
-      createMockDeleteService() as unknown as TenantDeleteService,
-    );
+    if (tenant.status === 'deleted') {
+      serviceRegistry.register(
+        tenant.name,
+        TenantDeleteService,
+        createMockDeleteService() as unknown as TenantDeleteService,
+      );
+    } else {
+      serviceRegistry.register(
+        tenant.name,
+        ConfluenceSynchronizationService,
+        createMockSyncService() as unknown as ConfluenceSynchronizationService,
+      );
+    }
   }
   return serviceRegistry;
 }
@@ -126,7 +121,7 @@ describe('TenantSyncScheduler', () => {
       });
     });
 
-    it('triggers initial sync for each tenant', async () => {
+    it('triggers initial job for each tenant', async () => {
       scheduler.onModuleInit();
 
       await vi.waitFor(() => {
@@ -148,7 +143,7 @@ describe('TenantSyncScheduler', () => {
         expect(mockLogger.log).toHaveBeenCalledWith(
           expect.objectContaining({
             tenantName: 'tenant-a',
-            msg: 'Scheduled sync with cron: */5 * * * *',
+            msg: 'Scheduled job with cron: */5 * * * *',
           }),
         );
       });
@@ -168,6 +163,23 @@ describe('TenantSyncScheduler', () => {
       expect(emptyRegistry.getAllTenants).not.toHaveBeenCalled();
       expect(schedulerRegistry.addCronJob).not.toHaveBeenCalled();
     });
+
+    it('registers cron jobs for deleted tenants', async () => {
+      const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
+      tenantRegistry = createMockTenantRegistry([tenantA, deletedTenant]);
+      serviceRegistry = createMockServiceRegistry([tenantA, deletedTenant]);
+      scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
+
+      scheduler.onModuleInit();
+
+      await vi.waitFor(() => {
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(2);
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+          'sync:deleted-tenant',
+          expect.anything(),
+        );
+      });
+    });
   });
 
   describe('onModuleDestroy', () => {
@@ -185,65 +197,104 @@ describe('TenantSyncScheduler', () => {
   });
 
   describe('syncTenant', () => {
-    it('processes deleted tenants before syncing', async () => {
-      const deletedTenant = createMockTenant('deleted-tenant');
-      tenantRegistry = createMockTenantRegistry([tenantA, tenantB], [deletedTenant]);
-      serviceRegistry = createMockServiceRegistry([tenantA, tenantB], [deletedTenant]);
+    it('calls synchronize() for active tenants', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
+      await (scheduler as any).syncTenant(tenantA);
+
+      const syncService = tenantStorage.run(tenantA, () =>
+        serviceRegistry.getService(ConfluenceSynchronizationService),
+      );
+      expect(syncService.synchronize).toHaveBeenCalledOnce();
+    });
+
+    it('calls deleteTenantContent() for deleted tenants', async () => {
+      const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
+      tenantRegistry = createMockTenantRegistry([deletedTenant]);
+      serviceRegistry = createMockServiceRegistry([deletedTenant]);
       scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
-      await (scheduler as any).syncTenant(tenantA);
+      await (scheduler as any).syncTenant(deletedTenant);
 
       const deleteService = tenantStorage.run(deletedTenant, () =>
         serviceRegistry.getService(TenantDeleteService),
       );
       expect(deleteService.deleteTenantContent).toHaveBeenCalledOnce();
-      const syncService = tenantStorage.run(tenantA, () =>
-        serviceRegistry.getService(ConfluenceSynchronizationService),
-      );
-      expect(syncService.synchronize).toHaveBeenCalledOnce();
     });
 
-    it('still syncs when tenant cleanup fails', async () => {
-      const deletedTenant = createMockTenant('deleted-tenant');
-      tenantRegistry = createMockTenantRegistry([tenantA, tenantB], [deletedTenant]);
-      serviceRegistry = createMockServiceRegistry([tenantA, tenantB], [deletedTenant]);
+    it('catches and logs cleanup errors with tenant name', async () => {
+      const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
+      tenantRegistry = createMockTenantRegistry([deletedTenant]);
+      serviceRegistry = createMockServiceRegistry([deletedTenant]);
       scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
 
       const deleteService = tenantStorage.run(deletedTenant, () =>
         serviceRegistry.getService(TenantDeleteService),
       );
-      vi.mocked(deleteService.deleteTenantContent).mockRejectedValue(
-        new Error('cleanup exploded'),
+      vi.mocked(deleteService.deleteTenantContent).mockRejectedValue(new Error('cleanup exploded'));
+
+      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
+      await (scheduler as any).syncTenant(deletedTenant);
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantName: 'deleted-tenant',
+          err: expect.any(Error),
+          msg: 'Unexpected error in tenant job',
+        }),
       );
+    });
+
+    it('skips job when already in progress', async () => {
+      tenantA.isScanning = true;
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ msg: 'Tenant cleanup failed' }),
-      );
+      expect(mockLogger.log).toHaveBeenCalledWith({
+        tenantName: 'tenant-a',
+        msg: 'Job already in progress, skipping',
+      });
       const syncService = tenantStorage.run(tenantA, () =>
         serviceRegistry.getService(ConfluenceSynchronizationService),
       );
-      expect(syncService.synchronize).toHaveBeenCalledOnce();
+      expect(syncService.synchronize).not.toHaveBeenCalled();
+      tenantA.isScanning = false;
     });
 
-    it('skips sync when shutting down', async () => {
+    it('resets isScanning after successful job', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
+      await (scheduler as any).syncTenant(tenantA);
+
+      expect(tenantA.isScanning).toBe(false);
+    });
+
+    it('resets isScanning after failed job', async () => {
+      const syncService = tenantStorage.run(tenantA, () =>
+        serviceRegistry.getService(ConfluenceSynchronizationService),
+      );
+      vi.mocked(syncService.synchronize).mockRejectedValue(new Error('boom'));
+
+      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
+      await (scheduler as any).syncTenant(tenantA);
+
+      expect(tenantA.isScanning).toBe(false);
+    });
+
+    it('skips job when shutting down', async () => {
       scheduler.onModuleDestroy();
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Skipping sync due to shutdown' });
-      expect(tenantRegistry.getDeletedTenants).not.toHaveBeenCalled();
+      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Skipping job due to shutdown' });
       const syncService = tenantStorage.run(tenantA, () =>
         serviceRegistry.getService(ConfluenceSynchronizationService),
       );
       expect(syncService.synchronize).not.toHaveBeenCalled();
     });
 
-    it('logs unexpected errors from synchronize()', async () => {
+    it('catches and logs sync errors with tenant name', async () => {
       const syncService = tenantStorage.run(tenantA, () =>
         serviceRegistry.getService(ConfluenceSynchronizationService),
       );
@@ -253,7 +304,11 @@ describe('TenantSyncScheduler', () => {
       await (scheduler as any).syncTenant(tenantA);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.any(Error), msg: 'Unexpected sync error' }),
+        expect.objectContaining({
+          tenantName: 'tenant-a',
+          err: expect.any(Error),
+          msg: 'Unexpected error in tenant job',
+        }),
       );
     });
   });

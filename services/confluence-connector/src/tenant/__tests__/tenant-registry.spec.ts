@@ -3,7 +3,7 @@ import { createMock } from '@golevelup/ts-vitest';
 import { describe, expect, it, vi } from 'vitest';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../../auth/confluence-auth';
 import type { NamedTenantConfig, TenantConfig } from '../../config/tenant-config-loader';
-import { getDeletedTenantConfigs, getTenantConfigs } from '../../config/tenant-config-loader';
+import { getTenantConfigs } from '../../config/tenant-config-loader';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../../confluence-api';
 import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
 import type { ProxyService } from '../../proxy';
@@ -29,7 +29,6 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 
 vi.mock('../../config/tenant-config-loader', () => ({
   getTenantConfigs: vi.fn(),
-  getDeletedTenantConfigs: vi.fn().mockReturnValue([]),
 }));
 
 vi.mock('../../auth/confluence-auth/confluence-auth.factory');
@@ -92,16 +91,12 @@ function createMockUniqueApiClient() {
   };
 }
 
-function createRegistry(
-  configs: NamedTenantConfig[],
-  deletedTenants: NamedTenantConfig[] = [],
-): {
+function createRegistry(configs: NamedTenantConfig[]): {
   registry: TenantRegistry;
   serviceRegistry: ServiceRegistry;
   mockUniqueApiFactory: { create: ReturnType<typeof vi.fn> };
 } {
   vi.mocked(getTenantConfigs).mockReturnValue(configs);
-  vi.mocked(getDeletedTenantConfigs).mockReturnValue(deletedTenants);
 
   const mockFactory = new ConfluenceAuthFactory(mockProxyService);
   vi.mocked(mockFactory.createAuthStrategy).mockImplementation(() => createMockAuth());
@@ -133,8 +128,8 @@ describe('TenantRegistry', () => {
   describe('onModuleInit', () => {
     it('registers tenants from configs', () => {
       const configs: NamedTenantConfig[] = [
-        { name: 'tenant-a', config: createMockTenantConfig() },
-        { name: 'tenant-b', config: createMockTenantConfig() },
+        { name: 'tenant-a', config: createMockTenantConfig(), status: 'active' },
+        { name: 'tenant-b', config: createMockTenantConfig(), status: 'active' },
       ];
 
       const { registry } = createRegistry(configs);
@@ -143,20 +138,20 @@ describe('TenantRegistry', () => {
     });
 
     it('logs tenant registration', () => {
-      createRegistry([{ name: 'tenant-a', config: createMockTenantConfig() }]);
+      createRegistry([{ name: 'tenant-a', config: createMockTenantConfig(), status: 'active' }]);
 
       expect(mockLogger.log).toHaveBeenCalledWith(
         expect.objectContaining({ msg: 'Tenant registered' }),
       );
     });
 
-    it('calls ConfluenceAuthFactory.createAuthStrategy for each tenant', () => {
+    it('calls ConfluenceAuthFactory.createAuthStrategy for each active tenant', () => {
       const configA = createMockTenantConfig();
       const configB = createMockTenantConfig();
 
       vi.mocked(getTenantConfigs).mockReturnValue([
-        { name: 'tenant-a', config: configA },
-        { name: 'tenant-b', config: configB },
+        { name: 'tenant-a', config: configA, status: 'active' },
+        { name: 'tenant-b', config: configB, status: 'active' },
       ]);
 
       const mockFactory = new ConfluenceAuthFactory(mockProxyService);
@@ -190,8 +185,8 @@ describe('TenantRegistry', () => {
       const configB = createMockTenantConfig();
 
       const { mockUniqueApiFactory } = createRegistry([
-        { name: 'tenant-a', config: configA },
-        { name: 'tenant-b', config: configB },
+        { name: 'tenant-a', config: configA, status: 'active' },
+        { name: 'tenant-b', config: configB, status: 'active' },
       ]);
 
       expect(mockUniqueApiFactory.create).toHaveBeenCalledTimes(2);
@@ -212,13 +207,13 @@ describe('TenantRegistry', () => {
       );
     });
 
-    it('calls ConfluenceApiClientFactory.create for each tenant', () => {
+    it('calls ConfluenceApiClientFactory.create for each active tenant', () => {
       const configA = createMockTenantConfig();
       const configB = createMockTenantConfig();
 
       vi.mocked(getTenantConfigs).mockReturnValue([
-        { name: 'tenant-a', config: configA },
-        { name: 'tenant-b', config: configB },
+        { name: 'tenant-a', config: configA, status: 'active' },
+        { name: 'tenant-b', config: configB, status: 'active' },
       ]);
 
       const mockFactory = new ConfluenceAuthFactory(mockProxyService);
@@ -255,10 +250,10 @@ describe('TenantRegistry', () => {
       );
     });
 
-    it('registers ConfluenceAuth, UniqueApiClient, and ConfluenceApiClient in ServiceRegistry for each tenant', () => {
-      const configs: NamedTenantConfig[] = [{ name: 'tenant-a', config: createMockTenantConfig() }];
-
-      const { registry, serviceRegistry } = createRegistry(configs);
+    it('registers ConfluenceAuth, UniqueApiClient, and ConfluenceApiClient in ServiceRegistry for active tenants', () => {
+      const { registry, serviceRegistry } = createRegistry([
+        { name: 'tenant-a', config: createMockTenantConfig(), status: 'active' },
+      ]);
       const tenant = registry.getTenant('tenant-a');
 
       tenantStorage.run(tenant, () => {
@@ -267,14 +262,62 @@ describe('TenantRegistry', () => {
         expect(serviceRegistry.getService(ConfluenceApiClient)).toBeDefined();
       });
     });
+
+    it('registers deleted tenants with only UniqueApiClient and TenantDeleteService', () => {
+      const { registry, serviceRegistry, mockUniqueApiFactory } = createRegistry([
+        { name: 'active-tenant', config: createMockTenantConfig(), status: 'active' },
+        { name: 'deleted-tenant', config: createMockTenantConfig(), status: 'deleted' },
+      ]);
+
+      const deletedTenant = registry.getTenant('deleted-tenant');
+      tenantStorage.run(deletedTenant, () => {
+        expect(serviceRegistry.getService(UniqueApiClient)).toBeDefined();
+        expect(serviceRegistry.getService(TenantDeleteService)).toBeInstanceOf(TenantDeleteService);
+      });
+
+      expect(mockUniqueApiFactory.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('logs deleted tenant registration', () => {
+      createRegistry([
+        { name: 'active-tenant', config: createMockTenantConfig(), status: 'active' },
+        { name: 'deleted-tenant', config: createMockTenantConfig(), status: 'deleted' },
+      ]);
+
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantName: 'deleted-tenant',
+          msg: 'Deleted tenant registered for cleanup',
+        }),
+      );
+    });
+
+    it('includes deleted tenants in tenantCount', () => {
+      const { registry } = createRegistry([
+        { name: 'active-tenant', config: createMockTenantConfig(), status: 'active' },
+        { name: 'deleted-tenant', config: createMockTenantConfig(), status: 'deleted' },
+      ]);
+
+      expect(registry.tenantCount).toBe(2);
+    });
+
+    it('sets correct status on tenant contexts', () => {
+      const { registry } = createRegistry([
+        { name: 'active-tenant', config: createMockTenantConfig(), status: 'active' },
+        { name: 'deleted-tenant', config: createMockTenantConfig(), status: 'deleted' },
+      ]);
+
+      expect(registry.getTenant('active-tenant').status).toBe('active');
+      expect(registry.getTenant('deleted-tenant').status).toBe('deleted');
+    });
   });
 
   describe('getTenant', () => {
     it('returns the correct tenant by name', () => {
       const configA = createMockTenantConfig();
       const configs: NamedTenantConfig[] = [
-        { name: 'tenant-a', config: configA },
-        { name: 'tenant-b', config: createMockTenantConfig() },
+        { name: 'tenant-a', config: configA, status: 'active' },
+        { name: 'tenant-b', config: createMockTenantConfig(), status: 'active' },
       ];
 
       const { registry } = createRegistry(configs);
@@ -285,31 +328,35 @@ describe('TenantRegistry', () => {
       expect(tenant.isScanning).toBe(false);
     });
 
-    it('throws for unknown tenant', () => {
-      const { registry } = createRegistry([{ name: 'tenant-a', config: createMockTenantConfig() }]);
+    it('returns deleted tenants', () => {
+      const { registry } = createRegistry([
+        { name: 'active-tenant', config: createMockTenantConfig(), status: 'active' },
+        { name: 'deleted-tenant', config: createMockTenantConfig(), status: 'deleted' },
+      ]);
 
-      expect(() => registry.getTenant('unknown')).toThrow('Unknown tenant: unknown');
+      const tenant = registry.getTenant('deleted-tenant');
+
+      expect(tenant.name).toBe('deleted-tenant');
+      expect(tenant.status).toBe('deleted');
     });
 
-    it('throws for deleted tenant name', () => {
-      const { registry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: createMockTenantConfig() }],
-      );
+    it('throws for unknown tenant', () => {
+      const { registry } = createRegistry([
+        { name: 'tenant-a', config: createMockTenantConfig(), status: 'active' },
+      ]);
 
-      expect(() => registry.getTenant('deleted-tenant')).toThrow('Unknown tenant: deleted-tenant');
+      expect(() => registry.getTenant('unknown')).toThrow('Unknown tenant: unknown');
     });
   });
 
   describe('getAllTenants', () => {
-    it('returns all registered tenants', () => {
-      const configs: NamedTenantConfig[] = [
-        { name: 'tenant-a', config: createMockTenantConfig() },
-        { name: 'tenant-b', config: createMockTenantConfig() },
-        { name: 'tenant-c', config: createMockTenantConfig() },
-      ];
+    it('returns all registered tenants including deleted', () => {
+      const { registry } = createRegistry([
+        { name: 'tenant-a', config: createMockTenantConfig(), status: 'active' },
+        { name: 'tenant-b', config: createMockTenantConfig(), status: 'active' },
+        { name: 'tenant-c', config: createMockTenantConfig(), status: 'deleted' },
+      ]);
 
-      const { registry } = createRegistry(configs);
       const all = registry.getAllTenants();
 
       expect(all).toHaveLength(3);
@@ -319,12 +366,10 @@ describe('TenantRegistry', () => {
 
   describe('tenantCount', () => {
     it('returns the number of registered tenants', () => {
-      const configs: NamedTenantConfig[] = [
-        { name: 'tenant-a', config: createMockTenantConfig() },
-        { name: 'tenant-b', config: createMockTenantConfig() },
-      ];
-
-      const { registry } = createRegistry(configs);
+      const { registry } = createRegistry([
+        { name: 'tenant-a', config: createMockTenantConfig(), status: 'active' },
+        { name: 'tenant-b', config: createMockTenantConfig(), status: 'active' },
+      ]);
 
       expect(registry.tenantCount).toBe(2);
     });
@@ -332,7 +377,9 @@ describe('TenantRegistry', () => {
 
   describe('run', () => {
     it('sets AsyncLocalStorage context for the duration of the callback', () => {
-      const { registry } = createRegistry([{ name: 'acme', config: createMockTenantConfig() }]);
+      const { registry } = createRegistry([
+        { name: 'acme', config: createMockTenantConfig(), status: 'active' },
+      ]);
       const tenant = registry.getTenant('acme');
 
       let captured: string | undefined;
@@ -341,86 +388,6 @@ describe('TenantRegistry', () => {
       });
 
       expect(captured).toBe('acme');
-    });
-  });
-
-  describe('onModuleInit with deleted tenants', () => {
-    it('registers deleted tenants with only UniqueApiClient', () => {
-      const deletedConfig = createMockTenantConfig();
-      const { serviceRegistry, mockUniqueApiFactory } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: deletedConfig }],
-      );
-
-      const deletedTenant = {
-        name: 'deleted-tenant',
-        config: deletedConfig,
-        isScanning: false,
-      };
-      tenantStorage.run(deletedTenant, () => {
-        expect(serviceRegistry.getService(UniqueApiClient)).toBeDefined();
-      });
-
-      expect(mockUniqueApiFactory.create).toHaveBeenCalledTimes(2);
-    });
-
-    it('logs deleted tenant registration', () => {
-      createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: createMockTenantConfig() }],
-      );
-
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'deleted-tenant',
-          msg: 'Deleted tenant registered for cleanup',
-        }),
-      );
-    });
-
-    it('does not include deleted tenants in tenantCount', () => {
-      const { registry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: createMockTenantConfig() }],
-      );
-
-      expect(registry.tenantCount).toBe(1);
-    });
-  });
-
-  describe('getDeletedTenants', () => {
-    it('returns empty array when no deleted tenants exist', () => {
-      const { registry } = createRegistry([
-        { name: 'active-tenant', config: createMockTenantConfig() },
-      ]);
-
-      expect(registry.getDeletedTenants()).toEqual([]);
-    });
-
-    it('returns deleted tenant contexts', () => {
-      const { registry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: createMockTenantConfig() }],
-      );
-
-      const deleted = registry.getDeletedTenants();
-      expect(deleted).toHaveLength(1);
-      expect(deleted[0]?.name).toBe('deleted-tenant');
-    });
-
-    it('registers TenantDeleteService for deleted tenants', () => {
-      const deletedConfig = createMockTenantConfig();
-      const { serviceRegistry } = createRegistry(
-        [{ name: 'active-tenant', config: createMockTenantConfig() }],
-        [{ name: 'deleted-tenant', config: deletedConfig }],
-      );
-
-      const deletedTenant = { name: 'deleted-tenant', config: deletedConfig, isScanning: false };
-      const cleanupService = tenantStorage.run(deletedTenant, () =>
-        serviceRegistry.getService(TenantDeleteService),
-      );
-
-      expect(cleanupService).toBeInstanceOf(TenantDeleteService);
     });
   });
 });

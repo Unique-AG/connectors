@@ -11,7 +11,6 @@ export {
   type TlsProxyConfig,
 } from './proxy.config';
 export {
-  getDeletedTenantConfigs,
   getTenantConfigs,
   type NamedTenantConfig,
   type TenantConfig,

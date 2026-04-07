@@ -8,6 +8,7 @@ import { PatAuthStrategy } from '../pat-auth.strategy';
 const mockTenant: TenantContext = {
   name: 'test-tenant',
   config: {} as TenantContext['config'],
+  status: 'active',
   isScanning: false,
 };
 

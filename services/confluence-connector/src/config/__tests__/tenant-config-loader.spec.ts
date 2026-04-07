@@ -264,7 +264,7 @@ describe('tenant-config-loader', () => {
   });
 
   describe('tenant status', () => {
-    it('includes active tenants in results', async () => {
+    it('includes active tenants with status "active"', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupSingleConfig(globSync, readFileSync, makeCloudOauth2loConfig({ status: 'active' }));
@@ -273,6 +273,7 @@ describe('tenant-config-loader', () => {
 
       expect(result).toHaveLength(1);
       expect(assertFirstElement(result).name).toBe('acme');
+      expect(assertFirstElement(result).status).toBe('active');
     });
 
     it('defaults to active when status is omitted', async () => {
@@ -283,6 +284,7 @@ describe('tenant-config-loader', () => {
       const result = getTenantConfigs();
 
       expect(result).toHaveLength(1);
+      expect(assertFirstElement(result).status).toBe('active');
     });
 
     it('excludes inactive tenants from results but validates config', async () => {
@@ -303,6 +305,7 @@ describe('tenant-config-loader', () => {
 
       expect(result).toHaveLength(1);
       expect(assertFirstElement(result).name).toBe('alpha');
+      expect(assertFirstElement(result).status).toBe('active');
     });
 
     it('fails validation for inactive tenant with invalid config', async () => {
@@ -318,7 +321,7 @@ describe('tenant-config-loader', () => {
       expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
     });
 
-    it('excludes deleted tenants from active configs', async () => {
+    it('includes deleted tenants with status "deleted"', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupFsMocks(globSync, readFileSync, [
@@ -331,8 +334,11 @@ describe('tenant-config-loader', () => {
 
       const result = getTenantConfigs();
 
-      expect(result).toHaveLength(1);
-      expect(assertFirstElement(result).name).toBe('active');
+      expect(result).toHaveLength(2);
+      expect(result[0]?.name).toBe('active');
+      expect(result[0]?.status).toBe('active');
+      expect(result[1]?.name).toBe('removed');
+      expect(result[1]?.status).toBe('deleted');
     });
 
     it('validates config for deleted tenants', async () => {
@@ -347,7 +353,23 @@ describe('tenant-config-loader', () => {
       expect(() => getTenantConfigs()).toThrow(/Failed to load or validate tenant config/);
     });
 
-    it('throws when all tenants are inactive or deleted', async () => {
+    it('allows only deleted tenants without any active tenants', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        {
+          path: '/config/removed-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'deleted' }),
+        },
+      ]);
+
+      const result = getTenantConfigs();
+
+      expect(result).toHaveLength(1);
+      expect(assertFirstElement(result).status).toBe('deleted');
+    });
+
+    it('throws when all tenants are inactive', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
       const { globSync, readFileSync, getTenantConfigs } = await loadModule();
       setupFsMocks(globSync, readFileSync, [
@@ -357,12 +379,12 @@ describe('tenant-config-loader', () => {
         },
         {
           path: '/config/beta-tenant-config.yaml',
-          config: makeCloudOauth2loConfig({ status: 'deleted' }),
+          config: makeCloudOauth2loConfig({ status: 'inactive' }),
         },
       ]);
 
       expect(() => getTenantConfigs()).toThrow(
-        'No active tenant configurations found. At least one tenant must have status "active".',
+        'No tenant configurations found. At least one tenant must have status "active" or "deleted".',
       );
     });
   });
@@ -659,73 +681,6 @@ describe('tenant-config-loader', () => {
       expect(firstCall).toBe(secondCall);
       expect(globSync).toHaveBeenCalledTimes(1);
       expect(readFileSync).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('getDeletedTenantConfigs', () => {
-    it('returns parsed configs for deleted tenants', async () => {
-      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
-      const { globSync, readFileSync, getDeletedTenantConfigs } = await loadModule();
-      setupFsMocks(globSync, readFileSync, [
-        { path: '/config/active-tenant-config.yaml', config: makeCloudOauth2loConfig() },
-        {
-          path: '/config/removed-tenant-config.yaml',
-          config: makeCloudOauth2loConfig({ status: 'deleted' }),
-        },
-      ]);
-
-      const result = getDeletedTenantConfigs();
-
-      expect(result).toHaveLength(1);
-      expect(assertFirstElement(result).name).toBe('removed');
-      expect(assertFirstElement(result).config.confluence.instanceType).toBe('cloud');
-    });
-
-    it('returns empty array when no deleted tenants exist', async () => {
-      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
-      const { globSync, readFileSync, getDeletedTenantConfigs } = await loadModule();
-      setupSingleConfig(globSync, readFileSync, makeCloudOauth2loConfig());
-
-      const result = getDeletedTenantConfigs();
-
-      expect(result).toHaveLength(0);
-    });
-
-    it('populates cache via getTenantConfigs on first call', async () => {
-      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
-      const { globSync, readFileSync, getDeletedTenantConfigs } = await loadModule();
-      setupFsMocks(globSync, readFileSync, [
-        { path: '/config/active-tenant-config.yaml', config: makeCloudOauth2loConfig() },
-        {
-          path: '/config/removed-tenant-config.yaml',
-          config: makeCloudOauth2loConfig({ status: 'deleted' }),
-        },
-      ]);
-
-      const firstCall = getDeletedTenantConfigs();
-      const secondCall = getDeletedTenantConfigs();
-
-      expect(firstCall).toBe(secondCall);
-      expect(globSync).toHaveBeenCalledTimes(1);
-    });
-
-    it('shares cache with getTenantConfigs', async () => {
-      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
-      const { globSync, readFileSync, getTenantConfigs, getDeletedTenantConfigs } =
-        await loadModule();
-      setupFsMocks(globSync, readFileSync, [
-        { path: '/config/active-tenant-config.yaml', config: makeCloudOauth2loConfig() },
-        {
-          path: '/config/removed-tenant-config.yaml',
-          config: makeCloudOauth2loConfig({ status: 'deleted' }),
-        },
-      ]);
-
-      getTenantConfigs();
-      const deleted = getDeletedTenantConfigs();
-
-      expect(deleted).toHaveLength(1);
-      expect(globSync).toHaveBeenCalledTimes(1);
     });
   });
 });
