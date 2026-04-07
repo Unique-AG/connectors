@@ -132,7 +132,6 @@ export class LiveCatchUpCommand {
       if (shouldStopNextRound) {
         return;
       }
-      console.log(`___SECOND_ROUND_RUNNING`);
     }
   }
 
