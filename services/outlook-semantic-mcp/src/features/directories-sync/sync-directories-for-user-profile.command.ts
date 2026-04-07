@@ -75,9 +75,8 @@ export class SyncDirectoriesForUserProfileCommand {
     const systemDirectoriesCount = totalSystemDirectories.at(0)?.count ?? 0;
     traceAttrs({ existingDirectoryCount: systemDirectoriesCount });
 
-    // We only sync the system directories if we detect a difference between the number of directories in database
-    // and what we have in ms graph.
-    if (systemDirectoriesCount !== systemDirectories.length) {
+    // We only sync the system directories if we detect an insertion error durring previous sync.
+    if (systemDirectoriesCount === 0) {
       traceEvent('syncing system directories');
       this.logger.log({
         userProfileId: userProfile.id,
