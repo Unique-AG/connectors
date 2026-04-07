@@ -22,7 +22,7 @@
     "@nestjs/schedule": "6.1.0",
     "@nestjs/throttler": "6.4.0",
     "bcrypt": "6.0.0",
-    "jsonwebtoken": "9.0.2",
+    "jsonwebtoken": "9.0.3",
     "nestjs-zod": "5.0.1",
     "reflect-metadata": "0.2.2",
     "serialize-error-cjs": "0.2.0",
