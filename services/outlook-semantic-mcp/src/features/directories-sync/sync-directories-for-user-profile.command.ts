@@ -75,7 +75,11 @@ export class SyncDirectoriesForUserProfileCommand {
     const systemDirectoriesCount = totalSystemDirectories.at(0)?.count ?? 0;
     traceAttrs({ existingDirectoryCount: systemDirectoriesCount });
 
-    // We only sync the system directories if we detect an insertion error durring previous sync.
+    // If no system directory is present we syncronise them. We check using length instead of using
+    // systemDirectoriesCount === systemDirectories.length because:
+    // 1. Microsoft deprecated a few years ago a system directory and made it optional for new Outlook users
+    // 2. When we create the system directories we insert them in bulk in one transaction which means we eighter
+    // have all of them or we have no system directory created.
     if (systemDirectoriesCount === 0) {
       traceEvent('syncing system directories');
       this.logger.log({
