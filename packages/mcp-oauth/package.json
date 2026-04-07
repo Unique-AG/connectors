@@ -30,9 +30,9 @@
     "zod": "4.1.5"
   },
   "devDependencies": {
-    "@nestjs/common": "11.1.6",
-    "@nestjs/core": "11.1.6",
-    "@nestjs/testing": "11.1.6",
+    "@nestjs/common": "11.1.18",
+    "@nestjs/core": "11.1.18",
+    "@nestjs/testing": "11.1.18",
     "@suites/di.nestjs": "3.0.1",
     "@suites/doubles.vitest": "3.0.1",
     "@suites/unit": "3.0.1",
