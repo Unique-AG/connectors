@@ -133,7 +133,7 @@ export class LiveCatchUpCommand {
       shouldStopNextRound =
         !inboxConfiguration ||
         !inboxConfiguration.lastWebhookReceivedAt ||
-        inboxConfiguration.lastWebhookReceivedAt < runResult.lastBatchQueriedAt;
+        inboxConfiguration.lastWebhookReceivedAt < runResult.batchProcessingStartedAt;
     }
 
     await this.db
@@ -205,7 +205,7 @@ export class LiveCatchUpCommand {
     user: { profileId: string; providerId: string; email: string };
     subscriptionId: string;
     liveCatchupOverlappingWindow: number;
-  }): Promise<{ status: 'success'; lastBatchQueriedAt: Date } | { status: 'failed' }> {
+  }): Promise<{ status: 'success'; batchProcessingStartedAt: Date } | { status: 'failed' }> {
     const logProps = Object.freeze({ userProfileId: user.profileId, subscriptionId });
 
     try {
@@ -213,7 +213,7 @@ export class LiveCatchUpCommand {
 
       const client = this.graphClientFactory.createClientForUser(user.profileId);
 
-      const { lastBatchQueriedAt } = await this.processMessages({
+      const { batchProcessingStartedAt } = await this.processMessages({
         user: {
           email: createSmeared(user.email),
           profileId: user.profileId,
@@ -226,7 +226,7 @@ export class LiveCatchUpCommand {
       });
 
       this.logger.log({ ...logProps, msg: 'Live catch-up completed' });
-      return { status: 'success', lastBatchQueriedAt };
+      return { status: 'success', batchProcessingStartedAt };
     } catch (error) {
       this.logger.error({ ...logProps, err: error, msg: 'Failed to execute live catch-up' });
       return { status: 'failed' };
@@ -249,7 +249,7 @@ export class LiveCatchUpCommand {
     client: Client;
     watermark: Date;
     filters: InboxConfigurationMailFilters;
-  }): Promise<{ lastBatchQueriedAt: Date }> {
+  }): Promise<{ batchProcessingStartedAt: Date }> {
     const processedIds = new Set<string>();
     let batchNumber = 0;
     const logContext = {
@@ -263,7 +263,7 @@ export class LiveCatchUpCommand {
       lastModifiedDateTime.getMinutes() - liveCatchupOverlappingWindow,
     );
 
-    let lastBatchQueriedAt = new Date();
+    const batchProcessingStartedAt = new Date();
     let emailsRaw = await client
       .api('me/messages')
       .header('Prefer', 'IdType="ImmutableId"')
@@ -333,7 +333,6 @@ export class LiveCatchUpCommand {
         break;
       }
 
-      lastBatchQueriedAt = new Date();
       emailsRaw = await client
         .api(emailResponse['@odata.nextLink'])
         .header('Prefer', 'IdType="ImmutableId"')
@@ -346,7 +345,7 @@ export class LiveCatchUpCommand {
       batchCount: batchNumber,
     });
 
-    return { lastBatchQueriedAt };
+    return { batchProcessingStartedAt };
   }
 
   private async updateWatermarks({
