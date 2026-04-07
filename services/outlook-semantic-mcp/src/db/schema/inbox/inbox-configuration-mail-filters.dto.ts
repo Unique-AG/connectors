@@ -38,7 +38,7 @@ export type InboxConfigurationMailFilters = z.infer<typeof inboxConfigurationMai
 export function computeIgnoredBefore(days: number): Date {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  date.setHours(0, 0, 0, 0);
+  date.setUTCHours(0, 0, 0, 0);
   return date;
 }
 
