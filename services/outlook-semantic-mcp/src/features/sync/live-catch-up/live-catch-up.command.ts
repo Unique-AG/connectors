@@ -103,7 +103,7 @@ export class LiveCatchUpCommand {
       const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
 
       const runResult = await this.runLiveCatchupWithLock({
-        watermark: new Date(lockResult.watermark),
+        watermark: lockResult.watermark,
         filters: lockResult.filters,
         user: {
           email: userProfile.userEmail,
@@ -259,8 +259,11 @@ export class LiveCatchUpCommand {
       providerUserId: user.providerId,
       userEmail: user.email.toString(),
     };
-
-    watermark.setMinutes(watermark.getMinutes() - liveCatchupOverlappingWindow);
+    // We clone it because we modify it.
+    const lastModifiedDateTime = new Date(watermark);
+    lastModifiedDateTime.setMinutes(
+      lastModifiedDateTime.getMinutes() - liveCatchupOverlappingWindow,
+    );
 
     let lastBatchQueriedAt = new Date();
     let emailsRaw = await client
@@ -269,7 +272,7 @@ export class LiveCatchUpCommand {
       .select(GraphMessageFields)
       // We cannot combine a createdDateTime filter with orderby on lastModifiedDateTime on the
       // Microsoft side (InefficientFilter). The ignoredBefore check is applied in-memory below.
-      .filter(`lastModifiedDateTime ge ${watermark.toISOString()}`)
+      .filter(`lastModifiedDateTime ge ${lastModifiedDateTime.toISOString()}`)
       .orderby('lastModifiedDateTime asc')
       .top(200)
       .get();
