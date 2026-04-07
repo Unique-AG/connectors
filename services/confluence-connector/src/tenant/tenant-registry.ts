@@ -44,8 +44,7 @@ export class TenantRegistry implements OnModuleInit {
       tenantStorage.run(tenant, () => {
         const uniqueClient = this.createUniqueApiClient(tenantName, config.unique);
         this.serviceRegistry.register(tenantName, UniqueApiClient, uniqueClient);
-
-        // right now we do not really need to instantiate all the services for deleted tenants.
+        
         // we instantiate only the minimum required services for these tenants
         if (status === 'deleted') {
           this.registerDeletedTenantServices(tenantName, config, uniqueClient);
