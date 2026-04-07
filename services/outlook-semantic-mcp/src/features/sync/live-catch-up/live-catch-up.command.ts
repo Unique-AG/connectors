@@ -97,10 +97,9 @@ export class LiveCatchUpCommand {
     }
 
     let finalStatus: 'ready' | 'failed' = 'ready';
-    let shouldStopNextRound = false;
 
     // We run maximum 3 rounds to avoid an infinite loop here.
-    for (let round = 0; round < 3 && !shouldStopNextRound; round++) {
+    for (let round = 0; round < 3; round++) {
       finalStatus = 'ready';
       // If we got webhooks while we were running we will run once more but with a smaller overlapping window
       // because we have some fresh data which appeared while we were running.
@@ -119,9 +118,8 @@ export class LiveCatchUpCommand {
       });
 
       if (runResult.status === 'failed') {
-        shouldStopNextRound = true;
         finalStatus = 'failed';
-        continue;
+        break;
       }
 
       const inboxConfiguration = await this.db
@@ -130,10 +128,12 @@ export class LiveCatchUpCommand {
         .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
         .then((rows) => rows[0]);
 
-      shouldStopNextRound =
-        !inboxConfiguration ||
-        !inboxConfiguration.lastWebhookReceivedAt ||
-        inboxConfiguration.lastWebhookReceivedAt < runResult.batchProcessingStartedAt;
+      if (
+        !inboxConfiguration?.lastWebhookReceivedAt ||
+        inboxConfiguration.lastWebhookReceivedAt < runResult.batchProcessingStartedAt
+      ) {
+        break;
+      }
     }
 
     await this.db
