@@ -6,7 +6,14 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes, Counter } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
 import { MetricService, Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions, userProfiles } from '~/db';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  inboxConfigurations,
+  subscriptions,
+  UserProfile,
+  userProfiles,
+} from '~/db';
 import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
@@ -96,49 +103,37 @@ export class LiveCatchUpCommand {
       return;
     }
 
-    const { watermark, filters } = lockResult;
-
-    try {
-      await this.syncDirectoriesCommand.run(
-        convertUserProfileIdToTypeId(userProfile.userProfileId),
-      );
-
-      const client = this.graphClientFactory.createClientForUser(userProfile.userProfileId);
-
-      await this.processMessages({
+    for (let round = 0; round < 3; round++) {
+      const runResult = await this.runLiveCatchupWithLock({
+        watermark: lockResult.watermark,
+        filters: lockResult.filters,
         user: {
-          email: createSmeared(userProfile.userEmail),
+          email: userProfile.userEmail,
           profileId: userProfile.userProfileId,
           providerId: userProfile.providerUserId,
         },
+        subscriptionId,
         liveCatchupOverlappingWindow,
-        client,
-        watermark,
-        filters,
       });
 
-      this.logger.log({
-        userProfileId: userProfile.userProfileId,
-        subscriptionId,
-        msg: 'Live catch-up completed',
-      });
-      await this.db
-        .update(inboxConfigurations)
-        .set({ liveCatchUpState: 'ready', liveCatchUpHeartbeatAt: sql`NOW()` })
+      if (runResult.status === 'failed') {
+        return;
+      }
+
+      const inboxConfiguration = await this.db
+        .select({ lastWebhookReceivedAt: inboxConfigurations.lastWebhookReceivedAt })
+        .from(inboxConfigurations)
         .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
-        .execute();
-    } catch (error) {
-      this.logger.error({
-        err: error,
-        msg: 'Failed to execute live catch-up',
-        userProfileId: userProfile.userProfileId,
-        subscriptionId,
-      });
-      await this.db
-        .update(inboxConfigurations)
-        .set({ liveCatchUpState: 'failed', liveCatchUpHeartbeatAt: sql`NOW()` })
-        .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
-        .execute();
+        .then((rows) => rows[0]);
+
+      const shouldStopNextRound =
+        !inboxConfiguration ||
+        !inboxConfiguration.lastWebhookReceivedAt ||
+        inboxConfiguration.lastWebhookReceivedAt < runResult.lastBatchQueriedAt;
+
+      if (shouldStopNextRound) {
+        return;
+      }
     }
   }
 
@@ -192,6 +187,56 @@ export class LiveCatchUpCommand {
     });
   }
 
+  private async runLiveCatchupWithLock({
+    watermark,
+    user,
+    subscriptionId,
+    filters,
+    liveCatchupOverlappingWindow,
+  }: {
+    watermark: Date;
+    filters: InboxConfigurationMailFilters;
+    user: { profileId: string; providerId: string; email: string };
+    subscriptionId: string;
+    liveCatchupOverlappingWindow: number;
+  }): Promise<{ status: 'success'; lastBatchQueriedAt: Date } | { status: 'failed' }> {
+    const logProps = Object.freeze({ userProfileId: user.profileId, subscriptionId });
+
+    try {
+      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(user.profileId));
+
+      const client = this.graphClientFactory.createClientForUser(user.profileId);
+
+      const { lastBatchQueriedAt } = await this.processMessages({
+        user: {
+          email: createSmeared(user.email),
+          profileId: user.profileId,
+          providerId: user.providerId,
+        },
+        liveCatchupOverlappingWindow,
+        client,
+        watermark,
+        filters,
+      });
+
+      this.logger.log({ ...logProps, msg: 'Live catch-up completed' });
+      await this.db
+        .update(inboxConfigurations)
+        .set({ liveCatchUpState: 'ready', liveCatchUpHeartbeatAt: sql`NOW()` })
+        .where(eq(inboxConfigurations.userProfileId, user.profileId))
+        .execute();
+      return { status: 'success', lastBatchQueriedAt };
+    } catch (error) {
+      this.logger.error({ ...logProps, err: error, msg: 'Failed to execute live catch-up' });
+      await this.db
+        .update(inboxConfigurations)
+        .set({ liveCatchUpState: 'failed', liveCatchUpHeartbeatAt: sql`NOW()` })
+        .where(eq(inboxConfigurations.userProfileId, user.profileId))
+        .execute();
+      return { status: 'failed' };
+    }
+  }
+
   private async processMessages({
     user,
     client,
@@ -208,7 +253,7 @@ export class LiveCatchUpCommand {
     client: Client;
     watermark: Date;
     filters: InboxConfigurationMailFilters;
-  }): Promise<Set<string>> {
+  }): Promise<{ lastBatchQueriedAt: Date }> {
     const processedIds = new Set<string>();
     let batchNumber = 0;
     const logContext = {
@@ -219,6 +264,7 @@ export class LiveCatchUpCommand {
 
     watermark.setMinutes(watermark.getMinutes() - liveCatchupOverlappingWindow);
 
+    let lastBatchQueriedAt = new Date();
     let emailsRaw = await client
       .api('me/messages')
       .header('Prefer', 'IdType="ImmutableId"')
@@ -288,6 +334,7 @@ export class LiveCatchUpCommand {
         break;
       }
 
+      lastBatchQueriedAt = new Date();
       emailsRaw = await client
         .api(emailResponse['@odata.nextLink'])
         .header('Prefer', 'IdType="ImmutableId"')
@@ -300,7 +347,7 @@ export class LiveCatchUpCommand {
       batchCount: batchNumber,
     });
 
-    return processedIds;
+    return { lastBatchQueriedAt };
   }
 
   private async updateWatermarks({

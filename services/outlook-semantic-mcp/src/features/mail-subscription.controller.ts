@@ -140,6 +140,8 @@ export class MailSubscriptionController {
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(ValidationCallInterceptor)
   public async notification(@Body() event: ChangeNotificationCollectionDto) {
+    const notificationReceivedAt = new Date();
+
     this.logger.log({
       msg: 'Received change notification webhook from Microsoft Graph',
       notificationCount: event.value.length,
@@ -188,9 +190,15 @@ export class MailSubscriptionController {
       unique(subscriptionIds).map((subscriptionId) => {
         const payload = LiveCatchUpEventDto.parse({
           type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
-          payload: { subscriptionId },
+          payload: {
+            subscriptionId,
+            notificationReceivedAt,
+          },
         });
-        this.logger.log({ msg: 'Publishing live catch-up event', subscriptionId });
+        this.logger.log({
+          msg: 'Publishing live catch-up event',
+          subscriptionId,
+        });
         return this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload);
       }),
     );
