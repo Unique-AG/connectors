@@ -96,8 +96,12 @@ export class LiveCatchUpCommand {
       return;
     }
 
+    let finalStatus: 'ready' | 'failed' = 'ready';
+    let shouldStopNextRound = false;
+
     // We run maximum 3 rounds to avoid an infinite loop here.
-    for (let round = 0; round < 3; round++) {
+    for (let round = 0; round < 3 && !shouldStopNextRound; round++) {
+      finalStatus = 'ready';
       // If we got webhooks while we were running we will run once more but with a smaller overlapping window
       // because we have some fresh data which appeared while we were running.
       const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
@@ -115,7 +119,9 @@ export class LiveCatchUpCommand {
       });
 
       if (runResult.status === 'failed') {
-        return;
+        shouldStopNextRound = true;
+        finalStatus = 'failed';
+        continue;
       }
 
       const inboxConfiguration = await this.db
@@ -124,15 +130,17 @@ export class LiveCatchUpCommand {
         .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
         .then((rows) => rows[0]);
 
-      const shouldStopNextRound =
+      shouldStopNextRound =
         !inboxConfiguration ||
         !inboxConfiguration.lastWebhookReceivedAt ||
         inboxConfiguration.lastWebhookReceivedAt < runResult.lastBatchQueriedAt;
-
-      if (shouldStopNextRound) {
-        return;
-      }
     }
+
+    await this.db
+      .update(inboxConfigurations)
+      .set({ liveCatchUpState: finalStatus, liveCatchUpHeartbeatAt: sql`NOW()` })
+      .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
+      .execute();
   }
 
   private async acquireLock(
@@ -218,19 +226,9 @@ export class LiveCatchUpCommand {
       });
 
       this.logger.log({ ...logProps, msg: 'Live catch-up completed' });
-      await this.db
-        .update(inboxConfigurations)
-        .set({ liveCatchUpState: 'ready', liveCatchUpHeartbeatAt: sql`NOW()` })
-        .where(eq(inboxConfigurations.userProfileId, user.profileId))
-        .execute();
       return { status: 'success', lastBatchQueriedAt };
     } catch (error) {
       this.logger.error({ ...logProps, err: error, msg: 'Failed to execute live catch-up' });
-      await this.db
-        .update(inboxConfigurations)
-        .set({ liveCatchUpState: 'failed', liveCatchUpHeartbeatAt: sql`NOW()` })
-        .where(eq(inboxConfigurations.userProfileId, user.profileId))
-        .execute();
       return { status: 'failed' };
     }
   }
