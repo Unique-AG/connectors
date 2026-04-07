@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
+import type { TenantContext } from '../tenant-context.interface';
+import { tenantStorage } from '../tenant-context.storage';
 import { TenantDeleteService } from '../tenant-delete.service';
 
 const mockLogger = vi.hoisted(() => ({
@@ -31,8 +33,21 @@ function createMockUniqueApiClient() {
   };
 }
 
+function createTenant(): TenantContext {
+  return {
+    name: 'my-tenant',
+    config: {} as TenantContext['config'],
+    status: 'deleted',
+    isScanning: false,
+  };
+}
+
 function createService(client: ReturnType<typeof createMockUniqueApiClient>) {
   return new TenantDeleteService('my-tenant', 'scope-1', client as never, createNoopMetrics());
+}
+
+function runInTenantContext(tenant: TenantContext, fn: () => Promise<void>): Promise<void> {
+  return tenantStorage.run(tenant, fn);
 }
 
 describe('TenantDeleteService', () => {
@@ -40,7 +55,7 @@ describe('TenantDeleteService', () => {
     const client = createMockUniqueApiClient();
     client.scopes.getById.mockResolvedValue(null);
 
-    await createService(client).deleteTenantContent();
+    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
 
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -56,7 +71,7 @@ describe('TenantDeleteService', () => {
     client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
     client.scopes.listChildren.mockResolvedValue([]);
 
-    await createService(client).deleteTenantContent();
+    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
 
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({ tenantName: 'my-tenant', msg: 'Already cleaned up, skipping' }),
@@ -82,7 +97,7 @@ describe('TenantDeleteService', () => {
       failedFolders: [],
     });
 
-    await createService(client).deleteTenantContent();
+    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
 
     expect(client.files.getContentIdsByScope).toHaveBeenCalledWith('child-1');
     expect(client.files.getContentIdsByScope).toHaveBeenCalledWith('child-2');
@@ -104,7 +119,7 @@ describe('TenantDeleteService', () => {
       failedFolders: [],
     });
 
-    await createService(client).deleteTenantContent();
+    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
 
     expect(client.files.deleteByIds).not.toHaveBeenCalled();
     expect(client.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
@@ -130,7 +145,7 @@ describe('TenantDeleteService', () => {
       failedFolders: [],
     });
 
-    await createService(client).deleteTenantContent();
+    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
 
     expect(client.files.getContentIdsByScope).toHaveBeenCalledTimes(3);
     expect(client.files.deleteByIds).toHaveBeenCalledTimes(2);
@@ -150,7 +165,7 @@ describe('TenantDeleteService', () => {
       failedFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
     });
 
-    await createService(client).deleteTenantContent();
+    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
 
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -179,7 +194,7 @@ describe('TenantDeleteService', () => {
       failedFolders: [],
     });
 
-    await createService(client).deleteTenantContent();
+    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
 
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -208,7 +223,7 @@ describe('TenantDeleteService', () => {
       failedFolders: [],
     });
 
-    await createService(client).deleteTenantContent();
+    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
 
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -239,10 +254,46 @@ describe('TenantDeleteService', () => {
     });
 
     const service = new TenantDeleteService('my-tenant', 'scope-1', client as never, metrics);
-    await service.deleteTenantContent();
+    await runInTenantContext(createTenant(), () => service.deleteTenantContent());
 
     expect(durationSpy).toHaveBeenCalledWith(expect.any(Number), 'success');
     expect(contentSpy).toHaveBeenCalledWith(2);
     expect(scopesSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('skips cleanup when already in progress', async () => {
+    const client = createMockUniqueApiClient();
+    const tenant = createTenant();
+    tenant.isScanning = true;
+
+    await runInTenantContext(tenant, () => createService(client).deleteTenantContent());
+
+    expect(mockLogger.log).toHaveBeenCalledWith(
+      expect.objectContaining({ msg: 'Cleanup already in progress, skipping' }),
+    );
+    expect(client.scopes.getById).not.toHaveBeenCalled();
+  });
+
+  it('resets isScanning after successful cleanup', async () => {
+    const client = createMockUniqueApiClient();
+    const tenant = createTenant();
+    client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
+    client.scopes.listChildren.mockResolvedValue([]);
+
+    await runInTenantContext(tenant, () => createService(client).deleteTenantContent());
+
+    expect(tenant.isScanning).toBe(false);
+  });
+
+  it('resets isScanning after failed cleanup', async () => {
+    const client = createMockUniqueApiClient();
+    const tenant = createTenant();
+    client.scopes.getById.mockRejectedValue(new Error('API down'));
+
+    await expect(
+      runInTenantContext(tenant, () => createService(client).deleteTenantContent()),
+    ).rejects.toThrow('API down');
+
+    expect(tenant.isScanning).toBe(false);
   });
 });

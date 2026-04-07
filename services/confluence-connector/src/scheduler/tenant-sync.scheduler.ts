@@ -74,12 +74,6 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    if (tenant.isScanning) {
-      this.logger.log({ tenantName: tenant.name, msg: 'Job already in progress, skipping' });
-      return;
-    }
-
-    tenant.isScanning = true;
     try {
       await this.tenantRegistry.run(tenant, async () => {
         if (tenant.status === 'deleted') {
@@ -97,8 +91,6 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
         err: error,
         msg: 'Unexpected error in tenant job',
       });
-    } finally {
-      tenant.isScanning = false;
     }
   }
 }

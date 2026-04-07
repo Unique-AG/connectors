@@ -2,6 +2,7 @@ import { type Scope, UniqueApiClient } from '@unique-ag/unique-api';
 import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import type { Metrics } from '../metrics';
+import { getCurrentTenant } from './tenant-context.storage';
 
 export class TenantDeleteService {
   private readonly logger = new Logger(TenantDeleteService.name);
@@ -14,6 +15,17 @@ export class TenantDeleteService {
   ) {}
 
   public async deleteTenantContent(): Promise<void> {
+    const tenant = getCurrentTenant();
+
+    if (tenant.isScanning) {
+      this.logger.log({
+        tenantName: this.tenantName,
+        msg: 'Cleanup already in progress, skipping',
+      });
+      return;
+    }
+
+    tenant.isScanning = true;
     const startTime = Date.now();
     let result: 'success' | 'failure' = 'success';
 
@@ -39,6 +51,7 @@ export class TenantDeleteService {
       result = 'failure';
       throw error;
     } finally {
+      tenant.isScanning = false;
       this.metrics.recordCleanupDuration(elapsedSeconds(startTime), result);
     }
   }

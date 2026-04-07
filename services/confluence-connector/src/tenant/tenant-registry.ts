@@ -7,7 +7,7 @@ import {
 } from '@unique-ag/unique-api';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
-import { getTenantConfigs, UniqueAuthMode, type UniqueConfig } from '../config';
+import { getTenantConfigs, type TenantConfig, UniqueAuthMode, type UniqueConfig } from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
 import { Metrics } from '../metrics';
 import { ProxyService } from '../proxy';
@@ -42,108 +42,14 @@ export class TenantRegistry implements OnModuleInit {
       this.tenants.set(tenantName, tenant);
 
       tenantStorage.run(tenant, () => {
-        const isExternal = config.unique.serviceAuthMode === UniqueAuthMode.External;
-        const uniqueApiDispatcher = this.proxyService.getDispatcher({
-          mode: isExternal ? 'always' : 'never',
-        });
-        const uniqueClient = this.uniqueApiFactory.create({
-          auth: this.buildUniqueAuthConfig(config.unique),
-          dispatcher: uniqueApiDispatcher,
-          ingestion: {
-            baseUrl: config.unique.ingestionServiceBaseUrl,
-            rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
-          },
-          scopeManagement: {
-            baseUrl: config.unique.scopeManagementServiceBaseUrl,
-            rateLimitPerMinute: config.unique.apiRateLimitPerMinute,
-          },
-          metadata: {
-            clientName: 'confluence-connector',
-            tenantKey: tenantName,
-          },
-        });
+        const uniqueClient = this.createUniqueApiClient(tenantName, config.unique);
         this.serviceRegistry.register(tenantName, UniqueApiClient, uniqueClient);
 
         if (status === 'deleted') {
-          const cleanupService = new TenantDeleteService(
-            tenantName,
-            config.ingestion.scopeId,
-            uniqueClient,
-            this.metrics,
-          );
-          this.serviceRegistry.register(tenantName, TenantDeleteService, cleanupService);
-          this.logger.log({ tenantName, msg: 'Deleted tenant registered for cleanup' });
-          return;
+          this.registerDeletedTenantServices(tenantName, config, uniqueClient);
+        } else {
+          this.registerActiveTenantServices(tenantName, config, uniqueClient);
         }
-
-        this.serviceRegistry.register(
-          tenantName,
-          ConfluenceAuth,
-          this.confluenceAuthFactory.createAuthStrategy(config.confluence),
-        );
-        const apiClient = this.confluenceApiClientFactory.create(
-          config.confluence,
-          { attachmentsEnabled: config.ingestion.attachments.enabled },
-          this.metrics,
-        );
-        this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
-
-        const scanner = new ConfluencePageScanner(
-          config.confluence,
-          config.processing,
-          apiClient,
-          config.ingestion.attachments,
-        );
-        this.serviceRegistry.register(tenantName, ConfluencePageScanner, scanner);
-
-        const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient);
-        this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
-
-        const scopeManagementService = new ScopeManagementService(
-          config.ingestion,
-          tenantName,
-          uniqueClient,
-        );
-        this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
-
-        const fileDiffService = new FileDiffService(
-          config.confluence,
-          tenantName,
-          config.ingestion.useV1KeyFormat,
-          uniqueClient,
-          this.metrics,
-        );
-        this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
-
-        const blobUploadDispatcher = this.proxyService.getDispatcher({
-          mode: isExternal ? 'always' : 'never',
-        });
-        const ingestionService = new IngestionService(
-          config,
-          tenantName,
-          uniqueClient,
-          apiClient,
-          this.metrics,
-          blobUploadDispatcher,
-        );
-        this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
-
-        const confluenceSynchronizationService = new ConfluenceSynchronizationService(
-          scanner,
-          fetcher,
-          fileDiffService,
-          ingestionService,
-          scopeManagementService,
-          this.metrics,
-        );
-        this.serviceRegistry.register(
-          tenantName,
-          ConfluenceSynchronizationService,
-          confluenceSynchronizationService,
-        );
-
-        this.metrics.initializeCounters();
-        this.logger.log({ tenantName, msg: 'Tenant registered' });
       });
     }
   }
@@ -164,6 +70,118 @@ export class TenantRegistry implements OnModuleInit {
 
   public get tenantCount(): number {
     return this.tenants.size;
+  }
+
+  private createUniqueApiClient(tenantName: string, uniqueConfig: UniqueConfig): UniqueApiClient {
+    const isExternal = uniqueConfig.serviceAuthMode === UniqueAuthMode.External;
+    const dispatcher = this.proxyService.getDispatcher({
+      mode: isExternal ? 'always' : 'never',
+    });
+
+    return this.uniqueApiFactory.create({
+      auth: this.buildUniqueAuthConfig(uniqueConfig),
+      dispatcher,
+      ingestion: {
+        baseUrl: uniqueConfig.ingestionServiceBaseUrl,
+        rateLimitPerMinute: uniqueConfig.apiRateLimitPerMinute,
+      },
+      scopeManagement: {
+        baseUrl: uniqueConfig.scopeManagementServiceBaseUrl,
+        rateLimitPerMinute: uniqueConfig.apiRateLimitPerMinute,
+      },
+      metadata: {
+        clientName: 'confluence-connector',
+        tenantKey: tenantName,
+      },
+    });
+  }
+
+  private registerDeletedTenantServices(
+    tenantName: string,
+    config: TenantConfig,
+    uniqueClient: UniqueApiClient,
+  ): void {
+    const cleanupService = new TenantDeleteService(
+      tenantName,
+      config.ingestion.scopeId,
+      uniqueClient,
+      this.metrics,
+    );
+    this.serviceRegistry.register(tenantName, TenantDeleteService, cleanupService);
+    this.logger.log({ tenantName, msg: 'Deleted tenant registered for cleanup' });
+  }
+
+  private registerActiveTenantServices(
+    tenantName: string,
+    config: TenantConfig,
+    uniqueClient: UniqueApiClient,
+  ): void {
+    this.serviceRegistry.register(
+      tenantName,
+      ConfluenceAuth,
+      this.confluenceAuthFactory.createAuthStrategy(config.confluence),
+    );
+
+    const apiClient = this.confluenceApiClientFactory.create(
+      config.confluence,
+      { attachmentsEnabled: config.ingestion.attachments.enabled },
+      this.metrics,
+    );
+    this.serviceRegistry.register(tenantName, ConfluenceApiClient, apiClient);
+
+    const scanner = new ConfluencePageScanner(
+      config.confluence,
+      config.processing,
+      apiClient,
+      config.ingestion.attachments,
+    );
+    this.serviceRegistry.register(tenantName, ConfluencePageScanner, scanner);
+
+    const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient);
+    this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
+
+    const scopeManagementService = new ScopeManagementService(
+      config.ingestion,
+      tenantName,
+      uniqueClient,
+    );
+    this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
+
+    const fileDiffService = new FileDiffService(
+      config.confluence,
+      tenantName,
+      config.ingestion.useV1KeyFormat,
+      uniqueClient,
+      this.metrics,
+    );
+    this.serviceRegistry.register(tenantName, FileDiffService, fileDiffService);
+
+    const isExternal = config.unique.serviceAuthMode === UniqueAuthMode.External;
+    const blobUploadDispatcher = this.proxyService.getDispatcher({
+      mode: isExternal ? 'always' : 'never',
+    });
+    const ingestionService = new IngestionService(
+      config,
+      tenantName,
+      uniqueClient,
+      apiClient,
+      this.metrics,
+      blobUploadDispatcher,
+    );
+    this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
+
+    const syncService = new ConfluenceSynchronizationService(
+      scanner,
+      fetcher,
+      fileDiffService,
+      ingestionService,
+      scopeManagementService,
+      this.metrics,
+    );
+    this.serviceRegistry.register(tenantName, ConfluenceSynchronizationService, syncService);
+
+    this.metrics.initializeCounters();
+    this.logger.log({ tenantName, msg: 'Tenant registered' });
   }
 
   private buildUniqueAuthConfig(

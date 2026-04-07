@@ -245,42 +245,6 @@ describe('TenantSyncScheduler', () => {
       );
     });
 
-    it('skips job when already in progress', async () => {
-      tenantA.isScanning = true;
-
-      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
-      await (scheduler as any).syncTenant(tenantA);
-
-      expect(mockLogger.log).toHaveBeenCalledWith({
-        tenantName: 'tenant-a',
-        msg: 'Job already in progress, skipping',
-      });
-      const syncService = tenantStorage.run(tenantA, () =>
-        serviceRegistry.getService(ConfluenceSynchronizationService),
-      );
-      expect(syncService.synchronize).not.toHaveBeenCalled();
-      tenantA.isScanning = false;
-    });
-
-    it('resets isScanning after successful job', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
-      await (scheduler as any).syncTenant(tenantA);
-
-      expect(tenantA.isScanning).toBe(false);
-    });
-
-    it('resets isScanning after failed job', async () => {
-      const syncService = tenantStorage.run(tenantA, () =>
-        serviceRegistry.getService(ConfluenceSynchronizationService),
-      );
-      vi.mocked(syncService.synchronize).mockRejectedValue(new Error('boom'));
-
-      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
-      await (scheduler as any).syncTenant(tenantA);
-
-      expect(tenantA.isScanning).toBe(false);
-    });
-
     it('skips job when shutting down', async () => {
       scheduler.onModuleDestroy();
 
