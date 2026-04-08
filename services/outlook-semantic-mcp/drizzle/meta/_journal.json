@@ -176,6 +176,13 @@
       "when": 1775132757155,
       "tag": "0024_petite_masque",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1775543871115,
+      "tag": "0025_sparkling_blue_marvel",
+      "breakpoints": true
     }
   ]
 }

@@ -4,9 +4,13 @@ import {
   RabbitSubscribe,
 } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { eq, inArray } from 'drizzle-orm';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { AppConfig, appConfig } from '~/config';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
+import { greatestFrom } from '~/utils/greatest-from';
+import { Nullish } from '~/utils/nullish';
 import { LiveCatchUpCommand } from './live-catch-up.command';
 import { LiveCatchUpEventDto } from './live-catch-up-event.dto';
 
@@ -16,6 +20,7 @@ export class LiveCatchUpListener {
 
   public constructor(
     private readonly liveCatchUpCommand: LiveCatchUpCommand,
+    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
   ) {}
 
@@ -32,6 +37,10 @@ export class LiveCatchUpListener {
     this.logger.log({ msg: 'Live catch-up event received', type: event.type });
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.live-catch-up.execute': {
+        await this.updateLastNotificationReceivedAt(
+          event.payload.subscriptionId,
+          event.payload.notificationReceivedAt,
+        );
         return await this.liveCatchUpCommand.run({
           ...event.payload,
           liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
@@ -47,5 +56,37 @@ export class LiveCatchUpListener {
         this.logger.error({ msg: `Unsuported live catchup event type: ${JSON.stringify(event)}` });
       }
     }
+  }
+
+  private async updateLastNotificationReceivedAt(
+    subscriptionId: string,
+    notificationReceivedAt: Nullish<string>,
+  ): Promise<void> {
+    if (!notificationReceivedAt) {
+      return;
+    }
+    const notificationTime = new Date(notificationReceivedAt);
+    const isValidDate =
+      notificationTime instanceof Date && !Number.isNaN(notificationTime.getTime());
+    if (!isValidDate) {
+      return;
+    }
+    await this.db
+      .update(inboxConfigurations)
+      .set({
+        lastWebhookReceivedAt: greatestFrom(
+          inboxConfigurations.lastWebhookReceivedAt,
+          notificationTime,
+        ),
+      })
+      .where(
+        inArray(
+          inboxConfigurations.userProfileId,
+          this.db
+            .select({ id: subscriptions.userProfileId })
+            .from(subscriptions)
+            .where(eq(subscriptions.subscriptionId, subscriptionId)),
+        ),
+      );
   }
 }

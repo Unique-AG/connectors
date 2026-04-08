@@ -30,7 +30,7 @@ export const META = createMeta({
   If \`ingestionStats.state\` is \`error\`: ❌ _Search index unavailable: {ingestionStats.message}_
   Otherwise:
   - ✅ Available in search: {ingestionStats.finished}
-  - ⏳ Still being indexed: {ingestionStats.inProgress} (will appear in search once done)
+  - ⏳ Still being indexed: {ingestionStats.inProgress} — if inProgress is 0 but the top-level \`state\` is \`running\`, show: (waiting for more emails to be uploaded); otherwise show: (will appear in search once done)
   - ❌ Failed to index: {ingestionStats.failed} (omit line if 0)
   If \`ingestionStats.failed\` > 0, append: ⚠️ _{ingestionStats.failed} email(s) could not be indexed and won't appear in search._
   Note: emails are indexed from newest to oldest, so recent emails become searchable first.
