@@ -733,11 +733,11 @@ importers:
         specifier: 7.2.0
         version: 7.2.0
       drizzle-orm:
-        specifier: 0.44.5
-        version: 0.44.5(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))
+        specifier: 0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))
       drizzle-zod:
         specifier: 0.8.3
-        version: 0.8.3(drizzle-orm@0.44.5(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2)))(zod@4.1.5)
+        version: 0.8.3(drizzle-orm@0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2)))(zod@4.1.5)
       jsonwebtoken:
         specifier: 9.0.3
         version: 9.0.3
@@ -938,11 +938,11 @@ importers:
         specifier: 4.3.5
         version: 4.3.5
       drizzle-orm:
-        specifier: 0.44.5
-        version: 0.44.5(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))
+        specifier: 0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))
       drizzle-zod:
         specifier: 0.8.3
-        version: 0.8.3(drizzle-orm@0.44.5(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2)))(zod@4.1.5)
+        version: 0.8.3(drizzle-orm@0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2)))(zod@4.1.5)
       express:
         specifier: 5.1.0
         version: 5.1.0
@@ -1303,11 +1303,11 @@ importers:
         specifier: 7.2.0
         version: 7.2.0
       drizzle-orm:
-        specifier: 0.44.5
-        version: 0.44.5(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))
+        specifier: 0.45.2
+        version: 0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))
       drizzle-zod:
         specifier: 0.8.3
-        version: 0.8.3(drizzle-orm@0.44.5(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2)))(zod@4.1.5)
+        version: 0.8.3(drizzle-orm@0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2)))(zod@4.1.5)
       jsonwebtoken:
         specifier: 9.0.3
         version: 9.0.3
@@ -4453,8 +4453,8 @@ packages:
     resolution: {integrity: sha512-tCPWVZWZqWVx2XUsVpJRnH9Mx0ClVOf5YUHerZ5so1OKSlqww4zy1R5ksEdGRcO3tM3zj0PYN6V48TbQCL1RfA==}
     hasBin: true
 
-  drizzle-orm@0.44.5:
-    resolution: {integrity: sha512-jBe37K7d8ZSKptdKfakQFdeljtu3P2Cbo7tJoJSVZADzIKOBo9IAJPOmMsH2bZl90bZgh8FQlD8BjxXA/zuBkQ==}
+  drizzle-orm@0.45.2:
+    resolution: {integrity: sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@cloudflare/workers-types': '>=4'
@@ -9681,6 +9681,14 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
+  '@vitest/mocker@3.2.4(vite@7.3.2(@types/node@22.16.5)(jiti@2.6.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))':
+    dependencies:
+      '@vitest/spy': 3.2.4
+      estree-walker: 3.0.3
+      magic-string: 0.30.17
+    optionalDependencies:
+      vite: 7.3.2(@types/node@22.16.5)(jiti@2.6.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3)
+
   '@vitest/mocker@3.2.4(vite@7.3.2(@types/node@24.4.0)(jiti@2.6.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))':
     dependencies:
       '@vitest/spy': 3.2.4
@@ -10437,7 +10445,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.44.5(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2)):
+  drizzle-orm@0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2)):
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
       '@prisma/client': 6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2)
@@ -10445,9 +10453,9 @@ snapshots:
       pg: 8.16.3
       prisma: 6.17.1(magicast@0.3.5)(typescript@5.9.2)
 
-  drizzle-zod@0.8.3(drizzle-orm@0.44.5(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2)))(zod@4.1.5):
+  drizzle-zod@0.8.3(drizzle-orm@0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2)))(zod@4.1.5):
     dependencies:
-      drizzle-orm: 0.44.5(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))
+      drizzle-orm: 0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.17.1(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.17.1(magicast@0.3.5)(typescript@5.9.2))
       zod: 4.1.5
 
   dunder-proto@1.0.1:
@@ -13185,7 +13193,7 @@ snapshots:
     dependencies:
       '@types/chai': 5.2.2
       '@vitest/expect': 3.2.4
-      '@vitest/mocker': 3.2.4(vite@7.3.2(@types/node@24.4.0)(jiti@2.6.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))
+      '@vitest/mocker': 3.2.4(vite@7.3.2(@types/node@22.16.5)(jiti@2.6.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))
       '@vitest/pretty-format': 3.2.4
       '@vitest/runner': 3.2.4
       '@vitest/snapshot': 3.2.4
