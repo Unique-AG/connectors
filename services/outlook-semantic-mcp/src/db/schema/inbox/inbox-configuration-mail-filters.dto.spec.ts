@@ -1,10 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeRetentionCutoff } from './inbox-configuration-mail-filters.dto';
 
+const FIXED_NOW = new Date('2025-06-15T14:32:00.000Z');
+
 describe('computeRetentionCutoff', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns UTC midnight of the date that is N days ago', () => {
     const result = computeRetentionCutoff(30);
-    const expected = new Date();
+    const expected = new Date(FIXED_NOW);
     expected.setDate(expected.getDate() - 30);
     expected.setUTCHours(0, 0, 0, 0);
 
@@ -27,7 +38,7 @@ describe('computeRetentionCutoff', () => {
 
   it('subtracts the correct number of days', () => {
     const result = computeRetentionCutoff(365);
-    const expected = new Date();
+    const expected = new Date(FIXED_NOW);
     expected.setDate(expected.getDate() - 365);
     expected.setUTCHours(0, 0, 0, 0);
 
