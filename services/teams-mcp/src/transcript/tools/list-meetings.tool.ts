@@ -5,9 +5,9 @@ import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import type { UniqueConfigNamespaced } from '~/config';
-import { type MetadataFilter, UniqueQLOperator } from '~/unique/unique.dtos';
 import { UniqueContentService } from '~/unique/unique-content.service';
 import { UniqueUserMappingService } from '~/unique/unique-user-mapping.service';
+import { buildTranscriptFilter, parseTranscriptMetadata } from './transcript-tools.helpers';
 
 const ListMeetingsInputSchema = z.object({
   dateFrom: z.iso
@@ -123,31 +123,24 @@ export class ListMeetingsTool {
     );
 
     const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
-    const filter = this.buildFilter(rootScopeId, input);
 
-    const result = await this.contentService.scopedFindByMetadata(filter, scopeContext, {
-      skip: input.skip,
-      take: input.take,
-    });
+    const result = await this.contentService.scopedFindByMetadata(
+      buildTranscriptFilter(rootScopeId, input),
+      scopeContext,
+      { skip: input.skip, take: input.take },
+    );
 
     const meetings = result.contents.map((item) => {
-      const metadata = item.metadata as Record<string, unknown> | null;
-      const participantNames = metadata?.participant_names;
-      const participants =
-        typeof participantNames === 'string'
-          ? participantNames
-              .split(',')
-              .map((p) => p.trim())
-              .filter(Boolean)
-          : undefined;
+      const { meetingDate, organizer, participants } = parseTranscriptMetadata(
+        item.metadata as Record<string, unknown> | null,
+      );
 
       return {
         id: item.id,
         title: item.title ?? 'Untitled Meeting',
-        meetingDate: typeof metadata?.date === 'string' ? metadata.date : undefined,
-        organizer:
-          typeof metadata?.organizer_name === 'string' ? metadata.organizer_name : undefined,
-        participants: participants?.length ? participants : undefined,
+        meetingDate,
+        organizer,
+        participants,
       };
     });
 
@@ -160,83 +153,5 @@ export class ListMeetingsTool {
     );
 
     return { meetings, total: result.total };
-  }
-
-  private buildFilter(
-    rootScopeId: string,
-    input: z.infer<typeof ListMeetingsInputSchema>,
-  ): MetadataFilter {
-    const conditions: MetadataFilter[] = [
-      {
-        path: ['folderIdPath'],
-        operator: UniqueQLOperator.CONTAINS,
-        value: `uniquepathid://${rootScopeId}`,
-      },
-      {
-        path: ['mimeType'],
-        operator: UniqueQLOperator.EQUALS,
-        value: 'text/vtt',
-      },
-    ];
-
-    if (input.subject) {
-      conditions.push({
-        path: ['title'],
-        operator: UniqueQLOperator.CONTAINS,
-        value: input.subject,
-      });
-    }
-
-    if (input.dateFrom) {
-      conditions.push({
-        path: ['metadata', 'date'],
-        operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
-        value: input.dateFrom,
-      });
-    }
-
-    if (input.dateTo) {
-      conditions.push({
-        path: ['metadata', 'date'],
-        operator: UniqueQLOperator.LESS_THAN_OR_EQUAL,
-        value: input.dateTo,
-      });
-    }
-
-    if (input.organizer) {
-      conditions.push({
-        or: [
-          {
-            path: ['metadata', 'organizer_name'],
-            operator: UniqueQLOperator.CONTAINS,
-            value: input.organizer,
-          },
-          {
-            path: ['metadata', 'organizer_email'],
-            operator: UniqueQLOperator.CONTAINS,
-            value: input.organizer,
-          },
-        ],
-      });
-    }
-
-    if (input.participant) {
-      conditions.push({
-        or: [
-          {
-            path: ['metadata', 'participant_names'],
-            operator: UniqueQLOperator.CONTAINS,
-            value: input.participant,
-          },
-          {
-            path: ['metadata', 'participant_emails'],
-            operator: UniqueQLOperator.CONTAINS,
-            value: input.participant,
-          },
-        ],
-      });
-    }
-
-    return { and: conditions };
   }
 }
