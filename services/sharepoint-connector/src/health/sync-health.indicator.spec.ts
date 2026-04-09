@@ -2,7 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Config } from '../config';
-import { SyncStep } from '../constants/sync-step.enum';
+import { FullSyncStep, SiteSyncStep } from '../constants/sync-step.enum';
 import { SyncHealthIndicator } from './sync-health.indicator';
 import { SyncRecord, SyncStatusStore } from './sync-status.store';
 
@@ -46,10 +46,12 @@ describe('SyncHealthIndicator', () => {
     indicator = new SyncHealthIndicator(store, healthIndicatorService, configService);
   });
 
-  it('returns empty object when no sync records exist', () => {
+  it('returns up with message when no sync records exist', () => {
     const result = indicator.check('sync');
 
-    expect(result).toEqual({});
+    expect(result).toEqual({
+      sync: { status: 'up', message: 'No sync records yet' },
+    });
   });
 
   it('returns up when all sites are below threshold', () => {
@@ -65,7 +67,7 @@ describe('SyncHealthIndicator', () => {
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'success' } },
-          { siteId: 'site-bbb', result: { status: 'failure', step: SyncStep.ContentSync } },
+          { siteId: 'site-bbb', result: { status: 'failure', step: SiteSyncStep.ContentSync } },
         ],
       }),
     );
@@ -90,7 +92,10 @@ describe('SyncHealthIndicator', () => {
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'success' } },
-          { siteId: 'site-bbb', result: { status: 'failure', step: SyncStep.PermissionsSync } },
+          {
+            siteId: 'site-bbb',
+            result: { status: 'failure', step: SiteSyncStep.PermissionsFetch },
+          },
         ],
       }),
     );
@@ -98,7 +103,7 @@ describe('SyncHealthIndicator', () => {
       makeSyncRecord({
         siteResults: [
           { siteId: 'site-aaa', result: { status: 'success' } },
-          { siteId: 'site-bbb', result: { status: 'failure', step: SyncStep.ContentSync } },
+          { siteId: 'site-bbb', result: { status: 'failure', step: SiteSyncStep.ContentSync } },
         ],
       }),
     );
@@ -131,7 +136,7 @@ describe('SyncHealthIndicator', () => {
     store.record(
       makeSyncRecord({
         siteResults: [
-          { siteId: 'site-aaa', result: { status: 'failure', step: SyncStep.ContentSync } },
+          { siteId: 'site-aaa', result: { status: 'failure', step: SiteSyncStep.ContentSync } },
         ],
       }),
     );
@@ -170,7 +175,7 @@ describe('SyncHealthIndicator', () => {
     );
     store.record(
       makeSyncRecord({
-        fullResult: { status: 'failure', step: SyncStep.SitesConfigLoading },
+        fullResult: { status: 'failure', step: FullSyncStep.SitesConfigLoading },
         siteResults: [],
       }),
     );
@@ -193,13 +198,13 @@ describe('SyncHealthIndicator', () => {
   it('reports down when all records are full sync failures with no site data', () => {
     store.record(
       makeSyncRecord({
-        fullResult: { status: 'failure', step: SyncStep.SitesConfigLoading },
+        fullResult: { status: 'failure', step: FullSyncStep.SitesConfigLoading },
         siteResults: [],
       }),
     );
     store.record(
       makeSyncRecord({
-        fullResult: { status: 'failure', step: SyncStep.Unknown },
+        fullResult: { status: 'failure', step: FullSyncStep.Unknown },
         siteResults: [],
       }),
     );
@@ -225,13 +230,13 @@ describe('SyncHealthIndicator', () => {
     );
     store.record(
       makeSyncRecord({
-        fullResult: { status: 'failure', step: SyncStep.SitesConfigLoading },
+        fullResult: { status: 'failure', step: FullSyncStep.SitesConfigLoading },
         siteResults: [],
       }),
     );
     store.record(
       makeSyncRecord({
-        fullResult: { status: 'failure', step: SyncStep.SitesConfigLoading },
+        fullResult: { status: 'failure', step: FullSyncStep.SitesConfigLoading },
         siteResults: [],
       }),
     );
@@ -255,7 +260,7 @@ describe('SyncHealthIndicator', () => {
     store.record(
       makeSyncRecord({
         siteResults: [
-          { siteId: 'site-aaa', result: { status: 'failure', step: SyncStep.ContentSync } },
+          { siteId: 'site-aaa', result: { status: 'failure', step: SiteSyncStep.ContentSync } },
         ],
       }),
     );

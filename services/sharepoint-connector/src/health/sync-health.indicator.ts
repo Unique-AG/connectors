@@ -23,14 +23,14 @@ export class SyncHealthIndicator {
   }
 
   public check(key: string): HealthIndicatorResult {
+    const indicator = this.healthIndicatorService.check(key);
     const records = this.store.getRecords();
     const latest = this.store.getLatest();
 
     if (isNullish(latest)) {
-      return {};
+      return indicator.up({ message: 'No sync records yet' });
     }
 
-    const indicator = this.healthIndicatorService.check(key);
     const sites = new Map<string, SiteStats>();
 
     // First pass: accumulate per-site stats from records that have site-level detail.

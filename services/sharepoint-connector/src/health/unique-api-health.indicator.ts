@@ -5,11 +5,7 @@ import { Dispatcher, fetch as undiciFetch } from 'undici';
 import { Config } from '../config';
 import { ProxyService } from '../proxy/proxy.service';
 import { UniqueAuthService } from '../unique-api/unique-auth.service';
-
-interface PingResult {
-  reachable: boolean;
-  errorCode?: string;
-}
+import { extractErrorCode, type PingResult } from './ping-result';
 
 /**
  * Checks reachability of both Unique API GraphQL endpoints (ingestion and scope management)
@@ -23,22 +19,38 @@ export class UniqueApiHealthIndicator {
   private readonly timeoutMs: number;
   private readonly ingestionUrl: string;
   private readonly scopeManagementUrl: string;
+  private readonly serviceAuthMode: string;
+  private readonly serviceExtraHeaders: Record<string, string>;
 
   public constructor(
-    private readonly configService: ConfigService<Config, true>,
     private readonly proxyService: ProxyService,
     private readonly uniqueAuthService: UniqueAuthService,
     private readonly healthIndicatorService: HealthIndicatorService,
+    configService: ConfigService<Config, true>,
   ) {
+    const uniqueConfig = configService.get('unique', { infer: true });
     this.timeoutMs = configService.get('health.connectivityTimeoutMs', { infer: true });
-    this.ingestionUrl = `${configService.get('unique.ingestionServiceBaseUrl', { infer: true })}/graphql`;
-    this.scopeManagementUrl = `${configService.get('unique.scopeManagementServiceBaseUrl', { infer: true })}/graphql`;
+    this.ingestionUrl = `${uniqueConfig.ingestionServiceBaseUrl}/graphql`;
+    this.scopeManagementUrl = `${uniqueConfig.scopeManagementServiceBaseUrl}/graphql`;
+    this.serviceAuthMode = uniqueConfig.serviceAuthMode;
+    this.serviceExtraHeaders =
+      uniqueConfig.serviceAuthMode === 'cluster_local' ? uniqueConfig.serviceExtraHeaders : {};
   }
 
   public async check(key: string): Promise<HealthIndicatorResult> {
     const indicator = this.healthIndicatorService.check(key);
     const dispatcher = this.proxyService.getDispatcher({ mode: 'for-external-only' });
-    const authHeaders = await this.getAuthHeaders();
+
+    let authHeaders: Record<string, string>;
+    try {
+      authHeaders = await this.getAuthHeaders();
+    } catch {
+      return indicator.down({
+        ingestion: 'unknown',
+        scopeManagement: 'unknown',
+        error: 'AUTH_FAILURE',
+      });
+    }
 
     const [ingestionResult, scopeManagementResult] = await Promise.all([
       this.ping(this.ingestionUrl, authHeaders, dispatcher),
@@ -67,9 +79,8 @@ export class UniqueApiHealthIndicator {
   }
 
   private async getAuthHeaders(): Promise<Record<string, string>> {
-    const uniqueConfig = this.configService.get('unique', { infer: true });
-    return uniqueConfig.serviceAuthMode === 'cluster_local'
-      ? { 'x-service-id': 'sharepoint-connector', ...uniqueConfig.serviceExtraHeaders }
+    return this.serviceAuthMode === 'cluster_local'
+      ? { 'x-service-id': 'sharepoint-connector', ...this.serviceExtraHeaders }
       : { Authorization: `Bearer ${await this.uniqueAuthService.getToken()}` };
   }
 
@@ -91,7 +102,7 @@ export class UniqueApiHealthIndicator {
       }
       return { reachable: false, errorCode: `HTTP_${response.status}` };
     } catch (error) {
-      return { reachable: false, errorCode: (error as NodeJS.ErrnoException).code ?? 'UNKNOWN' };
+      return { reachable: false, errorCode: extractErrorCode(error) };
     }
   }
 }

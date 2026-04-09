@@ -4,13 +4,9 @@ import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus'
 import { Dispatcher, fetch as undiciFetch } from 'undici';
 import { Config } from '../config';
 import { ProxyService } from '../proxy/proxy.service';
+import { extractErrorCode, type PingResult } from './ping-result';
 
 const GRAPH_URL = 'https://graph.microsoft.com/v1.0/';
-
-interface PingResult {
-  reachable: boolean;
-  errorCode?: string;
-}
 
 /**
  * Verifies network-level reachability to Microsoft Graph and SharePoint REST APIs.
@@ -85,10 +81,7 @@ export class ConnectivityHealthIndicator {
       });
       return { reachable: true };
     } catch (error) {
-      return {
-        reachable: false,
-        errorCode: (error as NodeJS.ErrnoException).code ?? 'UNKNOWN',
-      };
+      return { reachable: false, errorCode: extractErrorCode(error) };
     }
   }
 }

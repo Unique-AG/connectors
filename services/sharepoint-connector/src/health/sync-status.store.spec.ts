@@ -2,8 +2,8 @@ import * as assert from 'node:assert';
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SyncStep } from '../constants/sync-step.enum';
-import { FullSyncResult, SyncRecord, SyncStatusStore } from './sync-status.store';
+import { FullSyncStep, SiteSyncStep } from '../constants/sync-step.enum';
+import { type FullSyncResult, type SyncRecord, SyncStatusStore } from './sync-status.store';
 
 const HISTORY_SIZE = 3;
 
@@ -82,10 +82,10 @@ describe('SyncStatusStore', () => {
 
     it('stores records with site-level failure details', () => {
       const record = makeSyncRecord({
-        fullResult: { status: 'failure', step: SyncStep.ContentSync },
+        fullResult: { status: 'failure', step: FullSyncStep.Unknown },
         siteResults: [
           { siteId: 'site-1', result: { status: 'success' } },
-          { siteId: 'site-2', result: { status: 'failure', step: SyncStep.PermissionsSync } },
+          { siteId: 'site-2', result: { status: 'failure', step: SiteSyncStep.PermissionsFetch } },
           { siteId: 'site-3', result: { status: 'skipped', reason: 'not configured' } },
         ],
       });
@@ -94,11 +94,11 @@ describe('SyncStatusStore', () => {
 
       const stored = store.getLatest();
       assert.ok(stored);
-      expect(stored.fullResult).toEqual({ status: 'failure', step: SyncStep.ContentSync });
+      expect(stored.fullResult).toEqual({ status: 'failure', step: FullSyncStep.Unknown });
       expect(stored.siteResults).toHaveLength(3);
       expect(stored.siteResults[1]?.result).toEqual({
         status: 'failure',
-        step: SyncStep.PermissionsSync,
+        step: SiteSyncStep.PermissionsFetch,
       });
     });
   });
@@ -107,7 +107,7 @@ describe('SyncStatusStore', () => {
     it('returns the most recently recorded entry', () => {
       const first = makeSyncRecord({ fullResult: { status: 'success' } });
       const second = makeSyncRecord({
-        fullResult: { status: 'failure', step: SyncStep.Unknown },
+        fullResult: { status: 'failure', step: FullSyncStep.Unknown },
       });
 
       store.record(first);

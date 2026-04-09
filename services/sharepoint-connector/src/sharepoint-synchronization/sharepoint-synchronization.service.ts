@@ -7,8 +7,7 @@ import { ConfigDiagnosticsService } from '../config/config-diagnostics.service';
 import type { SiteConfig } from '../config/sharepoint.schema';
 import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import { IngestionMode } from '../constants/ingestion.constants';
-import { SyncStep } from '../constants/sync-step.enum';
-import type { FullSyncResult, SiteResultEntry, SiteSyncResult } from '../health/sync-status.store';
+import { FullSyncStep, SiteSyncStep } from '../constants/sync-step.enum';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
@@ -16,6 +15,7 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { PermissionsSyncError } from '../permissions-sync/permissions-sync.error';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
@@ -28,6 +28,7 @@ import { ContentSyncService } from './content-sync.service';
 import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
 import { SharepointSyncContext } from './sharepoint-sync-context.interface';
 import { DiscoveredSubsite, SubsiteDiscoveryService } from './subsite-discovery.service';
+import type { FullSyncResult, SiteResultEntry, SiteSyncResult } from './sync-result.types';
 
 export interface SynchronizeResult {
   fullResult: FullSyncResult;
@@ -75,7 +76,7 @@ export class SharepointSynchronizationService {
         });
         const fullResult: FullSyncResult = {
           status: 'failure',
-          step: SyncStep.SitesConfigLoading,
+          step: FullSyncStep.SitesConfigLoading,
         };
         this.recordFullSyncMetric(syncStartTime, fullResult);
         return { fullResult, siteResults: [] };
@@ -129,7 +130,7 @@ export class SharepointSynchronizationService {
         msg: 'Failed full synchronization',
         error: sanitizeError(error),
       });
-      this.recordFullSyncMetric(syncStartTime, { status: 'failure', step: SyncStep.Unknown });
+      this.recordFullSyncMetric(syncStartTime, { status: 'failure', step: FullSyncStep.Unknown });
       throw error;
     } finally {
       this.isScanning = false;
@@ -229,7 +230,7 @@ export class SharepointSynchronizationService {
   private async initializeSiteContext(
     siteConfig: SiteConfig,
     logPrefix: string,
-  ): Promise<{ context: SharepointSyncContext } | { failureStep: SyncStep }> {
+  ): Promise<{ context: SharepointSyncContext } | { failureStep: SiteSyncStep }> {
     let baseContext: RootScopeInfo;
     try {
       baseContext = await this.scopeManagementService.initializeRootScope(
@@ -242,7 +243,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to initialize root scope`,
         error: sanitizeError(error),
       });
-      return { failureStep: SyncStep.RootScopeInit };
+      return { failureStep: SiteSyncStep.RootScopeInit };
     }
 
     let siteName: Smeared;
@@ -254,7 +255,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to get site name`,
         error: sanitizeError(error),
       });
-      return { failureStep: SyncStep.SiteNameFetch };
+      return { failureStep: SiteSyncStep.SiteNameFetch };
     }
 
     return {
@@ -298,7 +299,7 @@ export class SharepointSynchronizationService {
           msg: `${logPrefix} Failed to discover subsites`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.SubsiteDiscovery };
+        return { status: 'failure', step: SiteSyncStep.SubsiteDiscovery };
       }
     }
 
@@ -317,7 +318,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to get site items`,
         error: sanitizeError(error),
       });
-      return { status: 'failure', step: SyncStep.SiteItemsFetch };
+      return { status: 'failure', step: SiteSyncStep.SiteItemsFetch };
     }
 
     if (subsites.length > 0) {
@@ -330,7 +331,7 @@ export class SharepointSynchronizationService {
           msg: `${logPrefix} Failed to fetch subsite items`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.SubsiteItemsFetch };
+        return { status: 'failure', step: SiteSyncStep.SubsiteItemsFetch };
       }
     }
 
@@ -349,7 +350,7 @@ export class SharepointSynchronizationService {
           msg: `${logPrefix} Failed to create scopes. Skipping site.`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.ScopesCreation };
+        return { status: 'failure', step: SiteSyncStep.ScopesCreation };
       }
     }
 
@@ -360,7 +361,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to synchronize content`,
         error: sanitizeError(error),
       });
-      return { status: 'failure', step: SyncStep.ContentSync };
+      return { status: 'failure', step: SiteSyncStep.ContentSync };
     }
 
     if (context.siteConfig.syncMode === 'content_and_permissions') {
@@ -375,7 +376,9 @@ export class SharepointSynchronizationService {
           msg: `${logPrefix} Failed to synchronize permissions`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.PermissionsSync };
+        const step =
+          error instanceof PermissionsSyncError ? error.step : SiteSyncStep.UnknownPermissionsSync;
+        return { status: 'failure', step };
       }
     }
 
@@ -386,7 +389,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to clean up orphaned scopes`,
         error: sanitizeError(error),
       });
-      return { status: 'failure', step: SyncStep.OrphanScopeCleanup };
+      return { status: 'failure', step: SiteSyncStep.OrphanScopeCleanup };
     }
 
     return { status: 'success' };

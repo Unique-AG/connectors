@@ -1,28 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../config';
-import { SyncStep } from '../constants/sync-step.enum';
+import type { SyncRecord } from '../sharepoint-synchronization/sync-result.types';
 
-export type SiteSyncResult =
-  | { status: 'success' }
-  | { status: 'failure'; step: SyncStep }
-  | { status: 'skipped'; reason: string };
-
-export type FullSyncResult =
-  | { status: 'success' }
-  | { status: 'failure'; step: SyncStep }
-  | { status: 'skipped'; reason: string };
-
-export interface SiteResultEntry {
-  siteId: string;
-  result: SiteSyncResult;
-}
-
-export interface SyncRecord {
-  timestamp: Date;
-  fullResult: FullSyncResult;
-  siteResults: SiteResultEntry[];
-}
+export type {
+  FullSyncResult,
+  SiteResultEntry,
+  SiteSyncResult,
+  SyncRecord,
+  SyncResult,
+} from '../sharepoint-synchronization/sync-result.types';
 
 @Injectable()
 export class SyncStatusStore {

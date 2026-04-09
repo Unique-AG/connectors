@@ -35,14 +35,10 @@ describe('UniqueApiHealthIndicator', () => {
           if (key === 'health.connectivityTimeoutMs') {
             return TIMEOUT_MS;
           }
-          if (key === 'unique.ingestionServiceBaseUrl') {
-            return INGESTION_BASE_URL;
-          }
-          if (key === 'unique.scopeManagementServiceBaseUrl') {
-            return SCOPE_MANAGEMENT_BASE_URL;
-          }
           if (key === 'unique') {
             return {
+              ingestionServiceBaseUrl: INGESTION_BASE_URL,
+              scopeManagementServiceBaseUrl: SCOPE_MANAGEMENT_BASE_URL,
               serviceAuthMode: 'external' as const,
             };
           }
@@ -178,6 +174,57 @@ describe('UniqueApiHealthIndicator', () => {
     });
   });
 
+  it('reports down with AUTH_FAILURE when getToken() rejects', async () => {
+    const { unit: failingIndicator } = await TestBed.solitary(UniqueApiHealthIndicator)
+      .mock(ConfigService)
+      .impl((stub) => ({
+        ...stub(),
+        get: vi.fn((key: string) => {
+          if (key === 'health.connectivityTimeoutMs') {
+            return TIMEOUT_MS;
+          }
+          if (key === 'unique') {
+            return {
+              ingestionServiceBaseUrl: INGESTION_BASE_URL,
+              scopeManagementServiceBaseUrl: SCOPE_MANAGEMENT_BASE_URL,
+              serviceAuthMode: 'external' as const,
+            };
+          }
+          return undefined;
+        }),
+      }))
+      .mock(ProxyService)
+      .impl((stub) => ({
+        ...stub(),
+        getDispatcher: vi.fn(() => mockDispatcher),
+      }))
+      .mock(UniqueAuthService)
+      .impl((stub) => ({
+        ...stub(),
+        getToken: vi.fn().mockRejectedValue(new Error('Zitadel is down')),
+      }))
+      .mock(HealthIndicatorService)
+      .impl(() => ({
+        check: (key: string) => ({
+          up: (data?: Record<string, unknown>) => ({ [key]: { status: 'up', ...data } }),
+          down: (data?: Record<string, unknown>) => ({ [key]: { status: 'down', ...data } }),
+        }),
+      }))
+      .compile();
+
+    const result = await failingIndicator.check('uniqueApi');
+
+    expect(result).toEqual({
+      uniqueApi: {
+        status: 'down',
+        ingestion: 'unknown',
+        scopeManagement: 'unknown',
+        error: 'AUTH_FAILURE',
+      },
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
   it('uses cluster_local auth headers when serviceAuthMode is cluster_local', async () => {
     const extraHeaders = { 'x-custom': 'value' };
     const { unit: clusterIndicator } = await TestBed.solitary(UniqueApiHealthIndicator)
@@ -188,14 +235,10 @@ describe('UniqueApiHealthIndicator', () => {
           if (key === 'health.connectivityTimeoutMs') {
             return TIMEOUT_MS;
           }
-          if (key === 'unique.ingestionServiceBaseUrl') {
-            return INGESTION_BASE_URL;
-          }
-          if (key === 'unique.scopeManagementServiceBaseUrl') {
-            return SCOPE_MANAGEMENT_BASE_URL;
-          }
           if (key === 'unique') {
             return {
+              ingestionServiceBaseUrl: INGESTION_BASE_URL,
+              scopeManagementServiceBaseUrl: SCOPE_MANAGEMENT_BASE_URL,
               serviceAuthMode: 'cluster_local' as const,
               serviceExtraHeaders: extraHeaders,
             };

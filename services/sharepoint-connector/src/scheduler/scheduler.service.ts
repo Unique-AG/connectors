@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { Config } from '../config';
-import { SyncStep } from '../constants/sync-step.enum';
+import { FullSyncStep } from '../constants/sync-step.enum';
 import { SyncStatusStore } from '../health/sync-status.store';
 import { SharepointSynchronizationService } from '../sharepoint-synchronization/sharepoint-synchronization.service';
 import { sanitizeError } from '../utils/normalize-error';
@@ -68,7 +68,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       // crashed before it could produce any per-site results.
       this.syncStatusStore.record({
         timestamp: new Date(),
-        fullResult: { status: 'failure', step: SyncStep.Unknown },
+        fullResult: { status: 'failure', step: FullSyncStep.Unknown },
         siteResults: [],
       });
       this.logger.error({
