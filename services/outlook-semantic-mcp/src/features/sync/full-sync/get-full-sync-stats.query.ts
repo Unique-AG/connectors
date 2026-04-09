@@ -5,11 +5,9 @@ import { omit } from 'remeda';
 import z from 'zod';
 import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
-import {
-  computeRetentionCutoff,
-  inboxConfigurationMailFilters,
-} from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { GetUserProfileQuery } from '../../user-utils/get-user-profile.query';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 
@@ -154,7 +152,7 @@ export class GetFullSyncStatsQuery {
       failedToUploadForIngestion: inboxConfig.fullSyncFailedToUploadForIngestion,
       filters: {
         retentionWindowInDays: filters.retentionWindowInDays,
-        ignoredBefore: computeRetentionCutoff(filters.retentionWindowInDays).toISOString(),
+        ignoredBefore: computeRetentionCutoffDate(filters.retentionWindowInDays).toISOString(),
         ignoredSenders: filters.ignoredSenders.map((r) => r.toString()),
         ignoredContents: filters.ignoredContents.map((r) => r.toString()),
       },

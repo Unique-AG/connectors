@@ -79,9 +79,17 @@ export const CONTENT_UPSERT_MUTATION = gql`
   }
 `;
 
-export const CONTENT_UPDATE_METADATA_MUTATION = gql`
-  mutation ContentUpdateMetadata($contentId: String!, $metadata: JSON!) {
-    contentUpdateMetadata(contentId: $contentId, metadata: $metadata) {
+export interface ContentUpdateMutationResult {
+  contentUpdate: {
+    id: string;
+    ownerId: string;
+    ownerType: string;
+  };
+}
+
+export const CONTENT_UPDATE_MUTATION = gql`
+  mutation ContentUpdate($contentId: String!, $expiresAt: String, $metadata: JSON) {
+    contentUpdate(contentId: $contentId, expiresAt: $expiresAt, metadata: $metadata) {
       id
       metadata
       ingestionState
@@ -89,19 +97,20 @@ export const CONTENT_UPDATE_METADATA_MUTATION = gql`
   }
 `;
 
-export interface ContentUpdateMetadataMutationInput {
+export interface ContentUpdateInput {
   contentId: string;
-  metadata: Record<string, ContentMetadataValue>;
+  metadata?: Record<string, ContentMetadataValue>;
+  expiresAt?: Date;
 }
 
-export interface ContentUpdateMetadataResponse {
+export interface ContentUpdateResponse {
   id: string;
   metadata: Record<string, ContentMetadataValue>;
   ingestionState: IngestionState;
 }
 
 export interface ContentUpdateMetadataMutationResponse {
-  contentUpdateMetadata: ContentUpdateMetadataResponse;
+  contentUpdate: ContentUpdateResponse;
 }
 
 export interface StatisticsIngestionQueryInput {

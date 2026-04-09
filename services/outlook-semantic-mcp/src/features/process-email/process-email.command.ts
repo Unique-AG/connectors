@@ -19,6 +19,7 @@ import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UploadFileForIngestionCommand } from '~/unique/upload-file-for-ingestion.command';
+import { getExpirationDate } from '~/utils/date/get-message-expiration-date';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { Nullish } from '~/utils/nullish';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
@@ -32,7 +33,7 @@ export type MessageIngestionResult =
   | 'ingested'
   | 'skipped'
   | 'skipped-content-unchanged-already-ingested'
-  | 'metadata-updated';
+  | 'content-updated';
 
 interface UserContext {
   email: Smeared;
@@ -163,7 +164,16 @@ export class ProcessEmailCommand {
     assert.ok(rootScope, `Parent scope id`);
 
     if (isNonNullish(file) && metadata.sentDateTime === file.metadata?.sentDateTime) {
-      if (metadata.lastModifiedDateTime === file.metadata?.lastModifiedDateTime) {
+      const expirationDate = getExpirationDate({
+        receivedDateTime: graphMessage.receivedDateTime,
+        retentionWindowInDays: filters.retentionWindowInDays,
+      });
+      const fileExpirationDate = file.expiresAt ? new Date(file.expiresAt).toISOString() : '';
+
+      if (
+        metadata.lastModifiedDateTime === file.metadata?.lastModifiedDateTime &&
+        expirationDate.toISOString() === fileExpirationDate
+      ) {
         this.logger.log({
           ...logContext,
           msg: `Skip Update reason: Last modified date not changed`,
@@ -171,13 +181,14 @@ export class ProcessEmailCommand {
         return 'skipped-content-unchanged-already-ingested';
       }
       this.logger.log({ ...logContext, msg: `Update file metadata` });
-      await this.uniqueApi.ingestion.updateMetadata({
+      await this.uniqueApi.ingestion.update({
         contentId: file.id,
+        expiresAt: expirationDate,
         // ContentMetadata value is Record<x, y> and metadata is an interface we do the type casting
         // here because you cannot assign an interface to a record.
         metadata: metadata as unknown as ContentMetadata,
       });
-      return 'metadata-updated';
+      return 'content-updated';
     }
 
     await this.uploadEmailForIngestion({
@@ -235,10 +246,10 @@ export class ProcessEmailCommand {
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       storeInternally: this.configService.get('unique.storeInternally', { infer: true }),
-      expiresAt: new Date(
-        new Date(graphMessage.receivedDateTime).getTime() +
-          filters.retentionWindowInDays * 24 * 60 * 60 * 1000,
-      ),
+      expiresAt: getExpirationDate({
+        receivedDateTime: graphMessage.receivedDateTime,
+        retentionWindowInDays: filters.retentionWindowInDays,
+      }),
     };
 
     this.logger.debug({ ...logContext, msg: `Register content: Started` });

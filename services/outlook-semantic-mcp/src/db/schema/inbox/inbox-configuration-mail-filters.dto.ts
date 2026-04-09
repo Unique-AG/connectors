@@ -35,13 +35,6 @@ export const inboxConfigurationMailFilters = z.object({
 
 export type InboxConfigurationMailFilters = z.infer<typeof inboxConfigurationMailFilters>;
 
-export function computeRetentionCutoff(days: number): Date {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  date.setUTCHours(0, 0, 0, 0);
-  return date;
-}
-
 export function serializeMailFilters(
   filters: InboxConfigurationMailFilters,
 ): Record<string, unknown> {

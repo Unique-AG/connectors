@@ -10,7 +10,6 @@ import { isNullish } from 'remeda';
 import z from 'zod';
 import { inboxConfigurations, UserProfile } from '~/db';
 import {
-  computeRetentionCutoff,
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
@@ -18,6 +17,7 @@ import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-uniqu
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { greatestFrom } from '~/utils/greatest-from';
 import { leastFrom } from '~/utils/least-from';
 import { NonNullishProps } from '~/utils/non-nullish-props';
@@ -304,7 +304,7 @@ export class ProcessFullSyncBatchCommand {
       }
   > {
     const conditions = [
-      `receivedDateTime ge ${computeRetentionCutoff(filters.retentionWindowInDays).toISOString()}`,
+      `receivedDateTime ge ${computeRetentionCutoffDate(filters.retentionWindowInDays).toISOString()}`,
     ];
 
     if (nextLink === START_FULL_SYNC_LINK) {
@@ -390,7 +390,7 @@ export class ProcessFullSyncBatchCommand {
       ingested: `ingested`,
       skipped: `skipped`,
       'skipped-content-unchanged-already-ingested': `ingested`,
-      'metadata-updated': `ingested`,
+      'content-updated': `ingested`,
       failed: `failed`,
     };
 

@@ -4,14 +4,12 @@ import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
-import {
-  computeRetentionCutoff,
-  inboxConfigurationMailFilters,
-} from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
@@ -290,7 +288,7 @@ export class FullSyncCommand {
       const count = (await client
         .api('me/messages/$count')
         .filter(
-          `receivedDateTime ge ${computeRetentionCutoff(filters.retentionWindowInDays).toISOString()}`,
+          `receivedDateTime ge ${computeRetentionCutoffDate(filters.retentionWindowInDays).toISOString()}`,
         )
         .header('Prefer', 'IdType="ImmutableId"')
         .header('ConsistencyLevel', 'eventual')
