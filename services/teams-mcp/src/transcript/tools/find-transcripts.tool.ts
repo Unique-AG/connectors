@@ -44,12 +44,6 @@ const FindTranscriptsInputSchema = z.object({
     .max(100)
     .default(10)
     .describe('Maximum number of results to return'),
-  scoreThreshold: z
-    .number()
-    .min(0)
-    .max(1)
-    .optional()
-    .describe('Minimum relevance score threshold (0-1)'),
 });
 
 const TranscriptChunkSchema = z.object({
@@ -62,7 +56,6 @@ const TranscriptChunkSchema = z.object({
   meetingDate: z.string().optional().describe('Date of the meeting'),
   organizer: z.string().optional().describe('Name of the meeting organizer'),
   participants: z.array(z.string()).optional().describe('List of participants'),
-  score: z.number().optional().describe('Relevance score'),
 });
 
 const FindTranscriptsOutputSchema = z.object({
@@ -167,7 +160,6 @@ export class FindTranscriptsTool {
         organizer:
           typeof metadata?.organizer_name === 'string' ? metadata.organizer_name : undefined,
         participants: participants?.length ? participants : undefined,
-        score: undefined, // Score not available in current response
       };
     });
 
@@ -262,7 +254,6 @@ export class FindTranscriptsTool {
       searchString: input.query,
       searchType: SearchType.COMBINED,
       limit: input.limit,
-      scoreThreshold: input.scoreThreshold,
       metaDataFilter: { and: conditions },
     };
   }

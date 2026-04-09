@@ -248,9 +248,12 @@ export class UniqueService {
     const metadata: Record<string, string> = {
       date: meeting.startDateTime.toISOString(),
       content_correlation_id: meeting.contentCorrelationId,
-      organizer_name: meeting.owner.name,
       organizer_email: meeting.owner.email.toLowerCase(),
     };
+
+    if (meeting.owner.name) {
+      metadata.organizer_name = meeting.owner.name;
+    }
 
     // Filter out empty names/emails before joining
     const names = meeting.participants.map((p) => p.name).filter(Boolean);

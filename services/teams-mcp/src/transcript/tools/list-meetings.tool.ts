@@ -50,7 +50,7 @@ const MeetingItemSchema = z.object({
 
 const ListMeetingsOutputSchema = z.object({
   meetings: z.array(MeetingItemSchema).describe('List of meetings matching the filters'),
-  total: z.number().optional().describe('Total number of matching meetings'),
+  total: z.number().describe('Total number of matching meetings'),
 });
 
 @Injectable()
@@ -87,6 +87,7 @@ export class ListMeetingsTool {
   public async listMeetings(
     input: z.infer<typeof ListMeetingsInputSchema>,
     _context: Context,
+    // Access control is enforced by the KB platform; no user identity resolution needed here
     _request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof ListMeetingsOutputSchema>> {
     const span = this.traceService.getSpan();
