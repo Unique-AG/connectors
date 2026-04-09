@@ -12,7 +12,7 @@ const regexPattern = z.string().transform((pattern, ctx) => {
   }
 
   try {
-    const compiled = new RegExp(patternPart, patternPart);
+    const compiled = new RegExp(patternPart, flagsPart);
     if (!safeRegex(compiled)) {
       ctx.addIssue({
         code: 'custom',
@@ -35,7 +35,7 @@ export const inboxConfigurationMailFilters = z.object({
 
 export type InboxConfigurationMailFilters = z.infer<typeof inboxConfigurationMailFilters>;
 
-export function computeIgnoredBefore(days: number): Date {
+export function computeRetentionCutoff(days: number): Date {
   const date = new Date();
   date.setDate(date.getDate() - days);
   date.setUTCHours(0, 0, 0, 0);

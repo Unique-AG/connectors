@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import {
-  computeIgnoredBefore,
+  computeRetentionCutoff,
   InboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceEvent } from '~/features/tracing.utils';
@@ -28,10 +28,11 @@ export function shouldSkipEmail(
   context: { userProfileId: string },
 ): SkipResult {
   try {
-    if (email.receivedDateTime) {
-      if (new Date(email.receivedDateTime) < computeIgnoredBefore(filters.retentionWindowInDays)) {
-        return { skip: true, reason: 'receivedDateTime' };
-      }
+    if (
+      email.receivedDateTime &&
+      new Date(email.receivedDateTime) < computeRetentionCutoff(filters.retentionWindowInDays)
+    ) {
+      return { skip: true, reason: 'receivedDateTime' };
     }
 
     for (const pattern of filters.ignoredSenders) {

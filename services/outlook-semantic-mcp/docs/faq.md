@@ -187,7 +187,7 @@ This must match exactly — including protocol, domain, and path — in both the
 
 ### What does `DEFAULT_MAIL_FILTERS` do?
 
-**Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `retentionWindowInDays` (positive integer — required, the application will not start without it; emails older than this rolling window are excluded and stamped with an `expiresAt` date), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
+**Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `retentionWindowInDays` (positive integer — required, the application will not start without it; all ingested emails have an expired at date which is computed using receivedDateTime + retentionWindowInDays), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
 
 When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Configuration](./operator/configuration.md) for the full filter reference.
 

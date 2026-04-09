@@ -5,7 +5,7 @@ import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
 import {
-  computeIgnoredBefore,
+  computeRetentionCutoff,
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
@@ -290,7 +290,7 @@ export class FullSyncCommand {
       const count = (await client
         .api('me/messages/$count')
         .filter(
-          `receivedDateTime ge ${computeIgnoredBefore(filters.retentionWindowInDays).toISOString()}`,
+          `receivedDateTime ge ${computeRetentionCutoff(filters.retentionWindowInDays).toISOString()}`,
         )
         .header('Prefer', 'IdType="ImmutableId"')
         .header('ConsistencyLevel', 'eventual')

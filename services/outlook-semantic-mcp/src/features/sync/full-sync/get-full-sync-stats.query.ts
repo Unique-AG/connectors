@@ -6,7 +6,7 @@ import z from 'zod';
 import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import {
-  computeIgnoredBefore,
+  computeRetentionCutoff,
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -154,7 +154,7 @@ export class GetFullSyncStatsQuery {
       failedToUploadForIngestion: inboxConfig.fullSyncFailedToUploadForIngestion,
       filters: {
         retentionWindowInDays: filters.retentionWindowInDays,
-        ignoredBefore: computeIgnoredBefore(filters.retentionWindowInDays).toISOString(),
+        ignoredBefore: computeRetentionCutoff(filters.retentionWindowInDays).toISOString(),
         ignoredSenders: filters.ignoredSenders.map((r) => r.toString()),
         ignoredContents: filters.ignoredContents.map((r) => r.toString()),
       },

@@ -10,7 +10,7 @@ import { isNullish } from 'remeda';
 import z from 'zod';
 import { inboxConfigurations, UserProfile } from '~/db';
 import {
-  computeIgnoredBefore,
+  computeRetentionCutoff,
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
@@ -304,7 +304,7 @@ export class ProcessFullSyncBatchCommand {
       }
   > {
     const conditions = [
-      `receivedDateTime ge ${computeIgnoredBefore(filters.retentionWindowInDays).toISOString()}`,
+      `receivedDateTime ge ${computeRetentionCutoff(filters.retentionWindowInDays).toISOString()}`,
     ];
 
     if (nextLink === START_FULL_SYNC_LINK) {
