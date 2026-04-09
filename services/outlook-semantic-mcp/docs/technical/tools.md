@@ -423,6 +423,7 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
     failedToUploadForIngestion: number;
     filters: {
       retentionWindowInDays: number;
+      ignoredBefore: string;       // ISO 8601 UTC cutoff — emails before this date are excluded
       ignoredSenders: string[];
       ignoredContents: string[];
     };
