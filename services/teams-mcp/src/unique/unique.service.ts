@@ -242,11 +242,14 @@ export class UniqueService {
   private buildContentMetadata(meeting: {
     startDateTime: Date;
     contentCorrelationId: string;
+    owner: { name: string; email: string };
     participants: { name: string; email: string }[];
   }): Record<string, string> {
     const metadata: Record<string, string> = {
       date: meeting.startDateTime.toISOString(),
       content_correlation_id: meeting.contentCorrelationId,
+      organizer_name: meeting.owner.name,
+      organizer_email: meeting.owner.email.toLowerCase(),
     };
 
     // Filter out empty names/emails before joining
