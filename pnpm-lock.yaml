@@ -780,7 +780,7 @@ importers:
         version: 2.43.1
       '@nestjs/cli':
         specifier: 11.0.18
-        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
+        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5))(@swc/core@1.13.5)(@types/node@22.16.5)(esbuild@0.25.12)
       '@nestjs/schematics':
         specifier: 11.0.10
         version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
@@ -1000,7 +1000,7 @@ importers:
         version: 2.43.1
       '@nestjs/cli':
         specifier: 11.0.18
-        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5))(@swc/core@1.13.5)(@types/node@22.16.5)(esbuild@0.25.12)
+        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
       '@nestjs/schematics':
         specifier: 11.0.10
         version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
