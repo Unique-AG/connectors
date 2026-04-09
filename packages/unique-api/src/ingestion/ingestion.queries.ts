@@ -88,8 +88,8 @@ export interface ContentUpdateMutationResult {
 }
 
 export const CONTENT_UPDATE_MUTATION = gql`
-  mutation ContentUpdate($contentId: String!, $expiresAt: String, $metadata: JSON) {
-    contentUpdate(contentId: $contentId, expiresAt: $expiresAt, metadata: $metadata) {
+  mutation ContentUpdate($contentId: String!, $expiresAt: DateTime, $metadata: JSON) {
+    contentUpdate(contentId: $contentId, input: { expiresAt: $expiresAt, metadata: $metadata }) {
       id
       metadata
       ingestionState
