@@ -13,7 +13,7 @@ export interface UniqueFile {
   ownerType: string;
   ownerId: string;
   byteSize: number;
-  expiresAt: string;
+  expiresAt: string | null;
   metadata: Record<string, string> | null;
 }
 
