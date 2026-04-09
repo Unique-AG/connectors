@@ -41,7 +41,9 @@ describe('DataCenterConfluenceApiClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new DataCenterConfluenceApiClient(mockConfig, mockAuth as never, mockHttpClient);
+    client = new DataCenterConfluenceApiClient(mockConfig, mockAuth as never, mockHttpClient, {
+      attachmentsEnabled: false,
+    });
   });
 
   describe('searchPagesByLabel', () => {

@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveCatchupRecoveryService } from './live-catchup-recovery.service';
+import { LiveCatchupSchedulerService } from './live-catchup-scheduler.service';
 
 vi.mock('~/features/tracing.utils', () => ({ traceEvent: vi.fn() }));
 
@@ -10,8 +10,8 @@ import { traceEvent } from '~/features/tracing.utils';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const USER_PROFILE_ID_1 = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
-const USER_PROFILE_ID_2 = 'user_profile_01jxk5r1s2fq9att23mp4z5ef3';
+const SUBSCRIPTION_ID_1 = 'sub_01jxk5r1s2fq9att23mp4z5ef2';
+const SUBSCRIPTION_ID_2 = 'sub_01jxk5r1s2fq9att23mp4z5ef3';
 
 // ---------------------------------------------------------------------------
 // Mock factories
@@ -28,7 +28,7 @@ function createMockAmqp() {
   return { publish: vi.fn().mockResolvedValue(undefined) };
 }
 
-function createMockDb({ liveCatchUpRows = [] as Array<{ userProfileId: string }> } = {}) {
+function createMockDb({ liveCatchUpRows = [] as Array<{ subscriptionId: string }> } = {}) {
   const makeSelectChain = (rows: unknown[]) => ({
     from: vi.fn().mockReturnValue({
       innerJoin: vi.fn().mockReturnValue({
@@ -44,14 +44,14 @@ function createMockDb({ liveCatchUpRows = [] as Array<{ userProfileId: string }>
 
 function createService({ amqp = createMockAmqp(), db = createMockDb() } = {}) {
   const schedulerRegistry = createMockSchedulerRegistry();
-  return new LiveCatchupRecoveryService(schedulerRegistry as any, amqp as any, db as any);
+  return new LiveCatchupSchedulerService(schedulerRegistry as any, amqp as any, db as any);
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('LiveCatchupRecoveryService', () => {
+describe('LiveCatchupSchedulerService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -68,10 +68,10 @@ describe('LiveCatchupRecoveryService', () => {
       expect(traceEvent).not.toHaveBeenCalled();
     });
 
-    it('publishes a recovery event and emits trace event for a stuck live catch-up', async () => {
+    it('publishes an execute event and emits trace event for a stuck live catch-up', async () => {
       const amqp = createMockAmqp();
       const db = createMockDb({
-        liveCatchUpRows: [{ userProfileId: USER_PROFILE_ID_1 }],
+        liveCatchUpRows: [{ subscriptionId: SUBSCRIPTION_ID_1 }],
       });
       const service = createService({ amqp, db });
 
@@ -80,24 +80,24 @@ describe('LiveCatchupRecoveryService', () => {
       expect(amqp.publish).toHaveBeenCalledTimes(1);
       expect(amqp.publish).toHaveBeenCalledWith(
         expect.any(String),
-        'unique.outlook-semantic-mcp.live-catch-up.recovery',
+        'unique.outlook-semantic-mcp.live-catch-up.execute',
         expect.objectContaining({
-          type: 'unique.outlook-semantic-mcp.live-catch-up.recovery',
-          payload: { userProfileId: USER_PROFILE_ID_1 },
+          type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
+          payload: { subscriptionId: SUBSCRIPTION_ID_1 },
         }),
       );
       expect(traceEvent).toHaveBeenCalledWith('live-catch-up stuck recovery triggered', {
         count: 1,
-        userProfileIds: [USER_PROFILE_ID_1],
+        subscriptionIds: [SUBSCRIPTION_ID_1],
       });
     });
 
-    it('publishes recovery events and traces for each stuck live catch-up config', async () => {
+    it('publishes execute events and traces for each stuck live catch-up config', async () => {
       const amqp = createMockAmqp();
       const db = createMockDb({
         liveCatchUpRows: [
-          { userProfileId: USER_PROFILE_ID_1 },
-          { userProfileId: USER_PROFILE_ID_2 },
+          { subscriptionId: SUBSCRIPTION_ID_1 },
+          { subscriptionId: SUBSCRIPTION_ID_2 },
         ],
       });
       const service = createService({ amqp, db });
@@ -107,7 +107,7 @@ describe('LiveCatchupRecoveryService', () => {
       expect(amqp.publish).toHaveBeenCalledTimes(2);
       expect(traceEvent).toHaveBeenCalledWith('live-catch-up stuck recovery triggered', {
         count: 2,
-        userProfileIds: [USER_PROFILE_ID_1, USER_PROFILE_ID_2],
+        subscriptionIds: [SUBSCRIPTION_ID_1, SUBSCRIPTION_ID_2],
       });
     });
   });

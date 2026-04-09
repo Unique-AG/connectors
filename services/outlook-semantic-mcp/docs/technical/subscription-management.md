@@ -46,7 +46,7 @@ Safe to call at any time — it is idempotent:
 
 Calling `reconnect_inbox` triggers a full sync when a new subscription is created. If the subscription is `already_active` or `expiring_soon`, no full sync is triggered.
 
-## `remove_inbox_connection`
+## `delete_inbox_data`
 
 Removes the mailbox connection entirely:
 
@@ -64,14 +64,15 @@ Microsoft Graph sends lifecycle notifications when a subscription's state change
 |-----------|-------------|----------------------|
 | `reauthorizationRequired` lifecycle event | Server automatically PATCHes the subscription with a new expiration time | No |
 | `subscriptionRemoved` lifecycle event | Subscription and `inbox_configurations` records are deleted — live catch-up and full sync stop | Yes — user must call `reconnect_inbox` |
+| `missed` lifecycle event | Server triggers a live catch-up run to recover missed emails from the watermark | No |
 | Subscription expired (missed renewal) | `verify_inbox_connection` reports `expired`; no notifications are received | Yes — user must call `reconnect_inbox` |
 | No subscription exists | `verify_inbox_connection` reports `not_configured` | Yes — user must call `reconnect_inbox` |
 
 ## Related Documentation
 
-- [Live Catch-Up](./live-catchup.md) - Webhook-driven ingestion that depends on an active subscription
-- [Directory Sync](./directory-sync.md) - Folder sync that also depends on an active connection
-- [Full Sync](./full-sync.md) - Historical batch ingestion triggered on subscription creation
+- [Live Catch-Up](./flows.md#live-catch-up-webhook-driven-email-ingestion) — Webhook-driven ingestion that depends on an active subscription
+- [Directory Sync](./flows.md#directory-sync-flow) — Folder sync that also depends on an active connection
+- [Full Sync](./flows.md#full-sync-historical-email-ingestion) — Historical batch ingestion triggered on subscription creation
 - [Flows](./flows.md#Subscription-Creation-and-Renewal-Lifecycle) - Subscription lifecycle sequence diagram
-- [Tools](./tools.md#verify_inbox_connection) - `verify_inbox_connection`, `reconnect_inbox`, `remove_inbox_connection` tool reference
+- [Tools](./tools.md#verify_inbox_connection) - `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data` tool reference
 - [Configuration](../operator/configuration.md) - `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` and related env vars

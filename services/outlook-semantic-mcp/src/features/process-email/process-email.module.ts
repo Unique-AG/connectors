@@ -4,13 +4,9 @@ import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';
-import { GetMessageDetailsQuery } from './get-message-details.query';
-import { IngestEmailCommand } from './ingest-email.command';
-import { IngestEmailLiveCatchupMessageCommand } from './ingest-live-catchup-message.command';
+import { ProcessEmailCommand } from './process-email.command';
 
-const COMMANDS: Provider[] = [IngestEmailCommand, IngestEmailLiveCatchupMessageCommand];
-
-const QUERIES: Provider[] = [GetMessageDetailsQuery];
+const COMMANDS: Provider[] = [ProcessEmailCommand];
 
 @Module({
   imports: [
@@ -20,7 +16,7 @@ const QUERIES: Provider[] = [GetMessageDetailsQuery];
     DirectoriesSyncModule,
     UniqueApiFeatureModule,
   ],
-  providers: [...COMMANDS, ...QUERIES],
-  exports: [...COMMANDS, ...QUERIES],
+  providers: [...COMMANDS],
+  exports: [...COMMANDS],
 })
-export class MailIngestionModule {}
+export class ProcessEmailModule {}

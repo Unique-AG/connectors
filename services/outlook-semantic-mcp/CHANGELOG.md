@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.2.18](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.17...outlook-semantic-mcp@0.2.18) (2026-04-07)
+
+
+### Bug Fixes
+
+* **deps:** resolve Dependabot security alerts for undici, path-to-regexp, orval, minimatch, and brace-expansion ([#432](https://github.com/Unique-AG/connectors/issues/432)) ([5cd9c0f](https://github.com/Unique-AG/connectors/commit/5cd9c0fdc3230de591b28574fccabb7df2cd2cce))
+* **deps:** resolve Dependabot security alerts related to jsonwebtoken, js-yaml and @nestjs/ libraries ([#446](https://github.com/Unique-AG/connectors/issues/446)) ([44835ec](https://github.com/Unique-AG/connectors/commit/44835ec851589e2288fd2e1551ca22edb148190e))
+* **outlook-semantic-mcp:** fix progress and synchronize missing system directories ([#433](https://github.com/Unique-AG/connectors/issues/433)) ([4416738](https://github.com/Unique-AG/connectors/commit/4416738c2c16d0bafac0390575b37460f2188d07))
+
+## [0.2.17](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.16...outlook-semantic-mcp@0.2.17) (2026-04-03)
+
+
+### Features
+
+* **outlook-semantic-mcp:** refactor live catch-up recovery, tune prefetch count ([#406](https://github.com/Unique-AG/connectors/issues/406)) ([358aeef](https://github.com/Unique-AG/connectors/commit/358aeef141cb6f18f8dc87a15e855dff483a15b1))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** live-catchup improvements and search improvements UN-18240 ([#417](https://github.com/Unique-AG/connectors/issues/417)) ([88143fe](https://github.com/Unique-AG/connectors/commit/88143fe5d8182629d000b5eaca32cd3a0c3a904d))
+* **outlook-semantic-mcp:** UN-17418  check why we need content length up front ([#408](https://github.com/Unique-AG/connectors/issues/408)) ([56d5bd5](https://github.com/Unique-AG/connectors/commit/56d5bd58d6d84e4eab5ca9942892eecaf8d28b3e))
+
 ## [0.2.16](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.15...outlook-semantic-mcp@0.2.16) (2026-03-25)
 
 

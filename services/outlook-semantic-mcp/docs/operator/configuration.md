@@ -31,6 +31,8 @@ Set via `mcpConfig.app` in Helm values:
 | `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
 | `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
 | `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
+| `LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.app.liveCatchupOverlappingWindowMinutes` | `3` (application) / `5` (Helm) | Minutes to overlap each live catch-up sync run to account for Office 365 eventual consistency. Minimum: `2` — see [LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES](#LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES) |
+| `LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.app.liveCatchupRecheckOverlappingWindowMinutes` | `10` | Minutes to overlap live catch-up ready-recheck runs. Uses a larger window for higher-latency scenarios. Minimum: `10` — see [LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES](#LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES) |
 | `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | (required) | JSON email sync filters — see [Mail Filters](#Mail-Filters) |
 
 ### Microsoft Configuration
@@ -143,6 +145,8 @@ mcpConfig:
   app:
     selfUrl: https://outlook.semantic.mcp.example.com
     mcpDebugMode: disabled
+    liveCatchupOverlappingWindowMinutes: 5
+    liveCatchupRecheckOverlappingWindowMinutes: 10
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
@@ -362,6 +366,14 @@ Required for `cluster_local` auth mode. Provide as a JSON object:
 
 - **`x-company-id`** — your organization's ID in the Unique platform. Find it in the Unique admin dashboard under **Settings > Organization**, or via the Unique API (`GET /api/company`).
 - **`x-user-id`** — the Zitadel service user ID. See [Zitadel Service Account](#Zitadel-Service-Account).
+
+### LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES
+
+Office 365 uses eventual consistency — messages can appear with a delayed `updatedAt` timestamp after the actual event. To avoid missing late-arriving messages, each live catch-up sync run re-queries an overlapping window of this many minutes. The application default is `3` minutes; the Helm chart overrides this to `5` for additional safety margin. Minimum: `2`.
+
+### LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES
+
+Overlapping window (in minutes) for live catch-up ready-recheck runs. Uses a larger window than the standard run to account for higher latency during recheck scenarios. Minimum and default: `10`.
 
 ### MAX_HEAP_MB
 

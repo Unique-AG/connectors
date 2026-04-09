@@ -82,15 +82,15 @@ sequenceDiagram
 
 | Action                               | What Is Removed                                                                                        |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| User calls `remove_inbox_connection` | Microsoft Graph subscription, per-user root scopes and all ingested email content in Unique KB, inbox configuration, folder sync data |
+| User calls `delete_inbox_data` | Microsoft Graph subscription, per-user root scopes and all ingested email content in Unique KB, inbox configuration, folder sync data |
 | MCP tokens                           | Expire naturally (access: 60 seconds, refresh: 30 days); not automatically removed from KB             |
 
 
-When a user calls `remove_inbox_connection`, the per-user root scopes are removed from the Unique knowledge base, which also removes all ingested email content for that user.
+When a user calls `delete_inbox_data`, the per-user root scopes are removed from the Unique knowledge base, which also removes all ingested email content for that user.
 
 ## Knowledge Base Data Isolation
 
-Each connected user's emails are stored in a **dedicated root scope** (a top-level isolation boundary in the Unique knowledge base that logically separates one user's data from another's) within the Unique knowledge base. Scopes are created automatically when the user connects (by `DirectoriesSyncModule`) and are removed when `remove_inbox_connection` is called.
+Each connected user's emails are stored in a **dedicated root scope** (a top-level isolation boundary in the Unique knowledge base that logically separates one user's data from another's) within the Unique knowledge base. Scopes are created automatically when the user connects (by `DirectoriesSyncModule`) and are removed when `delete_inbox_data` is called.
 
 **Logical isolation:**
 

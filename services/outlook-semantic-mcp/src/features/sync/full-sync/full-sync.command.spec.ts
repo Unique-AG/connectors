@@ -95,6 +95,15 @@ function createMockDb({
 
   return {
     transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(tx)),
+    query: {
+      userProfiles: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: USER_PROFILE_ID,
+          email: 'test@example.com',
+          providerUserId: null,
+        }),
+      },
+    },
     __tx: tx,
   };
 }
@@ -260,12 +269,13 @@ describe('FullSyncCommand', () => {
       expect(batchCommand.run).toHaveBeenCalledOnce();
     });
 
-    it('proceeds from failed state', async () => {
+    it('proceeds from failed state with stale heartbeat', async () => {
       const batchCommand = createMockProcessFullSyncBatchCommand('completed');
       const updateByVersionCommand = createMockUpdateByVersionCommand(true);
       const db = createMockDb({
         row: makeRow({
           fullSyncState: 'failed',
+          fullSyncHeartbeatAt: minutesAgo(25),
           fullSyncNextLink: 'https://graph.microsoft.com/next',
         }),
       });
@@ -275,6 +285,23 @@ describe('FullSyncCommand', () => {
 
       expect(result.status).toBe('completed');
       expect(batchCommand.run).toHaveBeenCalledOnce();
+    });
+
+    it('skips from failed state when heartbeat is within cooldown', async () => {
+      const batchCommand = createMockProcessFullSyncBatchCommand();
+      const db = createMockDb({
+        row: makeRow({
+          fullSyncState: 'failed',
+          fullSyncHeartbeatAt: minutesAgo(5),
+          fullSyncNextLink: 'https://graph.microsoft.com/next',
+        }),
+      });
+      const command = createCommand({ batchCommand, db });
+
+      const result = await command.run(USER_PROFILE_ID);
+
+      expect(result).toEqual({ status: 'skipped', reason: 'recovery-retried-to-early' });
+      expect(batchCommand.run).not.toHaveBeenCalled();
     });
 
     it('skips from paused state', async () => {

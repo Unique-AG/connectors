@@ -3,7 +3,7 @@ import { DrizzleModule } from '~/db/drizzle.module';
 import { DirectoriesSyncModule } from '~/features/directories-sync/directories-sync.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
-import { MailIngestionModule } from '../../mail-ingestion/mail-ingestion.module';
+import { ProcessEmailModule } from '../../process-email/process-email.module';
 import { SubscriptionUtilsModule } from '../../user-utils/subscription-utils.module';
 import { FindInboxConfigByVersionQuery } from './find-inbox-config-by-version.query';
 import { FullSyncCommand } from './full-sync.command';
@@ -22,7 +22,7 @@ import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-vers
     MsGraphModule,
     SubscriptionUtilsModule,
     UniqueApiFeatureModule,
-    MailIngestionModule,
+    ProcessEmailModule,
     DirectoriesSyncModule,
   ],
   providers: [
