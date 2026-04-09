@@ -2,8 +2,10 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { pick } from 'remeda';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
+  GET_CURRENT_USER_LOG_SAFE_KEYS,
   GET_CURRENT_USER_QUERY,
   GetCurrentUserQueryResult,
+  LIST_USERS_LOG_SAFE_KEYS,
   LIST_USERS_QUERY,
   ListUsersQueryInput,
   ListUsersQueryResult,
@@ -30,15 +32,19 @@ export class UniqueUsersService {
       const batchResult = await this.scopeManagementClient.request<
         ListUsersQueryResult,
         ListUsersQueryInput
-      >(LIST_USERS_QUERY, {
-        skip,
-        take: BATCH_SIZE,
-        where: {
-          active: {
-            equals: true,
+      >(
+        LIST_USERS_QUERY,
+        {
+          skip,
+          take: BATCH_SIZE,
+          where: {
+            active: {
+              equals: true,
+            },
           },
         },
-      });
+        { logSafeKeys: LIST_USERS_LOG_SAFE_KEYS },
+      );
       users.push(...batchResult.listUsers.nodes.map(pick(['id', 'email'])));
       batchCount = batchResult.listUsers.nodes.length;
       skip += BATCH_SIZE;
@@ -50,8 +56,11 @@ export class UniqueUsersService {
   public async getCurrentUserId(): Promise<string> {
     this.logger.log('Requesting current user ID from Unique API');
 
-    const result =
-      await this.scopeManagementClient.request<GetCurrentUserQueryResult>(GET_CURRENT_USER_QUERY);
+    const result = await this.scopeManagementClient.request<GetCurrentUserQueryResult>(
+      GET_CURRENT_USER_QUERY,
+      undefined,
+      { logSafeKeys: GET_CURRENT_USER_LOG_SAFE_KEYS },
+    );
 
     return result.me.user.id;
   }

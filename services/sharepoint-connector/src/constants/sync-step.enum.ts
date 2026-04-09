@@ -6,8 +6,8 @@ export const FullSyncStep = {
 export type FullSyncStep = (typeof FullSyncStep)[keyof typeof FullSyncStep];
 
 export const SiteSyncStep = {
-  RootScopeInit: 'root_scope_initialization',
   SiteNameFetch: 'site_name_fetch',
+  RootScopeInit: 'root_scope_initialization',
   SubsiteDiscovery: 'subsite_discovery',
   SiteItemsFetch: 'site_items_fetch',
   SubsiteItemsFetch: 'subsite_items_fetch',

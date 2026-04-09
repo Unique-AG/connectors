@@ -5,9 +5,9 @@ import type {
   IngestionFinalizationRequest,
   UniqueApiClient,
 } from '@unique-ag/unique-api';
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
-import { request } from 'undici';
+import { type Dispatcher, request } from 'undici';
 import type { TenantConfig } from '../config';
 import type { ConfluenceApiClient } from '../confluence-api';
 import {
@@ -16,19 +16,24 @@ import {
   OWNER_TYPE,
   SOURCE_OWNER_TYPE,
 } from '../constants/ingestion.constants';
+import type { Metrics } from '../metrics';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 export class IngestionService {
   private readonly logger = new Logger(IngestionService.name);
   private readonly sourceKind: string;
   private readonly sourceName: string;
+  private readonly dispatcher: Dispatcher | undefined;
 
   public constructor(
     private readonly config: TenantConfig,
     private readonly tenantName: string,
     private readonly uniqueApiClient: UniqueApiClient,
     private readonly confluenceApiClient: ConfluenceApiClient,
+    private readonly metrics: Metrics,
+    dispatcher?: Dispatcher,
   ) {
+    this.dispatcher = dispatcher;
     this.sourceKind = getSourceKind(this.config.confluence.instanceType);
     this.sourceName = this.config.confluence.baseUrl;
   }
@@ -107,7 +112,9 @@ export class IngestionService {
         attachment.pageId,
         attachment.downloadPath,
       );
+      const uploadStartTime = Date.now();
       await this.uploadStream(uploadUrl, stream, attachment.mediaType, attachment.fileSize);
+      this.metrics.recordAttachmentUploadDuration(elapsedSeconds(uploadStartTime));
 
       const finalizationRequest = this.buildFinalizationRequest(
         registrationRequest,
@@ -175,6 +182,11 @@ export class IngestionService {
         deletedCount,
         msg: 'Content deleted',
       });
+
+      // TODO: recordContentDeleted is disabled until deleteByIds returns accurate success/failure
+      // counts. Currently deleteByIds counts items sent, not items confirmed deleted by the API,
+      // and on failure we don't know how many were partially deleted. Follow-up: fix deleteByIds
+      // in @unique-ag/unique-api to return { deleted, failed } based on the mutation response.
       return deletedCount;
     } catch (error) {
       this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
@@ -265,6 +277,7 @@ export class IngestionService {
         'x-ms-blob-type': 'BlockBlob',
       },
       body: buffer,
+      dispatcher: this.dispatcher,
     });
 
     assert.ok(statusCode >= 200 && statusCode < 300, `Upload failed with status ${statusCode}`);
@@ -284,6 +297,7 @@ export class IngestionService {
         'x-ms-blob-type': 'BlockBlob',
       },
       body: stream,
+      dispatcher: this.dispatcher,
     });
 
     assert.ok(statusCode >= 200 && statusCode < 300, `Upload failed with status ${statusCode}`);

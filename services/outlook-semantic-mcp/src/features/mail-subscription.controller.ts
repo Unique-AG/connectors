@@ -17,7 +17,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { partition } from 'remeda';
+import { partition, unique } from 'remeda';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
@@ -80,6 +80,13 @@ export class MailSubscriptionController {
               notification.subscriptionId,
             );
           }
+          case 'missed': {
+            const payload = LiveCatchUpEventDto.parse({
+              type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
+              payload: { subscriptionId: notification.subscriptionId },
+            });
+            return this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload);
+          }
 
           default: {
             traceEvent('lifecycle notification unsupported', {
@@ -133,6 +140,8 @@ export class MailSubscriptionController {
   @HttpCode(HttpStatus.ACCEPTED)
   @UseInterceptors(ValidationCallInterceptor)
   public async notification(@Body() event: ChangeNotificationCollectionDto) {
+    const notificationReceivedAt = new Date();
+
     this.logger.log({
       msg: 'Received change notification webhook from Microsoft Graph',
       notificationCount: event.value.length,
@@ -155,7 +164,7 @@ export class MailSubscriptionController {
       return;
     }
 
-    const bySubscription = new Map<string, string[]>();
+    const subscriptionIds: string[] = [];
     for (const notification of notificationsToProcess) {
       const isTrusted = this.utils.isWebhookTrustedViaState(notification.clientState);
       if (!isTrusted) {
@@ -174,21 +183,22 @@ export class MailSubscriptionController {
         });
         continue;
       }
-      const existing = bySubscription.get(notification.subscriptionId);
-      if (existing) {
-        existing.push(messageId);
-      } else {
-        bySubscription.set(notification.subscriptionId, [messageId]);
-      }
+      subscriptionIds.push(notification.subscriptionId);
     }
 
     const publishResult = await Promise.allSettled(
-      Array.from(bySubscription).map(([subscriptionId, messageIds]) => {
+      unique(subscriptionIds).map((subscriptionId) => {
         const payload = LiveCatchUpEventDto.parse({
           type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
-          payload: { subscriptionId, messageIds },
+          payload: {
+            subscriptionId,
+            notificationReceivedAt: notificationReceivedAt.toISOString(),
+          },
         });
-        this.logger.log({ msg: 'Publishing live catch-up event', subscriptionId, messageIds });
+        this.logger.log({
+          msg: 'Publishing live catch-up event',
+          subscriptionId,
+        });
         return this.amqpConnection.publish(MAIN_EXCHANGE.name, payload.type, payload);
       }),
     );

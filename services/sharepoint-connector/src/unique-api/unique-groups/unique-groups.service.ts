@@ -3,22 +3,28 @@ import { pick, prop } from 'remeda';
 import { Smeared } from '../../utils/smeared';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
+  ADD_GROUP_MEMBERS_LOG_SAFE_KEYS,
   ADD_GROUP_MEMBERS_MUTATION,
   AddGroupMembersMutationInput,
   AddGroupMembersMutationResult,
+  CREATE_GROUP_LOG_SAFE_KEYS,
   CREATE_GROUP_MUTATION,
   CreateGroupMutationInput,
   CreateGroupMutationResult,
+  DELETE_GROUP_LOG_SAFE_KEYS,
   DELETE_GROUP_MUTATION,
   DeleteGroupMutationInput,
   DeleteGroupMutationResult,
   getListGroupsQuery,
+  LIST_GROUPS_LOG_SAFE_KEYS,
   ListGroupsQueryInput,
   ListGroupsQueryResult,
+  REMOVE_GROUP_MEMBER_LOG_SAFE_KEYS,
   REMOVE_GROUP_MEMBER_MUTATION,
   RemoveGroupMemberMutationInput,
   RemoveGroupMemberMutationResult,
   SHAREPOINT_CONNECTOR_GROUP_CREATED_BY,
+  UPDATE_GROUP_LOG_SAFE_KEYS,
   UPDATE_GROUP_MUTATION,
   UpdateGroupMutationInput,
   UpdateGroupMutationResult,
@@ -49,15 +55,19 @@ export class UniqueGroupsService {
       const batchResult = await this.scopeManagementClient.request<
         ListGroupsQueryResult<true>,
         ListGroupsQueryInput
-      >(getListGroupsQuery(true), {
-        where: {
-          externalId: {
-            startsWith: groupExternalIdPrefix,
+      >(
+        getListGroupsQuery(true),
+        {
+          where: {
+            externalId: {
+              startsWith: groupExternalIdPrefix,
+            },
           },
+          skip,
+          take: BATCH_SIZE,
         },
-        skip,
-        take: BATCH_SIZE,
-      });
+        { logSafeKeys: LIST_GROUPS_LOG_SAFE_KEYS },
+      );
       groups.push(
         ...batchResult.listGroups.map((group) => ({
           ...pick(group, ['id', 'name', 'externalId']),
@@ -77,11 +87,15 @@ export class UniqueGroupsService {
     const result = await this.scopeManagementClient.request<
       CreateGroupMutationResult,
       CreateGroupMutationInput
-    >(CREATE_GROUP_MUTATION, {
-      name: group.name,
-      externalId: group.externalId,
-      createdBy: SHAREPOINT_CONNECTOR_GROUP_CREATED_BY,
-    });
+    >(
+      CREATE_GROUP_MUTATION,
+      {
+        name: group.name,
+        externalId: group.externalId,
+        createdBy: SHAREPOINT_CONNECTOR_GROUP_CREATED_BY,
+      },
+      { logSafeKeys: CREATE_GROUP_LOG_SAFE_KEYS },
+    );
 
     return {
       ...result.createGroup,
@@ -95,10 +109,14 @@ export class UniqueGroupsService {
     const result = await this.scopeManagementClient.request<
       UpdateGroupMutationResult,
       UpdateGroupMutationInput
-    >(UPDATE_GROUP_MUTATION, {
-      groupId: group.id,
-      name: group.name,
-    });
+    >(
+      UPDATE_GROUP_MUTATION,
+      {
+        groupId: group.id,
+        name: group.name,
+      },
+      { logSafeKeys: UPDATE_GROUP_LOG_SAFE_KEYS },
+    );
 
     return result.updateGroup;
   }
@@ -109,6 +127,7 @@ export class UniqueGroupsService {
       {
         groupId,
       },
+      { logSafeKeys: DELETE_GROUP_LOG_SAFE_KEYS },
     );
   }
 
@@ -116,10 +135,14 @@ export class UniqueGroupsService {
     await this.scopeManagementClient.request<
       AddGroupMembersMutationResult,
       AddGroupMembersMutationInput
-    >(ADD_GROUP_MEMBERS_MUTATION, {
-      groupId,
-      userIds: memberIds,
-    });
+    >(
+      ADD_GROUP_MEMBERS_MUTATION,
+      {
+        groupId,
+        userIds: memberIds,
+      },
+      { logSafeKeys: ADD_GROUP_MEMBERS_LOG_SAFE_KEYS },
+    );
   }
 
   public async removeGroupMembers(groupId: string, userIds: string[]): Promise<void> {
@@ -129,10 +152,14 @@ export class UniqueGroupsService {
       await this.scopeManagementClient.request<
         RemoveGroupMemberMutationResult,
         RemoveGroupMemberMutationInput
-      >(REMOVE_GROUP_MEMBER_MUTATION, {
-        groupId,
-        userId,
-      });
+      >(
+        REMOVE_GROUP_MEMBER_MUTATION,
+        {
+          groupId,
+          userId,
+        },
+        { logSafeKeys: REMOVE_GROUP_MEMBER_LOG_SAFE_KEYS },
+      );
     }
   }
 }

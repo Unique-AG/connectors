@@ -225,23 +225,23 @@ describe('buildSearchFilter', () => {
 
   it('passes hasAttachments boolean value as-is', () => {
     const resultTrue = buildSearchFilter([
-      { hasAttachments: { value: true, operator: UniqueQLOperator.EQUALS } },
+      { hasAttachments: { value: 'true', operator: UniqueQLOperator.EQUALS } },
     ]);
 
     expect(resultTrue).toEqual({
       path: ['hasAttachments'],
       operator: UniqueQLOperator.EQUALS,
-      value: true,
+      value: 'true',
     });
 
     const resultFalse = buildSearchFilter([
-      { hasAttachments: { value: false, operator: UniqueQLOperator.EQUALS } },
+      { hasAttachments: { value: 'false', operator: UniqueQLOperator.EQUALS } },
     ]);
 
     expect(resultFalse).toEqual({
       path: ['hasAttachments'],
       operator: UniqueQLOperator.EQUALS,
-      value: false,
+      value: 'false',
     });
   });
 });

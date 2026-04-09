@@ -13,8 +13,8 @@ type FullSyncFields = Pick<
   | 'fullSyncScheduledForIngestion'
   | 'fullSyncFailedToUploadForIngestion'
   | 'filters'
-  | 'oldestCreatedDateTime'
-  | 'newestCreatedDateTime'
+  | 'oldestReceivedEmailDateTime'
+  | 'newestReceivedEmailDateTime'
 >;
 
 @Injectable()
@@ -31,8 +31,8 @@ export class FindInboxConfigByVersionQuery {
         fullSyncScheduledForIngestion: inboxConfigurations.fullSyncScheduledForIngestion,
         fullSyncFailedToUploadForIngestion: inboxConfigurations.fullSyncFailedToUploadForIngestion,
         filters: inboxConfigurations.filters,
-        oldestCreatedDateTime: inboxConfigurations.oldestCreatedDateTime,
-        newestCreatedDateTime: inboxConfigurations.newestCreatedDateTime,
+        oldestReceivedEmailDateTime: inboxConfigurations.oldestReceivedEmailDateTime,
+        newestReceivedEmailDateTime: inboxConfigurations.newestReceivedEmailDateTime,
       })
       .from(inboxConfigurations)
       .where(

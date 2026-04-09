@@ -11,6 +11,10 @@ import { ProxyService } from '../../proxy';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getErrorCodeFromGraphqlRequest } from '../../utils/graphql-error.util';
 import { sanitizeError } from '../../utils/normalize-error';
+import {
+  sanitizeGraphqlVariables,
+  type VariableLogPolicy,
+} from '../../utils/sanitize-graphql-variables';
 import { elapsedMilliseconds, elapsedSeconds } from '../../utils/timing.util';
 import { UniqueAuthService } from '../unique-auth.service';
 
@@ -80,6 +84,7 @@ export class UniqueGraphqlClient {
   public async request<T, V extends Variables = Variables>(
     document: RequestDocument,
     variables?: V,
+    options?: { logSafeKeys?: VariableLogPolicy },
   ): Promise<T> {
     return await this.limiter.schedule(async () => {
       const startTime = Date.now();
@@ -90,8 +95,8 @@ export class UniqueGraphqlClient {
         // However I tried to type variables, I always got an error, no matter how I tried. AI
         // agent wasted good 15 minutes on this and also didn't find a solution. For such internal
         // call and with such weird typing I think it's okay to use hard type casting.
-        const options = { document, variables } as unknown as RequestOptions<V, T>;
-        const result = await this.graphQlClient.request<T, V>(options);
+        const requestOptions = { document, variables } as unknown as RequestOptions<V, T>;
+        const result = await this.graphQlClient.request<T, V>(requestOptions);
 
         this.spcUniqueApiRequestDurationSeconds.record(elapsedSeconds(startTime), {
           api_method: apiMethod,
@@ -139,6 +144,10 @@ export class UniqueGraphqlClient {
         this.logger.error({
           msg: `Failed ${this.clientTarget} request (${operationName})`,
           operationName,
+          variables: sanitizeGraphqlVariables(
+            variables as Record<string, unknown> | undefined,
+            options?.logSafeKeys,
+          ),
           error: sanitizeError(error),
         });
         throw error;
