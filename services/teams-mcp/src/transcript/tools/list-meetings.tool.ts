@@ -1,12 +1,13 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import type { UniqueConfigNamespaced } from '~/config';
 import { type MetadataFilter, UniqueQLOperator } from '~/unique/unique.dtos';
 import { UniqueContentService } from '~/unique/unique-content.service';
+import { UniqueUserMappingService } from '~/unique/unique-user-mapping.service';
 
 const ListMeetingsInputSchema = z.object({
   dateFrom: z.iso
@@ -60,6 +61,7 @@ export class ListMeetingsTool {
   public constructor(
     private readonly config: ConfigService<UniqueConfigNamespaced, true>,
     private readonly contentService: UniqueContentService,
+    private readonly userMapping: UniqueUserMappingService,
     private readonly traceService: TraceService,
   ) {}
 
@@ -87,10 +89,18 @@ export class ListMeetingsTool {
   public async listMeetings(
     input: z.infer<typeof ListMeetingsInputSchema>,
     _context: Context,
-    // Access control is enforced by the KB platform; no user identity resolution needed here
-    _request: McpAuthenticatedRequest,
+    request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof ListMeetingsOutputSchema>> {
+    const userProfileId = request.user?.userProfileId;
+    if (!userProfileId) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+
+    const scopeContext = await this.userMapping.resolve(userProfileId);
+
     const span = this.traceService.getSpan();
+    span?.setAttribute('user_profile_id', userProfileId);
+    span?.setAttribute('unique_user_id', scopeContext.userId);
     span?.setAttribute('filter.has_date_from', !!input.dateFrom);
     span?.setAttribute('filter.has_date_to', !!input.dateTo);
     span?.setAttribute('filter.has_organizer', !!input.organizer);
@@ -115,7 +125,7 @@ export class ListMeetingsTool {
     const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
     const filter = this.buildFilter(rootScopeId, input);
 
-    const result = await this.contentService.findByMetadata(filter, {
+    const result = await this.contentService.scopedFindByMetadata(filter, scopeContext, {
       skip: input.skip,
       take: input.take,
     });
