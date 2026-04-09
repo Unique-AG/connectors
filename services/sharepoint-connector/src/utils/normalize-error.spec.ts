@@ -1,4 +1,4 @@
-import { ClientError } from 'graphql-request';
+import { ClientError, type GraphQLResponse } from 'graphql-request';
 import { describe, expect, it } from 'vitest';
 import { normalizeError, sanitizeError } from './normalize-error';
 
@@ -122,23 +122,22 @@ describe('sanitizeError', () => {
     baseMessage: string,
     variables: Record<string, unknown>,
   ): ClientError {
-    return new ClientError(
-      {
-        errors: [
-          {
-            message: baseMessage,
-            path: ['contentUpsert', 'writeUrl'],
-            extensions: { code: 'INTERNAL_SERVER_ERROR' },
-          },
-        ],
-        status: 200,
-      },
-      {
-        query:
-          'mutation ContentUpsert($input: ContentCreateInput!) { contentUpsert(input: $input) { id } }',
-        variables,
-      },
-    );
+    const response = {
+      errors: [
+        {
+          message: baseMessage,
+          path: ['contentUpsert', 'writeUrl'],
+          extensions: { code: 'INTERNAL_SERVER_ERROR' },
+        },
+      ],
+      status: 200,
+    } as unknown as GraphQLResponse;
+
+    return new ClientError(response, {
+      query:
+        'mutation ContentUpsert($input: ContentCreateInput!) { contentUpsert(input: $input) { id } }',
+      variables,
+    });
   }
 
   it('serialises a plain Error', () => {
@@ -197,7 +196,10 @@ describe('sanitizeError', () => {
   });
 
   it('handles GraphQL client error with no response errors array', () => {
-    const error = new ClientError({ status: 500 }, { query: 'query {}', variables: {} });
+    const error = new ClientError({ status: 500 } as unknown as GraphQLResponse, {
+      query: 'query {}',
+      variables: {},
+    });
 
     const result = sanitizeError(error) as Record<string, unknown>;
 
