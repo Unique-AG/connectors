@@ -250,7 +250,7 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 
 ### Can one connector serve multiple Confluence instances?
 
-**Answer:** Yes. Each Confluence instance is configured as a separate tenant with its own YAML configuration file. All tenants run within a single connector deployment with independent authentication, API clients, and sync schedules. See [Architecture -- Multi-Tenancy Model](./technical/architecture.md#Multi-Tenancy-Model) for details on tenant isolation and per-tenant service instances.
+**Answer:** Yes. Each Confluence instance is configured as a separate tenant with its own YAML configuration file. All tenants run within a single connector deployment with independent authentication, API clients, and sync schedules. See [Architecture -- Multi-Tenancy Support](./technical/architecture.md#Multi-Tenancy-Support) for details on tenant isolation and per-tenant service instances.
 
 ### How do I add a new tenant?
 

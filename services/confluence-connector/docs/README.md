@@ -91,7 +91,7 @@ Content types `database`, `whiteboard`, and `embed` are explicitly skipped (no b
 
 **Multi-Tenancy**
 
-- Multiple Confluence instances (tenants) can be configured in a single deployment, each with independent configuration, authentication, and sync schedules. See [Architecture -- Multi-Tenancy Model](./technical/architecture.md#Multi-Tenancy-Model) for the isolation model and per-tenant service details.
+- Multiple Confluence instances (tenants) can be configured in a single deployment, each with independent configuration, authentication, and sync schedules. See [Architecture -- Multi-Tenancy Support](./technical/architecture.md#Multi-Tenancy-Support) for the isolation model and per-tenant service details.
 
 **Concurrency Control**
 
