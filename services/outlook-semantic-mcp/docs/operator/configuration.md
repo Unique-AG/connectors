@@ -288,7 +288,7 @@ Values above 180 days are not recommended unless mail volume is low and the oper
 
 ```yaml
 mcpConfig:
-  defaultMailFilters: '{"retentionWindowInDays":180,"ignoredContents":["/unsubscribe/i"],"ignoredSenders":["/^noreply@example\\.com$/i"]}'
+  defaultMailFilters: '{"retentionWindowInDays":95,"ignoredContents":["/unsubscribe/i"],"ignoredSenders":["/^noreply@example\\.com$/i"]}'
 ```
 
 The example uses 180 days. Adjust based on your organization's mail volume and search needs.

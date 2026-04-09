@@ -15,7 +15,7 @@ vi.mock('~/features/tracing.utils', () => ({
 const USER_PROFILE_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 const VERSION = 'test-version-uuid';
 const _DEFAULT_FILTERS = {
-  retentionWindowInDays: 365,
+  retentionWindowInDays: 95,
   ignoredSenders: [],
   ignoredContents: [],
 };
@@ -106,7 +106,7 @@ function createMockFindConfigByVersion(config?: {
     fullSyncScheduledForIngestion: 0,
     fullSyncFailedToUploadForIngestion: 0,
     filters: {
-      retentionWindowInDays: 365,
+      retentionWindowInDays: 95,
       ignoredSenders: [],
       ignoredContents: [],
     },
@@ -179,7 +179,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: null,
         fullSyncBatchIndex: 0,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
@@ -206,7 +206,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: START_FULL_SYNC_LINK,
         fullSyncBatchIndex: 2,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
@@ -237,7 +237,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: START_FULL_SYNC_LINK,
         fullSyncBatchIndex: 0,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
@@ -282,7 +282,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: START_FULL_SYNC_LINK,
         fullSyncBatchIndex: 5,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
@@ -317,7 +317,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: START_FULL_SYNC_LINK,
         fullSyncBatchIndex: 3,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
@@ -347,7 +347,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: START_FULL_SYNC_LINK,
         fullSyncBatchIndex: 5,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
@@ -376,7 +376,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: START_FULL_SYNC_LINK,
         fullSyncBatchIndex: 5,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
@@ -410,7 +410,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: START_FULL_SYNC_LINK,
         fullSyncBatchIndex: 1,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
@@ -437,7 +437,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: START_FULL_SYNC_LINK,
         fullSyncBatchIndex: 3,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
@@ -461,7 +461,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: START_FULL_SYNC_LINK,
         fullSyncBatchIndex: 1,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
@@ -501,7 +501,7 @@ describe('ProcessFullSyncBatchCommand', () => {
         fullSyncNextLink: START_FULL_SYNC_LINK,
         fullSyncBatchIndex: 50,
         filters: {
-          retentionWindowInDays: 365,
+          retentionWindowInDays: 95,
           ignoredSenders: [],
           ignoredContents: [],
         },
