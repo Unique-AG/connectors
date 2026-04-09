@@ -1,14 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { shouldSkipEmail } from './should-skip-email';
 
 vi.mock('~/features/tracing.utils', () => ({ traceEvent: vi.fn() }));
 
-function daysAgoISO(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString();
-}
+const FIXED_NOW = new Date('2025-06-15T14:32:00.000Z');
+
+// Recent date well within any 30-day retention window used in these tests.
+const RECENT = '2025-06-14T10:00:00.000Z';
+// 60 days before FIXED_NOW — outside a 30-day retention window.
+const OLD = '2025-04-16T10:00:00.000Z';
 
 const baseFilters = (): InboxConfigurationMailFilters => ({
   retentionWindowInDays: 30,
@@ -19,10 +20,23 @@ const baseFilters = (): InboxConfigurationMailFilters => ({
 const context = { userProfileId: 'user-1' };
 
 describe('shouldSkipEmail', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe('no filters match', () => {
     it('returns { skip: false } when no patterns are configured', () => {
       const result = shouldSkipEmail(
-        { subject: 'Hello', from: { emailAddress: { address: 'a@b.com' } } },
+        {
+          receivedDateTime: RECENT,
+          subject: 'Hello',
+          from: { emailAddress: { address: 'a@b.com' } },
+        },
         baseFilters(),
         context,
       );
@@ -32,17 +46,12 @@ describe('shouldSkipEmail', () => {
 
   describe('retentionWindowInDays', () => {
     it('skips when receivedDateTime is older than the retention window', () => {
-      const result = shouldSkipEmail({ receivedDateTime: daysAgoISO(60) }, baseFilters(), context);
+      const result = shouldSkipEmail({ receivedDateTime: OLD }, baseFilters(), context);
       expect(result).toEqual({ skip: true, reason: 'receivedDateTime' });
     });
 
     it('does not skip when receivedDateTime is within the retention window', () => {
-      const result = shouldSkipEmail({ receivedDateTime: daysAgoISO(1) }, baseFilters(), context);
-      expect(result).toEqual({ skip: false });
-    });
-
-    it('does not skip when receivedDateTime is absent', () => {
-      const result = shouldSkipEmail({}, baseFilters(), context);
+      const result = shouldSkipEmail({ receivedDateTime: RECENT }, baseFilters(), context);
       expect(result).toEqual({ skip: false });
     });
   });
@@ -52,7 +61,7 @@ describe('shouldSkipEmail', () => {
       const filters = baseFilters();
       filters.ignoredSenders = [/^noreply@example\.com$/];
       const result = shouldSkipEmail(
-        { from: { emailAddress: { address: 'noreply@example.com' } } },
+        { receivedDateTime: RECENT, from: { emailAddress: { address: 'noreply@example.com' } } },
         filters,
         context,
       );
@@ -67,7 +76,7 @@ describe('shouldSkipEmail', () => {
       const filters = baseFilters();
       filters.ignoredSenders = [/no-?reply/i];
       const result = shouldSkipEmail(
-        { from: { emailAddress: { address: 'NoReply@corp.com' } } },
+        { receivedDateTime: RECENT, from: { emailAddress: { address: 'NoReply@corp.com' } } },
         filters,
         context,
       );
@@ -82,7 +91,7 @@ describe('shouldSkipEmail', () => {
       const filters = baseFilters();
       filters.ignoredSenders = [/noreply/];
       const result = shouldSkipEmail(
-        { from: { emailAddress: { address: 'alice@corp.com' } } },
+        { receivedDateTime: RECENT, from: { emailAddress: { address: 'alice@corp.com' } } },
         filters,
         context,
       );
@@ -92,7 +101,7 @@ describe('shouldSkipEmail', () => {
     it('does not skip when sender address is absent', () => {
       const filters = baseFilters();
       filters.ignoredSenders = [/noreply/];
-      const result = shouldSkipEmail({ from: null }, filters, context);
+      const result = shouldSkipEmail({ receivedDateTime: RECENT, from: null }, filters, context);
       expect(result).toEqual({ skip: false });
     });
   });
@@ -101,7 +110,11 @@ describe('shouldSkipEmail', () => {
     it('skips when pattern matches subject', () => {
       const filters = baseFilters();
       filters.ignoredContents = [/unsubscribe/i];
-      const result = shouldSkipEmail({ subject: 'Click here to Unsubscribe' }, filters, context);
+      const result = shouldSkipEmail(
+        { receivedDateTime: RECENT, subject: 'Click here to Unsubscribe' },
+        filters,
+        context,
+      );
       expect(result).toEqual({
         skip: true,
         reason: 'ignoredContents',
@@ -113,7 +126,11 @@ describe('shouldSkipEmail', () => {
       const filters = baseFilters();
       filters.ignoredContents = [/newsletter/i];
       const result = shouldSkipEmail(
-        { subject: 'Weekly update', uniqueBody: { content: 'You are receiving this Newsletter' } },
+        {
+          receivedDateTime: RECENT,
+          subject: 'Weekly update',
+          uniqueBody: { content: 'You are receiving this Newsletter' },
+        },
         filters,
         context,
       );
@@ -128,7 +145,11 @@ describe('shouldSkipEmail', () => {
       const filters = baseFilters();
       filters.ignoredContents = [/unsubscribe/i];
       const result = shouldSkipEmail(
-        { subject: 'Project update', uniqueBody: { content: 'See attached.' } },
+        {
+          receivedDateTime: RECENT,
+          subject: 'Project update',
+          uniqueBody: { content: 'See attached.' },
+        },
         filters,
         context,
       );
@@ -138,7 +159,11 @@ describe('shouldSkipEmail', () => {
     it('does not skip when uniqueBody is null', () => {
       const filters = baseFilters();
       filters.ignoredContents = [/newsletter/i];
-      const result = shouldSkipEmail({ subject: 'Hello', uniqueBody: null }, filters, context);
+      const result = shouldSkipEmail(
+        { receivedDateTime: RECENT, subject: 'Hello', uniqueBody: null },
+        filters,
+        context,
+      );
       expect(result).toEqual({ skip: false });
     });
   });
@@ -155,7 +180,7 @@ describe('shouldSkipEmail', () => {
       filters.ignoredContents = [contentsPattern];
 
       const result = shouldSkipEmail(
-        { from: { emailAddress: { address: 'noreply@example.com' } } },
+        { receivedDateTime: RECENT, from: { emailAddress: { address: 'noreply@example.com' } } },
         filters,
         context,
       );
@@ -180,7 +205,7 @@ describe('shouldSkipEmail', () => {
       filters.ignoredSenders = [throwingPattern];
 
       const result = shouldSkipEmail(
-        { from: { emailAddress: { address: 'a@b.com' } } },
+        { receivedDateTime: RECENT, from: { emailAddress: { address: 'a@b.com' } } },
         filters,
         context,
       );
