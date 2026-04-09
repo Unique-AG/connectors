@@ -6,7 +6,7 @@ export interface ParsedExternalId {
   spaceKey: string;
 }
 
-export function parseExternalId(externalId: string | undefined): ParsedExternalId | undefined {
+export function parseScopeExternalId(externalId: string | undefined): ParsedExternalId | undefined {
   if (!externalId) {
     return undefined;
   }
@@ -26,11 +26,15 @@ export function parseExternalId(externalId: string | undefined): ParsedExternalI
   return { tenantName, spaceId, spaceKey };
 }
 
-export function buildExternalId(tenantName: string, spaceId: string, spaceKey: string): string {
+export function buildScopeExternalId(
+  tenantName: string,
+  spaceId: string,
+  spaceKey: string,
+): string {
   return `${EXTERNAL_ID_PREFIX}${tenantName}:${spaceId}:${spaceKey}`;
 }
 
-export function buildPartialKey(
+export function buildPartialContentKey(
   tenantName: string,
   spaceId: string,
   spaceKey: string,

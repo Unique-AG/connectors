@@ -17,7 +17,7 @@ import {
   SOURCE_OWNER_TYPE,
 } from '../constants/ingestion.constants';
 import type { Metrics } from '../metrics';
-import { buildPartialKey } from '../utils/key-format';
+import { buildPartialContentKey } from '../utils/key-format';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 export class IngestionService {
@@ -52,7 +52,7 @@ export class IngestionService {
     let contentId: string | undefined;
     try {
       const htmlBuffer = Buffer.from(page.body, 'utf-8');
-      const partialKey = buildPartialKey(
+      const partialKey = buildPartialContentKey(
         this.tenantName,
         page.spaceId,
         page.spaceKey,
@@ -104,7 +104,7 @@ export class IngestionService {
     let stream: Readable | undefined;
     let contentId: string | undefined;
     try {
-      const partialKey = buildPartialKey(
+      const partialKey = buildPartialContentKey(
         this.tenantName,
         attachment.spaceId,
         attachment.spaceKey,

@@ -4,10 +4,10 @@ import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
 import type { Metrics } from '../metrics';
 import {
-  buildExternalId,
-  buildPartialKey,
+  buildPartialContentKey,
+  buildScopeExternalId,
   type ParsedExternalId,
-  parseExternalId,
+  parseScopeExternalId,
 } from '../utils/key-format';
 
 export class ScopeManagementService {
@@ -75,7 +75,7 @@ export class ScopeManagementService {
       const spaceId = spaceKeyToSpaceId.get(spaceKey);
       assert.ok(spaceId, `No spaceId found for spaceKey: ${spaceKey}`);
 
-      const externalId = buildExternalId(this.tenantName, spaceId, spaceKey);
+      const externalId = buildScopeExternalId(this.tenantName, spaceId, spaceKey);
       if (scope.externalId !== externalId) {
         await this.uniqueApiClient.scopes.updateExternalId(scope.id, externalId);
       }
@@ -110,7 +110,7 @@ export class ScopeManagementService {
 
     for (const { scope, parsed } of orphaned) {
       try {
-        const partialKey = buildPartialKey(
+        const partialKey = buildPartialContentKey(
           this.tenantName,
           parsed.spaceId,
           parsed.spaceKey,
@@ -150,7 +150,7 @@ export class ScopeManagementService {
     const result: Array<{ scope: Scope; parsed: ParsedExternalId }> = [];
 
     for (const child of children) {
-      const parsed = parseExternalId(child.externalId ?? undefined);
+      const parsed = parseScopeExternalId(child.externalId ?? undefined);
       if (!parsed) {
         this.logger.warn({
           scopeId: child.id,

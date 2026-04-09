@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildExternalId, buildPartialKey, parseExternalId } from '../key-format';
+import { buildPartialContentKey, buildScopeExternalId, parseScopeExternalId } from '../key-format';
 
-describe('parseExternalId', () => {
+describe('parseScopeExternalId', () => {
   it('parses a valid external id with all four segments', () => {
-    const result = parseExternalId('confc:my-tenant:space-123:ENG');
+    const result = parseScopeExternalId('confc:my-tenant:space-123:ENG');
 
     expect(result).toEqual({
       tenantName: 'my-tenant',
@@ -13,36 +13,36 @@ describe('parseExternalId', () => {
   });
 
   it('returns undefined for undefined input', () => {
-    expect(parseExternalId(undefined)).toBeUndefined();
+    expect(parseScopeExternalId(undefined)).toBeUndefined();
   });
 
   it('returns undefined for empty string', () => {
-    expect(parseExternalId('')).toBeUndefined();
+    expect(parseScopeExternalId('')).toBeUndefined();
   });
 
   it('returns undefined for wrong prefix', () => {
-    expect(parseExternalId('wrong:my-tenant:space-123:ENG')).toBeUndefined();
+    expect(parseScopeExternalId('wrong:my-tenant:space-123:ENG')).toBeUndefined();
   });
 
   it('returns undefined for old format with only 2 segments after prefix', () => {
-    expect(parseExternalId('confc:my-tenant:ENG')).toBeUndefined();
+    expect(parseScopeExternalId('confc:my-tenant:ENG')).toBeUndefined();
   });
 
   it('returns undefined for too many segments after prefix', () => {
-    expect(parseExternalId('confc:my-tenant:space-123:ENG:extra')).toBeUndefined();
+    expect(parseScopeExternalId('confc:my-tenant:space-123:ENG:extra')).toBeUndefined();
   });
 });
 
-describe('buildExternalId', () => {
+describe('buildScopeExternalId', () => {
   it('builds the canonical external id string', () => {
-    const result = buildExternalId('my-tenant', 'space-123', 'ENG');
+    const result = buildScopeExternalId('my-tenant', 'space-123', 'ENG');
 
     expect(result).toBe('confc:my-tenant:space-123:ENG');
   });
 
-  it('produces a value that parseExternalId round-trips', () => {
-    const externalId = buildExternalId('dogfood-cloud', 'abc-456', 'MKT');
-    const parsed = parseExternalId(externalId);
+  it('produces a value that parseScopeExternalId round-trips', () => {
+    const externalId = buildScopeExternalId('dogfood-cloud', 'abc-456', 'MKT');
+    const parsed = parseScopeExternalId(externalId);
 
     expect(parsed).toEqual({
       tenantName: 'dogfood-cloud',
@@ -52,15 +52,15 @@ describe('buildExternalId', () => {
   });
 });
 
-describe('buildPartialKey', () => {
+describe('buildPartialContentKey', () => {
   it('returns base key without tenant prefix for V1 format', () => {
-    const result = buildPartialKey('my-tenant', 'space-123', 'ENG', true);
+    const result = buildPartialContentKey('my-tenant', 'space-123', 'ENG', true);
 
     expect(result).toBe('space-123_ENG');
   });
 
   it('returns key with tenant prefix for V2 format', () => {
-    const result = buildPartialKey('my-tenant', 'space-123', 'ENG', false);
+    const result = buildPartialContentKey('my-tenant', 'space-123', 'ENG', false);
 
     expect(result).toBe('my-tenant/space-123_ENG');
   });
