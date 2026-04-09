@@ -1,4 +1,4 @@
-import { isObjectType } from 'remeda';
+import { ClientError } from 'graphql-request';
 import { serializeError } from 'serialize-error-cjs';
 
 export function normalizeError(error: unknown): Error {
@@ -32,31 +32,6 @@ export function normalizeError(error: unknown): Error {
   }
 }
 
-interface GraphqlClientErrorShape extends Error {
-  response: {
-    errors?: Array<{
-      message: string;
-      path?: (string | number)[];
-      extensions?: Record<string, unknown>;
-    }>;
-    status?: number;
-  };
-  request: {
-    query?: string;
-    variables?: Record<string, unknown>;
-  };
-}
-
-function isGraphqlClientError(error: unknown): error is GraphqlClientErrorShape {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  // Error type doesn't have any extra properties and here we are checking if they are actually here
-  // and of type we expect, so we have to hard type-cast so TypeScript doesn't complain.
-  const record = error as unknown as Record<string, unknown>;
-  return isObjectType(record.response) && isObjectType(record.request);
-}
-
 /**
  * Serialises an error for structured logging.
  *
@@ -66,7 +41,7 @@ function isGraphqlClientError(error: unknown): error is GraphqlClientErrorShape 
  * fields, so unsanitised variables never reach the logs.
  */
 export function sanitizeError(error: unknown): object {
-  if (isGraphqlClientError(error)) {
+  if (error instanceof ClientError) {
     const jsonDumpStart = error.message.indexOf(': {"response":');
     const baseMessage = jsonDumpStart >= 0 ? error.message.slice(0, jsonDumpStart) : error.message;
 
