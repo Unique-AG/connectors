@@ -150,6 +150,23 @@ describe('ConnectivityHealthIndicator', () => {
     });
   });
 
+  it('extracts error code from nested cause when undici wraps the transport error', async () => {
+    const cause = Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' });
+    const wrappedError = Object.assign(new TypeError('fetch failed'), { cause });
+    mockFetch.mockRejectedValueOnce(wrappedError).mockResolvedValueOnce(new Response());
+
+    const result = await indicator.check('connectivity');
+
+    expect(result).toEqual({
+      connectivity: {
+        status: 'down',
+        graph: 'unreachable',
+        graphError: 'ENOTFOUND',
+        sharepoint: [{ tenant: 'default', status: 'reachable' }],
+      },
+    });
+  });
+
   it('treats non-2xx HTTP responses as reachable', async () => {
     mockFetch
       .mockResolvedValueOnce(new Response(null, { status: 200 }))

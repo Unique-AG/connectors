@@ -1071,7 +1071,7 @@ describe('SharepointSynchronizationService', () => {
 
     const result = await service.synchronize();
 
-    expect(result.status).toBe('success');
+    expect(result.fullResult.status).toBe('success');
     expect(mockGraphApiService.getSiteInfo).toHaveBeenCalled();
     expect(mockScopeManagementService.initializeRootScope).not.toHaveBeenCalled();
     expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();

@@ -7,7 +7,9 @@ export function extractErrorCode(error: unknown): string {
   if (error instanceof DOMException && error.name === 'TimeoutError') {
     return 'TIMEOUT';
   }
-  // undici throws system-level errors (ECONNREFUSED, ENOTFOUND, etc.) as NodeJS.ErrnoException
-  // with a `.code` property identifying the OS-level failure reason.
-  return (error as NodeJS.ErrnoException).code ?? 'UNKNOWN';
+  // undici wraps transport failures in a TypeError whose `.cause` holds the original
+  // system error (ECONNREFUSED, ENOTFOUND, ENETUNREACH, etc.) as a NodeJS.ErrnoException.
+  const errno = error as NodeJS.ErrnoException;
+  const cause = errno.cause as NodeJS.ErrnoException | undefined;
+  return errno.code ?? cause?.code ?? 'UNKNOWN';
 }
