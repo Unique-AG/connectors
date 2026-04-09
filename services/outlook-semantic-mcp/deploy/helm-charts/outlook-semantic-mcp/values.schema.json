@@ -249,8 +249,24 @@
           "required": ["serviceAuthMode"]
         },
         "defaultMailFilters": {
-          "type": "string",
-          "description": "Default mail filters applied when syncing emails (JSON string). Example: '{\"retentionWindowInDays\":95,\"ignoredContents\":[],\"ignoredSenders\":[]}'"
+          "type": "object",
+          "description": "Default mail filters applied when syncing emails",
+          "properties": {
+            "retentionWindowInDays": {
+              "type": "integer",
+              "description": "Number of days to retain emails"
+            },
+            "ignoredContents": {
+              "type": "array",
+              "description": "List of content patterns to ignore",
+              "items": { "type": "string" }
+            },
+            "ignoredSenders": {
+              "type": "array",
+              "description": "List of sender addresses to ignore",
+              "items": { "type": "string" }
+            }
+          }
         },
         "auth": {
           "type": "object",

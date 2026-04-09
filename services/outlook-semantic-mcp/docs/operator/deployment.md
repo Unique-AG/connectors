@@ -144,7 +144,10 @@ mcpConfig:
   # Adjust it to control how far back the initial email sync goes. Setting a large value can
   # cause very large initial syncs for users with large mailboxes, potentially taking hours
   # and consuming significant Microsoft Graph API quota.
-  defaultMailFilters: '{"retentionWindowInDays":95,"ignoredContents":[],"ignoredSenders":[]}'
+  defaultMailFilters:
+    retentionWindowInDays: 95
+    ignoredContents: []
+    ignoredSenders: []
 ```
 
 **PostgreSQL backups:** Strongly recommended. Without a backup, all users must re-authenticate and full sync restarts from scratch. See [Disaster Recovery — Backup Recommendations](./disaster-recovery.md#Backup-recommendations).

@@ -160,7 +160,10 @@ mcpConfig:
       x-company-id: "<your-company-id>"
       x-user-id: "<your-zitadel-service-user-id>"
 
-  defaultMailFilters: '{"retentionWindowInDays":95,"ignoredContents":[],"ignoredSenders":[]}'
+  defaultMailFilters:
+    retentionWindowInDays: 95
+    ignoredContents: []
+    ignoredSenders: []
 
 ingress:
   enabled: true
@@ -261,7 +264,7 @@ The `KB_Admin` role covers all of the above. Using a broader role such as `Compa
 
 ## Mail Filters
 
-The `DEFAULT_MAIL_FILTERS` value controls which emails are synced during the initial import and ongoing sync. It is a JSON string set via `mcpConfig.defaultMailFilters`.
+The `DEFAULT_MAIL_FILTERS` value controls which emails are synced during the initial import and ongoing sync. It is configured as a dictionary under `mcpConfig.defaultMailFilters` and serialized to JSON automatically by the Helm chart.
 
 > **Warning:** Changing `DEFAULT_MAIL_FILTERS` only affects newly synced emails. Emails that were already ingested under a previous filter configuration are **not** removed. To remove previously ingested emails, you must delete them manually.
 
@@ -288,7 +291,12 @@ Values above 180 days are not recommended unless mail volume is low and the oper
 
 ```yaml
 mcpConfig:
-  defaultMailFilters: '{"retentionWindowInDays":95,"ignoredContents":["/unsubscribe/i"],"ignoredSenders":["/^noreply@example\\.com$/i"]}'
+  defaultMailFilters:
+    retentionWindowInDays: 95
+    ignoredContents:
+      - "/unsubscribe/i"
+    ignoredSenders:
+      - "/^noreply@example\\.com$/i"
 ```
 
 The example uses 180 days. Adjust based on your organization's mail volume and search needs.
