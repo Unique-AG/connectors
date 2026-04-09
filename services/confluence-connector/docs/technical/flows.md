@@ -286,6 +286,19 @@ Each item sent to the diff API contains:
 | `url` | Confluence URL of the page or attachment | Location tracking |
 | `updatedAt` | Last modification timestamp from Confluence | Change detection |
 
+### Safety Checks
+
+After each space's file diff is computed, two guards run to prevent accidental full deletion of content. Both abort the current tenant sync cycle if triggered.
+
+| Guard | Trigger Condition | Rationale |
+|---|---|---|
+| **Zero-submission guard** | Discovery submitted 0 items but the diff contains deletions | Likely a bug in page fetching or an authentication failure that returned no results. Deleting all stored content would be destructive. |
+| **Full-deletion guard** | The number of files to delete equals the total number of files stored in Unique for that space | Likely a key format change (e.g., toggling `useV1KeyFormat`) that causes all existing keys to appear unrecognized. |
+
+If neither guard triggers, deletions proceed normally. Partial deletions (removing some but not all files) are always allowed.
+
+To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards.
+
 ## Ingestion Pipeline
 
 The ingestion pipeline follows a 3-step process for each item: register, upload, and finalize.
