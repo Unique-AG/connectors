@@ -30,7 +30,7 @@ function createMockDb({
       }),
     }),
     query: {
-      inboxConfiguration: {
+      inboxConfigurations: {
         findFirst: vi.fn().mockResolvedValue(config),
       },
     },

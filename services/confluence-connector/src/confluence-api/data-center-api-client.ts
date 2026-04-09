@@ -23,7 +23,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     private readonly config: ConfluenceConfig,
     private readonly confluenceAuth: ConfluenceAuth,
     private readonly httpClient: RateLimitedHttpClient,
-    private readonly options: ApiClientOptions = { attachmentsEnabled: false },
+    private readonly options: ApiClientOptions,
   ) {
     super();
     this.attachmentExpand = options.attachmentsEnabled ? ATTACHMENT_EXPAND : '';
@@ -36,7 +36,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     // We exclude them because we already get attachments via the expand=children.attachment parameter.
     const cql = `((label="${this.config.ingestSingleLabel}") OR (label="${this.config.ingestAllLabel}")) AND ${spaceTypeFilter} AND type != attachment`;
     const expand = `metadata.labels,version,space${this.attachmentExpand}`;
-    const url = `${this.config.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=${expand}&os_authType=basic&limit=${SEARCH_PAGE_SIZE}&start=0`;
+    const url = `${this.config.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=${expand}&limit=${SEARCH_PAGE_SIZE}&start=0`;
 
     const pages = await fetchAllPaginated(
       url,
@@ -55,7 +55,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
 
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
     const expand = 'body.storage,version,space,metadata.labels';
-    const url = `${this.config.baseUrl}/rest/api/content/${pageId}?os_authType=basic&expand=${expand}`;
+    const url = `${this.config.baseUrl}/rest/api/content/${pageId}?expand=${expand}`;
     const raw = await this.makeAuthenticatedRequest(url);
     const result = confluencePageSchema.safeParse(raw);
     return result.success ? result.data : null;
@@ -74,7 +74,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
       // Attachments are child content in Confluence and would appear as top-level results here.
       // We exclude them because we already get attachments via the expand=children.attachment parameter.
       const cql = `ancestor IN (${batch.join(',')}) AND type != attachment`;
-      const url = `${this.config.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=${expand}&os_authType=basic&limit=${SEARCH_PAGE_SIZE}`;
+      const url = `${this.config.baseUrl}/rest/api/content/search?cql=${encodeURIComponent(cql)}&expand=${expand}&limit=${SEARCH_PAGE_SIZE}`;
 
       const pages = await fetchAllPaginated(
         url,

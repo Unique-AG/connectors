@@ -1,0 +1,380 @@
+<!-- confluence-page-id: 2065629188 -->
+<!-- confluence-space-key: PUBDOC -->
+
+# Configuration
+
+## Environment Variables
+
+All configuration is done via environment variables, either directly or through Helm values.
+
+### Required Secrets
+
+These must be provided via Kubernetes secrets:
+
+| Variable | Format | Description |
+|----------|--------|-------------|
+| `DATABASE_URL` | `postgresql://user:pass@host:5432/db` | PostgreSQL connection string |
+| `AMQP_URL` | `amqp://user:pass@host:5672/vhost` | RabbitMQ connection string (or use individual `AMQP_*` fields) |
+| `MICROSOFT_CLIENT_SECRET` | String from Azure portal | Entra app client secret |
+| `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret — see [Generating Secrets](#Generating-Secrets) |
+| `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key — see [Generating Secrets](#Generating-Secrets) |
+| `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key — see [Generating Secrets](#Generating-Secrets) |
+| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret (required for `external` auth mode only) |
+
+### Application Configuration
+
+Set via `mcpConfig.app` in Helm values:
+
+| Variable | Helm Path | Default | Description |
+|----------|-----------|---------|-------------|
+| `SELF_URL` | `mcpConfig.app.selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
+| `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
+| `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
+| `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
+| `LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.app.liveCatchupOverlappingWindowMinutes` | `3` (application) / `5` (Helm) | Minutes to overlap each live catch-up sync run to account for Office 365 eventual consistency. Minimum: `2` — see [LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES](#LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES) |
+| `LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.app.liveCatchupRecheckOverlappingWindowMinutes` | `10` | Minutes to overlap live catch-up ready-recheck runs. Uses a larger window for higher-latency scenarios. Minimum: `10` — see [LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES](#LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES) |
+| `DEFAULT_MAIL_FILTERS` | `mcpConfig.defaultMailFilters` | (required) | JSON email sync filters — see [Mail Filters](#Mail-Filters) |
+
+### Microsoft Configuration
+
+Set via `mcpConfig.microsoft` in Helm values:
+
+| Variable | Helm Path | Default | Description |
+|----------|-----------|---------|-------------|
+| `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
+| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | defaults to `SELF_URL` | Base URL for Microsoft Graph webhook callbacks — see [MICROSOFT_PUBLIC_WEBHOOK_URL](#MICROSOFT_PUBLIC_WEBHOOK_URL) |
+| `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC` | `3` | UTC hour (0–23) when daily subscription renewals run |
+
+### Unique API Configuration
+
+Set via `mcpConfig.unique` in Helm values:
+
+| Variable | Helm Path | Default | Description |
+|----------|-----------|---------|-------------|
+| `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
+| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
+| `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `mcpConfig.unique.scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
+| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | Store emails as files in the Knowledge Base — see [UNIQUE_STORE_INTERNALLY](#UNIQUE_STORE_INTERNALLY) |
+| `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | `x-company-id` and `x-user-id` headers for `cluster_local` mode — see [UNIQUE_SERVICE_EXTRA_HEADERS](#UNIQUE_SERVICE_EXTRA_HEADERS) |
+| `UNIQUE_ZITADEL_CLIENT_ID` | `mcpConfig.unique.zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
+| `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `mcpConfig.unique.zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
+| `UNIQUE_ZITADEL_PROJECT_ID` | `mcpConfig.unique.zitadel.projectId` | (required for `external`) | Zitadel project ID for audience validation |
+
+### Logs Configuration
+
+Set via `mcpConfig.logs` in Helm values:
+
+| Variable | Helm Path | Default | Description |
+|----------|-----------|---------|-------------|
+| `LOGS_DIAGNOSTICS_DATA_POLICY` | `mcpConfig.logs.diagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
+
+### Authentication Token Configuration
+
+These tokens are issued by the MCP server to MCP clients (e.g., AI assistants) after a user completes OAuth. They are distinct from Microsoft tokens and control how long a client session remains valid without re-authentication.
+
+Set via `mcpConfig.auth` in Helm values (optional — defaults are suitable for most deployments):
+
+| Variable | Helm Path | Default | Description |
+|----------|-----------|---------|-------------|
+| `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `mcpConfig.auth.accessTokenExpiresInSeconds` | `60` | TTL of the short-lived access token issued to MCP clients |
+| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `mcpConfig.auth.refreshTokenExpiresInSeconds` | `2592000` | TTL of the long-lived refresh token issued to MCP clients (30 days) |
+
+### Runtime Configuration
+
+Set via `server.env` in Helm values for plain config, or via `server.envVars` (with `valueFrom.secretKeyRef`) for secrets:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_LEVEL` | `info` | Log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` |
+| `MAX_HEAP_MB` | `850` | Node.js max heap size in MB — see [MAX_HEAP_MB](#MAX_HEAP_MB) |
+| `NODE_ENV` | `production` | Node environment |
+| `NODE_EXTRA_CA_CERTS` | — | Path to a PEM file with additional CA certificates for TLS verification |
+| `OTEL_METRICS_EXPORTER` | `prometheus` | OpenTelemetry metrics exporter |
+| `OTEL_EXPORTER_PROMETHEUS_HOST` | `0.0.0.0` | Host for the Prometheus metrics scrape endpoint |
+| `OTEL_EXPORTER_PROMETHEUS_PORT` | `51346` | Port for the Prometheus metrics scrape endpoint |
+
+## Helm Values Reference
+
+### Full Example
+
+```yaml
+server:
+  envVars:
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: DATABASE_URL
+    - name: AMQP_URL
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: AMQP_URL
+    - name: MICROSOFT_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: MICROSOFT_CLIENT_SECRET
+    - name: MICROSOFT_WEBHOOK_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: MICROSOFT_WEBHOOK_SECRET
+    - name: AUTH_HMAC_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: AUTH_HMAC_SECRET
+    - name: ENCRYPTION_KEY
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: ENCRYPTION_KEY
+
+  env:
+    LOG_LEVEL: info
+    MAX_HEAP_MB: 850
+    NODE_ENV: production
+    OTEL_METRICS_EXPORTER: prometheus
+    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+    OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
+
+mcpConfig:
+  enabled: true
+
+  app:
+    selfUrl: https://outlook.semantic.mcp.example.com
+    mcpDebugMode: disabled
+    liveCatchupOverlappingWindowMinutes: 5
+    liveCatchupRecheckOverlappingWindowMinutes: 10
+
+  microsoft:
+    clientId: "12345678-1234-1234-1234-123456789012"
+    # publicWebhookUrl: https://outlook.semantic.mcp.example.com  # optional, defaults to selfUrl
+
+  unique:
+    serviceAuthMode: cluster_local
+    ingestionServiceBaseUrl: http://node-ingestion.unique:8091
+    scopeManagementServiceBaseUrl: http://node-scope-management.unique:8092
+    serviceExtraHeaders:
+      x-company-id: "<your-company-id>"
+      x-user-id: "<your-zitadel-service-user-id>"
+
+  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
+
+ingress:
+  enabled: true
+  ingressClassName: kong
+  hosts:
+    - host: outlook.semantic.mcp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: outlook-semantic-mcp-tls
+      hosts:
+        - outlook.semantic.mcp.example.com
+
+grafana:
+  dashboard:
+    enabled: true
+    folder: mcp-servers
+
+alerts:
+  enabled: true
+  defaultAlerts:
+    graphql:
+      enabled: true
+    uniqueApi:
+      enabled: true
+```
+
+### Service Auth Modes
+
+#### cluster_local (Default)
+
+For deployments within the same Kubernetes cluster as Unique. Uses in-cluster service URLs with `x-company-id` and `x-user-id` headers passed to all Unique API requests.
+
+!!! warning "`x-user-id` must be a real Zitadel service user"
+    The `x-user-id` value **must** be the ID of an actual service user created in Zitadel — it cannot be an arbitrary value. See [Zitadel Service Account](#Zitadel-Service-Account) for setup instructions.
+
+```yaml
+mcpConfig:
+  unique:
+    serviceAuthMode: cluster_local
+    ingestionServiceBaseUrl: http://node-ingestion.unique:8091
+    scopeManagementServiceBaseUrl: http://node-scope-management.unique:8092
+    serviceExtraHeaders:
+      x-company-id: "<your-company-id>"
+      x-user-id: "<your-zitadel-service-user-id>"
+```
+
+#### external
+
+For deployments outside the Unique cluster. Uses Zitadel OAuth for service-to-service authentication. `UNIQUE_ZITADEL_CLIENT_SECRET` must be provided as a Kubernetes secret.
+
+```yaml
+mcpConfig:
+  unique:
+    serviceAuthMode: external
+    ingestionServiceBaseUrl: https://ingestion.unique.app
+    scopeManagementServiceBaseUrl: https://scope-management.unique.app
+    zitadel:
+      clientId: "<zitadel-client-id>"
+      oauthTokenUrl: "https://your-zitadel-instance.zitadel.cloud/oauth/v2/token"
+      projectId: "<zitadel-project-id>"
+```
+
+## Zitadel Service Account
+
+A Zitadel service account is required for both `cluster_local` and `external` auth modes. For `cluster_local`, its user ID is passed in the `x-user-id` header. For `external`, its credentials are used for service-to-service OAuth.
+
+For instructions on creating a service user, see the [How To Configure A Service User](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075/How+To+Configure+A+Service+User) guide.
+
+### Service-Specific Setup
+
+After creating the service user, note the following values for configuration:
+
+| Value | Used In | Helm Path |
+|-------|---------|-----------|
+| **User ID** | `cluster_local` | `mcpConfig.unique.serviceExtraHeaders.x-user-id` |
+| **Client ID** | `external` | `mcpConfig.unique.zitadel.clientId` |
+| **Client Secret** | `external` | Secret: `UNIQUE_ZITADEL_CLIENT_SECRET` |
+| **Project ID** | `external` | `mcpConfig.unique.zitadel.projectId` |
+| **OAuth Token URL** | `external` | `mcpConfig.unique.zitadel.oauthTokenUrl` |
+
+### Service Account Permissions
+
+The service account must be assigned the **`KB_Admin`** (Knowledge Base Admin) Gatekeeper role. This is the minimum role that grants all permissions the MCP server needs:
+
+| Resource | Required Permissions | Used For |
+|----------|---------------------|----------|
+| `CONTENT` | `READ`, `WRITE`, `DELETE` | Ingesting, updating, and removing email content via the ingestion service |
+| `SCOPE` | `READ`, `WRITE` | Creating and managing Knowledge Base scopes via the scope management service |
+| `SCOPE_ACCESS` | `READ`, `WRITE` | Managing user access to scopes |
+| `FOLDER` | `READ`, `WRITE`, `DELETE` | Managing Knowledge Base folders |
+
+The `KB_Admin` role covers all of the above. Using a broader role such as `Company_Admin` also works but grants unnecessary privileges.
+
+!!! note "Gatekeeper enforcement"
+    Authorization behavior differs by mode. In `cluster_local` mode, Gatekeeper does **not** check user roles — instead, the MCP server's service ID (`outlook-semantic-mcp`) must be listed in the guards of the relevant resolvers. In `external` mode, Gatekeeper authorization is enforced against the Zitadel client credentials, which must have the `KB_Admin` role assigned.
+
+## Mail Filters
+
+The `DEFAULT_MAIL_FILTERS` value controls which emails are synced during the initial import and ongoing sync. It is a JSON string set via `mcpConfig.defaultMailFilters`.
+
+> **Warning:** Changing `DEFAULT_MAIL_FILTERS` only affects newly synced emails. Emails that were already ingested under a previous filter configuration are **not** removed. To remove previously ingested emails, you must delete them manually.
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ignoredBefore` | ISO date string | Skip emails received before this date. Useful to limit the scope of the initial sync. |
+| `ignoredSenders` | Array of regex patterns | Regex patterns in `/pattern/flags` format tested against the sender's email address. Emails matching any pattern are excluded from sync. |
+| `ignoredContents` | Array of regex patterns | Regex patterns in `/pattern/flags` format tested against both the email subject and body. Emails matching any pattern are excluded from sync. |
+
+Patterns for `ignoredSenders` and `ignoredContents` must be in `/pattern/flags` format (e.g. `/^noreply@example\.com$/i`, `/unsubscribe/i`). Patterns are validated against ReDoS attacks on ingestion — invalid or unsafe patterns are rejected.
+
+### Example
+
+```yaml
+mcpConfig:
+  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":["/unsubscribe/i"],"ignoredSenders":["/^noreply@example\\.com$/i"]}'
+```
+
+The default value (`ignoredBefore: 2025-06-06`, empty arrays for the rest) limits the initial sync to emails received after June 6, 2025 with no sender or content exclusions.
+
+## Database Configuration
+
+### Connection String Format
+
+```
+postgresql://username:password@hostname:port/database?sslmode=require
+```
+
+No special PostgreSQL extensions are required. Database migrations run automatically on deployment and create all necessary tables and indexes.
+
+## RabbitMQ Configuration
+
+### Connection String Format
+
+```
+amqp://username:password@hostname:5672/vhost
+```
+
+### Alternative: Individual Fields
+
+Instead of `AMQP_URL`, you can provide individual connection fields:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AMQP_USERNAME` | RabbitMQ username | — |
+| `AMQP_PASSWORD` | RabbitMQ password | — |
+| `AMQP_HOST` | RabbitMQ hostname | — |
+| `AMQP_PORT` | RabbitMQ port | `5672` |
+| `AMQP_VHOST` | Virtual host | — |
+
+## Security Best Practices
+
+1. Rotate secrets regularly, especially `MICROSOFT_CLIENT_SECRET` and `ENCRYPTION_KEY`
+2. Use an external secret manager (e.g., AWS Secrets Manager, Azure Key Vault, HashiCorp Vault) rather than static Kubernetes secrets
+3. Keep `LOGS_DIAGNOSTICS_DATA_POLICY` set to `conceal` (the default) in production to avoid logging sensitive data
+4. Enable network policies to restrict inbound and outbound traffic to only required services
+5. Monitor deployments using the provided Grafana dashboards and alert rules (`grafana.dashboard.enabled: true`, `alerts.enabled: true`)
+
+## Variable Details
+
+### Generating Secrets
+
+The following secrets must be generated with a cryptographically secure random source:
+
+| Variable | Command |
+|----------|---------|
+| `MICROSOFT_WEBHOOK_SECRET` | `openssl rand -hex 64` |
+| `AUTH_HMAC_SECRET` | `openssl rand -hex 32` |
+| `ENCRYPTION_KEY` | `openssl rand -hex 32` |
+
+### PORT
+
+The server listens on `PORT` (default `9542`). In Helm deployments, `server.ports.application` (default `51345`) overrides this value — the Helm chart injects the port via the deployment spec, so `PORT` typically does not need to be set explicitly.
+
+### MCP_DEBUG_MODE
+
+When set to `enabled`, exposes four additional debug tools to all connected MCP users: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync`. These tools are intended for troubleshooting sync issues, but because MCP tools are scoped to the authenticated user there is no way to restrict them to operators only — all users can call them while debug mode is active. Enable only during active troubleshooting and disable immediately after.
+
+### MICROSOFT_PUBLIC_WEBHOOK_URL
+
+Microsoft Graph sends webhook callbacks (change notifications and lifecycle events) to this base URL. Microsoft appends `/mail-subscription/notification` and `/mail-subscription/lifecycle` to construct the full endpoints. The URL must be publicly reachable by Microsoft Graph.
+
+This defaults to `SELF_URL`. Set it explicitly only when the externally reachable webhook URL differs from `SELF_URL` — for example, when using a dev tunnel in local development. In most production deployments the two values are identical.
+
+Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callback`, not this variable.
+
+### UNIQUE_STORE_INTERNALLY
+
+When `enabled` (default), emails are ingested into the Unique Knowledge Base and stored as physical files, making them available for semantic search via `search_emails`.
+
+When `disabled`, emails are indexed (metadata recorded) but not stored as files. They remain searchable via `search_emails`, but the email content is not persisted in the Knowledge Base.
+
+### UNIQUE_SERVICE_EXTRA_HEADERS
+
+Required for `cluster_local` auth mode. Provide as a JSON object:
+
+```json
+{"x-company-id": "<your-company-id>", "x-user-id": "<your-zitadel-service-user-id>"}
+```
+
+- **`x-company-id`** — your organization's ID in the Unique platform. Find it in the Unique admin dashboard under **Settings > Organization**, or via the Unique API (`GET /api/company`).
+- **`x-user-id`** — the Zitadel service user ID. See [Zitadel Service Account](#Zitadel-Service-Account).
+
+### LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES
+
+Office 365 uses eventual consistency — messages can appear with a delayed `updatedAt` timestamp after the actual event. To avoid missing late-arriving messages, each live catch-up sync run re-queries an overlapping window of this many minutes. The application default is `3` minutes; the Helm chart overrides this to `5` for additional safety margin. Minimum: `2`.
+
+### LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES
+
+Overlapping window (in minutes) for live catch-up ready-recheck runs. Uses a larger window than the standard run to account for higher latency during recheck scenarios. Minimum and default: `10`.
+
+### MAX_HEAP_MB
+
+Sets the Node.js `--max-old-space-size` flag. With the default of `850` MB, set the pod memory request/limit to at least ~1 GB to account for non-heap memory overhead (native modules, OS buffers, etc.).

@@ -812,11 +812,22 @@ describe('MetricsMiddleware', () => {
     });
 
     it('does not conceal endpoints in logs when disabled', async () => {
+      const disclosingConfigService = {
+        get: vi.fn().mockImplementation((key: string, _options?: { infer?: boolean }) => {
+          if (key === 'sharepoint.tenantId') {
+            return 'test-tenant-id';
+          }
+          if (key === 'app.logsDiagnosticsDataPolicy') {
+            return 'disclose';
+          }
+          return undefined;
+        }),
+      } as unknown as ConfigService<Config, true>;
       const nonConcealingMiddleware = new MetricsMiddleware(
         mockHistogram,
         mockCounter,
         mockCounter,
-        mockConfigService,
+        disclosingConfigService,
       );
       nonConcealingMiddleware.setNext(mockNextMiddleware);
 

@@ -7,8 +7,6 @@ export const SCOPES = [
   'email',
   'offline_access',
   'User.Read', // (delegated):
-  'Mail.Read', // (delegated):
-  'Mail.ReadBasic', // (delegated):
   'MailboxSettings.Read', // (delegated):
   'Mail.ReadWrite', // (delegated):
   'People.Read', // (delegated):

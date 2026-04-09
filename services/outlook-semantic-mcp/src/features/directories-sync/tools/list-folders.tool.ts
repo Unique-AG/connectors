@@ -48,7 +48,7 @@ export class ListFoldersTool {
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: true,
-      openWorldHint: false,
+      openWorldHint: true,
     },
     _meta: META,
   })

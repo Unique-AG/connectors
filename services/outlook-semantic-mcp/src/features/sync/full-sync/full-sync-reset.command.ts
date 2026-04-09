@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 
 @Injectable()
 export class FullSyncResetCommand {
@@ -15,7 +15,7 @@ export class FullSyncResetCommand {
     const version = crypto.randomUUID();
 
     await this.db
-      .update(inboxConfiguration)
+      .update(inboxConfigurations)
       .set({
         fullSyncVersion: version,
         fullSyncNextLink: null,
@@ -27,7 +27,7 @@ export class FullSyncResetCommand {
         fullSyncLastRunAt: null,
         fullSyncState: 'ready',
       })
-      .where(eq(inboxConfiguration.userProfileId, userProfileId))
+      .where(eq(inboxConfigurations.userProfileId, userProfileId))
       .execute();
 
     this.logger.log({ userProfileId, version, msg: 'Full sync reset' });

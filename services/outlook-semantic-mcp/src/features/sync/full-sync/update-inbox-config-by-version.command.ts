@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, SQL } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 
-type InboxConfig = typeof inboxConfiguration.$inferSelect;
+type InboxConfig = typeof inboxConfigurations.$inferSelect;
 
 export type InboxConfigVersionedUpdate = Partial<{
   [K in Exclude<keyof InboxConfig, 'userProfileId' | 'fullSyncVersion'>]:
@@ -22,12 +22,12 @@ export class UpdateInboxConfigByVersionCommand {
     values: InboxConfigVersionedUpdate,
   ): Promise<boolean> {
     const result = await this.db
-      .update(inboxConfiguration)
+      .update(inboxConfigurations)
       .set(values)
       .where(
         and(
-          eq(inboxConfiguration.userProfileId, userProfileId),
-          eq(inboxConfiguration.fullSyncVersion, version),
+          eq(inboxConfigurations.userProfileId, userProfileId),
+          eq(inboxConfigurations.fullSyncVersion, version),
         ),
       )
       .execute();

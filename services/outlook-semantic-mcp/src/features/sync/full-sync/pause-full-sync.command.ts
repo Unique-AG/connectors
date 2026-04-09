@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 
 type PauseResult =
   | { status: 'paused' }
@@ -19,12 +19,12 @@ export class PauseFullSyncCommand {
   @Span()
   public async run(userProfileId: string): Promise<PauseResult> {
     const result = await this.db
-      .update(inboxConfiguration)
+      .update(inboxConfigurations)
       .set({ fullSyncState: 'paused' })
       .where(
         and(
-          eq(inboxConfiguration.userProfileId, userProfileId),
-          inArray(inboxConfiguration.fullSyncState, [...PAUSABLE_STATES]),
+          eq(inboxConfigurations.userProfileId, userProfileId),
+          inArray(inboxConfigurations.fullSyncState, [...PAUSABLE_STATES]),
         ),
       )
       .execute();
@@ -34,8 +34,8 @@ export class PauseFullSyncCommand {
       return { status: 'paused' };
     }
 
-    const config = await this.db.query.inboxConfiguration.findFirst({
-      where: eq(inboxConfiguration.userProfileId, userProfileId),
+    const config = await this.db.query.inboxConfigurations.findFirst({
+      where: eq(inboxConfigurations.userProfileId, userProfileId),
     });
 
     if (!config) {

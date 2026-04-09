@@ -8,7 +8,7 @@ import { AppConfig, appConfig } from '~/config';
 import {
   DRIZZLE,
   type DrizzleDatabase,
-  inboxConfiguration,
+  inboxConfigurations,
   subscriptions,
   userProfiles,
 } from '~/db';
@@ -112,8 +112,8 @@ export class SubscriptionCreateService {
         });
 
         await this.db
-          .delete(inboxConfiguration)
-          .where(eq(inboxConfiguration.userProfileId, existingSubscription.userProfileId));
+          .delete(inboxConfigurations)
+          .where(eq(inboxConfigurations.userProfileId, existingSubscription.userProfileId));
 
         traceEvent('inbox configuration deleted', {
           id: existingSubscription.id,
@@ -199,7 +199,7 @@ export class SubscriptionCreateService {
     // We create the inbox configuration before we do the subscription because we do not want
     // to create a rance condition between webhook events and not having the subscription.
     await this.db
-      .insert(inboxConfiguration)
+      .insert(inboxConfigurations)
       .values({
         userProfileId,
         filters: serializeMailFilters(this.config.defaultMailFilters),

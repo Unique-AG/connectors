@@ -4,7 +4,7 @@ import { Span } from 'nestjs-otel';
 import { omit } from 'remeda';
 import z from 'zod';
 import { AppConfig, appConfig } from '~/config';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration, subscriptions } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../../user-utils/get-user-profile.query';
@@ -50,8 +50,8 @@ export const GetFullSyncStatsResponse = z.object({
         .number()
         .describe('Messages that failed upload after 3 retries.'),
       dateWindow: z.object({
-        newestCreatedDateTime: z.string().nullable(),
-        oldestCreatedDateTime: z.string().nullable(),
+        newestReceivedEmailDateTime: z.string().nullable(),
+        oldestReceivedEmailDateTime: z.string().nullable(),
         newestLastModifiedDateTime: z.string().nullable(),
       }),
     })
@@ -82,8 +82,8 @@ export class GetFullSyncStatsQuery {
   @Span()
   public async run(userProfileId: UserProfileTypeID): Promise<FullSyncStats> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const inboxConfig = await this.db.query.inboxConfiguration.findFirst({
-      where: eq(inboxConfiguration.userProfileId, userProfile.id),
+    const inboxConfig = await this.db.query.inboxConfigurations.findFirst({
+      where: eq(inboxConfigurations.userProfileId, userProfile.id),
     });
     const subscription = await this.db.query.subscriptions.findFirst({
       where: eq(subscriptions.userProfileId, userProfile.id),
@@ -154,8 +154,8 @@ export class GetFullSyncStatsQuery {
         ignoredContents: filters.ignoredContents.map((r) => r.toString()),
       },
       dateWindow: {
-        newestCreatedDateTime: inboxConfig.newestCreatedDateTime?.toISOString() ?? null,
-        oldestCreatedDateTime: inboxConfig.oldestCreatedDateTime?.toISOString() ?? null,
+        newestReceivedEmailDateTime: inboxConfig.newestReceivedEmailDateTime?.toISOString() ?? null,
+        oldestReceivedEmailDateTime: inboxConfig.oldestReceivedEmailDateTime?.toISOString() ?? null,
         newestLastModifiedDateTime: inboxConfig.newestLastModifiedDateTime?.toISOString() ?? null,
       },
     };

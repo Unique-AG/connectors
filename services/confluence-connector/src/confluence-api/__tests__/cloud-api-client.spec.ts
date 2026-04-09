@@ -44,7 +44,9 @@ describe('CloudConfluenceApiClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new CloudConfluenceApiClient(mockConfig as never, mockAuth as never, mockHttpClient);
+    client = new CloudConfluenceApiClient(mockConfig as never, mockAuth as never, mockHttpClient, {
+      attachmentsEnabled: false,
+    });
   });
 
   describe('searchPagesByLabel', () => {

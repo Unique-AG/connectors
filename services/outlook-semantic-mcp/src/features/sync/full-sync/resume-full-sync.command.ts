@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { DRIZZLE, DrizzleDatabase, inboxConfiguration } from '~/db';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 import { FullSyncEventDto } from './full-sync-event.dto';
 
 type ResumeResult =
@@ -23,12 +23,12 @@ export class ResumeFullSyncCommand {
   @Span()
   public async run(userProfileId: string): Promise<ResumeResult> {
     const result = await this.db
-      .update(inboxConfiguration)
+      .update(inboxConfigurations)
       .set({ fullSyncState: 'waiting-for-ingestion' })
       .where(
         and(
-          eq(inboxConfiguration.userProfileId, userProfileId),
-          eq(inboxConfiguration.fullSyncState, 'paused'),
+          eq(inboxConfigurations.userProfileId, userProfileId),
+          eq(inboxConfigurations.fullSyncState, 'paused'),
         ),
       )
       .execute();
@@ -44,8 +44,8 @@ export class ResumeFullSyncCommand {
       return { status: 'resumed' };
     }
 
-    const config = await this.db.query.inboxConfiguration.findFirst({
-      where: eq(inboxConfiguration.userProfileId, userProfileId),
+    const config = await this.db.query.inboxConfigurations.findFirst({
+      where: eq(inboxConfigurations.userProfileId, userProfileId),
     });
 
     if (!config) {

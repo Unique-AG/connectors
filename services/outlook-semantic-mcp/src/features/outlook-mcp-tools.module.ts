@@ -7,16 +7,15 @@ import { ListCategoriesTool } from './categories/list-categories.tool';
 import { OpenEmailTool, SearchEmailsTool, SearchModule } from './content';
 import { DirectoriesSyncModule } from './directories-sync/directories-sync.module';
 import { ListFoldersTool } from './directories-sync/tools';
-import { CreateDraftEmailTool } from './email-management/create-draft-email.tool';
 import { EmailManagementModule } from './email-management/email-management.module';
-import { LookupContactsTool } from './email-management/lookup-contacts.tool';
-import { IngestionListener } from './mail-ingestion/ingestion.listener';
-import { MailIngestionModule } from './mail-ingestion/mail-ingestion.module';
+import { CreateDraftEmailTool } from './email-management/tools/create-draft-email.tool';
+import { LookupContactsTool } from './email-management/tools/lookup-contacts.tool';
 import { MailSubscriptionController } from './mail-subscription.controller';
+import { ProcessEmailModule } from './process-email/process-email.module';
 import { SubscriptionModule } from './subscriptions/subscription.module';
 import {
+  DeleteInboxDataTool,
   ReconnectInboxTool,
-  RemoveInboxConnectionTool,
   VerifyInboxConnectionTool,
 } from './subscriptions/tools';
 import {
@@ -40,8 +39,8 @@ const TOOLS = [
   ListFoldersTool,
   SyncProgressTool,
   VerifyInboxConnectionTool,
+  DeleteInboxDataTool,
   ReconnectInboxTool,
-  RemoveInboxConnectionTool,
   SearchEmailsTool,
   OpenEmailTool,
   ListCategoriesTool,
@@ -63,13 +62,13 @@ const TOOLS = [
     EmailManagementModule,
     FullSyncModule,
     LiveCatchUpModule,
-    MailIngestionModule,
+    ProcessEmailModule,
     DirectoriesSyncModule,
     SearchModule,
     UniqueApiFeatureModule,
     SyncRecoveryModule,
   ],
-  providers: [MailSubscriptionController, IngestionListener, ...TOOLS],
+  providers: [MailSubscriptionController, ...TOOLS],
   controllers: [MailSubscriptionController],
 })
 export class OutlookMcpToolsModule {}
