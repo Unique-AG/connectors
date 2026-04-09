@@ -138,6 +138,8 @@ The connector manages a two-level scope hierarchy:
 
 Pages are discovered through a CQL-based label search, then attachments are optionally extracted from the already-fetched page objects.
 
+**Important:** CQL search results are filtered by the authenticated user's permissions. Pages in spaces the service account cannot access are silently excluded from results. On Data Center, where scopes are assigned per space, this means the service account must be explicitly granted access to every space that contains pages to synchronize. Missing space assignments produce no errors -- the pages simply never appear in discovery results.
+
 ### Discovery Sequence
 
 ```mermaid

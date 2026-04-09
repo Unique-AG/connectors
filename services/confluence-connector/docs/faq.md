@@ -196,8 +196,9 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 **Checklist:**
 
 1. Does the page have the `ai-ingest` or `ai-ingest-all` label? (Check that the label names match your tenant configuration.)
-2. Is the page in a global space? (Cloud: also includes collaboration spaces.)
-3. Is the page a standard page type? (Databases, whiteboards, and embeds are skipped.)
+2. Does the service account have access to the page's space? On Data Center, scopes are assigned per space. Pages in spaces the service account cannot access are silently excluded from CQL results.
+3. Is the page in a global space? (Cloud: also includes collaboration spaces.)
+4. Is the page a standard page type? (Databases, whiteboards, and embeds are skipped.)
 4. Does the page have a non-empty body? Pages with empty bodies are discovered but skipped during content ingestion.
 5. Is the tenant status set to `active` in the YAML config?
 6. Check connector logs for errors related to authentication, API rate limits, or Unique API failures.

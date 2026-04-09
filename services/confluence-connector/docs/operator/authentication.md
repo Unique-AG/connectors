@@ -109,21 +109,10 @@ The `clientSecret` field uses the `os.environ/` prefix to resolve the value from
 
 1. In the [Atlassian Admin Console](https://admin.atlassian.com/), go to **Settings** > **User Management** > **Service Accounts**.
 2. Create a new service account and generate credentials.
-3. Grant the service account access to the Confluence application and assign the following scopes:
+3. Grant the service account access to the Confluence application and assign the `READ` (View content) scope.
+4. Specify which spaces the selected scopes should apply to.
 
-> **Note:** The scopes listed below are preliminary and subject to validation. The minimum required set may change before the stable release.
-
-| Scope | Purpose |
-|-------|---------|
-| `search:confluence` | CQL search for labeled pages |
-| `read:confluence-content.all` | Read full page content (body, metadata) |
-| `read:confluence-content.summary` | Read content summaries and version info |
-| `read:confluence-space.summary` | Read space metadata (key, name, type) |
-| `read:label:confluence` | Read page labels to determine sync eligibility |
-| `read:page:confluence` | Read individual pages |
-| `read:attachment:confluence` | Download file attachments (required when attachment ingestion is enabled) |
-
-4. Note the **Client ID** and **Client Secret**.
+5. Note the **Client ID** and **Client Secret**.
 
 **Required tenant YAML fields:**
 
