@@ -160,7 +160,7 @@ mcpConfig:
       x-company-id: "<your-company-id>"
       x-user-id: "<your-zitadel-service-user-id>"
 
-  defaultMailFilters: '{"retentionWindowInDays":365,"ignoredContents":[],"ignoredSenders":[]}'
+  defaultMailFilters: '{"retentionWindowInDays":95,"ignoredContents":[],"ignoredSenders":[]}'
 
 ingress:
   enabled: true
