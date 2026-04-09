@@ -1,4 +1,5 @@
 import { gql } from 'graphql-request';
+import type { VariableLogPolicy } from '../../utils/sanitize-graphql-variables';
 
 export const SHAREPOINT_CONNECTOR_GROUP_CREATED_BY = 'sharepoint-connector';
 
@@ -30,6 +31,8 @@ export interface ListGroupsQueryResult<TWithMembers extends boolean> {
     ? ListGroupsQueryResultNodeWithMembers[]
     : ListGroupsQueryResultNode[];
 }
+
+export const LIST_GROUPS_LOG_SAFE_KEYS: VariableLogPolicy = ['skip', 'take'];
 
 export function getListGroupsQuery(includeMembers: boolean): string {
   const membersFields = includeMembers
@@ -64,6 +67,8 @@ export interface CreateGroupMutationResult {
   };
 }
 
+export const CREATE_GROUP_LOG_SAFE_KEYS: VariableLogPolicy = ['createdBy'];
+
 export const CREATE_GROUP_MUTATION = gql`
   mutation CreateGroup($name: String!, $externalId: String!, $createdBy: String!) {
     createGroup(input: { name: $name, externalId: $externalId, createdBy: $createdBy }) {
@@ -87,6 +92,8 @@ export interface UpdateGroupMutationResult {
   };
 }
 
+export const UPDATE_GROUP_LOG_SAFE_KEYS: VariableLogPolicy = ['groupId'];
+
 export const UPDATE_GROUP_MUTATION = gql`
   mutation UpdateGroup($groupId: String!, $name: String!) {
     updateGroup(id: $groupId, input: { name: $name }) {
@@ -106,6 +113,8 @@ export interface DeleteGroupMutationResult {
     id: string;
   };
 }
+
+export const DELETE_GROUP_LOG_SAFE_KEYS: VariableLogPolicy = ['groupId'];
 
 export const DELETE_GROUP_MUTATION = gql`
   mutation DeleteGroup($groupId: String!) {
@@ -127,6 +136,8 @@ export interface AddGroupMembersMutationResult {
   }[];
 }
 
+export const ADD_GROUP_MEMBERS_LOG_SAFE_KEYS: VariableLogPolicy = ['groupId'];
+
 export const ADD_GROUP_MEMBERS_MUTATION = gql`
   mutation AddGroupMembers($groupId: String!, $userIds: [String!]!) {
     addGroupMembers: createMemberships(groupId: $groupId, userIds: $userIds) {
@@ -142,6 +153,8 @@ export interface RemoveGroupMemberMutationInput {
 }
 
 export type RemoveGroupMemberMutationResult = boolean;
+
+export const REMOVE_GROUP_MEMBER_LOG_SAFE_KEYS: VariableLogPolicy = ['groupId'];
 
 export const REMOVE_GROUP_MEMBER_MUTATION = gql`
   mutation RemoveGroupMember($groupId: String!, $userId: String!) {

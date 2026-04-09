@@ -14,7 +14,7 @@ import {
   getSlowRequestDurationBucket,
 } from '../../../metrics';
 import {
-  shouldConcealLogs,
+  shouldDiscloseLogs,
   smearSiteIdFromPath,
   smearSiteNameFromPath,
 } from '../../../utils/logging.util';
@@ -35,7 +35,7 @@ export class MetricsMiddleware implements Middleware {
     private readonly spcGraphApiSlowRequestsTotal: Counter,
     configService: ConfigService<Config, true>,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(configService);
+    this.shouldConcealLogs = !shouldDiscloseLogs(configService);
     this.msTenantId = configService.get('sharepoint.tenantId', { infer: true });
 
     this.extractApiMethod = createApiMethodExtractor([

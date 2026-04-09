@@ -1,4 +1,5 @@
 import { gql } from 'graphql-request';
+import type { VariableLogPolicy } from '../../utils/sanitize-graphql-variables';
 import type { FileAccessKey } from '../unique-files/unique-files.types';
 import type { IngestionApiResponse } from './unique-file-ingestion.types';
 
@@ -35,6 +36,18 @@ export interface ContentUpsertMutationInput {
 export interface ContentUpsertMutationResult {
   contentUpsert: IngestionApiResponse;
 }
+
+export const CONTENT_UPSERT_LOG_SAFE_KEYS: VariableLogPolicy = [
+  'scopeId',
+  'sourceOwnerType',
+  'sourceKind',
+  'sourceName',
+  'storeInternally',
+  'input.mimeType',
+  'input.ownerType',
+  'input.byteSize',
+  'input.ingestionConfig.uniqueIngestionMode',
+];
 
 export const CONTENT_UPSERT_MUTATION = gql`
   mutation ContentUpsert(
