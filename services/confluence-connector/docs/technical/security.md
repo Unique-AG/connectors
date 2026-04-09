@@ -71,7 +71,7 @@ Secrets are protected through multiple layers:
 - **In-memory protection:** Secret values are wrapped so that they cannot be accidentally serialized to logs or JSON output
 - **Log redaction:** Authorization headers and secret fields are censored in structured log output
 
-See [Authentication -- Secret Resolution](../operator/authentication.md#secret-resolution) for the full resolution mechanism and supported fields.
+See [Authentication -- Secret Resolution](../operator/authentication.md#Secret-Resolution) for the full resolution mechanism and supported fields.
 
 ### Diagnostics Data Policy
 

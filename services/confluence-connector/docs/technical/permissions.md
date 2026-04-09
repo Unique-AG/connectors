@@ -37,7 +37,7 @@ The Cloud API client calls the following endpoints through the Atlassian API gat
 
 ### Space Type Filter
 
-The Cloud client filters by `space.type=global OR space.type=collaboration`. See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on space type filtering. The OAuth integration must have access to spaces of both types to discover all labeled pages.
+The Cloud client filters by `space.type=global OR space.type=collaboration`. See the [Configuration Guide](../operator/configuration.md#Space-Scanning) for details on space type filtering. The OAuth integration must have access to spaces of both types to discover all labeled pages.
 
 ## Confluence Data Center Permissions
 
@@ -55,7 +55,7 @@ Attachment binary content is downloaded from the path provided in each attachmen
 
 ### Space Type Filter
 
-The Data Center client filters by `space.type=global` only (`collaboration` is a Cloud-only space type). See the [Configuration Guide](../operator/configuration.md#space-scanning) for details on space type filtering. The service account has instance-wide read access; space type filtering is applied client-side via CQL.
+The Data Center client filters by `space.type=global` only (`collaboration` is a Cloud-only space type). See the [Configuration Guide](../operator/configuration.md#Space-Scanning) for details on space type filtering. The service account has instance-wide read access; space type filtering is applied client-side via CQL.
 
 ## Permission Justification
 

@@ -51,7 +51,7 @@ flowchart LR
     Fetch --> Unique["Unique Knowledge Base"]
 ```
 
-See [Flows -- Discovery Phase](./flows.md#discovery-phase) for details.
+See [Flows -- Discovery Phase](./flows.md#Discovery-Phase) for details.
 
 ### File Diff Mechanism
 
@@ -61,7 +61,7 @@ The connector maintains state to detect changes:
 - **Updated items**: Items with changed metadata since last sync
 - **Deleted items**: Previously synced items no longer labeled or deleted from Confluence
 
-See [Flows -- File Diff Mechanism](./flows.md#file-diff-mechanism) for details.
+See [Flows -- File Diff Mechanism](./flows.md#File-Diff-Mechanism) for details.
 
 ## Related Documentation
 

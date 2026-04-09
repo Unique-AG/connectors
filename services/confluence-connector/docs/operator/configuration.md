@@ -13,16 +13,16 @@ The following environment variables control application-level behavior. They are
 |---|---|---|
 | `NODE_ENV` | `production` | Environment mode (`development`, `production`, `test`) |
 | `PORT` | `51349` | HTTP port the application binds to |
-| `LOG_LEVEL` | `info` | Log verbosity: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`. See [Logging](#logging) |
-| `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | Controls whether diagnostic data (emails, usernames, IDs) is logged in full (`disclose`) or partially masked (`conceal`). See [Logging](#diagnostics-data-policy) |
+| `LOG_LEVEL` | `info` | Log verbosity: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`. See [Logging](#Logging) |
+| `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | Controls whether diagnostic data (emails, usernames, IDs) is logged in full (`disclose`) or partially masked (`conceal`). See [Logging](#Diagnostics-Data-Policy) |
 | `TENANT_CONFIG_PATH_PATTERN` | -- (required; Helm chart sets `/app/tenant-configs/*-tenant-config.yaml`) | Glob pattern to tenant configuration YAML files |
-| `OTEL_METRICS_EXPORTER` | -- | OpenTelemetry metrics exporter (e.g., `prometheus`). See [Metrics](#metrics) |
+| `OTEL_METRICS_EXPORTER` | -- | OpenTelemetry metrics exporter (e.g., `prometheus`). See [Metrics](#Metrics) |
 | `OTEL_EXPORTER_PROMETHEUS_HOST` | -- | Prometheus exporter bind host |
 | `OTEL_EXPORTER_PROMETHEUS_PORT` | -- | Prometheus exporter bind port |
 | `NODE_EXTRA_CA_CERTS` | -- | Path to a PEM file containing additional CA certificates for TLS verification if the pod's trust store doesn't have them |
 | `MAX_HEAP_MB` | `1920` (Helm) / `1024` (Docker) | Node.js V8 max old space size in MB |
 
-Secret values in tenant YAML files are referenced via the `os.environ/` prefix (e.g., `os.environ/CONFLUENCE_CLIENT_SECRET`). The conventional environment variable names are `CONFLUENCE_CLIENT_SECRET`, `CONFLUENCE_PAT`, and `ZITADEL_CLIENT_SECRET`, but operators can use any variable name as long as the `os.environ/` reference in the tenant YAML matches. See [Authentication -- Secret Resolution](./authentication.md#secret-resolution) for the full resolution mechanism, supported fields, and Kubernetes integration.
+Secret values in tenant YAML files are referenced via the `os.environ/` prefix (e.g., `os.environ/CONFLUENCE_CLIENT_SECRET`). The conventional environment variable names are `CONFLUENCE_CLIENT_SECRET`, `CONFLUENCE_PAT`, and `ZITADEL_CLIENT_SECRET`, but operators can use any variable name as long as the `os.environ/` reference in the tenant YAML matches. See [Authentication -- Secret Resolution](./authentication.md#Secret-Resolution) for the full resolution mechanism, supported fields, and Kubernetes integration.
 
 ## Tenant Configuration File
 
@@ -30,7 +30,7 @@ Secret values in tenant YAML files are referenced via the `os.environ/` prefix (
 
 Tenant configuration files must follow the naming convention `{tenant-name}-tenant-config.yaml`. The tenant name is extracted from the filename by removing the `-tenant-config.yaml` suffix and must match the pattern `^[a-z0-9]+(-[a-z0-9]+)*$` (lowercase alphanumeric with hyphens). Duplicate tenant names cause a startup failure.
 
-The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at startup. At least one file must match the pattern, and at least one tenant must have `active` status. For details on how tenants are isolated at runtime, see [Architecture -- Multi-Tenancy Support](../technical/architecture.md#multi-tenancy-support).
+The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at startup. At least one file must match the pattern, and at least one tenant must have `active` status. For details on how tenants are isolated at runtime, see [Architecture -- Multi-Tenancy Support](../technical/architecture.md#Multi-Tenancy-Support).
 
 ### Tenant Status
 
@@ -133,7 +133,7 @@ confluence:
 | `instanceType` | Yes | -- | `cloud` or `data-center` |
 | `baseUrl` | Yes | -- | Base URL of the Confluence instance (e.g., `https://acme.atlassian.net`). Must not end with a trailing slash |
 | `cloudId` | Yes (Cloud only) | -- | Atlassian Cloud ID (UUID) for the Confluence site |
-| `auth` | Yes | -- | Authentication configuration (see [Authentication](./authentication.md#confluence-authentication-methods)) |
+| `auth` | Yes | -- | Authentication configuration (see [Authentication](./authentication.md#Confluence-Authentication-Methods)) |
 | `apiRateLimitPerMinute` | Yes | -- | Number of Confluence API requests allowed per minute |
 | `ingestSingleLabel` | Yes | -- | Confluence label that marks individual pages for synchronization (e.g., `ai-ingest`) |
 | `ingestAllLabel` | Yes | -- | Confluence label that marks a page and all its descendants for synchronization (e.g., `ai-ingest-all`) |
@@ -159,7 +159,7 @@ The connector discovers pages via Confluence Query Language (CQL) label searches
 
 The `unique` section configures how the connector communicates with the Unique platform. The field for selecting the auth mode is `serviceAuthMode` (not `authMode`).
 
-> **Note:** The Helm chart `values.yaml` uses `unique.authMode`, which the Helm template maps to `serviceAuthMode` in the generated tenant config YAML. See [Authentication -- Helm Chart Field Mapping](./authentication.md#helm-chart-field-mapping).
+> **Note:** The Helm chart `values.yaml` uses `unique.authMode`, which the Helm template maps to `serviceAuthMode` in the generated tenant config YAML. See [Authentication -- Helm Chart Field Mapping](./authentication.md#Helm-Chart-Field-Mapping).
 
 ```yaml
 unique:
@@ -179,7 +179,7 @@ unique:
 | `scopeManagementServiceBaseUrl` | Yes | -- | Base URL for the Unique scope management service. Must not end with a trailing slash |
 | `apiRateLimitPerMinute` | No | `100` | Number of Unique API requests allowed per minute |
 
-The additional fields required for each auth mode (`serviceExtraHeaders` for `cluster_local`, Zitadel credentials for `external`) are documented in the [Authentication Guide -- Unique Platform Authentication Methods](./authentication.md#unique-platform-authentication-methods), which also covers setup instructions and token flows.
+The additional fields required for each auth mode (`serviceExtraHeaders` for `cluster_local`, Zitadel credentials for `external`) are documented in the [Authentication Guide -- Unique Platform Authentication Methods](./authentication.md#Unique-Platform-Authentication-Methods), which also covers setup instructions and token flows.
 
 ## Ingestion Settings
 

@@ -100,7 +100,7 @@ connectorConfig:
         storeInternally: enabled
 ```
 
-**Note:** The Helm chart uses `unique.authMode`, which the Helm template maps to `serviceAuthMode` in the generated tenant config YAML. See [Authentication -- Helm Chart Field Mapping](./authentication.md#helm-chart-field-mapping).
+**Note:** The Helm chart uses `unique.authMode`, which the Helm template maps to `serviceAuthMode` in the generated tenant config YAML. See [Authentication -- Helm Chart Field Mapping](./authentication.md#Helm-Chart-Field-Mapping).
 
 ## Terraform Modules
 
@@ -176,7 +176,7 @@ The Confluence Connector is compatible with:
 - Atlassian Confluence Cloud
 - Atlassian Confluence Data Center
 
-See [Configuration -- Confluence Connection Settings](./configuration.md#confluence-connection-settings) for instance type details and [Authentication](./authentication.md) for supported authentication methods per instance type.
+See [Configuration -- Confluence Connection Settings](./configuration.md#Confluence-Connection-Settings) for instance type details and [Authentication](./authentication.md) for supported authentication methods per instance type.
 
 ### Unique Platform Compatibility
 
@@ -246,7 +246,7 @@ The connector validates all tenant configuration at startup. Check the pod logs 
 - Check Kubernetes Secrets exist and contain the expected keys
 - For `cluster_local` mode, ensure `x-company-id` and `x-user-id` headers are set
 
-See [Authentication -- Troubleshooting](./authentication.md#troubleshooting) for detailed diagnosis steps.
+See [Authentication -- Troubleshooting](./authentication.md#Troubleshooting) for detailed diagnosis steps.
 
 ### Network Connectivity
 
@@ -256,6 +256,6 @@ See [Authentication -- Troubleshooting](./authentication.md#troubleshooting) for
 - Check DNS resolution works
 - Confirm firewall rules permit HTTPS traffic on port 443
 
-See the network requirements table in the [Operator Guide](./README.md#network-requirements) for the full list of required endpoints.
+See the network requirements table in the [Operator Guide](./README.md#Network-Requirements) for the full list of required endpoints.
 
 See [FAQ](../faq.md) for more troubleshooting guidance.

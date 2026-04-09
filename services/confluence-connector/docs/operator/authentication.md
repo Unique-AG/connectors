@@ -65,7 +65,7 @@ For detailed instructions on creating and configuring a service user, see:
 
 The connector requires a pre-existing root scope in Unique. The root scope ID is configured in the tenant YAML under `ingestion.scopeId`. If the scope does not exist at startup, the connector fails.
 
-At startup, the connector automatically grants itself access on the root scope and will create child scopes for each Confluence space that has content to ingest. See the [Scope Hierarchy](../technical/flows.md#scope-hierarchy) for details.
+At startup, the connector automatically grants itself access on the root scope and will create child scopes for each Confluence space that has content to ingest. See the [Scope Hierarchy](../technical/flows.md#Scope-Hierarchy) for details.
 
 ### 3. Set Up Confluence Authentication
 
@@ -88,7 +88,7 @@ At startup, the connector automatically grants itself access on the root scope a
 | `read:attachment:confluence` | Download file attachments (required when attachment ingestion is enabled) |
 
 4. Note the **Client ID** and **Client Secret**.
-5. Obtain the **Cloud ID** for your Confluence instance (see [How do I find my Atlassian Cloud ID?](../faq.md#how-do-i-find-my-atlassian-cloud-id)).
+5. Obtain the **Cloud ID** for your Confluence instance (see [How do I find my Atlassian Cloud ID?](../faq.md#How-do-I-find-my-Atlassian-Cloud-ID)).
 
 **Required tenant YAML fields:**
 
@@ -103,7 +103,7 @@ confluence:
     clientSecret: os.environ/CONFLUENCE_CLIENT_SECRET
 ```
 
-The `clientSecret` field uses the `os.environ/` prefix to resolve the value from an environment variable at runtime (see [Secret Resolution](#secret-resolution)).
+The `clientSecret` field uses the `os.environ/` prefix to resolve the value from an environment variable at runtime (see [Secret Resolution](#Secret-Resolution)).
 
 #### Option B: OAuth 2.0 (2LO) -- Data Center
 
@@ -156,7 +156,7 @@ confluence:
     token: os.environ/CONFLUENCE_PAT
 ```
 
-The `token` field uses the `os.environ/` prefix to resolve the value from an environment variable at runtime (see [Secret Resolution](#secret-resolution)).
+The `token` field uses the `os.environ/` prefix to resolve the value from an environment variable at runtime (see [Secret Resolution](#Secret-Resolution)).
 
 ### 4. Set Up Unique Platform Authentication
 

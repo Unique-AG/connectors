@@ -33,7 +33,7 @@
 
 ### How does the connector decide which pages to sync?
 
-**Answer:** The connector uses two configurable Confluence labels: one for single-page sync (recommended: `ai-ingest`) and one for syncing a page and all its descendants (recommended: `ai-ingest-all`). Both labels must be explicitly set in the tenant configuration. See the [README](./README.md#core-capabilities) for a full overview of label-driven discovery and the [technical flows documentation](./technical/flows.md#discovery-phase) for the detailed CQL-based discovery process.
+**Answer:** The connector uses two configurable Confluence labels: one for single-page sync (recommended: `ai-ingest`) and one for syncing a page and all its descendants (recommended: `ai-ingest-all`). Both labels must be explicitly set in the tenant configuration. See the [README](./README.md#Core-Capabilities) for a full overview of label-driven discovery and the [technical flows documentation](./technical/flows.md#Discovery-Phase) for the detailed CQL-based discovery process.
 
 ### What happens when a page has both labels?
 
@@ -41,11 +41,11 @@
 
 ### What happens when a page has `ai-ingest` and its ancestor has `ai-ingest-all`?
 
-**Answer:** The page is discovered through both paths but deduplicated by ID, so it is ingested exactly once. See the [discovery flow](./technical/flows.md#discovery-sequence) for details on how deduplication works.
+**Answer:** The page is discovered through both paths but deduplicated by ID, so it is ingested exactly once. See the [discovery flow](./technical/flows.md#Discovery-Sequence) for details on how deduplication works.
 
 ### Which Confluence content types are synced?
 
-**Answer:** The connector ingests `page` and `blogpost` content (including Live Docs, which are a page subtype). Attachments are ingested conditionally when `attachments.mode=enabled`. Content types `database`, `whiteboard`, and `embed` are explicitly skipped because their APIs expose no renderable body. Folders have no body and are effectively skipped by the empty-body filter. Descendants of all non-skipped types (including skipped ones like databases) are still discovered and ingested when using `ai-ingest-all`. See the [Content Type Ingestion Map](./technical/flows.md#content-type-ingestion-map) for the full Cloud and Data Center breakdown.
+**Answer:** The connector ingests `page` and `blogpost` content (including Live Docs, which are a page subtype). Attachments are ingested conditionally when `attachments.mode=enabled`. Content types `database`, `whiteboard`, and `embed` are explicitly skipped because their APIs expose no renderable body. Folders have no body and are effectively skipped by the empty-body filter. Descendants of all non-skipped types (including skipped ones like databases) are still discovered and ingested when using `ai-ingest-all`. See the [Content Type Ingestion Map](./technical/flows.md#Content-Type-Ingestion-Map) for the full Cloud and Data Center breakdown.
 
 ### What format is the page content exported in?
 
@@ -57,7 +57,7 @@
 
 ### Which spaces are scanned?
 
-**Answer:** Only `global` spaces are scanned (Cloud also includes `collaboration` spaces). Personal spaces are excluded on both platforms. See the [Configuration Guide](./operator/configuration.md#space-scanning) for full details on space type filtering per instance type.
+**Answer:** Only `global` spaces are scanned (Cloud also includes `collaboration` spaces). Personal spaces are excluded on both platforms. See the [Configuration Guide](./operator/configuration.md#Space-Scanning) for full details on space type filtering per instance type.
 
 ## Authentication
 
@@ -67,7 +67,7 @@
 
 ### How are secrets managed in configuration?
 
-**Answer:** Secret values in tenant YAML configuration files use the `os.environ/VARIABLE_NAME` syntax to reference environment variables, resolved at startup. See [Authentication -- Secret Resolution](./operator/authentication.md#secret-resolution) for the full mechanism, supported fields, and Kubernetes integration.
+**Answer:** Secret values in tenant YAML configuration files use the `os.environ/VARIABLE_NAME` syntax to reference environment variables, resolved at startup. See [Authentication -- Secret Resolution](./operator/authentication.md#Secret-Resolution) for the full mechanism, supported fields, and Kubernetes integration.
 
 ## Configuration
 
@@ -116,7 +116,7 @@ See the [Configuration Guide](./operator/configuration.md) for all available opt
 
 ### What file extensions are allowed for attachments by default?
 
-**Answer:** The default allowed extensions are pdf, docx, xlsx, ppt, pptx, txt, csv, and html. These can be overridden via `ingestion.attachments.allowedExtensions` (case-insensitive). See [Configuration -- Attachment Configuration](./operator/configuration.md#attachment-configuration) for the full details.
+**Answer:** The default allowed extensions are pdf, docx, xlsx, ppt, pptx, txt, csv, and html. These can be overridden via `ingestion.attachments.allowedExtensions` (case-insensitive). See [Configuration -- Attachment Configuration](./operator/configuration.md#Attachment-Configuration) for the full details.
 
 ### How do I find my Atlassian Cloud ID?
 
@@ -146,7 +146,7 @@ The response contains a `cloudId` field with the UUID.
 
 ### How does change detection work?
 
-**Answer:** The connector uses a server-side file diff mechanism that compares discovered items per space against the state stored in Unique, returning which items are new, updated, deleted, or moved. Only new and updated items are fetched and ingested. See the [file diff mechanism](./technical/flows.md#file-diff-mechanism) documentation for the full details including item attributes, partial key format, and diagrams.
+**Answer:** The connector uses a server-side file diff mechanism that compares discovered items per space against the state stored in Unique, returning which items are new, updated, deleted, or moved. Only new and updated items are fetched and ingested. See the [file diff mechanism](./technical/flows.md#File-Diff-Mechanism) documentation for the full details including item attributes, partial key format, and diagrams.
 
 ### What happens when a label is removed from a page?
 
@@ -166,7 +166,7 @@ If an entire previously synced space disappears from discovery results (for exam
 
 ### How are scopes organized in Unique?
 
-**Answer:** Scopes follow a two-level hierarchy: a root scope configured per tenant, and child scopes automatically created for each Confluence space key. Child scopes inherit access from the root scope. See the [Scope Hierarchy](./technical/flows.md#scope-hierarchy) for details.
+**Answer:** Scopes follow a two-level hierarchy: a root scope configured per tenant, and child scopes automatically created for each Confluence space key. Child scopes inherit access from the root scope. See the [Scope Hierarchy](./technical/flows.md#Scope-Hierarchy) for details.
 
 ### What is the ingestion key format?
 
@@ -183,7 +183,7 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 
 ### What safety guards does the connector have?
 
-**Answer:** The connector includes two safeguards -- a zero-submission guard and a full-deletion guard -- that abort the current tenant sync cycle when the file diff results indicate a likely error in discovery or key format for a space. To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards. See the [safety checks](./technical/flows.md#safety-checks) documentation for full details.
+**Answer:** The connector includes two safeguards -- a zero-submission guard and a full-deletion guard -- that abort the current tenant sync cycle when the file diff results indicate a likely error in discovery or key format for a space. To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards. See the [safety checks](./technical/flows.md#Safety-Checks) documentation for full details.
 
 ### Are concurrent syncs for the same tenant possible?
 
@@ -250,7 +250,7 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 
 ### Can one connector serve multiple Confluence instances?
 
-**Answer:** Yes. Each Confluence instance is configured as a separate tenant with its own YAML configuration file. All tenants run within a single connector deployment with independent authentication, API clients, and sync schedules. See [Architecture -- Multi-Tenancy Model](./technical/architecture.md#multi-tenancy-model) for details on tenant isolation and per-tenant service instances.
+**Answer:** Yes. Each Confluence instance is configured as a separate tenant with its own YAML configuration file. All tenants run within a single connector deployment with independent authentication, API clients, and sync schedules. See [Architecture -- Multi-Tenancy Model](./technical/architecture.md#Multi-Tenancy-Model) for details on tenant isolation and per-tenant service instances.
 
 ### How do I add a new tenant?
 

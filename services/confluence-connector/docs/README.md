@@ -58,8 +58,8 @@ The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and 
 
 **Automatic Change Detection**
 
-- A per-space [file diff mechanism](./technical/flows.md#file-diff-mechanism) compares discovered items against the state stored in Unique, ingesting only new or modified items and removing deleted ones
-- [Safety checks](./technical/flows.md#safety-checks) prevent accidental full deletion of content
+- A per-space [file diff mechanism](./technical/flows.md#File-Diff-Mechanism) compares discovered items against the state stored in Unique, ingesting only new or modified items and removing deleted ones
+- [Safety checks](./technical/flows.md#Safety-Checks) prevent accidental full deletion of content
 
 **Attachment Ingestion**
 
@@ -70,16 +70,16 @@ The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and 
 
 **Default Allowed Attachment Extensions**
 
-Configurable allowed file types (default: pdf, docx, xlsx, ppt, pptx, txt, csv, html). See [Configuration](./operator/configuration.md#attachment-configuration) for details.
+Configurable allowed file types (default: pdf, docx, xlsx, ppt, pptx, txt, csv, html). See [Configuration](./operator/configuration.md#Attachment-Configuration) for details.
 
 **Skipped Content Types**
 
-Content types `database`, `whiteboard`, and `embed` are explicitly skipped (no body available via API). Folders have no body and are effectively skipped by the empty-body filter. Descendants of skipped types (such as sub-pages under a database) are still discovered and ingested. Live Docs pass through as regular pages. See the [Content Type Ingestion Map](./technical/flows.md#content-type-ingestion-map) for the full breakdown by platform.
+Content types `database`, `whiteboard`, and `embed` are explicitly skipped (no body available via API). Folders have no body and are effectively skipped by the empty-body filter. Descendants of skipped types (such as sub-pages under a database) are still discovered and ingested. Live Docs pass through as regular pages. See the [Content Type Ingestion Map](./technical/flows.md#Content-Type-Ingestion-Map) for the full breakdown by platform.
 
 **Scope Management**
 
 - A pre-existing root scope is configured per tenant (must be created in Unique before the connector starts), with child scopes automatically created per Confluence space
-- See the [Scope Hierarchy](./technical/flows.md#scope-hierarchy) for details
+- See the [Scope Hierarchy](./technical/flows.md#Scope-Hierarchy) for details
 
 **Scheduled Synchronization**
 
@@ -91,7 +91,7 @@ Content types `database`, `whiteboard`, and `embed` are explicitly skipped (no b
 
 **Multi-Tenancy**
 
-- Multiple Confluence instances (tenants) can be configured in a single deployment, each with independent configuration, authentication, and sync schedules. See [Architecture -- Multi-Tenancy Model](./technical/architecture.md#multi-tenancy-model) for the isolation model and per-tenant service details.
+- Multiple Confluence instances (tenants) can be configured in a single deployment, each with independent configuration, authentication, and sync schedules. See [Architecture -- Multi-Tenancy Model](./technical/architecture.md#Multi-Tenancy-Model) for the isolation model and per-tenant service details.
 
 **Concurrency Control**
 
