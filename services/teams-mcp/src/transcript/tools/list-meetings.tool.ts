@@ -67,7 +67,7 @@ export class ListMeetingsTool {
     name: 'list_meetings',
     title: 'List Meeting Transcripts',
     description:
-      'Browse and list meetings with transcripts without requiring a search query. Use this to discover meetings by date range, organizer, participant, or subject. Returns meeting metadata including title, date, organizer, and participants. Use find_transcripts to search within a specific meeting\'s content.',
+      "Browse and list meetings with transcripts without requiring a search query. Use this to discover meetings by date range, organizer, participant, or subject. Returns meeting metadata including title, date, organizer, and participants. Use find_transcripts to search within a specific meeting's content.",
     parameters: ListMeetingsInputSchema,
     outputSchema: ListMeetingsOutputSchema,
     annotations: {
@@ -134,7 +134,8 @@ export class ListMeetingsTool {
         id: item.id,
         title: item.title ?? 'Untitled Meeting',
         meetingDate: typeof metadata?.date === 'string' ? metadata.date : undefined,
-        organizer: typeof metadata?.organizer_name === 'string' ? metadata.organizer_name : undefined,
+        organizer:
+          typeof metadata?.organizer_name === 'string' ? metadata.organizer_name : undefined,
         participants: participants?.length ? participants : undefined,
       };
     });
@@ -142,7 +143,10 @@ export class ListMeetingsTool {
     span?.setAttribute('result_count', meetings.length);
     span?.setAttribute('total', result.total);
 
-    this.logger.debug({ resultCount: meetings.length, total: result.total }, 'Listed meeting transcripts');
+    this.logger.debug(
+      { resultCount: meetings.length, total: result.total },
+      'Listed meeting transcripts',
+    );
 
     return { meetings, total: result.total };
   }

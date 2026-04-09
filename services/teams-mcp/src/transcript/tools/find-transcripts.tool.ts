@@ -164,7 +164,8 @@ export class FindTranscriptsTool {
         text: item.text,
         url: `unique://content/${item.id}`,
         meetingDate: typeof metadata?.date === 'string' ? metadata.date : undefined,
-        organizer: typeof metadata?.organizer_name === 'string' ? metadata.organizer_name : undefined,
+        organizer:
+          typeof metadata?.organizer_name === 'string' ? metadata.organizer_name : undefined,
         participants: participants?.length ? participants : undefined,
         score: undefined, // Score not available in current response
       };
