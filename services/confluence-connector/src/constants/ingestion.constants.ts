@@ -31,6 +31,10 @@ export function buildRootScopeExternalId(
   return `${EXTERNAL_ID_PREFIX}${instanceType}:${instanceId}`;
 }
 
+export function buildSpaceScopeExternalId(tenantName: string, spaceKey: string): string {
+  return `${EXTERNAL_ID_PREFIX}${tenantName}:${spaceKey}`;
+}
+
 export const INGESTION_MIME_TYPE = 'text/html' as const;
 export const OWNER_TYPE = 'SCOPE' as const;
 export const SOURCE_OWNER_TYPE = 'COMPANY' as const;

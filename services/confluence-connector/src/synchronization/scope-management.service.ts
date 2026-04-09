@@ -6,7 +6,10 @@ import type {
   ConfluenceApiClient,
   InstanceIdentifier,
 } from '../confluence-api/confluence-api-client';
-import { buildRootScopeExternalId, EXTERNAL_ID_PREFIX } from '../constants/ingestion.constants';
+import {
+  buildRootScopeExternalId,
+  buildSpaceScopeExternalId,
+} from '../constants/ingestion.constants';
 
 export interface RootScopeInitResult {
   rootScopePath: string;
@@ -51,37 +54,7 @@ export class ScopeManagementService {
     const rootScope = await this.uniqueApiClient.scopes.getById(this.ingestionConfig.scopeId);
     assert.ok(rootScope, `Root scope with ID ${this.ingestionConfig.scopeId} not found`);
 
-    const instanceId = await this.getInstanceIdentifier();
-    const expectedExternalId = buildRootScopeExternalId(instanceId.type, instanceId.id);
-    let isInitialSync = false;
-
-    if (!rootScope.externalId) {
-      isInitialSync = true;
-      try {
-        const updatedScope = await this.uniqueApiClient.scopes.updateExternalId(
-          rootScope.id,
-          expectedExternalId,
-        );
-        rootScope.externalId = updatedScope.externalId;
-        this.logger.log({
-          scopeId: rootScope.id,
-          externalId: expectedExternalId,
-          msg: 'Claimed root scope ownership',
-        });
-      } catch (error) {
-        this.logger.warn({
-          scopeId: rootScope.id,
-          externalId: expectedExternalId,
-          err: error,
-          msg: 'Failed to claim root scope ownership',
-        });
-      }
-    } else {
-      assert.ok(
-        rootScope.externalId === expectedExternalId,
-        `Root scope ownership mismatch: expected ${expectedExternalId}, found ${rootScope.externalId}`,
-      );
-    }
+    const isInitialSync = await this.validateOwnership(rootScope);
 
     const pathSegments = [rootScope.name];
     let currentScope = rootScope;
@@ -103,6 +76,47 @@ export class ScopeManagementService {
     return { rootScopePath, isInitialSync };
   }
 
+  private async validateOwnership(rootScope: {
+    id: string;
+    externalId: string | null;
+  }): Promise<boolean> {
+    const instanceId = await this.getInstanceIdentifier();
+    const expectedExternalId = buildRootScopeExternalId(instanceId.type, instanceId.id);
+
+    if (!rootScope.externalId) {
+      // Claim fails fatally: if updateExternalId rejects (e.g. the Unique API enforces
+      // cross-org uniqueness on externalId), the sync must not proceed. This prevents the
+      // same Confluence instance from being ingested into two different Unique orgs.
+      try {
+        const updatedScope = await this.uniqueApiClient.scopes.updateExternalId(
+          rootScope.id,
+          expectedExternalId,
+        );
+        rootScope.externalId = updatedScope.externalId;
+        this.logger.log({
+          scopeId: rootScope.id,
+          externalId: expectedExternalId,
+          msg: 'Claimed root scope ownership',
+        });
+      } catch (error) {
+        this.logger.error({
+          scopeId: rootScope.id,
+          externalId: expectedExternalId,
+          err: error,
+          msg: 'Failed to claim root scope ownership',
+        });
+        throw error;
+      }
+      return true;
+    }
+
+    assert.ok(
+      rootScope.externalId === expectedExternalId,
+      `Root scope ownership mismatch: expected ${expectedExternalId}, found ${rootScope.externalId}`,
+    );
+    return false;
+  }
+
   public async ensureSpaceScopes(
     rootScopePath: string,
     spaceKeys: string[],
@@ -119,7 +133,7 @@ export class ScopeManagementService {
       assert.ok(scope, `Failed to create scope for space: ${spaceKey}`);
 
       if (!scope.externalId) {
-        const externalId = `${EXTERNAL_ID_PREFIX}${this.tenantName}:${spaceKey}`;
+        const externalId = buildSpaceScopeExternalId(this.tenantName, spaceKey);
         await this.uniqueApiClient.scopes.updateExternalId(scope.id, externalId);
       }
 

@@ -179,7 +179,25 @@ describe('ScopeManagementService', () => {
       );
     });
 
-    it('logs warning but does not throw when claim fails', async () => {
+    it('accepts ownership even when updateExternalId returns a different externalId', async () => {
+      const { service, scopes } = makeService();
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: null,
+      });
+      scopes.updateExternalId.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        externalId: null,
+      });
+
+      const result = await service.initialize();
+
+      expect(result.isInitialSync).toBe(true);
+    });
+
+    it('throws when claim fails', async () => {
       const { service, scopes } = makeService();
       scopes.getById.mockResolvedValueOnce({
         id: ROOT_SCOPE_ID,
@@ -189,10 +207,7 @@ describe('ScopeManagementService', () => {
       });
       scopes.updateExternalId.mockRejectedValueOnce(new Error('API error'));
 
-      const result = await service.initialize();
-
-      expect(result.isInitialSync).toBe(true);
-      expect(result.rootScopePath).toBe('/Confluence');
+      await expect(service.initialize()).rejects.toThrow('API error');
     });
 
     it('caches instance identifier across multiple calls', async () => {
@@ -269,6 +284,38 @@ describe('ScopeManagementService', () => {
       });
       expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-eng', `confc:${TENANT_NAME}:ENG`);
       expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-mkt', `confc:${TENANT_NAME}:MKT`);
+    });
+
+    it('skips updateExternalId for space scopes that already have an externalId', async () => {
+      const { service, scopes } = makeService();
+      const rootScopePath = await initializeService(service, scopes);
+
+      scopes.createFromPaths.mockResolvedValueOnce([
+        { id: 'scope-eng', name: 'ENG', externalId: `confc:${TENANT_NAME}:ENG` },
+        { id: 'scope-mkt', name: 'MKT' },
+      ]);
+      scopes.updateExternalId.mockResolvedValue(undefined);
+
+      const result = await service.ensureSpaceScopes(rootScopePath, ['ENG', 'MKT']);
+
+      expect(result).toEqual(
+        new Map([
+          ['ENG', 'scope-eng'],
+          ['MKT', 'scope-mkt'],
+        ]),
+      );
+      expect(scopes.updateExternalId).toHaveBeenCalledTimes(1);
+      expect(scopes.updateExternalId).toHaveBeenCalledWith('scope-mkt', `confc:${TENANT_NAME}:MKT`);
+    });
+
+    it('throws when updateExternalId fails on a space scope', async () => {
+      const { service, scopes } = makeService();
+      const rootScopePath = await initializeService(service, scopes);
+
+      scopes.createFromPaths.mockResolvedValueOnce([{ id: 'scope-eng', name: 'ENG' }]);
+      scopes.updateExternalId.mockRejectedValueOnce(new Error('Conflict'));
+
+      await expect(service.ensureSpaceScopes(rootScopePath, ['ENG'])).rejects.toThrow('Conflict');
     });
   });
 });

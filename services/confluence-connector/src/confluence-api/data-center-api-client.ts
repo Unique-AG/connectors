@@ -36,6 +36,8 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
   }
 
   public async resolveInstanceIdentifier(): Promise<InstanceIdentifier> {
+    // The manifest endpoint is public and does not require authentication, so we
+    // pass empty headers intentionally (no Authorization header needed).
     const url = `${this.config.baseUrl}/rest/applinks/1.0/manifest`;
     const response = await this.httpClient.rateLimitedRequest(url, {});
 
