@@ -84,9 +84,8 @@ export class ScopeManagementService {
     const expectedExternalId = buildRootScopeExternalId(instanceId.type, instanceId.id);
 
     if (!rootScope.externalId) {
-      // Claim fails fatally: if updateExternalId rejects (e.g. the Unique API enforces
-      // cross-org uniqueness on externalId), the sync must not proceed. This prevents the
-      // same Confluence instance from being ingested into two different Unique orgs.
+      // Claim fails fatally: if updateExternalId rejects (e.g. the externalId is already
+      // taken within this org), the sync must not proceed to avoid data conflicts.
       try {
         const updatedScope = await this.uniqueApiClient.scopes.updateExternalId(
           rootScope.id,
