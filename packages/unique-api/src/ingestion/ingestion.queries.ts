@@ -82,8 +82,8 @@ export const CONTENT_UPSERT_MUTATION = gql`
 export interface ContentUpdateMutationResult {
   contentUpdate: {
     id: string;
-    ownerId: string;
-    ownerType: string;
+    metadata: Record<string, ContentMetadataValue>;
+    ingestionState: IngestionState;
   };
 }
 
