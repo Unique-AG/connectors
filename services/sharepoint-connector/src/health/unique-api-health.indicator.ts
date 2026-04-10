@@ -60,12 +60,12 @@ export class UniqueApiHealthIndicator {
     const details: Record<string, string> = {};
 
     details.ingestion = ingestionResult.reachable ? 'reachable' : 'unreachable';
-    if (ingestionResult.errorCode) {
+    if (!ingestionResult.reachable) {
       details.ingestionError = ingestionResult.errorCode;
     }
 
     details.scopeManagement = scopeManagementResult.reachable ? 'reachable' : 'unreachable';
-    if (scopeManagementResult.errorCode) {
+    if (!scopeManagementResult.reachable) {
       details.scopeManagementError = scopeManagementResult.errorCode;
     }
 
@@ -97,6 +97,8 @@ export class UniqueApiHealthIndicator {
         dispatcher,
         signal: AbortSignal.timeout(this.timeoutMs),
       });
+      // Discard the body so undici releases the socket instead of holding it until GC.
+      await response.body?.cancel();
       if (response.ok) {
         return { reachable: true };
       }

@@ -134,6 +134,39 @@ describe('UniqueApiHealthIndicator', () => {
     });
   });
 
+  it('reports down with HTTP_500 when server returns internal error', async () => {
+    mockFetch.mockResolvedValue(new Response('Internal Server Error', { status: 500 }));
+
+    const result = await indicator.check('uniqueApi');
+
+    expect(result).toEqual({
+      uniqueApi: {
+        status: 'down',
+        ingestion: 'unreachable',
+        ingestionError: 'HTTP_500',
+        scopeManagement: 'unreachable',
+        scopeManagementError: 'HTTP_500',
+      },
+    });
+  });
+
+  it('reports down with HTTP_403 when access is forbidden', async () => {
+    mockFetch
+      .mockResolvedValueOnce(new Response('{"data":{"__typename":"Query"}}', { status: 200 }))
+      .mockResolvedValueOnce(new Response('Forbidden', { status: 403 }));
+
+    const result = await indicator.check('uniqueApi');
+
+    expect(result).toEqual({
+      uniqueApi: {
+        status: 'down',
+        ingestion: 'reachable',
+        scopeManagement: 'unreachable',
+        scopeManagementError: 'HTTP_403',
+      },
+    });
+  });
+
   it('reports down when both endpoints are down', async () => {
     const connError = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
     const dnsError = Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' });

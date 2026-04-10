@@ -167,6 +167,22 @@ describe('ConnectivityHealthIndicator', () => {
     });
   });
 
+  it('reports TIMEOUT when AbortSignal fires a DOMException TimeoutError', async () => {
+    const timeoutException = new DOMException('Signal timed out', 'TimeoutError');
+    mockFetch.mockRejectedValueOnce(timeoutException).mockResolvedValueOnce(new Response());
+
+    const result = await indicator.check('connectivity');
+
+    expect(result).toEqual({
+      connectivity: {
+        status: 'down',
+        graph: 'unreachable',
+        graphError: 'TIMEOUT',
+        sharepoint: [{ tenant: 'default', status: 'reachable' }],
+      },
+    });
+  });
+
   it('treats non-2xx HTTP responses as reachable', async () => {
     mockFetch
       .mockResolvedValueOnce(new Response(null, { status: 200 }))

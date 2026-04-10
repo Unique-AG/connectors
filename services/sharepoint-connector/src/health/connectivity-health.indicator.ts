@@ -58,7 +58,7 @@ export class ConnectivityHealthIndicator {
       status: sharepointResult.reachable ? 'reachable' : 'unreachable',
     };
 
-    if (sharepointResult.errorCode) {
+    if (!sharepointResult.reachable) {
       sharepointEntry.error = sharepointResult.errorCode;
     }
 
@@ -75,10 +75,12 @@ export class ConnectivityHealthIndicator {
 
   private async ping(url: string, dispatcher: Dispatcher): Promise<PingResult> {
     try {
-      await undiciFetch(url, {
+      const response = await undiciFetch(url, {
         dispatcher,
         signal: AbortSignal.timeout(this.timeoutMs),
       });
+      // Discard the body so undici releases the socket instead of holding it until GC.
+      await response.body?.cancel();
       return { reachable: true };
     } catch (error) {
       return { reachable: false, errorCode: extractErrorCode(error) };

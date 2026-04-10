@@ -1,7 +1,4 @@
-export interface PingResult {
-  reachable: boolean;
-  errorCode?: string;
-}
+export type PingResult = { reachable: true } | { reachable: false; errorCode: string };
 
 export function extractErrorCode(error: unknown): string {
   if (error instanceof DOMException && error.name === 'TimeoutError') {

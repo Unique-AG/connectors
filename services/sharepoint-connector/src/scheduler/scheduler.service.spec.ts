@@ -48,6 +48,29 @@ describe('SchedulerService', () => {
     expect(recordMock).not.toHaveBeenCalled();
   });
 
+  it('records when scan is skipped for reasons other than scan_in_progress', async () => {
+    const synchronizeMock = vi.fn().mockResolvedValue({
+      fullResult: { status: 'skipped', reason: 'no_active_sites' },
+      siteResults: [],
+    });
+    const recordMock = vi.fn();
+    const { unit } = await TestBed.solitary(SchedulerService)
+      .mock(SharepointSynchronizationService)
+      .impl(() => ({ synchronize: synchronizeMock }))
+      .mock(SyncStatusStore)
+      .impl(() => ({ record: recordMock }))
+      .compile();
+
+    await unit.runScheduledScan();
+
+    expect(recordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fullResult: { status: 'skipped', reason: 'no_active_sites' },
+        siteResults: [],
+      }),
+    );
+  });
+
   it('records failure on unexpected error', async () => {
     const synchronizeMock = vi.fn().mockRejectedValue(new Error('boom'));
     const recordMock = vi.fn();
