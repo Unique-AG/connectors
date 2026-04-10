@@ -39,7 +39,10 @@ connector:
   #           key: PROXY_PASSWORD
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
-  # -- List of ConfigMaps to load as environment variables
+  # -- List of ConfigMaps to load as environment variables.
+  # The default assumes releaseName=sharepoint-connector. For multi-instance deployments
+  # with a different release name, override to match the rendered ConfigMap name
+  # (<releaseName>-proxy-config).
   extraEnvCM:
     - sharepoint-connector-proxy-config
   image:
@@ -79,7 +82,10 @@ connector:
         items:
           - key: key.pem
             path: key.pem
-    # -- Tenant configuration YAML file mounted from ConfigMap
+    # -- Tenant configuration YAML file mounted from ConfigMap.
+    # The default assumes releaseName=sharepoint-connector. For multi-instance deployments
+    # with a different release name, override to match the rendered ConfigMap name
+    # (<releaseName>-tenant-config).
     - name: tenant-config
       configMap:
         name: sharepoint-connector-tenant-config
@@ -286,9 +292,9 @@ connectorConfig:
 # -- HTTP proxy configuration for external API calls
 # Required for environments where internet access is only available through a proxy.
 # Users preferring setting all variables by hand disable the enabled flag and remove
-# sharepoint-connector-proxy-config from connector.extraEnvCM.
+# the proxy-config ConfigMap from connector.extraEnvCM.
 proxyConfig:
-  # -- if disabled, sharepoint-connector-proxy-config must be removed from connector.extraEnvCM.
+  # -- if disabled, the proxy-config ConfigMap must be removed from connector.extraEnvCM.
   enabled: true
   # -- Proxy authentication mode
   # none: proxy disabled
