@@ -9,6 +9,39 @@ import {
 import type { Response } from 'express';
 
 /**
+ * MS Graph SDK bug: `.getStream()` error responses leave `GraphError.body` as
+ * an unconsumed ReadableStream instead of parsed JSON. The SDK's
+ * `GraphResponseHandler` converts the body using the requested responseType
+ * (STREAM) *before* checking `rawResponse.ok`, so the JSON error is never parsed.
+ *
+ * This function consumes the stream and backfills code/message/requestId on the
+ * exception so the filter can log them. Mirrors the SDK's internal parsing from
+ * `GraphErrorHandler.constructErrorFromResponse` (which is not publicly exported).
+ */
+async function hydrateStreamBody(exception: GraphError): Promise<void> {
+  if (!(exception.body instanceof ReadableStream)) {
+    return;
+  }
+
+  try {
+    const text = await new Response(exception.body).text();
+    const parsed = JSON.parse(text);
+    const error = parsed?.error;
+
+    if (error) {
+      exception.code ??= error.code ?? null;
+      exception.message ||= error.message ?? '';
+      exception.requestId ??= error.innerError?.['request-id'] ?? null;
+      exception.body = JSON.stringify(error);
+    } else {
+      exception.body = text;
+    }
+  } catch {
+    exception.body = null;
+  }
+}
+
+/**
  * Exception filter to handle Microsoft Graph API errors.
  *
  * Catches GraphError exceptions and formats them into structured log output
@@ -18,9 +51,11 @@ import type { Response } from 'express';
 export class GraphErrorFilter implements ExceptionFilter {
   private readonly logger = new Logger(GraphErrorFilter.name);
 
-  public catch(exception: GraphError, host: ArgumentsHost) {
+  public async catch(exception: GraphError, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+
+    await hydrateStreamBody(exception);
 
     const formattedCode = exception.code ? `[${exception.code ?? ''}] ` : ' ';
     this.logger.error(
