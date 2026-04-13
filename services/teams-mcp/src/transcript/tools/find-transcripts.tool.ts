@@ -5,14 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import type { UniqueConfigNamespaced } from '~/config';
-import {
-  type MetadataFilter,
-  type PublicSearchRequest,
-  SearchType,
-  UniqueQLOperator,
-} from '~/unique/unique.dtos';
+import { type PublicSearchRequest, SearchType } from '~/unique/unique.dtos';
 import { UniqueContentService } from '~/unique/unique-content.service';
 import { UniqueUserMappingService } from '~/unique/unique-user-mapping.service';
+import { buildTranscriptFilter, parseTranscriptMetadata } from './transcript-tools.helpers';
 
 const FindTranscriptsInputSchema = z.object({
   query: z.string().describe('Search query to find relevant content within transcripts'),
@@ -20,11 +16,19 @@ const FindTranscriptsInputSchema = z.object({
   dateFrom: z.iso
     .datetime()
     .optional()
-    .describe('Filter transcripts from this datetime (ISO 8601, e.g., 2024-01-15T00:00:00.000Z)'),
+    .describe(
+      'Filter transcripts from this datetime (ISO 8601, e.g., 2024-01-15T00:00:00.000Z). Matches the meeting start date.',
+    ),
   dateTo: z.iso
     .datetime()
     .optional()
-    .describe('Filter transcripts until this datetime (ISO 8601, e.g., 2024-01-31T23:59:59.999Z)'),
+    .describe(
+      'Filter transcripts until this datetime (ISO 8601, e.g., 2024-01-31T23:59:59.999Z). Matches the meeting start date.',
+    ),
+  organizer: z
+    .string()
+    .optional()
+    .describe('Filter by meeting organizer name or email (partial match)'),
   participant: z
     .string()
     .optional()
@@ -36,12 +40,6 @@ const FindTranscriptsInputSchema = z.object({
     .max(100)
     .default(10)
     .describe('Maximum number of results to return'),
-  scoreThreshold: z
-    .number()
-    .min(0)
-    .max(1)
-    .optional()
-    .describe('Minimum relevance score threshold (0-1)'),
 });
 
 const TranscriptChunkSchema = z.object({
@@ -52,8 +50,8 @@ const TranscriptChunkSchema = z.object({
   text: z.string().describe('The relevant passage'),
   url: z.string().optional().describe('External URL if applicable'),
   meetingDate: z.string().optional().describe('Date of the meeting'),
+  organizer: z.string().optional().describe('Name of the meeting organizer'),
   participants: z.array(z.string()).optional().describe('List of participants'),
-  score: z.number().optional().describe('Relevance score'),
 });
 
 const FindTranscriptsOutputSchema = z.object({
@@ -77,7 +75,7 @@ export class FindTranscriptsTool {
     name: 'find_transcripts',
     title: 'Search Meeting Transcripts',
     description:
-      'Search for content within meeting transcripts using semantic search. Returns relevant passages that can be cited using [N] notation where N is the result index.',
+      'Search for content within meeting transcripts using hybrid semantic + keyword search. Supports filtering by date range (dateFrom/dateTo), meeting organizer, participant, and subject. Returns relevant passages that can be cited using [N] notation where N is the result index.',
     parameters: FindTranscriptsInputSchema,
     outputSchema: FindTranscriptsOutputSchema,
     annotations: {
@@ -110,6 +108,7 @@ export class FindTranscriptsTool {
     span?.setAttribute('filter.has_subject', !!input.subject);
     span?.setAttribute('filter.has_date_from', !!input.dateFrom);
     span?.setAttribute('filter.has_date_to', !!input.dateTo);
+    span?.setAttribute('filter.has_organizer', !!input.organizer);
     span?.setAttribute('filter.has_participant', !!input.participant);
 
     const scopeContext = await this.userMapping.resolve(userProfileId);
@@ -123,6 +122,7 @@ export class FindTranscriptsTool {
         hasSubject: !!input.subject,
         hasDateFrom: !!input.dateFrom,
         hasDateTo: !!input.dateTo,
+        hasOrganizer: !!input.organizer,
         hasParticipant: !!input.participant,
         limit: input.limit,
       },
@@ -135,15 +135,9 @@ export class FindTranscriptsTool {
     const result = await this.contentService.scopedSearch(searchRequest, scopeContext);
 
     const results = result.data.map((item) => {
-      const metadata = item.metadata as Record<string, unknown> | null;
-      const participantNames = metadata?.participant_names;
-      const participants =
-        typeof participantNames === 'string'
-          ? participantNames
-              .split(',')
-              .map((p) => p.trim())
-              .filter(Boolean)
-          : undefined;
+      const { meetingDate, organizer, participants } = parseTranscriptMetadata(
+        item.metadata as Record<string, unknown> | null,
+      );
 
       return {
         id: item.id,
@@ -152,9 +146,9 @@ export class FindTranscriptsTool {
         key: item.key,
         text: item.text,
         url: `unique://content/${item.id}`,
-        meetingDate: typeof metadata?.date === 'string' ? metadata.date : undefined,
-        participants: participants?.length ? participants : undefined,
-        score: undefined, // Score not available in current response
+        meetingDate,
+        organizer,
+        participants,
       };
     });
 
@@ -172,68 +166,11 @@ export class FindTranscriptsTool {
     rootScopeId: string,
     input: z.infer<typeof FindTranscriptsInputSchema>,
   ): PublicSearchRequest {
-    const conditions: MetadataFilter[] = [
-      // Scope filter: only return content under our root scope
-      {
-        path: ['folderIdPath'],
-        operator: UniqueQLOperator.CONTAINS,
-        value: `uniquepathid://${rootScopeId}`,
-      },
-      // Type filter: only return transcripts (VTT files), not recordings
-      {
-        path: ['mimeType'],
-        operator: UniqueQLOperator.EQUALS,
-        value: 'text/vtt',
-      },
-    ];
-
-    if (input.subject) {
-      conditions.push({
-        path: ['title'],
-        operator: UniqueQLOperator.CONTAINS,
-        value: input.subject,
-      });
-    }
-
-    if (input.dateFrom) {
-      conditions.push({
-        path: ['metadata', 'date'],
-        operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
-        value: input.dateFrom,
-      });
-    }
-
-    if (input.dateTo) {
-      conditions.push({
-        path: ['metadata', 'date'],
-        operator: UniqueQLOperator.LESS_THAN_OR_EQUAL,
-        value: input.dateTo,
-      });
-    }
-
-    if (input.participant) {
-      conditions.push({
-        or: [
-          {
-            path: ['metadata', 'participant_names'],
-            operator: UniqueQLOperator.CONTAINS,
-            value: input.participant,
-          },
-          {
-            path: ['metadata', 'participant_emails'],
-            operator: UniqueQLOperator.CONTAINS,
-            value: input.participant,
-          },
-        ],
-      });
-    }
-
     return {
       searchString: input.query,
-      searchType: SearchType.VECTOR,
+      searchType: SearchType.COMBINED,
       limit: input.limit,
-      scoreThreshold: input.scoreThreshold,
-      metaDataFilter: { and: conditions },
+      metaDataFilter: buildTranscriptFilter(rootScopeId, input),
     };
   }
 }
