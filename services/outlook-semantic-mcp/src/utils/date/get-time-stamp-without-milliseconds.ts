@@ -1,3 +1,3 @@
 export const getTimeStampWithoutMilliseconds = (date: Date) => {
-  return date.getTime() / 1000;
+  return Math.floor(date.getTime() / 1000);
 };

@@ -266,7 +266,8 @@
               "description": "List of sender addresses to ignore",
               "items": { "type": "string" }
             }
-          }
+          },
+          "required": ["retentionWindowInDays"]
         },
         "auth": {
           "type": "object",
