@@ -20,6 +20,7 @@ import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UploadFileForIngestionCommand } from '~/unique/upload-file-for-ingestion.command';
 import { getMessageExpirationDate } from '~/utils/date/get-message-expiration-date';
+import { getTimeStampWithoutMilliseconds } from '~/utils/date/get-time-stamp-without-milliseconds';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { Nullish } from '~/utils/nullish';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
@@ -164,15 +165,24 @@ export class ProcessEmailCommand {
     assert.ok(rootScope, `Parent scope id`);
 
     if (isNonNullish(file) && metadata.sentDateTime === file.metadata?.sentDateTime) {
-      const expirationDate = getMessageExpirationDate({
-        receivedDateTime: graphMessage.receivedDateTime,
-        retentionWindowInDays: filters.retentionWindowInDays,
-      });
-      const fileExpirationTimeStamp = file.expiresAt ? new Date(file.expiresAt).getTime() : -1;
+      // We remove the milliseconds to avoid unnecesary updates because many DateTime scalar implementations and
+      // databases truncate sub-second values on round-trip, so a millisecond-level comparison would
+      // always be unequal for already-stored dates.
+      const expirationDateTimeStamp = getTimeStampWithoutMilliseconds(
+        getMessageExpirationDate({
+          receivedDateTime: graphMessage.receivedDateTime,
+          retentionWindowInDays: filters.retentionWindowInDays,
+        }),
+      );
+      const fileExpirationTimeStamp = file.expiresAt
+        ? getTimeStampWithoutMilliseconds(new Date(file.expiresAt))
+        : -1;
 
+      // lastModifiedDateTime is kept as a raw ISO string throughout (never deserialized to Date),
+      // so string equality is safe and not subject to round-trip precision loss.
       if (
         metadata.lastModifiedDateTime === file.metadata?.lastModifiedDateTime &&
-        expirationDate.getTime() === fileExpirationTimeStamp
+        expirationDateTimeStamp === fileExpirationTimeStamp
       ) {
         this.logger.log({
           ...logContext,
@@ -183,7 +193,7 @@ export class ProcessEmailCommand {
       this.logger.log({ ...logContext, msg: `Update file metadata` });
       await this.uniqueApi.ingestion.update({
         contentId: file.id,
-        expiresAt: expirationDate,
+        expiresAt: expirationDate.toISOString(),
         // ContentMetadata value is Record<x, y> and metadata is an interface we do the type casting
         // here because you cannot assign an interface to a record.
         metadata: metadata as unknown as ContentMetadata,

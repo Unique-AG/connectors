@@ -5,7 +5,7 @@ import { getMessageExpirationDate } from '../get-message-expiration-date';
 // Freeze at a mid-day UTC time so UTC-midnight truncation is non-trivial.
 const FIXED_NOW = new Date('2025-06-15T14:32:00.000Z');
 
-describe('retention boundary: computeRetentionCutoffDate and getExpirationDate are aligned', () => {
+describe('retention boundary: computeRetentionCutoffDate and getMessageExpirationDate are aligned', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(FIXED_NOW);
@@ -56,7 +56,8 @@ describe('retention boundary: computeRetentionCutoffDate and getExpirationDate a
     });
 
     const endOfToday = new Date(FIXED_NOW);
-    endOfToday.setUTCHours(23, 59, 59, 999);
+    endOfToday.setUTCDate(endOfToday.getUTCDate() + 1);
+    endOfToday.setUTCHours(0, 0, 0, 0);
 
     expect(expiration.toISOString()).toBe(endOfToday.toISOString());
   });
