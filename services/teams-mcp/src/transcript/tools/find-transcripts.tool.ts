@@ -170,6 +170,7 @@ export class FindTranscriptsTool {
       searchString: input.query,
       searchType: SearchType.COMBINED,
       limit: input.limit,
+      scoreThreshold: 0,
       metaDataFilter: buildTranscriptFilter(rootScopeId, input),
     };
   }
