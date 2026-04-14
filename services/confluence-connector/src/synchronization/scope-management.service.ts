@@ -15,11 +15,6 @@ import {
   parseScopeExternalId,
 } from '../utils/key-format';
 
-export interface RootScopeInitResult {
-  rootScopePath: string;
-  isInitialSync: boolean;
-}
-
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
   private cachedInstanceIdentifier: InstanceIdentifier | null = null;
@@ -41,7 +36,7 @@ export class ScopeManagementService {
     return identifier;
   }
 
-  public async initialize(): Promise<RootScopeInitResult> {
+  public async initialize(): Promise<string> {
     this.logger.log({
       tenantName: this.tenantName,
       msg: 'Requesting current user ID from Unique API',
@@ -59,7 +54,7 @@ export class ScopeManagementService {
     const rootScope = await this.uniqueApiClient.scopes.getById(this.ingestionConfig.scopeId);
     assert.ok(rootScope, `Root scope with ID ${this.ingestionConfig.scopeId} not found`);
 
-    const isInitialSync = await this.validateOwnership(rootScope);
+    await this.validateOwnership(rootScope);
 
     const pathSegments = [rootScope.name];
     let currentScope = rootScope;
@@ -78,13 +73,13 @@ export class ScopeManagementService {
 
     const rootScopePath = `/${pathSegments.join('/')}`;
     this.logger.log({ rootScopePath, msg: 'Scope management initialized' });
-    return { rootScopePath, isInitialSync };
+    return rootScopePath;
   }
 
   private async validateOwnership(rootScope: {
     id: string;
     externalId: string | null;
-  }): Promise<boolean> {
+  }): Promise<void> {
     const instanceId = await this.getInstanceIdentifier();
     const expectedExternalId = buildRootScopeExternalId(instanceId.type, instanceId.id);
 
@@ -96,7 +91,11 @@ export class ScopeManagementService {
           rootScope.id,
           expectedExternalId,
         );
-        rootScope.externalId = updatedScope.externalId;
+        assert.strictEqual(
+          updatedScope.externalId,
+          expectedExternalId,
+          `Root scope ownership mismatch after claim: expected ${expectedExternalId}, got ${updatedScope.externalId}`,
+        );
         this.logger.log({
           scopeId: rootScope.id,
           externalId: expectedExternalId,
@@ -111,14 +110,14 @@ export class ScopeManagementService {
         });
         throw error;
       }
-      return true;
+      return;
     }
 
-    assert.ok(
-      rootScope.externalId === expectedExternalId,
+    assert.strictEqual(
+      rootScope.externalId,
+      expectedExternalId,
       `Root scope ownership mismatch: expected ${expectedExternalId}, found ${rootScope.externalId}`,
     );
-    return false;
   }
 
   public async ensureSpaceScopes(

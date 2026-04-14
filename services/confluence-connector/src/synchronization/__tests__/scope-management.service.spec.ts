@@ -92,7 +92,7 @@ describe('ScopeManagementService', () => {
       externalId: `confc:cloud:${INSTANCE_ID}`,
     });
     scopes.updateExternalId.mockResolvedValue({ id: ROOT_SCOPE_ID, externalId: null });
-    const { rootScopePath } = await service.initialize();
+    const rootScopePath = await service.initialize();
     scopes.getById.mockReset();
     scopes.updateExternalId.mockReset();
     return rootScopePath;
@@ -115,7 +115,7 @@ describe('ScopeManagementService', () => {
         .mockResolvedValueOnce({ id: 'parent-1', name: 'Connectors', parentId: 'top-1' })
         .mockResolvedValueOnce({ id: 'top-1', name: 'Company', parentId: null });
 
-      const { rootScopePath } = await service.initialize();
+      const rootScopePath = await service.initialize();
 
       expect(rootScopePath).toBe('/Company/Connectors/Confluence');
       expect(scopes.getById).toHaveBeenCalledTimes(3);
@@ -133,7 +133,7 @@ describe('ScopeManagementService', () => {
         externalId: `confc:cloud:${INSTANCE_ID}`,
       });
 
-      const { rootScopePath } = await service.initialize();
+      const rootScopePath = await service.initialize();
 
       expect(rootScopePath).toBe('/RootScope');
       expect(scopes.getById).toHaveBeenCalledTimes(1);
@@ -164,7 +164,7 @@ describe('ScopeManagementService', () => {
   });
 
   describe('ownership validation', () => {
-    it('claims ownership and returns isInitialSync=true when externalId is null', async () => {
+    it('claims ownership when externalId is null', async () => {
       const { service, scopes } = makeService();
       scopes.getById.mockResolvedValueOnce({
         id: ROOT_SCOPE_ID,
@@ -177,17 +177,16 @@ describe('ScopeManagementService', () => {
         externalId: `confc:cloud:${INSTANCE_ID}`,
       });
 
-      const result = await service.initialize();
+      const rootScopePath = await service.initialize();
 
-      expect(result.isInitialSync).toBe(true);
-      expect(result.rootScopePath).toBe('/Confluence');
+      expect(rootScopePath).toBe('/Confluence');
       expect(scopes.updateExternalId).toHaveBeenCalledWith(
         ROOT_SCOPE_ID,
         `confc:cloud:${INSTANCE_ID}`,
       );
     });
 
-    it('proceeds with isInitialSync=false when externalId matches', async () => {
+    it('skips claim when externalId already matches', async () => {
       const { service, scopes } = makeService();
       scopes.getById.mockResolvedValueOnce({
         id: ROOT_SCOPE_ID,
@@ -196,10 +195,9 @@ describe('ScopeManagementService', () => {
         externalId: `confc:cloud:${INSTANCE_ID}`,
       });
 
-      const result = await service.initialize();
+      const rootScopePath = await service.initialize();
 
-      expect(result.isInitialSync).toBe(false);
-      expect(result.rootScopePath).toBe('/Confluence');
+      expect(rootScopePath).toBe('/Confluence');
       expect(scopes.updateExternalId).not.toHaveBeenCalled();
     });
 
@@ -217,7 +215,7 @@ describe('ScopeManagementService', () => {
       );
     });
 
-    it('accepts ownership even when updateExternalId returns a different externalId', async () => {
+    it('throws when updateExternalId returns a different externalId than expected', async () => {
       const { service, scopes } = makeService();
       scopes.getById.mockResolvedValueOnce({
         id: ROOT_SCOPE_ID,
@@ -230,9 +228,9 @@ describe('ScopeManagementService', () => {
         externalId: null,
       });
 
-      const result = await service.initialize();
-
-      expect(result.isInitialSync).toBe(true);
+      await expect(service.initialize()).rejects.toThrow(
+        'Root scope ownership mismatch after claim',
+      );
     });
 
     it('throws when claim fails', async () => {
@@ -288,9 +286,8 @@ describe('ScopeManagementService', () => {
         externalId: 'confc:data-center:dc-instance-456',
       });
 
-      const result = await service.initialize();
+      await service.initialize();
 
-      expect(result.isInitialSync).toBe(true);
       expect(scopes.updateExternalId).toHaveBeenCalledWith(
         ROOT_SCOPE_ID,
         'confc:data-center:dc-instance-456',

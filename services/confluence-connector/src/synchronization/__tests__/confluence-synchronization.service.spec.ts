@@ -34,7 +34,7 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 });
 
 const mockScopeManagementService = {
-  initialize: vi.fn().mockResolvedValue({ rootScopePath: '/Confluence', isInitialSync: false }),
+  initialize: vi.fn().mockResolvedValue('/Confluence'),
   ensureSpaceScopes: vi.fn().mockResolvedValue(new Map([['SP', 'scope-1']])),
   cleanupRemovedSpaces: vi.fn().mockResolvedValue(undefined),
 } as unknown as ScopeManagementService;
