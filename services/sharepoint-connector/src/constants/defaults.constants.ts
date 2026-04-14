@@ -13,3 +13,7 @@ export const HTTP_STATUS_OK_MAX = 299 as const;
 export const DEFAULT_MIME_TYPE = 'application/octet-stream' as const;
 
 export const CRON_EVERY_15_MINUTES = '*/15 * * * *' as const;
+
+export const DEFAULT_HEALTH_SYNC_HISTORY_SIZE = 5 as const;
+export const DEFAULT_HEALTH_SYNC_SITE_FAILURE_THRESHOLD = 0.5 as const;
+export const DEFAULT_HEALTH_CONNECTIVITY_TIMEOUT_MS = 3000 as const;

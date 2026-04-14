@@ -55,6 +55,7 @@ export const inboxConfigurations = pgTable('inbox_configurations', {
   fullSyncLastRunAt: timestamp(`full_sync_last_run_at`),
   fullSyncLastStartedAt: timestamp(`full_sync_last_started_at`),
   // Live catchup specific columns
+  lastWebhookReceivedAt: timestamp(`last_webhook_received_at`),
   liveCatchUpState: liveCatchUpState(`live_catch_up_state`).notNull().default('ready'),
   liveCatchUpHeartbeatAt: timestamp(`live_catch_up_heartbeat_at`).notNull().defaultNow(),
 

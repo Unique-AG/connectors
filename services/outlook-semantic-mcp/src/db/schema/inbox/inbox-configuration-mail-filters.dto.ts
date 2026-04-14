@@ -12,7 +12,7 @@ const regexPattern = z.string().transform((pattern, ctx) => {
   }
 
   try {
-    const compiled = new RegExp(patternPart, patternPart);
+    const compiled = new RegExp(patternPart, flagsPart);
     if (!safeRegex(compiled)) {
       ctx.addIssue({
         code: 'custom',
@@ -28,7 +28,7 @@ const regexPattern = z.string().transform((pattern, ctx) => {
 });
 
 export const inboxConfigurationMailFilters = z.object({
-  ignoredBefore: z.coerce.date(),
+  retentionWindowInDays: z.number().int().positive(),
   ignoredSenders: z.array(regexPattern).optional().default([]),
   ignoredContents: z.array(regexPattern).optional().default([]),
 });
@@ -39,7 +39,7 @@ export function serializeMailFilters(
   filters: InboxConfigurationMailFilters,
 ): Record<string, unknown> {
   return {
-    ignoredBefore: filters.ignoredBefore.toISOString(),
+    retentionWindowInDays: filters.retentionWindowInDays,
     ignoredSenders: filters.ignoredSenders.map((reg) => reg.toString()),
     ignoredContents: filters.ignoredContents.map((reg) => reg.toString()),
   };

@@ -453,6 +453,7 @@ flowchart TB
 ## Related Documentation
 
 - [Architecture](./architecture.md) - System components and infrastructure
+- [Metadata](./metadata.md) - Ingested metadata fields for documents and SitePages
 - [Permissions](./permissions.md) - Required API permissions
 - [Configuration](../operator/configuration.md) - Scheduler and processing settings
 

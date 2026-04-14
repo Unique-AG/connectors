@@ -139,8 +139,8 @@ export class ScopeManagementService {
             msg: `${logPrefix} Partial deletion failure for child scope ${child.id}`,
             failedFolders: result.failedFolders.map((f) => ({
               id: f.id,
-              name: f.name,
-              path: createSmeared(f.path),
+              name: createSmeared(f.name),
+              path: smearPath(createSmeared(f.path)),
               reason: f.failReason,
             })),
           });

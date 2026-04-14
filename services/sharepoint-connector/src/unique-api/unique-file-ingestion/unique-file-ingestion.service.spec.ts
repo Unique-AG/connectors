@@ -6,7 +6,10 @@ import { UniqueOwnerType } from '../../constants/unique-owner-type.enum';
 import { Smeared } from '../../utils/smeared';
 import { IngestionHttpClient } from '../clients/ingestion-http.client';
 import { INGESTION_CLIENT } from '../clients/unique-graphql.client';
-import { CONTENT_UPSERT_MUTATION } from './unique-file-ingestion.consts';
+import {
+  CONTENT_UPSERT_LOG_SAFE_KEYS,
+  CONTENT_UPSERT_MUTATION,
+} from './unique-file-ingestion.consts';
 import { UniqueFileIngestionService } from './unique-file-ingestion.service';
 import type {
   ContentRegistrationRequest,
@@ -79,6 +82,7 @@ describe('UniqueFileIngestionService', () => {
           },
         }),
       }),
+      { logSafeKeys: CONTENT_UPSERT_LOG_SAFE_KEYS },
     );
   });
 
@@ -113,6 +117,7 @@ describe('UniqueFileIngestionService', () => {
           },
         }),
       }),
+      { logSafeKeys: CONTENT_UPSERT_LOG_SAFE_KEYS },
     );
   });
 

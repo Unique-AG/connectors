@@ -6,7 +6,7 @@ import { chunk, identity } from 'remeda';
 import { Dispatcher, interceptors } from 'undici';
 import { Config } from '../../config';
 import { ProxyService } from '../../proxy';
-import { shouldConcealLogs } from '../../utils/logging.util';
+import { shouldDiscloseLogs } from '../../utils/logging.util';
 import { encodeSiteNameForPath, type ManagedPath } from '../../utils/paths.util';
 import type { Smeared } from '../../utils/smeared';
 import { MicrosoftAuthenticationService } from '../auth/microsoft-authentication.service';
@@ -27,7 +27,7 @@ export class SharepointRestHttpService {
     private readonly configService: ConfigService<Config, true>,
     private readonly proxyService: ProxyService,
   ) {
-    this.shouldConcealLogs = shouldConcealLogs(this.configService);
+    this.shouldConcealLogs = !shouldDiscloseLogs(this.configService);
     this.origin = this.configService.get('sharepoint.baseUrl', { infer: true });
 
     // TODO: Add metrics middleware once we start implementing proper metrics

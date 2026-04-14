@@ -22,13 +22,13 @@
     "graphql": "16.11.0",
     "graphql-request": "7.2.0",
     "remeda": "2.32.0",
-    "undici": "7.18.2",
+    "undici": "7.24.4",
     "zod": "4.1.5"
   },
   "devDependencies": {
-    "@nestjs/common": "11.1.6",
-    "@nestjs/core": "11.1.6",
-    "@nestjs/testing": "11.1.6",
+    "@nestjs/common": "11.1.18",
+    "@nestjs/core": "11.1.18",
+    "@nestjs/testing": "11.1.18",
     "@opentelemetry/api": "1.9.0",
     "@suites/di.nestjs": "3.0.1",
     "@suites/doubles.vitest": "3.0.1",

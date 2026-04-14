@@ -30,7 +30,7 @@ export const META = createMeta({
   If \`ingestionStats.state\` is \`error\`: ❌ _Search index unavailable: {ingestionStats.message}_
   Otherwise:
   - ✅ Available in search: {ingestionStats.finished}
-  - ⏳ Still being indexed: {ingestionStats.inProgress} (will appear in search once done)
+  - ⏳ Still being indexed: {ingestionStats.inProgress} — if inProgress is 0 but the top-level \`state\` is \`running\`, show: (waiting for more emails to be uploaded); otherwise show: (will appear in search once done)
   - ❌ Failed to index: {ingestionStats.failed} (omit line if 0)
   If \`ingestionStats.failed\` > 0, append: ⚠️ _{ingestionStats.failed} email(s) could not be indexed and won't appear in search._
   Note: emails are indexed from newest to oldest, so recent emails become searchable first.
@@ -40,8 +40,7 @@ export const META = createMeta({
   ### Active filters
   Always show this section so the user understands which emails will be synchronized for search.
 
-  **Ignoring emails before:** {ignoredBefore formatted as "Mon DD, YYYY"}, or _none_ if null.
-  Emails with a received date before this date are permanently excluded from search — they will never appear in results.
+  **Retention window:** {syncStats.filters.retentionWindowInDays} days — only emails received on or after {syncStats.filters.ignoredBefore formatted as "Mon DD, YYYY"} are synced and searchable. Emails older than this date are excluded from search and will automatically expire from the Knowledge Base.
 
   **Ignored senders** — each entry is a JavaScript regex in \`/pattern/flags\` format matched against the sender's email address. Emails from matching senders are excluded.
   If the list is empty, show: _No sender filters active — all senders are included._

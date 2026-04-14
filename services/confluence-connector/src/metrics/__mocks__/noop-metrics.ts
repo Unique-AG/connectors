@@ -25,6 +25,8 @@ export function createNoopMetrics(): Metrics {
     recordCleanupDuration: noop,
     recordCleanupContentDeleted: noop,
     recordCleanupScopesDeleted: noop,
+    recordOrphanedScopesCleaned: noop,
+    recordOrphanedFilesCleaned: noop,
     initializeCounters: noop,
   };
 

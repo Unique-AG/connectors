@@ -19,6 +19,8 @@ import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UploadFileForIngestionCommand } from '~/unique/upload-file-for-ingestion.command';
+import { getMessageExpirationDate } from '~/utils/date/get-message-expiration-date';
+import { getTimeStampWithoutMilliseconds } from '~/utils/date/get-time-stamp-without-milliseconds';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { Nullish } from '~/utils/nullish';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
@@ -32,7 +34,7 @@ export type MessageIngestionResult =
   | 'ingested'
   | 'skipped'
   | 'skipped-content-unchanged-already-ingested'
-  | 'metadata-updated';
+  | 'content-updated';
 
 interface UserContext {
   email: Smeared;
@@ -163,7 +165,24 @@ export class ProcessEmailCommand {
     assert.ok(rootScope, `Parent scope id`);
 
     if (isNonNullish(file) && metadata.sentDateTime === file.metadata?.sentDateTime) {
-      if (metadata.lastModifiedDateTime === file.metadata?.lastModifiedDateTime) {
+      const expirationDate = getMessageExpirationDate({
+        receivedDateTime: graphMessage.receivedDateTime,
+        retentionWindowInDays: filters.retentionWindowInDays,
+      });
+      // We remove the milliseconds to avoid unnecesary updates because many DateTime scalar implementations and
+      // databases truncate sub-second values on round-trip, so a millisecond-level comparison would
+      // always be unequal for already-stored dates.
+      const expirationDateTimeStamp = getTimeStampWithoutMilliseconds(expirationDate);
+      const fileExpirationTimeStamp = file.expiresAt
+        ? getTimeStampWithoutMilliseconds(new Date(file.expiresAt))
+        : -1;
+
+      // lastModifiedDateTime is kept as a raw ISO string throughout (never deserialized to Date),
+      // so string equality is safe and not subject to round-trip precision loss.
+      if (
+        metadata.lastModifiedDateTime === file.metadata?.lastModifiedDateTime &&
+        expirationDateTimeStamp === fileExpirationTimeStamp
+      ) {
         this.logger.log({
           ...logContext,
           msg: `Skip Update reason: Last modified date not changed`,
@@ -171,13 +190,14 @@ export class ProcessEmailCommand {
         return 'skipped-content-unchanged-already-ingested';
       }
       this.logger.log({ ...logContext, msg: `Update file metadata` });
-      await this.uniqueApi.ingestion.updateMetadata({
+      await this.uniqueApi.ingestion.update({
         contentId: file.id,
+        expiresAt: expirationDate.toISOString(),
         // ContentMetadata value is Record<x, y> and metadata is an interface we do the type casting
         // here because you cannot assign an interface to a record.
         metadata: metadata as unknown as ContentMetadata,
       });
-      return 'metadata-updated';
+      return 'content-updated';
     }
 
     await this.uploadEmailForIngestion({
@@ -187,6 +207,7 @@ export class ProcessEmailCommand {
       graphMessage,
       client,
       logContext,
+      filters,
     });
     return 'ingested';
   }
@@ -199,6 +220,7 @@ export class ProcessEmailCommand {
     metadata,
     fileKey,
     logContext: logContextRaw,
+    filters,
   }: {
     client: Client;
     rootScopeId: string;
@@ -210,6 +232,7 @@ export class ProcessEmailCommand {
       providerUserId: string;
       userEmail: string;
     };
+    filters: InboxConfigurationMailFilters;
   }): Promise<void> {
     // We will update the log context while we run.
     const logContext = clone(logContextRaw) as Record<string, string>;
@@ -232,6 +255,10 @@ export class ProcessEmailCommand {
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       storeInternally: this.configService.get('unique.storeInternally', { infer: true }),
+      expiresAt: getMessageExpirationDate({
+        receivedDateTime: graphMessage.receivedDateTime,
+        retentionWindowInDays: filters.retentionWindowInDays,
+      }),
     };
 
     this.logger.debug({ ...logContext, msg: `Register content: Started` });

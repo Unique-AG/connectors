@@ -19,6 +19,8 @@ export class Metrics {
   private readonly cleanupDuration: Histogram;
   private readonly cleanupContentDeleted: Counter;
   private readonly cleanupScopesDeleted: Counter;
+  private readonly orphanedScopesCleaned: Counter;
+  private readonly orphanedFilesCleaned: Counter;
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
@@ -86,6 +88,14 @@ export class Metrics {
 
     this.cleanupScopesDeleted = metricService.getCounter('cfc_cleanup_scopes_deleted_total', {
       description: 'Number of scopes deleted during tenant cleanup',
+    });
+
+    this.orphanedScopesCleaned = metricService.getCounter('cfc_orphaned_scopes_cleaned_total', {
+      description: 'Number of orphaned space scopes cleaned up after space removal',
+    });
+
+    this.orphanedFilesCleaned = metricService.getCounter('cfc_orphaned_files_cleaned_total', {
+      description: 'Number of files deleted during orphaned space cleanup',
     });
   }
 
@@ -163,6 +173,14 @@ export class Metrics {
     this.cleanupScopesDeleted.add(count, { tenant: this.tenantName });
   }
 
+  public recordOrphanedScopesCleaned(count: number, result: 'success' | 'failure'): void {
+    this.orphanedScopesCleaned.add(count, { tenant: this.tenantName, result });
+  }
+
+  public recordOrphanedFilesCleaned(count: number): void {
+    this.orphanedFilesCleaned.add(count, { tenant: this.tenantName });
+  }
+
   public recordApiThrottleEvent(): void {
     // Bottleneck's reservoir-refresh timer can fire `depleted` outside any AsyncLocalStorage
     // context, so the tenantName getter (which asserts) may throw here.
@@ -194,5 +212,8 @@ export class Metrics {
     this.fileDiffEvents.add(0, { ...tenant, diff_result_type: 'deleted' });
     this.fileDiffEvents.add(0, { ...tenant, diff_result_type: 'moved' });
     this.confluenceApiThrottleEvents.add(0, tenant);
+    this.orphanedScopesCleaned.add(0, { ...tenant, result: 'success' });
+    this.orphanedScopesCleaned.add(0, { ...tenant, result: 'failure' });
+    this.orphanedFilesCleaned.add(0, tenant);
   }
 }

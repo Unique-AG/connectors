@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.3.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.18...outlook-semantic-mcp@0.3.0) (2026-04-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **outlook-semantic-mcp,unique-api:** Replace ignoredBefore date with retention window in days
+
+### Features
+
+* **outlook-semantic-mcp,unique-api:** Implement content expiration ([#434](https://github.com/Unique-AG/connectors/issues/434)) ([9df76f6](https://github.com/Unique-AG/connectors/commit/9df76f6f01e69391d12157fb7063edb1e7280bcc))
+
+
+### Bug Fixes
+
+* **deps:** enable stripLeadingPaths in SWC builder for all services ([#458](https://github.com/Unique-AG/connectors/issues/458)) ([caa3abc](https://github.com/Unique-AG/connectors/commit/caa3abc26b9aea44dede0ce89101df64b3f97b77))
+* **deps:** resolve Dependabot security alerts for multiple transitive dependencies ([#449](https://github.com/Unique-AG/connectors/issues/449)) ([c800b51](https://github.com/Unique-AG/connectors/commit/c800b51439145282cababd491a6fba1a84a748a9))
+* **outlook-semantic-mcp:** fix search emails tool formatting ([#453](https://github.com/Unique-AG/connectors/issues/453)) ([fca7ac4](https://github.com/Unique-AG/connectors/commit/fca7ac474d1216c8be20b7fd3ae8dde8978383ea))
+
+## [0.2.18](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.17...outlook-semantic-mcp@0.2.18) (2026-04-07)
+
+
+### Bug Fixes
+
+* **deps:** resolve Dependabot security alerts for undici, path-to-regexp, orval, minimatch, and brace-expansion ([#432](https://github.com/Unique-AG/connectors/issues/432)) ([5cd9c0f](https://github.com/Unique-AG/connectors/commit/5cd9c0fdc3230de591b28574fccabb7df2cd2cce))
+* **deps:** resolve Dependabot security alerts related to jsonwebtoken, js-yaml and @nestjs/ libraries ([#446](https://github.com/Unique-AG/connectors/issues/446)) ([44835ec](https://github.com/Unique-AG/connectors/commit/44835ec851589e2288fd2e1551ca22edb148190e))
+* **outlook-semantic-mcp:** fix progress and synchronize missing system directories ([#433](https://github.com/Unique-AG/connectors/issues/433)) ([4416738](https://github.com/Unique-AG/connectors/commit/4416738c2c16d0bafac0390575b37460f2188d07))
+
 ## [0.2.17](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.16...outlook-semantic-mcp@0.2.17) (2026-04-03)
 
 

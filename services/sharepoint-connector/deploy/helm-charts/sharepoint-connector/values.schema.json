@@ -568,7 +568,7 @@
       "properties": {
         "enabled": {
           "type": "boolean",
-          "description": "Enable proxy configuration. If disabled, sharepoint-connector-proxy-config must be removed from connector.extraEnvCM.",
+          "description": "Enable proxy configuration. If disabled, the proxy-config ConfigMap must be removed from connector.extraEnvCM.",
           "default": true
         },
         "authMode": {
