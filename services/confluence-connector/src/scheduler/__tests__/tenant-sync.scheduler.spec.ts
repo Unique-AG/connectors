@@ -1,5 +1,6 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TenantStatus } from '../../config';
 import { ConfluenceSynchronizationService } from '../../synchronization/confluence-synchronization.service';
 import { ServiceRegistry } from '../../tenant/service-registry';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
@@ -68,7 +69,7 @@ function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
 function createMockServiceRegistry(tenants: TenantContext[]): ServiceRegistry {
   const serviceRegistry = new ServiceRegistry();
   for (const tenant of tenants) {
-    if (tenant.status === 'deleted') {
+    if (tenant.status === TenantStatus.Deleted) {
       serviceRegistry.register(
         tenant.name,
         TenantDeleteService,

@@ -39,7 +39,7 @@ export class TenantDeleteService {
       }
 
       // Only child scopes are deleted. The root scope is intentionally preserved so the
-      // tenant's top-level scope remains available for re-provisioning without requiring
+      // tenant's top-level scope remains available for re-syncing without requiring
       // a new scope to be created on the Unique side.
       const childScopes = await this.uniqueClient.scopes.listChildren(this.scopeId);
       if (childScopes.length === 0) {
