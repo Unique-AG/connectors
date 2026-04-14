@@ -7,7 +7,13 @@ import {
 } from '@unique-ag/unique-api';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfluenceAuth, ConfluenceAuthFactory } from '../auth/confluence-auth';
-import { getTenantConfigs, type TenantConfig, UniqueAuthMode, type UniqueConfig } from '../config';
+import {
+  getTenantConfigs,
+  type TenantConfig,
+  TenantStatus,
+  UniqueAuthMode,
+  type UniqueConfig,
+} from '../config';
 import { ConfluenceApiClient, ConfluenceApiClientFactory } from '../confluence-api';
 import { Metrics } from '../metrics';
 import { ProxyService } from '../proxy';
@@ -53,7 +59,7 @@ export class TenantRegistry implements OnModuleInit {
         this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
 
         // we instantiate only the minimum required services for these tenants
-        if (status === 'deleted') {
+        if (status === TenantStatus.Deleted) {
           this.registerDeletedTenantServices(tenantName, config, uniqueClient);
         } else {
           this.registerActiveTenantServices(tenantName, config, uniqueClient);
@@ -116,6 +122,7 @@ export class TenantRegistry implements OnModuleInit {
       this.metrics,
     );
     this.serviceRegistry.register(tenantName, TenantDeleteService, cleanupService);
+    this.metrics.initializeCleanupCounters();
     this.logger.log({ tenantName, msg: 'Deleted tenant registered for cleanup' });
   }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
 import type { TenantContext } from '../tenant-context.interface';
 import { tenantStorage } from '../tenant-context.storage';
@@ -51,6 +51,10 @@ function runInTenantContext(tenant: TenantContext, fn: () => Promise<void>): Pro
 }
 
 describe('TenantDeleteService', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('skips cleanup when root scope is not found', async () => {
     const client = createMockUniqueApiClient();
     client.scopes.getById.mockResolvedValue(null);
@@ -257,8 +261,8 @@ describe('TenantDeleteService', () => {
     await runInTenantContext(createTenant(), () => service.deleteTenantContent());
 
     expect(durationSpy).toHaveBeenCalledWith(expect.any(Number), 'success');
-    expect(contentSpy).toHaveBeenCalledWith(2);
-    expect(scopesSpy).toHaveBeenCalledWith(1);
+    expect(contentSpy).toHaveBeenCalledWith(2, 'success');
+    expect(scopesSpy).toHaveBeenCalledWith(1, 'success');
   });
 
   it('skips cleanup when already in progress', async () => {
@@ -295,5 +299,100 @@ describe('TenantDeleteService', () => {
     ).rejects.toThrow('API down');
 
     expect(tenant.isScanning).toBe(false);
+  });
+
+  it('records cleanup duration with failure when an API call throws', async () => {
+    const client = createMockUniqueApiClient();
+    const metrics = createNoopMetrics();
+    const durationSpy = vi.spyOn(metrics, 'recordCleanupDuration');
+
+    client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
+    client.scopes.listChildren.mockRejectedValue(new Error('API down'));
+
+    const service = new TenantDeleteService('my-tenant', 'scope-1', client as never, metrics);
+
+    await expect(
+      runInTenantContext(createTenant(), () => service.deleteTenantContent()),
+    ).rejects.toThrow('API down');
+
+    expect(durationSpy).toHaveBeenCalledWith(expect.any(Number), 'failure');
+  });
+
+  it('does not record cleanup duration for no-op early returns', async () => {
+    const client = createMockUniqueApiClient();
+    const metrics = createNoopMetrics();
+    const durationSpy = vi.spyOn(metrics, 'recordCleanupDuration');
+
+    client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
+    client.scopes.listChildren.mockResolvedValue([]);
+
+    const service = new TenantDeleteService('my-tenant', 'scope-1', client as never, metrics);
+    await runInTenantContext(createTenant(), () => service.deleteTenantContent());
+
+    expect(durationSpy).not.toHaveBeenCalled();
+  });
+
+  it('records scope metrics for both succeeded and failed folders in partial failure', async () => {
+    const client = createMockUniqueApiClient();
+    const metrics = createNoopMetrics();
+    const scopesSpy = vi.spyOn(metrics, 'recordCleanupScopesDeleted');
+
+    client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
+    client.scopes.listChildren.mockResolvedValue([
+      { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
+    ]);
+    client.files.getContentIdsByScope.mockResolvedValue(['file-1']);
+    client.files.deleteByIds.mockResolvedValue(1);
+    client.scopes.delete.mockResolvedValue({
+      successFolders: [{ id: 'sub-1', name: 'sub', path: '/root/space-a/sub' }],
+      failedFolders: [
+        { id: 'sub-2', name: 'sub2', path: '/root/space-a/sub2' },
+        { id: 'sub-3', name: 'sub3', path: '/root/space-a/sub3' },
+      ],
+    });
+
+    const service = new TenantDeleteService('my-tenant', 'scope-1', client as never, metrics);
+    await runInTenantContext(createTenant(), () => service.deleteTenantContent());
+
+    expect(scopesSpy).toHaveBeenCalledWith(1, 'success');
+    expect(scopesSpy).toHaveBeenCalledWith(2, 'failure');
+  });
+
+  it('still attempts scope deletion for scopes where content deletion failed', async () => {
+    const client = createMockUniqueApiClient();
+    client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
+    client.scopes.listChildren.mockResolvedValue([
+      { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
+    ]);
+    client.files.getContentIdsByScope.mockRejectedValue(new Error('API error'));
+    client.scopes.delete.mockResolvedValue({
+      successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
+      failedFolders: [],
+    });
+
+    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
+
+    expect(client.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
+  });
+
+  it('records content deletion failure metric when content deletion throws', async () => {
+    const client = createMockUniqueApiClient();
+    const metrics = createNoopMetrics();
+    const contentSpy = vi.spyOn(metrics, 'recordCleanupContentDeleted');
+
+    client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
+    client.scopes.listChildren.mockResolvedValue([
+      { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
+    ]);
+    client.files.getContentIdsByScope.mockRejectedValue(new Error('API error'));
+    client.scopes.delete.mockResolvedValue({
+      successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
+      failedFolders: [],
+    });
+
+    const service = new TenantDeleteService('my-tenant', 'scope-1', client as never, metrics);
+    await runInTenantContext(createTenant(), () => service.deleteTenantContent());
+
+    expect(contentSpy).toHaveBeenCalledWith(0, 'failure');
   });
 });

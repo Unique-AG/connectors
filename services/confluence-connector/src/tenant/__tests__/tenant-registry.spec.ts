@@ -27,9 +27,13 @@ vi.mock('@nestjs/common', async (importOriginal) => {
   };
 });
 
-vi.mock('../../config/tenant-config-loader', () => ({
-  getTenantConfigs: vi.fn(),
-}));
+vi.mock('../../config/tenant-config-loader', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../config/tenant-config-loader')>();
+  return {
+    ...actual,
+    getTenantConfigs: vi.fn(),
+  };
+});
 
 vi.mock('../../auth/confluence-auth/confluence-auth.factory');
 vi.mock('../../confluence-api/confluence-api-client.factory');

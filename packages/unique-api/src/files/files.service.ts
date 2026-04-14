@@ -10,9 +10,8 @@ import {
   CONTENT_DELETE_MUTATION,
   CONTENT_ID_BY_SCOPE_AND_METADATA_KEY,
   CONTENT_UPDATE_MUTATION,
-  type ContentByScopeAndMetadataKeyInput,
-  type ContentByScopeAndMetadataKeyResult,
   type ContentByScopeInput,
+  type ContentByScopeResult,
   type ContentDeleteByContentIdsMutationInput,
   type ContentDeleteByContentIdsMutationResult,
   type ContentDeleteMutationInput,
@@ -347,7 +346,7 @@ export class FilesService implements UniqueFilesFacade {
     const ids: string[] = [];
     while (hasMore) {
       const batchResult = await this.ingestionClient.request<
-        ContentByScopeAndMetadataKeyResult,
+        ContentByScopeResult,
         ContentByScopeInput
       >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
         skip,
@@ -376,8 +375,8 @@ export class FilesService implements UniqueFilesFacade {
     const ids: string[] = [];
     while (hasMore) {
       const batchResult = await this.ingestionClient.request<
-        ContentByScopeAndMetadataKeyResult,
-        ContentByScopeAndMetadataKeyInput
+        ContentByScopeResult,
+        ContentByScopeInput
       >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
         skip,
         take: CONTENT_BATCH_SIZE,
@@ -390,9 +389,9 @@ export class FilesService implements UniqueFilesFacade {
           },
         },
       });
-      batchResult.paginatedContent.nodes.forEach((node) => {
+      for (const node of batchResult.paginatedContent.nodes) {
         ids.push(node.id);
-      });
+      }
       skip += CONTENT_BATCH_SIZE;
       hasMore = CONTENT_BATCH_SIZE === batchResult.paginatedContent.nodes.length;
     }

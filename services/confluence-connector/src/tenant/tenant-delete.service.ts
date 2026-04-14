@@ -27,7 +27,6 @@ export class TenantDeleteService {
 
     tenant.isScanning = true;
     const startTime = Date.now();
-    let result: 'success' | 'failure' = 'success';
 
     try {
       const rootScope = await this.uniqueClient.scopes.getById(this.scopeId);
@@ -39,6 +38,9 @@ export class TenantDeleteService {
         return;
       }
 
+      // Only child scopes are deleted. The root scope is intentionally preserved so the
+      // tenant's top-level scope remains available for re-provisioning without requiring
+      // a new scope to be created on the Unique side.
       const childScopes = await this.uniqueClient.scopes.listChildren(this.scopeId);
       if (childScopes.length === 0) {
         this.logger.log({ tenantName: this.tenantName, msg: 'Already cleaned up, skipping' });
@@ -47,12 +49,12 @@ export class TenantDeleteService {
 
       await this.deleteContentByScopes(childScopes);
       await this.deleteChildScopes(childScopes);
+      this.metrics.recordCleanupDuration(elapsedSeconds(startTime), 'success');
     } catch (error) {
-      result = 'failure';
+      this.metrics.recordCleanupDuration(elapsedSeconds(startTime), 'failure');
       throw error;
     } finally {
       tenant.isScanning = false;
-      this.metrics.recordCleanupDuration(elapsedSeconds(startTime), result);
     }
   }
 
@@ -62,7 +64,7 @@ export class TenantDeleteService {
         const contentIds = await this.uniqueClient.files.getContentIdsByScope(scope.id);
         if (contentIds.length > 0) {
           await this.uniqueClient.files.deleteByIds(contentIds);
-          this.metrics.recordCleanupContentDeleted(contentIds.length);
+          this.metrics.recordCleanupContentDeleted(contentIds.length, 'success');
           this.logger.log({
             tenantName: this.tenantName,
             scopeName: scope.name,
@@ -71,6 +73,7 @@ export class TenantDeleteService {
           });
         }
       } catch (error) {
+        this.metrics.recordCleanupContentDeleted(0, 'failure');
         this.logger.error({
           tenantName: this.tenantName,
           scopeName: scope.name,
@@ -86,15 +89,17 @@ export class TenantDeleteService {
       try {
         const result = await this.uniqueClient.scopes.delete(child.id, { recursive: true });
         if (result.failedFolders.length > 0) {
+          this.metrics.recordCleanupScopesDeleted(result.successFolders.length, 'success');
+          this.metrics.recordCleanupScopesDeleted(result.failedFolders.length, 'failure');
           this.logger.warn({
             tenantName: this.tenantName,
             scopeName: child.name,
             succeeded: result.successFolders.length,
-            failedFolders: result.failedFolders,
+            failed: result.failedFolders.length,
             msg: 'Partial scope deletion failure',
           });
         } else {
-          this.metrics.recordCleanupScopesDeleted(1);
+          this.metrics.recordCleanupScopesDeleted(result.successFolders.length, 'success');
           this.logger.log({
             tenantName: this.tenantName,
             scopeName: child.name,
@@ -103,6 +108,7 @@ export class TenantDeleteService {
           });
         }
       } catch (error) {
+        this.metrics.recordCleanupScopesDeleted(1, 'failure');
         this.logger.error({
           tenantName: this.tenantName,
           scopeName: child.name,

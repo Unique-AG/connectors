@@ -13,11 +13,14 @@ import { UniqueConfigSchema } from './unique.schema';
 const TENANT_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const TENANT_CONFIG_SUFFIX = '-tenant-config.yaml';
 
-const TenantStatus = {
+export const TenantStatus = {
   Active: 'active',
   Inactive: 'inactive',
   Deleted: 'deleted',
 } as const;
+
+/** Statuses that survive config filtering (inactive tenants are skipped). */
+export type LoadedTenantStatus = typeof TenantStatus.Active | typeof TenantStatus.Deleted;
 
 const TenantStatusSchema = z.object({
   status: z
@@ -36,7 +39,7 @@ export type TenantConfig = z.infer<typeof TenantConfigSchema>;
 export interface NamedTenantConfig {
   name: string;
   config: TenantConfig;
-  status: 'active' | 'deleted';
+  status: LoadedTenantStatus;
 }
 
 const logger = new Logger('TenantConfigLoader');

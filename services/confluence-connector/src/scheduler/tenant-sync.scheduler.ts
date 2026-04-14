@@ -1,6 +1,7 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { TenantStatus } from '../config';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import type { TenantContext } from '../tenant';
 import { ServiceRegistry, TenantDeleteService, TenantRegistry } from '../tenant';
@@ -45,7 +46,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     }
 
     for (const tenant of this.tenantRegistry.getAllTenants()) {
-      this.logger.log({ tenantName: tenant.name, msg: 'Triggering initial job' });
+      this.logger.log({ tenantName: tenant.name, msg: 'Triggering first sync on startup' });
       void this.syncTenant(tenant);
       this.registerCronJob(tenant);
     }
@@ -76,7 +77,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
 
     try {
       await this.tenantRegistry.run(tenant, async () => {
-        if (tenant.status === 'deleted') {
+        if (tenant.status === TenantStatus.Deleted) {
           const deleteService = this.serviceRegistry.getService(TenantDeleteService);
           await deleteService.deleteTenantContent();
           return;

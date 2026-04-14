@@ -28,6 +28,7 @@ export function createNoopMetrics(): Metrics {
     recordOrphanedScopesCleaned: noop,
     recordOrphanedFilesCleaned: noop,
     initializeCounters: noop,
+    initializeCleanupCounters: noop,
   };
 
   return noopRecord as unknown as Metrics;

@@ -183,23 +183,14 @@ export interface ContentByScopeInput {
   where: {
     ownerId: { equals: string };
     ownerType: { equals: string };
-  };
-}
-
-export interface ContentByScopeAndMetadataKeyInput {
-  skip: number;
-  take: number;
-  where: {
-    ownerId: { equals: string };
-    ownerType: { equals: string };
-    metadata: {
+    metadata?: {
       path: string[];
       equals: string;
     };
   };
 }
 
-export interface ContentByScopeAndMetadataKeyResult {
+export interface ContentByScopeResult {
   paginatedContent: {
     nodes: {
       id: string;

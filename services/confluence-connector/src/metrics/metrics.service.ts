@@ -165,12 +165,12 @@ export class Metrics {
     this.cleanupDuration.record(durationSeconds, { tenant: this.tenantName, result });
   }
 
-  public recordCleanupContentDeleted(count: number): void {
-    this.cleanupContentDeleted.add(count, { tenant: this.tenantName });
+  public recordCleanupContentDeleted(count: number, result: 'success' | 'failure'): void {
+    this.cleanupContentDeleted.add(count, { tenant: this.tenantName, result });
   }
 
-  public recordCleanupScopesDeleted(count: number): void {
-    this.cleanupScopesDeleted.add(count, { tenant: this.tenantName });
+  public recordCleanupScopesDeleted(count: number, result: 'success' | 'failure'): void {
+    this.cleanupScopesDeleted.add(count, { tenant: this.tenantName, result });
   }
 
   public recordOrphanedScopesCleaned(count: number, result: 'success' | 'failure'): void {
@@ -215,5 +215,13 @@ export class Metrics {
     this.orphanedScopesCleaned.add(0, { ...tenant, result: 'success' });
     this.orphanedScopesCleaned.add(0, { ...tenant, result: 'failure' });
     this.orphanedFilesCleaned.add(0, tenant);
+  }
+
+  public initializeCleanupCounters(): void {
+    const tenant = { tenant: this.tenantName };
+    this.cleanupContentDeleted.add(0, { ...tenant, result: 'success' });
+    this.cleanupContentDeleted.add(0, { ...tenant, result: 'failure' });
+    this.cleanupScopesDeleted.add(0, { ...tenant, result: 'success' });
+    this.cleanupScopesDeleted.add(0, { ...tenant, result: 'failure' });
   }
 }
