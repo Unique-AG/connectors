@@ -1,15 +1,19 @@
 import assert from 'node:assert';
-import type { UniqueApiClient } from '@unique-ag/unique-api';
+import type { Scope, UniqueApiClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
 import type {
   ConfluenceApiClient,
   InstanceIdentifier,
 } from '../confluence-api/confluence-api-client';
+import { buildRootScopeExternalId } from '../constants/ingestion.constants';
+import type { Metrics } from '../metrics';
 import {
-  buildRootScopeExternalId,
-  buildSpaceScopeExternalId,
-} from '../constants/ingestion.constants';
+  buildPartialContentKey,
+  buildScopeExternalId,
+  type ParsedExternalId,
+  parseScopeExternalId,
+} from '../utils/key-format';
 
 export interface RootScopeInitResult {
   rootScopePath: string;
@@ -25,6 +29,7 @@ export class ScopeManagementService {
     private readonly tenantName: string,
     private readonly confluenceApiClient: ConfluenceApiClient,
     private readonly uniqueApiClient: UniqueApiClient,
+    private readonly metrics: Metrics,
   ) {}
 
   private async getInstanceIdentifier(): Promise<InstanceIdentifier> {
@@ -119,6 +124,7 @@ export class ScopeManagementService {
   public async ensureSpaceScopes(
     rootScopePath: string,
     spaceKeys: string[],
+    spaceKeyToSpaceId: Map<string, string>,
   ): Promise<Map<string, string>> {
     const paths = spaceKeys.map((key) => `${rootScopePath}/${key}`);
     const createdScopes = await this.uniqueApiClient.scopes.createFromPaths(paths, {
@@ -131,8 +137,11 @@ export class ScopeManagementService {
       const scope = createdScopes[index];
       assert.ok(scope, `Failed to create scope for space: ${spaceKey}`);
 
-      if (!scope.externalId) {
-        const externalId = buildSpaceScopeExternalId(this.tenantName, spaceKey);
+      const spaceId = spaceKeyToSpaceId.get(spaceKey);
+      assert.ok(spaceId, `No spaceId found for spaceKey: ${spaceKey}`);
+
+      const externalId = buildScopeExternalId(this.tenantName, spaceId, spaceKey);
+      if (scope.externalId !== externalId) {
         await this.uniqueApiClient.scopes.updateExternalId(scope.id, externalId);
       }
 
@@ -140,6 +149,87 @@ export class ScopeManagementService {
     }
 
     this.logger.debug({ spaceKeys, count: spaceKeys.length, msg: 'Space scopes resolved' });
+    return result;
+  }
+
+  public async cleanupRemovedSpaces(discoveredSpaceKeys: Set<string>): Promise<void> {
+    if (discoveredSpaceKeys.size === 0) {
+      this.logger.warn({
+        msg: 'Skipping space cleanup because discovery returned zero spaces. This could indicate a Confluence API issue.',
+      });
+      return;
+    }
+
+    const children = await this.uniqueApiClient.scopes.listChildren(this.ingestionConfig.scopeId);
+
+    const orphaned = this.identifyOrphanedScopes(children, discoveredSpaceKeys);
+
+    if (orphaned.length === 0) {
+      return;
+    }
+
+    this.logger.log({
+      count: orphaned.length,
+      msg: 'Cleaning up orphaned space scopes',
+    });
+
+    for (const { scope, parsed } of orphaned) {
+      try {
+        const partialKey = buildPartialContentKey(
+          this.tenantName,
+          parsed.spaceId,
+          parsed.spaceKey,
+          this.ingestionConfig.useV1KeyFormat,
+        );
+
+        const deletedFileCount = await this.uniqueApiClient.files.deleteByKeyPrefix(partialKey);
+        await this.uniqueApiClient.scopes.delete(scope.id);
+
+        this.metrics.recordOrphanedScopesCleaned(1, 'success');
+        this.metrics.recordOrphanedFilesCleaned(deletedFileCount);
+
+        this.logger.log({
+          scopeId: scope.id,
+          spaceKey: parsed.spaceKey,
+          spaceId: parsed.spaceId,
+          deletedFileCount,
+          msg: 'Deleted orphaned space scope and its files',
+        });
+      } catch (error) {
+        this.metrics.recordOrphanedScopesCleaned(1, 'failure');
+
+        this.logger.error({
+          scopeId: scope.id,
+          spaceKey: parsed.spaceKey,
+          err: error,
+          msg: 'Failed to clean up orphaned space scope',
+        });
+      }
+    }
+  }
+
+  private identifyOrphanedScopes(
+    children: Scope[],
+    discoveredSpaceKeys: Set<string>,
+  ): Array<{ scope: Scope; parsed: ParsedExternalId }> {
+    const result: Array<{ scope: Scope; parsed: ParsedExternalId }> = [];
+
+    for (const child of children) {
+      const parsed = parseScopeExternalId(child.externalId ?? undefined);
+      if (!parsed) {
+        this.logger.warn({
+          scopeId: child.id,
+          scopeName: child.name,
+          externalId: child.externalId,
+          msg: 'Scope has missing or unparseable externalId, skipping cleanup',
+        });
+        continue;
+      }
+      if (!discoveredSpaceKeys.has(parsed.spaceKey)) {
+        result.push({ scope: child, parsed });
+      }
+    }
+
     return result;
   }
 }

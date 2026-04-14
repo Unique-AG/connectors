@@ -169,6 +169,41 @@ export class UniqueContentService {
   }
 
   /**
+   * Scoped variant of findByMetadata — passes `x-user-id` and `x-company-id` headers
+   * so results are filtered to what the given user is permitted to access.
+   */
+  @Span()
+  public async scopedFindByMetadata(
+    filter: MetadataFilter,
+    scopeContext: UniqueIdentity,
+    options?: { skip?: number; take?: number },
+  ): Promise<{ contents: ContentInfoItem[]; total: number }> {
+    const request: PublicContentInfosRequest = {
+      skip: options?.skip ?? 0,
+      take: options?.take ?? 50,
+      metadataFilter: filter,
+    };
+
+    const payload = PublicContentInfosRequestSchema.encode(request);
+
+    const response = await this.fetch('content/infos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-user-id': scopeContext.userId,
+        'x-company-id': scopeContext.companyId,
+      },
+      body: JSON.stringify(payload),
+    });
+    const result = PublicContentInfosResultSchema.parse(await response.json());
+
+    return {
+      contents: result.contents,
+      total: result.total ?? result.contents.length,
+    };
+  }
+
+  /**
    * @param scopeContext - When provided, overrides `x-user-id` and `x-company-id` headers
    *   to scope the search to the given user's permissions. When `undefined`, the search
    *   runs unscoped with service-level credentials — this is intentional for admin/ingestion flows.

@@ -1,7 +1,7 @@
 {{- define "chart.config.app" -}}
 {{- with .Values.mcpConfig }}
 SELF_URL: {{ .app.selfUrl | quote }}
-DEFAULT_MAIL_FILTERS: {{ .defaultMailFilters | quote }}
+DEFAULT_MAIL_FILTERS: {{ .defaultMailFilters | toJson | quote }}
 MCP_DEBUG_MODE: {{ .app.mcpDebugMode | quote }}
 {{- if .app.bufferLogs }}
 APP_BUFFER_LOGS: {{ .app.bufferLogs | quote }}

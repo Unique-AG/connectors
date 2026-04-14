@@ -54,6 +54,11 @@ export class ConfluenceSynchronizationService {
         msg: 'Discovery completed',
       });
 
+      const allSpaceKeyToSpaceId = this.buildSpaceKeyToSpaceIdMap(
+        discoveredPages,
+        discoveredAttachments,
+      );
+
       const diffResult = await this.fileDiffService.computeDiff(
         discoveredPages,
         discoveredAttachments,
@@ -69,13 +74,14 @@ export class ConfluenceSynchronizationService {
         const spaceKeys = [
           ...new Set([
             ...pagesToFetch.map((p) => p.spaceKey),
-            // add attachments space keys in for completion and possible edge cases
+            // include attachment space keys for completeness and possible edge cases
             ...attachmentsToIngest.map((a) => a.spaceKey),
           ]),
         ];
         const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(
           rootScopePath,
           spaceKeys,
+          allSpaceKeyToSpaceId,
         );
 
         const concurrency = tenant.config.processing.concurrency;
@@ -92,6 +98,8 @@ export class ConfluenceSynchronizationService {
           msg: 'Deleted content processed',
         });
       }
+
+      await this.scopeManagementService.cleanupRemovedSpaces(new Set(allSpaceKeyToSpaceId.keys()));
 
       this.logger.log({ msg: 'Sync work done' });
     } catch (error) {
@@ -202,5 +210,19 @@ export class ConfluenceSynchronizationService {
       failed,
       msg: 'Attachment ingestion summary',
     });
+  }
+
+  private buildSpaceKeyToSpaceIdMap(
+    pages: DiscoveredPage[],
+    attachments: DiscoveredAttachment[],
+  ): Map<string, string> {
+    const map = new Map<string, string>();
+    for (const page of pages) {
+      map.set(page.spaceKey, page.spaceId);
+    }
+    for (const attachment of attachments) {
+      map.set(attachment.spaceKey, attachment.spaceId);
+    }
+    return map;
   }
 }
