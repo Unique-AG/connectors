@@ -3,11 +3,11 @@ import { sanitizePath } from '@unique-ag/utils';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import type { UniqueHttpClient } from '../clients/unique-http.client';
 import {
-  CONTENT_UPDATE_METADATA_MUTATION,
+  CONTENT_UPDATE_MUTATION,
   CONTENT_UPSERT_MUTATION,
-  ContentUpdateMetadataMutationInput,
-  ContentUpdateMetadataMutationResponse,
-  ContentUpdateMetadataResponse,
+  ContentUpdateMutationInput,
+  ContentUpdateMutationResponse,
+  ContentUpdateResponse,
   type ContentUpsertMutationInput,
   type ContentUpsertMutationResult,
   STATISTICS_INGESTION_QUERY,
@@ -32,16 +32,14 @@ export class FileIngestionService implements UniqueIngestionFacade {
     private readonly ingestionBaseUrl: string,
   ) {}
 
-  public async updateMetadata(
-    request: ContentUpdateMetadataMutationInput,
-  ): Promise<ContentUpdateMetadataResponse> {
+  public async update(request: ContentUpdateMutationInput): Promise<ContentUpdateResponse> {
     const result = await this.ingestionClient.request<
-      ContentUpdateMetadataMutationResponse,
-      ContentUpdateMetadataMutationInput
-    >(CONTENT_UPDATE_METADATA_MUTATION, request);
+      ContentUpdateMutationResponse,
+      ContentUpdateMutationInput
+    >(CONTENT_UPDATE_MUTATION, request);
 
-    assert.ok(result?.contentUpdateMetadata, 'Invalid response from Unique API metadata update');
-    return result.contentUpdateMetadata;
+    assert.ok(result?.contentUpdate, 'Invalid response from Unique API metadata update');
+    return result.contentUpdate;
   }
 
   public async registerContent(request: ContentRegistrationRequest): Promise<IngestionApiResponse> {
@@ -54,6 +52,7 @@ export class FileIngestionService implements UniqueIngestionFacade {
         url: request.url,
         byteSize: request.byteSize,
         metadata: request.metadata,
+        expiresAt: request.expiresAt?.toISOString(),
       },
       scopeId: request.scopeId,
       sourceOwnerType: request.sourceOwnerType,
@@ -86,6 +85,7 @@ export class FileIngestionService implements UniqueIngestionFacade {
         byteSize: request.byteSize,
         url: request.url,
         metadata: request.metadata,
+        expiresAt: request.expiresAt?.toISOString(),
       },
       scopeId: request.scopeId,
       sourceOwnerType: request.sourceOwnerType,

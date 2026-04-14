@@ -17,6 +17,7 @@ import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-uniqu
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { greatestFrom } from '~/utils/greatest-from';
 import { leastFrom } from '~/utils/least-from';
 import { NonNullishProps } from '~/utils/non-nullish-props';
@@ -302,7 +303,9 @@ export class ProcessFullSyncBatchCommand {
         status: 'version-mismatch';
       }
   > {
-    const conditions = [`receivedDateTime ge ${filters.ignoredBefore.toISOString()}`];
+    const conditions = [
+      `receivedDateTime ge ${computeRetentionCutoffDate(filters.retentionWindowInDays).toISOString()}`,
+    ];
 
     if (nextLink === START_FULL_SYNC_LINK) {
       const raw = await recordInHistogram({
@@ -387,7 +390,7 @@ export class ProcessFullSyncBatchCommand {
       ingested: `ingested`,
       skipped: `skipped`,
       'skipped-content-unchanged-already-ingested': `ingested`,
-      'metadata-updated': `ingested`,
+      'content-updated': `ingested`,
       failed: `failed`,
     };
 

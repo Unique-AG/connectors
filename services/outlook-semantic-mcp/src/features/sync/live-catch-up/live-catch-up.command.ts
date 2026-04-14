@@ -268,8 +268,8 @@ export class LiveCatchUpCommand {
       .api('me/messages')
       .header('Prefer', 'IdType="ImmutableId"')
       .select(GraphMessageFields)
-      // We cannot combine a createdDateTime filter with orderby on lastModifiedDateTime on the
-      // Microsoft side (InefficientFilter). The ignoredBefore check is applied in-memory below.
+      // We cannot combine a receivedDateTime filter with orderby on lastModifiedDateTime on the
+      // Microsoft side (InefficientFilter). The retentionWindowInDays check is applied by processEmailCommand
       .filter(`lastModifiedDateTime ge ${lastModifiedDateTime.toISOString()}`)
       .orderby('lastModifiedDateTime asc')
       .top(200)

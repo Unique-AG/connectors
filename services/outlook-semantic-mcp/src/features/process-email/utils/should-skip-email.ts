@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { traceEvent } from '~/features/tracing.utils';
+import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 
 const logger = new Logger('shouldSkipEmail');
 
@@ -8,14 +9,14 @@ interface EmailInput {
   from?: { emailAddress?: { address?: string } | null } | null;
   subject?: string | null;
   uniqueBody?: { content?: string } | null;
-  receivedDateTime?: string;
+  receivedDateTime: string;
 }
 
 type SkipResult =
   | { skip: false }
   | {
       skip: true;
-      reason: 'ignoredBefore' | 'ignoredSenders' | 'ignoredContents';
+      reason: 'receivedDateTime' | 'ignoredSenders' | 'ignoredContents';
       matchedPattern?: string;
     };
 
@@ -25,10 +26,10 @@ export function shouldSkipEmail(
   context: { userProfileId: string },
 ): SkipResult {
   try {
-    if (filters.ignoredBefore && email.receivedDateTime) {
-      if (new Date(email.receivedDateTime) < filters.ignoredBefore) {
-        return { skip: true, reason: 'ignoredBefore' };
-      }
+    if (
+      new Date(email.receivedDateTime) < computeRetentionCutoffDate(filters.retentionWindowInDays)
+    ) {
+      return { skip: true, reason: 'receivedDateTime' };
     }
 
     for (const pattern of filters.ignoredSenders) {

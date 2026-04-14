@@ -21,6 +21,7 @@ export interface ContentUpsertMutationInput {
     fileAccess?: FileAccessKey[];
     ingestionConfig?: IngestionConfig;
     metadata?: Record<string, unknown>;
+    expiresAt?: string;
   };
   fileUrl?: string;
   chatId?: string;
@@ -78,9 +79,9 @@ export const CONTENT_UPSERT_MUTATION = gql`
   }
 `;
 
-export const CONTENT_UPDATE_METADATA_MUTATION = gql`
-  mutation ContentUpdateMetadata($contentId: String!, $metadata: JSON!) {
-    contentUpdateMetadata(contentId: $contentId, metadata: $metadata) {
+export const CONTENT_UPDATE_MUTATION = gql`
+  mutation ContentUpdate($contentId: String!, $expiresAt: DateTime, $metadata: JSON) {
+    contentUpdate(contentId: $contentId, input: { expiresAt: $expiresAt, metadata: $metadata }) {
       id
       metadata
       ingestionState
@@ -88,19 +89,20 @@ export const CONTENT_UPDATE_METADATA_MUTATION = gql`
   }
 `;
 
-export interface ContentUpdateMetadataMutationInput {
+export interface ContentUpdateMutationInput {
   contentId: string;
-  metadata: Record<string, ContentMetadataValue>;
+  metadata?: Record<string, ContentMetadataValue>;
+  expiresAt?: string;
 }
 
-export interface ContentUpdateMetadataResponse {
+export interface ContentUpdateResponse {
   id: string;
   metadata: Record<string, ContentMetadataValue>;
   ingestionState: IngestionState;
 }
 
-export interface ContentUpdateMetadataMutationResponse {
-  contentUpdateMetadata: ContentUpdateMetadataResponse;
+export interface ContentUpdateMutationResponse {
+  contentUpdate: ContentUpdateResponse;
 }
 
 export interface StatisticsIngestionQueryInput {
