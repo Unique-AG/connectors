@@ -47,6 +47,9 @@ export class TenantDeleteService {
         return;
       }
 
+      // Two-step deletion is intentional: deleteContentByScopes removes files in batches per
+      // scope, then deleteChildScopes with recursive:true catches anything that failed in the
+      // first step. This ensures no content is orphaned even if individual file deletions fail.
       await this.deleteContentByScopes(childScopes);
       await this.deleteChildScopes(childScopes);
       this.metrics.recordCleanupDuration(elapsedSeconds(startTime), 'success');

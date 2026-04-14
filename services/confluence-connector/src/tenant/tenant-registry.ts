@@ -50,15 +50,7 @@ export class TenantRegistry implements OnModuleInit {
       tenantStorage.run(tenant, () => {
         const uniqueClient = this.createUniqueApiClient(tenantName, config.unique);
         this.serviceRegistry.register(tenantName, UniqueApiClient, uniqueClient);
-        const scopeManagementService = new ScopeManagementService(
-          config.ingestion,
-          tenantName,
-          uniqueClient,
-          this.metrics,
-        );
-        this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
 
-        // we instantiate only the minimum required services for these tenants
         if (status === TenantStatus.Deleted) {
           this.registerDeletedTenantServices(tenantName, config, uniqueClient);
         } else {
@@ -178,12 +170,20 @@ export class TenantRegistry implements OnModuleInit {
     );
     this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
 
+    const scopeManagementService = new ScopeManagementService(
+      config.ingestion,
+      tenantName,
+      uniqueClient,
+      this.metrics,
+    );
+    this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
+
     const syncService = new ConfluenceSynchronizationService(
       scanner,
       fetcher,
       fileDiffService,
       ingestionService,
-      this.serviceRegistry.getService(ScopeManagementService),
+      scopeManagementService,
       this.metrics,
     );
     this.serviceRegistry.register(tenantName, ConfluenceSynchronizationService, syncService);
