@@ -168,11 +168,11 @@ export class ProcessEmailCommand {
         receivedDateTime: graphMessage.receivedDateTime,
         retentionWindowInDays: filters.retentionWindowInDays,
       });
-      const fileExpirationDate = file.expiresAt ? new Date(file.expiresAt).getTime() : -1;
+      const fileExpirationTimeStamp = file.expiresAt ? new Date(file.expiresAt).getTime() : -1;
 
       if (
         metadata.lastModifiedDateTime === file.metadata?.lastModifiedDateTime &&
-        expirationDate.getTime() === fileExpirationDate
+        expirationDate.getTime() === fileExpirationTimeStamp
       ) {
         this.logger.log({
           ...logContext,
