@@ -168,12 +168,11 @@ export class ProcessEmailCommand {
       // We remove the milliseconds to avoid unnecesary updates because many DateTime scalar implementations and
       // databases truncate sub-second values on round-trip, so a millisecond-level comparison would
       // always be unequal for already-stored dates.
-      const expirationDateTimeStamp = getTimeStampWithoutMilliseconds(
-        getMessageExpirationDate({
-          receivedDateTime: graphMessage.receivedDateTime,
-          retentionWindowInDays: filters.retentionWindowInDays,
-        }),
-      );
+      const expirationDate = getMessageExpirationDate({
+        receivedDateTime: graphMessage.receivedDateTime,
+        retentionWindowInDays: filters.retentionWindowInDays,
+      });
+      const expirationDateTimeStamp = getTimeStampWithoutMilliseconds(expirationDate);
       const fileExpirationTimeStamp = file.expiresAt
         ? getTimeStampWithoutMilliseconds(new Date(file.expiresAt))
         : -1;
