@@ -1,32 +1,13 @@
 import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
-import { beforeEach, describe, expect, it } from 'vitest';
-import type { Config } from '../config';
+import { TestBed } from '@suites/unit';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FullSyncStep, SiteSyncStep } from '../constants/sync-step.enum';
 import { SyncHealthIndicator } from './sync-health.indicator';
 import { SyncRecord, SyncStatusStore } from './sync-status.store';
 
 const HISTORY_SIZE = 10;
 const THRESHOLD = 0.5;
-
-const configService = {
-  get: (key: string) => {
-    if (key === 'health.syncHistorySize') {
-      return HISTORY_SIZE;
-    }
-    if (key === 'health.syncSiteFailureThreshold') {
-      return THRESHOLD;
-    }
-    return undefined;
-  },
-} as unknown as ConfigService<Config, true>;
-
-const healthIndicatorService = {
-  check: (key: string) => ({
-    up: (data?: Record<string, unknown>) => ({ [key]: { status: 'up', ...data } }),
-    down: (data?: Record<string, unknown>) => ({ [key]: { status: 'down', ...data } }),
-  }),
-} as unknown as HealthIndicatorService;
 
 function makeSyncRecord(overrides: Partial<SyncRecord> = {}): SyncRecord {
   return {
@@ -37,13 +18,45 @@ function makeSyncRecord(overrides: Partial<SyncRecord> = {}): SyncRecord {
   };
 }
 
+const configGetImpl = (stub: CallableFunction) => ({
+  ...stub(),
+  get: vi.fn((key: string) => {
+    if (key === 'health.syncHistorySize') {
+      return HISTORY_SIZE;
+    }
+    if (key === 'health.syncSiteFailureThreshold') {
+      return THRESHOLD;
+    }
+    return undefined;
+  }),
+});
+
 describe('SyncHealthIndicator', () => {
   let indicator: SyncHealthIndicator;
   let store: SyncStatusStore;
 
-  beforeEach(() => {
-    store = new SyncStatusStore(configService);
-    indicator = new SyncHealthIndicator(store, healthIndicatorService, configService);
+  beforeEach(async () => {
+    const storeTestBed = await TestBed.solitary(SyncStatusStore)
+      .mock(ConfigService)
+      .impl(configGetImpl)
+      .compile();
+    store = storeTestBed.unit;
+
+    const { unit } = await TestBed.solitary(SyncHealthIndicator)
+      .mock(ConfigService)
+      .impl(configGetImpl)
+      .mock(SyncStatusStore)
+      .final(store)
+      .mock(HealthIndicatorService)
+      .impl(() => ({
+        check: (key: string) => ({
+          up: (data?: Record<string, unknown>) => ({ [key]: { status: 'up', ...data } }),
+          down: (data?: Record<string, unknown>) => ({ [key]: { status: 'down', ...data } }),
+        }),
+      }))
+      .compile();
+
+    indicator = unit;
   });
 
   it('returns up with message when no sync records exist', () => {
