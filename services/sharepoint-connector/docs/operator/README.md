@@ -144,3 +144,4 @@ In cluster-internal mode, Zitadel token validation is not needed as services com
 - [ ] Sites are being scanned
 - [ ] Flagged files are being synced
 - [ ] Files appear in Unique knowledge base
+- [ ] `GET /health` returns 200 with all checks passing
