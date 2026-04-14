@@ -5,8 +5,8 @@ import type { UniqueHttpClient } from '../clients/unique-http.client';
 import {
   CONTENT_UPDATE_MUTATION,
   CONTENT_UPSERT_MUTATION,
-  ContentUpdateInput,
-  ContentUpdateMetadataMutationResponse as ContentUpdateMutationResponse,
+  ContentUpdateMutationInput,
+  ContentUpdateMutationResponse,
   ContentUpdateResponse,
   type ContentUpsertMutationInput,
   type ContentUpsertMutationResult,
@@ -32,10 +32,10 @@ export class FileIngestionService implements UniqueIngestionFacade {
     private readonly ingestionBaseUrl: string,
   ) {}
 
-  public async update(request: ContentUpdateInput): Promise<ContentUpdateResponse> {
+  public async update(request: ContentUpdateMutationInput): Promise<ContentUpdateResponse> {
     const result = await this.ingestionClient.request<
       ContentUpdateMutationResponse,
-      ContentUpdateInput
+      ContentUpdateMutationInput
     >(CONTENT_UPDATE_MUTATION, request);
 
     assert.ok(result?.contentUpdate, 'Invalid response from Unique API metadata update');

@@ -79,14 +79,6 @@ export const CONTENT_UPSERT_MUTATION = gql`
   }
 `;
 
-export interface ContentUpdateMutationResult {
-  contentUpdate: {
-    id: string;
-    metadata: Record<string, ContentMetadataValue>;
-    ingestionState: IngestionState;
-  };
-}
-
 export const CONTENT_UPDATE_MUTATION = gql`
   mutation ContentUpdate($contentId: String!, $expiresAt: DateTime, $metadata: JSON) {
     contentUpdate(contentId: $contentId, input: { expiresAt: $expiresAt, metadata: $metadata }) {
@@ -97,7 +89,7 @@ export const CONTENT_UPDATE_MUTATION = gql`
   }
 `;
 
-export interface ContentUpdateInput {
+export interface ContentUpdateMutationInput {
   contentId: string;
   metadata?: Record<string, ContentMetadataValue>;
   expiresAt?: Date;
@@ -109,7 +101,7 @@ export interface ContentUpdateResponse {
   ingestionState: IngestionState;
 }
 
-export interface ContentUpdateMetadataMutationResponse {
+export interface ContentUpdateMutationResponse {
   contentUpdate: ContentUpdateResponse;
 }
 

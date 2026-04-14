@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { computeRetentionCutoffDate } from '../compute-retention-cutoff-date';
-import { getExpirationDate } from '../get-message-expiration-date';
+import { getMessageExpirationDate } from '../get-message-expiration-date';
 
 // Freeze at a mid-day UTC time so UTC-midnight truncation is non-trivial.
 const FIXED_NOW = new Date('2025-06-15T14:32:00.000Z');
@@ -22,7 +22,7 @@ describe('retention boundary: computeRetentionCutoffDate and getExpirationDate a
 
     // Oldest message that passes: received exactly at the cutoff timestamp.
     const receivedDateTime = cutoff.toISOString();
-    const expiration = getExpirationDate({
+    const expiration = getMessageExpirationDate({
       receivedDateTime,
       retentionWindowInDays: RETENTION_DAYS,
     });
@@ -36,7 +36,7 @@ describe('retention boundary: computeRetentionCutoffDate and getExpirationDate a
 
     // One millisecond before the cutoff — just outside the retention window.
     const receivedDateTime = new Date(cutoff.getTime() - 1).toISOString();
-    const expiration = getExpirationDate({
+    const expiration = getMessageExpirationDate({
       receivedDateTime,
       retentionWindowInDays: RETENTION_DAYS,
     });
@@ -50,7 +50,7 @@ describe('retention boundary: computeRetentionCutoffDate and getExpirationDate a
 
     // Message received at the cutoff = UTC midnight of (today - RETENTION_DAYS).
     // Expiration = end of (today - RETENTION_DAYS + RETENTION_DAYS) = end of today.
-    const expiration = getExpirationDate({
+    const expiration = getMessageExpirationDate({
       receivedDateTime: cutoff,
       retentionWindowInDays: RETENTION_DAYS,
     });

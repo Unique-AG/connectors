@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { getExpirationDate } from '../get-message-expiration-date';
+import { getMessageExpirationDate } from '../get-message-expiration-date';
 
-describe('getExpirationDate', () => {
+describe('getMessageExpirationDate', () => {
   it('returns end of the last retention day in UTC for a mid-day receivedDateTime string', () => {
     // received 2025-05-16T14:32:00Z, retention 30 days
     // → UTC midnight of received day = 2025-05-16T00:00:00Z
     // → + 31 days = 2025-06-16T00:00:00Z
     // → - 1ms   = 2025-06-15T23:59:59.999Z
-    const result = getExpirationDate({
+    const result = getMessageExpirationDate({
       receivedDateTime: '2025-05-16T14:32:00.000Z',
       retentionWindowInDays: 30,
     });
@@ -15,7 +15,7 @@ describe('getExpirationDate', () => {
   });
 
   it('returns end of the last retention day in UTC for a UTC-midnight receivedDateTime', () => {
-    const result = getExpirationDate({
+    const result = getMessageExpirationDate({
       receivedDateTime: '2025-05-16T00:00:00.000Z',
       retentionWindowInDays: 30,
     });
@@ -23,7 +23,7 @@ describe('getExpirationDate', () => {
   });
 
   it('accepts a Date object as receivedDateTime', () => {
-    const result = getExpirationDate({
+    const result = getMessageExpirationDate({
       receivedDateTime: new Date('2025-05-16T14:32:00.000Z'),
       retentionWindowInDays: 30,
     });
@@ -31,7 +31,7 @@ describe('getExpirationDate', () => {
   });
 
   it('expiration is at 23:59:59.999 UTC (end of day)', () => {
-    const result = getExpirationDate({
+    const result = getMessageExpirationDate({
       receivedDateTime: '2025-01-01T00:00:00.000Z',
       retentionWindowInDays: 7,
     });
@@ -43,7 +43,7 @@ describe('getExpirationDate', () => {
 
   it('works for a 1-day retention window', () => {
     // received 2025-06-15, retention 1 day → expires end of 2025-06-16
-    const result = getExpirationDate({
+    const result = getMessageExpirationDate({
       receivedDateTime: '2025-06-15T00:00:00.000Z',
       retentionWindowInDays: 1,
     });
@@ -51,7 +51,7 @@ describe('getExpirationDate', () => {
   });
 
   it('works for a 365-day retention window', () => {
-    const result = getExpirationDate({
+    const result = getMessageExpirationDate({
       receivedDateTime: '2024-06-15T00:00:00.000Z',
       retentionWindowInDays: 365,
     });

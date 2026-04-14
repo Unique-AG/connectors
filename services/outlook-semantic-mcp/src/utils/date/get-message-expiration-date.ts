@@ -1,14 +1,15 @@
-export const getExpirationDate = ({
+export const getMessageExpirationDate = ({
   receivedDateTime,
   retentionWindowInDays,
 }: {
   receivedDateTime: string | Date;
   retentionWindowInDays: number;
 }): Date => {
-  // End of utc day.
-  const currentReceivedAt = new Date(receivedDateTime);
-  currentReceivedAt.setUTCHours(0, 0, 0, 0);
-  currentReceivedAt.setUTCDate(currentReceivedAt.getUTCDate() + retentionWindowInDays + 1);
-  currentReceivedAt.setUTCMilliseconds(-1);
-  return currentReceivedAt;
+  // The expiration date is end of day receivedDateTime + retentionWindowInDays we set it like this
+  // to have concistency when a batch of emails expire otherwise during the day things will start
+  // to dissapear from searches, like this at end of UTC day all emails expire.
+  const expirationDate = new Date(receivedDateTime);
+  expirationDate.setUTCDate(expirationDate.getUTCDate() + retentionWindowInDays);
+  expirationDate.setUTCHours(23, 59, 59, 999);
+  return expirationDate;
 };

@@ -1,4 +1,4 @@
-import { ContentUpdateInput, ContentUpdateResponse } from './ingestion.queries';
+import { ContentUpdateMutationInput, ContentUpdateResponse } from './ingestion.queries';
 import type {
   ContentRegistrationRequest,
   FileDiffItem,
@@ -17,6 +17,6 @@ export interface UniqueIngestionFacade {
     sourceKind: string,
     sourceName: string,
   ): Promise<FileDiffResponse>;
-  update(request: ContentUpdateInput): Promise<ContentUpdateResponse>;
+  update(request: ContentUpdateMutationInput): Promise<ContentUpdateResponse>;
   getIngestionStats(scopeId: string): Promise<Partial<Record<IngestionState, number>>>;
 }

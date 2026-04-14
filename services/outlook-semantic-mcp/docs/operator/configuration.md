@@ -299,7 +299,7 @@ mcpConfig:
       - "/^noreply@example\\.com$/i"
 ```
 
-The example uses 180 days. Adjust based on your organization's mail volume and search needs.
+The example uses 95 days. Adjust based on your organization's mail volume and search needs.
 
 ## Database Configuration
 

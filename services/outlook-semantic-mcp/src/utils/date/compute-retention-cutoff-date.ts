@@ -1,6 +1,6 @@
 import { startOfUtcDay } from './start-of-utc-day';
-import { subDays } from './sub-days';
+import { subUtcDays } from './sub-utc-days';
 
-export function computeRetentionCutoffDate(days: number): Date {
-  return startOfUtcDay(subDays(new Date(), days));
-}
+export const computeRetentionCutoffDate = (days: number): Date => {
+  return startOfUtcDay(subUtcDays(new Date(), days));
+};

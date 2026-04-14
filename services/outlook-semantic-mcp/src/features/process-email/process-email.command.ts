@@ -19,7 +19,7 @@ import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UploadFileForIngestionCommand } from '~/unique/upload-file-for-ingestion.command';
-import { getExpirationDate } from '~/utils/date/get-message-expiration-date';
+import { getMessageExpirationDate } from '~/utils/date/get-message-expiration-date';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { Nullish } from '~/utils/nullish';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
@@ -164,15 +164,15 @@ export class ProcessEmailCommand {
     assert.ok(rootScope, `Parent scope id`);
 
     if (isNonNullish(file) && metadata.sentDateTime === file.metadata?.sentDateTime) {
-      const expirationDate = getExpirationDate({
+      const expirationDate = getMessageExpirationDate({
         receivedDateTime: graphMessage.receivedDateTime,
         retentionWindowInDays: filters.retentionWindowInDays,
       });
-      const fileExpirationDate = file.expiresAt ? new Date(file.expiresAt).toISOString() : '';
+      const fileExpirationDate = file.expiresAt ? new Date(file.expiresAt).getTime() : -1;
 
       if (
         metadata.lastModifiedDateTime === file.metadata?.lastModifiedDateTime &&
-        expirationDate.toISOString() === fileExpirationDate
+        expirationDate.getTime() === fileExpirationDate
       ) {
         this.logger.log({
           ...logContext,
@@ -246,7 +246,7 @@ export class ProcessEmailCommand {
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
       storeInternally: this.configService.get('unique.storeInternally', { infer: true }),
-      expiresAt: getExpirationDate({
+      expiresAt: getMessageExpirationDate({
         receivedDateTime: graphMessage.receivedDateTime,
         retentionWindowInDays: filters.retentionWindowInDays,
       }),
