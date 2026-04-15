@@ -506,7 +506,7 @@ Restart the full sync from scratch, discarding all previous progress.
 
 ## Related Documentation
 
-- [Full Sync](./full-sync.md) - Full sync mechanics, states, and filters
-- [Live Catch-Up](./live-catchup.md) - Webhook-driven real-time ingestion
+- [Full Sync](./flows.md#Full-Sync:-Historical-Email-Ingestion) - Full sync mechanics and states
+- [Live Catch-Up](./flows.md#Live-Catch-Up:-Webhook-Driven-Email-Ingestion) - Webhook-driven real-time ingestion
 - [Flows](./flows.md) - Sequence diagrams for OAuth, sync, and draft creation flows
 - [Permissions](./permissions.md) - Microsoft Graph permissions required by these tools
