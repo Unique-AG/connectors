@@ -18,6 +18,7 @@ The SharePoint Connector is a Node.js-based service that integrates Microsoft Sh
 |----------|-------------|
 | [Architecture](./architecture.md) | System components, hosting models, connectivity |
 | [Flows](./flows.md) | Content sync, permission sync, file diff mechanism |
+| [Metadata](./metadata.md) | Ingested metadata fields for documents and SitePages |
 | [Permissions](./permissions.md) | Microsoft Graph and SharePoint REST API permissions |
 | [Security](./security.md) | Security updates, reports, and SBOM |
 

@@ -63,7 +63,7 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(decodedUrl).toContain('type != attachment');
     });
 
-    it('uses /rest/api/content/search with os_authType=basic', async () => {
+    it('uses /rest/api/content/search without os_authType', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -73,7 +73,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).toContain('/rest/api/content/search');
-      expect(url).toContain('os_authType=basic');
+      expect(url).not.toContain('os_authType');
     });
 
     it('does not include collaboration space type (unsupported by Data Center)', async () => {
@@ -103,14 +103,14 @@ describe('DataCenterConfluenceApiClient', () => {
   });
 
   describe('getPageById', () => {
-    it('uses direct content endpoint with os_authType=basic', async () => {
+    it('uses direct content endpoint without os_authType', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(makePage({ id: '42' }));
 
       await client.getPageById('42');
 
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).toContain('/rest/api/content/42');
-      expect(url).toContain('os_authType=basic');
+      expect(url).not.toContain('os_authType');
       expect(url).toContain('expand=body.storage,version,space,metadata.labels');
     });
 
@@ -167,7 +167,7 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(mockHttpClient.rateLimitedRequest).not.toHaveBeenCalled();
     });
 
-    it('uses CQL ancestor IN (...) with os_authType=basic for single root ID', async () => {
+    it('uses CQL ancestor IN (...) without os_authType for single root ID', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -178,7 +178,7 @@ describe('DataCenterConfluenceApiClient', () => {
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('ancestor IN (55)');
-      expect(url).toContain('os_authType=basic');
+      expect(url).not.toContain('os_authType');
     });
 
     it('uses CQL ancestor IN (...) for multiple root IDs', async () => {

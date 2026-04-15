@@ -21,6 +21,9 @@ The following environment variables control application-level behavior. They are
 | `OTEL_EXPORTER_PROMETHEUS_HOST`       | —                                                 | Prometheus exporter bind host                                                                                        |
 | `OTEL_EXPORTER_PROMETHEUS_PORT`       | —                                                 | Prometheus exporter bind port                                                                                        |
 | `NODE_EXTRA_CA_CERTS`                 | —                                                 | Path to a PEM file containing additional CA certificates for TLS verification if pod's trust store doesn't have them |
+| `HEALTH_SYNC_HISTORY_SIZE`            | `5`                                               | Number of recent sync runs kept in the sliding window for health evaluation                                          |
+| `HEALTH_SYNC_SITE_FAILURE_THRESHOLD`  | `0.5`                                             | Per-site failure ratio (0–1) across the window that marks the service unhealthy when exceeded                        |
+| `HEALTH_CONNECTIVITY_TIMEOUT_MS`      | `3000`                                            | Timeout in milliseconds for each reachability ping used by the health endpoint                                       |
 
 The following environment variables are loaded from Kubernetes secrets:
 
@@ -589,6 +592,90 @@ alerts:
       annotations:
         summary: "Sync cycle taking too long"
 ```
+
+## Health Endpoint
+
+The connector exposes a `GET /health` endpoint that reports operational health. It is separate from the existing `GET /probe` endpoint used for K8s liveness/readiness probes — `GET /health` is intended for external monitoring and SRE tooling.
+
+The endpoint returns HTTP `200` when all checks pass and HTTP `503` when any check fails. The response follows the `@nestjs/terminus` format with `status`, `info`, `error`, and `details` fields.
+
+### Health Checks
+
+The endpoint runs three checks on every request:
+
+**Sync** — Evaluates sync history from a sliding window of the last N runs (configurable via `HEALTH_SYNC_HISTORY_SIZE`). Each site's failure ratio is computed independently: `failures / appearances`. If any site exceeds `HEALTH_SYNC_SITE_FAILURE_THRESHOLD`, the check is `down`. When no sync has completed yet (e.g. shortly after startup), this check is omitted from the response. A single transient per-site failure is absorbed by the window and does not trigger an alert.
+
+**Connectivity** — Performs unauthenticated HTTP requests to Microsoft Graph (`https://graph.microsoft.com/v1.0/`) and the configured SharePoint base URL. Any HTTP response (including 401/403) proves the endpoint is reachable — only transport-level failures (DNS, TLS, timeout, connection refused) are treated as unhealthy.
+
+**Unique API** — Sends a minimal `{ __typename }` GraphQL query to both Unique API endpoints (ingestion and scope management). Unlike the connectivity check, non-2xx responses (401/403/500) are treated as unhealthy because they indicate the API is not functioning correctly. These requests bypass the internal rate limiter to avoid queuing behind sync traffic.
+
+### Response Examples
+
+**Healthy (200):**
+
+```json
+{
+  "status": "ok",
+  "info": {
+    "sync": {
+      "status": "up",
+      "lastSyncAt": "2026-03-18T10:15:00.000Z",
+      "recentSyncs": 5,
+      "sites": {
+        "site-aaa": { "failures": 0, "total": 5 },
+        "site-bbb": { "failures": 1, "total": 5 }
+      }
+    },
+    "connectivity": {
+      "status": "up",
+      "graph": "reachable",
+      "sharepoint": [
+        { "tenant": "default", "status": "reachable" }
+      ]
+    },
+    "uniqueApi": {
+      "status": "up",
+      "ingestion": "reachable",
+      "scopeManagement": "reachable"
+    }
+  },
+  "error": {},
+  "details": { "...same as info when healthy..." }
+}
+```
+
+**Unhealthy (503) — site exceeds sync failure threshold:**
+
+```json
+{
+  "status": "error",
+  "info": {
+    "connectivity": { "status": "up", "..." : "..." },
+    "uniqueApi": { "status": "up", "..." : "..." }
+  },
+  "error": {
+    "sync": {
+      "status": "down",
+      "lastSyncAt": "2026-03-18T10:15:00.000Z",
+      "threshold": 0.5,
+      "failingSites": ["site-bbb"],
+      "sites": {
+        "site-aaa": { "failures": 0, "total": 5 },
+        "site-bbb": { "failures": 4, "total": 5 }
+      }
+    }
+  },
+  "details": { "...all checks combined..." }
+}
+```
+
+### Configuration
+
+| Variable                             | Default | Description                                                              |
+| ------------------------------------ | ------- | ------------------------------------------------------------------------ |
+| `HEALTH_SYNC_HISTORY_SIZE`           | `5`     | Number of recent sync runs in the sliding window                         |
+| `HEALTH_SYNC_SITE_FAILURE_THRESHOLD` | `0.5`   | Per-site failure ratio (0–1) that triggers unhealthy when exceeded       |
+| `HEALTH_CONNECTIVITY_TIMEOUT_MS`     | `3000`  | Timeout in milliseconds for each reachability ping (connectivity checks) |
 
 ## Complete Re-ingestion
 

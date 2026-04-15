@@ -1,5 +1,4 @@
-import { LogsDiagnosticDataPolicy } from '../config/app.config';
-import { smear } from './logging.util';
+import { shouldDiscloseLogs, smear } from './logging.util';
 
 /**
  * Wraps diagnostic data that we want visible in dev but smeared in production.
@@ -31,12 +30,8 @@ export class Smeared {
   }
 }
 
-export function isSmearingActive(): boolean {
-  return process.env.LOGS_DIAGNOSTICS_DATA_POLICY !== LogsDiagnosticDataPolicy.DISCLOSE;
-}
-
 export function createSmeared(value: string): Smeared {
-  return new Smeared(value, isSmearingActive());
+  return new Smeared(value, !shouldDiscloseLogs());
 }
 
 export function smearPath(path: Smeared) {

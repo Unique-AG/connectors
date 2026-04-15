@@ -1,3 +1,4 @@
+import { HealthConfigNamespaced } from './health.config';
 import { ProxyConfigNamespaced } from './proxy.config';
 import {
   AppConfigNamespaced,
@@ -10,6 +11,8 @@ export type Config = UniqueConfigNamespaced &
   ProcessingConfigNamespaced &
   SharepointConfigNamespaced &
   AppConfigNamespaced &
-  ProxyConfigNamespaced;
+  ProxyConfigNamespaced &
+  HealthConfigNamespaced;
 
+export * from './health.config';
 export * from './proxy.config';

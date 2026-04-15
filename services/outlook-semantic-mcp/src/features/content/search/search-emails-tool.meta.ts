@@ -16,14 +16,15 @@ export const META = createMeta({
   toolFormatInformation: `## Email Display Rules
   ALWAYS follow these rules when displaying results from \`search_emails\` or when referencing information extracted from emails.
   ### Format for listing emails
-  When listing multiple emails, format each as a compact block — NEVER use a markdown table:
-  📩 **{Subject}** [open]({outlookWebLink if non-empty, otherwise https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem})
-  {From}
-  {Date formatted as "Mon DD, YYYY at HH:MM AM/PM"}
-  > {Short summary, max 1 sentence ending with ...}
+  When listing multiple emails, use a markdown table with exactly 3 columns: Time, Sender, Subject.
+  - **Time**: Use the \`receivedDateTime\` field. Format as "Mon DD, YYYY HH:MM AM/PM".
+  - **Sender**: Display as "Name (email)" e.g. "Sarah Chen (sarah.chen@acme.com)".
+  - **Subject**: Link the subject to the email. Use \`outlookWebLink\` if non-empty, otherwise construct: \`https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem\`
   - Show most recent emails first.
-  - Separate each email with a blank line.
-  - The summary should be a single short sentence from the body. If no body content exists, omit the summary line entirely.
+  ### Table format
+  | Time | Sender | Subject |
+  |------|--------|---------|
+  | {Date} | {Name (email)} | [📩 {Subject}]({link}) |
   ### Format when extracting or summarizing information from emails
   When the user asks a question and you answer using information found in emails (e.g. "What did Sarah say about the budget?", "When is the maintenance window?", "Summarize my conversation with Marco"), you MUST:
   - Write your answer in natural language.
@@ -42,23 +43,12 @@ export const META = createMeta({
   - NEVER show raw IDs (emailId, folderId, contentId) to the user.
   - NEVER display email results or reference email content without a link to the original email.
   ### Full listing example
-  📩 **Q2 Budget Approval Needed** [open](https://outlook.office.com/owa/?ItemID=AAkALgAA...&exvsurl=1&viewmodel=ReadMessageItem)
-  Sarah Chen (sarah.chen@acme.com)
-  Mar 8, 2026 at 2:15 PM
-  > Please review the attached Q2 budget proposal and approve by EOD Friday...
-  📩 **Re: Partnership Agreement Draft** [open](https://outlook.office.com/owa/?ItemID=AAkALgBB...&exvsurl=1&viewmodel=ReadMessageItem)
-  Marco Rossi (marco.rossi@external-partner.io)
-  Mar 7, 2026 at 11:42 AM
-  > We've reviewed Section 3 and have a few suggested changes to the liability clause...
-  📩 **Onboarding Schedule - New Hires March 2026** [open](https://outlook.office.com/owa/?ItemID=AAkALgCC...&exvsurl=1&viewmodel=ReadMessageItem)
-  HR Team (hr@acme.com)
-  Mar 6, 2026 at 9:00 AM
-  > Three new team members are joining next Monday, onboarding schedule attached...
-  📩 **Accepted: Product Roadmap Review** [open](https://outlook.office.com/owa/?ItemID=AAkALgDD...&exvsurl=1&viewmodel=ReadMessageItem)
-  Priya Patel (priya.patel@acme.com)
-  Mar 5, 2026 at 4:30 PM
-  📩 **Server Maintenance Window - March 12** [open](https://outlook.office.com/owa/?ItemID=AAkALgEE...&exvsurl=1&viewmodel=ReadMessageItem)
-  DevOps (devops-alerts@acme.com)
-  Mar 4, 2026 at 8:00 AM
+  | Time | Sender | Subject |
+  |------|--------|---------|
+  | Mar 8, 2026 2:15 PM | Sarah Chen (sarah.chen@acme.com) | [📩 Q2 Budget Approval Needed](https://outlook.office.com/owa/?ItemID=AAkALgAA...&exvsurl=1&viewmodel=ReadMessageItem) |
+  | Mar 7, 2026 11:42 AM | Marco Rossi (marco.rossi@external-partner.io) | [📩 Re: Partnership Agreement Draft](https://outlook.office.com/owa/?ItemID=AAkALgBB...&exvsurl=1&viewmodel=ReadMessageItem) |
+  | Mar 6, 2026 9:00 AM | HR Team (hr@acme.com) | [📩 Onboarding Schedule - New Hires March 2026](https://outlook.office.com/owa/?ItemID=AAkALgCC...&exvsurl=1&viewmodel=ReadMessageItem) |
+  | Mar 5, 2026 4:30 PM | Priya Patel (priya.patel@acme.com) | [📩 Accepted: Product Roadmap Review](https://outlook.office.com/owa/?ItemID=AAkALgDD...&exvsurl=1&viewmodel=ReadMessageItem) |
+  | Mar 4, 2026 8:00 AM | DevOps (devops-alerts@acme.com) | [📩 Server Maintenance Window - March 12](https://outlook.office.com/owa/?ItemID=AAkALgEE...&exvsurl=1&viewmodel=ReadMessageItem) |
 `,
 });

@@ -292,8 +292,60 @@ See [Authentication Architecture - Single App Registration Architecture](./techn
 
 - **Real-time transcription**: Only processes completed transcripts, not live captions
 - **Meeting creation**: Read-only access; cannot create or modify meetings
-- **Selective meeting capture**: All meetings with transcription enabled are captured
+- **Selective meeting capture**: All meetings with transcription enabled are captured (no organizer-only or meeting-type filter)
 - **Token introspection**: Tokens validated locally with short TTLs for performance
+- **Historical/full sync**: No mechanism to backfill transcripts from meetings that took place before the user connected; see [Why can't historical transcripts be synced?](./faq.md#why-cant-historical-transcripts-be-synced)
+- **Delta/incremental sync**: No ability to poll for missed or updated transcripts since a given point in time; see [Why is there no delta sync?](./faq.md#why-is-there-no-delta-sync)
+- **Missed-notification recovery**: If a subscription lapses, any transcripts produced during the gap are permanently lost — there is no catch-up or replay mechanism
+- **Multi-tenant in one session**: A user belonging to multiple Microsoft tenants must authenticate separately for each tenant; one OAuth session covers exactly one tenant
+- **Transcript format variants**: Only VTT-format transcripts are processed; meetings with transcripts in other formats are silently skipped
+- **Recording size assurance**: No application-level size check on recordings; very large files (e.g., multi-hour all-hands) may time out during download and be skipped, while the transcript is still ingested
+
+### Microsoft Graph API Constraints
+
+The following limitations originate directly from the Microsoft Graph API and cannot be worked around while using **delegated permissions**.
+
+#### No Delta Sync with Delegated Permissions
+
+Microsoft Graph does expose a delta API for transcripts and recordings:
+
+```
+GET /users/{userId}/onlineMeetings/getAllTranscripts(...)/delta
+GET /users/{userId}/onlineMeetings/getAllRecordings(...)/delta
+```
+
+These APIs support both full initial synchronization and incremental sync (returning only transcripts added since the last `$deltaToken`). However, the official permission table is:
+
+| Permission type | Support |
+|---|---|
+| Delegated (work or school account) | **Not supported** |
+| Delegated (personal Microsoft account) | **Not supported** |
+| Application | `OnlineMeetingTranscript.Read.All` / `OnlineMeetingRecording.Read.All` |
+
+Source: [callTranscript: delta — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/calltranscript-delta) · [callRecording: delta — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/callrecording-delta)
+
+Teams MCP uses delegated permissions so that users can connect their own Microsoft account without IT administrator involvement. Switching to application permissions would enable delta sync, but would require tenant administrators to configure [Application Access Policies](https://learn.microsoft.com/en-us/graph/cloud-communication-online-meeting-application-access-policy) via PowerShell for every user — defeating the self-service connection model.
+
+#### No Historical/Full Sync with Delegated Permissions
+
+The only Microsoft Graph API capable of listing transcripts across all of a user's meetings (without knowing individual meeting IDs in advance) is `getAllTranscripts`:
+
+```
+GET /users/{userId}/onlineMeetings/getAllTranscripts(meetingOrganizerUserId='{userId}',startDateTime=...)
+```
+
+This API also requires **application permissions only** — delegated permissions are explicitly not supported.
+
+Source: [onlineMeeting: getAllTranscripts — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/onlinemeeting-getalltranscripts)
+
+With delegated permissions, the only available path to read transcripts is `GET /users/{userId}/onlineMeetings/{meetingId}/transcripts`, which requires knowing the meeting ID in advance. There is no delegated-permission API that enumerates past meetings and their transcripts in bulk. As a result, Teams MCP can only capture transcripts going forward from the moment the user connects — not from any earlier meetings.
+
+**Additional constraints on historical data (even with application permissions):**
+
+- Transcripts are only accessible for meetings that have not expired. One-time meetings expire 60 days after their scheduled time; recurring meetings with no end date expire 1 year after the last activity.
+- Recording and transcript files are subject to the tenant's admin-configured expiration policy (Microsoft default: 120 days after creation).
+
+Source: [Limits and specifications for Microsoft Teams — Meeting expiration](https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams)
 
 ### Single App Registration Architecture
 

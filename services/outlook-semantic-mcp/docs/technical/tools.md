@@ -422,7 +422,8 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
     scheduledForIngestion: number;  // successfully uploaded
     failedToUploadForIngestion: number;
     filters: {
-      ignoredBefore: string | null;
+      retentionWindowInDays: number;
+      ignoredBefore: string;       // ISO 8601 UTC cutoff — emails before this date are excluded
       ignoredSenders: string[];
       ignoredContents: string[];
     };
@@ -505,7 +506,7 @@ Restart the full sync from scratch, discarding all previous progress.
 
 ## Related Documentation
 
-- [Full Sync](./flows.md#Full-Sync:-Historical-Email-Ingestion) - Full sync mechanics, states, and filters
+- [Full Sync](./flows.md#Full-Sync:-Historical-Email-Ingestion) - Full sync mechanics and states
 - [Live Catch-Up](./flows.md#Live-Catch-Up:-Webhook-Driven-Email-Ingestion) - Webhook-driven real-time ingestion
 - [Flows](./flows.md) - Sequence diagrams for OAuth, sync, and draft creation flows
 - [Permissions](./permissions.md) - Microsoft Graph permissions required by these tools

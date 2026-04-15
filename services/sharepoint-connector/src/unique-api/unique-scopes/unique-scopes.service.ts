@@ -7,18 +7,23 @@ import {
   CREATE_SCOPE_ACCESSES_MUTATION,
   CreateScopeAccessesMutationInput,
   CreateScopeAccessesMutationResult,
+  DELETE_FOLDER_LOG_SAFE_KEYS,
   DELETE_FOLDER_MUTATION,
   DELETE_SCOPE_ACCESSES_MUTATION,
   DeleteFolderMutationInput,
   DeleteFolderMutationResult,
   DeleteScopeAccessesMutationInput,
   DeleteScopeAccessesMutationResult,
+  GENERATE_SCOPES_LOG_SAFE_KEYS,
   GenerateScopesBasedOnPathsMutationInput,
   GenerateScopesBasedOnPathsMutationResult,
   getGenerateScopesBasedOnPathsMutation,
+  PAGINATED_SCOPE_LOG_SAFE_KEYS,
   PAGINATED_SCOPE_QUERY,
   PaginatedScopeQueryInput,
   PaginatedScopeQueryResult,
+  SCOPE_ACCESSES_LOG_SAFE_KEYS,
+  UPDATE_SCOPE_LOG_SAFE_KEYS,
   UPDATE_SCOPE_MUTATION,
   UpdateScopeMutationInput,
   UpdateScopeMutationResult,
@@ -66,7 +71,7 @@ export class UniqueScopesService {
         const result = await this.scopeManagementClient.request<
           GenerateScopesBasedOnPathsMutationResult,
           GenerateScopesBasedOnPathsMutationInput
-        >(mutation, variables);
+        >(mutation, variables, { logSafeKeys: GENERATE_SCOPES_LOG_SAFE_KEYS });
 
         return result.generateScopesBasedOnPaths;
       },
@@ -85,10 +90,14 @@ export class UniqueScopesService {
     const result = await this.scopeManagementClient.request<
       UpdateScopeMutationResult,
       UpdateScopeMutationInput
-    >(UPDATE_SCOPE_MUTATION, {
-      id: scopeId,
-      input: { externalId: externalId?.value ?? null },
-    });
+    >(
+      UPDATE_SCOPE_MUTATION,
+      {
+        id: scopeId,
+        input: { externalId: externalId?.value ?? null },
+      },
+      { logSafeKeys: UPDATE_SCOPE_LOG_SAFE_KEYS },
+    );
 
     return result.updateScope;
   }
@@ -100,14 +109,18 @@ export class UniqueScopesService {
     const result = await this.scopeManagementClient.request<
       UpdateScopeMutationResult,
       UpdateScopeMutationInput
-    >(UPDATE_SCOPE_MUTATION, {
-      id: scopeId,
-      input: {
-        parrentScope: {
-          connect: { id: newParentId },
+    >(
+      UPDATE_SCOPE_MUTATION,
+      {
+        id: scopeId,
+        input: {
+          parrentScope: {
+            connect: { id: newParentId },
+          },
         },
       },
-    });
+      { logSafeKeys: UPDATE_SCOPE_LOG_SAFE_KEYS },
+    );
 
     return result.updateScope;
   }
@@ -124,16 +137,20 @@ export class UniqueScopesService {
     await this.scopeManagementClient.request<
       CreateScopeAccessesMutationResult,
       CreateScopeAccessesMutationInput
-    >(CREATE_SCOPE_ACCESSES_MUTATION, {
-      scopeId,
-      scopeAccesses: scopeAccesses.map((scopeAccess) => ({
-        accessType: scopeAccess.type,
-        entityId: scopeAccess.entityId,
-        entityType: scopeAccess.entityType,
-      })),
-      applyToSubScopes,
-      skipFileAccessPropagation: true,
-    });
+    >(
+      CREATE_SCOPE_ACCESSES_MUTATION,
+      {
+        scopeId,
+        scopeAccesses: scopeAccesses.map((scopeAccess) => ({
+          accessType: scopeAccess.type,
+          entityId: scopeAccess.entityId,
+          entityType: scopeAccess.entityType,
+        })),
+        applyToSubScopes,
+        skipFileAccessPropagation: true,
+      },
+      { logSafeKeys: SCOPE_ACCESSES_LOG_SAFE_KEYS },
+    );
   }
 
   public async deleteScopeAccesses(
@@ -148,29 +165,37 @@ export class UniqueScopesService {
     await this.scopeManagementClient.request<
       DeleteScopeAccessesMutationResult,
       DeleteScopeAccessesMutationInput
-    >(DELETE_SCOPE_ACCESSES_MUTATION, {
-      scopeId,
-      scopeAccesses: scopeAccesses.map((scopeAccess) => ({
-        accessType: scopeAccess.type,
-        entityId: scopeAccess.entityId,
-        entityType: scopeAccess.entityType,
-      })),
-      applyToSubScopes,
-      skipFileAccessPropagation: true,
-    });
+    >(
+      DELETE_SCOPE_ACCESSES_MUTATION,
+      {
+        scopeId,
+        scopeAccesses: scopeAccesses.map((scopeAccess) => ({
+          accessType: scopeAccess.type,
+          entityId: scopeAccess.entityId,
+          entityType: scopeAccess.entityType,
+        })),
+        applyToSubScopes,
+        skipFileAccessPropagation: true,
+      },
+      { logSafeKeys: SCOPE_ACCESSES_LOG_SAFE_KEYS },
+    );
   }
 
   public async getScopeById(id: string): Promise<Scope | null> {
     const result = await this.scopeManagementClient.request<
       PaginatedScopeQueryResult,
       PaginatedScopeQueryInput
-    >(PAGINATED_SCOPE_QUERY, {
-      skip: 0,
-      take: 1,
-      where: {
-        id: { equals: id },
+    >(
+      PAGINATED_SCOPE_QUERY,
+      {
+        skip: 0,
+        take: 1,
+        where: {
+          id: { equals: id },
+        },
       },
-    });
+      { logSafeKeys: PAGINATED_SCOPE_LOG_SAFE_KEYS },
+    );
 
     return result.paginatedScope.nodes[0] ?? null;
   }
@@ -179,13 +204,17 @@ export class UniqueScopesService {
     const result = await this.scopeManagementClient.request<
       PaginatedScopeQueryResult,
       PaginatedScopeQueryInput
-    >(PAGINATED_SCOPE_QUERY, {
-      skip: 0,
-      take: 1,
-      where: {
-        externalId: { equals: externalId },
+    >(
+      PAGINATED_SCOPE_QUERY,
+      {
+        skip: 0,
+        take: 1,
+        where: {
+          externalId: { equals: externalId },
+        },
       },
-    });
+      { logSafeKeys: PAGINATED_SCOPE_LOG_SAFE_KEYS },
+    );
 
     return result.paginatedScope.nodes[0] ?? null;
   }
@@ -202,15 +231,19 @@ export class UniqueScopesService {
       const batchResult = await this.scopeManagementClient.request<
         PaginatedScopeQueryResult,
         PaginatedScopeQueryInput
-      >(PAGINATED_SCOPE_QUERY, {
-        skip,
-        take: BATCH_SIZE,
-        where: {
-          parentId: {
-            equals: parentId,
+      >(
+        PAGINATED_SCOPE_QUERY,
+        {
+          skip,
+          take: BATCH_SIZE,
+          where: {
+            parentId: {
+              equals: parentId,
+            },
           },
         },
-      });
+        { logSafeKeys: PAGINATED_SCOPE_LOG_SAFE_KEYS },
+      );
       scopes.push(...batchResult.paginatedScope.nodes);
       batchCount = batchResult.paginatedScope.nodes.length;
       skip += BATCH_SIZE;
@@ -231,15 +264,19 @@ export class UniqueScopesService {
       const batchResult = await this.scopeManagementClient.request<
         PaginatedScopeQueryResult,
         PaginatedScopeQueryInput
-      >(PAGINATED_SCOPE_QUERY, {
-        skip,
-        take: BATCH_SIZE,
-        where: {
-          externalId: {
-            startsWith: prefix.value,
+      >(
+        PAGINATED_SCOPE_QUERY,
+        {
+          skip,
+          take: BATCH_SIZE,
+          where: {
+            externalId: {
+              startsWith: prefix.value,
+            },
           },
         },
-      });
+        { logSafeKeys: PAGINATED_SCOPE_LOG_SAFE_KEYS },
+      );
       scopes.push(...batchResult.paginatedScope.nodes);
       batchCount = batchResult.paginatedScope.nodes.length;
       skip += BATCH_SIZE;
@@ -258,10 +295,14 @@ export class UniqueScopesService {
     const result = await this.scopeManagementClient.request<
       DeleteFolderMutationResult,
       DeleteFolderMutationInput
-    >(DELETE_FOLDER_MUTATION, {
-      scopeId,
-      recursive,
-    });
+    >(
+      DELETE_FOLDER_MUTATION,
+      {
+        scopeId,
+        recursive,
+      },
+      { logSafeKeys: DELETE_FOLDER_LOG_SAFE_KEYS },
+    );
 
     this.logger.debug(
       `Deleted ${result.deleteFolder.successFolders.length} folders successfully, ${result.deleteFolder.failedFolders.length} failed`,

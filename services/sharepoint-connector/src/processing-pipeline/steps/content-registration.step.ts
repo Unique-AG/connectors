@@ -37,8 +37,6 @@ export class ContentRegistrationStep implements IPipelineStep {
   }
 
   public async execute(context: ProcessingContext): Promise<ProcessingContext> {
-    const stepStartTime = Date.now();
-
     const itemKey = buildIngestionItemKey(context.pipelineItem);
 
     const contentRegistrationRequest: ContentRegistrationRequest = {
@@ -99,7 +97,6 @@ export class ContentRegistrationStep implements IPipelineStep {
       context.uploadUrl = this.correctWriteUrl(registrationResponse.writeUrl);
       context.uniqueContentId = registrationResponse.id;
       context.registrationResponse = registrationResponse;
-      const _stepDuration = Date.now() - stepStartTime;
 
       return context;
     } catch (error) {

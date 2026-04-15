@@ -240,10 +240,10 @@ describe('SharepointSynchronizationService', () => {
     const [firstResult, secondResult] = await Promise.all([firstScan, secondScan]);
 
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
-    expect(firstResult.status).toBe('success');
-    expect(secondResult.status).toBe('skipped');
-    if (secondResult.status === 'skipped') {
-      expect(secondResult.reason).toBe('scan_in_progress');
+    expect(firstResult.fullResult.status).toBe('success');
+    expect(secondResult.fullResult.status).toBe('skipped');
+    if (secondResult.fullResult.status === 'skipped') {
+      expect(secondResult.fullResult.reason).toBe('scan_in_progress');
     }
   });
 
@@ -254,18 +254,13 @@ describe('SharepointSynchronizationService', () => {
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
   });
 
-  it('releases scan lock on getAllSiteItems error', async () => {
+  it('releases scan lock after site-level failure', async () => {
     mockGraphApiService.getAllSiteItems = vi
       .fn()
       .mockRejectedValueOnce(new Error('API failure'))
       .mockResolvedValue({ items: [mockFile], directories: [] });
 
-    try {
-      await service.synchronize();
-    } catch {
-      // Expected to throw because of the error in getAllSiteItems
-    }
-
+    await service.synchronize();
     await service.synchronize();
 
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
@@ -363,7 +358,7 @@ describe('SharepointSynchronizationService', () => {
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledTimes(1);
     expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledTimes(1);
-    expect(result.status).toBe('success');
+    expect(result.fullResult.status).toBe('success');
   });
 
   it('handles permissions sync errors gracefully', async () => {
@@ -851,7 +846,7 @@ describe('SharepointSynchronizationService', () => {
 
     const result = await service.synchronize();
 
-    expect(result.status).toBe('success');
+    expect(result.fullResult.status).toBe('success');
     expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
   });
 
@@ -877,7 +872,7 @@ describe('SharepointSynchronizationService', () => {
 
     const result = await service.synchronize();
 
-    expect(result.status).toBe('success');
+    expect(result.fullResult.status).toBe('success');
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
     expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
   });
@@ -1076,7 +1071,7 @@ describe('SharepointSynchronizationService', () => {
 
     const result = await service.synchronize();
 
-    expect(result.status).toBe('success');
+    expect(result.fullResult.status).toBe('success');
     expect(mockGraphApiService.getSiteInfo).toHaveBeenCalled();
     expect(mockScopeManagementService.initializeRootScope).not.toHaveBeenCalled();
     expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
