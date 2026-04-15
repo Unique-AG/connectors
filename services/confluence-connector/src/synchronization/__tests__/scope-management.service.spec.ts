@@ -1,11 +1,13 @@
 import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestionConfig } from '../../config/ingestion.schema';
+import type { ConfluenceApiClient } from '../../confluence-api/confluence-api-client';
 import type { Metrics } from '../../metrics';
 import { ScopeManagementService } from '../scope-management.service';
 
 const TENANT_NAME = 'dogfood-cloud';
 const ROOT_SCOPE_ID = 'root-scope-id';
+const INSTANCE_ID = 'abc-123-instance';
 
 interface MockDeps {
   service: ScopeManagementService;
@@ -19,6 +21,9 @@ interface MockDeps {
   };
   files: {
     deleteByKeyPrefix: ReturnType<typeof vi.fn>;
+  };
+  confluenceApi: {
+    resolveInstanceIdentifier: ReturnType<typeof vi.fn>;
   };
   metrics: {
     recordOrphanedScopesCleaned: ReturnType<typeof vi.fn>;
@@ -46,6 +51,10 @@ function makeService(options?: { useV1KeyFormat?: boolean }): MockDeps {
 
   const uniqueApiClient = { scopes, files, users } as unknown as UniqueApiClient;
 
+  const confluenceApi = {
+    resolveInstanceIdentifier: vi.fn().mockResolvedValue({ type: 'cloud', id: INSTANCE_ID }),
+  };
+
   const ingestionConfig = {
     scopeId: ROOT_SCOPE_ID,
     useV1KeyFormat: options?.useV1KeyFormat ?? false,
@@ -60,11 +69,13 @@ function makeService(options?: { useV1KeyFormat?: boolean }): MockDeps {
     service: new ScopeManagementService(
       ingestionConfig,
       TENANT_NAME,
+      confluenceApi as unknown as ConfluenceApiClient,
       uniqueApiClient,
       metrics as unknown as Metrics,
     ),
     scopes,
     files,
+    confluenceApi,
     metrics,
   };
 }
@@ -78,9 +89,12 @@ describe('ScopeManagementService', () => {
       id: ROOT_SCOPE_ID,
       name: 'Confluence',
       parentId: null,
+      externalId: `confc:cloud:${INSTANCE_ID}`,
     });
+    scopes.updateExternalId.mockResolvedValue({ id: ROOT_SCOPE_ID, externalId: null });
     const rootScopePath = await service.initialize();
     scopes.getById.mockReset();
+    scopes.updateExternalId.mockReset();
     return rootScopePath;
   }
 
@@ -92,7 +106,12 @@ describe('ScopeManagementService', () => {
     it('builds root scope path from scope hierarchy', async () => {
       const { service, scopes } = makeService();
       scopes.getById
-        .mockResolvedValueOnce({ id: ROOT_SCOPE_ID, name: 'Confluence', parentId: 'parent-1' })
+        .mockResolvedValueOnce({
+          id: ROOT_SCOPE_ID,
+          name: 'Confluence',
+          parentId: 'parent-1',
+          externalId: `confc:cloud:${INSTANCE_ID}`,
+        })
         .mockResolvedValueOnce({ id: 'parent-1', name: 'Connectors', parentId: 'top-1' })
         .mockResolvedValueOnce({ id: 'top-1', name: 'Company', parentId: null });
 
@@ -111,6 +130,7 @@ describe('ScopeManagementService', () => {
         id: ROOT_SCOPE_ID,
         name: 'RootScope',
         parentId: null,
+        externalId: `confc:cloud:${INSTANCE_ID}`,
       });
 
       const rootScopePath = await service.initialize();
@@ -135,10 +155,143 @@ describe('ScopeManagementService', () => {
           id: ROOT_SCOPE_ID,
           name: 'Confluence',
           parentId: 'missing-parent',
+          externalId: `confc:cloud:${INSTANCE_ID}`,
         })
         .mockResolvedValueOnce(null);
 
       await expect(service.initialize()).rejects.toThrow('Parent scope not found: missing-parent');
+    });
+  });
+
+  describe('ownership validation', () => {
+    it('claims ownership when externalId is null', async () => {
+      const { service, scopes } = makeService();
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: null,
+      });
+      scopes.updateExternalId.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        externalId: `confc:cloud:${INSTANCE_ID}`,
+      });
+
+      const rootScopePath = await service.initialize();
+
+      expect(rootScopePath).toBe('/Confluence');
+      expect(scopes.updateExternalId).toHaveBeenCalledWith(
+        ROOT_SCOPE_ID,
+        `confc:cloud:${INSTANCE_ID}`,
+      );
+    });
+
+    it('skips claim when externalId already matches', async () => {
+      const { service, scopes } = makeService();
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: `confc:cloud:${INSTANCE_ID}`,
+      });
+
+      const rootScopePath = await service.initialize();
+
+      expect(rootScopePath).toBe('/Confluence');
+      expect(scopes.updateExternalId).not.toHaveBeenCalled();
+    });
+
+    it('throws on ownership mismatch when externalId differs', async () => {
+      const { service, scopes } = makeService();
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: 'confc:cloud:other-instance',
+      });
+
+      await expect(service.initialize()).rejects.toThrow(
+        `Root scope ownership mismatch: expected confc:cloud:${INSTANCE_ID}, found confc:cloud:other-instance`,
+      );
+    });
+
+    it('throws when updateExternalId returns a different externalId than expected', async () => {
+      const { service, scopes } = makeService();
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: null,
+      });
+      scopes.updateExternalId.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        externalId: null,
+      });
+
+      await expect(service.initialize()).rejects.toThrow(
+        'Root scope ownership mismatch after claim',
+      );
+    });
+
+    it('throws when claim fails', async () => {
+      const { service, scopes } = makeService();
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: null,
+      });
+      scopes.updateExternalId.mockRejectedValueOnce(new Error('API error'));
+
+      await expect(service.initialize()).rejects.toThrow('API error');
+    });
+
+    it('caches instance identifier across multiple calls', async () => {
+      const { service, scopes, confluenceApi } = makeService();
+
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: `confc:cloud:${INSTANCE_ID}`,
+      });
+      await service.initialize();
+
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: `confc:cloud:${INSTANCE_ID}`,
+      });
+      await service.initialize();
+
+      expect(confluenceApi.resolveInstanceIdentifier).toHaveBeenCalledTimes(1);
+    });
+
+    it('builds correct externalId for data-center instance type', async () => {
+      const { service, scopes, confluenceApi } = makeService();
+      confluenceApi.resolveInstanceIdentifier.mockResolvedValue({
+        type: 'data-center',
+        id: 'dc-instance-456',
+      });
+
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: null,
+      });
+      scopes.updateExternalId.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        externalId: 'confc:data-center:dc-instance-456',
+      });
+
+      await service.initialize();
+
+      expect(scopes.updateExternalId).toHaveBeenCalledWith(
+        ROOT_SCOPE_ID,
+        'confc:data-center:dc-instance-456',
+      );
     });
   });
 
