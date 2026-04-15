@@ -11,7 +11,7 @@ The Confluence Connector requires specific permissions to access the Confluence 
 
 | Instance Type | Auth Method | Permissions Required |
 |---|---|---|
-| Cloud | OAuth 2.0 (2LO) | OAuth application configured for the client credentials flow with instance-wide read access (no explicit OAuth scopes are sent in the token request) |
+| Cloud | OAuth 2.0 (2LO) | OAuth application configured for the client credentials flow with three scopes: `search:confluence`, `read:attachment:confluence`, `readonly:content.attachment:confluence` (no explicit OAuth scopes are sent in the token request; scopes are granted on the service account) |
 | Data Center | OAuth 2.0 (2LO) | OAuth 2.0 application configured with `READ` scope (instance-wide) |
 | Data Center (below 10.1) | Personal Access Token (not recommended) | Inherits the permissions of the user who created it. Use OAuth 2.0 (2LO) on Data Center 10.1+ instead. |
 
@@ -19,7 +19,7 @@ The Confluence Connector requires specific permissions to access the Confluence 
 
 | Auth Mode | Permissions Required |
 |---|---|
-| `cluster_local` | Service identity headers (`x-company-id`, `x-user-id`) for a user with scope management and ingestion access |
+| `cluster_local` | Service identity headers (`x-company-id`, `x-user-id`) referencing an existing Zitadel service user. Zitadel authorizations are not enforced in this mode. |
 | `external` | Zitadel service account with scope management and ingestion access |
 
 ## Confluence Cloud Permissions
@@ -28,12 +28,12 @@ The Confluence Connector requires specific permissions to access the Confluence 
 
 The Cloud API client calls the following endpoints through the Atlassian API gateway (`https://api.atlassian.com/ex/confluence/<cloudId>`):
 
-| API Endpoint | Method | Use Case                                                                                           |
-|---|---|----------------------------------------------------------------------------------------------------|
-| `/wiki/rest/api/content/search?cql=...` | GET | Search for labeled pages using CQL; discover descendant pages via `ancestor IN (...)`              |
-| `/wiki/rest/api/content/search?cql=id%3D{pageId}` | GET | Fetch a single page with `body.storage` for content ingestion                                      |
-| `/wiki/api/v2/pages/{pageId}/attachments` | GET | Fetch attachment list for pages exceeding the Confluence-imposed inline limit (max 25 attachments) |
-| `/wiki/rest/api/content/{pageId}/child/attachment/{attachmentId}/download` | GET | Download attachment binary content                                                                 |
+| API Endpoint | Method | Required Scope | Use Case |
+|---|---|---|---|
+| `/wiki/rest/api/content/search?cql=...` | GET | `search:confluence` | Search for labeled pages using CQL; discover descendant pages via `ancestor IN (...)` |
+| `/wiki/rest/api/content/search?cql=id%3D{pageId}` | GET | `search:confluence` | Fetch a single page with `body.storage` for content ingestion |
+| `/wiki/api/v2/pages/{pageId}/attachments` | GET | `read:attachment:confluence` | Fetch attachment list for pages exceeding the Confluence-imposed inline limit (max 25 attachments) |
+| `/wiki/rest/api/content/{pageId}/child/attachment/{attachmentId}/download` | GET | `readonly:content.attachment:confluence` | Download attachment binary content |
 
 ### Space Type Filter
 

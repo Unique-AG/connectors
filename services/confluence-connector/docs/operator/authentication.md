@@ -37,7 +37,11 @@ The connector's tenant YAML field for selecting the Unique auth mode is `service
 
 ### 1. Create a Unique Service User
 
-The connector requires a service user in the Unique platform (Zitadel) with the following permissions:
+The connector requires a service user in the Unique platform (Zitadel). The user must exist in Zitadel so that a valid `x-user-id` can be referenced.
+
+**Zitadel authorizations** (role assignments) are only enforced in `external` mode. In `cluster_local` mode, the Unique platform does not check Zitadel authorizations. The `x-user-id` must reference an actual existing service user, but its assigned roles are irrelevant.
+
+In `external` mode, the service user must have the following authorizations:
 
 | Permission | Purpose |
 |------------|---------|
@@ -47,14 +51,14 @@ The connector requires a service user in the Unique platform (Zitadel) with the 
 
 This user identity is referenced:
 
-- In `cluster_local` mode: as the `x-user-id` header value in `serviceExtraHeaders`. This **must** be the ID of an actual service user in Zitadel -- it cannot be an arbitrary value.
+- In `cluster_local` mode: as the `x-user-id` header value in `serviceExtraHeaders`. This **must** be the ID of an actual service user in Zitadel. It cannot be an arbitrary value.
 - In `external` mode: implicitly via the Zitadel client credentials (`zitadelClientId` / `zitadelClientSecret`).
 
 Steps:
 
 1. Navigate to Zitadel.
 2. Create a new service user.
-3. Assign the required permissions listed above.
+3. For `external` mode: assign the required authorizations listed above. For `cluster_local` mode: no authorizations are needed.
 4. Note the user ID for configuration.
 
 For detailed instructions on creating and configuring a service user, see:
@@ -71,21 +75,17 @@ At startup, the connector automatically grants itself access on the root scope a
 
 #### Option A: OAuth 2.0 (2LO) -- Cloud
 
-1. In the [Atlassian Admin Console](https://admin.atlassian.com/), go to **Settings** > **User Management** > **Service Accounts**.
-2. Create a new service account and generate credentials.
+1. In the [Atlassian Admin Console](https://admin.atlassian.com/), go to **Directory** > **Service Accounts**.
+2. Create a new service account 
+3. Add User Role to the Confluence App
+4. Now Create Credentials and select OAuth 2.0
 3. Grant the service account access to the Confluence application and assign the following scopes:
 
-> **Note:** The scopes listed below are preliminary and subject to validation. The minimum required set may change before the stable release.
-
-| Scope | Purpose |
-|-------|---------|
-| `search:confluence` | CQL search for labeled pages |
-| `read:confluence-content.all` | Read full page content (body, metadata) |
-| `read:confluence-content.summary` | Read content summaries and version info |
-| `read:confluence-space.summary` | Read space metadata (key, name, type) |
-| `read:label:confluence` | Read page labels to determine sync eligibility |
-| `read:page:confluence` | Read individual pages |
-| `read:attachment:confluence` | Download file attachments (required when attachment ingestion is enabled) |
+| Scope | Type | Purpose |
+|-------|------|---------|
+| `search:confluence` | Classic | CQL search for labeled pages and descendants; covers page body and label expansions |
+| `read:attachment:confluence` | Granular | List page attachments (required when attachment ingestion is enabled) |
+| `readonly:content.attachment:confluence` | Classic | Download attachment binary content (required when attachment ingestion is enabled) |
 
 4. Note the **Client ID** and **Client Secret**.
 5. Obtain the **Cloud ID** for your Confluence instance (see [How do I find my Atlassian Cloud ID?](../faq.md#How-do-I-find-my-Atlassian-Cloud-ID)).
