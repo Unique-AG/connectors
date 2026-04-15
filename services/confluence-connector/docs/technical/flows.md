@@ -129,6 +129,17 @@ sequenceDiagram
         Connector->>Unique: Delete content by IDs
     end
 
+    rect rgb(255, 235, 200)
+        Note over Connector,Unique: Cleanup Phase
+        Connector->>Unique: List root scope children
+        Unique->>Connector: Existing space scopes
+        Note over Connector: Detect scopes for spaces<br/>no longer discovered
+        opt Orphaned space scopes exist
+            Connector->>Unique: Delete files for each orphaned space
+            Connector->>Unique: Delete each orphaned space scope
+        end
+    end
+
     Note over Connector: Sync cycle complete
 ```
 
@@ -352,6 +363,17 @@ Deleted items identified by the file diff are processed after ingestion:
 3. Delete content by IDs
 
 If no content is found for the given keys, a warning is logged and no deletion occurs.
+
+### Removed Space Cleanup
+
+The file diff runs once per Confluence space that appears in the current discovery results. Spaces that have disappeared from discovery entirely (because the space was deleted in Confluence, or all ingest labels were removed from its pages) are not diffed and would otherwise leave orphaned content and scopes in Unique.
+
+After the per-item deletion step, the connector detects orphaned space scopes by listing the root scope's children and comparing them against the set of Confluence space keys discovered during the current sync. For each orphaned space:
+
+1. All files belonging to that space are deleted.
+2. The space scope is deleted.
+
+Files are deleted before the scope so that a partial failure does not leave files without a parent scope. Each orphaned space is cleaned up in isolation: a failure for one space is logged and does not prevent the cleanup of other orphaned spaces. The cleanup phase runs at the end of every sync cycle.
 
 ### Concurrency and Progress
 

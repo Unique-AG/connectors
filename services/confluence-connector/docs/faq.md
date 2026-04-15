@@ -134,7 +134,7 @@ The response contains a `cloudId` field with the UUID.
 
 **Answer:** Each sync cycle follows these steps:
 
-1. Grant the service account access to the pre-existing root scope in Unique and resolve its path (the root scope must be created by an administrator before the connector can use it)
+1. Grant the service account access to the pre-existing root scope in Unique and resolve its path. On the first sync cycle the connector also marks the scope as owned by this tenant's Confluence instance; subsequent cycles verify that mark. The root scope must be created by an administrator before the connector can use it.
 2. Discover all pages matching the configured labels via CQL search
 3. Fetch descendant pages for any pages with the all-descendants label
 4. Extract allowed attachments from discovered pages
@@ -143,6 +143,7 @@ The response contains a `cloudId` field with the UUID.
 7. Fetch and ingest new or updated pages (HTML storage representation)
 8. Download and ingest new or updated attachments (streamed)
 9. Delete items from Unique that are no longer discovered
+10. Detect space scopes whose Confluence space is no longer discovered, and remove their files and scopes
 
 ### How does change detection work?
 
@@ -158,7 +159,7 @@ If the `ai-ingest-all` label is removed from a parent page, all descendant pages
 
 **Answer:** If the page's space is still discovered during the next sync cycle, the file diff detects the missing page and deletes the corresponding content (page and its attachments) from Unique.
 
-If an entire previously synced space disappears from discovery results (for example, because all its labels were removed or the space was deleted), the connector does not automatically clean up its content. This is because the file diff runs per-space and only executes for spaces that still appear in the current discovery results. Content from the disappeared space remains in Unique and requires manual deletion.
+If an entire previously synced space disappears from discovery results (for example, because all its labels were removed or the space was deleted), the connector detects the orphaned space scope at the end of the sync cycle and removes both the space's files and the space scope itself. See [Removed Space Cleanup](./technical/flows.md#Removed-Space-Cleanup) for details.
 
 ### What happens to attachments when their parent page is unlabeled?
 
@@ -305,7 +306,7 @@ The connector discovers pages via CQL search queries filtered by label. Only pag
 
 **Answer:** Pages in inaccessible spaces are silently excluded from CQL search results. The connector does not receive an error; it simply never discovers those pages.
 
-If a space that was previously accessible becomes inaccessible, the connector does not automatically clean up that space's already ingested content. The file diff runs per-space and only executes for spaces that still appear in discovery results, so a space that vanishes from CQL results is never diffed and its content remains in Unique. Manual cleanup is required in that situation.
+If a space that was previously accessible becomes inaccessible, its content is cleaned up by the end-of-cycle removed-space cleanup: the connector lists the root scope's children, detects the scope for the now-inaccessible space as orphaned, and removes both its files and its scope. See [Removed Space Cleanup](./technical/flows.md#Removed-Space-Cleanup) for details.
 
 ### How does Unique platform authentication work?
 
