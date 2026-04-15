@@ -48,7 +48,7 @@
     "graphql": "16.11.0",
     "graphql-request": "7.2.0",
     "js-yaml": "4.1.1",
-    "nestjs-otel": "7.0.1",
+    "nestjs-otel": "8.0.2",
     "nestjs-pino": "4.6.1",
     "nestjs-zod": "5.0.1",
     "p-limit": "7.3.0",
