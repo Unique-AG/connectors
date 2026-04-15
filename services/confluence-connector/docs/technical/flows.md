@@ -397,8 +397,8 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 | Page not found | Page deleted between discovery and content fetch | Log warning, skip the page |
 | Page with empty body | Page has no content (e.g., newly created) | Log, skip the page |
 | Attachment with zero bytes | Empty attachment | Log, skip the attachment |
-| Page ingestion failure | Upload error, registration error | Log error, skip the page |
-| Attachment ingestion failure | Download error, upload error | Destroy stream, log error, skip the attachment |
+| Page ingestion failure | Upload or finalization error after successful registration | Delete the registered content from Unique, log error, skip the page |
+| Attachment ingestion failure | Download error, or upload/finalization error after successful registration | Destroy the download stream, delete the registered content from Unique if registration succeeded, log error, skip the attachment |
 | Content deletion failure | Unique API error | Log error, return 0 deleted count |
 | Unhandled sync error | Unexpected exception | Caught at top level, logged, sync state reset |
 
