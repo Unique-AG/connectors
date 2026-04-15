@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.4.1...sharepoint-connector@2.5.0) (2026-04-15)
+
+
+### Features
+
+* **sharepoint-connector,deps:** add /health endpoint with sync, connectivity, and Unique API indicators ([#459](https://github.com/Unique-AG/connectors/issues/459)) ([77384de](https://github.com/Unique-AG/connectors/commit/77384defd4a3874144e00603a3251748231c1c59))
+* **sharepoint-connector:** make Unique group names unique by embedding group identifier ([#470](https://github.com/Unique-AG/connectors/issues/470)) ([c6d42a8](https://github.com/Unique-AG/connectors/commit/c6d42a84505a1e48098981b5fd6044ffe4d749b6))
+
 ## [2.4.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.4.0...sharepoint-connector@2.4.1) (2026-04-10)
 
 
