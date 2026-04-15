@@ -6,7 +6,6 @@ connector:
   env:
     LOG_LEVEL: info
     LOGS_DIAGNOSTICS_DATA_POLICY: conceal
-    MAX_FILE_SIZE_MB: "200"
     MAX_HEAP_MB: 1920
     NODE_ENV: production
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
@@ -206,7 +205,7 @@ connectorConfig:
         #     - txt
         #     - csv
         #     - html
-        #   # -- Maximum file size in megabytes (default: 200, or MAX_FILE_SIZE_MB env)
+        #   # -- Maximum file size in megabytes (default: 200)
         #   maxFileSizeMb: 200
 
 # -- HTTP proxy configuration for external API calls

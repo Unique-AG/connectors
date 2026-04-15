@@ -74,7 +74,7 @@ Configurable allowed file types (default: pdf, docx, xlsx, ppt, pptx, txt, csv, 
 
 **Skipped Content Types**
 
-Content types `database`, `whiteboard`, and `embed` are explicitly skipped (no body available via API). Folders have no body and are effectively skipped by the empty-body filter. Descendants of skipped types (such as sub-pages under a database) are still discovered and ingested. Live Docs pass through as regular pages. See the [Content Type Ingestion Map](./technical/flows.md#Content-Type-Ingestion-Map) for the full breakdown by platform.
+Content types `database`, `whiteboard`, and `embed` are explicitly skipped (no body available via API). Folders are not explicitly skipped but have no body, so they are excluded during ingestion. In both cases, descendants (such as sub-pages under a database or folder) are still discovered and ingested. Live Docs pass through as regular pages. See the [Content Type Ingestion Map](./technical/flows.md#Content-Type-Ingestion-Map) for the full breakdown by platform.
 
 **Scope Management**
 
