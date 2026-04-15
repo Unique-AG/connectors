@@ -365,15 +365,58 @@ connector:
 
 The Helm chart ships these values by default.
 
-### Host and API Metrics
+### System Telemetry
 
-The connector exposes standard host metrics (CPU, memory, event loop) and HTTP API metrics.
+The connector exposes standard host metrics (CPU, memory, event loop) and HTTP API metrics collected by the OpenTelemetry host and API instrumentations.
 
-Unique API metrics and custom connector metrics will be documented in a future update.
+### Application Telemetry
+
+Custom connector metrics use the `cfc_` prefix (Confluence Connector). Unique platform interaction metrics use the `confluence_connector_unique_api_` prefix and are provided by the shared Unique API package.
+
+#### Sync Cycle Metrics
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `cfc_sync_duration_seconds` | Histogram | `tenant`, `result` | Duration of a full synchronization cycle per tenant |
+| `cfc_scan_duration_seconds` | Histogram | `tenant` | Duration of the page discovery (scan) phase |
+| `cfc_attachment_upload_duration_seconds` | Histogram | `tenant` | Duration of a single attachment upload to Unique |
+
+Attachment upload histogram buckets: 100ms, 200ms, 500ms, 1s, 2s, 3s, 5s, 10s, 20s, 30s, 60s.
+
+#### Content Throughput Metrics
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `cfc_pages_processed_total` | Counter | `tenant`, `result` | Pages ingested per sync cycle |
+| `cfc_attachments_processed_total` | Counter | `tenant`, `result` | Attachments ingested per sync cycle |
+| `cfc_content_deleted_total` | Counter | `tenant`, `result` | Content items deleted from Unique |
+| `cfc_file_diff_events_total` | Counter | `tenant`, `diff_result_type` | File change detection events (`new`, `updated`, `deleted`, `moved`) |
+| `cfc_orphaned_scopes_cleaned_total` | Counter | `tenant`, `result` | Space scopes removed after their Confluence space was removed or unlabeled |
+| `cfc_orphaned_files_cleaned_total` | Counter | `tenant` | Files removed during orphaned space cleanup |
+
+#### Confluence API Metrics
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `cfc_confluence_api_request_duration_seconds` | Histogram | `tenant`, `endpoint`, `result` | Request latency for Confluence API calls, keyed by a normalized endpoint path |
+| `cfc_confluence_api_throttle_events_total` | Counter | `tenant` | Confluence API rate-limit (429) events |
+| `cfc_confluence_api_errors_total` | Counter | `tenant`, `http_status_class` | Confluence API error responses grouped by HTTP status class |
+
+Confluence API request histogram buckets: 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s.
+
+#### Unique API Metrics
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `confluence_connector_unique_api_requests_total` | Counter | `operation`, `target`, `result`, `status_code_class`, `tenant` | Total Unique API requests |
+| `confluence_connector_unique_api_errors_total` | Counter | `operation`, `target`, `result`, `status_code_class`, `tenant` | Total Unique API error responses |
+| `confluence_connector_unique_api_request_duration_ms` | Histogram | `operation`, `target`, `result`, `status_code_class`, `tenant` | Request latency for Unique API calls in milliseconds |
+| `confluence_connector_unique_api_slow_requests_total` | Counter | `operation`, `target`, `result`, `status_code_class`, `tenant` | Slow Unique API requests |
+| `confluence_connector_unique_api_auth_token_refresh_total` | Counter | `tenant` | Zitadel auth token refreshes (only emitted in `external` mode) |
 
 ### Grafana Dashboard
 
-A Grafana dashboard ConfigMap is available in the Helm chart. The dashboard visualizes sync durations, content throughput, attachment uploads, Confluence API performance, Unique API performance, and Node.js runtime metrics. Enable it with:
+A Grafana dashboard ConfigMap is available in the Helm chart. The dashboard visualizes sync pipeline duration, content throughput, attachment uploads, Confluence API performance, Unique API performance, and Node.js runtime metrics, each broken down per tenant. Enable it with:
 
 ```yaml
 grafana:
