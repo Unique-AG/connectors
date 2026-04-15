@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.7](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.6...teams-mcp@0.2.7) (2026-04-14)
+
+
+### Features
+
+* **confluence-connector,unique-api,utils,deps:** implement ingestion pipeline ([#305](https://github.com/Unique-AG/connectors/issues/305)) ([7d2c64c](https://github.com/Unique-AG/connectors/commit/7d2c64c1f4248e06a822a7d827715c4ae001eeec))
+* **teams-mcp:** organizer metadata, hybrid search, and list_meetings tool ([#456](https://github.com/Unique-AG/connectors/issues/456)) ([aa516fc](https://github.com/Unique-AG/connectors/commit/aa516fc757e841b282ebf80337f482de47828ce7))
+
+
+### Bug Fixes
+
+* **deps:** enable stripLeadingPaths in SWC builder for all services ([#458](https://github.com/Unique-AG/connectors/issues/458)) ([caa3abc](https://github.com/Unique-AG/connectors/commit/caa3abc26b9aea44dede0ce89101df64b3f97b77))
+* **deps:** resolve Dependabot security alerts for multiple transitive dependencies ([#449](https://github.com/Unique-AG/connectors/issues/449)) ([c800b51](https://github.com/Unique-AG/connectors/commit/c800b51439145282cababd491a6fba1a84a748a9))
+* **deps:** resolve Dependabot security alerts related to jsonwebtoken, js-yaml and @nestjs/ libraries ([#446](https://github.com/Unique-AG/connectors/issues/446)) ([44835ec](https://github.com/Unique-AG/connectors/commit/44835ec851589e2288fd2e1551ca22edb148190e))
+* **teams-mcp:** parse GraphError body from ReadableStream on getStream() failures ([#462](https://github.com/Unique-AG/connectors/issues/462)) ([1579c2c](https://github.com/Unique-AG/connectors/commit/1579c2c29b3d4913512f53c29d46a98c6c356ed5))
+* **teams-mcp:** pass through Graph API status codes to MCP clients ([#405](https://github.com/Unique-AG/connectors/issues/405)) ([36a784b](https://github.com/Unique-AG/connectors/commit/36a784b63c75480a79e44bf183b9f83f08fb826c))
+
 ## [0.2.6](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.5...teams-mcp@0.2.6) (2026-02-26)
 
 

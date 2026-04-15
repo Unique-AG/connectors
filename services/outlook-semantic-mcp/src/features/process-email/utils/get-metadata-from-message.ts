@@ -79,7 +79,7 @@ export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata =
     senderName: message.sender?.emailAddress?.name ?? '',
     toRecipientsEmailAddresses: extractFromEmailArray(message.toRecipients, 'address'),
     toRecipientsNames: extractFromEmailArray(message.toRecipients, 'name'),
-    receivedDateTime: message.receivedDateTime ?? '',
+    receivedDateTime: message.receivedDateTime,
     ccRecipientsEmailAddresses: extractFromEmailArray(message.ccRecipients, 'address'),
     ccRecipientsNames: extractFromEmailArray(message.ccRecipients, 'name'),
     categories: filterOutNilOrEmptyValues(message.categories),

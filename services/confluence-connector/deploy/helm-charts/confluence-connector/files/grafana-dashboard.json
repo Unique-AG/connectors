@@ -305,6 +305,83 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "id": 60,
+      "title": "Space cleanup",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Orphaned space scopes cleaned up after spaces were removed from Confluence. A spike may indicate a mass space removal or a Confluence API issue. Failures mean the scope or its files could not be deleted.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "stacking": { "mode": "normal" }
+          },
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 27 },
+      "id": 61,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_orphaned_scopes_cleaned_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — success",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_orphaned_scopes_cleaned_total{job=~\"$job\", tenant=~\"$tenant\", result=\"failure\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — failure",
+          "refId": "B"
+        }
+      ],
+      "title": "Orphaned scopes cleaned per tenant (in 1 minute)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Files deleted during orphaned space cleanup. Each bar represents the number of files removed when an orphaned space scope was cleaned up.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "stacking": { "mode": "normal" }
+          },
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 27 },
+      "id": 62,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_orphaned_files_cleaned_total{job=~\"$job\", tenant=~\"$tenant\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Orphaned files cleaned per tenant (in 1 minute)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
       "id": 20,
       "title": "Attachment uploads",
       "type": "row"
@@ -326,7 +403,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 27 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 37 },
       "id": 21,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -369,7 +446,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
       "id": 30,
       "title": "Confluence API performance",
       "type": "row"
@@ -391,7 +468,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 37 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 47 },
       "id": 31,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -423,7 +500,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 37 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 47 },
       "id": 32,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
@@ -448,7 +525,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
       "id": 35,
       "title": "Unique API performance",
       "type": "row"
@@ -470,7 +547,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 47 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 57 },
       "id": 36,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -502,7 +579,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 47 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 57 },
       "id": 37,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
@@ -521,7 +598,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 66 },
       "id": 50,
       "panels": [],
       "title": "Node.js runtime",
@@ -543,7 +620,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 57 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 67 },
       "id": 51,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -576,7 +653,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 57 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 67 },
       "id": 52,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -609,7 +686,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 57 },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 67 },
       "id": 53,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },

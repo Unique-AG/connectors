@@ -4,7 +4,10 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "builder": {
-      "type": "swc"
+      "type": "swc",
+      "options": {
+        "stripLeadingPaths": true
+      }
     }
   }
 }

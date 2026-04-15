@@ -297,6 +297,7 @@ Planned enhancements:
 - [Technical Reference](./technical/README.md) - Architecture, flows, and design decisions
   - [Architecture](./technical/architecture.md) - System components and infrastructure
   - [Flows](./technical/flows.md) - Content sync, permission sync, file diff mechanism
+  - [Metadata](./technical/metadata.md) - Ingested metadata fields for documents and SitePages
   - [Permissions](./technical/permissions.md) - Microsoft Graph and SharePoint REST permissions
   - [Security](./technical/security.md) - Security updates and SBOM
 

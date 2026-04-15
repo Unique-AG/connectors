@@ -96,7 +96,9 @@ export class TenantRegistry implements OnModuleInit {
         const scopeManagementService = new ScopeManagementService(
           config.ingestion,
           tenantName,
+          apiClient,
           uniqueClient,
+          this.metrics,
         );
         this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
 

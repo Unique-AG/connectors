@@ -92,7 +92,10 @@ export class GraphClientFactory {
     // Pass the first middleware in the chain to initialize the client
     const clientOptions: ClientOptions = {
       middleware: middlewares[0],
-      debugLogging: this.configService.get('app.isDebuggingOn', { infer: true }),
+      // The SDK's debugLogging does a raw `console.log(url)` for every request,
+      // which bypasses pino and produces unstructured log lines. Our own
+      // MetricsMiddleware already captures request details in structured form.
+      debugLogging: false,
     };
 
     return Client.initWithMiddleware(clientOptions);

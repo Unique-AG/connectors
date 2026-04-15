@@ -1,18 +1,6 @@
 <!-- confluence-page-id: 2061664285 -->
 <!-- confluence-space-key: PUBDOC -->
 
-!!! danger "Pre-Release Disclaimer"
-    **`outlook-semantic-mcp` is pre-release software.**
-
-    - **No SLA/SSLA**: No service level agreements or support level agreements apply
-    - **No Support**: No guaranteed support, response times, or issue resolution
-    - **Breaking Changes**: APIs, configurations, and behavior may change without notice between versions
-    - **No Stability Guarantees**: Features may be incomplete, modified, or removed at any time
-    - **Data Loss Risk**: Bugs or changes may result in data loss or corruption
-    - **Use at Your Own Risk**: This software is provided "as-is" without warranties of any kind
-
-    Pre-release software is intended for evaluation and testing purposes only. Do not rely on this software for production workloads without understanding these limitations.
-
 ## Getting Started
 
 - **IT Operators:** Start with the [Operator Guide](./operator/README.md) for deployment, configuration, and operations

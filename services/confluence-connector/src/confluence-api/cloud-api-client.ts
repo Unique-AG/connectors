@@ -3,7 +3,11 @@ import { chunk, isNullish, uniqueBy } from 'remeda';
 import type { ConfluenceAuth } from '../auth/confluence-auth';
 import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
-import { type ApiClientOptions, ConfluenceApiClient } from './confluence-api-client';
+import {
+  type ApiClientOptions,
+  ConfluenceApiClient,
+  type InstanceIdentifier,
+} from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
 import {
   type ConfluenceAttachment,
@@ -34,6 +38,10 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     super();
     this.apiBaseUrl = `${ATLASSIAN_API_BASE}/${config.cloudId}`;
     this.attachmentExpand = options.attachmentsEnabled ? ATTACHMENT_EXPAND : '';
+  }
+
+  public async resolveInstanceIdentifier(): Promise<InstanceIdentifier> {
+    return { type: 'cloud', id: this.config.cloudId };
   }
 
   public async searchPagesByLabel(): Promise<ConfluencePage[]> {

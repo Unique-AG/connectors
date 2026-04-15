@@ -5,6 +5,7 @@ import { groupBy } from 'remeda';
 import type { ConfluenceConfig } from '../config';
 import { getSourceKind } from '../constants/ingestion.constants';
 import type { Metrics } from '../metrics';
+import { buildPartialContentKey } from '../utils/key-format';
 import type { DiscoveredAttachment, DiscoveredPage, FileDiffResult } from './sync.types';
 
 export class FileDiffService {
@@ -55,10 +56,12 @@ export class FileDiffService {
       const firstItem = pages[0] ?? attachments[0];
       assert.ok(firstItem, `Expected at least one page or attachment for space "${spaceKey}"`);
 
-      const basePartialKey = `${firstItem.spaceId}_${spaceKey}`;
-      const partialKey = this.useV1KeyFormat
-        ? basePartialKey
-        : `${this.tenantName}/${basePartialKey}`;
+      const partialKey = buildPartialContentKey(
+        this.tenantName,
+        firstItem.spaceId,
+        spaceKey,
+        this.useV1KeyFormat,
+      );
 
       const diffResponse = await this.uniqueApiClient.ingestion.performFileDiff(
         fileDiffItems,

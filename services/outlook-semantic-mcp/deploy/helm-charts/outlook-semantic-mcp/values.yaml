@@ -32,7 +32,7 @@ server:
     - outlook-semantic-mcp-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/outlook-semantic-mcp
-    tag: 0.2.18 # x-release-please-version
+    tag: 0.3.0 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
@@ -203,8 +203,11 @@ mcpConfig:
         oauthTokenUrl: unset_default_value
         projectId: unset_default_value
 
-  # -- Default mail filters applied when syncing emails (JSON string)
-  defaultMailFilters: '{"ignoredBefore":"2025-06-06","ignoredContents":[],"ignoredSenders":[]}'
+  # -- Default mail filters applied when syncing emails
+  defaultMailFilters:
+    retentionWindowInDays: 95
+    ignoredContents: []
+    ignoredSenders: []
 
   # -- Authentication configuration for the MCP server
   # Optional. Access and refresh token expiration times. To override:

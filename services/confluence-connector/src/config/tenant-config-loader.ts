@@ -77,6 +77,22 @@ function validateTenantNames(entries: { name: string; path: string }[]): void {
   }
 }
 
+function validateUniqueConfluenceInstances(configs: NamedTenantConfig[]): void {
+  const seen = new Map<string, string>();
+  for (const { name, config } of configs) {
+    const instanceKey =
+      config.confluence.instanceType === 'cloud'
+        ? `cloud:${config.confluence.cloudId}`
+        : `data-center:${config.confluence.baseUrl}`;
+    const existing = seen.get(instanceKey);
+    assert.ok(
+      !existing,
+      `Duplicate Confluence instance in tenants '${existing}' and '${name}': ${instanceKey}`,
+    );
+    seen.set(instanceKey, name);
+  }
+}
+
 function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
   const files = globSync(pathPattern);
   assert.ok(
@@ -128,6 +144,8 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
       throw error;
     }
   }
+
+  validateUniqueConfluenceInstances(activeConfigs);
 
   assert.ok(
     activeConfigs.length > 0,
