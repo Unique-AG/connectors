@@ -228,7 +228,7 @@ To move a tenant to a different Confluence instance, create a new root scope in 
 
 ### Why do I see "Aborting to prevent accidental full deletion" errors?
 
-**Answer:** This means the safety guard was triggered. Possible causes:
+**Answer:** This means the full-deletion safety guard was triggered. The guard aborts the sync when the file diff would delete every file stored for a space and the submitted items share keys with the items being deleted (indicating a key format problem rather than genuine content replacement). Possible causes:
 
 - A bug in page discovery returned zero results for a space (e.g., Confluence API issue, authentication failure for specific spaces)
 - The ingestion key format changed (e.g., `useV1KeyFormat` was toggled), causing the diff to see all existing keys as unrecognized
@@ -238,6 +238,8 @@ To move a tenant to a different Confluence instance, create a new root scope in 
 1. Check Confluence API connectivity and authentication
 2. Verify that the `useV1KeyFormat` setting has not changed unexpectedly
 3. If the key format change was intentional, the old content must be cleaned up manually before switching formats
+
+If your intent really was to replace all pages in a space with a completely new set of pages, the sync proceeds automatically as long as the new pages have different identifiers from the old ones. See [Safety Checks](./technical/flows.md#Safety-Checks) for full details.
 
 ### Why is sync taking too long?
 

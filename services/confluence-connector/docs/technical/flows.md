@@ -315,16 +315,16 @@ Each item sent to the diff API contains:
 
 ### Safety Checks
 
-After each space's file diff is computed, two guards run to prevent accidental full deletion of content. Both abort the current tenant sync cycle if triggered.
+After each space's file diff is computed, two guards run to prevent accidental full deletion of content. Both abort the current tenant sync cycle when triggered.
 
 | Guard | Trigger Condition | Rationale |
 |---|---|---|
 | **Zero-submission guard** | Discovery submitted 0 items but the diff contains deletions | Likely a bug in page fetching or an authentication failure that returned no results. Deleting all stored content would be destructive. |
-| **Full-deletion guard** | The number of files to delete equals the total number of files stored in Unique for that space | Likely a key format change (e.g., toggling `useV1KeyFormat`) that causes all existing keys to appear unrecognized. |
+| **Full-deletion guard** | The diff would delete every file stored in Unique for the space, **and** either no new items were submitted or the newly submitted keys overlap with the keys being deleted | Overlap between submitted and deleted keys is a strong signal of a key format change (e.g., toggling `useV1KeyFormat`) that makes existing keys unrecognizable. Without that signal, the diff is treated as legitimate content replacement. |
 
-If neither guard triggers, deletions proceed normally. Partial deletions (removing some but not all files) are always allowed.
+If the diff would delete all existing files but the submitted items use entirely different keys from the deleted ones, the sync proceeds with a warning. This allows scenarios where an entire space's pages were genuinely replaced with new pages that happen to have different identifiers, without requiring operator intervention.
 
-To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards.
+Partial deletions (removing some but not all files) are always allowed.
 
 ## Ingestion Pipeline
 
