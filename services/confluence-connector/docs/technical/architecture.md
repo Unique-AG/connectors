@@ -89,7 +89,7 @@ flowchart TB
 
 - Fetches content and attachments from Confluence Cloud or Data Center REST APIs
 - Processes and forwards content to Unique platform APIs
-- Handles authentication via OAuth 2.0 (Cloud and Data Center) or PAT (Data Center below 10.1)
+- Handles authentication via OAuth 2.0 (Cloud and Data Center 10.1+) or PAT (Data Center below 10.1, where OAuth 2LO is not available)
 - **Traffic:**
   - Outbound HTTPS to Confluence API (TCP:443)
   - Internal HTTP or external HTTPS to Unique platform
@@ -270,8 +270,8 @@ The Node.js service operates with the following default resource allocation (fro
 | Memory request | 512 Mi |
 | Memory limit | 1 Gi |
 | CPU request | 1 core |
-| Default max heap size | 1024 MB (configurable via `MAX_HEAP_MB`) |
-| Helm chart `MAX_HEAP_MB` | 1920 MB |
+| CPU limit | Not set (intentionally burstable) |
+| `MAX_HEAP_MB` | 1920 MB (Helm chart default) |
 | Application port | 51349 |
 | Metrics port (Prometheus) | 51350 |
 
@@ -287,6 +287,6 @@ The connector is an IO-driven, low CPU workload. Unique AI ingestion services ar
 ## Standard References
 
 - [Confluence Cloud REST API](https://developer.atlassian.com/cloud/confluence/rest/v1/intro/) - Atlassian Confluence Cloud API documentation
-- [Confluence Data Center REST API](https://docs.atlassian.com/ConfluenceServer/rest/latest/) - Atlassian Confluence Data Center API documentation
+- [Confluence Data Center REST API](https://developer.atlassian.com/server/confluence/rest/) - Atlassian Confluence Data Center API documentation
 - [Atlassian OAuth 2.0 (3LO) apps](https://developer.atlassian.com/cloud/confluence/oauth-2-3lo-apps/) - Atlassian Cloud OAuth app setup (prerequisite for 2LO client credentials)
 - [Confluence Query Language (CQL)](https://developer.atlassian.com/cloud/confluence/advanced-searching-using-cql/) - CQL reference for content search queries

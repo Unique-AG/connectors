@@ -22,7 +22,7 @@ The image contains the application code plus all necessary runtime dependencies.
 
 ## Helm Chart
 
-The Helm chart wraps the [`backend-service`](https://github.com/unique-ag/helm-charts) subchart (aliased as `connector`), so image, env, resources, and volumes are nested under the `connector` key. Tenant-specific configuration lives under `connectorConfig`.
+The Helm chart wraps the [`backend-service`](https://github.com/unique-ag/helm-charts) subchart (`~10.1.0`, aliased as `connector`), so image, env, resources, and volumes are nested under the `connector` key. Tenant-specific configuration lives under `connectorConfig`.
 
 ### Installation
 

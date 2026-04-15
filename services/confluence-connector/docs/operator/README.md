@@ -84,8 +84,8 @@ In cluster-internal mode, Zitadel token validation is not needed. The connector 
 |-----------|-------------|-------|
 | **Kubernetes** | 1.25+ | Any Kubernetes distribution |
 | **Container Runtime** | Docker / containerd | Standard container runtime |
-| **Memory** | 1 Gi | Minimum allocation |
-| **CPU** | 1 core | Minimum allocation |
+| **Memory** | 512 Mi request / 1 Gi limit | Default Helm allocation |
+| **CPU** | 1 core request (no limit) | Default Helm allocation |
 
 ### Network Requirements
 

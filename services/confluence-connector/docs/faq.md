@@ -33,7 +33,7 @@
 
 ### How does the connector decide which pages to sync?
 
-**Answer:** The connector uses two configurable Confluence labels: one for single-page sync (recommended: `ai-ingest`) and one for syncing a page and all its descendants (recommended: `ai-ingest-all`). Both labels must be explicitly set in the tenant configuration. See the [README](./README.md#Core-Capabilities) for a full overview of label-driven discovery and the [technical flows documentation](./technical/flows.md#Discovery-Phase) for the detailed CQL-based discovery process.
+**Answer:** The connector uses two configurable Confluence labels: one for single-page sync (e.g. `ai-ingest`) and one for syncing a page and all its descendants (e.g. `ai-ingest-all`). Both labels must be explicitly set in the tenant configuration. See the [README](./README.md#Core-Capabilities) for a full overview of label-driven discovery and the [technical flows documentation](./technical/flows.md#Discovery-Phase) for the detailed CQL-based discovery process.
 
 ### What happens when a page has both labels?
 
@@ -45,7 +45,7 @@
 
 ### Which Confluence content types are synced?
 
-**Answer:** The connector ingests `page` and `blogpost` content (including Live Docs, which are a page subtype). Attachments are ingested conditionally when `attachments.mode=enabled`. Content types `database`, `whiteboard`, and `embed` are explicitly skipped because their APIs expose no renderable body. Folders have no body and are effectively skipped by the empty-body filter. Descendants of all non-skipped types (including skipped ones like databases) are still discovered and ingested when using `ai-ingest-all`. See the [Content Type Ingestion Map](./technical/flows.md#Content-Type-Ingestion-Map) for the full Cloud and Data Center breakdown.
+**Answer:** The connector ingests `page` and `blogpost` content (including Live Docs, which are a page subtype). Attachments are ingested conditionally when `attachments.mode=enabled`. Content types `database`, `whiteboard`, and `embed` are explicitly skipped because their APIs expose no renderable body. Folders have no body and are effectively skipped by the empty-body filter. When a skipped content type (such as a database) carries the all-descendants label, its child pages are still discovered and ingested; only the skipped parent itself is excluded. See the [Content Type Ingestion Map](./technical/flows.md#Content-Type-Ingestion-Map) for the full Cloud and Data Center breakdown.
 
 ### What format is the page content exported in?
 
@@ -209,7 +209,7 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 
 1. Is attachment ingestion enabled? (`ingestion.attachments.mode` must be `enabled`, which is the default.)
 2. Does the file extension appear in the `allowedExtensions` list?
-3. Is the file smaller than the configured `maxFileSizeMb` (default: 200 MB)?
+3. Is the file at most the configured `maxFileSizeMb` (default: 200 MB)?
 4. Is the file size greater than 0 bytes? (Zero-byte attachments are skipped.)
 5. Check connector logs for attachment-specific errors.
 
@@ -326,5 +326,5 @@ These defaults are suitable for a single-tenant deployment with moderate page co
 ## Standard References
 
 - [Confluence Cloud REST API](https://developer.atlassian.com/cloud/confluence/rest/v1/intro/) - Atlassian Confluence Cloud API documentation
-- [Confluence Data Center REST API](https://docs.atlassian.com/ConfluenceServer/rest/latest/) - Atlassian Confluence Data Center API documentation
+- [Confluence Data Center REST API](https://developer.atlassian.com/server/confluence/rest/) - Atlassian Confluence Data Center API documentation
 - [Confluence Query Language (CQL)](https://developer.atlassian.com/cloud/confluence/advanced-searching-using-cql/) - CQL reference for content search queries

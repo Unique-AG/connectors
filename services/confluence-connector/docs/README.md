@@ -51,9 +51,9 @@ The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and 
 **Label-Driven Page Discovery**
 
 - Pages are discovered via configurable Confluence labels and ingested in HTML format (Confluence storage representation)
-- The `ai-ingest` label (configurable per tenant) marks individual pages for synchronization
-- The `ai-ingest-all` label (configurable per tenant) marks a page and all its descendant pages for synchronization
-- operators must explicitly set these label names in their tenant configuration
+- A configurable label (e.g. `ai-ingest`) marks individual pages for synchronization
+- A second configurable label (e.g. `ai-ingest-all`) marks a page and all its descendant pages for synchronization
+- Operators must explicitly set both label names in their tenant configuration
 - Only pages in global spaces are scanned (Cloud also includes collaboration spaces)
 
 **Automatic Change Detection**
@@ -222,7 +222,7 @@ See [Technical Reference](./technical/README.md) for detailed architecture and f
 - Real-time synchronization (periodic scanning only)
 - Permission synchronization (content sync only)
 - Confluence databases, whiteboards, and embeds (these content types are automatically skipped)
-- Recursive/hierarchical ingestion mode (only flat mode is available)
+- Hierarchical scope structure (all pages from a space are placed in a single flat scope; sub-scopes mirroring the Confluence page tree are not created)
 
 ### Considerations
 
@@ -255,6 +255,6 @@ See [Technical Reference](./technical/README.md) for detailed architecture and f
 ## Standard References
 
 - [Confluence Cloud REST API](https://developer.atlassian.com/cloud/confluence/rest/v1/intro/) - Atlassian Confluence Cloud API documentation
-- [Confluence Data Center REST API](https://docs.atlassian.com/ConfluenceServer/rest/latest/) - Atlassian Confluence Data Center API documentation
+- [Confluence Data Center REST API](https://developer.atlassian.com/server/confluence/rest/) - Atlassian Confluence Data Center API documentation
 - [Atlassian OAuth 2.0 (3LO) apps](https://developer.atlassian.com/cloud/confluence/oauth-2-3lo-apps/) - Atlassian Cloud OAuth app setup (prerequisite for 2LO client credentials)
 - [Confluence Query Language (CQL)](https://developer.atlassian.com/cloud/confluence/advanced-searching-using-cql/) - CQL reference for content search queries

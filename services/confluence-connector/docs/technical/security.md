@@ -88,7 +88,7 @@ The policy is controlled by the `LOGS_DIAGNOSTICS_DATA_POLICY` environment varia
 
 - **TLS:** All external communication encrypted via HTTPS
 - **Custom CA support:** Additional CA certificates can be provided for environments with corporate proxies or custom PKI
-- **No TLS downgrade:** The connector does not expose configuration to disable TLS verification
+- **No TLS downgrade:** The connector does not expose configuration to disable TLS verification. Note that the Node.js `NODE_TLS_REJECT_UNAUTHORIZED=0` environment variable can bypass TLS verification at runtime. Operators should ensure this variable is not set in production environments.
 
 ### Data Handling
 
