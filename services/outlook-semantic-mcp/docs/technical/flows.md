@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2062942216 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Flows
+# Outlook Semantic MCP - Flows
 
 This page documents the key flows in the Outlook Semantic MCP Server: how users connect, how emails are synced in real time and historically, how subscriptions stay alive, and how email drafts are created.
 

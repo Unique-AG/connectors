@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2061238285 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Tools
+# Outlook Semantic MCP - Tools
 
 The Outlook Semantic MCP Server exposes 10 MCP tools available to all users, plus 4 debug-mode tools only exposed when `MCP_DEBUG_MODE=enabled` is set on the server.
 

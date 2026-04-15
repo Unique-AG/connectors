@@ -1,6 +1,8 @@
 <!-- confluence-page-id: 2061664285 -->
 <!-- confluence-space-key: PUBDOC -->
 
+# Outlook Semantic MCP
+
 ## Getting Started
 
 - **IT Operators:** Start with the [Operator Guide](./operator/README.md) for deployment, configuration, and operations
