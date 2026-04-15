@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2062254116 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Architecture
+# Outlook Semantic MCP - Architecture
 
 The Outlook Semantic MCP Server is a NestJS-based microservice that connects Microsoft Outlook email with the Unique platform through the Model Context Protocol (MCP). It syncs emails from connected mailboxes into the Unique knowledge base and exposes MCP tools for AI-assisted email search, draft creation, and contact lookup.
 

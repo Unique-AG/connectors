@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2065629188 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Configuration
+# Outlook Semantic MCP - Configuration
 
 ## Environment Variables
 

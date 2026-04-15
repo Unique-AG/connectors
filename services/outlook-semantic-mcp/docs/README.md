@@ -1,6 +1,8 @@
 <!-- confluence-page-id: 2061664285 -->
 <!-- confluence-space-key: PUBDOC -->
 
+# Outlook Semantic MCP
+
 !!! danger "Pre-Release Disclaimer"
     **`outlook-semantic-mcp` is pre-release software.**
 

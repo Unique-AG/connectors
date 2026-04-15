@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2074345526 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Disaster Recovery
+# Outlook Semantic MCP - Disaster Recovery
 
 This runbook covers recovery procedures for the three stateful components the Outlook Semantic MCP Server depends on: the local PostgreSQL database, RabbitMQ, and the Unique Knowledge Base. Each component has a distinct failure mode and recovery path.
 
@@ -50,7 +50,7 @@ Emails are sourced from Microsoft Graph, which retains the authoritative copy. I
 
 - **Webhook notifications lost during an outage** are recovered by the live catch-up recovery scheduler — if no new activity occurs for 4 hours it retriggers live catch-up, which polls Microsoft Graph for any emails modified since the last known watermark.
 - **If a webhook subscription expires during an extended outage** (subscriptions renew daily), users must call `reconnect_inbox` to re-create it. Emails received during the gap are picked up by the subsequent full re-sync.
-- **Worst case:** emails received between the last successful live catch-up and service restoration are delayed, not lost. Full re-sync recovers all emails from Microsoft Graph that match the operator-configured [Inbox Filters](../technical/full-sync.md#Inbox-Filters) — emails outside the configured date window or matching exclusion rules are not synced.
+- **Worst case:** emails received between the last successful live catch-up and service restoration are delayed, not lost. Full re-sync recovers all emails from Microsoft Graph that match the operator-configured [Inbox Filters](./configuration.md#Mail-Filters) — emails outside the configured date window or matching exclusion rules are not synced.
 
 ### Personnel
 
