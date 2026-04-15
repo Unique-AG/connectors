@@ -248,6 +248,22 @@ The connector validates all tenant configuration at startup. Check the pod logs 
 
 See [Authentication -- Troubleshooting](./authentication.md#Troubleshooting) for detailed diagnosis steps.
 
+### Root Scope Ownership Mismatch
+
+**Symptom:** Sync cycle aborts with an ownership mismatch error referencing the root scope.
+
+**Cause:** The root scope configured via `ingestion.scopeId` is already marked as owned by a different Confluence instance. This typically happens when:
+
+- The same `scopeId` is reused across multiple tenant configurations pointing at different Confluence instances.
+- A tenant's Confluence instance (`baseUrl` or `cloudId`) was changed while keeping the original root scope.
+
+**Resolution:**
+
+1. Confirm which Confluence instance should own the root scope.
+2. If the current tenant is correct: create a new root scope in Unique for the other tenant and update its `scopeId`.
+3. If the other tenant is correct: create a new root scope for the current tenant and update its `scopeId`.
+4. Do not attempt to manually clear or rewrite the ownership mark on the existing scope. See [Authentication -- Create the Root Scope](./authentication.md#2-create-the-root-scope-in-unique) for context.
+
 ### Network Connectivity
 
 - Verify egress to Confluence endpoints is allowed (Cloud: `api.atlassian.com`, `auth.atlassian.com`, `api.media.atlassian.com`, and `*.atlassian.net`; Data Center: your instance host)

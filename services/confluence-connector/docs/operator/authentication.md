@@ -71,6 +71,8 @@ The connector requires a pre-existing root scope in Unique. The root scope ID is
 
 At startup, the connector automatically grants itself access on the root scope and will create child scopes for each Confluence space that has content to ingest. See the [Scope Hierarchy](../technical/flows.md#Scope-Hierarchy) for details.
 
+On the first sync cycle, the connector also marks the root scope as owned by this tenant's Confluence instance. Subsequent sync cycles verify the ownership mark before ingesting content. A root scope can only be owned by one Confluence instance: reusing the same scope across tenants, or repointing a tenant to a different Confluence instance while keeping the original scope, causes the sync to fail. See [Root Scope Ownership Validation](../technical/flows.md#Root-Scope-Ownership-Validation) for details.
+
 ### 3. Set Up Confluence Authentication
 
 #### Option A: OAuth 2.0 (2LO) -- Cloud

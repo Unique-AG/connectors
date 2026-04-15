@@ -90,6 +90,12 @@ The policy is controlled by the `LOGS_DIAGNOSTICS_DATA_POLICY` environment varia
 - **Custom CA support:** Additional CA certificates can be provided for environments with corporate proxies or custom PKI
 - **No TLS downgrade:** The connector does not expose configuration to disable TLS verification. Note that the Node.js `NODE_TLS_REJECT_UNAUTHORIZED=0` environment variable can bypass TLS verification at runtime. Operators should ensure this variable is not set in production environments.
 
+### Tenant Isolation
+
+The connector tags the root scope with an identifier derived from the Confluence instance on the first sync cycle. On every subsequent sync cycle, this ownership mark is verified before content is ingested. A mismatch aborts the tenant sync cycle, preventing the same Confluence instance from being connected to multiple Unique organizations, or the same root scope from being reused across different Confluence instances by accident.
+
+See [Flows -- Root Scope Ownership Validation](./flows.md#Root-Scope-Ownership-Validation) for the full verification flow.
+
 ### Data Handling
 
 - **Streaming transfers:** Files streamed from Confluence to Unique, not stored locally

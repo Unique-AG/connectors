@@ -188,6 +188,7 @@ Attachment downloads are served via `api.media.atlassian.com`. The connector's H
 
 | Endpoint | Use Case |
 |----------|----------|
+| `<baseUrl>/rest/applinks/1.0/manifest` | Fetch the Data Center instance identifier used to mark root scope ownership. Called at the start of each sync cycle. Requires no authentication |
 | `<baseUrl>/rest/api/content/search?cql=...` | Search for labeled pages and descendants via CQL |
 | `<baseUrl>/rest/api/content/<pageId>` | Fetch individual page content (HTML storage representation) |
 | `<baseUrl><_links.download>` | Download attachment content (uses download path from API response) |

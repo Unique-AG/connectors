@@ -74,7 +74,12 @@ sequenceDiagram
         Note over Connector: Skip (re-entrancy guard)
     end
 
-    Connector->>Unique: Initialize root scope<br/>(grant access, verify exists)
+    opt Data Center only
+        Connector->>Confluence: GET /rest/applinks/1.0/manifest
+        Confluence->>Connector: Instance identifier
+    end
+
+    Connector->>Unique: Initialize root scope<br/>(grant access, claim or verify ownership)
 
     rect rgb(200, 210, 240)
         Note over Connector,Confluence: Discovery Phase
@@ -131,8 +136,17 @@ sequenceDiagram
 
 The connector manages a two-level scope hierarchy:
 
-1. **Root scope** -- Must pre-exist in the Unique platform. Configured via `ingestion.scopeId`. The connector grants itself access at initialization.
+1. **Root scope** -- Must pre-exist in the Unique platform. Configured via `ingestion.scopeId`. The connector grants itself access at initialization and marks the scope as owned by this Confluence instance on the first sync cycle. Subsequent sync cycles verify that the ownership mark still matches the configured Confluence instance.
 2. **Space scopes** -- Created automatically as children of the root scope, one per Confluence space key. Access is inherited from the root scope.
+
+### Root Scope Ownership Validation
+
+To prevent misconfiguration where the same Confluence instance is connected to multiple Unique organizations, or the same root scope is pointed at a different Confluence instance, the connector tags the root scope with an identifier derived from the Confluence instance on the first sync cycle:
+
+- **Cloud:** the identifier is derived from the `cloudId` configured in the tenant YAML.
+- **Data Center:** the identifier is fetched from the Data Center's application manifest endpoint (`/rest/applinks/1.0/manifest`). No authentication is required.
+
+On every subsequent sync cycle, the connector reads the ownership mark from the root scope and compares it against the current Confluence instance. A mismatch aborts the tenant sync cycle with a fatal error. The ownership mark is only applied to root scopes that do not yet carry one, so existing root scopes are claimed automatically on the next sync.
 
 ## Discovery Phase
 
@@ -355,6 +369,7 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 |---|---|---|
 | Sync already in progress | Overlapping cron triggers or long-running sync | Skip the cycle entirely (re-entrancy guard) |
 | Root scope not found | Misconfigured `scopeId` or scope deleted | Abort the entire sync cycle |
+| Root scope belongs to a different Confluence instance | `scopeId` reused across tenants or the tenant's Confluence instance was reassigned | Abort the entire tenant sync cycle |
 | Accidental full deletion detected | Bug in page fetching or key format change | Abort the entire tenant sync cycle |
 | Page fetch failure | Page deleted between discovery and content fetch, transient API error | Log error, skip the page, continue other pages |
 | Page not found | Page deleted between discovery and content fetch | Log warning, skip the page |

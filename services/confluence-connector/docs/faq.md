@@ -183,7 +183,19 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 
 ### What safety guards does the connector have?
 
-**Answer:** The connector includes two safeguards -- a zero-submission guard and a full-deletion guard -- that abort the current tenant sync cycle when the file diff results indicate a likely error in discovery or key format for a space. To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards. See the [safety checks](./technical/flows.md#Safety-Checks) documentation for full details.
+**Answer:** The connector includes the following safeguards to prevent accidental data loss and misconfiguration:
+
+- **Zero-submission guard:** If discovery returns zero items for a space but the file diff would still delete content, the sync cycle is aborted. This prevents a transient Confluence error or a silent authentication failure from wiping ingested content.
+- **Full-deletion guard:** If the file diff would delete every file stored in Unique for a space, the sync cycle is aborted unless the items currently submitted for that space have entirely different keys from the ones being deleted. Full replacement with non-overlapping keys is allowed with a warning.
+- **Root scope ownership validation:** Each root scope is tagged with the Confluence instance that owns it. If a scope was already claimed by a different Confluence instance, the sync for that tenant fails immediately, preventing two tenants from accidentally writing into the same scope.
+
+See the [safety checks](./technical/flows.md#Safety-Checks) and [root scope ownership validation](./technical/flows.md#Root-Scope-Ownership-Validation) documentation for full details.
+
+### What happens if I reassign the root scope to a different Confluence instance?
+
+**Answer:** This is not supported. On the first sync cycle, the connector marks the root scope as owned by this tenant's Confluence instance. If the tenant is later reconfigured to point at a different Confluence instance while keeping the same `scopeId`, the next sync cycle detects the mismatch and aborts with a fatal error.
+
+To move a tenant to a different Confluence instance, create a new root scope in Unique and configure it as the tenant's `scopeId`. The old scope and its content remain untouched and can be removed manually if no longer needed.
 
 ### Are concurrent syncs for the same tenant possible?
 
