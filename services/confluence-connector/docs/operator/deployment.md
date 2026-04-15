@@ -22,7 +22,7 @@ The image contains the application code plus all necessary runtime dependencies.
 
 ## Helm Chart
 
-The Helm chart wraps the [`backend-service`](https://github.com/unique-ag/helm-charts) subchart (`~10.1.0`, aliased as `connector`), so image, env, resources, and volumes are nested under the `connector` key. Tenant-specific configuration lives under `connectorConfig`.
+The Helm chart wraps the [`backend-service`](https://github.com/unique-ag/helm-charts) subchart (`~10.1.0`, aliased as `connector`), so image, env, resources, and volumes are nested under the `connector` key. Tenant-specific configuration lives under `connectorConfig`, and optional forward-proxy settings live under `proxyConfig`.
 
 ### Installation
 
@@ -98,9 +98,16 @@ connectorConfig:
         ingestionMode: flat
         scopeId: "your-scope-id"
         storeInternally: enabled
+
+# Proxy configuration (optional)
+proxyConfig:
+  enabled: true
+  authMode: none
 ```
 
 **Note:** The Helm chart uses `unique.authMode`, which the Helm template maps to `serviceAuthMode` in the generated tenant config YAML. See [Authentication -- Helm Chart Field Mapping](./authentication.md#Helm-Chart-Field-Mapping).
+
+For the full list of proxy modes and the environment variables required by each, see [Configuration -- Proxy Configuration](./configuration.md#Proxy-Configuration).
 
 ## Terraform Modules
 

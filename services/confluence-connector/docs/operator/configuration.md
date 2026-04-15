@@ -22,7 +22,16 @@ The following environment variables control application-level behavior. They are
 | `NODE_EXTRA_CA_CERTS` | -- | Path to a PEM file containing additional CA certificates for TLS verification if the pod's trust store doesn't have them |
 | `MAX_HEAP_MB` | `1920` (Helm) / `1024` (Docker) | Node.js V8 max old space size in MB |
 
-Secret values in tenant YAML files are referenced via the `os.environ/` prefix (e.g., `os.environ/CONFLUENCE_CLIENT_SECRET`). The conventional environment variable names are `CONFLUENCE_CLIENT_SECRET`, `CONFLUENCE_PAT`, and `ZITADEL_CLIENT_SECRET`, but operators can use any variable name as long as the `os.environ/` reference in the tenant YAML matches. See [Authentication -- Secret Resolution](./authentication.md#Secret-Resolution) for the full resolution mechanism, supported fields, and Kubernetes integration.
+The following environment variables are typically loaded from Kubernetes Secrets:
+
+| Variable | Description |
+|---|---|
+| `CONFLUENCE_CLIENT_SECRET` | OAuth 2.0 client secret (used when `confluence.auth.mode` is `oauth_2lo`) |
+| `CONFLUENCE_PAT` | Personal Access Token (used when `confluence.auth.mode` is `pat`; Data Center below 10.1 only) |
+| `ZITADEL_CLIENT_SECRET` | Zitadel client secret (required when `unique.serviceAuthMode` is `external`) |
+| `PROXY_PASSWORD` | Proxy password (required when proxy `authMode` is `username_password`) |
+
+Secret values in tenant YAML files are referenced via the `os.environ/` prefix (e.g., `os.environ/CONFLUENCE_CLIENT_SECRET`). The conventional environment variable names are listed above, but operators can use any variable name as long as the `os.environ/` reference in the tenant YAML matches. See [Authentication -- Secret Resolution](./authentication.md#Secret-Resolution) for the full resolution mechanism, supported fields, and Kubernetes integration.
 
 ## Tenant Configuration File
 
@@ -180,6 +189,52 @@ unique:
 | `apiRateLimitPerMinute` | No | `100` | Number of Unique API requests allowed per minute |
 
 The additional fields required for each auth mode (`serviceExtraHeaders` for `cluster_local`, Zitadel credentials for `external`) are documented in the [Authentication Guide -- Unique Platform Authentication Methods](./authentication.md#Unique-Platform-Authentication-Methods), which also covers setup instructions and token flows.
+
+## Proxy Configuration
+
+The connector supports HTTP/HTTPS forward proxies for environments where outbound internet access is only available through a proxy. Proxy settings are configured via environment variables (managed by the Helm chart's `proxyConfig` section).
+
+| Mode | Description |
+|---|---|
+| `none` | Proxy disabled (default) |
+| `no_auth` | Proxy enabled without authentication |
+| `username_password` | Basic authentication proxy |
+| `ssl_tls` | TLS client certificate proxy |
+
+**Common options** (required for `no_auth`, `username_password`, and `ssl_tls` modes):
+
+| Variable | Description |
+|---|---|
+| `PROXY_HOST` | Proxy server hostname |
+| `PROXY_PORT` | Proxy server port |
+| `PROXY_PROTOCOL` | `http` or `https` |
+| `PROXY_SSL_CA_BUNDLE_PATH` | (Optional) Path to CA bundle for verifying proxy TLS certificate |
+| `PROXY_HEADERS` | (Optional) JSON string of custom headers for CONNECT request |
+
+**`username_password` mode** adds:
+
+| Variable | Description |
+|---|---|
+| `PROXY_USERNAME` | Proxy username |
+| `PROXY_PASSWORD` | Proxy password (loaded from secret) |
+
+**`ssl_tls` mode** adds:
+
+| Variable | Description |
+|---|---|
+| `PROXY_SSL_CERT_PATH` | Path to TLS client certificate |
+| `PROXY_SSL_KEY_PATH` | Path to TLS client key |
+
+### Traffic Routing
+
+When the proxy is enabled, traffic is routed as follows:
+
+| Target | Routing |
+|---|---|
+| Confluence API (Cloud or Data Center) | Always through the proxy |
+| Atlassian or Data Center OAuth token endpoint | Always through the proxy |
+| Unique Ingestion and Scope Management services | Through the proxy only when `unique.serviceAuthMode` is `external`. Bypassed in `cluster_local` mode |
+| Attachment and content uploads to Unique | Same routing as Unique API calls above |
 
 ## Ingestion Settings
 
