@@ -263,6 +263,101 @@ describe('tenant-config-loader', () => {
     });
   });
 
+  describe('duplicate Confluence instance validation', () => {
+    it('rejects two active cloud tenants with the same cloudId', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        {
+          path: '/config/alpha-tenant-config.yaml',
+          config: makeCloudOauth2loConfig(),
+        },
+        {
+          path: '/config/beta-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({
+            unique: {
+              ...clusterLocalUniqueConfig,
+              serviceExtraHeaders: { 'x-company-id': 'other-company', 'x-user-id': 'other-user' },
+            },
+            ingestion: { ...baseIngestionConfig, scopeId: 'other-scope-id' },
+          }),
+        },
+      ]);
+
+      expect(() => getTenantConfigs()).toThrow(
+        "Duplicate Confluence instance in tenants 'alpha' and 'beta': cloud:test-cloud-id",
+      );
+    });
+
+    it('rejects two active data-center tenants with the same baseUrl', async () => {
+      process.env.CONFLUENCE_PAT = 'env-pat-token';
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        {
+          path: '/config/alpha-tenant-config.yaml',
+          config: makeDataCenterPatConfig(),
+        },
+        {
+          path: '/config/beta-tenant-config.yaml',
+          config: makeDataCenterPatConfig({
+            ingestion: { ...baseIngestionConfig, scopeId: 'other-scope-id' },
+          }),
+        },
+      ]);
+
+      expect(() => getTenantConfigs()).toThrow(
+        "Duplicate Confluence instance in tenants 'alpha' and 'beta': data-center:https://confluence.acme.com",
+      );
+    });
+
+    it('allows different cloud tenants with different cloudIds', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        {
+          path: '/config/alpha-tenant-config.yaml',
+          config: makeCloudOauth2loConfig(),
+        },
+        {
+          path: '/config/beta-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({
+            confluence: {
+              instanceType: 'cloud',
+              cloudId: 'different-cloud-id',
+              baseUrl: 'https://other.atlassian.net',
+              auth: oauth2loAuth,
+              ...baseConfluenceFields,
+            },
+          }),
+        },
+      ]);
+
+      const result = getTenantConfigs();
+
+      expect(result).toHaveLength(2);
+    });
+
+    it('does not flag inactive tenants as duplicates', async () => {
+      process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';
+      const { globSync, readFileSync, getTenantConfigs } = await loadModule();
+      setupFsMocks(globSync, readFileSync, [
+        {
+          path: '/config/alpha-tenant-config.yaml',
+          config: makeCloudOauth2loConfig(),
+        },
+        {
+          path: '/config/beta-tenant-config.yaml',
+          config: makeCloudOauth2loConfig({ status: 'inactive' }),
+        },
+      ]);
+
+      const result = getTenantConfigs();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.name).toBe('alpha');
+    });
+  });
+
   describe('tenant status', () => {
     it('includes active tenants with status "active"', async () => {
       process.env.CONFLUENCE_CLIENT_SECRET = 'env-client-secret';

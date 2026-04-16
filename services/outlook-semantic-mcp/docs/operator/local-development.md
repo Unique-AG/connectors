@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2061271048 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Local Development
+# Outlook Semantic MCP - Local Development
 
 This guide walks through setting up the Outlook Semantic MCP Server for local development and testing.
 

@@ -44,7 +44,7 @@
     "@unique-ag/probe": "workspace:*",
     "cache-manager": "7.2.0",
     "jsonwebtoken": "9.0.3",
-    "nestjs-otel": "7.0.1",
+    "nestjs-otel": "8.0.2",
     "nestjs-pino": "4.6.1",
     "nestjs-zod": "5.0.1",
     "openid-client": "5.7.1",

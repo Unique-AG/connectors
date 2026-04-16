@@ -51,10 +51,10 @@
     "vitest": "3.2.4"
   },
   "peerDependencies": {
-    "@nestjs/common": "^10 || ^11",
-    "@nestjs/core": "^10 || ^11",
+    "@nestjs/common": "^11",
+    "@nestjs/core": "^11",
     "@opentelemetry/api": "^1.9.0",
-    "nestjs-otel": "^7",
+    "nestjs-otel": "^8",
     "passport": "^0.7"
   }
 }

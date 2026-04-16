@@ -11,6 +11,8 @@ export type EnabledDisabledMode = (typeof EnabledDisabledMode)[keyof typeof Enab
 
 export type IngestionMode = (typeof IngestionMode)[keyof typeof IngestionMode];
 
+export const EXTERNAL_ID_PREFIX = 'confc:' as const;
+
 export const IngestionSourceKind = {
   Cloud: 'ATLASSIAN_CONFLUENCE_CLOUD',
   DataCenter: 'ATLASSIAN_CONFLUENCE_ONPREM',
@@ -20,6 +22,13 @@ export type IngestionSourceKind = (typeof IngestionSourceKind)[keyof typeof Inge
 
 export function getSourceKind(instanceType: 'cloud' | 'data-center'): IngestionSourceKind {
   return instanceType === 'cloud' ? IngestionSourceKind.Cloud : IngestionSourceKind.DataCenter;
+}
+
+export function buildRootScopeExternalId(
+  instanceType: 'cloud' | 'data-center',
+  instanceId: string,
+): string {
+  return `${EXTERNAL_ID_PREFIX}${instanceType}:${instanceId}`;
 }
 
 export const INGESTION_MIME_TYPE = 'text/html' as const;

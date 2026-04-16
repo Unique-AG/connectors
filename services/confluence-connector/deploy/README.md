@@ -109,7 +109,7 @@ An initial deployment requires two sequential pull requests:
 1. Merge the Connectors PR — this triggers release-please to create a release PR
 2. Merge the release PR — this creates the git tag (e.g., `confluence-connector@2.0.0-alpha.1`)
 3. Merge the Monorepo PR — Atlantis runs `terraform apply` on `76-connectors.tf` to provision Key Vault placeholders, ArgoCD picks up the application spec
-4. Set the real secret values in Azure Key Vault (see [Secret Management](#secret-management))
+4. Set the real secret values in Azure Key Vault (see [Secret Management](#Secret-Management))
 5. Sync the ArgoCD application — ESO pulls the Key Vault secrets, the workload starts
 
 ---

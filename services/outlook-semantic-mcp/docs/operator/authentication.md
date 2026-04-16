@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2061664301 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Authentication
+# Outlook Semantic MCP - Authentication
 
 ## Overview
 

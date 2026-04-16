@@ -46,6 +46,79 @@ describe('DataCenterConfluenceApiClient', () => {
     });
   });
 
+  describe('resolveInstanceIdentifier', () => {
+    it('calls the applinks manifest endpoint with empty auth headers', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: 'dc-instance-uuid',
+        name: 'My Confluence',
+      });
+
+      await client.resolveInstanceIdentifier();
+
+      expect(mockHttpClient.rateLimitedRequest).toHaveBeenCalledWith(
+        `${BASE_URL}/rest/applinks/1.0/manifest`,
+        {},
+      );
+    });
+
+    it('returns data-center type with id from manifest response', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: 'dc-instance-uuid',
+        name: 'My Confluence',
+      });
+
+      const result = await client.resolveInstanceIdentifier();
+
+      expect(result).toEqual({ type: 'data-center', id: 'dc-instance-uuid' });
+    });
+
+    it('throws when manifest response is missing the id field', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        name: 'My Confluence',
+      });
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('throws when manifest response id is not a string', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: 12345,
+      });
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('throws when manifest response id is an empty string', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: '',
+      });
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('throws when manifest response is null', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(null);
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('propagates HTTP errors from the manifest request', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockRejectedValueOnce(
+        new Error('Error response from https://dc.example.com/rest/applinks/1.0/manifest: 500'),
+      );
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow('500');
+    });
+  });
+
   describe('searchPagesByLabel', () => {
     it('constructs CQL with both labels and only space.type=global filter', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
@@ -63,7 +136,7 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(decodedUrl).toContain('type != attachment');
     });
 
-    it('uses /rest/api/content/search with os_authType=basic', async () => {
+    it('uses /rest/api/content/search without os_authType', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -73,7 +146,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).toContain('/rest/api/content/search');
-      expect(url).toContain('os_authType=basic');
+      expect(url).not.toContain('os_authType');
     });
 
     it('does not include collaboration space type (unsupported by Data Center)', async () => {
@@ -103,14 +176,14 @@ describe('DataCenterConfluenceApiClient', () => {
   });
 
   describe('getPageById', () => {
-    it('uses direct content endpoint with os_authType=basic', async () => {
+    it('uses direct content endpoint without os_authType', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(makePage({ id: '42' }));
 
       await client.getPageById('42');
 
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).toContain('/rest/api/content/42');
-      expect(url).toContain('os_authType=basic');
+      expect(url).not.toContain('os_authType');
       expect(url).toContain('expand=body.storage,version,space,metadata.labels');
     });
 
@@ -167,7 +240,7 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(mockHttpClient.rateLimitedRequest).not.toHaveBeenCalled();
     });
 
-    it('uses CQL ancestor IN (...) with os_authType=basic for single root ID', async () => {
+    it('uses CQL ancestor IN (...) without os_authType for single root ID', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -178,7 +251,7 @@ describe('DataCenterConfluenceApiClient', () => {
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('ancestor IN (55)');
-      expect(url).toContain('os_authType=basic');
+      expect(url).not.toContain('os_authType');
     });
 
     it('uses CQL ancestor IN (...) for multiple root IDs', async () => {

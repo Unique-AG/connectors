@@ -49,6 +49,20 @@ describe('CloudConfluenceApiClient', () => {
     });
   });
 
+  describe('resolveInstanceIdentifier', () => {
+    it('returns cloud type with cloudId from config', async () => {
+      const result = await client.resolveInstanceIdentifier();
+
+      expect(result).toEqual({ type: 'cloud', id: CLOUD_ID });
+    });
+
+    it('does not make any HTTP requests', async () => {
+      await client.resolveInstanceIdentifier();
+
+      expect(mockHttpClient.rateLimitedRequest).not.toHaveBeenCalled();
+    });
+  });
+
   describe('searchPagesByLabel', () => {
     it('constructs CQL with global and collaboration space type filter', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
