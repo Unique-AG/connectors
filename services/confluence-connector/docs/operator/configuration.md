@@ -9,18 +9,18 @@ The Confluence Connector uses a **YAML-based tenant configuration file** for all
 
 The following environment variables control application-level behavior. They are set outside the tenant configuration YAML (typically in Helm `connector.env`).
 
-| Variable | Default | Description |
-|---|---|---|
-| `NODE_ENV` | `production` | Environment mode (`development`, `production`, `test`) |
-| `PORT` | `51349` | HTTP port the application binds to |
-| `LOG_LEVEL` | `info` | Log verbosity: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`. See [Logging](#Logging) |
-| `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | Controls whether diagnostic data (emails, usernames, IDs) is logged in full (`disclose`) or partially masked (`conceal`). See [Logging](#Diagnostics-Data-Policy) |
-| `TENANT_CONFIG_PATH_PATTERN` | -- (required; Helm chart sets `/app/tenant-configs/*-tenant-config.yaml`) | Glob pattern to tenant configuration YAML files |
-| `OTEL_METRICS_EXPORTER` | -- | OpenTelemetry metrics exporter (e.g., `prometheus`). See [Metrics](#Metrics) |
-| `OTEL_EXPORTER_PROMETHEUS_HOST` | -- | Prometheus exporter bind host |
-| `OTEL_EXPORTER_PROMETHEUS_PORT` | -- | Prometheus exporter bind port |
-| `NODE_EXTRA_CA_CERTS` | -- | Path to a PEM file containing additional CA certificates for TLS verification if the pod's trust store doesn't have them |
-| `MAX_HEAP_MB` | `1920` (Helm) / `1024` (Docker) | Node.js V8 max old space size in MB |
+| Variable                       | Default                        | Description                                                                                                                                   |
+|--------------------------------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| `NODE_ENV`                     | `production`                   | Environment mode (`development`, `production`, `test`)                                                                                        |
+| `PORT`                         | `51349`                        | HTTP port the application binds to                                                                                                            |
+| `LOG_LEVEL`                    | `info`                         | Log verbosity: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`. See [Logging](#Logging)                                          |
+| `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal`                      | Controls whether diagnostic data (emails, usernames, IDs) is logged in full (`disclose`) or partially masked (`conceal`). See [Logging](#Diagnostics-Data-Policy) |
+| `TENANT_CONFIG_PATH_PATTERN`   | -- (required; Helm chart sets `/app/tenant-configs/*-tenant-config.yaml`) | Glob pattern to tenant configuration YAML files                                                                              |
+| `OTEL_METRICS_EXPORTER`        | --                             | OpenTelemetry metrics exporter (e.g., `prometheus`). See [Metrics](#Metrics)                                                                  |
+| `OTEL_EXPORTER_PROMETHEUS_HOST` | --                            | Prometheus exporter bind host                                                                                                                 |
+| `OTEL_EXPORTER_PROMETHEUS_PORT` | --                            | Prometheus exporter bind port                                                                                                                 |
+| `NODE_EXTRA_CA_CERTS`          | --                             | Path to a PEM file containing additional CA certificates for TLS verification if the pod's trust store doesn't have them                      |
+| `MAX_HEAP_MB`                  | `1920` (Helm) / `1024` (Docker) | Node.js V8 max old space size in MB                                                                                                         |
 
 Secret values in tenant YAML files are referenced via the `os.environ/` prefix (e.g., `os.environ/CONFLUENCE_CLIENT_SECRET`). The conventional environment variable names are `CONFLUENCE_CLIENT_SECRET`, `CONFLUENCE_PAT`, and `ZITADEL_CLIENT_SECRET`, but operators can use any variable name as long as the `os.environ/` reference in the tenant YAML matches. See [Authentication -- Secret Resolution](./authentication.md#Secret-Resolution) for the full resolution mechanism, supported fields, and Kubernetes integration.
 
@@ -36,11 +36,11 @@ The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at 
 
 Each tenant configuration file can include a top-level `status` field:
 
-| Status | Default | Behavior                                        |
-|---|---|-------------------------------------------------|
-| `active` | Yes | Tenant is loaded and sync jobs are scheduled    |
-| `inactive` | -- | Tenant config is validated but no sync jobs run |
-| `deleted` | -- | Tenant is skipped entirely (for now)            |
+| Status     | Default | Behavior                                        |
+|------------|---------|------------------------------------------------|
+| `active`   | Yes     | Tenant is loaded and sync jobs are scheduled    |
+| `inactive` | --      | Tenant config is validated but no sync jobs run |
+| `deleted`  | --      | Tenant is skipped entirely (for now)            |
 
 ### Complete Example (Cloud + External Auth)
 
@@ -128,15 +128,15 @@ confluence:
   ingestAllLabel: ai-ingest-all
 ```
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `instanceType` | Yes | -- | `cloud` or `data-center` |
-| `baseUrl` | Yes | -- | Base URL of the Confluence instance (e.g., `https://acme.atlassian.net`). Must not end with a trailing slash |
-| `cloudId` | Yes (Cloud only) | -- | Atlassian Cloud ID (UUID) for the Confluence site |
-| `auth` | Yes | -- | Authentication configuration (see [Authentication](./authentication.md#Confluence-Authentication-Methods)) |
-| `apiRateLimitPerMinute` | Yes | -- | Number of Confluence API requests allowed per minute |
-| `ingestSingleLabel` | Yes | -- | Confluence label that marks individual pages for synchronization (e.g., `ai-ingest`) |
-| `ingestAllLabel` | Yes | -- | Confluence label that marks a page and all its descendants for synchronization (e.g., `ai-ingest-all`) |
+| Field                  | Required         | Default | Description                                                                                                  |
+|------------------------|------------------|---------|--------------------------------------------------------------------------------------------------------------|
+| `instanceType`         | Yes              | --      | `cloud` or `data-center`                                                                                     |
+| `baseUrl`              | Yes              | --      | Base URL of the Confluence instance (e.g., `https://acme.atlassian.net`). Must not end with a trailing slash |
+| `cloudId`              | Yes (Cloud only) | --      | Atlassian Cloud ID (UUID) for the Confluence site                                                            |
+| `auth`                 | Yes              | --      | Authentication configuration (see [Authentication](./authentication.md#Confluence-Authentication-Methods))   |
+| `apiRateLimitPerMinute` | Yes             | --      | Number of Confluence API requests allowed per minute                                                         |
+| `ingestSingleLabel`    | Yes              | --      | Confluence label that marks individual pages for synchronization (e.g., `ai-ingest`)                         |
+| `ingestAllLabel`       | Yes              | --      | Confluence label that marks a page and all its descendants for synchronization (e.g., `ai-ingest-all`)       |
 
 **Important:** `ingestSingleLabel` and `ingestAllLabel` are required fields with no schema default. Operators must explicitly configure them.
 
@@ -150,10 +150,10 @@ For full details on authentication setup, credential management, secret resoluti
 
 The connector discovers pages via Confluence Query Language (CQL) label searches. Only pages in the following space types are scanned:
 
-| Instance Type | Space Types Scanned |
-|---|---|
-| Cloud | `global`, `collaboration` |
-| Data Center | `global` |
+| Instance Type | Space Types Scanned      |
+|---------------|--------------------------|
+| Cloud         | `global`, `collaboration` |
+| Data Center   | `global`                 |
 
 ## Unique Platform Settings
 
@@ -172,12 +172,12 @@ unique:
     x-user-id: "service-user-id"
 ```
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `serviceAuthMode` | Yes | -- | `cluster_local` or `external` |
-| `ingestionServiceBaseUrl` | Yes | -- | Base URL for the Unique ingestion service. Must not end with a trailing slash |
-| `scopeManagementServiceBaseUrl` | Yes | -- | Base URL for the Unique scope management service. Must not end with a trailing slash |
-| `apiRateLimitPerMinute` | No | `100` | Number of Unique API requests allowed per minute |
+| Field                          | Required | Default | Description                                                                            |
+|--------------------------------|----------|---------|----------------------------------------------------------------------------------------|
+| `serviceAuthMode`              | Yes      | --      | `cluster_local` or `external`                                                          |
+| `ingestionServiceBaseUrl`      | Yes      | --      | Base URL for the Unique ingestion service. Must not end with a trailing slash           |
+| `scopeManagementServiceBaseUrl` | Yes     | --      | Base URL for the Unique scope management service. Must not end with a trailing slash    |
+| `apiRateLimitPerMinute`        | No       | `100`   | Number of Unique API requests allowed per minute                                       |
 
 The additional fields required for each auth mode (`serviceExtraHeaders` for `cluster_local`, Zitadel credentials for `external`) are documented in the [Authentication Guide -- Unique Platform Authentication Methods](./authentication.md#Unique-Platform-Authentication-Methods), which also covers setup instructions and token flows.
 
@@ -205,23 +205,23 @@ ingestion:
     maxFileSizeMb: 200
 ```
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `ingestionMode` | No | `flat` | Ingestion traversal mode. Currently only `flat` is supported (all pages from a space go into a single scope per space) |
-| `scopeId` | Yes | -- | Root scope ID in the Unique platform. The scope must exist before the connector starts (see [Authentication -- Create the Root Scope in Unique](./authentication.md#2-create-the-root-scope-in-unique)) |
-| `storeInternally` | No | `enabled` | Whether to store content internally in Unique (`enabled` or `disabled`) |
-| `useV1KeyFormat` | No | `disabled` | Use v1-compatible ingestion key format (`spaceId_spaceKey/pageId`) without tenant prefix (`enabled` or `disabled`). Only relevant when migrating from Confluence Connector v1 |
-| `attachments` | No | (see sub-fields) | Configuration for file attachment ingestion |
+| Field            | Required | Default          | Description                                                                                                                                                         |
+|------------------|----------|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ingestionMode`  | No       | `flat`           | Ingestion traversal mode. Currently only `flat` is supported (all pages from a space go into a single scope per space)                                              |
+| `scopeId`        | Yes      | --               | Root scope ID in the Unique platform. The scope must exist before the connector starts (see [Authentication -- Create the Root Scope in Unique](./authentication.md#2-create-the-root-scope-in-unique)) |
+| `storeInternally` | No      | `enabled`        | Whether to store content internally in Unique (`enabled` or `disabled`)                                                                                             |
+| `useV1KeyFormat` | No       | `disabled`       | Use v1-compatible ingestion key format (`spaceId_spaceKey/pageId`) without tenant prefix (`enabled` or `disabled`). Only relevant when migrating from Confluence Connector v1 |
+| `attachments`    | No       | (see sub-fields) | Configuration for file attachment ingestion                                                                                                                          |
 
 ### Attachment Configuration
 
 The `attachments` sub-section controls ingestion of file attachments from Confluence pages:
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `attachments.mode` | No | `enabled` | Whether to ingest file attachments (`enabled` or `disabled`) |
-| `attachments.allowedExtensions` | No | `pdf`, `docx`, `xlsx`, `ppt`, `pptx`, `txt`, `csv`, `html` | File extensions to include when ingesting attachments. Values are case-insensitive |
-| `attachments.maxFileSizeMb` | No | `200` | Maximum file size in megabytes. Attachments larger than this are skipped |
+| Field                          | Required | Default                                                  | Description                                                                        |
+|--------------------------------|----------|----------------------------------------------------------|------------------------------------------------------------------------------------|
+| `attachments.mode`             | No       | `enabled`                                                | Whether to ingest file attachments (`enabled` or `disabled`)                       |
+| `attachments.allowedExtensions` | No      | `pdf`, `docx`, `xlsx`, `ppt`, `pptx`, `txt`, `csv`, `html` | File extensions to include when ingesting attachments. Values are case-insensitive |
+| `attachments.maxFileSizeMb`    | No       | `200`                                                    | Maximum file size in megabytes. Attachments larger than this are skipped           |
 
 ## Processing Settings
 
@@ -234,11 +234,11 @@ processing:
   # maxItemsToScan: 100
 ```
 
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `concurrency` | No | `1` | Number of pages/attachments to submit for ingestion into Unique concurrently |
-| `scanIntervalCron` | No | `*/15 * * * *` | Cron expression for the scheduled sync interval |
-| `maxItemsToScan` | No | -- (unlimited) | Maximum number of items (pages + attachments) to scan per run. Intended for testing purposes |
+| Field              | Required | Default         | Description                                                                            |
+|--------------------|----------|-----------------|----------------------------------------------------------------------------------------|
+| `concurrency`      | No       | `1`             | Number of pages/attachments to submit for ingestion into Unique concurrently           |
+| `scanIntervalCron` | No       | `*/15 * * * *`  | Cron expression for the scheduled sync interval                                        |
+| `maxItemsToScan`   | No       | -- (unlimited)  | Maximum number of items (pages + attachments) to scan per run. Intended for testing purposes |
 
 ## Scheduler and Sync Interval
 
@@ -265,15 +265,15 @@ The connector produces structured JSON logs. In production (`NODE_ENV=production
 
 Set via the `LOG_LEVEL` environment variable:
 
-| Level | Description |
-|---|---|
-| `fatal` | Unrecoverable errors |
-| `error` | Error conditions |
-| `warn` | Warning conditions |
-| `info` | General operational information (default) |
-| `debug` | Detailed debugging information |
-| `trace` | Very detailed trace-level information |
-| `silent` | No logging output |
+| Level   | Description                                  |
+|---------|----------------------------------------------|
+| `fatal` | Unrecoverable errors                         |
+| `error` | Error conditions                             |
+| `warn`  | Warning conditions                           |
+| `info`  | General operational information (default)    |
+| `debug` | Detailed debugging information               |
+| `trace` | Very detailed trace-level information        |
+| `silent` | No logging output                           |
 
 ### Tenant Context in Logs
 
@@ -283,10 +283,10 @@ Every log entry emitted within a tenant sync context automatically includes the 
 
 The `LOGS_DIAGNOSTICS_DATA_POLICY` environment variable controls how diagnostic data (emails, usernames, IDs) appears in logs:
 
-| Value | Behavior |
-|---|---|
-| `conceal` (default) | Partially masks values (e.g., `John Smith` becomes `**** *mith`) |
-| `disclose` | Shows values in full |
+| Value                | Behavior                                                            |
+|----------------------|---------------------------------------------------------------------|
+| `conceal` (default)  | Partially masks values (e.g., `John Smith` becomes `**** *mith`)   |
+| `disclose`           | Shows values in full                                                |
 
 This applies to diagnostic data only. Actual secrets (passwords, tokens, keys) are always fully redacted regardless of this setting.
 
@@ -333,17 +333,17 @@ grafana:
 
 The Helm chart provides one default alert:
 
-| Category | Alert Name | Description |
-|---|---|---|
-| `uniqueApi` | `ConfluenceConnectorUniqueAPIErrors` | Fires when the Unique API error rate (4xx/5xx responses) exceeds the configured threshold |
+| Category    | Alert Name                              | Description                                                                          |
+|-------------|-----------------------------------------|--------------------------------------------------------------------------------------|
+| `uniqueApi` | `ConfluenceConnectorUniqueAPIErrors`    | Fires when the Unique API error rate (4xx/5xx responses) exceeds the configured threshold |
 
 **Default alert parameters:**
 
-| Parameter | Default Value |
-|---|---|
+| Parameter   | Default Value          |
+|-------------|------------------------|
 | `threshold` | `0.01` (1% error rate) |
-| `for` | `30s` |
-| `severity` | `warning` |
+| `for`       | `30s`                  |
+| `severity`  | `warning`              |
 
 #### Alert Configuration
 
