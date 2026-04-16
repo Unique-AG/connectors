@@ -195,14 +195,15 @@ Content that passes the filter has its `body.storage` HTML extracted and ingeste
 
 #### Confluence Data Center
 
-| Content Type | Exists in DC? | Ingested? | Notes |
-|---|---|---|---|
-| Page | Yes | **Yes** | Primary content type. Full body ingestion (storage format / XHTML). |
-| Blog Post | Yes | **Yes** | Treated identically to pages by the connector. |
-| Attachment | Yes | **Yes** (conditional) | Only when `attachments.mode=enabled`. Uses v1 pagination (`_links.next`). |
-| Comment (inline/footer) | Yes | **No** | Not discovered -- comments do not appear in label/ancestor CQL results. |
-| Custom Content (plugin-defined) | Yes | **No** | Accessed via plugin-specific REST APIs, not standard `/rest/api/content`. |
-| Whiteboard, Database, Embed, Folder, Live Doc | No | N/A | Cloud-only features. Do not exist in Data Center. |
+| Content Type | Ingested? | Notes |
+|---|---|---|
+| Page | **Yes** | Primary content type. Full body ingestion (storage format / XHTML). |
+| Blog Post | **Yes** | Treated identically to pages by the connector. |
+| Attachment | **Yes** (conditional) | Only when `attachments.mode=enabled`. Uses v1 pagination (`_links.next`). |
+| Comment (inline/footer) | **No** | Not discovered -- comments do not appear in label/ancestor CQL results. |
+| Custom Content (plugin-defined) | **No** | Accessed via plugin-specific REST APIs, not standard `/rest/api/content`. |
+
+Whiteboard, Database, Embed, Folder, and Live Doc are Cloud-only features and do not exist in Data Center.
 
 ## File Diff Mechanism
 
@@ -242,7 +243,7 @@ After each space's file diff is computed, guards run to prevent accidental full 
 - **Zero-submission guard**: If discovery submitted zero items but the diff contains deletions, the sync cycle for that space is aborted. This prevents accidental full deletion due to a bug in page fetching or an authentication failure that returned no results.
 - **Full-deletion guard**: If the file diff would delete all files stored in Unique for a space, the sync cycle for that space is aborted. Legitimate content replacement (where new files have entirely different keys than deleted files) is allowed to proceed.
 
-Partial deletions (removing some but not all files) are always allowed. To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards.
+Partial deletions (removing some but not all files) are always allowed. To intentionally remove all content for a tenant, set the tenant status to `deleted` (see [Configuration -- Tenant Status](../operator/configuration.md#Tenant-Status)).
 
 ## Ingestion Pipeline
 
