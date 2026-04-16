@@ -98,7 +98,7 @@ Replace `<root-scope-id>` with the scope ID from `ingestion.scopeId` and `<servi
 2. Create a new service account 
 3. Add User Role to the Confluence App
 4. Now Create Credentials and select OAuth 2.0
-3. Grant the service account access to the Confluence application and assign the following scopes:
+5. Grant the service account access to the Confluence application and assign the following scopes:
 
 | Scope | Type | Purpose |
 |-------|------|---------|
