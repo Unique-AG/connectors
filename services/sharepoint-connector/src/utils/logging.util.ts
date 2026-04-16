@@ -2,8 +2,6 @@ import { ConfigService } from '@nestjs/config';
 import { regexes } from 'zod';
 import type { Config } from '../config';
 import { LogsDiagnosticDataPolicy } from '../config/app.config';
-export const EXTERNAL_ID_PREFIX = 'spc:' as const;
-export const PENDING_DELETE_PREFIX = 'spc:pending-delete:' as const;
 
 // SharePoint reserved virtual directories that appear after the site/subsite path. Used as
 // terminators to distinguish multi-segment subsite names from library/folder segments.

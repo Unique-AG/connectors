@@ -5,6 +5,7 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { ScopeExternalIdMigrationService } from '../scope-external-id-migration/scope-external-id-migration.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
@@ -163,6 +164,7 @@ describe('ScopeManagementService', () => {
     let getCurrentUserIdMock: ReturnType<typeof vi.fn>;
     let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
     let migrateIfNeededMock: ReturnType<typeof vi.fn>;
+    let migrateSiteScopesMock: ReturnType<typeof vi.fn>;
 
     beforeEach(async () => {
       getScopeByIdMock = vi.fn();
@@ -170,6 +172,7 @@ describe('ScopeManagementService', () => {
       getCurrentUserIdMock = vi.fn().mockResolvedValue('user-123');
       updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
       migrateIfNeededMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
+      migrateSiteScopesMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
 
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
@@ -188,6 +191,11 @@ describe('ScopeManagementService', () => {
         .impl((stubFn) => ({
           ...stubFn(),
           migrateIfNeeded: migrateIfNeededMock,
+        }))
+        .mock<ScopeExternalIdMigrationService>(ScopeExternalIdMigrationService)
+        .impl((stubFn) => ({
+          ...stubFn(),
+          migrateSiteScopes: migrateSiteScopesMock,
         }))
         .compile();
 
@@ -216,7 +224,7 @@ describe('ScopeManagementService', () => {
 
       const siteId = new Smeared('site-123', false);
       // As we do not patch env variable, Smeared external id constructed inside will be active.
-      const externalId = new Smeared(`spc:site:${siteId.value}`, true);
+      const externalId = new Smeared(`spc:${siteId.value}/site`, true);
       await service.initializeRootScope('root-scope-123', siteId, IngestionMode.Flat);
 
       expect(migrateIfNeededMock).toHaveBeenCalledWith('root-scope-123', siteId);
@@ -318,6 +326,99 @@ describe('ScopeManagementService', () => {
       expect(createScopeAccessesMock).toHaveBeenCalledWith('parent-1', [
         { type: 'READ', entityId: 'user-123', entityType: 'USER' },
       ]);
+    });
+
+    it('accepts new-format root externalId as valid ownership', async () => {
+      getScopeByIdMock.mockResolvedValueOnce({
+        id: 'root-scope-123',
+        name: 'test1',
+        externalId: 'spc:site-123/site',
+        parentId: null,
+      });
+
+      const result = await service.initializeRootScope(
+        'root-scope-123',
+        new Smeared('site-123', false),
+        IngestionMode.Flat,
+      );
+
+      expect(result.isInitialSync).toBe(false);
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+    });
+
+    describe('scope externalId migration', () => {
+      it('calls migrateSiteScopes when root scope has legacy externalId', async () => {
+        getScopeByIdMock.mockResolvedValueOnce({
+          id: 'root-scope-123',
+          name: 'test1',
+          externalId: 'spc:site:site-123',
+          parentId: null,
+        });
+
+        await service.initializeRootScope(
+          'root-scope-123',
+          new Smeared('site-123', false),
+          IngestionMode.Flat,
+        );
+
+        expect(migrateSiteScopesMock).toHaveBeenCalledWith('site-123');
+      });
+
+      it('does not call migrateSiteScopes when root scope has new-format externalId', async () => {
+        getScopeByIdMock.mockResolvedValueOnce({
+          id: 'root-scope-123',
+          name: 'test1',
+          externalId: 'spc:site-123/site',
+          parentId: null,
+        });
+
+        await service.initializeRootScope(
+          'root-scope-123',
+          new Smeared('site-123', false),
+          IngestionMode.Flat,
+        );
+
+        expect(migrateSiteScopesMock).not.toHaveBeenCalled();
+      });
+
+      it('does not call migrateSiteScopes when root scope has no externalId', async () => {
+        getScopeByIdMock.mockResolvedValueOnce({
+          id: 'root-scope-123',
+          name: 'test1',
+          externalId: null,
+          parentId: null,
+        });
+
+        await service.initializeRootScope(
+          'root-scope-123',
+          new Smeared('site-123', false),
+          IngestionMode.Flat,
+        );
+
+        expect(migrateSiteScopesMock).not.toHaveBeenCalled();
+      });
+
+      it('throws and aborts sync when migration reports failure', async () => {
+        getScopeByIdMock.mockResolvedValueOnce({
+          id: 'root-scope-123',
+          name: 'test1',
+          externalId: 'spc:site:site-123',
+          parentId: null,
+        });
+        migrateSiteScopesMock.mockResolvedValueOnce({
+          status: 'migration_failed',
+          migratedCount: 3,
+          failedCount: 2,
+        });
+
+        await expect(
+          service.initializeRootScope(
+            'root-scope-123',
+            new Smeared('site-123', false),
+            IngestionMode.Flat,
+          ),
+        ).rejects.toThrow(/Scope externalId migration failed.*migrated=3.*failed=2/);
+      });
     });
   });
 
@@ -554,15 +655,15 @@ describe('ScopeManagementService', () => {
 
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+          expect.objectContaining({ value: `spc:site-123/subsite:${subASiteId}` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:drive:${subASiteId}/sub-drive` }),
+          expect.objectContaining({ value: `spc:site-123/drive:${subASiteId}/sub-drive` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:folder:${subASiteId}/sub-folder` }),
+          expect.objectContaining({ value: `spc:site-123/folder:${subASiteId}/sub-folder` }),
         );
       });
 
@@ -588,15 +689,15 @@ describe('ScopeManagementService', () => {
 
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+          expect.objectContaining({ value: `spc:site-123/subsite:${subASiteId}` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:subsite:${subBSiteId}` }),
+          expect.objectContaining({ value: `spc:site-123/subsite:${subBSiteId}` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:drive:${subBSiteId}/nested-drive` }),
+          expect.objectContaining({ value: `spc:site-123/drive:${subBSiteId}/nested-drive` }),
         );
       });
 
@@ -612,11 +713,11 @@ describe('ScopeManagementService', () => {
 
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+          expect.objectContaining({ value: `spc:site-123/subsite:${subASiteId}` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:drive:${subASiteId}/drive-1` }),
+          expect.objectContaining({ value: `spc:site-123/drive:${subASiteId}/drive-1` }),
         );
       });
 
@@ -655,23 +756,23 @@ describe('ScopeManagementService', () => {
 
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: 'spc:drive:site-123/root-drive' }),
+          expect.objectContaining({ value: 'spc:site-123/drive:site-123/root-drive' }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: 'spc:folder:site-123/root-folder' }),
+          expect.objectContaining({ value: 'spc:site-123/folder:site-123/root-folder' }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+          expect.objectContaining({ value: `spc:site-123/subsite:${subASiteId}` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:drive:${subASiteId}/sub-drive` }),
+          expect.objectContaining({ value: `spc:site-123/drive:${subASiteId}/sub-drive` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:folder:${subASiteId}/sub-folder` }),
+          expect.objectContaining({ value: `spc:site-123/folder:${subASiteId}/sub-folder` }),
         );
       });
     });
@@ -842,7 +943,7 @@ describe('ScopeManagementService', () => {
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-1',
-        expect.objectContaining({ value: 'spc:drive:site-123/drive-1' }),
+        expect.objectContaining({ value: 'spc:site-123/drive:site-123/drive-1' }),
       );
     });
 
@@ -874,7 +975,7 @@ describe('ScopeManagementService', () => {
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
       const [, externalId] = updateScopeExternalIdMock.mock.calls[0] as [string, Smeared];
-      expect(externalId.value).toMatch(/^spc:unknown:site-123::\/test1\/SubA\/UnknownLib-/);
+      expect(externalId.value).toMatch(/^spc:site-123\/unknown:\/test1\/SubA\/UnknownLib-/);
     });
 
     describe('conflict marking', () => {
@@ -940,7 +1041,7 @@ describe('ScopeManagementService', () => {
         expect(renameId).toBe('old-scope-id');
         expect(renameExternalId).toBeInstanceOf(Smeared);
         expect(renameExternalId.value).toMatch(
-          /^spc:pending-delete:site-123\/unknown:site-123::\/test1\/TestScope-/,
+          /^spc:pending-delete:site-123\/site-123\/unknown:\/test1\/TestScope-/,
         );
 
         expect(updateScopeExternalIdMock).toHaveBeenNthCalledWith(

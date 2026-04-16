@@ -4,6 +4,7 @@ import { MetricsModule } from '../metrics/metrics.module';
 import { MicrosoftApisModule } from '../microsoft-apis/microsoft-apis.module';
 import { PermissionsSyncModule } from '../permissions-sync/permissions-sync.module';
 import { ProcessingPipelineModule } from '../processing-pipeline/processing-pipeline.module';
+import { ScopeExternalIdMigrationModule } from '../scope-external-id-migration/scope-external-id-migration.module';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
@@ -20,6 +21,7 @@ import { SubsiteDiscoveryService } from './subsite-discovery.service';
     UniqueApiModule,
     ProcessingPipelineModule,
     PermissionsSyncModule,
+    ScopeExternalIdMigrationModule,
   ],
   providers: [
     SharepointSynchronizationService,

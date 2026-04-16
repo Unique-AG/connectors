@@ -8,19 +8,27 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { ScopeExternalIdMigrationService } from '../scope-external-id-migration/scope-external-id-migration.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX } from '../utils/logging.util';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
+import {
+  buildDriveExternalId,
+  buildFolderExternalId,
+  buildRootExternalId,
+  buildSitePagesExternalId,
+  buildSubsiteExternalId,
+  buildUnknownExternalId,
+  EXTERNAL_ID_PREFIX,
+  PENDING_DELETE_PREFIX,
+  parseLegacyExternalId,
+} from '../utils/scope-external-id';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
 import { RootScopeMigrationService } from './root-scope-migration.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
-
-const buildSiteExternalId = (siteId: Smeared) =>
-  createSmeared(`${EXTERNAL_ID_PREFIX}site:${siteId.value}`);
 
 export interface RootScopeInfo {
   serviceUserId: string;
@@ -36,6 +44,7 @@ export class ScopeManagementService {
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly rootScopeMigrationService: RootScopeMigrationService,
+    private readonly scopeExternalIdMigrationService: ScopeExternalIdMigrationService,
   ) {}
 
   public async initializeRootScope(
@@ -64,6 +73,19 @@ export class ScopeManagementService {
       `Root scope ${rootScopeId} is owned by a different site. This scope cannot be synced by this site.`,
     );
 
+    // Check if the root scope has a legacy externalId and migrate it if needed.
+    if (rootScope.externalId && parseLegacyExternalId(rootScope.externalId)?.type === 'root') {
+      const migrationResult = await this.scopeExternalIdMigrationService.migrateSiteScopes(
+        siteId.value,
+      );
+      if (migrationResult.status === 'migration_failed') {
+        throw new Error(
+          `${logPrefix} Scope externalId migration failed: ` +
+            `migrated=${migrationResult.migratedCount}, failed=${migrationResult.failedCount}`,
+        );
+      }
+    }
+
     const isInitialSync = !rootScope.externalId;
 
     if (isInitialSync) {
@@ -75,7 +97,7 @@ export class ScopeManagementService {
         throw new Error(`Root scope migration failed: ${migrationResult.error}`);
       }
 
-      const externalId = buildSiteExternalId(siteId);
+      const externalId = buildRootExternalId(siteId.value);
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           rootScopeId,
@@ -240,8 +262,11 @@ export class ScopeManagementService {
       return true;
     }
 
-    const expectedExternalId = buildSiteExternalId(siteId);
-    return rootScope.externalId === expectedExternalId.value;
+    // Accept both legacy (spc:site:{id}) and new (spc:{id}/site) formats during
+    // the transition period while existing scopes are being migrated.
+    const newExternalId = buildRootExternalId(siteId.value).value;
+    const legacyExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId.value}`;
+    return rootScope.externalId === newExternalId || rootScope.externalId === legacyExternalId;
   }
 
   /**
@@ -358,14 +383,13 @@ export class ScopeManagementService {
         continue;
       }
 
-      let externalId = pathToExternalIdMap[path]
-        ? createSmeared(pathToExternalIdMap[path])
-        : undefined;
+      let externalId = pathToExternalIdMap[path];
 
       if (isNullish(externalId)) {
         this.logger.warn(`${logPrefix} No external ID found for path ${createSmeared(path)}`);
-        externalId = createSmeared(
-          `${EXTERNAL_ID_PREFIX}unknown:${context.siteConfig.siteId.value}::${path}-${randomUUID()}`,
+        externalId = buildUnknownExternalId(
+          context.siteConfig.siteId.value,
+          `${path}-${randomUUID()}`,
         );
       }
 
@@ -428,23 +452,24 @@ export class ScopeManagementService {
     items: SharepointContentItem[],
     directories: SharepointDirectoryItem[],
     context: SharepointSyncContext,
-  ): Record<string, string> {
+  ): Record<string, Smeared> {
     const { rootPath, siteName, siteConfig, discoveredSubsites } = context;
-    const pathToExternalIdMap: Record<string, string> = {};
+    const pathToExternalIdMap: Record<string, Smeared> = {};
 
+    const rootSiteId = siteConfig.siteId.value;
     const siteIdToPrefix = new Map<string, string>();
     for (const subsite of discoveredSubsites) {
       siteIdToPrefix.set(subsite.siteId.value, subsite.relativePath.value);
       pathToExternalIdMap[`${rootPath.value}/${subsite.relativePath.value}`] ??=
-        `${EXTERNAL_ID_PREFIX}subsite:${subsite.siteId.value}`;
-      // Site pages is a special collection we fetch for ASPX pages, but has no folders.
+        buildSubsiteExternalId(rootSiteId, subsite.siteId.value);
       pathToExternalIdMap[`${rootPath.value}/${subsite.relativePath.value}/SitePages`] =
-        `${EXTERNAL_ID_PREFIX}${subsite.siteId.value}/sitePages`;
+        buildSitePagesExternalId(rootSiteId, subsite.siteId.value);
     }
 
-    // Site pages is a special collection we fetch for ASPX pages, but has no folders.
-    pathToExternalIdMap[`${rootPath.value}/SitePages`] =
-      `${EXTERNAL_ID_PREFIX}${siteConfig.siteId.value}/sitePages`;
+    pathToExternalIdMap[`${rootPath.value}/SitePages`] = buildSitePagesExternalId(
+      rootSiteId,
+      rootSiteId,
+    );
 
     const registeredDrives = new Set<string>();
 
@@ -454,8 +479,11 @@ export class ScopeManagementService {
         continue;
       }
 
-      pathToExternalIdMap[path.value] ??=
-        `${EXTERNAL_ID_PREFIX}folder:${directory.siteId.value}/${directory.item.id}`;
+      pathToExternalIdMap[path.value] ??= buildFolderExternalId(
+        rootSiteId,
+        directory.siteId.value,
+        directory.item.id,
+      );
 
       const sitePrefix = siteIdToPrefix.get(directory.siteId.value);
       const siteScopePath = sitePrefix ? `${rootPath.value}/${sitePrefix}` : rootPath.value;
@@ -464,8 +492,11 @@ export class ScopeManagementService {
       // Segments can be empty when a directory resolves to exactly the site scope path.
       if (segments[0]) {
         registeredDrives.add(`${directory.siteId.value}/${directory.driveId}`);
-        pathToExternalIdMap[`${siteScopePath}/${segments[0]}`] ??=
-          `${EXTERNAL_ID_PREFIX}drive:${directory.siteId.value}/${directory.driveId}`;
+        pathToExternalIdMap[`${siteScopePath}/${segments[0]}`] ??= buildDriveExternalId(
+          rootSiteId,
+          directory.siteId.value,
+          directory.driveId,
+        );
       }
     }
 
@@ -495,8 +526,11 @@ export class ScopeManagementService {
       const driveRelative = parentPath.value.substring(siteScopePath.length);
       const segments = driveRelative.split('/').filter(Boolean);
       if (segments[0]) {
-        pathToExternalIdMap[`${siteScopePath}/${segments[0]}`] ??=
-          `${EXTERNAL_ID_PREFIX}drive:${item.siteId.value}/${item.driveId}`;
+        pathToExternalIdMap[`${siteScopePath}/${segments[0]}`] ??= buildDriveExternalId(
+          rootSiteId,
+          item.siteId.value,
+          item.driveId,
+        );
       }
     }
 
