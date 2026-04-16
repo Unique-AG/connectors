@@ -39,7 +39,7 @@ importers:
   packages/aes-gcm-encryption:
     dependencies:
       '@nestjs/common':
-        specifier: ^10 || ^11
+        specifier: ^11
         version: 11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2)
       zod:
         specifier: 4.1.5
@@ -116,7 +116,7 @@ importers:
   packages/logger:
     dependencies:
       '@nestjs/common':
-        specifier: ^10 || ^11
+        specifier: ^11
         version: 11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2)
       nestjs-pino:
         specifier: ^4.6.0
@@ -238,10 +238,10 @@ importers:
         specifier: 1.27.1
         version: 1.27.1(zod@4.1.5)
       '@nestjs/common':
-        specifier: ^10 || ^11
+        specifier: ^11
         version: 11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core':
-        specifier: ^10 || ^11
+        specifier: ^11
         version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@opentelemetry/api':
         specifier: ^1.9.0
@@ -269,7 +269,7 @@ importers:
   packages/probe:
     dependencies:
       '@nestjs/common':
-        specifier: ^10 || ^11
+        specifier: ^11
         version: 11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/swagger':
         specifier: ^11

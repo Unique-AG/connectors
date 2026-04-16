@@ -19,7 +19,7 @@
     "typescript": "5.9.2"
   },
   "peerDependencies": {
-    "@nestjs/common": "^10 || ^11",
+    "@nestjs/common": "^11",
     "nestjs-pino": "^4.6.0",
     "pino-http": "^10.5.0"
   }
