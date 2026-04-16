@@ -28,7 +28,7 @@ flowchart TB
 
     subgraph Processing["Processing Phase"]
         Diff["Per-space file diff<br/>(Unique Platform)"]
-        Validate["Safety checks"]
+        Validate["Re-ingestion guards"]
     end
 
     subgraph Sync["Sync Phase"]
