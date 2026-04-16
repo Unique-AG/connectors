@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2074345526 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Disaster Recovery
+# Outlook Semantic MCP - Disaster Recovery
 
 This runbook covers recovery procedures for the three stateful components the Outlook Semantic MCP Server depends on: the local PostgreSQL database, RabbitMQ, and the Unique Knowledge Base. Each component has a distinct failure mode and recovery path.
 

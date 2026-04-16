@@ -42,7 +42,7 @@
     "bottleneck": "2.19.5",
     "cron": "4.3.5",
     "js-yaml": "4.1.1",
-    "nestjs-otel": "7.0.1",
+    "nestjs-otel": "8.0.2",
     "nestjs-pino": "4.6.1",
     "p-limit": "7.3.0",
     "pino": "10.3.1",

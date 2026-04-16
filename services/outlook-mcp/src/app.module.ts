@@ -65,9 +65,6 @@ import { serverInstructions } from './server.instructions';
     OpenTelemetryModule.forRoot({
       metrics: {
         hostMetrics: true,
-        apiMetrics: {
-          enable: true,
-        },
       },
     }),
     McpOAuthModule.forRootAsync({

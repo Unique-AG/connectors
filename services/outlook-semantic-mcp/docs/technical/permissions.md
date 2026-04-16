@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2064252966 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Permissions
+# Outlook Semantic MCP - Permissions
 
 All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to.
 

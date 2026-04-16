@@ -1,4 +1,4 @@
-<!-- confluence-page-id: -->
+<!-- confluence-page-id: 2148859913 -->
 <!-- confluence-space-key: PUBDOC -->
 
 ## Overview
@@ -58,8 +58,8 @@ Steps:
 
 1. Navigate to Zitadel.
 2. Create a new service user.
-3. For `external` mode: assign the required authorizations listed above. For `cluster_local` mode: no authorizations are needed.
-4. Note the user ID for configuration.
+3. For `external` mode: assign the required authorizations listed above and generate a client secret. For `cluster_local` mode: no authorizations or client secret are needed.
+4. Note the user ID (and for `external` mode, the client ID and client secret) for configuration.
 
 For detailed instructions on creating and configuring a service user, see:
 - [How To Configure A Service User](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075/How+To+Configure+A+Service+User)
@@ -72,6 +72,23 @@ The connector requires a pre-existing root scope in Unique. The root scope ID is
 At startup, the connector automatically grants itself access on the root scope and will create child scopes for each Confluence space that has content to ingest. See the [Scope Hierarchy](../technical/flows.md#Scope-Hierarchy) for details.
 
 On the first sync cycle, the connector also marks the root scope as owned by this tenant's Confluence instance. Subsequent sync cycles verify the ownership mark before ingesting content. A root scope can only be owned by one Confluence instance: reusing the same scope across tenants, or repointing a tenant to a different Confluence instance while keeping the original scope, causes the sync to fail. See [Root Scope Ownership Validation](../technical/flows.md#Root-Scope-Ownership-Validation) for details.
+
+**External mode with Gatekeeper enforced:** If the Unique platform has Gatekeeper in `enforce` mode, the connector's self-grant may be blocked. In that case, an administrator must pre-grant the service user access on the root scope before starting the connector:
+
+```graphql
+mutation {
+  createScopeAccesses(
+    scopeId: "<root-scope-id>"
+    scopeAccesses: [
+      { type: MANAGE, entityId: "<service-user-id>", entityType: USER }
+      { type: READ, entityId: "<service-user-id>", entityType: USER }
+      { type: WRITE, entityId: "<service-user-id>", entityType: USER }
+    ]
+  )
+}
+```
+
+Replace `<root-scope-id>` with the scope ID from `ingestion.scopeId` and `<service-user-id>` with the Zitadel service user ID.
 
 ### 3. Set Up Confluence Authentication
 
@@ -109,7 +126,7 @@ The `clientSecret` field uses the `os.environ/` prefix to resolve the value from
 
 #### Option B: OAuth 2.0 (2LO) -- Data Center
 
-1. In the [Atlassian Admin Console](https://admin.atlassian.com/), go to **Settings** > **User Management** > **Service Accounts**.
+1. In the [Atlassian Admin Console](https://<data-center-confluence-url>), go to **Settings** > **User Management** > **Service Accounts**.
 2. Create a new service account and generate credentials.
 3. Grant the service account access to the Confluence application and assign the `READ` (View content) scope. Space selection is optional. **When no spaces are specified, the service account has read access to all spaces.**
 

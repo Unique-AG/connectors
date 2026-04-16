@@ -1,4 +1,4 @@
-<!-- confluence-page-id: -->
+<!-- confluence-page-id: 1504182474 -->
 <!-- confluence-space-key: PUBDOC -->
 
 > **Pre-release Notice:** The Confluence Connector v2 is currently in alpha (`2.0.0-alpha.4`). Configuration options and behavior may change before the stable release.
@@ -132,7 +132,6 @@ flowchart TB
     IngestPages["Ingest New/Updated Pages"]
     IngestAttachments["Ingest New/Updated Attachments"]
     Delete["Delete Removed Items"]
-    CleanupSpaces["Clean Up Removed Spaces"]
     Done(("Done"))
   end
 
@@ -143,15 +142,14 @@ flowchart TB
   EnsureScopes --> IngestPages
   IngestPages --> IngestAttachments
   IngestAttachments --> Delete
-  Delete --> CleanupSpaces
-  CleanupSpaces --> Done
+  Delete --> Done
 
 classDef start fill:#FFA726,stroke:#EF6C00,stroke-width:2px,color:white
 classDef process fill:#29B6F6,stroke:#0277BD,stroke-width:0px,color:white
 classDef container fill:#F5F5F5,stroke:#BDBDBD,stroke-width:1px,stroke-dasharray: 5 5,color:#616161
 
 class Start,Done start
-class InitScope,Discover,Diff,EnsureScopes,IngestPages,IngestAttachments,Delete,CleanupSpaces process
+class InitScope,Discover,Diff,EnsureScopes,IngestPages,IngestAttachments,Delete process
 ```
 
 ### Content Sync Flow
@@ -193,7 +191,6 @@ sequenceDiagram
         Connector->>Unique: Register, upload, finalize
 
         Connector->>Unique: Delete removed items
-        Connector->>Unique: Clean up scopes and files for removed spaces
     end
 
     Note over Connector: Sync cycle complete

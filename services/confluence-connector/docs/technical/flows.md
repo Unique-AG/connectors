@@ -1,4 +1,4 @@
-<!-- confluence-page-id: -->
+<!-- confluence-page-id: 2150301717 -->
 <!-- confluence-space-key: PUBDOC -->
 
 ## Content Sync Flow
@@ -14,7 +14,7 @@ flowchart TB
     end
 
     subgraph Initialization["Initialization"]
-        Guard["Re-entrancy guard"]
+        Guard["Skip if sync in progress"]
         Scope["Initialize root scope"]
     end
 
@@ -28,7 +28,7 @@ flowchart TB
 
     subgraph Processing["Processing Phase"]
         Diff["Per-space file diff<br/>(Unique Platform)"]
-        Validate["Safety checks"]
+        Validate["Re-ingestion guards"]
     end
 
     subgraph Sync["Sync Phase"]
@@ -88,7 +88,7 @@ sequenceDiagram
 
         opt Pages with ingestAllLabel
             Connector->>Confluence: CQL ancestor query<br/>(batches of 100 root IDs)
-            Confluence->>Connector: Descendant pages
+            Confluence->>Connector: Descendant pages<br/>(with inline attachments)
         end
 
         Note over Connector: Deduplicate, filter skipped types,<br/>extract attachments (if enabled)
@@ -165,31 +165,6 @@ Pages are discovered through a CQL-based label search, then attachments are opti
 
 **Important:** CQL search results are filtered by the authenticated user's permissions. Pages in spaces the service account cannot access are silently excluded from results. On Data Center, the service account's space access can optionally be restricted to specific spaces. When no spaces are specified, the service account has read access to all spaces. If space restrictions are configured, pages in excluded spaces never appear in discovery results and no error is produced.
 
-### Discovery Sequence
-
-```mermaid
-flowchart TB
-    CQL["CQL search:<br/>ingestSingleLabel OR ingestAllLabel"] --> LabeledPages["Labeled pages<br/>(with inline attachments)"]
-    LabeledPages --> FilterIngestAll["Filter pages with ingestAllLabel"]
-    FilterIngestAll --> HasIngestAll{"Any ingestAll<br/>pages?"}
-    HasIngestAll -->|Yes| FetchDescendants["CQL ancestor query<br/>(batches of 100)"]
-    HasIngestAll -->|No| Merge
-    FetchDescendants --> Merge["Merge & deduplicate<br/>(by page ID)"]
-    Merge --> MapPages["Map to discovered pages"]
-    MapPages --> LimitCheck{"maxItemsToScan<br/>reached?"}
-    LimitCheck -->|Yes| Stop["Stop accepting"]
-    LimitCheck -->|No| SkipTypes{"Content type<br/>check"}
-    SkipTypes -->|"database, whiteboard, embed"| Skip["Skip"]
-    SkipTypes -->|"page, blogpost, folder"| Continue["Continue"]
-
-    Continue --> AttachmentsEnabled{"Attachments<br/>enabled?"}
-    AttachmentsEnabled -->|No| Done["Return pages only"]
-    AttachmentsEnabled -->|Yes| ExtractAttachments["Extract attachments<br/>from page objects"]
-    ExtractAttachments --> FilterAttachments["Filter by extension<br/>and file size"]
-    FilterAttachments --> RemainingCapacity{"Remaining capacity<br/>(maxItemsToScan - pages)?"}
-    RemainingCapacity --> Done2["Return pages + attachments"]
-```
-
 ### CQL Queries
 
 The connector uses Confluence Query Language (CQL) to discover pages. The exact CQL differs by instance type:
@@ -214,14 +189,12 @@ Pages labeled with `ingestAllLabel` trigger a descendant search:
 
 ### Attachment Extraction
 
-When `attachments.mode` is `enabled` (default), attachments are extracted from the already-fetched page objects -- no additional API calls are made during extraction. Attachments were inlined by the `expand=children.attachment` parameter during the CQL search.
+When `attachments.mode` is `enabled` (default), attachments are extracted from the already-fetched page objects. Confluence inlines up to 25 attachments per page via the `expand=children.attachment` parameter during the CQL search. If a page has more than 25 attachments, additional attachments are fetched via pagination (Cloud uses the v2 attachments endpoint; Data Center uses v1 pagination via `_links.next`).
 
 An attachment is accepted if:
 - Its file extension is in the `allowedExtensions` list (default: `pdf`, `docx`, `xlsx`, `ppt`, `pptx`, `txt`, `csv`, `html`)
 - Its file size does not exceed `maxFileSizeMb` (default: 200 MB)
 - The `maxItemsToScan` capacity has not been exhausted (pages count first, attachments use remaining capacity)
-
-If a page has more than 25 attachments (the Confluence inline limit), additional attachments are fetched via pagination.
 
 ### Content Type Ingestion Map
 
@@ -247,44 +220,19 @@ Content that passes the filter has its `body.storage` HTML extracted and ingeste
 
 #### Confluence Data Center
 
-| Content Type | Exists in DC? | Ingested? | Notes |
-|---|---|---|---|
-| Page | Yes | **Yes** | Primary content type. Full body ingestion (storage format / XHTML). |
-| Blog Post | Yes | **Yes** | Treated identically to pages by the connector. |
-| Attachment | Yes | **Yes** (conditional) | Only when `attachments.mode=enabled`. Uses v1 pagination (`_links.next`). |
-| Comment (inline/footer) | Yes | **No** | Not discovered -- comments do not appear in label/ancestor CQL results. |
-| Custom Content (plugin-defined) | Yes | **No** | Accessed via plugin-specific REST APIs, not standard `/rest/api/content`. |
-| Whiteboard, Database, Embed, Folder, Live Doc | No | N/A | Cloud-only features. Do not exist in Data Center. |
+| Content Type | Ingested? | Notes |
+|---|---|---|
+| Page | **Yes** | Primary content type. Full body ingestion (storage format / XHTML). |
+| Blog Post | **Yes** | Treated identically to pages by the connector. |
+| Attachment | **Yes** (conditional) | Only when `attachments.mode=enabled`. Uses v1 pagination (`_links.next`). |
+| Comment (inline/footer) | **No** | Not discovered -- comments do not appear in label/ancestor CQL results. |
+| Custom Content (plugin-defined) | **No** | Accessed via plugin-specific REST APIs, not standard `/rest/api/content`. |
+
+Whiteboard, Database, Embed, Folder, and Live Doc are Cloud-only features and do not exist in Data Center.
 
 ## File Diff Mechanism
 
 The connector uses the Unique platform's server-side file diff API (`/v2/content/file-diff`) to detect changes between sync cycles. The connector does **not** compute local content hashes -- instead, it sends each item's `key`, `url`, and `updatedAt` timestamp to the diff endpoint, which returns categorized results. The diff is called once per Confluence space.
-
-### State Comparison
-
-```mermaid
-flowchart TB
-    subgraph Input["Input"]
-        ConfluenceState["Confluence State<br/>(current scan: key, url, updatedAt per item)"]
-    end
-
-    subgraph Comparison["Server-Side Diff"]
-        Compare["POST /v2/content/file-diff<br/>(Unique Platform)"]
-    end
-
-    subgraph Output["Output"]
-        New["New Items"]
-        Modified["Updated Items"]
-        Moved["Moved Items"]
-        Deleted["Deleted Items"]
-    end
-
-    ConfluenceState --> Compare
-    Compare --> New
-    Compare --> Modified
-    Compare --> Moved
-    Compare --> Deleted
-```
 
 ### Change Detection Logic
 
@@ -322,7 +270,7 @@ After each space's file diff is computed, two guards run to prevent accidental f
 | **Zero-submission guard** | Discovery submitted 0 items but the diff contains deletions | Likely a bug in page fetching or an authentication failure that returned no results. Deleting all stored content would be destructive. |
 | **Full-deletion guard** | The diff would delete every file stored in Unique for the space and the connector determines the deletion is not a legitimate full content replacement | Likely a key format change (e.g., toggling `useV1KeyFormat`) that causes all existing content to appear unrecognized. If the connector determines the content was genuinely replaced rather than misidentified, the sync proceeds with a warning instead of aborting. |
 
-Partial deletions (removing some but not all files) are always allowed.
+Partial deletions (removing some but not all files) are always allowed. To intentionally remove all content for a tenant, set the tenant status to `deleted` (see [Configuration -- Tenant Status](../operator/configuration.md#Tenant-Status)).
 
 ## Ingestion Pipeline
 
@@ -385,14 +333,14 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 | Sync already in progress | Overlapping cron triggers or long-running sync | Skip the cycle entirely (re-entrancy guard) |
 | Root scope not found | Misconfigured `scopeId` or scope deleted | Abort the entire sync cycle |
 | Root scope belongs to a different Confluence instance | `scopeId` reused across tenants or the tenant's Confluence instance was reassigned | Abort the entire tenant sync cycle |
+| Discovery failure | Error during page or attachment fetching from Confluence | Abort the sync cycle to avoid submitting partial results to file-diff, which could cause unnecessary deletions and re-ingestion costs |
 | Accidental full deletion detected | Bug in page fetching or key format change | Abort the entire tenant sync cycle |
-| Page fetch failure | Page deleted between discovery and content fetch, transient API error | Log error, skip the page, continue other pages |
-| Page not found | Page deleted between discovery and content fetch | Log warning, skip the page |
+| Page unavailable | Page deleted between discovery and content fetch, or transient API error | Log, skip the page, continue other pages |
 | Page with empty body | Page has no content (e.g., newly created) | Log, skip the page |
 | Attachment with zero bytes | Empty attachment | Log, skip the attachment |
-| Page ingestion failure | Upload or finalization error after successful registration | Delete the registered content from Unique, log error, skip the page |
-| Attachment ingestion failure | Download error, or upload/finalization error after successful registration | Destroy the download stream, delete the registered content from Unique if registration succeeded, log error, skip the attachment |
-| Content deletion failure | Unique API error | Log error, return 0 deleted count |
+| Page ingestion failure | Upload error, registration error | Clean up partial content from KB, log error, skip the page |
+| Attachment ingestion failure | Download error, upload error | Destroy stream, clean up partial content from KB, log error, skip the attachment |
+| Content deletion failure | Unique API error | Log error, continue |
 | Unhandled sync error | Unexpected exception | Caught at top level, logged, sync state reset |
 
 ### Retry Logic

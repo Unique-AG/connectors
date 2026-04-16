@@ -47,7 +47,7 @@
     "drizzle-orm": "0.45.2",
     "drizzle-zod": "0.8.3",
     "jsonwebtoken": "9.0.3",
-    "nestjs-otel": "7.0.1",
+    "nestjs-otel": "8.0.2",
     "nestjs-pino": "4.6.1",
     "nestjs-zod": "5.0.1",
     "passport": "0.7.0",

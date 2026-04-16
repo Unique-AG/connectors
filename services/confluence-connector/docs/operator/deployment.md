@@ -1,4 +1,4 @@
-<!-- confluence-page-id: -->
+<!-- confluence-page-id: 2149056548 -->
 <!-- confluence-space-key: PUBDOC -->
 
 ## Content
@@ -22,7 +22,7 @@ The image contains the application code plus all necessary runtime dependencies.
 
 ## Helm Chart
 
-The Helm chart wraps the [`backend-service`](https://github.com/unique-ag/helm-charts) subchart (`~10.1.0`, aliased as `connector`), so image, env, resources, and volumes are nested under the `connector` key. Tenant-specific configuration lives under `connectorConfig`, and optional forward-proxy settings live under `proxyConfig`.
+The Helm chart wraps the [`backend-service`](https://github.com/unique-ag/helm-charts) subchart (`~10.1.0`, aliased as `connector`), so image, env, resources, and volumes are nested under the `connector` key. Tenant-specific configuration lives under `connectorConfig`.
 
 ### Installation
 
@@ -98,16 +98,9 @@ connectorConfig:
         ingestionMode: flat
         scopeId: "your-scope-id"
         storeInternally: enabled
-
-# Proxy configuration (optional)
-proxyConfig:
-  enabled: true
-  authMode: none
 ```
 
 **Note:** The Helm chart uses `unique.authMode`, which the Helm template maps to `serviceAuthMode` in the generated tenant config YAML. See [Authentication -- Helm Chart Field Mapping](./authentication.md#Helm-Chart-Field-Mapping).
-
-For the full list of proxy modes and the environment variables required by each, see [Configuration -- Proxy Configuration](./configuration.md#Proxy-Configuration).
 
 ## Terraform Modules
 
@@ -254,22 +247,6 @@ The connector validates all tenant configuration at startup. Check the pod logs 
 - For `cluster_local` mode, ensure `x-company-id` and `x-user-id` headers are set
 
 See [Authentication -- Troubleshooting](./authentication.md#Troubleshooting) for detailed diagnosis steps.
-
-### Root Scope Ownership Mismatch
-
-**Symptom:** Sync cycle aborts with an ownership mismatch error referencing the root scope.
-
-**Cause:** The root scope configured via `ingestion.scopeId` is already marked as owned by a different Confluence instance. This typically happens when:
-
-- The same `scopeId` is reused across multiple tenant configurations pointing at different Confluence instances.
-- A tenant's Confluence instance (`baseUrl` or `cloudId`) was changed while keeping the original root scope.
-
-**Resolution:**
-
-1. Confirm which Confluence instance should own the root scope.
-2. If the current tenant is correct: create a new root scope in Unique for the other tenant and update its `scopeId`.
-3. If the other tenant is correct: create a new root scope for the current tenant and update its `scopeId`.
-4. Do not attempt to manually clear or rewrite the ownership mark on the existing scope. See [Authentication -- Create the Root Scope](./authentication.md#2-create-the-root-scope-in-unique) for context.
 
 ### Network Connectivity
 

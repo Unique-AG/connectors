@@ -1,4 +1,4 @@
-<!-- confluence-page-id: -->
+<!-- confluence-page-id: 2150170649 -->
 <!-- confluence-space-key: PUBDOC -->
 
 ## General
@@ -21,11 +21,9 @@
 
 | Aspect | v1 | v2 |
 |---|---|---|
-| Architecture | Monorepo module | Standalone service |
-| Deployment | Part of a larger Node.js application | Independent Kubernetes container |
-| Multi-tenancy | Not supported | Multiple Confluence instances in a single deployment |
+| Multi-tenancy | Not supported | Multiple Confluence instances in a single connector pod |
 | Attachment ingestion | Not supported | Supported with configurable extensions and size limits |
-| Change detection | Re-ingests all content | File-diff mechanism ingests only new or modified items |
+| Change detection | File-diff mechanism (pages only) | File-diff mechanism (pages and attachments) |
 | Safety guards | None | Full-deletion prevention, concurrent sync prevention |
 | Key format | `spaceId_spaceKey/pageId` | `tenantName/spaceId_spaceKey/pageId` (v1 format available via `useV1KeyFormat`) |
 
@@ -173,10 +171,10 @@ If an entire previously synced space disappears from discovery results (for exam
 
 **Answer:** The key format determines how content is identified in Unique:
 
-| Format | Key Pattern (pages) | Key Pattern (attachments) |
-|---|---|---|
-| Default (v2) | `<tenantName>/<spaceId>_<spaceKey>/<pageId>` | `<tenantName>/<spaceId>_<spaceKey>/<pageId>::<attachmentId>` |
-| v1 compatible | `<spaceId>_<spaceKey>/<pageId>` | `<spaceId>_<spaceKey>/<pageId>::<attachmentId>` |
+| Format           | Key Pattern (pages)                            | Key Pattern (attachments)                                    |
+|------------------|------------------------------------------------|--------------------------------------------------------------|
+| Default (v2)     | `<tenantName>/<spaceId>_<spaceKey>/<pageId>`   | `<tenantName>/<spaceId>_<spaceKey>/<pageId>::<attachmentId>` |
+| v1 compatible    | `<spaceId>_<spaceKey>/<pageId>`                | `<spaceId>_<spaceKey>/<pageId>::<attachmentId>`              |
 
 The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backward compatibility during migration from v1.
 
@@ -274,7 +272,7 @@ If your intent really was to replace all pages in a space with a completely new 
 
 ### Can two tenants use the same scope ID?
 
-**Answer:** This is not recommended. Each tenant should have its own root scope to avoid conflicts in scope ownership and content management.
+**Answer:** No. Each root scope is tagged with the tenant that owns it. If a second tenant tries to use a scope already claimed by another tenant, the sync fails immediately.
 
 ## Performance
 

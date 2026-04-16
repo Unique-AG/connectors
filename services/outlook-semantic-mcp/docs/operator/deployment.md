@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2064449566 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Deployment
+# Outlook Semantic MCP - Deployment
 
 ## Prerequisites
 
