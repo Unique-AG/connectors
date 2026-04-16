@@ -167,17 +167,6 @@ If an entire previously synced space disappears from discovery results (for exam
 
 **Answer:** Scopes follow a two-level hierarchy: a root scope configured per tenant, and child scopes automatically created for each Confluence space key. Child scopes inherit access from the root scope. See the [Scope Hierarchy](./technical/flows.md#Scope-Hierarchy) for details.
 
-### What is the ingestion key format?
-
-**Answer:** The key format determines how content is identified in Unique:
-
-| Format           | Key Pattern (pages)                            | Key Pattern (attachments)                                    |
-|------------------|------------------------------------------------|--------------------------------------------------------------|
-| Default (v2)     | `<tenantName>/<spaceId>_<spaceKey>/<pageId>`   | `<tenantName>/<spaceId>_<spaceKey>/<pageId>::<attachmentId>` |
-| v1 compatible    | `<spaceId>_<spaceKey>/<pageId>`                | `<spaceId>_<spaceKey>/<pageId>::<attachmentId>`              |
-
-The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backward compatibility during migration from v1.
-
 ## Safety and Deletion
 
 ### What safety guards does the connector have?
