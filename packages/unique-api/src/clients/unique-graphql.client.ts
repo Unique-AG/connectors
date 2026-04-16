@@ -43,7 +43,7 @@ export class UniqueGraphqlClient {
             ...options,
             dispatcher: this.dispatcher,
           } as Parameters<typeof undiciFetch>[1],
-        )) as typeof fetch,
+        )) as unknown as typeof fetch,
       requestMiddleware: async (request) => {
         const authHeaders = await this.auth.getAuthHeaders();
         const requestHeaders = request.headers as Headers;
