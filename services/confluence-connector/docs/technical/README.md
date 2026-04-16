@@ -1,4 +1,4 @@
-<!-- confluence-page-id: -->
+<!-- confluence-page-id: 2149253140 -->
 <!-- confluence-space-key: PUBDOC -->
 
 The Confluence Connector is a Node.js-based service that synchronizes page content and file attachments from Confluence to the Unique platform. It supports both Confluence Cloud and Confluence Data Center deployments.
