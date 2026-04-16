@@ -298,6 +298,7 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 |---|---|---|
 | Sync already in progress | Overlapping cron triggers or long-running sync | Skip the cycle entirely (re-entrancy guard) |
 | Root scope not found | Misconfigured `scopeId` or scope deleted | Abort the entire sync cycle |
+| Discovery failure | Error during page or attachment fetching from Confluence | Abort the sync cycle to avoid submitting partial results to file-diff, which could cause unnecessary deletions and re-ingestion costs |
 | Accidental full deletion detected | Bug in page fetching or key format change | Abort the entire tenant sync cycle |
 | Page unavailable | Page deleted between discovery and content fetch, or transient API error | Log, skip the page, continue other pages |
 | Page with empty body | Page has no content (e.g., newly created) | Log, skip the page |
