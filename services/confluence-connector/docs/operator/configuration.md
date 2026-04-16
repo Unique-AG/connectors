@@ -36,11 +36,11 @@ The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at 
 
 Each tenant configuration file can include a top-level `status` field:
 
-| Status     | Default | Behavior                                        |
-|------------|---------|------------------------------------------------|
-| `active`   | Yes     | Tenant is loaded and sync jobs are scheduled    |
-| `inactive` | --      | Tenant config is validated but no sync jobs run |
-| `deleted`  | --      | Tenant is skipped entirely (for now)            |
+| Status     | Default | Behavior                                                                            |
+|------------|---------|------------------------------------------------------------------------------------|
+| `active`   | Yes     | Tenant is loaded and sync jobs are scheduled                                        |
+| `inactive` | --      | Tenant config is validated but no sync jobs run                                     |
+| `deleted`  | --      | Ingested content is deleted from the Unique knowledge base and sync is stopped |
 
 ### Complete Example (Cloud + External Auth)
 
@@ -265,15 +265,12 @@ The connector produces structured JSON logs. In production (`NODE_ENV=production
 
 Set via the `LOG_LEVEL` environment variable:
 
-| Level   | Description                                  |
-|---------|----------------------------------------------|
-| `fatal` | Unrecoverable errors                         |
-| `error` | Error conditions                             |
-| `warn`  | Warning conditions                           |
-| `info`  | General operational information (default)    |
-| `debug` | Detailed debugging information               |
-| `trace` | Very detailed trace-level information        |
-| `silent` | No logging output                           |
+| Level   | Description                               |
+|---------|-------------------------------------------|
+| `error` | Error conditions                          |
+| `warn`  | Warning conditions                        |
+| `info`  | General operational information (default) |
+| `debug` | Detailed debugging information            |
 
 ### Tenant Context in Logs
 
@@ -378,33 +375,17 @@ To perform a complete re-ingestion of all synced Confluence content:
 ### Prerequisites
 
 - Access to the Unique API or admin interface
-- Ability to pause the connector
+- Ability to update the tenant configuration
 
-### Step 1: Pause the Connector
+### Step 1: Delete Ingested Content
 
-Scale down the deployment:
-
-```bash
-kubectl scale deployment confluence-connector --replicas=0 -n <namespace>
-```
-
-### Step 2: Delete Synced Content Under the Root Scope
-
-Use the Unique Public API or admin interface to remove the connector-managed content under the configured root scope.
-
-Do not delete the root scope itself. The connector validates that the scope referenced by `ingestion.scopeId` exists at the start of each sync cycle. If the scope is missing, the sync cycle fails. The application remains running but every sync attempt fails until the scope is restored or the configuration is corrected.
+Set the tenant status to `deleted` in its YAML configuration file and restart the connector. This deletes the tenant's ingested content from the Unique knowledge base and stops sync. Other tenants continue running.
 
 **Warning:** This operation is irreversible. Ensure you have backups if needed.
 
-### Step 3: Re-enable the Connector
+### Step 2: Re-enable the Tenant
 
-Scale up the deployment:
-
-```bash
-kubectl scale deployment confluence-connector --replicas=1 -n <namespace>
-```
-
-The connector triggers an initial sync immediately on startup, re-ingesting all labeled content from scratch into the existing root scope.
+Set the tenant status back to `active` and restart the connector. The connector triggers an initial sync immediately on startup, re-ingesting all labeled content from scratch into the existing root scope.
 
 ### Further Guidance
 

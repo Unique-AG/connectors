@@ -58,8 +58,8 @@ Steps:
 
 1. Navigate to Zitadel.
 2. Create a new service user.
-3. For `external` mode: assign the required authorizations listed above. For `cluster_local` mode: no authorizations are needed.
-4. Note the user ID for configuration.
+3. For `external` mode: assign the required authorizations listed above and generate a client secret. For `cluster_local` mode: no authorizations or client secret are needed.
+4. Note the user ID (and for `external` mode, the client ID and client secret) for configuration.
 
 For detailed instructions on creating and configuring a service user, see:
 - [How To Configure A Service User](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075/How+To+Configure+A+Service+User)
