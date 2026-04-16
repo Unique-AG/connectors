@@ -149,7 +149,7 @@ In cluster-internal mode (`serviceAuthMode: cluster_local`):
 
 ## Multi-Tenancy Support
 
-Multiple Confluence instances (tenants) can be configured in a single deployment. Each tenant is isolated at runtime and has its own service instances, API clients, authentication strategy, and sync schedule. All per-tenant services are initialized at startup.
+Multiple Confluence instances (tenants) can be configured within a single connector pod. Each tenant is isolated at the application level and has its own service instances, API clients, authentication strategy, and sync schedule. All tenants share the same process and pod. All per-tenant services are initialized at startup.
 
 Tenant configuration files are loaded from YAML files matching the glob pattern set in `TENANT_CONFIG_PATH_PATTERN` (default: `/app/tenant-configs/*-tenant-config.yaml`). Each tenant has a status (`active`, `inactive`, or `deleted`). Only `active` tenants are registered and scheduled. See the [Operator Guide](../operator/README.md) for configuration details.
 
