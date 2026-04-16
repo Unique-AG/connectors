@@ -157,7 +157,7 @@ To prevent misconfiguration where the same Confluence instance is connected to m
 - **Cloud:** the identifier is derived from the `cloudId` configured in the tenant YAML.
 - **Data Center:** the identifier is fetched from the Data Center's application manifest endpoint (`/rest/applinks/1.0/manifest`). No authentication is required.
 
-On every subsequent sync cycle, the connector reads the ownership mark from the root scope and compares it against the current Confluence instance. A mismatch aborts the tenant sync cycle with a fatal error. The ownership mark is only applied to root scopes that do not yet carry one, so existing root scopes are claimed automatically on the next sync.
+On every subsequent sync cycle, the connector reads the ownership mark from the root scope and compares it against the current Confluence instance. A mismatch aborts the tenant sync cycle with a fatal error.
 
 ## Discovery Phase
 
@@ -320,9 +320,7 @@ After each space's file diff is computed, two guards run to prevent accidental f
 | Guard | Trigger Condition | Rationale |
 |---|---|---|
 | **Zero-submission guard** | Discovery submitted 0 items but the diff contains deletions | Likely a bug in page fetching or an authentication failure that returned no results. Deleting all stored content would be destructive. |
-| **Full-deletion guard** | The diff would delete every file stored in Unique for the space, **and** either no new items were submitted or the newly submitted keys overlap with the keys being deleted | Overlap between submitted and deleted keys is a strong signal of a key format change (e.g., toggling `useV1KeyFormat`) that makes existing keys unrecognizable. Without that signal, the diff is treated as legitimate content replacement. |
-
-If the diff would delete all existing files but the submitted items use entirely different keys from the deleted ones, the sync proceeds with a warning. This allows scenarios where an entire space's pages were genuinely replaced with new pages that happen to have different identifiers, without requiring operator intervention.
+| **Full-deletion guard** | The diff would delete every file stored in Unique for the space and the connector determines the deletion is not a legitimate full content replacement | Likely a key format change (e.g., toggling `useV1KeyFormat`) that causes all existing content to appear unrecognized. If the connector determines the content was genuinely replaced rather than misidentified, the sync proceeds with a warning instead of aborting. |
 
 Partial deletions (removing some but not all files) are always allowed.
 
@@ -368,12 +366,7 @@ If no content is found for the given keys, a warning is logged and no deletion o
 
 The file diff runs once per Confluence space that appears in the current discovery results. Spaces that have disappeared from discovery entirely (because the space was deleted in Confluence, or all ingest labels were removed from its pages) are not diffed and would otherwise leave orphaned content and scopes in Unique.
 
-After the per-item deletion step, the connector detects orphaned space scopes by listing the root scope's children and comparing them against the set of Confluence space keys discovered during the current sync. For each orphaned space:
-
-1. All files belonging to that space are deleted.
-2. The space scope is deleted.
-
-Files are deleted before the scope so that a partial failure does not leave files without a parent scope. Each orphaned space is cleaned up in isolation: a failure for one space is logged and does not prevent the cleanup of other orphaned spaces. The cleanup phase runs at the end of every sync cycle.
+After the per-item deletion step, the connector detects orphaned space scopes by comparing the root scope's children against the set of Confluence space keys discovered during the current sync. For each orphaned space, the connector deletes both the space's files and the space scope itself. A failure for one space does not prevent the cleanup of other orphaned spaces.
 
 ### Concurrency and Progress
 

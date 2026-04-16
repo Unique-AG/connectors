@@ -371,7 +371,7 @@ The connector exposes standard host metrics (CPU, memory, event loop) and HTTP A
 
 ### Application Telemetry
 
-Custom connector metrics use the `cfc_` prefix (Confluence Connector). Unique platform interaction metrics use the `confluence_connector_unique_api_` prefix and are provided by the shared Unique API package.
+Custom connector metrics use the `cfc_` prefix (Confluence Connector). Unique platform interaction metrics use the `confluence_connector_unique_api_` prefix.
 
 #### Sync Cycle Metrics
 

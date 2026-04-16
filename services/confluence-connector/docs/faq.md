@@ -187,7 +187,7 @@ The v1 format can be enabled via `ingestion.useV1KeyFormat: enabled` for backwar
 **Answer:** The connector includes the following safeguards to prevent accidental data loss and misconfiguration:
 
 - **Zero-submission guard:** If discovery returns zero items for a space but the file diff would still delete content, the sync cycle is aborted. This prevents a transient Confluence error or a silent authentication failure from wiping ingested content.
-- **Full-deletion guard:** If the file diff would delete every file stored in Unique for a space, the sync cycle is aborted unless the items currently submitted for that space have entirely different keys from the ones being deleted. Full replacement with non-overlapping keys is allowed with a warning.
+- **Full-deletion guard:** If the file diff would delete every file stored in Unique for a space, the sync cycle is aborted. If the connector determines the deletion is a legitimate full content replacement (rather than a misconfiguration), the sync proceeds with a warning instead of aborting.
 - **Root scope ownership validation:** Each root scope is tagged with the Confluence instance that owns it. If a scope was already claimed by a different Confluence instance, the sync for that tenant fails immediately, preventing two tenants from accidentally writing into the same scope.
 
 See the [safety checks](./technical/flows.md#Safety-Checks) and [root scope ownership validation](./technical/flows.md#Root-Scope-Ownership-Validation) documentation for full details.
@@ -228,7 +228,7 @@ To move a tenant to a different Confluence instance, create a new root scope in 
 
 ### Why do I see "Aborting to prevent accidental full deletion" errors?
 
-**Answer:** This means the full-deletion safety guard was triggered. The guard aborts the sync when the file diff would delete every file stored for a space and the submitted items share keys with the items being deleted (indicating a key format problem rather than genuine content replacement). Possible causes:
+**Answer:** This means the full-deletion safety guard was triggered. The guard aborts the sync when the file diff would delete every file stored for a space and the connector determines the deletion is not a legitimate content replacement. Possible causes:
 
 - A bug in page discovery returned zero results for a space (e.g., Confluence API issue, authentication failure for specific spaces)
 - The ingestion key format changed (e.g., `useV1KeyFormat` was toggled), causing the diff to see all existing keys as unrecognized
@@ -239,7 +239,7 @@ To move a tenant to a different Confluence instance, create a new root scope in 
 2. Verify that the `useV1KeyFormat` setting has not changed unexpectedly
 3. If the key format change was intentional, the old content must be cleaned up manually before switching formats
 
-If your intent really was to replace all pages in a space with a completely new set of pages, the sync proceeds automatically as long as the new pages have different identifiers from the old ones. See [Safety Checks](./technical/flows.md#Safety-Checks) for full details.
+If your intent really was to replace all pages in a space with a completely new set of pages, the connector detects this as a legitimate replacement and proceeds automatically. See [Safety Checks](./technical/flows.md#Safety-Checks) for full details.
 
 ### Why is sync taking too long?
 
@@ -308,7 +308,7 @@ The connector discovers pages via CQL search queries filtered by label. Only pag
 
 **Answer:** Pages in inaccessible spaces are silently excluded from CQL search results. The connector does not receive an error; it simply never discovers those pages.
 
-If a space that was previously accessible becomes inaccessible, its content is cleaned up by the end-of-cycle removed-space cleanup: the connector lists the root scope's children, detects the scope for the now-inaccessible space as orphaned, and removes both its files and its scope. See [Removed Space Cleanup](./technical/flows.md#Removed-Space-Cleanup) for details.
+If a space that was previously accessible becomes inaccessible, its content is cleaned up automatically at the end of the sync cycle. The connector detects the orphaned space scope and removes both its files and its scope. See [Removed Space Cleanup](./technical/flows.md#Removed-Space-Cleanup) for details.
 
 ### How does Unique platform authentication work?
 
