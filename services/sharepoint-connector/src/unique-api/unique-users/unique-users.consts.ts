@@ -1,4 +1,5 @@
 import { gql } from 'graphql-request';
+import type { VariableLogPolicy } from '../../utils/sanitize-graphql-variables';
 
 export interface ListUsersQueryInput {
   skip: number;
@@ -21,6 +22,8 @@ export interface ListUsersQueryResult {
   };
 }
 
+export const LIST_USERS_LOG_SAFE_KEYS: VariableLogPolicy = ['skip', 'take', 'where.active.equals'];
+
 export const LIST_USERS_QUERY = gql`
   query ListUsers($skip: Int!, $take: Int!, $where: UserWhereInput) {
     listUsers: paginatedUsers(skip: $skip, take: $take, where: $where) {
@@ -41,6 +44,8 @@ export interface GetCurrentUserQueryResult {
     };
   };
 }
+
+export const GET_CURRENT_USER_LOG_SAFE_KEYS: VariableLogPolicy = [];
 
 export const GET_CURRENT_USER_QUERY = gql`
   query User {

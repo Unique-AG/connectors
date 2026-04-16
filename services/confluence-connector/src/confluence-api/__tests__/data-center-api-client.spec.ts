@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import type { RateLimitedHttpClient } from '../../utils/rate-limited-http-client';
@@ -10,6 +11,7 @@ const mockAuth = { acquireToken: vi.fn().mockResolvedValue('dc-token') };
 
 const mockHttpClient = {
   rateLimitedRequest: vi.fn(),
+  rateLimitedStreamRequest: vi.fn(),
 } as unknown as RateLimitedHttpClient;
 
 const mockConfig: ConfluenceConfig = {
@@ -39,11 +41,86 @@ describe('DataCenterConfluenceApiClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    client = new DataCenterConfluenceApiClient(mockConfig, mockAuth as never, mockHttpClient);
+    client = new DataCenterConfluenceApiClient(mockConfig, mockAuth as never, mockHttpClient, {
+      attachmentsEnabled: false,
+    });
+  });
+
+  describe('resolveInstanceIdentifier', () => {
+    it('calls the applinks manifest endpoint with empty auth headers', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: 'dc-instance-uuid',
+        name: 'My Confluence',
+      });
+
+      await client.resolveInstanceIdentifier();
+
+      expect(mockHttpClient.rateLimitedRequest).toHaveBeenCalledWith(
+        `${BASE_URL}/rest/applinks/1.0/manifest`,
+        {},
+      );
+    });
+
+    it('returns data-center type with id from manifest response', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: 'dc-instance-uuid',
+        name: 'My Confluence',
+      });
+
+      const result = await client.resolveInstanceIdentifier();
+
+      expect(result).toEqual({ type: 'data-center', id: 'dc-instance-uuid' });
+    });
+
+    it('throws when manifest response is missing the id field', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        name: 'My Confluence',
+      });
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('throws when manifest response id is not a string', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: 12345,
+      });
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('throws when manifest response id is an empty string', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        id: '',
+      });
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('throws when manifest response is null', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(null);
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow(
+        'did not contain a valid "id" field',
+      );
+    });
+
+    it('propagates HTTP errors from the manifest request', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockRejectedValueOnce(
+        new Error('Error response from https://dc.example.com/rest/applinks/1.0/manifest: 500'),
+      );
+
+      await expect(client.resolveInstanceIdentifier()).rejects.toThrow('500');
+    });
   });
 
   describe('searchPagesByLabel', () => {
-    it('constructs CQL with both labels and space.type=global filter', async () => {
+    it('constructs CQL with both labels and only space.type=global filter', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -55,11 +132,11 @@ describe('DataCenterConfluenceApiClient', () => {
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('label="sync"');
       expect(decodedUrl).toContain('label="sync-all"');
-      expect(decodedUrl).toContain('space.type=global');
+      expect(decodedUrl).toContain('AND space.type=global AND');
       expect(decodedUrl).toContain('type != attachment');
     });
 
-    it('uses /rest/api/content/search with os_authType=basic', async () => {
+    it('uses /rest/api/content/search without os_authType', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -69,10 +146,10 @@ describe('DataCenterConfluenceApiClient', () => {
 
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).toContain('/rest/api/content/search');
-      expect(url).toContain('os_authType=basic');
+      expect(url).not.toContain('os_authType');
     });
 
-    it('excludes collaboration space type from filter', async () => {
+    it('does not include collaboration space type (unsupported by Data Center)', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -82,7 +159,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
-      expect(decodedUrl).not.toContain('collaboration');
+      expect(decodedUrl).not.toContain('space.type=collaboration');
     });
 
     it('uses limit=100 for search pages', async () => {
@@ -99,14 +176,14 @@ describe('DataCenterConfluenceApiClient', () => {
   });
 
   describe('getPageById', () => {
-    it('uses direct content endpoint with os_authType=basic', async () => {
+    it('uses direct content endpoint without os_authType', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(makePage({ id: '42' }));
 
       await client.getPageById('42');
 
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       expect(url).toContain('/rest/api/content/42');
-      expect(url).toContain('os_authType=basic');
+      expect(url).not.toContain('os_authType');
       expect(url).toContain('expand=body.storage,version,space,metadata.labels');
     });
 
@@ -163,7 +240,7 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(mockHttpClient.rateLimitedRequest).not.toHaveBeenCalled();
     });
 
-    it('uses CQL ancestor IN (...) with os_authType=basic for single root ID', async () => {
+    it('uses CQL ancestor IN (...) without os_authType for single root ID', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         results: [],
         _links: {},
@@ -174,7 +251,7 @@ describe('DataCenterConfluenceApiClient', () => {
       const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
       const decodedUrl = decodeURIComponent(url);
       expect(decodedUrl).toContain('ancestor IN (55)');
-      expect(url).toContain('os_authType=basic');
+      expect(url).not.toContain('os_authType');
     });
 
     it('uses CQL ancestor IN (...) for multiple root IDs', async () => {
@@ -229,6 +306,198 @@ describe('DataCenterConfluenceApiClient', () => {
       const url = client.buildPageWebUrl(page);
 
       expect(url).toBe(`${BASE_URL}/pages/viewpage.action?pageId=99`);
+    });
+  });
+
+  describe('buildAttachmentWebUrl', () => {
+    it('builds attachment preview URL with viewpageattachments.action', () => {
+      const url = client.buildAttachmentWebUrl('327683', '327685', 'lock-icon.png');
+
+      expect(url).toBe(
+        `${BASE_URL}/pages/viewpageattachments.action?pageId=327683&preview=%2F327683%2F327685%2Flock-icon.png`,
+      );
+    });
+
+    it('does not strip any prefix from Data Center attachment IDs', () => {
+      const url = client.buildAttachmentWebUrl('100', '200', 'file.pdf');
+
+      expect(url).toContain('preview=%2F100%2F200%2Ffile.pdf');
+    });
+
+    it('encodes special characters in attachment title', () => {
+      const url = client.buildAttachmentWebUrl('100', '200', 'report (final).pdf');
+
+      expect(url).toContain('preview=%2F100%2F200%2Freport%20(final).pdf');
+    });
+  });
+
+  describe('attachmentsEnabled option', () => {
+    it('includes attachment expand fields when attachmentsEnabled is true', async () => {
+      const clientWithAttachments = new DataCenterConfluenceApiClient(
+        mockConfig,
+        mockAuth as never,
+        mockHttpClient,
+        { attachmentsEnabled: true },
+      );
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
+
+      await clientWithAttachments.searchPagesByLabel();
+
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
+      expect(url).toContain('children.attachment');
+      expect(url).toContain('children.attachment.version');
+      expect(url).toContain('children.attachment.extensions');
+    });
+
+    it('excludes attachment expand fields when attachmentsEnabled is false', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
+
+      await client.searchPagesByLabel();
+
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
+      expect(url).not.toContain('children.attachment');
+    });
+
+    it('parses pages with children but without attachment field', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [makePage({ children: {} })],
+        _links: {},
+      });
+
+      const pages = await client.searchPagesByLabel();
+
+      expect(pages).toHaveLength(1);
+      expect(pages[0]?.children?.attachment).toBeUndefined();
+    });
+  });
+
+  describe('fetchMoreAttachments', () => {
+    it('fetches remaining attachments when page has more than initial limit', async () => {
+      const clientWithAttachments = new DataCenterConfluenceApiClient(
+        mockConfig,
+        mockAuth as never,
+        mockHttpClient,
+        { attachmentsEnabled: true },
+      );
+
+      const pageWithPaginatedAttachments = makePage({
+        children: {
+          attachment: {
+            results: [
+              {
+                id: 'att-1',
+                title: 'a.pdf',
+                extensions: { mediaType: 'application/pdf', fileSize: 100 },
+                version: { when: '2024-01-01' },
+                _links: { download: '/d/a.pdf' },
+              },
+            ],
+            size: 25,
+            limit: 25,
+            _links: { next: '/rest/api/content/100/child/attachment?start=25&limit=25' },
+          },
+        },
+      });
+
+      vi.mocked(mockHttpClient.rateLimitedRequest)
+        .mockResolvedValueOnce({
+          results: [pageWithPaginatedAttachments],
+          _links: {},
+        })
+        .mockResolvedValueOnce({
+          results: [
+            {
+              id: 'att-2',
+              title: 'b.pdf',
+              extensions: { mediaType: 'application/pdf', fileSize: 200 },
+              version: { when: '2024-01-01' },
+              _links: { download: '/d/b.pdf' },
+            },
+          ],
+          _links: {},
+        });
+
+      const pages = await clientWithAttachments.searchPagesByLabel();
+
+      expect(pages[0]?.children?.attachment?.results).toHaveLength(2);
+      expect(pages[0]?.children?.attachment?.results[1]?.id).toBe('att-2');
+      const paginationUrl = vi.mocked(mockHttpClient.rateLimitedRequest).mock
+        .calls[1]?.[0] as string;
+      expect(paginationUrl).toContain(`${BASE_URL}/rest/api/content/100/child/attachment`);
+    });
+
+    it('does not fetch remaining attachments when size < limit', async () => {
+      const clientWithAttachments = new DataCenterConfluenceApiClient(
+        mockConfig,
+        mockAuth as never,
+        mockHttpClient,
+        { attachmentsEnabled: true },
+      );
+
+      const pageWithFewAttachments = makePage({
+        children: {
+          attachment: {
+            results: [
+              {
+                id: 'att-1',
+                title: 'a.pdf',
+                extensions: { mediaType: 'application/pdf', fileSize: 100 },
+                version: { when: '2024-01-01' },
+                _links: { download: '/d/a.pdf' },
+              },
+            ],
+            size: 1,
+            limit: 25,
+            _links: {},
+          },
+        },
+      });
+
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [pageWithFewAttachments],
+        _links: {},
+      });
+
+      await clientWithAttachments.searchPagesByLabel();
+
+      expect(mockHttpClient.rateLimitedRequest).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getAttachmentDownloadStream', () => {
+    it('builds download URL with baseUrl prefix using downloadPath', async () => {
+      const mockStream = new Readable({ read() {} });
+      vi.mocked(mockHttpClient.rateLimitedStreamRequest).mockResolvedValueOnce(mockStream);
+
+      await client.getAttachmentDownloadStream(
+        'att456',
+        '123',
+        '/download/attachments/123/report.pdf?version=1&api=v2',
+      );
+
+      expect(mockHttpClient.rateLimitedStreamRequest).toHaveBeenCalledWith(
+        `${BASE_URL}/download/attachments/123/report.pdf?version=1&api=v2`,
+        { Authorization: 'Bearer dc-token' },
+      );
+    });
+
+    it('returns the stream from the HTTP client', async () => {
+      const mockStream = new Readable({ read() {} });
+      vi.mocked(mockHttpClient.rateLimitedStreamRequest).mockResolvedValueOnce(mockStream);
+
+      const result = await client.getAttachmentDownloadStream(
+        'att789',
+        '123',
+        '/download/attachments/123/file.txt',
+      );
+
+      expect(result).toBe(mockStream);
     });
   });
 });

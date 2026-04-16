@@ -8,6 +8,7 @@ connectorConfig:
         auth:
           mode: oauth_2lo
           clientId: test-dc-client-id
+          clientSecret: "os.environ/CONFLUENCE_CLIENT_SECRET"
         apiRateLimitPerMinute: 50
         ingestSingleLabel: ai-ingest
         ingestAllLabel: ai-ingest-all
@@ -20,6 +21,10 @@ connectorConfig:
           x-company-id: "123456789101112131"
           x-user-id: "123456789101112131"
       processing:
-        stepTimeoutSeconds: 600
         concurrency: 1
         scanIntervalCron: "0 */2 * * *"
+      ingestion:
+        ingestionMode: flat
+        scopeId: test-scope-id
+        storeInternally: enabled
+        useV1KeyFormat: disabled

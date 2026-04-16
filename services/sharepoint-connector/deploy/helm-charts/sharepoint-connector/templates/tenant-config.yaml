@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: sharepoint-connector-tenant-config
+  name: {{ include "chart.fullname" . }}-tenant-config
   labels:
     {{- include "chart.labels" . | nindent 4 }}
 data:

@@ -7,18 +7,18 @@ import {
 } from '../utils/zod.util';
 
 export const AuthMode = {
-  OAUTH_2LO: 'oauth_2lo',
-  PAT: 'pat',
+  OAuth2Lo: 'oauth_2lo',
+  Pat: 'pat',
 } as const;
 
 const oauth2loAuth = z.object({
-  mode: z.literal(AuthMode.OAUTH_2LO).describe('OAuth 2.0 two-legged (client credentials)'),
+  mode: z.literal(AuthMode.OAuth2Lo).describe('OAuth 2.0 two-legged (client credentials)'),
   clientId: z.string().min(1),
   clientSecret: envRequiredSecretSchema,
 });
 
 const patAuth = z.object({
-  mode: z.literal(AuthMode.PAT).describe('Personal Access Token (Data Center only)'),
+  mode: z.literal(AuthMode.Pat).describe('Personal Access Token (Data Center only)'),
   token: envRequiredSecretSchema,
 });
 

@@ -53,7 +53,9 @@ const appSettingsSchema = z.object({
 
       try {
         const hexBuffer = Buffer.from(key, 'hex');
-        if (hexBuffer.length === key.length / 2) return hexBuffer;
+        if (hexBuffer.length === key.length / 2) {
+          return hexBuffer;
+        }
       } catch {
         // fallback to base64
       }

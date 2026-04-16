@@ -8,7 +8,7 @@ export type {
   SearchResult as PublicSearchResult,
   SearchResultItem,
 } from './content/search-content.dto';
-export { SearchType, UniqueQLOperator } from './content/search-content.dto';
+export { UniqueQLOperator } from './content/search-content.dto';
 export type { UniqueContentFacade } from './content/unique-content.facade';
 export type { UniqueApiMetrics } from './core/observability';
 export {
@@ -35,6 +35,7 @@ export type {
   IngestionApiResponse,
   IngestionFinalizationRequest,
 } from './ingestion/ingestion.types';
+export { IngestionState } from './ingestion/ingestion.types';
 export type {
   DeleteFolderResult,
   Scope,
@@ -43,7 +44,6 @@ export type {
 } from './scopes/scopes.types';
 export type {
   UniqueAccessType,
-  UniqueApiClient,
   UniqueApiClientFactory,
   UniqueApiClientRegistry,
   UniqueApiScopes,
@@ -54,5 +54,8 @@ export type {
   UniqueIngestionFacade,
   UniqueUsersFacade,
 } from './types';
-export { UniqueOwnerType } from './types';
-export type { SimpleUser } from './users/users.types';
+export {
+  UniqueApiClient,
+  UniqueOwnerType,
+} from './types';
+export type { SimpleUser, UserWithCompany } from './users/users.types';

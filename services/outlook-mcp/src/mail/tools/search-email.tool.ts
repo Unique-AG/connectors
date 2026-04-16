@@ -103,17 +103,29 @@ export class SearchEmailTool extends BaseMsGraphTool {
 
       const filterConditions: string[] = [];
 
-      if (from)
+      if (from) {
         filterConditions.push(
           `from/emailAddress/address eq '${from}' or from/emailAddress/name eq '${from}'`,
         );
-      if (subject) filterConditions.push(`contains(subject,'${subject}')`);
-      if (hasAttachments !== undefined)
+      }
+      if (subject) {
+        filterConditions.push(`contains(subject,'${subject}')`);
+      }
+      if (hasAttachments !== undefined) {
         filterConditions.push(`hasAttachments eq ${hasAttachments}`);
-      if (isRead !== undefined) filterConditions.push(`isRead eq ${isRead}`);
-      if (importance) filterConditions.push(`importance eq '${importance}'`);
-      if (dateFrom) filterConditions.push(`receivedDateTime ge ${dateFrom}T00:00:00Z`);
-      if (dateTo) filterConditions.push(`receivedDateTime le ${dateTo}T23:59:59Z`);
+      }
+      if (isRead !== undefined) {
+        filterConditions.push(`isRead eq ${isRead}`);
+      }
+      if (importance) {
+        filterConditions.push(`importance eq '${importance}'`);
+      }
+      if (dateFrom) {
+        filterConditions.push(`receivedDateTime ge ${dateFrom}T00:00:00Z`);
+      }
+      if (dateTo) {
+        filterConditions.push(`receivedDateTime le ${dateTo}T23:59:59Z`);
+      }
 
       let graphQuery = graphClient
         .api(endpoint)

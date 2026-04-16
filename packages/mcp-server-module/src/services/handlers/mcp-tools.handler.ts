@@ -11,6 +11,7 @@ import { Inject, Injectable, Scope } from '@nestjs/common';
 import { ContextIdFactory, ModuleRef } from '@nestjs/core';
 import * as z from 'zod';
 import { HttpRequest } from '../../interfaces/http-adapter.interface';
+import { formatZodError } from '../../utils/format-zod-error';
 import { McpRegistryService } from '../mcp-registry.service';
 import { McpHandlerBase } from './mcp-handler.base';
 
@@ -43,7 +44,7 @@ export class McpToolsHandler extends McpHandlerBase {
       if (!validation.success) {
         throw new McpError(
           ErrorCode.InternalError,
-          `Tool result does not match outputSchema: ${validation.error.message}`,
+          `Tool result does not match outputSchema: ${formatZodError(validation.error)}`,
         );
       }
       return {
@@ -75,12 +76,17 @@ export class McpToolsHandler extends McpHandlerBase {
           }) as Tool['inputSchema'],
         };
 
-        if (tool.metadata.title) toolSchema.title = tool.metadata.title;
-        if (tool.metadata._meta) toolSchema._meta = tool.metadata._meta;
-        if (tool.metadata.outputSchema)
+        if (tool.metadata.title) {
+          toolSchema.title = tool.metadata.title;
+        }
+        if (tool.metadata._meta) {
+          toolSchema._meta = tool.metadata._meta;
+        }
+        if (tool.metadata.outputSchema) {
           toolSchema.outputSchema = z.toJSONSchema(
             tool.metadata.outputSchema,
           ) as Tool['outputSchema'];
+        }
 
         return toolSchema;
       });
@@ -106,7 +112,7 @@ export class McpToolsHandler extends McpHandlerBase {
           if (!validation.success) {
             throw new McpError(
               ErrorCode.InvalidParams,
-              `Invalid parameters: ${validation.error.message}`,
+              `Invalid parameters: ${formatZodError(validation.error)}`,
             );
           }
           // Use validated arguments to ensure defaults and transformations are applied

@@ -53,7 +53,9 @@ export class OpaqueTokenService {
    * @returns The final scope to use, or null if invalid
    */
   private validateAndDetermineScope(originalScope: string, requestedScope?: string): string | null {
-    if (!requestedScope) return originalScope;
+    if (!requestedScope) {
+      return originalScope;
+    }
 
     const originalScopes = originalScope.split(' ').filter((s) => s.length > 0);
     const requestedScopes = requestedScope.split(' ').filter((s) => s.length > 0);
@@ -198,7 +200,9 @@ export class OpaqueTokenService {
     }
 
     const metadata = await this.validateRefreshToken(refreshToken);
-    if (!metadata) return null;
+    if (!metadata) {
+      return null;
+    }
 
     if (metadata.clientId !== clientId) {
       this.logger.warn({
@@ -220,7 +224,9 @@ export class OpaqueTokenService {
       return null;
     }
 
-    if (this.store.markRefreshTokenAsUsed) await this.store.markRefreshTokenAsUsed(refreshToken);
+    if (this.store.markRefreshTokenAsUsed) {
+      await this.store.markRefreshTokenAsUsed(refreshToken);
+    }
 
     // Rotate refresh token with same family but incremented generation
     await this.store.removeRefreshToken(refreshToken);

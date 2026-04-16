@@ -17,7 +17,7 @@ export class GetUserProfileQuery {
       where: eq(userProfiles.id, userProfileId.toString()),
     });
     assert.ok(userProfile, `User Profile missing userProfileId: ${userProfileId}`);
-    traceAttrs({ user_profile_id: userProfile.id });
+    traceAttrs({ userProfileId: userProfile.id });
     const email = userProfile.email;
     assert.ok(email, `User Profile with id:${userProfile.id} has no email ${email}`);
 

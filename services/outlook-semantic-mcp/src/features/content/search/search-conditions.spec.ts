@@ -1,6 +1,6 @@
 import { UniqueQLOperator } from '@unique-ag/unique-api';
 import { describe, expect, it } from 'vitest';
-import { buildSearchFilter } from './search-conditions.dto';
+import { buildSearchFilter, CONTAINS_ANY_OPERATOR } from './search-conditions.dto';
 
 describe('buildSearchFilter', () => {
   it('returns undefined when conditions is undefined', () => {
@@ -41,12 +41,12 @@ describe('buildSearchFilter', () => {
 
   it('passes array value as-is for an array field', () => {
     const result = buildSearchFilter([
-      { fromSenders: { value: ['alice@example.com'], operator: UniqueQLOperator.EQUALS } },
+      { fromSenders: { value: ['alice@example.com'], operator: UniqueQLOperator.IN } },
     ]);
 
     expect(result).toEqual({
-      path: ['from.emailAddress'],
-      operator: UniqueQLOperator.EQUALS,
+      path: ['fromEmailAddress'],
+      operator: UniqueQLOperator.IN,
       value: ['alice@example.com'],
     });
   });
@@ -56,14 +56,14 @@ describe('buildSearchFilter', () => {
       {
         fromSenders: {
           value: ['alice@example.com', 'bob@example.com'],
-          operator: UniqueQLOperator.EQUALS,
+          operator: UniqueQLOperator.IN,
         },
       },
     ]);
 
     expect(result).toEqual({
-      path: ['from.emailAddress'],
-      operator: UniqueQLOperator.EQUALS,
+      path: ['fromEmailAddress'],
+      operator: UniqueQLOperator.IN,
       value: ['alice@example.com', 'bob@example.com'],
     });
   });
@@ -72,7 +72,7 @@ describe('buildSearchFilter', () => {
     const result = buildSearchFilter([
       {
         dateFrom: { value: '2024-01-01', operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL },
-        fromSenders: { value: ['alice@example.com'], operator: UniqueQLOperator.EQUALS },
+        fromSenders: { value: ['alice@example.com'], operator: UniqueQLOperator.IN },
       },
     ]);
 
@@ -84,8 +84,8 @@ describe('buildSearchFilter', () => {
           value: '2024-01-01',
         },
         {
-          path: ['from.emailAddress'],
-          operator: UniqueQLOperator.EQUALS,
+          path: ['fromEmailAddress'],
+          operator: UniqueQLOperator.IN,
           value: ['alice@example.com'],
         },
       ],
@@ -95,7 +95,7 @@ describe('buildSearchFilter', () => {
   it('ORs multiple condition groups', () => {
     const result = buildSearchFilter([
       { dateFrom: { value: '2024-01-01', operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL } },
-      { directories: { value: ['inbox-id'], operator: UniqueQLOperator.EQUALS } },
+      { directories: { value: ['inbox-id'], operator: UniqueQLOperator.IN } },
     ]);
 
     expect(result).toEqual({
@@ -107,7 +107,7 @@ describe('buildSearchFilter', () => {
         },
         {
           path: ['parentFolderId'],
-          operator: UniqueQLOperator.EQUALS,
+          operator: UniqueQLOperator.IN,
           value: ['inbox-id'],
         },
       ],
@@ -117,28 +117,107 @@ describe('buildSearchFilter', () => {
   it('uses correct metadata paths for toRecipients, ccRecipients, and categories', () => {
     const result = buildSearchFilter([
       {
-        toRecipients: { value: ['carol@example.com'], operator: UniqueQLOperator.EQUALS },
-        ccRecipients: { value: ['dave@example.com'], operator: UniqueQLOperator.EQUALS },
-        categories: { value: ['important'], operator: UniqueQLOperator.EQUALS },
+        toRecipients: { value: ['carol@example.com'], operator: UniqueQLOperator.IN },
+        ccRecipients: { value: ['dave@example.com'], operator: UniqueQLOperator.IN },
+        categories: { value: ['important'], operator: UniqueQLOperator.IN },
       },
     ]);
 
     expect(result).toEqual({
       and: [
         {
-          path: ['toRecipients.emailAddresses'],
-          operator: UniqueQLOperator.EQUALS,
+          path: ['toRecipientsEmailAddresses'],
+          operator: UniqueQLOperator.IN,
           value: ['carol@example.com'],
         },
         {
-          path: ['ccRecipients.emailAddresses'],
-          operator: UniqueQLOperator.EQUALS,
+          path: ['ccRecipientsEmailAddresses'],
+          operator: UniqueQLOperator.IN,
           value: ['dave@example.com'],
         },
         {
           path: ['categories'],
-          operator: UniqueQLOperator.EQUALS,
+          operator: UniqueQLOperator.IN,
           value: ['important'],
+        },
+      ],
+    });
+  });
+
+  it('expands containsAny with multiple emails to an or of contains leaves', () => {
+    const result = buildSearchFilter([
+      {
+        fromSenders: {
+          value: ['alice@example.com', 'bob@example.com'],
+          operator: CONTAINS_ANY_OPERATOR,
+        },
+      },
+    ]);
+
+    expect(result).toEqual({
+      or: [
+        {
+          path: ['fromEmailAddress'],
+          operator: UniqueQLOperator.CONTAINS,
+          value: 'alice@example.com',
+        },
+        {
+          path: ['fromEmailAddress'],
+          operator: UniqueQLOperator.CONTAINS,
+          value: 'bob@example.com',
+        },
+      ],
+    });
+  });
+
+  it('unwraps containsAny with a single value to a bare contains leaf', () => {
+    const result = buildSearchFilter([
+      {
+        fromSenders: {
+          value: ['alice@example.com'],
+          operator: CONTAINS_ANY_OPERATOR,
+        },
+      },
+    ]);
+
+    expect(result).toEqual({
+      path: ['fromEmailAddress'],
+      operator: UniqueQLOperator.CONTAINS,
+      value: 'alice@example.com',
+    });
+  });
+
+  it('ANDs containsAny with other conditions in the same group', () => {
+    const result = buildSearchFilter([
+      {
+        dateFrom: { value: '2024-01-01', operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL },
+        fromSenders: {
+          value: ['alice@example.com', 'bob@example.com'],
+          operator: CONTAINS_ANY_OPERATOR,
+        },
+      },
+    ]);
+
+    expect(result).toEqual({
+      and: [
+        {
+          path: ['receivedDateTime'],
+          operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL,
+          value: '2024-01-01',
+        },
+        {
+          or: [
+            {
+              path: ['fromEmailAddress'],
+              operator: UniqueQLOperator.CONTAINS,
+              value: 'alice@example.com',
+            },
+            {
+              path: ['fromEmailAddress'],
+              operator: UniqueQLOperator.CONTAINS,
+              value: 'bob@example.com',
+            },
+          ],
         },
       ],
     });
@@ -146,23 +225,23 @@ describe('buildSearchFilter', () => {
 
   it('passes hasAttachments boolean value as-is', () => {
     const resultTrue = buildSearchFilter([
-      { hasAttachments: { value: true, operator: UniqueQLOperator.EQUALS } },
+      { hasAttachments: { value: 'true', operator: UniqueQLOperator.EQUALS } },
     ]);
 
     expect(resultTrue).toEqual({
       path: ['hasAttachments'],
       operator: UniqueQLOperator.EQUALS,
-      value: true,
+      value: 'true',
     });
 
     const resultFalse = buildSearchFilter([
-      { hasAttachments: { value: false, operator: UniqueQLOperator.EQUALS } },
+      { hasAttachments: { value: 'false', operator: UniqueQLOperator.EQUALS } },
     ]);
 
     expect(resultFalse).toEqual({
       path: ['hasAttachments'],
       operator: UniqueQLOperator.EQUALS,
-      value: false,
+      value: 'false',
     });
   });
 });

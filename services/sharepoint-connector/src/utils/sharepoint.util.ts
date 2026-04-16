@@ -10,8 +10,8 @@ import { createSmeared, type Smeared } from './smeared';
  * Gets the web URL for a SharePoint item with ?web=1 parameter.
  *
  * We are reading the webUrl from item.listItem because it contains the real path to the item.
- * listItem.webUrl example: https://[tenant].sharepoint.com/sites/[site]/[library]/[path]/[filename]
- * item.webUrl example: https://[tenant].sharepoint.com/sites/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
+ * listItem.webUrl example: https://[tenant].sharepoint.com/{sites|teams}/[site]/[library]/[path]/[filename]
+ * item.webUrl example: https://[tenant].sharepoint.com/{sites|teams}/[site]/_layouts/15/Doc.aspx?sourcedoc=%7B[guid]%7D&file=[filename]&action=edit&mobileredirect=true
  * We are adding ?web=1 to the url to get the web view of the item.
  */
 export function getItemUrl(sharepointContentItem: SharepointContentItem): string {
@@ -24,7 +24,7 @@ export function getItemUrl(sharepointContentItem: SharepointContentItem): string
  * because the file-diff API splits stored keys by `/` and compares only the last segment. Using
  * `/` would cause the diff to lose the subsite prefix and produce phantom new+deleted results.
  */
-const SUBSITE_KEY_SEPARATOR = '::';
+export const SUBSITE_KEY_SEPARATOR = '::';
 
 /**
  * Builds the key portion submitted to the file-diff API.
@@ -54,16 +54,16 @@ export function buildIngestionItemKey(sharepointContentItem: AnySharepointItem):
 }
 
 /**
- * Extracts a relative path from a SharePoint URL, stripping the /sites/{siteName} prefix.
+ * Extracts a relative path from a SharePoint URL, stripping the managed path and site name prefix.
  *
- * For regular sites (siteName = "SiteName"), strips /sites/SiteName.
- * For subsites (siteName = "SiteName/SubSite"), strips /sites/SiteName/SubSite.
+ * For regular sites (siteName = "SiteName"), strips /{sites|teams}/SiteName.
+ * For subsites (siteName = "SiteName/SubSite"), strips /{sites|teams}/SiteName/SubSite.
  *
  * We need to pass siteName because in the url, subsite is indistinguishable from a library. If you
  * have a subsite named SubsiteA and a library called DriveB, the urls will simply be
- * https://tenant.sharepoint.com/sites/SiteName/SubsiteA and
- * https://tenant.sharepoint.com/sites/SiteName/DriveB with no indication which is which. To
- * distinguish between the two, we need to pass the siteName to the function.
+ * https://tenant.sharepoint.com/{sites|teams}/SiteName/SubsiteA and
+ * https://tenant.sharepoint.com/{sites|teams}/SiteName/DriveB with no indication which is which.
+ * To distinguish between the two, we need to pass the siteName to the function.
  */
 function getRelativeUniquePathFromUrl(url: string, siteName: Smeared): string {
   const urlObj = new URL(url);

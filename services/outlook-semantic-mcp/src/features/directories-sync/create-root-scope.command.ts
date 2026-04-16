@@ -36,11 +36,11 @@ export class CreateRootScopeCommand {
   }: {
     scopePath: string;
     externalId: string;
-  }): Promise<void> {
+  }): Promise<{ id: string; created: boolean }> {
     const scopeExists = await this.uniqueApi.scopes.getByExternalId(externalId);
     if (scopeExists) {
       this.logger.debug(`Scope: ${scopePath} already exists.`);
-      return;
+      return { id: scopeExists.id, created: false };
     }
 
     this.logger.debug(`Create Scope: ${scopePath}`);
@@ -53,5 +53,6 @@ export class CreateRootScopeCommand {
       this.logger.debug(`Update scope with external id: ${scopePath}`);
       await this.uniqueApi.scopes.updateExternalId(scope.id, externalId);
     }
+    return { id: scope.id, created: true };
   }
 }

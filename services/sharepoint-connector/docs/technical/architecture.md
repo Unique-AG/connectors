@@ -158,7 +158,7 @@ In cluster-internal mode:
 
 ## Multi-Origin Support
 
-**Note:** Multi-origin support is not available in the current `2.0.x` GA release line.
+**Note:** Multi-origin support is not available in the current release line.
 
 ### Scenarios
 
@@ -206,8 +206,8 @@ Used to obtain OAuth2 tokens for Microsoft Graph and SharePoint REST APIs.
 
 | Endpoint | Use Case |
 |----------|----------|
-| `{tenant}.sharepoint.com/sites/{siteName}/_api/web/sitegroups/getById({groupId})` | Fetch site group details |
-| `{tenant}.sharepoint.com/sites/{siteName}/_api/web/sitegroups/getById({groupId})/users` | Fetch site group members |
+| `{tenant}.sharepoint.com/{sites|teams}/{siteName}/_api/web/sitegroups/getById({groupId})` | Fetch site group details |
+| `{tenant}.sharepoint.com/{sites|teams}/{siteName}/_api/web/sitegroups/getById({groupId})/users` | Fetch site group members |
 
 ## Hosting Models
 
@@ -275,6 +275,7 @@ These settings ensure the service has sufficient capacity for expected workloads
 ## Related Documentation
 
 - [Flows](./flows.md) - Content sync, subsite discovery, permission sync, file diff mechanism
+- [Metadata](./metadata.md) - Ingested metadata fields for documents and SitePages
 - [Permissions](./permissions.md) - Microsoft Graph and SharePoint REST permissions
 - [Security](./security.md) - Security updates and SBOM
 - [Operator Guide](../operator/README.md) - Deployment and operations

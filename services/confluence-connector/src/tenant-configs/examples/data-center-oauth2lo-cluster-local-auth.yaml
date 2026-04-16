@@ -28,6 +28,10 @@ unique:
   apiRateLimitPerMinute: 100
 
 processing:
-  stepTimeoutSeconds: 600
   concurrency: 1
   scanIntervalCron: "0 */2 * * *"
+
+ingestion:
+  ingestionMode: flat
+  scopeId: your-scope-id
+  storeInternally: enabled

@@ -63,7 +63,9 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
             level: config.logLevel,
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
-              if (!ctx) return typeid('trace').toString();
+              if (!ctx) {
+                return typeid('trace').toString();
+              }
               return ctx.traceId;
             },
           },

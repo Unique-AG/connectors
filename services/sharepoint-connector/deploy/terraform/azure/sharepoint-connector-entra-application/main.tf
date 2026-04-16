@@ -5,22 +5,29 @@ locals {
   graph_app_id      = data.azuread_application_published_app_ids.well_known.result["MicrosoftGraph"]
   sharepoint_app_id = data.azuread_application_published_app_ids.well_known.result["Office365SharePointOnline"]
 
-  # Define role mappings based on sync mode
-  role_mappings = {
+  # Maps each content access scope to its Graph API permission
+  content_access_role_map = {
+    sites = "Sites.Selected"
+    lists = "Lists.SelectedOperations.Selected"
+  }
+
+  # Additional roles required by each sync mode
+  sync_mode_extra_roles = {
     content_only = {
-      graph_roles      = ["Sites.Selected"]
+      graph_roles      = []
       sharepoint_roles = []
     }
     content_and_permissions = {
-      graph_roles      = ["Sites.Selected", "GroupMember.Read.All", "User.ReadBasic.All"]
+      graph_roles      = ["GroupMember.Read.All", "User.ReadBasic.All"]
       sharepoint_roles = ["Sites.Selected"]
     }
   }
 
-  # Select roles based on sync mode preset
-  selected_roles   = local.role_mappings[var.sync_mode_role_preset]
-  graph_roles      = toset(local.selected_roles.graph_roles)
-  sharepoint_roles = toset(local.selected_roles.sharepoint_roles)
+  graph_roles = toset(concat(
+    [for scope in var.content_access_scopes : local.content_access_role_map[scope]],
+    local.sync_mode_extra_roles[var.sync_mode_role_preset].graph_roles,
+  ))
+  sharepoint_roles = toset(local.sync_mode_extra_roles[var.sync_mode_role_preset].sharepoint_roles)
 }
 
 # Service principals for Microsoft services

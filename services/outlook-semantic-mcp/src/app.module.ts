@@ -4,10 +4,12 @@ import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
 import { UniqueApiModule } from '@unique-ag/unique-api';
+import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { context, trace } from '@opentelemetry/api';
 import { Cache } from 'cache-manager';
 import { MetricService, OpenTelemetryModule } from 'nestjs-otel';
@@ -56,6 +58,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         uniqueConfig,
       ],
     }),
+    ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({
       inject: [appConfig.KEY],
       useFactory: (config: AppConfig) => {
@@ -64,9 +67,22 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
           pinoHttp: {
             ...defaultLoggerOptions.pinoHttp,
             level: config.logLevel,
+            mixin: () => {
+              // For some reason open telemetry pino integration which we are using is not adding
+              // this properties to the logs, in order to bridge the gap between logs and traces
+              // I added them manually but we should debug the shared package.
+              const span = trace.getActiveSpan();
+              if (!span?.isRecording()) {
+                return {};
+              }
+              const ctx = span.spanContext();
+              return { trace_id: ctx.traceId, span_id: ctx.spanId, trace_flags: ctx.traceFlags };
+            },
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
-              if (!ctx) return typeid('trace').toString();
+              if (!ctx) {
+                return typeid('trace').toString();
+              }
               return ctx.traceId;
             },
           },
@@ -93,7 +109,14 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     McpOAuthModule.forRootAsync({
       imports: [DrizzleModule],
-      inject: [ConfigService, AesGcmEncryptionService, DRIZZLE, CACHE_MANAGER, MetricService],
+      inject: [
+        ConfigService,
+        AesGcmEncryptionService,
+        DRIZZLE,
+        CACHE_MANAGER,
+        MetricService,
+        AmqpConnection,
+      ],
       useFactory: async (
         configService: ConfigService<
           AppConfigNamespaced & MicrosoftConfigNamespaced & AuthConfigNamespaced,
@@ -103,6 +126,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         drizzle: DrizzleDatabase,
         cacheManager: Cache,
         metricService: MetricService,
+        amqpConnection: AmqpConnection,
       ) => ({
         provider: MicrosoftOAuthProvider,
 
@@ -122,7 +146,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
           infer: true,
         }),
 
-        oauthStore: new McpOAuthStore(drizzle, aesService, cacheManager),
+        oauthStore: new McpOAuthStore(drizzle, aesService, cacheManager, amqpConnection),
         encryptionService: aesService,
         metricService,
       }),

@@ -18,23 +18,23 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
 
   public onModuleInit(): void {
     if (this.tenantRegistry.tenantCount === 0) {
-      this.logger.warn('No tenants registered — no sync jobs will be scheduled');
+      this.logger.warn({ msg: 'No tenants registered — no sync jobs will be scheduled' });
       return;
     }
 
     for (const tenant of this.tenantRegistry.getAllTenants()) {
-      this.logger.log(`Triggering initial sync for tenant: ${tenant.name}`);
+      this.logger.log({ tenantName: tenant.name, msg: 'Triggering initial sync' });
       void this.syncTenant(tenant);
       this.registerCronJob(tenant);
     }
   }
 
   public onModuleDestroy(): void {
-    this.logger.log('Shutting down tenant sync scheduler');
+    this.logger.log({ msg: 'Shutting down tenant sync scheduler' });
     this.isShuttingDown = true;
     try {
       for (const [name, job] of this.schedulerRegistry.getCronJobs()) {
-        this.logger.log(`Stopping cron job: ${name}`);
+        this.logger.log({ msg: `Stopping cron job: ${name}` });
         job.stop();
       }
     } catch (error) {
@@ -52,26 +52,26 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     job.start();
 
     this.tenantRegistry.run(tenant, () => {
-      const logger = this.serviceRegistry.getServiceLogger(TenantSyncScheduler);
-      logger.info(`Scheduled sync with cron: ${cronExpression}`);
+      this.logger.log({
+        tenantName: tenant.name,
+        msg: `Scheduled sync with cron: ${cronExpression}`,
+      });
     });
   }
 
-  // services are resolved per-call because TenantSyncScheduler is a single instance for all tenants so we can't set services in the constructor
   private async syncTenant(tenant: TenantContext): Promise<void> {
     await this.tenantRegistry.run(tenant, async () => {
-      const logger = this.serviceRegistry.getServiceLogger(TenantSyncScheduler);
       const syncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
 
       if (this.isShuttingDown) {
-        logger.info('Skipping sync due to shutdown');
+        this.logger.log({ msg: 'Skipping sync due to shutdown' });
         return;
       }
 
       try {
         await syncService.synchronize();
       } catch (error) {
-        logger.error({ err: error, msg: 'Unexpected sync error' });
+        this.logger.error({ err: error, msg: 'Unexpected sync error' });
       }
     });
   }

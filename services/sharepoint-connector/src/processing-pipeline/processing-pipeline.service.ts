@@ -82,7 +82,9 @@ export class ProcessingPipelineService {
         });
 
         this.logger.debug(`${logPrefix} Completed step: ${step.stepName}`);
-        if (step.cleanup) await step.cleanup(context);
+        if (step.cleanup) {
+          await step.cleanup(context);
+        }
       } catch (error) {
         const totalDuration = Date.now() - startTime.getTime();
         const normalizedError = normalizeError(error);
@@ -104,7 +106,9 @@ export class ProcessingPipelineService {
           error: sanitizeError(error),
         });
 
-        if (step.cleanup) await step.cleanup(context);
+        if (step.cleanup) {
+          await step.cleanup(context);
+        }
         this.finalCleanup(context);
 
         return { success: false };

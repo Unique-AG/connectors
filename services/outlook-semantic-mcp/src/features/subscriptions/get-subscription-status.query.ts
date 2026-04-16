@@ -49,7 +49,7 @@ export class GetSubscriptionStatusQuery {
       return {
         success: false,
         status: 'subscription_missing',
-        message: 'Inbox is disconnected. Use connect_inbox to begin ingesting emails.',
+        message: 'Inbox is disconnected. Use reconnect_inbox to begin ingesting emails.',
       };
     }
 
@@ -57,7 +57,7 @@ export class GetSubscriptionStatusQuery {
       return {
         success: false,
         status: 'subscription_expired',
-        message: 'Inbox is disconnected. Use connect_inbox to begin ingesting emails.',
+        message: 'Inbox is disconnected. Use reconnect_inbox to begin ingesting emails.',
       };
     }
 

@@ -13,7 +13,7 @@ const mockTenant: TenantContext = {
 
 describe('PatAuthStrategy', () => {
   const authConfig = {
-    mode: AuthMode.PAT,
+    mode: AuthMode.Pat,
     token: new Redacted('my-personal-access-token'),
   };
 

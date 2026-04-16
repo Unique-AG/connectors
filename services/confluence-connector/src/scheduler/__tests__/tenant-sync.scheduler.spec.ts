@@ -7,11 +7,21 @@ import { tenantStorage } from '../../tenant/tenant-context.storage';
 import { TenantRegistry } from '../../tenant/tenant-registry';
 import { TenantSyncScheduler } from '../tenant-sync.scheduler';
 
-const mockTenantLogger = vi.hoisted(() => ({
-  info: vi.fn(),
+const mockLogger = vi.hoisted(() => ({
+  log: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
+  debug: vi.fn(),
+  verbose: vi.fn(),
 }));
+
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return {
+    ...actual,
+    Logger: vi.fn().mockImplementation(() => mockLogger),
+  };
+});
 
 function createMockSyncService() {
   return { synchronize: vi.fn().mockResolvedValue(undefined) };
@@ -51,11 +61,7 @@ function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
 
 function createMockServiceRegistry(tenants: TenantContext[]): ServiceRegistry {
   const serviceRegistry = new ServiceRegistry();
-  const mockBaseLogger = {
-    child: () => mockTenantLogger,
-  };
   for (const tenant of tenants) {
-    serviceRegistry.registerTenantLogger(tenant.name, mockBaseLogger as never);
     serviceRegistry.register(
       tenant.name,
       ConfluenceSynchronizationService,
@@ -108,10 +114,15 @@ describe('TenantSyncScheduler', () => {
       });
     });
 
-    it('logs the scheduled cron expression via ServiceRegistry.getServiceLogger', () => {
+    it('logs the scheduled cron expression', () => {
       scheduler.onModuleInit();
 
-      expect(mockTenantLogger.info).toHaveBeenCalledWith('Scheduled sync with cron: */5 * * * *');
+      expect(mockLogger.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantName: 'tenant-a',
+          msg: 'Scheduled sync with cron: */5 * * * *',
+        }),
+      );
     });
 
     it('skips scheduling when no tenants are registered', () => {
@@ -163,7 +174,7 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(mockTenantLogger.info).toHaveBeenCalledWith('Skipping sync due to shutdown');
+      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Skipping sync due to shutdown' });
       const syncService = tenantStorage.run(tenantA, () =>
         serviceRegistry.getService(ConfluenceSynchronizationService),
       );
@@ -179,7 +190,7 @@ describe('TenantSyncScheduler', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(mockTenantLogger.error).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ err: expect.any(Error), msg: 'Unexpected sync error' }),
       );
     });

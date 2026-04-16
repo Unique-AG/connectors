@@ -248,6 +248,27 @@
           },
           "required": ["serviceAuthMode"]
         },
+        "defaultMailFilters": {
+          "type": "object",
+          "description": "Default mail filters applied when syncing emails",
+          "properties": {
+            "retentionWindowInDays": {
+              "type": "integer",
+              "description": "Number of days to retain emails"
+            },
+            "ignoredContents": {
+              "type": "array",
+              "description": "List of content patterns to ignore",
+              "items": { "type": "string" }
+            },
+            "ignoredSenders": {
+              "type": "array",
+              "description": "List of sender addresses to ignore",
+              "items": { "type": "string" }
+            }
+          },
+          "required": ["retentionWindowInDays"]
+        },
         "auth": {
           "type": "object",
           "description": "Authentication configuration for the MCP server",

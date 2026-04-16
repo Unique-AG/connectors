@@ -31,7 +31,9 @@ export const createIdPrefixExtension = (prefixMap: Record<Prisma.DMMF.Model['nam
             }
 
             case 'createMany': {
-              if (!Array.isArray(args.data)) return query(args);
+              if (!Array.isArray(args.data)) {
+                return query(args);
+              }
 
               return query({
                 ...args,

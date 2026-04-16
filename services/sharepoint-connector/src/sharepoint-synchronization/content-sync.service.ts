@@ -14,7 +14,7 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueFile } from '../unique-api/unique-files/unique-files.types';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
-import { buildFileDiffKey, getItemUrl } from '../utils/sharepoint.util';
+import { buildFileDiffKey, getItemUrl, SUBSITE_KEY_SEPARATOR } from '../utils/sharepoint.util';
 import type { Smeared } from '../utils/smeared';
 import { elapsedSecondsLog } from '../utils/timing.util';
 import { FileMoveProcessor } from './file-move-processor.service';
@@ -186,25 +186,47 @@ export class ContentSyncService {
 
     // If the file diff indicated we should delete all files even when we submitted some files to
     // diff, it most probably means that we have some kind of bug in file diff or something
-    // unexpected changed in the logic. We should not proceed with the sync to avoid costly
-    // re-ingestions. If user actually deleted all the files from the site and uploaded new ones,
-    // they should recursively delete the site data from Unique first via GraphQL API.
+    // unexpected changed in the logic (e.g. key format change). We should not proceed with the
+    // sync to avoid costly re-ingestions. However, if the new files have completely different item
+    // IDs than the deleted files, this is a legitimate content replacement scenario (e.g. old files
+    // were deleted and new ones uploaded) — not a key format bug or accidental full deletion.
     const totalFilesForSiteInUnique = await this.uniqueFilesService.getFilesCountForSite(siteId);
     if (fileDiffResult.deletedFiles.length === totalFilesForSiteInUnique) {
-      this.logger.error({
-        msg:
-          `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files ` +
-          `stored in Unique as to be deleted. Aborting sync to prevent accidental full deletion. ` +
-          `If you wish to delete all files, add a dummy file to the site and mark it for ` +
-          `synchronization.`,
-        siteId,
-        totalFilesForSiteInUnique,
-        fileDiffResultCounts: mapValues(fileDiffResult, length()),
-      });
-      assert.fail(
-        `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files stored ` +
-          `in Unique as to be deleted. Aborting sync to prevent accidental full deletion.`,
+      const submittedItemIds = new Set(fileDiffItems.map((item) => extractItemId(item.key)));
+      const deletedKeysOverlap = fileDiffResult.deletedFiles.some((key) =>
+        submittedItemIds.has(extractItemId(key)),
       );
+
+      // If new file keys share item IDs with deleted keys, it's likely a key format change bug —
+      // the same items appear as both "new" (new key format) and "deleted" (old key format). Block.
+      // If there's no overlap, the files are genuinely different and the deletion is intentional.
+      if (fileDiffResult.newFiles.length === 0 || deletedKeysOverlap) {
+        this.logger.error({
+          msg:
+            `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files ` +
+            `stored in Unique as to be deleted. Aborting sync to prevent accidental full deletion. ` +
+            `If you wish to delete all files, add a dummy file to the site and mark it for ` +
+            `synchronization.`,
+          siteId,
+          totalFilesForSiteInUnique,
+          deletedKeysOverlap,
+          fileDiffResultCounts: mapValues(fileDiffResult, length()),
+        });
+        assert.fail(
+          `${logPrefix} File diff declares all ${fileDiffResult.deletedFiles.length} files stored ` +
+            `in Unique as to be deleted. Aborting sync to prevent accidental full deletion.`,
+        );
+      } else {
+        this.logger.warn({
+          msg:
+            `${logPrefix} File diff would delete all ${fileDiffResult.deletedFiles.length} files ` +
+            `in Unique, but ${fileDiffResult.newFiles.length} new files with different item IDs ` +
+            `are being added. Allowing deletion as this appears to be a legitimate content replacement.`,
+          siteId,
+          totalFilesForSiteInUnique,
+          fileDiffResultCounts: mapValues(fileDiffResult, length()),
+        });
+      }
     }
   }
 
@@ -256,4 +278,13 @@ export class ContentSyncService {
       `${logPrefix} Completed file deletion in Unique: ${totalDeleted}/${deletedFileKeys.length} files deleted`,
     );
   }
+}
+
+/**
+ * Extracts the base item ID from a file diff key by stripping any subsite prefix.
+ * E.g. "subsiteId::itemId" → "itemId", "itemId" → "itemId".
+ */
+function extractItemId(key: string): string {
+  const separatorIndex = key.indexOf(SUBSITE_KEY_SEPARATOR);
+  return separatorIndex >= 0 ? key.slice(separatorIndex + SUBSITE_KEY_SEPARATOR.length) : key;
 }

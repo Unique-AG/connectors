@@ -74,6 +74,7 @@ export const redacted = <S extends z.core.$ZodType>(schema: S) =>
 
 export const enabledDisabledBoolean = (
   description: string,
+  defaultValue: 'enabled' | 'disabled' = 'enabled',
 ): z.ZodPipe<
   z.ZodDefault<
     z.ZodEnum<{
@@ -85,6 +86,6 @@ export const enabledDisabledBoolean = (
 > =>
   z
     .enum(['enabled', 'disabled'])
-    .default('enabled')
+    .default(defaultValue)
     .describe(description)
     .transform((value) => value === 'enabled');

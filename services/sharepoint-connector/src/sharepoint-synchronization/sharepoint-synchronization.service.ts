@@ -7,7 +7,7 @@ import { ConfigDiagnosticsService } from '../config/config-diagnostics.service';
 import type { SiteConfig } from '../config/sharepoint.schema';
 import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import { IngestionMode } from '../constants/ingestion.constants';
-import { SyncStep } from '../constants/sync-step.enum';
+import { FullSyncStep, SiteSyncStep } from '../constants/sync-step.enum';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
@@ -15,27 +15,25 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { PermissionsSyncError } from '../permissions-sync/permissions-sync.error';
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
+import type { ManagedPath } from '../utils/paths.util';
 import { type Smeared, smearPath } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
 import { SharepointSyncContext } from './sharepoint-sync-context.interface';
 import { DiscoveredSubsite, SubsiteDiscoveryService } from './subsite-discovery.service';
+import type { FullSyncResult, SiteResultEntry, SiteSyncResult } from './sync-result.types';
 
-type SiteSyncResult =
-  | { status: 'success' }
-  | { status: 'failure'; step: SyncStep }
-  | { status: 'skipped'; reason: string };
-
-type FullSyncResult =
-  | { status: 'success' }
-  | { status: 'failure'; step: SyncStep }
-  | { status: 'skipped'; reason: string };
+export interface SynchronizeResult {
+  fullResult: FullSyncResult;
+  siteResults: SiteResultEntry[];
+}
 
 @Injectable()
 export class SharepointSynchronizationService {
@@ -56,13 +54,13 @@ export class SharepointSynchronizationService {
     private readonly spcSyncDurationSeconds: Histogram,
   ) {}
 
-  public async synchronize(): Promise<FullSyncResult> {
+  public async synchronize(): Promise<SynchronizeResult> {
     const syncStartTime = Date.now();
     if (this.isScanning) {
       this.logger.warn('Skipping scan - previous scan is still in progress.');
-      const result: FullSyncResult = { status: 'skipped', reason: 'scan_in_progress' };
-      this.recordFullSyncMetric(syncStartTime, result);
-      return result;
+      const fullResult: FullSyncResult = { status: 'skipped', reason: 'scan_in_progress' };
+      this.recordFullSyncMetric(syncStartTime, fullResult);
+      return { fullResult, siteResults: [] };
     }
 
     this.isScanning = true;
@@ -76,12 +74,12 @@ export class SharepointSynchronizationService {
           msg: 'Failed to load sites configuration',
           error: sanitizeError(error),
         });
-        const result: FullSyncResult = {
+        const fullResult: FullSyncResult = {
           status: 'failure',
-          step: SyncStep.SitesConfigLoading,
+          step: FullSyncStep.SitesConfigLoading,
         };
-        this.recordFullSyncMetric(syncStartTime, result);
-        return result;
+        this.recordFullSyncMetric(syncStartTime, fullResult);
+        return { fullResult, siteResults: [] };
       }
 
       sites = this.deduplicateByScopeId(sites);
@@ -96,9 +94,9 @@ export class SharepointSynchronizationService {
 
       if (active.length === 0) {
         this.logger.warn('No active sites configured for synchronization');
-        const result: FullSyncResult = { status: 'skipped', reason: 'no_active_sites' };
-        this.recordFullSyncMetric(syncStartTime, result);
-        return result;
+        const fullResult: FullSyncResult = { status: 'skipped', reason: 'no_active_sites' };
+        this.recordFullSyncMetric(syncStartTime, fullResult);
+        return { fullResult, siteResults: [] };
       }
 
       this.logger.log(`Starting scan of ${active.length} active SharePoint sites...`);
@@ -111,29 +109,28 @@ export class SharepointSynchronizationService {
         sites.map((site) => site.siteId.value).filter((siteId) => siteId.split(',').length === 3),
       );
 
+      const siteResults: SiteResultEntry[] = [];
+
       for (const siteConfig of active) {
         const siteSyncStartTime = Date.now();
 
         const result = await this.syncSite(siteConfig, configuredSubsiteIds);
         this.recordSiteMetric(siteSyncStartTime, siteConfig.siteId, result);
+        siteResults.push({ siteId: siteConfig.siteId.value, result });
       }
 
       this.logger.log(
         `SharePoint synchronization completed in ${elapsedSecondsLog(syncStartTime)}`,
       );
-      const result: FullSyncResult = { status: 'success' };
-      this.recordFullSyncMetric(syncStartTime, result);
-      return result;
+      const fullResult: FullSyncResult = { status: 'success' };
+      this.recordFullSyncMetric(syncStartTime, fullResult);
+      return { fullResult, siteResults };
     } catch (error) {
       this.logger.error({
         msg: 'Failed full synchronization',
         error: sanitizeError(error),
       });
-      this.spcSyncDurationSeconds.record(elapsedSeconds(syncStartTime), {
-        sync_type: 'full',
-        result: 'failure',
-        failure_step: SyncStep.Unknown,
-      });
+      this.recordFullSyncMetric(syncStartTime, { status: 'failure', step: FullSyncStep.Unknown });
       throw error;
     } finally {
       this.isScanning = false;
@@ -198,7 +195,7 @@ export class SharepointSynchronizationService {
     const logPrefix = `[Site: ${siteConfig.siteId}]`;
 
     this.logger.log(
-      `${logPrefix} Processing site marked for deletion (ScopeId: ${siteConfig.scopeId})`,
+      `${logPrefix} Processing deleted site - resetting root scope (ScopeId: ${siteConfig.scopeId})`,
     );
 
     try {
@@ -212,12 +209,12 @@ export class SharepointSynchronizationService {
       }
 
       await this.uniqueFilesService.deleteFilesBySiteId(siteConfig.siteId);
-      await this.scopeManagementService.deleteRootScopeRecursively(siteConfig.scopeId);
+      await this.scopeManagementService.resetRootScope(siteConfig.scopeId);
 
-      this.logger.log(`${logPrefix} Successfully processed deletion`);
+      this.logger.log(`${logPrefix} Successfully reset root scope`);
     } catch (error) {
       this.logger.error({
-        msg: `${logPrefix} Failed to process site deletion. Continuing with other sites`,
+        msg: `${logPrefix} Failed to reset root scope. Continuing with other sites`,
         scopeId: siteConfig.scopeId,
         error: sanitizeError(error),
       });
@@ -230,10 +227,26 @@ export class SharepointSynchronizationService {
     }
   }
 
+  // IMPORTANT: getSiteInfo must run before initializeRootScope. The root scope init permanently
+  // stamps the scope's externalId with the configured siteId. If that siteId is wrong, the scope
+  // becomes locked to it and cannot be re-bound without manual intervention. Validating the site
+  // exists via the Graph API first ensures we never claim a scope with a bogus siteId.
   private async initializeSiteContext(
     siteConfig: SiteConfig,
     logPrefix: string,
-  ): Promise<{ context: SharepointSyncContext } | { failureStep: SyncStep }> {
+  ): Promise<{ context: SharepointSyncContext } | { failureStep: SiteSyncStep }> {
+    let siteName: Smeared;
+    let managedPath: ManagedPath;
+    try {
+      ({ siteName, managedPath } = await this.graphApiService.getSiteInfo(siteConfig.siteId));
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to get site info`,
+        error: sanitizeError(error),
+      });
+      return { failureStep: SiteSyncStep.SiteNameFetch };
+    }
+
     let baseContext: RootScopeInfo;
     try {
       baseContext = await this.scopeManagementService.initializeRootScope(
@@ -246,24 +259,14 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to initialize root scope`,
         error: sanitizeError(error),
       });
-      return { failureStep: SyncStep.RootScopeInit };
-    }
-
-    let siteName: Smeared;
-    try {
-      siteName = await this.graphApiService.getSiteName(siteConfig.siteId);
-    } catch (error) {
-      this.logger.error({
-        msg: `${logPrefix} Failed to get site name`,
-        error: sanitizeError(error),
-      });
-      return { failureStep: SyncStep.SiteNameFetch };
+      return { failureStep: SiteSyncStep.RootScopeInit };
     }
 
     return {
       context: {
         siteConfig,
         siteName,
+        managedPath,
         serviceUserId: baseContext.serviceUserId,
         rootPath: baseContext.rootPath,
         isInitialSync: baseContext.isInitialSync,
@@ -300,7 +303,7 @@ export class SharepointSynchronizationService {
           msg: `${logPrefix} Failed to discover subsites`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.SubsiteDiscovery };
+        return { status: 'failure', step: SiteSyncStep.SubsiteDiscovery };
       }
     }
 
@@ -319,7 +322,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to get site items`,
         error: sanitizeError(error),
       });
-      return { status: 'failure', step: SyncStep.SiteItemsFetch };
+      return { status: 'failure', step: SiteSyncStep.SiteItemsFetch };
     }
 
     if (subsites.length > 0) {
@@ -332,7 +335,7 @@ export class SharepointSynchronizationService {
           msg: `${logPrefix} Failed to fetch subsite items`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.SubsiteItemsFetch };
+        return { status: 'failure', step: SiteSyncStep.SubsiteItemsFetch };
       }
     }
 
@@ -351,7 +354,7 @@ export class SharepointSynchronizationService {
           msg: `${logPrefix} Failed to create scopes. Skipping site.`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.ScopesCreation };
+        return { status: 'failure', step: SiteSyncStep.ScopesCreation };
       }
     }
 
@@ -362,7 +365,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to synchronize content`,
         error: sanitizeError(error),
       });
-      return { status: 'failure', step: SyncStep.ContentSync };
+      return { status: 'failure', step: SiteSyncStep.ContentSync };
     }
 
     if (context.siteConfig.syncMode === 'content_and_permissions') {
@@ -377,7 +380,9 @@ export class SharepointSynchronizationService {
           msg: `${logPrefix} Failed to synchronize permissions`,
           error: sanitizeError(error),
         });
-        return { status: 'failure', step: SyncStep.PermissionsSync };
+        const step =
+          error instanceof PermissionsSyncError ? error.step : SiteSyncStep.UnknownPermissionsSync;
+        return { status: 'failure', step };
       }
     }
 
@@ -388,7 +393,7 @@ export class SharepointSynchronizationService {
         msg: `${logPrefix} Failed to clean up orphaned scopes`,
         error: sanitizeError(error),
       });
-      return { status: 'failure', step: SyncStep.OrphanScopeCleanup };
+      return { status: 'failure', step: SiteSyncStep.OrphanScopeCleanup };
     }
 
     return { status: 'success' };

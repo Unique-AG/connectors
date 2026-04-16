@@ -58,7 +58,7 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
 
   @Span()
   private async fetchMicrosoftSystemFolders(userProfileId: string): Promise<GraphDirectoryInfo[]> {
-    traceAttrs({ user_profile_id: userProfileId.toString() });
+    traceAttrs({ userProfileId: userProfileId.toString() });
 
     traceEvent('Start fetching system directories from microsoft graph');
     const client = this.graphClientFactory.createClientForUser(userProfileId);

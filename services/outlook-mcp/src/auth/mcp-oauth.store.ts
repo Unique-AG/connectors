@@ -50,7 +50,9 @@ export class McpOAuthStore implements IOAuthStore {
       .insert(oauthClients)
       .values(toDrizzleOAuthClientInsert(client))
       .returning();
-    if (!saved.length || !saved[0]) throw new Error('Failed to store client');
+    if (!saved.length || !saved[0]) {
+      throw new Error('Failed to store client');
+    }
     return fromDrizzleOAuthClientRow(saved[0]);
   }
 
@@ -59,7 +61,9 @@ export class McpOAuthStore implements IOAuthStore {
       .select()
       .from(oauthClients)
       .where(eq(oauthClients.clientId, client_id));
-    if (!client) return undefined;
+    if (!client) {
+      return undefined;
+    }
     return fromDrizzleOAuthClientRow(client);
   }
 
@@ -68,7 +72,9 @@ export class McpOAuthStore implements IOAuthStore {
       .select()
       .from(oauthClients)
       .where(eq(oauthClients.clientName, client_name));
-    if (!client) return undefined;
+    if (!client) {
+      return undefined;
+    }
     return fromDrizzleOAuthClientRow(client);
   }
 
@@ -87,7 +93,9 @@ export class McpOAuthStore implements IOAuthStore {
       .select()
       .from(authorizationCodes)
       .where(eq(authorizationCodes.code, code));
-    if (!authCode) return undefined;
+    if (!authCode) {
+      return undefined;
+    }
     if (authCode.expiresAt < new Date()) {
       await this.removeAuthCode(code);
       return undefined;
@@ -116,7 +124,9 @@ export class McpOAuthStore implements IOAuthStore {
       .select()
       .from(oauthSessions)
       .where(eq(oauthSessions.sessionId, sessionId));
-    if (!session) return undefined;
+    if (!session) {
+      return undefined;
+    }
     if (session.expiresAt && session.expiresAt < new Date()) {
       await this.removeOAuthSession(sessionId);
       return undefined;
@@ -161,7 +171,9 @@ export class McpOAuthStore implements IOAuthStore {
         set: mappedProfile,
       })
       .returning({ id: userProfiles.id });
-    if (!saved) throw new Error('Failed to upsert user profile');
+    if (!saved) {
+      throw new Error('Failed to upsert user profile');
+    }
     return saved.id;
   }
 
@@ -173,7 +185,9 @@ export class McpOAuthStore implements IOAuthStore {
       .from(userProfiles)
       .where(eq(userProfiles.id, profileId));
 
-    if (!profile) return undefined;
+    if (!profile) {
+      return undefined;
+    }
 
     return {
       profile_id: profile.id,
@@ -189,7 +203,9 @@ export class McpOAuthStore implements IOAuthStore {
 
   public async storeAccessToken(token: string, metadata: AccessTokenMetadata): Promise<void> {
     const profile = await this.getUserProfileById(metadata.userProfileId);
-    if (!profile) throw new Error('User profile not found');
+    if (!profile) {
+      throw new Error('User profile not found');
+    }
 
     await this.drizzle.insert(tokens).values({
       token,
@@ -233,7 +249,9 @@ export class McpOAuthStore implements IOAuthStore {
       .leftJoin(userProfiles, eq(tokens.userProfileId, userProfiles.id))
       .where(eq(tokens.token, token))
       .then((rows) => rows[0]);
-    if (!metadata) return undefined;
+    if (!metadata) {
+      return undefined;
+    }
     if (metadata.expiresAt < new Date()) {
       await this.removeAccessToken(token);
       return undefined;
@@ -251,7 +269,9 @@ export class McpOAuthStore implements IOAuthStore {
 
   public async storeRefreshToken(token: string, metadata: RefreshTokenMetadata): Promise<void> {
     const profile = await this.getUserProfileById(metadata.userProfileId);
-    if (!profile) throw new Error('User profile not found');
+    if (!profile) {
+      throw new Error('User profile not found');
+    }
 
     await this.drizzle.insert(tokens).values({
       token,
@@ -298,7 +318,9 @@ export class McpOAuthStore implements IOAuthStore {
       .where(eq(tokens.token, token))
       .then((rows) => rows[0]);
 
-    if (!metadata) return undefined;
+    if (!metadata) {
+      return undefined;
+    }
     if (metadata.expiresAt < new Date()) {
       await this.removeRefreshToken(token);
       return undefined;
@@ -366,7 +388,9 @@ export class McpOAuthStore implements IOAuthStore {
     const cacheKey = this.getAccessTokenCacheKey(token);
     const ttl = Math.max(0, Math.floor((metadata.expiresAt.getTime() - Date.now()) / 1000));
 
-    if (ttl > 0) await this.cacheManager.set(cacheKey, metadata, ttl);
+    if (ttl > 0) {
+      await this.cacheManager.set(cacheKey, metadata, ttl);
+    }
   }
 
   private async cacheRefreshTokenMetadata(
@@ -376,7 +400,9 @@ export class McpOAuthStore implements IOAuthStore {
     const cacheKey = this.getRefreshTokenCacheKey(token);
     const ttl = Math.max(0, Math.floor((metadata.expiresAt.getTime() - Date.now()) / 1000));
 
-    if (ttl > 0) await this.cacheManager.set(cacheKey, metadata, ttl);
+    if (ttl > 0) {
+      await this.cacheManager.set(cacheKey, metadata, ttl);
+    }
   }
 
   private async removeCachedAccessToken(token: string): Promise<void> {

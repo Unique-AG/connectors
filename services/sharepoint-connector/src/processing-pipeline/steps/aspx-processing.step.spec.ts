@@ -42,6 +42,7 @@ describe('AspxProcessingStep', () => {
     syncContext: {
       siteConfig: createMockSiteConfig(),
       siteName: new Smeared('test-site', false),
+      managedPath: 'sites',
       serviceUserId: 'user-1',
       rootPath: new Smeared('/Root', false),
       isInitialSync: false,
@@ -67,7 +68,9 @@ describe('AspxProcessingStep', () => {
   beforeEach(async () => {
     mockConfigService = {
       get: vi.fn((key: string) => {
-        if (key === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com';
+        if (key === 'sharepoint.baseUrl') {
+          return 'https://contoso.sharepoint.com';
+        }
         return undefined;
       }),
     };
@@ -340,7 +343,9 @@ describe('AspxProcessingStep', () => {
 
     it('normalizes baseUrl with trailing slash before converting links', async () => {
       mockConfigService.get.mockImplementation((key: string) => {
-        if (key === 'sharepoint.baseUrl') return 'https://contoso.sharepoint.com/';
+        if (key === 'sharepoint.baseUrl') {
+          return 'https://contoso.sharepoint.com/';
+        }
         return undefined;
       });
 

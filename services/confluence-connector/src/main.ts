@@ -9,13 +9,14 @@ import { type AppConfigNamespaced } from './config';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  const logger = app.get(Logger);
+  // All Logger instances app-wide (including shared packages) route through this single pino
+  // instance via Logger.staticInstanceRef, so the mixin and log level apply universally.
+  app.useLogger(logger);
 
   const configService = app.get<ConfigService<AppConfigNamespaced, true>>(ConfigService);
 
   app.enableShutdownHooks();
-
-  const logger = app.get(Logger);
-  app.useLogger(logger);
 
   app.enableCors({
     origin: true,
@@ -23,7 +24,7 @@ async function bootstrap() {
 
   const port = configService.get('app.port', { infer: true });
   await app.listen(port);
-  logger.log(`Server is running on http://localhost:${port}`);
+  logger.log({ msg: `Server is running on http://localhost:${port}` });
 }
 
 initOpenTelemetry({

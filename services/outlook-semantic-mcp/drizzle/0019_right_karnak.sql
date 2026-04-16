@@ -1,0 +1,1 @@
+ALTER TABLE "inbox_configuration" ADD COLUMN "full_sync_heartbeat_at" timestamp;

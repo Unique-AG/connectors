@@ -1,0 +1,2 @@
+ALTER TABLE "inbox_configuration" RENAME COLUMN "last_full_sync_run_at" TO "full_sync_last_run_at";--> statement-breakpoint
+ALTER TABLE "inbox_configuration" RENAME COLUMN "last_full_sync_started_at" TO "full_sync_last_started_at";

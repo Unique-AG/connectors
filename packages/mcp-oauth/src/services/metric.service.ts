@@ -25,10 +25,14 @@ export class MetricService {
   }
 
   public incrementClientsRegistered(): void {
-    if (this.oauthClientsRegisteredCounter) this.oauthClientsRegisteredCounter.add(1);
+    if (this.oauthClientsRegisteredCounter) {
+      this.oauthClientsRegisteredCounter.add(1);
+    }
   }
 
   public incrementFlowsStarted(): void {
-    if (this.oauthFlowsStartedCounter) this.oauthFlowsStartedCounter.add(1);
+    if (this.oauthFlowsStartedCounter) {
+      this.oauthFlowsStartedCounter.add(1);
+    }
   }
 }

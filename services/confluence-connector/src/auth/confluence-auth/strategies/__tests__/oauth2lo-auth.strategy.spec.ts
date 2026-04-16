@@ -1,20 +1,33 @@
-import type pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthMode } from '../../../../config/confluence.schema';
 import { Redacted } from '../../../../utils/redacted';
 import { OAuth2LoAuthStrategy } from '../oauth2lo-auth.strategy';
 
-const { mockRequest } = vi.hoisted(() => ({
+const { mockRequest, mockLogger } = vi.hoisted(() => ({
   mockRequest: vi.fn(),
+  mockLogger: {
+    log: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 vi.mock('undici', () => ({
   request: mockRequest,
 }));
 
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return {
+    ...actual,
+    Logger: vi.fn().mockImplementation(() => mockLogger),
+  };
+});
+
 describe('OAuth2LoAuthStrategy', () => {
   const authConfig = {
-    mode: AuthMode.OAUTH_2LO,
+    mode: AuthMode.OAuth2Lo,
     clientId: 'my-client-id',
     clientSecret: new Redacted('my-client-secret'),
   };
@@ -35,10 +48,6 @@ describe('OAuth2LoAuthStrategy', () => {
     token_type: 'Bearer',
   };
 
-  let loggerInfoMock: ReturnType<typeof vi.fn>;
-  let loggerErrorMock: ReturnType<typeof vi.fn>;
-  let mockLogger: pino.Logger;
-
   function mockTokenResponse(statusCode: number, body: unknown): void {
     mockRequest.mockResolvedValueOnce({
       statusCode,
@@ -53,13 +62,6 @@ describe('OAuth2LoAuthStrategy', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-02-13T12:00:00.000Z'));
-
-    loggerInfoMock = vi.fn();
-    loggerErrorMock = vi.fn();
-    mockLogger = {
-      info: loggerInfoMock,
-      error: loggerErrorMock,
-    } as unknown as pino.Logger;
   });
 
   afterEach(() => {
@@ -70,7 +72,7 @@ describe('OAuth2LoAuthStrategy', () => {
     it('requests a Cloud access token via the Atlassian OAuth endpoint', async () => {
       mockTokenResponse(200, successBody);
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
       await strategy.acquireToken();
 
       expect(mockRequest).toHaveBeenCalledOnce();
@@ -91,7 +93,7 @@ describe('OAuth2LoAuthStrategy', () => {
     it('returns access token for cloud', async () => {
       mockTokenResponse(200, successBody);
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
       const token = await strategy.acquireToken();
 
       expect(token).toBe('returned-access-token');
@@ -99,7 +101,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
     it('caches token across sequential calls', async () => {
       mockTokenResponse(200, successBody);
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       const tokenA = await strategy.acquireToken();
       const tokenB = await strategy.acquireToken();
@@ -111,7 +113,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
     it('deduplicates concurrent token acquisition calls', async () => {
       mockTokenResponse(200, successBody);
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       const [tokenA, tokenB] = await Promise.all([
         strategy.acquireToken(),
@@ -126,13 +128,13 @@ describe('OAuth2LoAuthStrategy', () => {
     it('logs before acquiring token', async () => {
       mockTokenResponse(200, successBody);
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
       await strategy.acquireToken();
 
-      expect(loggerInfoMock).toHaveBeenCalledWith(
-        'Acquiring Confluence cloud token via OAuth 2.0 2LO',
-      );
-      expect(loggerErrorMock).not.toHaveBeenCalled();
+      expect(mockLogger.log).toHaveBeenCalledWith({
+        msg: 'Acquiring Confluence cloud token via OAuth 2.0 2LO',
+      });
+      expect(mockLogger.error).not.toHaveBeenCalled();
     });
   });
 
@@ -140,7 +142,7 @@ describe('OAuth2LoAuthStrategy', () => {
     it('requests a Data Center access token via the instance OAuth endpoint', async () => {
       mockTokenResponse(200, successBody);
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection);
       await strategy.acquireToken();
 
       expect(mockRequest).toHaveBeenCalledOnce();
@@ -160,7 +162,7 @@ describe('OAuth2LoAuthStrategy', () => {
     it('returns access token for DC', async () => {
       mockTokenResponse(200, successBody);
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection);
       const token = await strategy.acquireToken();
 
       expect(token).toBe('returned-access-token');
@@ -171,13 +173,13 @@ describe('OAuth2LoAuthStrategy', () => {
     it('logs the error before rethrowing', async () => {
       mockRequest.mockRejectedValueOnce(new Error('getaddrinfo ENOTFOUND'));
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow();
 
-      expect(loggerErrorMock).toHaveBeenCalledOnce();
+      expect(mockLogger.error).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
-      const [loggedObj] = loggerErrorMock.mock.calls[0]!;
+      const [loggedObj] = mockLogger.error.mock.calls[0]!;
       expect(loggedObj).toMatchObject({
         err: expect.any(Error),
         msg: 'Failed to acquire Confluence cloud token via OAuth 2.0 2LO',
@@ -188,7 +190,7 @@ describe('OAuth2LoAuthStrategy', () => {
       const networkError = new Error('getaddrinfo ENOTFOUND');
       mockRequest.mockRejectedValueOnce(networkError);
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(networkError);
     });
@@ -196,7 +198,7 @@ describe('OAuth2LoAuthStrategy', () => {
     it('throws on HTTP 401 indicating invalid credentials', async () => {
       mockTokenResponse(401, 'Unauthorized');
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(
         'Error response from https://api.atlassian.com/oauth/token: 401 Unauthorized',
@@ -206,7 +208,7 @@ describe('OAuth2LoAuthStrategy', () => {
     it('throws on HTTP 403 indicating invalid credentials', async () => {
       mockTokenResponse(403, 'Forbidden');
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(
         'Error response from https://confluence.corp.example.com/rest/oauth2/latest/token: 403 Forbidden',
@@ -216,7 +218,7 @@ describe('OAuth2LoAuthStrategy', () => {
     it('throws on HTTP 500 with status and response body', async () => {
       mockTokenResponse(500, 'Internal Server Error');
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(
         'Error response from https://api.atlassian.com/oauth/token: 500 Internal Server Error',
@@ -232,7 +234,7 @@ describe('OAuth2LoAuthStrategy', () => {
         },
       });
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(
         'Error response from https://api.atlassian.com/oauth/token: 500 No response body',
@@ -242,7 +244,7 @@ describe('OAuth2LoAuthStrategy', () => {
     it('throws ZodError on malformed response missing access_token', async () => {
       mockTokenResponse(200, { expires_in: 3600 });
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(/access_token/);
     });
@@ -250,7 +252,7 @@ describe('OAuth2LoAuthStrategy', () => {
     it('throws ZodError on malformed response missing expires_in', async () => {
       mockTokenResponse(200, { access_token: 'tok' });
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(/expires_in/);
     });
@@ -258,7 +260,7 @@ describe('OAuth2LoAuthStrategy', () => {
     it('throws ZodError on malformed response missing both fields', async () => {
       mockTokenResponse(200, {});
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow(/access_token/);
     });
@@ -272,7 +274,7 @@ describe('OAuth2LoAuthStrategy', () => {
         },
       });
 
-      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection, mockLogger);
+      const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
       await expect(strategy.acquireToken()).rejects.toThrow('invalid json');
     });

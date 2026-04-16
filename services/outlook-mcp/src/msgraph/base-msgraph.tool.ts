@@ -28,18 +28,26 @@ export abstract class BaseMsGraphTool {
    */
   protected getGraphClient(request: McpAuthenticatedRequest, span?: Span): Client {
     const userProfileId = request.user?.userProfileId;
-    if (!userProfileId) throw new UnauthorizedException('User not authenticated');
+    if (!userProfileId) {
+      throw new UnauthorizedException('User not authenticated');
+    }
 
-    if (span) span.setAttribute(OTEL_ATTRIBUTES.USER_ID, userProfileId);
+    if (span) {
+      span.setAttribute(OTEL_ATTRIBUTES.USER_ID, userProfileId);
+    }
 
     return this.graphClientFactory.createClientForUser(userProfileId);
   }
 
   protected incrementActionCounter(action: string) {
-    if (this.actionCounter) this.actionCounter.add(1, { action });
+    if (this.actionCounter) {
+      this.actionCounter.add(1, { action });
+    }
   }
 
   protected incrementActionFailureCounter(action: string, reason: string) {
-    if (this.actionFailureCounter) this.actionFailureCounter.add(1, { action, reason });
+    if (this.actionFailureCounter) {
+      this.actionFailureCounter.add(1, { action, reason });
+    }
   }
 }

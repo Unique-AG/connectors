@@ -21,9 +21,11 @@ describe('FetchGraphPermissionsMapQuery', () => {
   let query: FetchGraphPermissionsMapQuery;
   let graphApiService: GraphApiService;
   let loggerWarnSpy: ReturnType<typeof vi.fn>;
+  let loggerLogSpy: ReturnType<typeof vi.fn>;
 
   const mockSiteId = 'site-123';
   const mockSiteName = 'TestSite';
+  const mockSmearedSiteId = new Smeared(mockSiteId, false);
 
   const createMockDriveItem = (id: string): AnySharepointItem => ({
     itemType: 'driveItem',
@@ -93,10 +95,11 @@ describe('FetchGraphPermissionsMapQuery', () => {
 
   beforeEach(async () => {
     loggerWarnSpy = vi.fn();
+    loggerLogSpy = vi.fn();
     vi.mocked(Logger).mockImplementation(
       () =>
         ({
-          log: vi.fn(),
+          log: loggerLogSpy,
           error: vi.fn(),
           warn: loggerWarnSpy,
           debug: vi.fn(),
@@ -134,7 +137,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(items, new Smeared(mockSiteName, false));
+      await query.run(items, new Smeared(mockSiteName, false), mockSmearedSiteId);
 
       expect(loggerWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('No parsable permissions for permission perm-unparseable'),
@@ -175,7 +178,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(items, new Smeared(mockSiteName, false));
+      await query.run(items, new Smeared(mockSiteName, false), mockSmearedSiteId);
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-user-data'),
@@ -208,7 +211,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(items, new Smeared(mockSiteName, false));
+      await query.run(items, new Smeared(mockSiteName, false), mockSmearedSiteId);
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-siteuser-data'),
@@ -255,7 +258,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(items, new Smeared(mockSiteName, false));
+      await query.run(items, new Smeared(mockSiteName, false), mockSmearedSiteId);
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-multiple-nulls'),
@@ -301,7 +304,7 @@ describe('FetchGraphPermissionsMapQuery', () => {
       const items = [createMockDriveItem('item-1')];
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      await query.run(items, new Smeared(mockSiteName, false));
+      await query.run(items, new Smeared(mockSiteName, false), mockSmearedSiteId);
 
       const warnCall = loggerWarnSpy.mock.calls.find((call) =>
         call[0].includes('No parsable permissions for permission perm-structure-check'),
@@ -346,7 +349,11 @@ describe('FetchGraphPermissionsMapQuery', () => {
 
       vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
 
-      const result = await query.run([subsiteItem], new Smeared(rootSiteName, false));
+      const result = await query.run(
+        [subsiteItem],
+        new Smeared(rootSiteName, false),
+        mockSmearedSiteId,
+      );
 
       const itemKey = buildIngestionItemKey(subsiteItem);
       const permissions = result[itemKey];
@@ -359,6 +366,41 @@ describe('FetchGraphPermissionsMapQuery', () => {
       assert.ok(permission.type === 'siteGroup');
       expect(permission.id).toBe(`${rootSiteName}|${siteGroupId}`);
       expect(permission.name).toBe('Site Collection Owners');
+    });
+  });
+
+  describe('progress logging', () => {
+    const mockPermission: SimplePermission = {
+      id: 'perm-1',
+      grantedToV2: {
+        user: { id: 'user-1', email: 'user@example.com' },
+      } as SimpleIdentitySet,
+    };
+
+    it('logs progress every 100 items', async () => {
+      const items = Array.from({ length: 250 }, (_, i) => createMockDriveItem(`item-${i}`));
+      vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
+
+      await query.run(items, new Smeared(mockSiteName, false), mockSmearedSiteId);
+
+      const progressLogs = loggerLogSpy.mock.calls.filter((call: string[]) =>
+        call[0]?.includes('items processed so far'),
+      );
+      expect(progressLogs).toHaveLength(2);
+      expect(progressLogs[0]?.[0]).toContain('100/250 items processed so far');
+      expect(progressLogs[1]?.[0]).toContain('200/250 items processed so far');
+    });
+
+    it('does not log progress when total items are below the interval', async () => {
+      const items = Array.from({ length: 50 }, (_, i) => createMockDriveItem(`item-${i}`));
+      vi.mocked(graphApiService.getDriveItemPermissions).mockResolvedValue([mockPermission]);
+
+      await query.run(items, new Smeared(mockSiteName, false), mockSmearedSiteId);
+
+      const progressLogs = loggerLogSpy.mock.calls.filter((call: string[]) =>
+        call[0]?.includes('items processed so far'),
+      );
+      expect(progressLogs).toHaveLength(0);
     });
   });
 });

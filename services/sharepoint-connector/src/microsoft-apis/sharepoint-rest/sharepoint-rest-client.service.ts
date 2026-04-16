@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { fromEntries, map, pipe, prop, zip } from 'remeda';
+import type { ManagedPath } from '../../utils/paths.util';
 import type { Smeared } from '../../utils/smeared';
 import { SharepointRestHttpService } from './sharepoint-rest-http.service';
 
@@ -9,12 +10,14 @@ export class SharepointRestClientService {
 
   public async getSiteGroupsMemberships(
     siteName: Smeared,
+    managedPath: ManagedPath,
     siteGroupIds: string[],
   ): Promise<Record<string, SiteGroupMembership[]>> {
     const responses = await this.sharepointRestHttpService.requestBatch<{
       value: SiteGroupMembership[];
     }>(
       siteName,
+      managedPath,
       siteGroupIds.map((id) => `/sitegroups/getById(${id})/users`),
     );
 

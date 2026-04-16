@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { type Histogram } from '@opentelemetry/api';
 import { filter, flat, indexBy, mapKeys, mapValues, pipe, prop, uniqueBy, values } from 'remeda';
 import { IngestionMode } from '../constants/ingestion.constants';
-import { SyncStep } from '../constants/sync-step.enum';
+import { SiteSyncStep } from '../constants/sync-step.enum';
 import { SPC_PERMISSIONS_SYNC_DURATION_SECONDS } from '../metrics';
 import type {
   SharepointContentItem,
@@ -14,12 +14,14 @@ import { UniqueGroupsService } from '../unique-api/unique-groups/unique-groups.s
 import { getSharepointConnectorGroupExternalIdPrefix } from '../unique-api/unique-groups/unique-groups.utils';
 import { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
+import type { ManagedPath } from '../utils/paths.util';
 import { Smeared } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { FetchGraphPermissionsMapQuery, PermissionsMap } from './fetch-graph-permissions-map.query';
 import { FetchGroupsWithMembershipsQuery } from './fetch-groups-with-memberships.query';
 import { GetRegularFolderPermissionsQuery } from './get-regular-folder-permissions.query';
 import { GetTopFolderPermissionsQuery } from './get-top-folder-permissions.query';
+import { PermissionsSyncError } from './permissions-sync.error';
 import { SyncSharepointFilesPermissionsToUniqueCommand } from './sync-sharepoint-files-permissions-to-unique.command';
 import { SyncSharepointFolderPermissionsToUniqueCommand } from './sync-sharepoint-folder-permissions-to-unique.command';
 import { SyncSharepointGroupsToUniqueCommand } from './sync-sharepoint-groups-to-unique.command';
@@ -62,7 +64,7 @@ export class PermissionsSyncService {
 
     const logPrefix = `[Site: ${siteId}]`;
     const startTime = Date.now();
-    let currentStep: SyncStep = SyncStep.PermissionsFetch;
+    let currentStep: SiteSyncStep = SiteSyncStep.PermissionsFetch;
 
     try {
       this.logger.log(
@@ -73,14 +75,16 @@ export class PermissionsSyncService {
       const permissionsMap = await this.fetchGraphPermissionsMapQuery.run(
         [...sharePoint.items, ...sharePoint.directories],
         context.siteName,
+        siteId,
       );
       this.logger.log(
         `${logPrefix} Fetched permissions for ${sharePoint.items.length} items in ${elapsedSecondsLog(permissionsFetchStartTime)}`,
       );
 
-      currentStep = SyncStep.GroupsMembershipsFetch;
+      currentStep = SiteSyncStep.GroupsMembershipsFetch;
       const groupsWithMembershipsMap = await this.fetchGroupsWithMembershipsForSite(
         siteId,
+        context.managedPath,
         permissionsMap,
       );
 
@@ -88,7 +92,7 @@ export class PermissionsSyncService {
         `${logPrefix} Fetched ${Object.keys(groupsWithMembershipsMap).length} groups with memberships`,
       );
 
-      currentStep = SyncStep.UniqueDataFetch;
+      currentStep = SiteSyncStep.UniqueDataFetch;
       const uniqueUsersMap = await this.getUniqueUsersMap();
       const uniqueGroupsMap = await this.getUniqueGroupsMap(siteId);
 
@@ -96,7 +100,7 @@ export class PermissionsSyncService {
         `${logPrefix} Found ${Object.keys(uniqueGroupsMap).length} unique groups and ${Object.keys(uniqueUsersMap).length} unique users`,
       );
 
-      currentStep = SyncStep.GroupsSync;
+      currentStep = SiteSyncStep.GroupsSync;
       const { updatedUniqueGroupsMap } = await this.syncSharepointGroupsToUniqueCommand.run({
         siteId,
         sharePoint: { groupsMap: groupsWithMembershipsMap },
@@ -107,7 +111,7 @@ export class PermissionsSyncService {
         `${logPrefix} Synced ${Object.keys(updatedUniqueGroupsMap).length} resulting unique groups`,
       );
 
-      currentStep = SyncStep.FilePermissionsSync;
+      currentStep = SiteSyncStep.FilePermissionsSync;
       await this.syncSharepointFilesPermissionsToUniqueCommand.run({
         context,
         sharePoint: { permissionsMap },
@@ -115,7 +119,7 @@ export class PermissionsSyncService {
       });
 
       if (ingestionMode === IngestionMode.Recursive) {
-        currentStep = SyncStep.FolderPermissionsSync;
+        currentStep = SiteSyncStep.FolderPermissionsSync;
         assert.ok(unique.folders, `${logPrefix} Folders are required for recursive ingestion mode`);
 
         const regularFolderPermissions = this.getRegularFolderPermissionsQuery.run({
@@ -160,12 +164,13 @@ export class PermissionsSyncService {
         result: 'failure',
         failure_step: currentStep,
       });
-      throw error;
+      throw new PermissionsSyncError(currentStep, error);
     }
   }
 
   private async fetchGroupsWithMembershipsForSite(
     siteId: Smeared,
+    managedPath: ManagedPath,
     permissionsMap: PermissionsMap,
   ): Promise<SharePointGroupsMap> {
     const logPrefix = `[Site: ${siteId}]`;
@@ -180,7 +185,11 @@ export class PermissionsSyncService {
       `${logPrefix} Fetching groups with memberships from SharePoint & Graph APIs for ` +
         `${uniqueGroupPermissions.length} unique group permissions`,
     );
-    return await this.fetchGroupsWithMembershipsQuery.run(siteId, uniqueGroupPermissions);
+    return await this.fetchGroupsWithMembershipsQuery.run(
+      siteId,
+      managedPath,
+      uniqueGroupPermissions,
+    );
   }
 
   private async getUniqueUsersMap(): Promise<UniqueUsersMap> {

@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
 import { ListCategoriesQuery, ListCategoriesQueryOutputSchema } from './list-categories.query';
+import { META } from './list-categories-tool.meta';
 
 const InputSchema = z.object({});
 
@@ -20,7 +21,7 @@ export class ListCategoriesTool {
     name: 'list_categories',
     title: 'List Categories',
     description:
-      'List all Outlook mail categories available for the user. Returns the display names of all master categories configured in Outlook.',
+      'List all Outlook mail categories available for the user. Returns display names of all master categories configured in Outlook. Category names can be passed to the `categories` filter in `search_emails` to narrow results.',
     parameters: InputSchema,
     outputSchema: ListCategoriesQueryOutputSchema,
     annotations: {
@@ -30,11 +31,7 @@ export class ListCategoriesTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'tag',
-      'unique.app/system-prompt':
-        'Returns the list of Outlook mail category names configured for the user. Use category names when filtering emails by category. Call this tool when the user wants to know which categories are available or wants to search emails by category.',
-    },
+    _meta: META,
   })
   @Span()
   public async listCategories(

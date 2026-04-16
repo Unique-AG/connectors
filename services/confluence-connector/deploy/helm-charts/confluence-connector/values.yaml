@@ -6,7 +6,7 @@ connector:
   env:
     LOG_LEVEL: info
     LOGS_DIAGNOSTICS_DATA_POLICY: conceal
-    MAX_FILE_SIZE_BYTES: "209715200"
+    MAX_FILE_SIZE_MB: "200"
     MAX_HEAP_MB: 896
     NODE_ENV: production
     OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
@@ -29,13 +29,20 @@ connector:
   #         secretKeyRef:
   #           name: confluence-connector-secret
   #           key: CONFLUENCE_CLIENT_SECRET
+  #     # For proxy basic auth password (required when proxy.authMode is 'username_password')
+  #     - name: PROXY_PASSWORD
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: confluence-connector-secret
+  #           key: PROXY_PASSWORD
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
   # -- List of ConfigMaps to load as environment variables
-  extraEnvCM: []
+  extraEnvCM:
+    - confluence-connector-proxy-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/confluence-connector
-    tag: 2.0.0-alpha.0 # x-release-please-version
+    tag: 2.0.0-alpha.4 # x-release-please-version
   ports:
     application: 51349
     metrics: 51350
@@ -120,8 +127,12 @@ connectorConfig:
           mode: oauth_2lo
           # -- OAuth 2.0 (2LO) application client ID
           clientId: unset_default_value
+          # -- OAuth 2.0 client secret. Use "os.environ/ENV_VAR_NAME" to read from environment variable at runtime.
+          # This default is overridden per-tenant in the monorepo app.yaml values.
+          clientSecret: "os.environ/CONFLUENCE_CLIENT_SECRET"
         # -- Number of Confluence API requests allowed per minute
-        apiRateLimitPerMinute: 100
+        # Atlassian recommends DC admins allow at least 20 req/s (1200 RPM). Cloud uses a points-based quota.
+        apiRateLimitPerMinute: 1200
         # -- Label to trigger single-page sync
         ingestSingleLabel: ai-ingest
         # -- Label to trigger full sync of all labeled pages
@@ -165,11 +176,66 @@ connectorConfig:
           projectId: unset_default_value
 
       processing:
-        # -- timeout in seconds for a page processing step before it will stop and skip processing the page
-        stepTimeoutSeconds: 300
         # -- how many pages you want to submit for ingestion into Unique at once
         concurrency: 1
         # -- cron expression for the scheduled Confluence scan interval default: every 15 minutes
         scanIntervalCron: "*/15 * * * *"
-        # -- maximum number of pages to scan per run (null/empty for unlimited, useful for testing)
-        # maxPagesToScan: 100
+        # -- maximum number of items (pages + attachments) to scan per run (null/empty for unlimited, useful for testing)
+        # maxItemsToScan: 100
+
+      ingestion:
+        # -- Ingestion traversal mode
+        ingestionMode: flat
+        # -- Root scope ID for ingestion
+        scopeId: unset_default_value
+        # -- Whether to store content internally in Unique
+        storeInternally: enabled
+        # -- Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix
+        useV1KeyFormat: disabled
+        # -- File attachment ingestion configuration (optional, all fields have defaults)
+        # attachments:
+        #   # -- Enable attachment ingestion (default: enabled)
+        #   mode: enabled
+        #   # -- File extensions to include (default: pdf, docx, xlsx, ppt, pptx, txt, csv, html)
+        #   allowedExtensions:
+        #     - pdf
+        #     - docx
+        #     - xlsx
+        #     - ppt
+        #     - pptx
+        #     - txt
+        #     - csv
+        #     - html
+        #   # -- Maximum file size in megabytes (default: 200, or MAX_FILE_SIZE_MB env)
+        #   maxFileSizeMb: 200
+
+# -- HTTP proxy configuration for external API calls
+# Required for environments where internet access is only available through a proxy.
+# Users preferring setting all variables by hand disable the enabled flag and remove
+# confluence-connector-proxy-config from connector.extraEnvCM.
+proxyConfig:
+  # -- if disabled, confluence-connector-proxy-config must be removed from connector.extraEnvCM.
+  enabled: true
+  # -- Proxy authentication mode
+  # none: proxy disabled
+  # no_auth: proxy enabled, no authentication
+  # username_password: username/password authentication
+  # ssl_tls: TLS client certificate authentication
+  authMode: none
+  # -- Proxy server hostname (required for no_auth/username_password/ssl_tls modes)
+  # host: proxy.example.com
+  # -- Proxy server port (required for no_auth/username_password/ssl_tls modes)
+  # port: 8080
+  # -- Proxy protocol: http or https (required for no_auth/username_password/ssl_tls modes)
+  # protocol: http
+  # -- Basic auth username (required for username_password mode)
+  # username: proxy-user
+  # password is loaded from a secret, see connector.envVars example for PROXY_PASSWORD
+  # -- Path to SSL/TLS client certificate (required for ssl_tls mode)
+  # sslCertPath: /app/proxy-certs/client.crt
+  # -- Path to SSL/TLS client key (required for ssl_tls mode)
+  # sslKeyPath: /app/proxy-certs/client.key
+  # -- Path to CA bundle for verifying proxy server certificate (optional)
+  # sslCaBundlePath: /app/proxy-certs/ca.crt
+  # -- Optional JSON string of headers for CONNECT request
+  # headers: '{"X-Proxy-Header":"value"}'

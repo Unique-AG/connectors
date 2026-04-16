@@ -1,4 +1,5 @@
 import { gql } from 'graphql-request';
+import type { VariableLogPolicy } from '../../utils/sanitize-graphql-variables';
 import { UniqueAccessType, UniqueEntityType } from '../types';
 import type { Scope } from './unique-scopes.types';
 
@@ -10,6 +11,8 @@ export interface GenerateScopesBasedOnPathsMutationInput {
 export interface GenerateScopesBasedOnPathsMutationResult {
   generateScopesBasedOnPaths: Scope[];
 }
+
+export const GENERATE_SCOPES_LOG_SAFE_KEYS: VariableLogPolicy = ['inheritAccess'];
 
 export function getGenerateScopesBasedOnPathsMutation(includePermissions: boolean): string {
   const scopeAccessFields = includePermissions
@@ -49,6 +52,14 @@ export interface CreateScopeAccessesMutationInput {
 export interface CreateScopeAccessesMutationResult {
   createScopeAccesses: boolean;
 }
+
+export const SCOPE_ACCESSES_LOG_SAFE_KEYS: VariableLogPolicy = [
+  'scopeId',
+  'applyToSubScopes',
+  'skipFileAccessPropagation',
+  'scopeAccesses.accessType',
+  'scopeAccesses.entityType',
+];
 
 export const CREATE_SCOPE_ACCESSES_MUTATION = gql`
   mutation CreateScopeAccesses(
@@ -120,6 +131,8 @@ export interface PaginatedScopeQueryResult {
   };
 }
 
+export const PAGINATED_SCOPE_LOG_SAFE_KEYS: VariableLogPolicy = ['skip', 'take'];
+
 export const PAGINATED_SCOPE_QUERY = gql`
   query PaginatedScope($skip: Int!, $take: Int!, $where: ScopeWhereInput!) {
     paginatedScope(skip: $skip, take: $take, where: $where) {
@@ -137,7 +150,7 @@ export const PAGINATED_SCOPE_QUERY = gql`
 export interface UpdateScopeMutationInput {
   id: string;
   input: {
-    externalId?: string;
+    externalId?: string | null;
     // There's a typo in Unique API: "parrent" instead of "parent"
     parrentScope?: {
       connect: {
@@ -155,6 +168,8 @@ export interface UpdateScopeMutationResult {
     parentId: string | null;
   };
 }
+
+export const UPDATE_SCOPE_LOG_SAFE_KEYS: VariableLogPolicy = ['id'];
 
 export const UPDATE_SCOPE_MUTATION = gql`
   mutation UpdateScope($id: String!, $input: ScopeUpdateInput!) {
@@ -187,6 +202,8 @@ export interface DeleteFolderMutationResult {
     }>;
   };
 }
+
+export const DELETE_FOLDER_LOG_SAFE_KEYS: VariableLogPolicy = ['scopeId', 'recursive'];
 
 export const DELETE_FOLDER_MUTATION = gql`
   mutation DeleteFolder($scopeId: String!, $recursive: Boolean!) {

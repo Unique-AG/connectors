@@ -92,19 +92,25 @@ export class ClientService {
 
   public async getClient(clientId: string): Promise<OAuthClient | null> {
     const client = await this.store.getClient(clientId);
-    if (!client) return null;
+    if (!client) {
+      return null;
+    }
 
     return client;
   }
 
   public async validateRedirectUri(clientId: string, redirectUri: string): Promise<boolean> {
     const client = await this.getClient(clientId);
-    if (!client) return false;
+    if (!client) {
+      return false;
+    }
 
     // Strict validation: no wildcards, exact match only
     // Exception: Allow localhost with different ports for development
     const isValid = client.redirect_uris.some((registeredUri) => {
-      if (registeredUri === redirectUri) return true;
+      if (registeredUri === redirectUri) {
+        return true;
+      }
 
       // Allow loopback interface exceptions per RFC 8252
       try {
@@ -148,13 +154,19 @@ export class ClientService {
     clientSecret: string | undefined,
   ): Promise<boolean> {
     const client = await this.getClient(clientId);
-    if (!client) return false;
+    if (!client) {
+      return false;
+    }
 
     // Public clients (token_endpoint_auth_method === 'none')
-    if (!client.client_secret) return !clientSecret;
+    if (!client.client_secret) {
+      return !clientSecret;
+    }
 
     // Confidential clients - require secret
-    if (!clientSecret) return false;
+    if (!clientSecret) {
+      return false;
+    }
 
     try {
       return await bcrypt.compare(clientSecret, client.client_secret);

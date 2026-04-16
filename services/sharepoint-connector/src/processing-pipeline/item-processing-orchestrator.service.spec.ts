@@ -86,7 +86,9 @@ describe('ItemProcessingOrchestratorService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'processing.concurrency') return 3;
+          if (key === 'processing.concurrency') {
+            return 3;
+          }
           return undefined;
         }),
       }))
@@ -100,6 +102,7 @@ describe('ItemProcessingOrchestratorService', () => {
   const mockSyncContext: SharepointSyncContext = {
     siteConfig: createMockSiteConfig(),
     siteName: new Smeared('test-site', false),
+    managedPath: 'sites',
     serviceUserId: 'test-user-id',
     rootPath: new Smeared('/Root', false),
     isInitialSync: false,

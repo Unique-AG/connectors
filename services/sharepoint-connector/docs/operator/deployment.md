@@ -1,7 +1,6 @@
 <!-- confluence-page-id: 1952907339 -->
 <!-- confluence-space-key: PUBDOC -->
 
-
 ## Content
 
 The SharePoint Connector is delivered as part of the [Unique Connectors](https://github.com/Unique-AG/connectors) repository. Each release includes:
@@ -16,7 +15,7 @@ The SharePoint Connector is delivered as part of the [Unique Connectors](https:/
 Container images are available from container registries, including `uniquecr` and GitHub Container Registry:
 
 ```
-ghcr.io/unique-ag/sharepoint-connector:<version>
+ghcr.io/unique-ag/connectors/services/sharepoint-connector:<version>
 ```
 
 **Note:** With `2.0.0` GA and higher, images are available via the `uniquecr` OCI registry.
@@ -49,88 +48,104 @@ helm install sharepoint-connector oci://ghcr.io/unique-ag/charts/sharepoint-conn
 
 ### Helm Values Example
 
+The chart wraps the [`backend-service`](https://github.com/unique-ag/helm-charts) subchart (aliased as `connector`), so image, env, resources, and volumes are nested under the `connector` key. Connector-specific configuration lives under `connectorConfig` and `proxyConfig`.
+
 ```yaml
-image:
-  repository: ghcr.io/unique-ag/sharepoint-connector
-  tag: "2.0.0"
-  pullPolicy: IfNotPresent
+connector:
+  image:
+    repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
+    tag: "2.2.0"
+  env:
+    LOG_LEVEL: info
+  envVars: []
+  resources:
+    limits:
+      memory: 2048Mi
+    requests:
+      cpu: 1
+      memory: 1984Mi
 
-# Environment variables from secrets
-envVars:
-  - secretRef:
-      name: sharepoint-connector-secrets
+# Tenant configuration (rendered into a ConfigMap and mounted as YAML)
+connectorConfig:
+  enabled: true
+  sharepoint:
+    tenantId: "your-tenant-id"
+    baseUrl: "https://acme.sharepoint.com"
+    graphApiRateLimitPerMinuteThousands: 780
+    auth:
+      mode: certificate
+      clientId: "your-client-id"
+      privateKeyPath: /app/key.pem
+      thumbprintSha1: "AB12CD34..."
+    sitesSource: config_file
+    sites:
+      - siteId: "site-id-1"
+        syncColumnName: FinanceGPTKnowledge
+        ingestionMode: recursive
+        scopeId: scope_xxx
+        syncMode: content_and_permissions
+  unique:
+    serviceAuthMode: cluster_local
+    ingestionServiceBaseUrl: "http://node-ingestion.finance-gpt:8091"
+    scopeManagementServiceBaseUrl: "http://node-scope-management.finance-gpt:8094"
+    apiRateLimitPerMinute: 100
+    serviceExtraHeaders:
+      x-company-id: "company-id"
+      x-user-id: "service-user-id"
+  processing:
+    scanIntervalCron: "*/15 * * * *"
+    concurrency: 1
+    allowedMimeTypes:
+      - application/pdf
+      - text/plain
+      - text/html
+      - application/x-asp
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      - application/vnd.openxmlformats-officedocument.presentationml.presentation
 
-# Static environment variables
-env:
-  LOG_LEVEL: info
-  SYNC_INTERVAL_MINUTES: "15"
-
-# Resource limits
-resources:
-  limits:
-    memory: 2048Mi
-  requests:
-    cpu: 1
-    memory: 2048Mi
-
-# SharePoint configuration
-sharepointConfig:
-  tenantId: "your-tenant-id"
-  clientId: "your-client-id"
-  siteIds:
-    - "site-id-1"
-    - "site-id-2"
-  syncColumnName: "UniqueAI"
-
-# Unique configuration
-uniqueConfig:
-  apiBaseUrl: "http://api-gateway.unique:8080"
-  ingestionBaseUrl: "http://node-ingestion.unique:8091"
-  rootScopeId: "scope_xxx"
-  companyId: "company-id"
-  userId: "service-user-id"
+# Proxy configuration (optional)
+proxyConfig:
+  enabled: true
+  authMode: none
 ```
 
 ## Terraform Modules
 
 Each release contains matching Terraform modules that offer the needed functionality to run the connector:
 
-- Azure AD App Registration module
-- Kubernetes deployment module
-- Certificate generation module
+- **Entra Application module** — registers the Azure AD app with the required Graph/SharePoint permissions
+- **Secrets module** — provisions Key Vault secrets and optionally generates a TLS certificate
 
-### Azure AD Module
+### Entra Application Module
 
 ```hcl
 module "sharepoint_connector_app" {
-  source = "github.com/Unique-AG/connectors//services/sharepoint-connector/deploy/terraform/azure-ad"
+  source = "github.com/Unique-AG/connectors//services/sharepoint-connector/deploy/terraform/azure/sharepoint-connector-entra-application"
 
-  display_name = "Unique SharePoint Connector"
-  tenant_id    = var.tenant_id
-  
-  # Sites to grant access to
-  site_ids = var.sharepoint_site_ids
+  display_name         = "Unique AI SharePoint Connector"
+  sync_mode_role_preset = "content_and_permissions"
 }
 ```
 
-### Kubernetes Module
+Outputs: `client_id`, `object_id`.
+
+### Secrets Module
 
 ```hcl
-module "sharepoint_connector" {
-  source = "github.com/Unique-AG/connectors//services/sharepoint-connector/deploy/terraform/kubernetes"
+module "sharepoint_connector_secrets" {
+  source = "github.com/Unique-AG/connectors//services/sharepoint-connector/deploy/terraform/azure/sharepoint-connector-secrets"
 
-  namespace    = "sharepoint-connector"
-  image_tag    = "2.0.0"
-  
-  # Azure AD configuration
-  tenant_id    = var.tenant_id
-  client_id    = module.sharepoint_connector_app.client_id
-  
-  # Certificate from Azure AD module
-  certificate_pem = module.sharepoint_connector_app.certificate_pem
-  private_key_pem = module.sharepoint_connector_app.private_key_pem
+  key_vault_id = var.key_vault_id
+
+  # Optional: auto-generate a TLS certificate (pass null to disable)
+  # tls_certificate = {
+  #   subject = "sharepoint-connector"
+  # }
 }
 ```
+
+Outputs: `certificate` (with `pem`, `validity_end_time`, `thumbprint_sha1` when TLS generation is enabled).
 
 ## Releases
 
@@ -171,8 +186,8 @@ Further compatibilities (Data Center, On Premise, or other variants) are on the 
 ### Unique Platform Compatibility
 
 | Connector Version | Minimum Unique Version |
-|-------------------|------------------------|
-| 2.0.x | TBD |
+| ----------------- | ---------------------- |
+| 2.x               | TBD                    |
 
 ## Upgrading
 
@@ -217,6 +232,7 @@ helm rollback sharepoint-connector <revision> -n sharepoint-connector
 ### Pod Not Starting
 
 1. Check pod events:
+
    ```bash
    kubectl describe pod -l app=sharepoint-connector -n sharepoint-connector
    ```

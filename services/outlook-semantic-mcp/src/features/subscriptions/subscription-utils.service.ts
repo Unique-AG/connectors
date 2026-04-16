@@ -25,7 +25,7 @@ export class MailSubscriptionUtilsService {
       isTrusted,
       hasState: state !== null,
     });
-    traceAttrs({ is_trusted: isTrusted });
+    traceAttrs({ isTrusted: isTrusted });
 
     return isTrusted;
   }

@@ -1,3 +1,4 @@
+import { Smeared } from '@unique-ag/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConfluenceConfig } from '../../config';
 import type { ConfluencePage } from '../../confluence-api';
@@ -5,12 +6,21 @@ import { ConfluenceApiClient, ContentType } from '../../confluence-api';
 import { ConfluenceContentFetcher } from '../confluence-content-fetcher';
 import type { DiscoveredPage } from '../sync.types';
 
-const mockTenantLogger = vi.hoisted(() => ({
-  info: vi.fn(),
+const mockLogger = vi.hoisted(() => ({
+  log: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
   debug: vi.fn(),
+  verbose: vi.fn(),
 }));
+
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return {
+    ...actual,
+    Logger: vi.fn().mockImplementation(() => mockLogger),
+  };
+});
 
 const baseConfluenceConfig: ConfluenceConfig = {
   instanceType: 'data-center',
@@ -27,7 +37,7 @@ const baseConfluenceConfig: ConfluenceConfig = {
 function makeDiscoveredPage(id: string, overrides: Partial<DiscoveredPage> = {}): DiscoveredPage {
   return {
     id,
-    title: `Page ${id}`,
+    title: new Smeared(`Page ${id}`, false),
     type: ContentType.PAGE,
     spaceId: 'space-1',
     spaceKey: 'SP',
@@ -71,7 +81,6 @@ function createFetcher(
   return new ConfluenceContentFetcher(
     baseConfluenceConfig,
     apiClient as unknown as ConfluenceApiClient,
-    mockTenantLogger as never,
   );
 }
 
@@ -91,24 +100,18 @@ describe('ConfluenceContentFetcher', () => {
     };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPagesContent([discoveredPage]);
+    const result = await fetcher.fetchPageContent(discoveredPage);
 
-    expect(result).toEqual([
-      {
-        id: '1',
-        title: 'Page 1',
-        body: '<p>content</p>',
-        webUrl: 'https://confluence.example.com/wiki/1',
-        spaceId: 'space-1',
-        spaceKey: 'SP',
-        spaceName: 'Space',
-        metadata: { confluenceLabels: ['engineering'] },
-      },
-    ]);
-    expect(mockTenantLogger.info).toHaveBeenCalledWith(
-      { count: 1, total: 1 },
-      'Content fetching completed',
-    );
+    expect(result).toEqual({
+      id: '1',
+      title: new Smeared('Page 1', false),
+      body: '<p>content</p>',
+      webUrl: 'https://confluence.example.com/wiki/1',
+      spaceId: 'space-1',
+      spaceKey: 'SP',
+      spaceName: 'Space',
+      metadata: { confluenceLabels: ['engineering'] },
+    });
   });
 
   it('omits metadata when page has only ingest labels', async () => {
@@ -120,10 +123,10 @@ describe('ConfluenceContentFetcher', () => {
     };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPagesContent([discoveredPage]);
+    const result = await fetcher.fetchPageContent(discoveredPage);
 
-    expect(result).toHaveLength(1);
-    expect(result[0]?.metadata).toBeUndefined();
+    expect(result).toBeDefined();
+    expect(result?.metadata).toBeUndefined();
   });
 
   it('skips pages that are missing in Confluence', async () => {
@@ -133,13 +136,14 @@ describe('ConfluenceContentFetcher', () => {
     };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPagesContent([discoveredPage]);
+    const result = await fetcher.fetchPageContent(discoveredPage);
 
-    expect(result).toEqual([]);
-    expect(mockTenantLogger.warn).toHaveBeenCalledWith(
-      { pageId: 'missing', title: 'Page missing' },
-      'Page not found, possibly deleted',
-    );
+    expect(result).toBeNull();
+    expect(mockLogger.warn).toHaveBeenCalledWith({
+      pageId: 'missing',
+      title: new Smeared('Page missing', false),
+      msg: 'Page not found, possibly deleted',
+    });
   });
 
   it('skips pages with empty body', async () => {
@@ -149,30 +153,40 @@ describe('ConfluenceContentFetcher', () => {
     };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPagesContent([discoveredPage]);
+    const result = await fetcher.fetchPageContent(discoveredPage);
 
-    expect(result).toEqual([]);
-    expect(mockTenantLogger.info).toHaveBeenCalledWith(
-      { pageId: 'empty', title: 'Page empty' },
-      'Page has no body, skipping',
-    );
+    expect(result).toBeNull();
+    expect(mockLogger.log).toHaveBeenCalledWith({
+      pageId: 'empty',
+      title: new Smeared('Page empty', false),
+      msg: 'Page has no body, skipping',
+    });
   });
 
-  it('continues processing after getPageById error', async () => {
-    const failingPage = makeDiscoveredPage('fail');
-    const successfulPage = makeDiscoveredPage('ok');
+  it('returns labels sorted alphabetically', async () => {
+    const discoveredPage = makeDiscoveredPage('1');
     const apiClient = {
       getPageById: vi
         .fn()
-        .mockRejectedValueOnce(new Error('request failed'))
-        .mockResolvedValueOnce(makeFullPage('ok', { labels: ['engineering'] })),
+        .mockResolvedValue(makeFullPage('1', { labels: ['zebra', 'alpha', 'ai-ingest'] })),
     };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPagesContent([failingPage, successfulPage]);
+    const result = await fetcher.fetchPageContent(discoveredPage);
 
-    expect(result.map((page) => page.id)).toEqual(['ok']);
-    expect(mockTenantLogger.error).toHaveBeenCalledWith(
+    expect(result?.metadata?.confluenceLabels).toEqual(['alpha', 'zebra']);
+  });
+
+  it('continues processing after getPageById error', async () => {
+    const apiClient = {
+      getPageById: vi.fn().mockRejectedValue(new Error('request failed')),
+    };
+
+    const fetcher = createFetcher(apiClient);
+    const result = await fetcher.fetchPageContent(makeDiscoveredPage('fail'));
+
+    expect(result).toBeNull();
+    expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         pageId: 'fail',
         err: expect.any(Error),

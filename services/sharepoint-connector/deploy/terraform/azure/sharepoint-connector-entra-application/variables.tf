@@ -34,6 +34,20 @@ variable "sync_mode_role_preset" {
   }
 }
 
+variable "content_access_scopes" {
+  description = "List of Graph content-access permission scopes to request. Must contain at least one element. Supported values: 'sites' (Sites.Selected), 'lists' (Lists.SelectedOperations.Selected)."
+  type        = set(string)
+  default     = ["sites", "lists"]
+  validation {
+    condition     = length(var.content_access_scopes) > 0
+    error_message = "At least one content access scope must be specified."
+  }
+  validation {
+    condition     = alltrue([for s in var.content_access_scopes : contains(["sites", "lists"], s)])
+    error_message = "Unsupported content access scope. Supported values are 'sites' and 'lists'."
+  }
+}
+
 variable "federated_identity_credentials" {
   description = "A map of federated identity credentials for the Azure AD application. Each key is the display name and the value contains the credential configuration. Currently we only support OIDC from this module. You can reuse the same application for multiple origins without sharing secrets by adding multiple issuers and subjects to the map."
   type = map(object({

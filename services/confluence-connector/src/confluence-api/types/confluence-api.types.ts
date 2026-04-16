@@ -9,6 +9,25 @@ export enum ContentType {
   EMBED = 'embed',
 }
 
+export const confluenceAttachmentSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  extensions: z.object({
+    mediaType: z.string(),
+    fileSize: z.number(),
+  }),
+  version: z
+    .object({
+      when: z.string(),
+    })
+    .optional(),
+  _links: z.object({
+    download: z.string(),
+  }),
+});
+
+export type ConfluenceAttachment = z.infer<typeof confluenceAttachmentSchema>;
+
 export const confluencePageSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -36,6 +55,23 @@ export const confluencePageSchema = z.object({
       results: z.array(z.object({ name: z.string() })),
     }),
   }),
+  children: z
+    .object({
+      attachment: z
+        .object({
+          results: z.array(confluenceAttachmentSchema),
+          start: z.number().optional(),
+          limit: z.number().optional(),
+          size: z.number().optional(),
+          _links: z
+            .object({
+              next: z.string().optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export type ConfluencePage = z.infer<typeof confluencePageSchema>;
@@ -52,3 +88,18 @@ export interface PaginatedResponse<T> {
   results: T[];
   _links: { next?: string };
 }
+
+export const confluenceAttachmentV2Schema = z.object({
+  id: z.string(),
+  title: z.string(),
+  mediaType: z.string(),
+  fileSize: z.number(),
+  downloadLink: z.string(),
+  version: z
+    .object({
+      createdAt: z.string(),
+    })
+    .optional(),
+});
+
+export type ConfluenceAttachmentV2 = z.infer<typeof confluenceAttachmentV2Schema>;

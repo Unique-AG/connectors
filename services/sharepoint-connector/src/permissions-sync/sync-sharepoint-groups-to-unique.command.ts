@@ -49,7 +49,7 @@ export class SyncSharepointGroupsToUniqueCommand {
 
     const logPrefix = `[Site: ${siteId}]`;
 
-    const siteName = await this.graphApiService.getSiteName(siteId);
+    const { siteName } = await this.graphApiService.getSiteInfo(siteId);
     const updatedUniqueGroupsMap: Record<GroupDistinctId, UniqueGroupWithMembers | null> = {};
 
     const sharePointGroups = Object.values(sharePoint.groupsMap);
@@ -78,12 +78,12 @@ export class SyncSharepointGroupsToUniqueCommand {
       // per-subsite) and Entra groups are tenant-wide. Neither is subsite-specific.
       const correspondingUniqueGroup = unique.groupsMap[sharePointGroup.id];
       if (!correspondingUniqueGroup) {
-        const newUniqueGroup = await this.createUniqueGroup(
+        const newUniqueGroup = await this.createUniqueGroup({
           siteId,
           siteName,
           sharePointGroup,
-          unique.usersMap,
-        );
+          uniqueUsersMap: unique.usersMap,
+        });
         updatedUniqueGroupsMap[sharePointGroup.id] = newUniqueGroup;
         if (newUniqueGroup) {
           groupsSyncStats.created++;
@@ -159,12 +159,13 @@ export class SyncSharepointGroupsToUniqueCommand {
     };
   }
 
-  private async createUniqueGroup(
-    siteId: Smeared,
-    siteName: Smeared,
-    sharePointGroup: SharepointGroupWithMembers,
-    uniqueUsersMap: UniqueUsersMap,
-  ): Promise<UniqueGroupWithMembers | null> {
+  private async createUniqueGroup(input: {
+    siteId: Smeared;
+    siteName: Smeared;
+    sharePointGroup: SharepointGroupWithMembers;
+    uniqueUsersMap: UniqueUsersMap;
+  }): Promise<UniqueGroupWithMembers | null> {
+    const { siteId, siteName, sharePointGroup, uniqueUsersMap } = input;
     const memberIds = getUniqueMemberIds(sharePointGroup, uniqueUsersMap);
 
     if (memberIds.length === 0) {
@@ -172,7 +173,7 @@ export class SyncSharepointGroupsToUniqueCommand {
     }
 
     const uniqueGroup = await this.uniqueGroupsService.createGroup({
-      name: getUniqueGroupName(siteName, sharePointGroup.displayName),
+      name: getUniqueGroupName(siteName, sharePointGroup),
       externalId: getSharepointConnectorGroupExternalId(siteId.value, sharePointGroup.id),
     });
 
@@ -201,10 +202,10 @@ export class SyncSharepointGroupsToUniqueCommand {
     let groupUpdated = false;
 
     // Currently nothing other than name is used in the Unique Groups so we keep check simple
-    if (uniqueGroup.name !== getUniqueGroupName(siteName, sharePointGroup.displayName)) {
+    if (uniqueGroup.name !== getUniqueGroupName(siteName, sharePointGroup)) {
       const updatedUniqueGroup = await this.uniqueGroupsService.updateGroup({
         id: uniqueGroup.id,
-        name: getUniqueGroupName(siteName, sharePointGroup.displayName),
+        name: getUniqueGroupName(siteName, sharePointGroup),
       });
       uniqueGroup = { ...updatedUniqueGroup, memberIds: uniqueGroup.memberIds };
       groupUpdated = true;
@@ -233,8 +234,24 @@ export class SyncSharepointGroupsToUniqueCommand {
   }
 }
 
-function getUniqueGroupName(siteName: Smeared, sharePointGroupName: string): string {
-  return `[SPC-${siteName.value}] ${sharePointGroupName}`;
+function getGroupIdentifier(groupDistinctId: GroupDistinctId): string {
+  const [type, ...rest] = groupDistinctId.split(':');
+  const id = rest.join(':');
+
+  if (type === 'siteGroup') {
+    return id.split('|').pop() ?? id;
+  }
+
+  const shortId = id.split('-')[0] ?? id;
+  return type === 'groupOwners' ? `${shortId}_o` : shortId;
+}
+
+function getUniqueGroupName(
+  siteName: Smeared,
+  sharePointGroup: Pick<SharepointGroupWithMembers, 'id' | 'displayName'>,
+): string {
+  const identifier = getGroupIdentifier(sharePointGroup.id);
+  return `[SPC-${siteName.value}][${identifier}] ${sharePointGroup.displayName}`;
 }
 
 function getUniqueMemberIds(

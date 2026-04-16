@@ -1,0 +1,1 @@
+ALTER TABLE "inbox_configuration" ALTER COLUMN "filters" SET NOT NULL;

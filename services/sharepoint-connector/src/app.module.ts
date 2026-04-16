@@ -7,6 +7,7 @@ import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { ConfigDiagnosticsModule } from './config/config-diagnostics.module';
+import { healthConfig } from './config/health.config';
 import { proxyConfig } from './config/proxy.config';
 import {
   AppConfig,
@@ -15,6 +16,7 @@ import {
   sharepointConfig,
   uniqueConfig,
 } from './config/tenant-config-loader';
+import { HealthModule } from './health/health.module';
 import { ProxyModule } from './proxy';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { Redacted } from './utils/redacted';
@@ -24,7 +26,14 @@ import { Redacted } from './utils/redacted';
     ConfigModule.forRoot({
       isGlobal: true,
       ignoreEnvFile: true,
-      load: [appConfig, sharepointConfig, processingConfig, uniqueConfig, proxyConfig],
+      load: [
+        appConfig,
+        sharepointConfig,
+        processingConfig,
+        uniqueConfig,
+        proxyConfig,
+        healthConfig,
+      ],
     }),
     ProxyModule,
     ConfigDiagnosticsModule,
@@ -37,7 +46,9 @@ import { Redacted } from './utils/redacted';
             level: appConfig.logLevel,
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
-              if (!ctx) return crypto.randomUUID();
+              if (!ctx) {
+                return crypto.randomUUID();
+              }
               return ctx.traceId;
             },
             redact: {
@@ -60,6 +71,7 @@ import { Redacted } from './utils/redacted';
         },
       },
     }),
+    HealthModule,
     SchedulerModule,
   ],
   controllers: [],

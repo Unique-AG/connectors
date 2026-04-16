@@ -13,6 +13,7 @@
       "!**/dist",
       "!**/.github",
       "!**/.turbo",
+      "!**/.pnpm-store",
       "!**/.zed",
       "!**/@generated",
       "!**/coverage",
@@ -45,7 +46,8 @@
             "accessibility": "explicit"
           }
         },
-        "useConsistentTypeDefinitions": "error"
+        "useConsistentTypeDefinitions": "error",
+        "useBlockStatements": "error"
       },
       "complexity": {
         "noUselessConstructor": "off"

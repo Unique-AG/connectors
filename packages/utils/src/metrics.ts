@@ -1,19 +1,35 @@
 import { isObjectType } from 'remeda';
 
 export function getSlowRequestDurationBucket(durationMs: number): string | null {
-  if (durationMs > 10_000) return '>10s';
-  if (durationMs > 5_000) return '>5s';
-  if (durationMs > 2_000) return '>2s';
-  if (durationMs > 1_000) return '>1s';
+  if (durationMs > 10_000) {
+    return '>10s';
+  }
+  if (durationMs > 5_000) {
+    return '>5s';
+  }
+  if (durationMs > 2_000) {
+    return '>2s';
+  }
+  if (durationMs > 1_000) {
+    return '>1s';
+  }
   return null;
 }
 
 export function getHttpStatusCodeClass(statusCode: number): string {
-  if (statusCode >= 200 && statusCode < 300) return '2xx';
-  if (statusCode >= 300 && statusCode < 400) return '3xx';
+  if (statusCode >= 200 && statusCode < 300) {
+    return '2xx';
+  }
+  if (statusCode >= 300 && statusCode < 400) {
+    return '3xx';
+  }
   // 4xx codes are reported as-is because the specific code matters for debugging
-  if (statusCode >= 400 && statusCode < 500) return statusCode.toString();
-  if (statusCode >= 500) return '5xx';
+  if (statusCode >= 400 && statusCode < 500) {
+    return statusCode.toString();
+  }
+  if (statusCode >= 500) {
+    return '5xx';
+  }
   return 'unknown';
 }
 

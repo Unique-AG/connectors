@@ -73,8 +73,12 @@ describe('GraphApiService', () => {
       .impl((stub) => ({
         ...stub(),
         get: vi.fn((key: string) => {
-          if (key === 'sharepoint.graphApiRateLimitPerMinuteThousands') return 10;
-          if (key === 'processing.maxFilesToScan') return maxFilesToScanConfig;
+          if (key === 'sharepoint.graphApiRateLimitPerMinuteThousands') {
+            return 10;
+          }
+          if (key === 'processing.maxFilesToScan') {
+            return maxFilesToScanConfig;
+          }
           return undefined;
         }),
       }))
@@ -121,6 +125,232 @@ describe('GraphApiService', () => {
       await expect(service.getListColumns(new Smeared('site-1', false), 'list-1')).rejects.toThrow(
         'API Error',
       );
+    });
+  });
+
+  describe('getDriveColumns', () => {
+    it('fetches columns for a drive list', async () => {
+      const mockColumns: ListColumn[] = [
+        { id: '1', name: 'Title', displayName: 'Title' },
+        { id: '2', name: 'FinanceGPTKnowledge', displayName: 'Finance GPT Knowledge' },
+      ];
+
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).paginateGraphApiRequest = vi.fn().mockResolvedValue(mockColumns);
+
+      const result = await service.getDriveColumns('drive-1');
+
+      expect(result).toEqual(mockColumns);
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method call
+      expect((service as any).paginateGraphApiRequest).toHaveBeenCalledWith(
+        '/drives/drive-1/list/columns',
+        expect.any(Function),
+      );
+    });
+
+    it('throws error when fetching drive columns fails', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).paginateGraphApiRequest = vi.fn().mockRejectedValue(new Error('API Error'));
+
+      await expect(service.getDriveColumns('drive-1')).rejects.toThrow('API Error');
+    });
+  });
+
+  describe('getAllFilesForSite', () => {
+    it('skips drive when sync column is not present', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).getDrivesForSite = vi.fn().mockResolvedValue([mockDrive]);
+      vi.spyOn(service, 'getDriveColumns').mockResolvedValue([
+        { id: '1', name: 'Title', displayName: 'Title' },
+      ]);
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).recursivelyFetchDriveItems = vi.fn();
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method call
+      const recursiveSpy = (service as any).recursivelyFetchDriveItems;
+
+      const result = await service.getAllFilesForSite(
+        new Smeared('site-1', false),
+        'FinanceGPTKnowledge',
+      );
+
+      expect(result.items).toHaveLength(0);
+      expect(result.directories).toHaveLength(0);
+      expect(recursiveSpy).not.toHaveBeenCalled();
+    });
+
+    it('scans drive when sync column matches by internal name', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).getDrivesForSite = vi.fn().mockResolvedValue([mockDrive]);
+      vi.spyOn(service, 'getDriveColumns').mockResolvedValue([
+        { id: '1', name: 'Title', displayName: 'Title' },
+        { id: '2', name: 'FinanceGPTKnowledge', displayName: 'Finance GPT Knowledge' },
+      ]);
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).recursivelyFetchDriveItems = vi.fn().mockResolvedValue({
+        items: [],
+        directories: [],
+      });
+
+      await service.getAllFilesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge');
+
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method call
+      expect((service as any).recursivelyFetchDriveItems).toHaveBeenCalledWith(
+        'drive-1',
+        'root',
+        new Smeared('site-1', false),
+        'Documents',
+        'FinanceGPTKnowledge',
+        { filesScanned: 0, maxFiles: undefined },
+      );
+    });
+
+    it('resolves display name to internal API name when scanning drive', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).getDrivesForSite = vi.fn().mockResolvedValue([mockDrive]);
+      vi.spyOn(service, 'getDriveColumns').mockResolvedValue([
+        { id: '1', name: 'Title', displayName: 'Title' },
+        { id: '2', name: 'InternalSyncName', displayName: 'My Sync Column' },
+      ]);
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).recursivelyFetchDriveItems = vi.fn().mockResolvedValue({
+        items: [],
+        directories: [],
+      });
+
+      await service.getAllFilesForSite(new Smeared('site-1', false), 'My Sync Column');
+
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method call
+      expect((service as any).recursivelyFetchDriveItems).toHaveBeenCalledWith(
+        'drive-1',
+        'root',
+        new Smeared('site-1', false),
+        'Documents',
+        'InternalSyncName',
+        { filesScanned: 0, maxFiles: undefined },
+      );
+    });
+
+    it('propagates error when getDriveColumns throws', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).getDrivesForSite = vi.fn().mockResolvedValue([mockDrive]);
+      vi.spyOn(service, 'getDriveColumns').mockRejectedValue(new Error('API Error'));
+
+      await expect(
+        service.getAllFilesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge'),
+      ).rejects.toThrow('API Error');
+    });
+
+    it('prioritizes display name match over internal name match', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).getDrivesForSite = vi.fn().mockResolvedValue([mockDrive]);
+      vi.spyOn(service, 'getDriveColumns').mockResolvedValue([
+        { id: '1', name: 'SyncFlag', displayName: 'SyncFlag' },
+        { id: '2', name: 'OtherInternalName', displayName: 'SyncFlag' },
+      ]);
+      // biome-ignore lint/suspicious/noExplicitAny: Mock private method for testing
+      (service as any).recursivelyFetchDriveItems = vi.fn().mockResolvedValue({
+        items: [],
+        directories: [],
+      });
+
+      await service.getAllFilesForSite(new Smeared('site-1', false), 'SyncFlag');
+
+      // Display name match (col id:1) is preferred, its internal name is also 'SyncFlag'
+      // biome-ignore lint/suspicious/noExplicitAny: Check private method call
+      expect((service as any).recursivelyFetchDriveItems).toHaveBeenCalledWith(
+        'drive-1',
+        'root',
+        new Smeared('site-1', false),
+        'Documents',
+        'SyncFlag',
+        { filesScanned: 0, maxFiles: undefined },
+      );
+    });
+  });
+
+  describe('getAspxPagesForSite', () => {
+    it('skips SitePages when sync column is not present', async () => {
+      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
+        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
+      ]);
+      vi.spyOn(service, 'getListColumns').mockResolvedValue([
+        { id: '1', name: 'Title', displayName: 'Title' },
+      ]);
+      const getAspxListItemsSpy = vi.spyOn(service, 'getAspxListItems');
+
+      const result = await service.getAspxPagesForSite(
+        new Smeared('site-1', false),
+        'FinanceGPTKnowledge',
+      );
+
+      expect(result).toHaveLength(0);
+      expect(getAspxListItemsSpy).not.toHaveBeenCalled();
+    });
+
+    it('scans SitePages when sync column is present', async () => {
+      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
+        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
+      ]);
+      vi.spyOn(service, 'getListColumns').mockResolvedValue([
+        { id: '1', name: 'Title', displayName: 'Title' },
+        { id: '2', name: 'FinanceGPTKnowledge', displayName: 'Finance GPT Knowledge' },
+      ]);
+      vi.spyOn(service, 'getAspxListItems').mockResolvedValue([]);
+
+      await service.getAspxPagesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge');
+
+      expect(service.getAspxListItems).toHaveBeenCalledWith(
+        new Smeared('site-1', false),
+        'sitepages-list',
+        'FinanceGPTKnowledge',
+        undefined,
+      );
+    });
+
+    it('propagates error when getListColumns throws', async () => {
+      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
+        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
+      ]);
+      vi.spyOn(service, 'getListColumns').mockRejectedValue(new Error('API Error'));
+
+      await expect(
+        service.getAspxPagesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge'),
+      ).rejects.toThrow('API Error');
+    });
+
+    it('resolves display name to internal API name for SitePages', async () => {
+      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
+        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
+      ]);
+      vi.spyOn(service, 'getListColumns').mockResolvedValue([
+        { id: '1', name: 'Title', displayName: 'Title' },
+        { id: '2', name: 'InternalSyncName', displayName: 'My Sync Column' },
+      ]);
+      vi.spyOn(service, 'getAspxListItems').mockResolvedValue([]);
+
+      await service.getAspxPagesForSite(new Smeared('site-1', false), 'My Sync Column');
+
+      expect(service.getAspxListItems).toHaveBeenCalledWith(
+        new Smeared('site-1', false),
+        'sitepages-list',
+        'InternalSyncName',
+        undefined,
+      );
+    });
+
+    it('propagates error when getAspxListItems throws', async () => {
+      vi.spyOn(service, 'getSiteLists').mockResolvedValue([
+        { id: 'sitepages-list', name: 'SitePages', displayName: 'Site Pages' },
+      ]);
+      vi.spyOn(service, 'getListColumns').mockResolvedValue([
+        { id: '1', name: 'Title', displayName: 'Title' },
+        { id: '2', name: 'FinanceGPTKnowledge', displayName: 'Finance GPT Knowledge' },
+      ]);
+      vi.spyOn(service, 'getAspxListItems').mockRejectedValue(new Error('ASPX fetch failed'));
+
+      await expect(
+        service.getAspxPagesForSite(new Smeared('site-1', false), 'FinanceGPTKnowledge'),
+      ).rejects.toThrow('ASPX fetch failed');
     });
   });
 
@@ -339,6 +569,27 @@ describe('GraphApiService', () => {
       }
     });
 
+    it('throws when getAllFilesForSite rejects', async () => {
+      vi.spyOn(service, 'getAspxPagesForSite').mockResolvedValue([]);
+      vi.spyOn(service, 'getAllFilesForSite').mockRejectedValue(new Error('Drive scan failed'));
+
+      await expect(
+        service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn'),
+      ).rejects.toThrow('Drive scan failed');
+    });
+
+    it('throws when getAspxPagesForSite rejects', async () => {
+      vi.spyOn(service, 'getAspxPagesForSite').mockRejectedValue(new Error('Pages scan failed'));
+      vi.spyOn(service, 'getAllFilesForSite').mockResolvedValue({
+        items: [mockSharepointContentItem],
+        directories: [],
+      });
+
+      await expect(
+        service.getAllSiteItems(new Smeared('site-1', false), 'TestColumn'),
+      ).rejects.toThrow('Pages scan failed');
+    });
+
     it('limits site pages by maxFilesToScan', async () => {
       const firstItem = {
         id: 'item-1',
@@ -380,15 +631,27 @@ describe('GraphApiService', () => {
     });
   });
 
-  describe('getSiteName', () => {
-    it('extracts site name from a regular site URL', async () => {
+  describe('getSiteInfo', () => {
+    it('extracts site name and managed path from a /sites/ URL', async () => {
       vi.spyOn(service, 'getSiteWebUrl').mockResolvedValue(
         'https://contoso.sharepoint.com/sites/WealthManagement',
       );
 
-      const result = await service.getSiteName(new Smeared('site-1', false));
+      const result = await service.getSiteInfo(new Smeared('site-1', false));
 
-      expect(result.value).toBe('WealthManagement');
+      expect(result.siteName.value).toBe('WealthManagement');
+      expect(result.managedPath).toBe('sites');
+    });
+
+    it('extracts site name and managed path from a /teams/ URL', async () => {
+      vi.spyOn(service, 'getSiteWebUrl').mockResolvedValue(
+        'https://contoso.sharepoint.com/teams/Engineering',
+      );
+
+      const result = await service.getSiteInfo(new Smeared('site-1', false));
+
+      expect(result.siteName.value).toBe('Engineering');
+      expect(result.managedPath).toBe('teams');
     });
 
     it('extracts full path for a subsite URL', async () => {
@@ -396,9 +659,9 @@ describe('GraphApiService', () => {
         'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1',
       );
 
-      const result = await service.getSiteName(new Smeared('site-1', false));
+      const result = await service.getSiteInfo(new Smeared('site-1', false));
 
-      expect(result.value).toBe('WealthManagement/WMSub1');
+      expect(result.siteName.value).toBe('WealthManagement/WMSub1');
     });
 
     it('extracts full path for a deeply nested subsite URL', async () => {
@@ -406,9 +669,9 @@ describe('GraphApiService', () => {
         'https://contoso.sharepoint.com/sites/WealthManagement/WMSub1/Nested',
       );
 
-      const result = await service.getSiteName(new Smeared('site-1', false));
+      const result = await service.getSiteInfo(new Smeared('site-1', false));
 
-      expect(result.value).toBe('WealthManagement/WMSub1/Nested');
+      expect(result.siteName.value).toBe('WealthManagement/WMSub1/Nested');
     });
 
     it('decodes URL-encoded site names', async () => {
@@ -416,9 +679,9 @@ describe('GraphApiService', () => {
         'https://contoso.sharepoint.com/sites/Wealth%20Management',
       );
 
-      const result = await service.getSiteName(new Smeared('site-1', false));
+      const result = await service.getSiteInfo(new Smeared('site-1', false));
 
-      expect(result.value).toBe('Wealth Management');
+      expect(result.siteName.value).toBe('Wealth Management');
     });
   });
 

@@ -10,7 +10,7 @@ import { GRAPH_API_PAGE_SIZE } from '../../constants/defaults.constants';
 import { BottleneckFactory } from '../../utils/bottleneck.factory';
 import { getTitle } from '../../utils/list-item.util';
 import { sanitizeError } from '../../utils/normalize-error';
-import { extractSiteNameFromWebUrl } from '../../utils/paths.util';
+import { extractSitePathInfoFromWebUrl, type ManagedPath } from '../../utils/paths.util';
 import { createSmeared, Smeared } from '../../utils/smeared';
 import { FileFilterService } from './file-filter.service';
 import { GraphClientFactory } from './graph-client.factory';
@@ -28,6 +28,13 @@ import {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from './types/sharepoint-content-item.interface';
+
+const SCAN_PROGRESS_LOG_INTERVAL = 100;
+
+interface ScanProgress {
+  filesScanned: number;
+  maxFiles?: number;
+}
 
 @Injectable()
 export class GraphApiService {
@@ -64,39 +71,21 @@ export class GraphApiService {
     syncColumnName: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const logPrefix = `[Site: ${siteId}]`;
-    const [aspxPagesResult, filesResult] = await Promise.allSettled([
+
+    // Both scans must succeed — partial results would cause the diff to treat missing items as
+    // deletions and result in unnecessary re-ingestions. We have retries in place to handle
+    // transient errors so if any call for site fails, so does entire site scan.
+    const [aspxPages, filesResult] = await Promise.all([
       this.getAspxPagesForSite(siteId, syncColumnName),
       this.getAllFilesForSite(siteId, syncColumnName),
     ]);
 
-    const sharepointContentItemsToSync: SharepointContentItem[] = [];
-    const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
-
-    if (aspxPagesResult.status === 'fulfilled') {
-      sharepointContentItemsToSync.push(...aspxPagesResult.value);
-    } else {
-      this.logger.error({
-        msg: `${logPrefix} Failed to scan pages`,
-        siteId,
-        error: sanitizeError(aspxPagesResult.reason),
-      });
-    }
-
-    if (filesResult.status === 'fulfilled') {
-      sharepointContentItemsToSync.push(...filesResult.value.items);
-      sharepointDirectoryItemsToSync.push(...filesResult.value.directories);
-    } else {
-      this.logger.error({
-        msg: `${logPrefix} Failed to scan drive files`,
-        siteId,
-        error: sanitizeError(filesResult.reason),
-      });
-    }
+    const items = [...aspxPages, ...filesResult.items];
 
     this.logger.log(
-      `${logPrefix} Completed scan. Found ${sharepointContentItemsToSync.length} total items marked for synchronization.`,
+      `${logPrefix} Completed scan. Found ${items.length} total items marked for synchronization.`,
     );
-    return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
+    return { items, directories: filesResult.directories };
   }
 
   public async getAllFilesForSite(
@@ -104,13 +93,15 @@ export class GraphApiService {
     syncColumnName: string,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
     const maxFilesToScan = this.configService.get('processing.maxFilesToScan', { infer: true });
+    const logPrefix = `[Site: ${siteId}]`;
     const sharepointContentFilesToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
-    let totalScanned = 0;
-    const LOG_INTERVAL = 20;
+    const progress: ScanProgress = { filesScanned: 0, maxFiles: maxFilesToScan };
 
-    if (maxFilesToScan) {
-      this.logger.warn(`File scan limit set to ${maxFilesToScan} files for testing purpose.`);
+    if (progress.maxFiles) {
+      this.logger.warn(
+        `${logPrefix} File scan limit set to ${progress.maxFiles} files for testing purpose.`,
+      );
     }
 
     const drives = await this.getDrivesForSite(siteId);
@@ -120,10 +111,21 @@ export class GraphApiService {
         continue;
       }
 
-      const remainingLimit = maxFilesToScan ? maxFilesToScan - totalScanned : undefined;
-      if (remainingLimit !== undefined && remainingLimit <= 0) {
-        this.logger.log(`Reached file scan limit of ${maxFilesToScan}, stopping drive scan`);
-        break;
+      const smearedDriveName = createSmeared(drive.name);
+      const driveColumns = await this.getDriveColumns(drive.id);
+
+      const resolvedColumnName = this.resolveSyncColumnName(driveColumns, syncColumnName);
+      if (!resolvedColumnName) {
+        this.logger.warn(
+          `[Site: ${siteId}] Drive "${smearedDriveName}" does not have sync column "${syncColumnName}", skipping`,
+        );
+        continue;
+      }
+
+      if (resolvedColumnName !== syncColumnName) {
+        this.logger.log(
+          `[Site: ${siteId}] Drive "${smearedDriveName}": resolved sync column display name "${syncColumnName}" to API name "${resolvedColumnName}"`,
+        );
       }
 
       const { items, directories } = await this.recursivelyFetchDriveItems(
@@ -131,29 +133,22 @@ export class GraphApiService {
         'root',
         siteId,
         drive.name,
-        syncColumnName,
-        remainingLimit,
+        resolvedColumnName,
+        progress,
       );
 
       sharepointContentFilesToSync.push(...items);
       sharepointDirectoryItemsToSync.push(...directories);
-      totalScanned += items.length;
 
-      // Log progress every 20 files
-      if (totalScanned % LOG_INTERVAL === 0) {
-        this.logger.log(
-          `Scanning in progress for site ${siteId}: ${totalScanned} files scanned so far`,
+      if (progress.maxFiles && progress.filesScanned >= progress.maxFiles) {
+        this.logger.warn(
+          `${logPrefix} Reached file scan limit of ${progress.maxFiles}, stopping scan`,
         );
-      }
-
-      // Stop scanning if we've reached the limit for testing
-      if (maxFilesToScan && totalScanned >= maxFilesToScan) {
-        this.logger.log(`Reached file scan limit of ${maxFilesToScan}, stopping scan`);
         break;
       }
     }
 
-    this.logger.log(`Found ${sharepointContentFilesToSync.length} drive files for site ${siteId}`);
+    this.logger.log(`${logPrefix} Found ${sharepointContentFilesToSync.length} drive files`);
     return { items: sharepointContentFilesToSync, directories: sharepointDirectoryItemsToSync };
   }
 
@@ -190,32 +185,37 @@ export class GraphApiService {
       this.logger.warn(`Items scan limit set to ${maxFilesToScan} items for testing purpose.`);
     }
 
-    // Scan ASPX files from SitePages list
     const sitePagesList = lists.find((list) => list.name?.toLowerCase() === 'sitepages');
     if (!sitePagesList?.id) {
       this.logger.warn(`${logPrefix} Cannot scan Site Pages because SitePages list was not found`);
       return [];
     }
 
-    try {
-      const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
-        siteId,
-        sitePagesList.id,
-        syncColumnName,
-        maxFilesToScan,
+    const sitePagesColumns = await this.getListColumns(siteId, sitePagesList.id);
+    const resolvedColumnName = this.resolveSyncColumnName(sitePagesColumns, syncColumnName);
+    if (!resolvedColumnName) {
+      this.logger.warn(
+        `${logPrefix} SitePages list does not have sync column "${syncColumnName}", skipping`,
       );
-      this.logger.log(
-        `${logPrefix} Found ${aspxSharepointContentItems.length} ASPX files from SitePages`,
-      );
-      return aspxSharepointContentItems;
-    } catch (error) {
-      this.logger.warn({
-        msg: `${logPrefix} Failed to scan ASPX files from SitePages`,
-        siteId,
-        error: sanitizeError(error),
-      });
       return [];
     }
+
+    if (resolvedColumnName !== syncColumnName) {
+      this.logger.log(
+        `${logPrefix} SitePages: resolved sync column display name "${syncColumnName}" to API name "${resolvedColumnName}"`,
+      );
+    }
+
+    const aspxSharepointContentItems: SharepointContentItem[] = await this.getAspxListItems(
+      siteId,
+      sitePagesList.id,
+      resolvedColumnName,
+      maxFilesToScan,
+    );
+    this.logger.log(
+      `${logPrefix} Found ${aspxSharepointContentItems.length} ASPX files from SitePages`,
+    );
+    return aspxSharepointContentItems;
   }
 
   public async getSiteLists(siteId: Smeared): Promise<List[]> {
@@ -266,6 +266,28 @@ export class GraphApiService {
       this.logger.error({
         msg: `${logPrefix} Failed to fetch subsites. Check Sites.Selected permission.`,
         siteId,
+        error: sanitizeError(error),
+      });
+      throw error;
+    }
+  }
+
+  public async getDriveColumns(driveId: string): Promise<ListColumn[]> {
+    const logPrefix = `[Drive: ${driveId}]`;
+
+    try {
+      const columns = await this.paginateGraphApiRequest<ListColumn>(
+        `/drives/${driveId}/list/columns`,
+        (url) => this.graphClient.api(url).select('id,name,displayName').get(),
+      );
+
+      this.logger.log(`${logPrefix} Found ${columns.length} columns`);
+
+      return columns;
+    } catch (error) {
+      this.logger.error({
+        msg: `${logPrefix} Failed to fetch drive list columns`,
+        driveId,
         error: sanitizeError(error),
       });
       throw error;
@@ -478,9 +500,12 @@ export class GraphApiService {
     }
   }
 
-  public async getSiteName(siteId: Smeared): Promise<Smeared> {
+  public async getSiteInfo(
+    siteId: Smeared,
+  ): Promise<{ siteName: Smeared; managedPath: ManagedPath }> {
     const siteWebUrl = await this.getSiteWebUrl(siteId);
-    return createSmeared(extractSiteNameFromWebUrl(siteWebUrl));
+    const { siteName, managedPath } = extractSitePathInfoFromWebUrl(siteWebUrl);
+    return { siteName: createSmeared(siteName), managedPath };
   }
 
   private async getDrivesForSite(siteId: Smeared): Promise<Drive[]> {
@@ -510,8 +535,10 @@ export class GraphApiService {
     siteId: Smeared,
     driveName: string,
     syncColumnName: string,
-    maxFiles?: number,
+    progress: ScanProgress,
   ): Promise<{ items: SharepointContentItem[]; directories: SharepointDirectoryItem[] }> {
+    const logPrefix = `[Site: ${siteId}][Drive: ${driveId}]`;
+    const smearedDriveName = createSmeared(driveName);
     const sharepointContentItemsToSync: SharepointContentItem[] = [];
     const sharepointDirectoryItemsToSync: SharepointDirectoryItem[] = [];
     try {
@@ -519,24 +546,18 @@ export class GraphApiService {
 
       for (const driveItem of allItems) {
         // Check if we've reached the file limit for local testing
-        if (maxFiles && sharepointContentItemsToSync.length >= maxFiles) {
-          this.logger.warn(
-            `Reached file limit of ${maxFiles}, stopping scan in drive ${driveId}, item ${itemId} for site ${siteId}`,
-          );
+        if (progress.maxFiles && progress.filesScanned >= progress.maxFiles) {
           break;
         }
 
         if (this.isFolder(driveItem)) {
-          const remainingLimit = maxFiles
-            ? maxFiles - sharepointContentItemsToSync.length
-            : undefined;
           const { items, directories } = await this.recursivelyFetchDriveItems(
             driveId,
             driveItem.id,
             siteId,
             driveName,
             syncColumnName,
-            remainingLimit,
+            progress,
           );
 
           // We simply do not care about subtree of the site that contains no files to sync.
@@ -566,21 +587,26 @@ export class GraphApiService {
             folderPath,
             fileName: driveItem.name,
           });
+
+          progress.filesScanned++;
+          if (progress.filesScanned % SCAN_PROGRESS_LOG_INTERVAL === 0) {
+            this.logger.log(
+              `${logPrefix} Scanning drive "${smearedDriveName}", ${progress.filesScanned} files found so far for site`,
+            );
+          }
         }
       }
 
       return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
     } catch (error) {
       this.logger.error({
-        msg: 'Failed to fetch items for drive',
+        msg: `${logPrefix} Failed to fetch items`,
         driveId,
         itemId,
         error: sanitizeError(error),
       });
 
-      this.logger.warn(
-        `Continuing scan with results collected so far from drive ${driveId}, item ${itemId} for site ${siteId}`,
-      );
+      this.logger.warn(`${logPrefix} Continuing scan with results collected so far`);
       return { items: sharepointContentItemsToSync, directories: sharepointDirectoryItemsToSync };
     }
   }
@@ -650,6 +676,16 @@ export class GraphApiService {
     }
 
     return allItems;
+  }
+
+  private resolveSyncColumnName(columns: ListColumn[], syncColumnName: string): string | undefined {
+    const byDisplayName = columns.find((col) => col.displayName === syncColumnName);
+    if (byDisplayName) {
+      return byDisplayName.name;
+    }
+
+    const byName = columns.find((col) => col.name === syncColumnName);
+    return byName?.name;
   }
 
   private isFolder(driveItem: DriveItem): boolean {

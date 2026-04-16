@@ -18,7 +18,9 @@ export class TokenRefreshMiddleware implements Middleware {
   }
 
   private async isTokenExpiredError(response: Response | undefined): Promise<boolean> {
-    if (response?.status !== 401) return false;
+    if (response?.status !== 401) {
+      return false;
+    }
 
     try {
       // Clone the response to read the body without consuming it
@@ -38,7 +40,9 @@ export class TokenRefreshMiddleware implements Middleware {
   }
 
   private cloneRequest(request: RequestInfo, _options?: RequestInit): RequestInfo {
-    if (typeof request === 'string') return request;
+    if (typeof request === 'string') {
+      return request;
+    }
     return request.clone();
   }
 
@@ -55,13 +59,17 @@ export class TokenRefreshMiddleware implements Middleware {
   }
 
   public async execute(context: Context): Promise<void> {
-    if (!this.nextMiddleware) throw new Error('Next middleware not set');
+    if (!this.nextMiddleware) {
+      throw new Error('Next middleware not set');
+    }
 
     // Execute the request for the first time
     await this.nextMiddleware.execute(context);
 
     const isExpired = await this.isTokenExpiredError(context.response);
-    if (!isExpired) return;
+    if (!isExpired) {
+      return;
+    }
 
     this.logger.debug(
       {

@@ -1,5 +1,57 @@
 # Changelog
 
+## [2.5.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.4.1...sharepoint-connector@2.5.0) (2026-04-15)
+
+
+### Features
+
+* **sharepoint-connector,deps:** add /health endpoint with sync, connectivity, and Unique API indicators ([#459](https://github.com/Unique-AG/connectors/issues/459)) ([77384de](https://github.com/Unique-AG/connectors/commit/77384defd4a3874144e00603a3251748231c1c59))
+* **sharepoint-connector:** make Unique group names unique by embedding group identifier ([#470](https://github.com/Unique-AG/connectors/issues/470)) ([c6d42a8](https://github.com/Unique-AG/connectors/commit/c6d42a84505a1e48098981b5fd6044ffe4d749b6))
+
+## [2.4.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.4.0...sharepoint-connector@2.4.1) (2026-04-10)
+
+
+### Bug Fixes
+
+* **deps:** enable stripLeadingPaths in SWC builder for all services ([#458](https://github.com/Unique-AG/connectors/issues/458)) ([caa3abc](https://github.com/Unique-AG/connectors/commit/caa3abc26b9aea44dede0ce89101df64b3f97b77))
+* **deps:** resolve Dependabot security alerts for multiple transitive dependencies ([#449](https://github.com/Unique-AG/connectors/issues/449)) ([c800b51](https://github.com/Unique-AG/connectors/commit/c800b51439145282cababd491a6fba1a84a748a9))
+* **deps:** resolve Dependabot security alerts for undici, path-to-regexp, orval, minimatch, and brace-expansion ([#432](https://github.com/Unique-AG/connectors/issues/432)) ([5cd9c0f](https://github.com/Unique-AG/connectors/commit/5cd9c0fdc3230de591b28574fccabb7df2cd2cce))
+* **deps:** resolve Dependabot security alerts related to jsonwebtoken, js-yaml and @nestjs/ libraries ([#446](https://github.com/Unique-AG/connectors/issues/446)) ([44835ec](https://github.com/Unique-AG/connectors/commit/44835ec851589e2288fd2e1551ca22edb148190e))
+* **sharepoint-connector:** reset root scope instead of deleting it on site deletion ([#419](https://github.com/Unique-AG/connectors/issues/419)) ([c161ba7](https://github.com/Unique-AG/connectors/commit/c161ba735e78f2953221cc2076dfad128afc7ba1))
+* **sharepoint-connector:** smear PII in GraphQL error logs and variables ([#420](https://github.com/Unique-AG/connectors/issues/420)) ([fedd1b6](https://github.com/Unique-AG/connectors/commit/fedd1b6ea346ec95a239540f58e406fe0b5b7b82))
+* **sharepoint-connector:** use dynamic ConfigMap names in chart templates ([#460](https://github.com/Unique-AG/connectors/issues/460)) ([5537d5c](https://github.com/Unique-AG/connectors/commit/5537d5cf6bbcee96224583b86bdedd1a08c702f2))
+* **sharepoint-connector:** validate siteId before claiming root scope ([#411](https://github.com/Unique-AG/connectors/issues/411)) ([d451575](https://github.com/Unique-AG/connectors/commit/d451575482bbcf2f7d6fb9d24d14cd2646bed46e))
+
+## [2.4.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.3.1...sharepoint-connector@2.4.0) (2026-03-25)
+
+
+### Features
+
+* **sharepoint-connector:** add admin_consent_url output to entra module ([#400](https://github.com/Unique-AG/connectors/issues/400)) ([926004a](https://github.com/Unique-AG/connectors/commit/926004ace055685f75a6bc842cc16761f1283fe2))
+* **sharepoint-connector:** add Lists.SelectedOperations.Selected permission support ([#397](https://github.com/Unique-AG/connectors/issues/397)) ([9b36401](https://github.com/Unique-AG/connectors/commit/9b364010b67928dfd7884e6d1a840f61ff1612d2))
+
+## [2.3.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.3.0...sharepoint-connector@2.3.1) (2026-03-13)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** support /teams/ sites as well ([#364](https://github.com/Unique-AG/connectors/issues/364)) ([44e8393](https://github.com/Unique-AG/connectors/commit/44e83939c0b23587bd5ca6f020fc2951d40f6364))
+
+## [2.3.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.2.0...sharepoint-connector@2.3.0) (2026-03-13)
+
+
+### Features
+
+* **confluence-connector,unique-api,utils,deps:** implement ingestion pipeline ([#305](https://github.com/Unique-AG/connectors/issues/305)) ([7d2c64c](https://github.com/Unique-AG/connectors/commit/7d2c64c1f4248e06a822a7d827715c4ae001eeec))
+* **sharepoint-connector:** add no_auth proxy mode for unauthenticated proxies ([#356](https://github.com/Unique-AG/connectors/issues/356)) ([1598121](https://github.com/Unique-AG/connectors/commit/15981216772f8d5c728b0e563b9756db4693c226))
+* **sharepoint-connector:** skip drives without sync column, resolve display names, and fail site scan on partial errors ([#357](https://github.com/Unique-AG/connectors/issues/357)) ([e32fe74](https://github.com/Unique-AG/connectors/commit/e32fe74a3f9d2a46a036a9060d860c87f5d31bc7))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** add progress logging during drive scan and permissions fetch ([#353](https://github.com/Unique-AG/connectors/issues/353)) ([a29a0da](https://github.com/Unique-AG/connectors/commit/a29a0da565e3a6224edb4e30f484a18182cf7dab))
+* **sharepoint-connector:** allow deletion guard to pass when new files are being added ([#363](https://github.com/Unique-AG/connectors/issues/363)) ([fd8c8d3](https://github.com/Unique-AG/connectors/commit/fd8c8d392b21b968951c05654ac7ba95b4a1903d))
+
 ## [2.2.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.1.1...sharepoint-connector@2.2.0) (2026-03-04)
 
 

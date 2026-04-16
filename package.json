@@ -17,20 +17,33 @@
     "style": "biome check .",
     "style:fix": "biome check . --write",
     "check-types": "turbo check-types",
+    "check-all": "pnpm style && pnpm check-types && pnpm test && syncpack lint",
+    "fix-all": "pnpm style:fix && syncpack fix-mismatches",
     "syncpack": "syncpack",
+    "quality": "./scripts/lint.sh",
+    "ct:install": "ct install --config .github/configs/ct-install.yaml",
+    "helm-docs:sharepoint": "services/sharepoint-connector/deploy/helm-charts/helm-docs.sh",
+    "helm-docs:confluence": "services/confluence-connector/deploy/helm-charts/helm-docs.sh",
     "clean:force": "rimraf -g \"**/node_modules\" \"**/.turbo\" \"**/dist\" \"**/.turbo\" \"**/coverage\" \"**/@generated\" \"**/*.tsbuildinfo\" && pnpm store prune && pnpm cache delete"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.11",
-    "rimraf": "^6.0.1",
+    "rimraf": "6.0.1",
     "syncpack": "14.0.0-alpha.19",
-    "turbo": "^2.6.0",
-    "typescript": "^5.9.2",
-    "unplugin-swc": "^1.5.7",
-    "vitest": "^3.2.4"
+    "turbo": "2.6.0",
+    "typescript": "5.9.2",
+    "unplugin-swc": "1.5.7",
+    "vitest": "3.2.4"
   },
   "engines": {
     "node": "24"
   },
-  "packageManager": "pnpm@10.28.1"
+  "packageManager": "pnpm@10.28.1",
+  "pnpm": {
+    "overrides": {
+      "minimatch@<3.1.4": "3.1.5",
+      "path-to-regexp@>=8.0.0 <8.4.2": "8.4.2",
+      "lodash@<=4.17.23": "4.18.1"
+    }
+  }
 }

@@ -7,9 +7,14 @@ import * as z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { META } from './open-email-tool.meta';
 
 const OpenEmailByIdInputSchema = z.object({
-  id: z.string().describe('The content ID returned by the search_emails tool.'),
+  id: z
+    .string()
+    .describe(
+      'The content ID returned by the search_emails tool, e.g. "cont_zwgng9aoz0gbo6qxgnwese7g".',
+    ),
 });
 
 export const EmailDataChunkSchema = z.object({
@@ -54,11 +59,7 @@ export class OpenEmailTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: {
-      'unique.app/icon': 'mail',
-      'unique.app/system-prompt':
-        'Retrieves the full content of an ingested Outlook email by its content ID. Use the ID returned by search_emails.',
-    },
+    _meta: META,
   })
   @Span()
   public async openEmailById(

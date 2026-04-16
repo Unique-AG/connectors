@@ -1,7 +1,7 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { createSmeared } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, count, eq, inArray, not } from 'drizzle-orm';
+import { and, count, eq, inArray, not, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { prop } from 'remeda';
 import {
@@ -11,6 +11,7 @@ import {
   directories,
   directoriesSync,
   SystemDirectoriesIgnoredForSync,
+  systemDirectories,
 } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
@@ -41,14 +42,14 @@ export class SyncDirectoriesForUserProfileCommand {
 
   @Span()
   public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
-    traceAttrs({ user_profile_type_id: userProfileTypeId.toString() });
+    traceAttrs({ userProfileTypeId: userProfileTypeId.toString() });
     this.logger.log({
       userProfileId: userProfileTypeId.toString(),
       msg: `Starting full directories sync for user profile`,
     });
 
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
-    traceAttrs({ user_profile_id: userProfile.id });
+    traceAttrs({ userProfileId: userProfile.id });
     const userEmail = createSmeared(userProfile.email);
     this.logger.log({
       userProfileId: userProfile.id,
@@ -60,17 +61,26 @@ export class SyncDirectoriesForUserProfileCommand {
       userProviderUserId: userProfile.providerUserId,
     });
 
-    const totalDirectories = await this.db
+    const totalSystemDirectories = await this.db
       .select({ count: count() })
       .from(directories)
-      .where(eq(directories.userProfileId, userProfile.id))
+      .where(
+        and(
+          eq(directories.userProfileId, userProfile.id),
+          inArray(sql`${directories.internalType}::text`, systemDirectories),
+        ),
+      )
       .execute();
 
-    const existingDirectoryCount = totalDirectories.at(0)?.count ?? 0;
-    traceAttrs({ existing_directory_count: existingDirectoryCount });
+    const systemDirectoriesCount = totalSystemDirectories.at(0)?.count ?? 0;
+    traceAttrs({ existingDirectoryCount: systemDirectoriesCount });
 
-    // We only sync the system directories once.
-    if (!totalDirectories.length || existingDirectoryCount === 0) {
+    // If no system directory is present we synchronise them. We check using length instead of using
+    // systemDirectoriesCount === systemDirectories.length because:
+    // 1. Microsoft deprecated a few years ago a system directory and made it optional for new Outlook users
+    // 2. When we create the system directories we insert them in bulk in one transaction which means we either
+    // have all of them or we have no system directory created.
+    if (systemDirectoriesCount === 0) {
       traceEvent('syncing system directories');
       this.logger.log({
         userProfileId: userProfile.id,
@@ -184,9 +194,9 @@ export class SyncDirectoriesForUserProfileCommand {
         microsoftDirectories,
       });
     traceEvent('directories to remove computed', {
-      delete_count: idsToDeleteInDatabase.length,
-      ignore_count: ignoredDirectoryIds.length,
-      unique_delete_count: providerParentIdsToDeleteInUnique.length,
+      deleteCount: idsToDeleteInDatabase.length,
+      ignoreCount: ignoredDirectoryIds.length,
+      uniqueDeleteCount: providerParentIdsToDeleteInUnique.length,
     });
     this.logger.log({
       userProfileId,

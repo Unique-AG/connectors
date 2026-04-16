@@ -1,13 +1,11 @@
-import {
-  ContentUpdateMetadataMutationInput,
-  ContentUpdateMetadataResponse,
-} from './ingestion.queries';
+import { ContentUpdateMutationInput, ContentUpdateResponse } from './ingestion.queries';
 import type {
   ContentRegistrationRequest,
   FileDiffItem,
   FileDiffResponse,
   IngestionApiResponse,
   IngestionFinalizationRequest,
+  IngestionState,
 } from './ingestion.types';
 
 export interface UniqueIngestionFacade {
@@ -19,7 +17,6 @@ export interface UniqueIngestionFacade {
     sourceKind: string,
     sourceName: string,
   ): Promise<FileDiffResponse>;
-  updateMetadata(
-    request: ContentUpdateMetadataMutationInput,
-  ): Promise<ContentUpdateMetadataResponse>;
+  update(request: ContentUpdateMutationInput): Promise<ContentUpdateResponse>;
+  getIngestionStats(scopeId: string): Promise<Partial<Record<IngestionState, number>>>;
 }

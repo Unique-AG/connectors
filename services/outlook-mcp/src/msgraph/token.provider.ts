@@ -54,9 +54,12 @@ export class TokenProvider implements AuthenticationProvider {
       where: eq(userProfiles.id, this.userProfileId),
     });
 
-    if (!userProfile) throw new Error(`User profile not found: ${this.userProfileId}`);
-    if (!userProfile.accessToken)
+    if (!userProfile) {
+      throw new Error(`User profile not found: ${this.userProfileId}`);
+    }
+    if (!userProfile.accessToken) {
       throw new Error(`Access token not found for user: ${this.userProfileId}`);
+    }
 
     const decrypedAccessToken = this.encryptionService.decryptFromString(userProfile.accessToken);
 
@@ -71,8 +74,9 @@ export class TokenProvider implements AuthenticationProvider {
       where: eq(userProfiles.id, userProfileId),
     });
 
-    if (!userProfile?.refreshToken)
+    if (!userProfile?.refreshToken) {
       throw new Error(`No refresh token available for user: ${this.userProfileId}`);
+    }
 
     const decrypedRefreshToken = this.encryptionService.decryptFromString(userProfile.refreshToken);
 

@@ -1,6 +1,18 @@
+import type { Readable } from 'node:stream';
 import type { ConfluencePage } from './types/confluence-api.types';
 
+export interface InstanceIdentifier {
+  type: 'cloud' | 'data-center';
+  id: string;
+}
+
+export interface ApiClientOptions {
+  attachmentsEnabled: boolean;
+}
+
 export abstract class ConfluenceApiClient {
+  public abstract resolveInstanceIdentifier(): Promise<InstanceIdentifier>;
+
   public abstract searchPagesByLabel(): Promise<ConfluencePage[]>;
 
   public abstract getPageById(pageId: string): Promise<ConfluencePage | null>;
@@ -8,4 +20,16 @@ export abstract class ConfluenceApiClient {
   public abstract getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]>;
 
   public abstract buildPageWebUrl(page: ConfluencePage): string;
+
+  public abstract buildAttachmentWebUrl(
+    pageId: string,
+    attachmentId: string,
+    attachmentTitle: string,
+  ): string;
+
+  public abstract getAttachmentDownloadStream(
+    attachmentId: string,
+    pageId: string,
+    downloadPath: string,
+  ): Promise<Readable>;
 }
