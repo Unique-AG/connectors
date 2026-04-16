@@ -13,7 +13,7 @@ The following environment variables control application-level behavior. They are
 |--------------------------------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
 | `NODE_ENV`                     | `production`                   | Environment mode (`development`, `production`, `test`)                                                                                        |
 | `PORT`                         | `51349`                        | HTTP port the application binds to                                                                                                            |
-| `LOG_LEVEL`                    | `info`                         | Log verbosity: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`. See [Logging](#Logging)                                          |
+| `LOG_LEVEL`                    | `info`                         | Log verbosity: `error`, `warn`, `info`, `debug`. See [Logging](#Logging)                                                                      |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal`                      | Controls whether diagnostic data (emails, usernames, IDs) is logged in full (`disclose`) or partially masked (`conceal`). See [Logging](#Diagnostics-Data-Policy) |
 | `TENANT_CONFIG_PATH_PATTERN`   | -- (required; Helm chart sets `/app/tenant-configs/*-tenant-config.yaml`) | Glob pattern to tenant configuration YAML files                                                                              |
 | `OTEL_METRICS_EXPORTER`        | --                             | OpenTelemetry metrics exporter (e.g., `prometheus`). See [Metrics](#Metrics)                                                                  |
@@ -39,7 +39,7 @@ Secret values in tenant YAML files are referenced via the `os.environ/` prefix (
 
 Tenant configuration files must follow the naming convention `{tenant-name}-tenant-config.yaml`. The tenant name is extracted from the filename by removing the `-tenant-config.yaml` suffix and must match the pattern `^[a-z0-9]+(-[a-z0-9]+)*$` (lowercase alphanumeric with hyphens). Duplicate tenant names cause a startup failure.
 
-The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at startup. At least one file must match the pattern, and at least one tenant must have `active` status. For details on how tenants are isolated at runtime, see [Architecture -- Multi-Tenancy Support](../technical/architecture.md#Multi-Tenancy-Support).
+The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at startup. At least one file must match the pattern, and at least one tenant must have `active` or `deleted` status. For details on how tenants are isolated at runtime, see [Architecture -- Multi-Tenancy Support](../technical/architecture.md#Multi-Tenancy-Support).
 
 ### Tenant Status
 
@@ -263,7 +263,7 @@ ingestion:
 | Field            | Required | Default          | Description                                                                                                                                                         |
 |------------------|----------|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `ingestionMode`  | No       | `flat`           | Ingestion traversal mode. Currently only `flat` is supported (all pages from a space go into a single scope per space)                                              |
-| `scopeId`        | Yes      | --               | Root scope ID in the Unique platform. The scope must exist before the connector starts (see [Authentication -- Create the Root Scope in Unique](./authentication.md#2-create-the-root-scope-in-unique)) |
+| `scopeId`        | Yes      | --               | Root scope ID in the Unique platform. The scope must exist before the connector starts (see [Authentication -- Create the Root Scope in Unique](./authentication.md#2.-Create-the-Root-Scope-in-Unique)) |
 | `storeInternally` | No      | `enabled`        | Whether to store content internally in Unique (`enabled` or `disabled`)                                                                                             |
 | `useV1KeyFormat` | No       | `disabled`       | Use v1-compatible ingestion key format (`spaceId_spaceKey/pageId`) without tenant prefix (`enabled` or `disabled`). Only relevant when migrating from Confluence Connector v1 |
 | `attachments`    | No       | (see sub-fields) | Configuration for file attachment ingestion                                                                                                                          |
@@ -391,6 +391,14 @@ Attachment upload histogram buckets: 100ms, 200ms, 500ms, 1s, 2s, 3s, 5s, 10s, 2
 | `cfc_orphaned_scopes_cleaned_total`   | Counter | `tenant`, `result`            | Space scopes removed after their Confluence space was removed or unlabeled       |
 | `cfc_orphaned_files_cleaned_total`    | Counter | `tenant`                      | Files removed during orphaned space cleanup                                      |
 
+#### Tenant Cleanup Metrics
+
+| Metric                                    | Type      | Labels            | Description                                              |
+|-------------------------------------------|-----------|-------------------|----------------------------------------------------------|
+| `cfc_cleanup_duration_seconds`            | Histogram | `tenant`, `result` | Duration of a deleted tenant content cleanup             |
+| `cfc_cleanup_content_deleted_total`       | Counter   | `tenant`, `result` | Content items deleted during tenant cleanup              |
+| `cfc_cleanup_scopes_deleted_total`        | Counter   | `tenant`, `result` | Scopes deleted during tenant cleanup                     |
+
 #### Confluence API Metrics
 
 | Metric                                            | Type      | Labels                            | Description                                                                            |
@@ -477,13 +485,13 @@ To perform a complete re-ingestion of all synced Confluence content:
 
 ### Step 1: Delete Ingested Content
 
-Set the tenant status to `deleted` in its YAML configuration file and restart the connector. This deletes the tenant's ingested content from the Unique knowledge base and stops sync. Other tenants continue running.
+Set the tenant status to `deleted` in its YAML configuration file and restart the connector. The cleanup runs immediately on startup and deletes all ingested files and child scopes while preserving the root scope. Other tenants continue running normally.
 
 **Warning:** This operation is irreversible. Ensure you have backups if needed.
 
 ### Step 2: Re-enable the Tenant
 
-Set the tenant status back to `active` and restart the connector. The connector triggers an initial sync immediately on startup, re-ingesting all labeled content from scratch into the existing root scope.
+Set the tenant status back to `active` and restart the connector. The connector triggers an initial sync immediately on startup, re-ingesting all labeled content from scratch into the preserved root scope (no new scope needs to be created).
 
 ### Further Guidance
 

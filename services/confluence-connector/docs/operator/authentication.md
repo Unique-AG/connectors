@@ -126,7 +126,7 @@ The `clientSecret` field uses the `os.environ/` prefix to resolve the value from
 
 #### Option B: OAuth 2.0 (2LO) -- Data Center
 
-1. In the [Atlassian Admin Console](https://<data-center-confluence-url>), go to **Settings** > **User Management** > **Service Accounts**.
+1. In your Confluence Data Center admin console, go to **Settings** > **User Management** > **Service Accounts**.
 2. Create a new service account and generate credentials.
 3. Grant the service account access to the Confluence application and assign the `READ` (View content) scope. Space selection is optional. **When no spaces are specified, the service account has read access to all spaces.**
 

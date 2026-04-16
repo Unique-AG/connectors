@@ -151,7 +151,7 @@ In cluster-internal mode (`serviceAuthMode: cluster_local`):
 
 Multiple Confluence instances (tenants) can be configured within a single connector pod. Each tenant is isolated at the application level and has its own service instances, API clients, authentication strategy, and sync schedule. All tenants share the same process and pod. All per-tenant services are initialized at startup.
 
-Tenant configuration files are loaded from YAML files matching the glob pattern set in `TENANT_CONFIG_PATH_PATTERN` (default: `/app/tenant-configs/*-tenant-config.yaml`). Each tenant has a status (`active`, `inactive`, or `deleted`). Only `active` tenants are registered and scheduled. See the [Operator Guide](../operator/README.md) for configuration details.
+Tenant configuration files are loaded from YAML files matching the glob pattern set in `TENANT_CONFIG_PATH_PATTERN` (default: `/app/tenant-configs/*-tenant-config.yaml`). Each tenant has a status (`active`, `inactive`, or `deleted`). Active tenants run sync cycles on schedule. Deleted tenants run a cleanup cycle that removes ingested content. Inactive tenants are skipped entirely. See the [Operator Guide](../operator/README.md) for configuration details.
 
 ## Container Platform
 

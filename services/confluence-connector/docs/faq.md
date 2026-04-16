@@ -39,7 +39,7 @@
 
 ### What happens when a page has `ai-ingest` and its ancestor has `ai-ingest-all`?
 
-**Answer:** The page is discovered through both paths but deduplicated by ID, so it is ingested exactly once. See the [discovery flow](./technical/flows.md#Discovery-Sequence) for details on how deduplication works.
+**Answer:** The page is discovered through both paths but deduplicated by ID, so it is ingested exactly once. See [Descendant Discovery](./technical/flows.md#Descendant-Discovery) for details on how deduplication works.
 
 ### Which Confluence content types are synced?
 
@@ -81,9 +81,9 @@
 |---|---|
 | `active` | Tenant is loaded and sync is scheduled (default if not specified) |
 | `inactive` | Tenant config is validated but the tenant is not loaded |
-| `deleted` | Tenant is skipped entirely |
+| `deleted` | Ingested content is deleted from the Unique knowledge base and sync is stopped |
 
-At least one tenant must have `active` status for the connector to start.
+At least one tenant must have `active` or `deleted` status for the connector to start.
 
 ### What are the key configuration sections?
 
@@ -210,9 +210,9 @@ To move a tenant to a different Confluence instance, create a new root scope in 
 2. Does the service account have access to the page's space? On Data Center, access can optionally be restricted to specific spaces. If space restrictions are configured, pages in excluded spaces are silently excluded from CQL results.
 3. Is the page in a global space? (Cloud: also includes collaboration spaces.)
 4. Is the page a standard page type? (Databases, whiteboards, and embeds are skipped.)
-4. Does the page have a non-empty body? Pages with empty bodies are discovered but skipped during content ingestion.
-5. Is the tenant status set to `active` in the YAML config?
-6. Check connector logs for errors related to authentication, API rate limits, or Unique API failures.
+5. Does the page have a non-empty body? Pages with empty bodies are discovered but skipped during content ingestion.
+6. Is the tenant status set to `active` in the YAML config?
+7. Check connector logs for errors related to authentication, API rate limits, or Unique API failures.
 
 ### Why aren't attachments being ingested?
 
