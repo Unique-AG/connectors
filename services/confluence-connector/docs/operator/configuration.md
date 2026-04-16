@@ -408,11 +408,11 @@ Confluence API request histogram buckets: 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
-| `confluence_connector_unique_api_requests_total` | Counter | `operation`, `target`, `result`, `status_code_class`, `tenant` | Total Unique API requests |
-| `confluence_connector_unique_api_errors_total` | Counter | `operation`, `target`, `result`, `status_code_class`, `tenant` | Total Unique API error responses |
-| `confluence_connector_unique_api_request_duration_ms` | Histogram | `operation`, `target`, `result`, `status_code_class`, `tenant` | Request latency for Unique API calls in milliseconds |
-| `confluence_connector_unique_api_slow_requests_total` | Counter | `operation`, `target`, `result`, `status_code_class`, `tenant` | Slow Unique API requests |
-| `confluence_connector_unique_api_auth_token_refresh_total` | Counter | `tenant` | Zitadel auth token refreshes (only emitted in `external` mode) |
+| `confluence_connector_unique_api_requests_total` | Counter | `operation`, `target`, `tenant`, `result` | Total Unique API requests |
+| `confluence_connector_unique_api_errors_total` | Counter | `operation`, `target`, `tenant`, `status_code_class` | Total Unique API error responses |
+| `confluence_connector_unique_api_request_duration_ms` | Histogram | `operation`, `target`, `tenant`, `result`, `status_code_class` | Request latency for Unique API calls in milliseconds |
+| `confluence_connector_unique_api_slow_requests_total` | Counter | `operation`, `target`, `tenant`, `duration_bucket` | Slow Unique API requests |
+| `confluence_connector_unique_api_auth_token_refresh_total` | Counter | -- | Zitadel auth token refreshes (only emitted in `external` mode) |
 
 ### Grafana Dashboard
 
