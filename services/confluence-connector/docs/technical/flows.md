@@ -303,8 +303,8 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 | Page unavailable | Page deleted between discovery and content fetch, or transient API error | Log, skip the page, continue other pages |
 | Page with empty body | Page has no content (e.g., newly created) | Log, skip the page |
 | Attachment with zero bytes | Empty attachment | Log, skip the attachment |
-| Page ingestion failure | Upload error, registration error | Log error, skip the page |
-| Attachment ingestion failure | Download error, upload error | Destroy stream, log error, skip the attachment |
+| Page ingestion failure | Upload error, registration error | Clean up partial content from KB, log error, skip the page |
+| Attachment ingestion failure | Download error, upload error | Destroy stream, clean up partial content from KB, log error, skip the attachment |
 | Content deletion failure | Unique API error | Log error, continue |
 | Unhandled sync error | Unexpected exception | Caught at top level, logged, sync state reset |
 
