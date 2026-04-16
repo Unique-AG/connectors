@@ -3,9 +3,9 @@ import { createSmeared, Smeared } from './smeared';
 export const EXTERNAL_ID_PREFIX = 'spc:' as const;
 export const PENDING_DELETE_PREFIX = 'spc:pending-delete:' as const;
 
-const LEGACY_TYPE_PREFIXES = ['site:', 'subsite:', 'drive:', 'folder:', 'unknown:'] as const;
-
 const LEGACY_SITE_PAGES_REGEX = new RegExp(`^${EXTERNAL_ID_PREFIX}[^/]+/sitePages$`);
+
+const NEW_ROOT_REGEX = new RegExp(`^${EXTERNAL_ID_PREFIX}([^/]+)/site$`);
 
 // --- Legacy format types ---
 
@@ -54,32 +54,36 @@ export type ParsedLegacyExternalId =
 
 // --- Legacy format detection and parsing ---
 
+// Returns true only when the externalId is a fully-parseable legacy format.
+// Strings that merely start with a legacy type prefix but cannot be parsed
+// (e.g. `spc:drive:no-slash`) return false so callers don't misclassify them
+// as migratable.
 export function isLegacyExternalId(externalId: string): boolean {
+  return parseLegacyExternalId(externalId) !== null;
+}
+
+// Extracts the rootSiteId from a root scope externalId in either legacy
+// (`spc:site:{id}`) or new (`spc:{id}/site`) format. Used to anchor scope
+// grouping during migration so that partially-migrated sites still resolve
+// their children under the same root.
+export function extractRootSiteId(externalId: string): string | null {
+  const legacy = parseLegacyExternalId(externalId);
+  if (legacy?.type === 'root') {
+    return legacy.siteId;
+  }
+  return externalId.match(NEW_ROOT_REGEX)?.[1] ?? null;
+}
+
+export function parseLegacyExternalId(externalId: string): ParsedLegacyExternalId | null {
   if (!externalId.startsWith(EXTERNAL_ID_PREFIX)) {
-    return false;
+    return null;
   }
 
   const afterPrefix = externalId.slice(EXTERNAL_ID_PREFIX.length);
 
   if (afterPrefix.startsWith('pending-delete:')) {
-    return false;
-  }
-
-  for (const typePrefix of LEGACY_TYPE_PREFIXES) {
-    if (afterPrefix.startsWith(typePrefix)) {
-      return true;
-    }
-  }
-
-  return LEGACY_SITE_PAGES_REGEX.test(externalId);
-}
-
-export function parseLegacyExternalId(externalId: string): ParsedLegacyExternalId | null {
-  if (!isLegacyExternalId(externalId)) {
     return null;
   }
-
-  const afterPrefix = externalId.slice(EXTERNAL_ID_PREFIX.length);
 
   if (afterPrefix.startsWith('site:')) {
     const siteId = afterPrefix.slice('site:'.length);

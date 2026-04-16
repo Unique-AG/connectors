@@ -1,10 +1,12 @@
 import { Scope } from '../unique-api/unique-scopes/unique-scopes.types';
-import { parseLegacyExternalId } from '../utils/scope-external-id';
+import { extractRootSiteId } from '../utils/scope-external-id';
 
 // Attributes each scope to its root site by walking parentId chains upward.
-// Scopes form a tree: root scope (spc:site:{id}) -> drives -> folders -> etc.
-// We need to know which root site each scope belongs to so the migration can
-// process one site at a time.
+// Scopes form a tree: root scope -> drives -> folders -> etc.
+// Root scopes are recognized in BOTH legacy (spc:site:{id}) and new
+// (spc:{id}/site) formats so that a partially-migrated site — where the root
+// has already been flipped to new format but some children are still legacy —
+// continues to group children correctly.
 export function groupScopesByRootSiteId(scopes: Scope[]): Map<string, Scope[]> {
   const scopeById = new Map<string, Scope>();
   const rootScopeIdToSiteId = new Map<string, string>();
@@ -12,9 +14,9 @@ export function groupScopesByRootSiteId(scopes: Scope[]): Map<string, Scope[]> {
   for (const scope of scopes) {
     scopeById.set(scope.id, scope);
     if (scope.externalId) {
-      const parsed = parseLegacyExternalId(scope.externalId);
-      if (parsed?.type === 'root') {
-        rootScopeIdToSiteId.set(scope.id, parsed.siteId);
+      const rootSiteId = extractRootSiteId(scope.externalId);
+      if (rootSiteId) {
+        rootScopeIdToSiteId.set(scope.id, rootSiteId);
       }
     }
   }

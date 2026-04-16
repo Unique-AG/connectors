@@ -6,6 +6,7 @@ import {
   buildSitePagesExternalId,
   buildSubsiteExternalId,
   buildUnknownExternalId,
+  extractRootSiteId,
   isLegacyExternalId,
   migrateLegacyExternalId,
   parseLegacyExternalId,
@@ -65,6 +66,40 @@ describe('isLegacyExternalId', () => {
 
   it('returns false for non-spc prefix', () => {
     expect(isLegacyExternalId('other:site:abc')).toBe(false);
+  });
+
+  // `isLegacyExternalId` must only return true when the id is fully parseable.
+  // Otherwise a malformed legacy id would satisfy the detection check, the
+  // migration step would then throw on parse, and a single corrupt row would
+  // block the whole site's sync.
+  it.each([
+    ['drive missing slash', 'spc:drive:no-slash-here'],
+    ['folder missing slash', 'spc:folder:no-slash-here'],
+    ['unknown missing separator', 'spc:unknown:no-double-colon'],
+    ['root with slash in siteId', 'spc:site:abc/xyz'],
+  ])('returns false for malformed legacy-like id (%s)', (_desc, id) => {
+    expect(isLegacyExternalId(id)).toBe(false);
+  });
+});
+
+describe('extractRootSiteId', () => {
+  it('extracts siteId from legacy root externalId', () => {
+    expect(extractRootSiteId('spc:site:site-id-abc')).toBe('site-id-abc');
+  });
+
+  it('extracts siteId from new-format root externalId', () => {
+    expect(extractRootSiteId('spc:site-id-abc/site')).toBe('site-id-abc');
+  });
+
+  it('returns null for non-root externalIds', () => {
+    expect(extractRootSiteId(LEGACY_IDS.drive)).toBeNull();
+    expect(extractRootSiteId(NEW_IDS.drive)).toBeNull();
+    expect(extractRootSiteId('spc:site-id-abc/subsite:foo')).toBeNull();
+  });
+
+  it('returns null for empty or unrelated strings', () => {
+    expect(extractRootSiteId('')).toBeNull();
+    expect(extractRootSiteId('other:site:abc')).toBeNull();
   });
 });
 

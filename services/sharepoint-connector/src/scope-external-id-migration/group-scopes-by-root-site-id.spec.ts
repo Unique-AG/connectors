@@ -58,14 +58,15 @@ describe('groupScopesByRootSiteId', () => {
     expect(groups.get('ordered-site')).toHaveLength(3);
   });
 
-  it('ignores scopes with new-format externalIds as root markers', () => {
-    // A scope with a new-format externalId is not a legacy root; it must not
-    // be treated as a grouping anchor.
+  it('recognizes new-format root externalIds as grouping anchors', () => {
+    // A partially-migrated site may have the root already in new format while
+    // some children are still in legacy format — grouping must still attribute
+    // those stranded children to the same root so the next sync can retry.
     const newFormatRoot = scope('nf', null, 'spc:nf-site/site');
     const child = scope('c', 'nf', null);
 
     const groups = groupScopesByRootSiteId([newFormatRoot, child]);
-    expect(groups.size).toBe(0);
+    expect(groups.get('nf-site')).toEqual([newFormatRoot, child]);
   });
 
   it('groups multiple disjoint trees independently', () => {

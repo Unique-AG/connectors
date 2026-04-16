@@ -74,16 +74,15 @@ export class ScopeManagementService {
     );
 
     // Check if the root scope has a legacy externalId and migrate it if needed.
-    if (rootScope.externalId && parseLegacyExternalId(rootScope.externalId)?.type === 'root') {
-      const migrationResult = await this.scopeExternalIdMigrationService.migrateSiteScopes(
-        siteId.value,
+    const externalIdMigrationResult = await this.scopeExternalIdMigrationService.migrateIfNeeded(
+      siteId.value,
+    );
+    if (externalIdMigrationResult.status === 'migration_failed') {
+      throw new Error(
+        `${logPrefix} Scope externalId migration failed: ` +
+          `migrated=${externalIdMigrationResult.migratedCount}, ` +
+          `failed=${externalIdMigrationResult.failedCount}`,
       );
-      if (migrationResult.status === 'migration_failed') {
-        throw new Error(
-          `${logPrefix} Scope externalId migration failed: ` +
-            `migrated=${migrationResult.migratedCount}, failed=${migrationResult.failedCount}`,
-        );
-      }
     }
 
     const isInitialSync = !rootScope.externalId;
@@ -264,9 +263,11 @@ export class ScopeManagementService {
 
     // Accept both legacy (spc:site:{id}) and new (spc:{id}/site) formats during
     // the transition period while existing scopes are being migrated.
-    const newExternalId = buildRootExternalId(siteId.value).value;
-    const legacyExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId.value}`;
-    return rootScope.externalId === newExternalId || rootScope.externalId === legacyExternalId;
+    const legacy = parseLegacyExternalId(rootScope.externalId);
+    if (legacy?.type === 'root' && legacy.siteId === siteId.value) {
+      return true;
+    }
+    return rootScope.externalId === buildRootExternalId(siteId.value).value;
   }
 
   /**
@@ -394,7 +395,7 @@ export class ScopeManagementService {
       }
 
       if (!context.isInitialSync) {
-        await this.markConflictingScope(scope.id, externalId, context.siteConfig.siteId, logPrefix);
+        await this.markConflictingScope(scope.id, externalId, logPrefix);
       }
 
       try {
@@ -420,7 +421,6 @@ export class ScopeManagementService {
   private async markConflictingScope(
     newScopeId: string,
     externalId: Smeared,
-    siteId: Smeared,
     logPrefix: string,
   ): Promise<void> {
     try {
@@ -430,8 +430,11 @@ export class ScopeManagementService {
         return;
       }
 
+      // New-format externalIds already embed the rootSiteId after `spc:`, so
+      // replacing the `spc:` prefix with `spc:pending-delete:` produces a
+      // prefix-matchable pending-delete marker without duplicating the site id.
       const pendingDeleteExternalId = externalId.transform((value) =>
-        value.replace(EXTERNAL_ID_PREFIX, `${PENDING_DELETE_PREFIX}${siteId.value}/`),
+        value.replace(EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX),
       );
       this.logger.log(
         `${logPrefix} Marking conflicting scope ${existingScope.id} with pending-delete prefix`,

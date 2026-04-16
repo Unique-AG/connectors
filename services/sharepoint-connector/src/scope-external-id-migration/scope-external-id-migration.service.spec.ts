@@ -56,7 +56,7 @@ describe('ScopeExternalIdMigrationService', () => {
     it('fetches scopes with the spc: prefix', async () => {
       listScopesByExternalIdPrefixMock.mockResolvedValue([]);
 
-      await service.migrateSiteScopes(ROOT_SITE_ID);
+      await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledTimes(1);
       const arg = listScopesByExternalIdPrefixMock.mock.calls[0]?.[0];
@@ -67,7 +67,7 @@ describe('ScopeExternalIdMigrationService', () => {
     it('returns no_migration_needed when scope list is empty', async () => {
       listScopesByExternalIdPrefixMock.mockResolvedValue([]);
 
-      const result = await service.migrateSiteScopes(ROOT_SITE_ID);
+      const result = await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(result).toEqual({ status: 'no_migration_needed' });
     });
@@ -77,7 +77,7 @@ describe('ScopeExternalIdMigrationService', () => {
         scope('s1', null, `spc:${ROOT_SITE_ID}/site`),
       ]);
 
-      const result = await service.migrateSiteScopes(ROOT_SITE_ID);
+      const result = await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(result).toEqual({ status: 'no_migration_needed' });
     });
@@ -86,7 +86,7 @@ describe('ScopeExternalIdMigrationService', () => {
       listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope, driveScope, folderScope]);
       updateScopeExternalIdMock.mockResolvedValue({ id: 'any', externalId: 'any' });
 
-      const result = await service.migrateSiteScopes(ROOT_SITE_ID);
+      const result = await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(result).toEqual({ status: 'migration_completed', migratedCount: 3 });
     });
@@ -96,7 +96,7 @@ describe('ScopeExternalIdMigrationService', () => {
       listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope, driveScope, newFormatScope]);
       updateScopeExternalIdMock.mockResolvedValue({ id: 'any', externalId: 'any' });
 
-      const result = await service.migrateSiteScopes(ROOT_SITE_ID);
+      const result = await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(result).toEqual({ status: 'migration_completed', migratedCount: 2 });
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
@@ -107,7 +107,7 @@ describe('ScopeExternalIdMigrationService', () => {
       listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope, nullScope]);
       updateScopeExternalIdMock.mockResolvedValue({ id: 'any', externalId: 'any' });
 
-      const result = await service.migrateSiteScopes(ROOT_SITE_ID);
+      const result = await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(result).toEqual({ status: 'migration_completed', migratedCount: 1 });
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
@@ -117,16 +117,30 @@ describe('ScopeExternalIdMigrationService', () => {
       listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope, driveScope, folderScope]);
       updateScopeExternalIdMock
         .mockRejectedValueOnce(new Error('API error'))
-        .mockResolvedValueOnce({ id: 'folder-1', externalId: 'new' })
-        .mockResolvedValueOnce({ id: 'root-1', externalId: 'new' });
+        .mockResolvedValueOnce({ id: 'folder-1', externalId: 'new' });
 
-      const result = await service.migrateSiteScopes(ROOT_SITE_ID);
+      const result = await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(result).toEqual({
         status: 'migration_failed',
-        migratedCount: 2,
+        migratedCount: 1,
         failedCount: 1,
       });
+    });
+
+    it('does not migrate root scope when any child migration fails', async () => {
+      listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope, driveScope, folderScope]);
+      updateScopeExternalIdMock
+        .mockRejectedValueOnce(new Error('API error'))
+        .mockResolvedValueOnce({ id: 'folder-1', externalId: 'new' });
+
+      await service.migrateIfNeeded(ROOT_SITE_ID);
+
+      // Root is never attempted so the next sync still sees a legacy root and
+      // retries the stranded legacy children.
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
+      const calledScopeIds = updateScopeExternalIdMock.mock.calls.map((c) => c[0]);
+      expect(calledScopeIds).not.toContain(rootScope.id);
     });
 
     it('returns migration_failed when root scope update fails', async () => {
@@ -135,7 +149,7 @@ describe('ScopeExternalIdMigrationService', () => {
         .mockResolvedValueOnce({ id: 'drive-1', externalId: 'new' })
         .mockRejectedValueOnce(new Error('Root update error'));
 
-      const result = await service.migrateSiteScopes(ROOT_SITE_ID);
+      const result = await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(result).toEqual({
         status: 'migration_failed',
@@ -152,7 +166,7 @@ describe('ScopeExternalIdMigrationService', () => {
         return Promise.resolve({ id: scopeId, externalId: 'new' });
       });
 
-      await service.migrateSiteScopes(ROOT_SITE_ID);
+      await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(updateOrder).toHaveLength(3);
       expect(updateOrder[updateOrder.length - 1]).toBe(rootScope.id);
@@ -168,7 +182,7 @@ describe('ScopeExternalIdMigrationService', () => {
       listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope]);
       updateScopeExternalIdMock.mockResolvedValue({ id: 'root-1', externalId: 'new' });
 
-      await service.migrateSiteScopes(ROOT_SITE_ID);
+      await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
       const [scopeId, smearedArg] = updateScopeExternalIdMock.mock.calls[0] ?? [];
@@ -181,18 +195,18 @@ describe('ScopeExternalIdMigrationService', () => {
       listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope, driveScope, folderScope]);
       updateScopeExternalIdMock
         .mockRejectedValueOnce(new Error('API error'))
-        .mockResolvedValueOnce({ id: 'folder-1', externalId: 'new' })
-        .mockResolvedValueOnce({ id: 'root-1', externalId: 'new' });
+        .mockResolvedValueOnce({ id: 'folder-1', externalId: 'new' });
 
-      await service.migrateSiteScopes(ROOT_SITE_ID);
+      await service.migrateIfNeeded(ROOT_SITE_ID);
 
-      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(3);
+      // Both children are attempted before short-circuiting on the root.
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
     });
 
     it('returns migration_failed with zero counts when fetch fails', async () => {
       listScopesByExternalIdPrefixMock.mockRejectedValue(new Error('Network error'));
 
-      const result = await service.migrateSiteScopes(ROOT_SITE_ID);
+      const result = await service.migrateIfNeeded(ROOT_SITE_ID);
 
       expect(result).toEqual({
         status: 'migration_failed',
@@ -208,8 +222,8 @@ describe('ScopeExternalIdMigrationService', () => {
       listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope, driveScope, rootB]);
       updateScopeExternalIdMock.mockResolvedValue({ id: 'any', externalId: 'any' });
 
-      await service.migrateSiteScopes(ROOT_SITE_ID);
-      await service.migrateSiteScopes(siteB);
+      await service.migrateIfNeeded(ROOT_SITE_ID);
+      await service.migrateIfNeeded(siteB);
 
       expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledTimes(1);
     });
@@ -221,30 +235,42 @@ describe('ScopeExternalIdMigrationService', () => {
       listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope, driveScope, rootB]);
       updateScopeExternalIdMock.mockResolvedValue({ id: 'any', externalId: 'any' });
 
-      await service.migrateSiteScopes(ROOT_SITE_ID);
+      await service.migrateIfNeeded(ROOT_SITE_ID);
       expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledTimes(1);
 
       // Site B's cache entry still valid — no re-fetch needed
-      await service.migrateSiteScopes(siteB);
+      await service.migrateIfNeeded(siteB);
       expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledTimes(1);
 
       // Requesting ROOT_SITE_ID again triggers re-fetch (evicted after migration)
       listScopesByExternalIdPrefixMock.mockResolvedValue([]);
-      await service.migrateSiteScopes(ROOT_SITE_ID);
+      await service.migrateIfNeeded(ROOT_SITE_ID);
       expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledTimes(2);
     });
 
     it('re-fetches when cache entry has expired', async () => {
       vi.useFakeTimers();
       try {
-        listScopesByExternalIdPrefixMock.mockResolvedValue([]);
+        // A non-legacy site B is used here so its cache entry survives the
+        // post-migration eviction of ROOT_SITE_ID — we then age it past the TTL
+        // and assert it gets re-fetched.
+        const siteB = 'site-xyz';
+        const newFormatRootB = scope('root-b', null, `spc:${siteB}/site`);
 
-        await service.migrateSiteScopes(ROOT_SITE_ID);
+        listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope, newFormatRootB]);
+        updateScopeExternalIdMock.mockResolvedValue({ id: 'any', externalId: 'any' });
+
+        await service.migrateIfNeeded(siteB);
         expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledTimes(1);
 
-        vi.advanceTimersByTime(2 * 60 * 60 * 1000 + 1);
+        // Still cached — no re-fetch just before TTL
+        vi.advanceTimersByTime(2 * 60 * 60 * 1000 - 1);
+        await service.migrateIfNeeded(siteB);
+        expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledTimes(1);
 
-        await service.migrateSiteScopes(ROOT_SITE_ID);
+        // Past TTL — triggers a re-fetch
+        vi.advanceTimersByTime(2);
+        await service.migrateIfNeeded(siteB);
         expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledTimes(2);
       } finally {
         vi.useRealTimers();

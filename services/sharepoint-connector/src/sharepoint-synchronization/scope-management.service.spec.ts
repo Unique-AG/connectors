@@ -163,16 +163,16 @@ describe('ScopeManagementService', () => {
     let createScopeAccessesMock: ReturnType<typeof vi.fn>;
     let getCurrentUserIdMock: ReturnType<typeof vi.fn>;
     let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
-    let migrateIfNeededMock: ReturnType<typeof vi.fn>;
-    let migrateSiteScopesMock: ReturnType<typeof vi.fn>;
+    let rootMigrationMock: ReturnType<typeof vi.fn>;
+    let externalIdMigrationMock: ReturnType<typeof vi.fn>;
 
     beforeEach(async () => {
       getScopeByIdMock = vi.fn();
       createScopeAccessesMock = vi.fn();
       getCurrentUserIdMock = vi.fn().mockResolvedValue('user-123');
       updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
-      migrateIfNeededMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
-      migrateSiteScopesMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
+      rootMigrationMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
+      externalIdMigrationMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
 
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
@@ -190,12 +190,12 @@ describe('ScopeManagementService', () => {
         .mock<RootScopeMigrationService>(RootScopeMigrationService)
         .impl((stubFn) => ({
           ...stubFn(),
-          migrateIfNeeded: migrateIfNeededMock,
+          migrateIfNeeded: rootMigrationMock,
         }))
         .mock<ScopeExternalIdMigrationService>(ScopeExternalIdMigrationService)
         .impl((stubFn) => ({
           ...stubFn(),
-          migrateSiteScopes: migrateSiteScopesMock,
+          migrateIfNeeded: externalIdMigrationMock,
         }))
         .compile();
 
@@ -227,7 +227,7 @@ describe('ScopeManagementService', () => {
       const externalId = new Smeared(`spc:${siteId.value}/site`, true);
       await service.initializeRootScope('root-scope-123', siteId, IngestionMode.Flat);
 
-      expect(migrateIfNeededMock).toHaveBeenCalledWith('root-scope-123', siteId);
+      expect(rootMigrationMock).toHaveBeenCalledWith('root-scope-123', siteId);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', externalId);
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
@@ -242,7 +242,7 @@ describe('ScopeManagementService', () => {
         externalId: null,
         parentId: null,
       });
-      migrateIfNeededMock.mockResolvedValueOnce({
+      rootMigrationMock.mockResolvedValueOnce({
         status: 'migration_failed',
         error: 'Failed to move child scopes',
       });
@@ -347,7 +347,7 @@ describe('ScopeManagementService', () => {
     });
 
     describe('scope externalId migration', () => {
-      it('calls migrateSiteScopes when root scope has legacy externalId', async () => {
+      it('delegates the migration decision to the migration service', async () => {
         getScopeByIdMock.mockResolvedValueOnce({
           id: 'root-scope-123',
           name: 'test1',
@@ -361,41 +361,7 @@ describe('ScopeManagementService', () => {
           IngestionMode.Flat,
         );
 
-        expect(migrateSiteScopesMock).toHaveBeenCalledWith('site-123');
-      });
-
-      it('does not call migrateSiteScopes when root scope has new-format externalId', async () => {
-        getScopeByIdMock.mockResolvedValueOnce({
-          id: 'root-scope-123',
-          name: 'test1',
-          externalId: 'spc:site-123/site',
-          parentId: null,
-        });
-
-        await service.initializeRootScope(
-          'root-scope-123',
-          new Smeared('site-123', false),
-          IngestionMode.Flat,
-        );
-
-        expect(migrateSiteScopesMock).not.toHaveBeenCalled();
-      });
-
-      it('does not call migrateSiteScopes when root scope has no externalId', async () => {
-        getScopeByIdMock.mockResolvedValueOnce({
-          id: 'root-scope-123',
-          name: 'test1',
-          externalId: null,
-          parentId: null,
-        });
-
-        await service.initializeRootScope(
-          'root-scope-123',
-          new Smeared('site-123', false),
-          IngestionMode.Flat,
-        );
-
-        expect(migrateSiteScopesMock).not.toHaveBeenCalled();
+        expect(externalIdMigrationMock).toHaveBeenCalledWith('site-123');
       });
 
       it('throws and aborts sync when migration reports failure', async () => {
@@ -405,7 +371,7 @@ describe('ScopeManagementService', () => {
           externalId: 'spc:site:site-123',
           parentId: null,
         });
-        migrateSiteScopesMock.mockResolvedValueOnce({
+        externalIdMigrationMock.mockResolvedValueOnce({
           status: 'migration_failed',
           migratedCount: 3,
           failedCount: 2,
@@ -1041,7 +1007,7 @@ describe('ScopeManagementService', () => {
         expect(renameId).toBe('old-scope-id');
         expect(renameExternalId).toBeInstanceOf(Smeared);
         expect(renameExternalId.value).toMatch(
-          /^spc:pending-delete:site-123\/site-123\/unknown:\/test1\/TestScope-/,
+          /^spc:pending-delete:site-123\/unknown:\/test1\/TestScope-/,
         );
 
         expect(updateScopeExternalIdMock).toHaveBeenNthCalledWith(

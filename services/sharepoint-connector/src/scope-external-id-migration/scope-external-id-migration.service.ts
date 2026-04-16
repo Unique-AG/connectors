@@ -35,7 +35,7 @@ export class ScopeExternalIdMigrationService {
 
   public constructor(private readonly uniqueScopesService: UniqueScopesService) {}
 
-  public async migrateSiteScopes(rootSiteId: string): Promise<ExternalIdMigrationResult> {
+  public async migrateIfNeeded(rootSiteId: string): Promise<ExternalIdMigrationResult> {
     const logPrefix = `[ExternalId Migration: ${createSmeared(rootSiteId)}]`;
 
     try {
@@ -58,8 +58,10 @@ export class ScopeExternalIdMigrationService {
       let migratedCount = 0;
       let failedCount = 0;
 
-      // Migrate children first — the root externalId is the definitive marker
-      // that migration for this site is complete, so it must be updated last.
+      // Migrate children first. The root externalId is the definitive marker
+      // that migration for this site is complete, so it must stay in legacy
+      // format until every child succeeds — otherwise the next sync would see
+      // a new-format root and skip retrying the stranded legacy children.
       for (const scope of children) {
         if (!scope.externalId || !isLegacyExternalId(scope.externalId)) {
           continue;
@@ -81,7 +83,13 @@ export class ScopeExternalIdMigrationService {
         }
       }
 
-      // Root scope migrated last — its updated externalId signals completion.
+      if (failedCount > 0) {
+        // Leave the root in legacy format so the next sync retries the failed
+        // children. Evict the cache since at least one child's externalId changed.
+        this.siteCache.delete(rootSiteId);
+        return { status: 'migration_failed', migratedCount, failedCount };
+      }
+
       try {
         const newRootExternalId = migrateLegacyExternalId(
           rootSiteId,
@@ -97,7 +105,6 @@ export class ScopeExternalIdMigrationService {
         failedCount++;
       }
 
-      // Evict this site's cached data since its externalIds have changed.
       this.siteCache.delete(rootSiteId);
 
       if (failedCount > 0) {
