@@ -71,6 +71,23 @@ The connector requires a pre-existing root scope in Unique. The root scope ID is
 
 At startup, the connector automatically grants itself access on the root scope and will create child scopes for each Confluence space that has content to ingest. See the [Scope Hierarchy](../technical/flows.md#Scope-Hierarchy) for details.
 
+**External mode with Gatekeeper enforced:** If the Unique platform has Gatekeeper in `enforce` mode, the connector's self-grant may be blocked. In that case, an administrator must pre-grant the service user access on the root scope before starting the connector:
+
+```graphql
+mutation {
+  createScopeAccesses(
+    scopeId: "<root-scope-id>"
+    scopeAccesses: [
+      { type: MANAGE, entityId: "<service-user-id>", entityType: USER }
+      { type: READ, entityId: "<service-user-id>", entityType: USER }
+      { type: WRITE, entityId: "<service-user-id>", entityType: USER }
+    ]
+  )
+}
+```
+
+Replace `<root-scope-id>` with the scope ID from `ingestion.scopeId` and `<service-user-id>` with the Zitadel service user ID.
+
 ### 3. Set Up Confluence Authentication
 
 #### Option A: OAuth 2.0 (2LO) -- Cloud
