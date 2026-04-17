@@ -43,6 +43,7 @@ export class ConfluenceSynchronizationService {
     try {
       this.logger.log({ tenantName: tenant.name, msg: 'Starting sync' });
 
+      this.metrics.setSyncPhase('scanning');
       const rootScopePath = await this.scopeManagementService.initialize();
 
       const scanStartTime = Date.now();
@@ -54,6 +55,7 @@ export class ConfluenceSynchronizationService {
         msg: 'Discovery completed',
       });
 
+      this.metrics.setSyncPhase('diffing');
       const allSpaceKeyToSpaceId = this.buildSpaceKeyToSpaceIdMap(
         discoveredPages,
         discoveredAttachments,
@@ -70,6 +72,8 @@ export class ConfluenceSynchronizationService {
         itemIdsToProcess.has(`${a.pageId}::${a.id}`),
       );
 
+      this.metrics.recordSyncItemTotals(pagesToFetch.length, attachmentsToIngest.length);
+
       if (pagesToFetch.length > 0 || attachmentsToIngest.length > 0) {
         const spaceKeys = [
           ...new Set([
@@ -85,11 +89,16 @@ export class ConfluenceSynchronizationService {
         );
 
         const concurrency = tenant.config.processing.concurrency;
+
+        this.metrics.setSyncPhase('ingesting_pages');
         await this.fetchAndIngestPages(pagesToFetch, spaceScopes, concurrency);
+
+        this.metrics.setSyncPhase('ingesting_attachments');
         await this.ingestAttachments(attachmentsToIngest, spaceScopes, concurrency);
       }
 
       if (diffResult.deletedItems.length > 0) {
+        this.metrics.setSyncPhase('deleting');
         const contentKeys = diffResult.deletedItems.map((item) => `${item.partialKey}/${item.id}`);
         const deletedCount = await this.ingestionService.deleteContentByKeys(contentKeys);
         this.logger.log({
@@ -99,6 +108,7 @@ export class ConfluenceSynchronizationService {
         });
       }
 
+      this.metrics.setSyncPhase('cleaning_up');
       await this.scopeManagementService.cleanupRemovedSpaces(new Set(allSpaceKeyToSpaceId.keys()));
 
       this.logger.log({ msg: 'Sync work done' });
@@ -107,6 +117,7 @@ export class ConfluenceSynchronizationService {
       this.logger.error({ err: error, msg: 'Sync failed' });
     } finally {
       tenant.isScanning = false;
+      this.metrics.setSyncPhase('idle');
       this.metrics.recordSyncDuration(elapsedSeconds(startTime), syncResult);
     }
   }

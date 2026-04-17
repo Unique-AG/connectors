@@ -1,8 +1,17 @@
 import { getHttpStatusCodeClass } from '@unique-ag/utils';
 import { Injectable } from '@nestjs/common';
-import type { Counter, Histogram } from '@opentelemetry/api';
+import type { Counter, Histogram, ObservableGauge } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 import { getCurrentTenant } from '../tenant';
+
+export type SyncPhase =
+  | 'idle'
+  | 'scanning'
+  | 'diffing'
+  | 'ingesting_pages'
+  | 'ingesting_attachments'
+  | 'deleting'
+  | 'cleaning_up';
 
 @Injectable()
 export class Metrics {
@@ -18,6 +27,10 @@ export class Metrics {
   private readonly confluenceApiErrors: Counter;
   private readonly orphanedScopesCleaned: Counter;
   private readonly orphanedFilesCleaned: Counter;
+  private readonly syncPagesTotal: Counter;
+  private readonly syncAttachmentsTotal: Counter;
+
+  private readonly syncPhaseState = new Map<string, SyncPhase>();
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
@@ -81,6 +94,24 @@ export class Metrics {
 
     this.orphanedFilesCleaned = metricService.getCounter('cfc_orphaned_files_cleaned_total', {
       description: 'Number of files deleted during orphaned space cleanup',
+    });
+
+    this.syncPagesTotal = metricService.getCounter('cfc_sync_pages_total', {
+      description: 'Total number of pages to process in the current sync cycle (set after diff)',
+    });
+
+    this.syncAttachmentsTotal = metricService.getCounter('cfc_sync_attachments_total', {
+      description:
+        'Total number of attachments to process in the current sync cycle (set after diff)',
+    });
+
+    const syncPhaseGauge = metricService.getObservableGauge('cfc_sync_phase', {
+      description: 'Current sync phase (1 = active). Labels: tenant, phase',
+    });
+    syncPhaseGauge.addCallback((observable) => {
+      for (const [tenant, phase] of this.syncPhaseState) {
+        observable.observe(1, { tenant, phase });
+      }
     });
   }
 
@@ -152,6 +183,15 @@ export class Metrics {
 
   public recordOrphanedFilesCleaned(count: number): void {
     this.orphanedFilesCleaned.add(count, { tenant: this.tenantName });
+  }
+
+  public setSyncPhase(phase: SyncPhase): void {
+    this.syncPhaseState.set(this.tenantName, phase);
+  }
+
+  public recordSyncItemTotals(pages: number, attachments: number): void {
+    this.syncPagesTotal.add(pages, { tenant: this.tenantName });
+    this.syncAttachmentsTotal.add(attachments, { tenant: this.tenantName });
   }
 
   public recordApiThrottleEvent(): void {
