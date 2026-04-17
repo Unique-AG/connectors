@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-alpha.6](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.5...confluence-connector@2.0.0-alpha.6) (2026-04-17)
+
+
+### Bug Fixes
+
+* **confluence-connector:** add typeid-js dependency required by @unique-ag/utils/zod ([#480](https://github.com/Unique-AG/connectors/issues/480)) ([6370be9](https://github.com/Unique-AG/connectors/commit/6370be948ffefbdde5b2920c1b5b08a2cb903d40))
+
 ## [2.0.0-alpha.5](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.4...confluence-connector@2.0.0-alpha.5) (2026-04-17)
 
 
