@@ -3,10 +3,10 @@ import { extractRootSiteId } from '../utils/scope-external-id';
 
 // Attributes each scope to its root site by walking parentId chains upward.
 // Scopes form a tree: root scope -> drives -> folders -> etc.
-// Root scopes are recognized in BOTH legacy (spc:site:{id}) and new
-// (spc:{id}/site) formats so that a partially-migrated site — where the root
-// has already been flipped to new format but some children are still legacy —
-// continues to group children correctly.
+// Root scopes are recognized in BOTH legacy (spc:site:{id}) and new (spc:{id}/site) formats so that
+// a partially-migrated site — where the root has already been flipped to new format but some
+// children are still legacy — continues to group children correctly. In practice the root scope is
+// migrated last, but we handle that case just in case.
 export function groupScopesByRootSiteId(scopes: Scope[]): Map<string, Scope[]> {
   const scopeById = new Map<string, Scope>();
   const rootScopeIdToSiteId = new Map<string, string>();

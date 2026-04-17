@@ -59,9 +59,8 @@ describe('groupScopesByRootSiteId', () => {
   });
 
   it('recognizes new-format root externalIds as grouping anchors', () => {
-    // A partially-migrated site may have the root already in new format while
-    // some children are still in legacy format — grouping must still attribute
-    // those stranded children to the same root so the next sync can retry.
+    // While case of partially-migrated site having the root already in new format is purely
+    // theoretical, we still handle it just in case. In practice the root scope is migrated last.
     const newFormatRoot = scope('nf', null, 'spc:nf-site/site');
     const child = scope('c', 'nf', null);
 
