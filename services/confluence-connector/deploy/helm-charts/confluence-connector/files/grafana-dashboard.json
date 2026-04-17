@@ -141,6 +141,144 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 70,
+      "title": "Sync progress",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Current sync phase per tenant. Shows what the connector is doing right now: scanning, diffing, ingesting pages, ingesting attachments, deleting, cleaning up, or idle.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "text", "value": null }]
+          },
+          "mappings": [
+            { "options": { "idle": { "text": "Idle", "color": "gray", "index": 0 } }, "type": "value" },
+            { "options": { "scanning": { "text": "Scanning", "color": "blue", "index": 1 } }, "type": "value" },
+            { "options": { "diffing": { "text": "Diffing", "color": "purple", "index": 2 } }, "type": "value" },
+            { "options": { "ingesting_pages": { "text": "Ingesting pages", "color": "green", "index": 3 } }, "type": "value" },
+            { "options": { "ingesting_attachments": { "text": "Ingesting attachments", "color": "orange", "index": 4 } }, "type": "value" },
+            { "options": { "deleting": { "text": "Deleting", "color": "red", "index": 5 } }, "type": "value" },
+            { "options": { "cleaning_up": { "text": "Cleaning up", "color": "yellow", "index": 6 } }, "type": "value" }
+          ]
+        }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 7 },
+      "id": 71,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "topk(1, cfc_sync_phase{job=~\"$job\", tenant=~\"$tenant\"}) by (tenant, phase) * on(tenant, phase) group_left cfc_sync_phase{job=~\"$job\", tenant=~\"$tenant\"} == 1",
+          "legendFormat": "{{tenant}} — {{phase}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "reduce",
+          "options": { "reducers": ["lastNotNull"] }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [{ "fieldName": "Last *", "config": { "id": "equal", "options": { "value": 1 } } }],
+            "type": "include",
+            "match": "any"
+          }
+        }
+      ],
+      "title": "Current sync phase",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Pages processed vs total pages to process. Shows ingestion progress during a long sync.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 7 },
+      "id": 72,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(cfc_pages_processed_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}) or vector(0)",
+          "legendFormat": "Processed",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(cfc_sync_pages_total{job=~\"$job\", tenant=~\"$tenant\"}) or vector(0)",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ],
+      "title": "Pages: processed / total",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Attachments processed vs total attachments to process. Shows ingestion progress during a long sync.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 7 },
+      "id": 73,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(cfc_attachments_processed_total{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}) or vector(0)",
+          "legendFormat": "Processed",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(cfc_sync_attachments_total{job=~\"$job\", tenant=~\"$tenant\"}) or vector(0)",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ],
+      "title": "Attachments: processed / total",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
       "id": 1,
       "title": "Sync pipeline",
       "type": "row"
