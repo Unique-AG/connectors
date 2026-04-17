@@ -726,12 +726,12 @@
       },
       {
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(cfc_sync_duration_seconds_count, job)",
+        "definition": "label_values(cfc_pages_processed_total, job)",
         "includeAll": false,
         "label": "Job",
         "name": "job",
         "query": {
-          "query": "label_values(cfc_sync_duration_seconds_count, job)",
+          "query": "label_values(cfc_pages_processed_total, job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -740,12 +740,12 @@
       },
       {
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(cfc_sync_duration_seconds_count, tenant)",
+        "definition": "label_values(cfc_pages_processed_total, tenant)",
         "includeAll": true,
         "label": "Tenant",
         "name": "tenant",
         "query": {
-          "query": "label_values(cfc_sync_duration_seconds_count, tenant)",
+          "query": "label_values(cfc_pages_processed_total, tenant)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
