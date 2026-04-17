@@ -139,6 +139,10 @@ export class ConfluenceSynchronizationService {
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
           await this.ingestionService.ingestPage(fetched, scopeId);
           ingested++;
+          this.metrics.recordPagesProcessed(1, 'success');
+        }).catch((err) => {
+          this.metrics.recordPagesProcessed(1, 'failure');
+          throw err;
         }).finally(() => {
           processed++;
           if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
@@ -153,9 +157,6 @@ export class ConfluenceSynchronizationService {
     );
 
     const failed = pages.length - ingested;
-
-    this.metrics.recordPagesProcessed(ingested, 'success');
-    this.metrics.recordPagesProcessed(failed, 'failure');
 
     this.logger.log({
       total: pages.length,
@@ -187,6 +188,10 @@ export class ConfluenceSynchronizationService {
           assert.ok(scopeId, `No scope resolved for space: ${attachment.spaceKey}`);
           await this.ingestionService.ingestAttachment(attachment, scopeId);
           ingested++;
+          this.metrics.recordAttachmentsProcessed(1, 'success');
+        }).catch((err) => {
+          this.metrics.recordAttachmentsProcessed(1, 'failure');
+          throw err;
         }).finally(() => {
           processed++;
           if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
@@ -201,8 +206,6 @@ export class ConfluenceSynchronizationService {
     );
 
     const failed = attachments.length - ingested;
-    this.metrics.recordAttachmentsProcessed(ingested, 'success');
-    this.metrics.recordAttachmentsProcessed(failed, 'failure');
 
     this.logger.log({
       total: attachments.length,
