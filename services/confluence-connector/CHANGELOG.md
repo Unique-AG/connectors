@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.0.0-alpha.5](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.4...confluence-connector@2.0.0-alpha.5) (2026-04-17)
+
+
+### Features
+
+* **confluence-connector,utils,deps:** add HTTP proxy support ([#394](https://github.com/Unique-AG/connectors/issues/394)) ([ddee2ca](https://github.com/Unique-AG/connectors/commit/ddee2ca32c6474f1d0c2fa4ac4bf8908ab1ee6df))
+* **confluence-connector:** add metrics and Grafana dashboard ([#395](https://github.com/Unique-AG/connectors/issues/395)) ([cb765d5](https://github.com/Unique-AG/connectors/commit/cb765d5a6897073cc566eed3a6a7e6676e625ef1))
+* **confluence-connector:** set external ID on root scope and validate instance ownership ([#435](https://github.com/Unique-AG/connectors/issues/435)) ([2ffeb74](https://github.com/Unique-AG/connectors/commit/2ffeb74c29dd9fb7b009c647eb48ed083af60c28))
+
+
+### Bug Fixes
+
+* **confluence-connector:** allow deletion guard to pass when new files are being added ([#368](https://github.com/Unique-AG/connectors/issues/368)) ([b57683c](https://github.com/Unique-AG/connectors/commit/b57683c27d13c32c847758cb77be52c65a00dcfa))
+* **confluence-connector:** clean up orphaned files and scopes when spaces are removed ([#421](https://github.com/Unique-AG/connectors/issues/421)) ([b72b99d](https://github.com/Unique-AG/connectors/commit/b72b99d70e07b6e568680173dabc74d54c05f18c))
+* **confluence-connector:** clean up registered content after failed upload or finalization ([#381](https://github.com/Unique-AG/connectors/issues/381)) ([b78cebb](https://github.com/Unique-AG/connectors/commit/b78cebb2017726f653901392a2561b618399d6a1))
+* **confluence-connector:** remove os_authType=basic from Data Center API URLs ([#457](https://github.com/Unique-AG/connectors/issues/457)) ([542ff07](https://github.com/Unique-AG/connectors/commit/542ff074aa8ce4b050bede6092a62e350763d292))
+* **deps:** enable stripLeadingPaths in SWC builder for all services ([#458](https://github.com/Unique-AG/connectors/issues/458)) ([caa3abc](https://github.com/Unique-AG/connectors/commit/caa3abc26b9aea44dede0ce89101df64b3f97b77))
+* **deps:** resolve Dependabot security alerts for multiple transitive dependencies ([#449](https://github.com/Unique-AG/connectors/issues/449)) ([c800b51](https://github.com/Unique-AG/connectors/commit/c800b51439145282cababd491a6fba1a84a748a9))
+* **deps:** resolve Dependabot security alerts for undici, path-to-regexp, orval, minimatch, and brace-expansion ([#432](https://github.com/Unique-AG/connectors/issues/432)) ([5cd9c0f](https://github.com/Unique-AG/connectors/commit/5cd9c0fdc3230de591b28574fccabb7df2cd2cce))
+* **deps:** resolve Dependabot security alerts related to jsonwebtoken, js-yaml and @nestjs/ libraries ([#446](https://github.com/Unique-AG/connectors/issues/446)) ([44835ec](https://github.com/Unique-AG/connectors/commit/44835ec851589e2288fd2e1551ca22edb148190e))
+* **deps:** upgrade nestjs-otel to v8 to resolve systeminformation CVEs ([#471](https://github.com/Unique-AG/connectors/issues/471)) ([ec584a9](https://github.com/Unique-AG/connectors/commit/ec584a95427b3a9989387c548d654c8b4fbbd775))
+
 ## [2.0.0-alpha.4](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.3...confluence-connector@2.0.0-alpha.4) (2026-03-17)
 
 
