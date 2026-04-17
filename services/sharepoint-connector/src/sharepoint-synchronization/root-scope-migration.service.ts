@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
-import { EXTERNAL_ID_PREFIX } from '../utils/scope-external-id';
 import { sanitizeError } from '../utils/normalize-error';
+import { EXTERNAL_ID_PREFIX } from '../utils/scope-external-id';
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
 
 export type MigrationResult =

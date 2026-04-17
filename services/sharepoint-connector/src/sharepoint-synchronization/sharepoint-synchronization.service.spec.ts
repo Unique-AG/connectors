@@ -27,7 +27,7 @@ describe('SharepointSynchronizationService', () => {
     initializeRootScope: ReturnType<typeof vi.fn>;
     batchCreateScopes: ReturnType<typeof vi.fn>;
     resetRootScope: ReturnType<typeof vi.fn>;
-    deleteOrphanedScopes: ReturnType<typeof vi.fn>;
+    deleteStaleScopes: ReturnType<typeof vi.fn>;
   };
   let mockSubsiteDiscoveryService: {
     discoverAllSubsites: ReturnType<typeof vi.fn>;
@@ -136,7 +136,7 @@ describe('SharepointSynchronizationService', () => {
       }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
       resetRootScope: vi.fn().mockResolvedValue(undefined),
-      deleteOrphanedScopes: vi.fn().mockResolvedValue(undefined),
+      deleteStaleScopes: vi.fn().mockResolvedValue(undefined),
     };
 
     mockSubsiteDiscoveryService = {
@@ -337,27 +337,25 @@ describe('SharepointSynchronizationService', () => {
     expect(mockPermissionsSyncService.syncPermissionsForSite).not.toHaveBeenCalled();
   });
 
-  it('calls orphan scope cleanup after content sync', async () => {
+  it('calls stale scope cleanup after content sync', async () => {
     await service.synchronize();
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledTimes(1);
-    expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledTimes(1);
-    expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledWith(
+    expect(mockScopeManagementService.deleteStaleScopes).toHaveBeenCalledTimes(1);
+    expect(mockScopeManagementService.deleteStaleScopes).toHaveBeenCalledWith(
       expect.objectContaining({
         value: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
       }),
     );
   });
 
-  it('continues global synchronization when orphan scope cleanup fails for a site', async () => {
-    mockScopeManagementService.deleteOrphanedScopes.mockRejectedValueOnce(
-      new Error('Cleanup failed'),
-    );
+  it('continues global synchronization when stale scope cleanup fails for a site', async () => {
+    mockScopeManagementService.deleteStaleScopes.mockRejectedValueOnce(new Error('Cleanup failed'));
 
     const result = await service.synchronize();
 
     expect(mockContentSyncService.syncContentForSite).toHaveBeenCalledTimes(1);
-    expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledTimes(1);
+    expect(mockScopeManagementService.deleteStaleScopes).toHaveBeenCalledTimes(1);
     expect(result.fullResult.status).toBe('success');
   });
 
@@ -1036,7 +1034,7 @@ describe('SharepointSynchronizationService', () => {
     );
   });
 
-  it('cleans up orphaned scopes using parent site ID when subsites are enabled', async () => {
+  it('cleans up stale scopes using parent site ID when subsites are enabled', async () => {
     const siteConfig = createMockSiteConfig({
       siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
       subsitesScan: 'enabled',
@@ -1062,8 +1060,8 @@ describe('SharepointSynchronizationService', () => {
 
     await service.synchronize();
 
-    expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledTimes(1);
-    expect(mockScopeManagementService.deleteOrphanedScopes).toHaveBeenCalledWith(siteConfig.siteId);
+    expect(mockScopeManagementService.deleteStaleScopes).toHaveBeenCalledTimes(1);
+    expect(mockScopeManagementService.deleteStaleScopes).toHaveBeenCalledWith(siteConfig.siteId);
   });
 
   it('does not initialize root scope when getSiteInfo fails', async () => {

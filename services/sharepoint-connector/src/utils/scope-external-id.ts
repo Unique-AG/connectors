@@ -169,6 +169,22 @@ export function buildUnknownExternalId(rootSiteId: string, suffix: string): Smea
   return createSmeared(`${EXTERNAL_ID_PREFIX}${rootSiteId}/unknown:${suffix}`);
 }
 
+// Prefix that matches every active (non-pending-delete) scope for a given root site.
+export function buildActiveScopesPrefix(rootSiteId: string): Smeared {
+  return createSmeared(`${EXTERNAL_ID_PREFIX}${rootSiteId}/`);
+}
+
+// Prefix that matches every stale (pending-delete) scope for a given root site.
+export function buildStaleScopesPrefix(rootSiteId: string): Smeared {
+  return createSmeared(`${PENDING_DELETE_PREFIX}${rootSiteId}/`);
+}
+
+// Moves an active externalId into the pending-delete namespace. Suffix is is preserved verbatim so
+// operators can still identify the original scope type/site from the marker.
+export function toPendingDeleteExternalId(activeExternalId: string): Smeared {
+  return createSmeared(activeExternalId.replace(EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX));
+}
+
 // --- Migration helper (legacy -> new) ---
 
 export function migrateLegacyExternalId(rootSiteId: string, legacyExternalId: Smeared): Smeared {

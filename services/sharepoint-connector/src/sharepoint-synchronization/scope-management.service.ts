@@ -15,15 +15,16 @@ import { UniqueUsersService } from '../unique-api/unique-users/unique-users.serv
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import {
+  buildActiveScopesPrefix,
   buildDriveExternalId,
   buildFolderExternalId,
   buildRootExternalId,
   buildSitePagesExternalId,
+  buildStaleScopesPrefix,
   buildSubsiteExternalId,
   buildUnknownExternalId,
-  EXTERNAL_ID_PREFIX,
-  PENDING_DELETE_PREFIX,
   parseLegacyExternalId,
+  toPendingDeleteExternalId,
 } from '../utils/scope-external-id';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
@@ -186,70 +187,69 @@ export class ScopeManagementService {
     }
   }
 
-  public async deleteOrphanedScopes(siteId: Smeared): Promise<void> {
+  public async deleteStaleScopes(siteId: Smeared): Promise<void> {
     const logPrefix = `[Site: ${siteId}]`;
 
-    // Note: When subsites are enabled, we do not need to iterate over all discovered subsite IDs.
-    // This is because `markConflictingScope` (which marks scopes for deletion) constructs the
-    // pending-delete prefix using the root site's ID for all items, including those from subsites.
-    // Therefore, querying by the root site's ID prefix is sufficient to find all orphaned scopes
-    // for the entire site tree.
-    let orphanedScopes: Scope[];
+    // When subsites are enabled, querying by the root site's ID prefix is sufficient because
+    // `markStaleScopesForDeletion` constructs pending-delete externalIds using the root site's ID
+    // for all scopes, including those from subsites.
+    let staleScopes: Scope[];
     try {
-      orphanedScopes = await this.uniqueScopesService.listScopesByExternalIdPrefix(
-        siteId.transform((value) => `${PENDING_DELETE_PREFIX}${value}/`),
+      staleScopes = await this.uniqueScopesService.listScopesByExternalIdPrefix(
+        siteId.transform((value) => buildStaleScopesPrefix(value).value),
       );
     } catch (error) {
       this.logger.warn({
-        msg: `${logPrefix} Failed to query orphaned scopes, skipping cleanup`,
+        msg: `${logPrefix} Failed to query stale scopes, skipping cleanup`,
         error: sanitizeError(error),
       });
       return;
     }
 
-    if (orphanedScopes.length === 0) {
+    if (staleScopes.length === 0) {
       return;
     }
 
-    // We sort the orphans by depth to delete the deepest scopes first to avoid deleting scopes that
-    // have children. This way we can delete without recursive to be sure we're not accidentally
-    // deleting some content.
-
-    const orphanById = new Map(orphanedScopes.map((s) => [s.id, s]));
+    // Delete deepest scopes first so every `deleteScope` call can run non-recursive, preventing
+    // accidental removal of child content that was not itself flagged as stale.
+    const staleById = new Map(staleScopes.map((s) => [s.id, s]));
     const depthById = new Map<string, number>();
 
-    const setOrphanDepth = (scope: Scope): number => {
+    const setStaleDepth = (scope: Scope): number => {
       const cached = depthById.get(scope.id);
       if (isNonNullish(cached)) {
         return cached;
       }
 
       let depth = 0;
-      const parent = scope.parentId ? orphanById.get(scope.parentId) : undefined;
+      const parent = scope.parentId ? staleById.get(scope.parentId) : undefined;
       if (parent) {
-        depth = 1 + setOrphanDepth(parent);
+        depth = 1 + setStaleDepth(parent);
       }
       depthById.set(scope.id, depth);
       return depth;
     };
 
-    for (const scope of orphanedScopes) {
-      setOrphanDepth(scope);
+    for (const scope of staleScopes) {
+      setStaleDepth(scope);
     }
 
-    const sortedOrphans = sortBy(orphanedScopes, [(scope) => depthById.get(scope.id) ?? 0, 'desc']);
+    const sortedStaleScopes = sortBy(staleScopes, [
+      (scope) => depthById.get(scope.id) ?? 0,
+      'desc',
+    ]);
 
     this.logger.log(
-      `${logPrefix} Deleting ${orphanedScopes.length} orphaned scopes marked with pending-delete prefix`,
+      `${logPrefix} Deleting ${staleScopes.length} stale scopes marked with pending-delete prefix`,
     );
 
-    for (const scope of sortedOrphans) {
+    for (const scope of sortedStaleScopes) {
       try {
         await this.uniqueScopesService.deleteScope(scope.id);
-        this.logger.debug(`${logPrefix} Deleted orphaned scope ${scope.id}`);
+        this.logger.debug(`${logPrefix} Deleted stale scope ${scope.id}`);
       } catch (error) {
         this.logger.warn({
-          msg: `${logPrefix} Failed to delete orphaned scope ${scope.id}`,
+          msg: `${logPrefix} Failed to delete stale scope ${scope.id}`,
           error: sanitizeError(error),
         });
       }
@@ -336,7 +336,8 @@ export class ScopeManagementService {
     });
     this.logger.log(`${logPrefix} Created ${scopes.length} scopes`);
 
-    // Update newly created scopes with externalId
+    await this.markStaleScopesForDeletion(scopes, context);
+
     await this.updateNewlyCreatedScopesWithExternalId(
       scopes,
       allPathsWithParents,
@@ -394,10 +395,6 @@ export class ScopeManagementService {
         );
       }
 
-      if (!context.isInitialSync) {
-        await this.markConflictingScope(scope.id, externalId, logPrefix);
-      }
-
       try {
         const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
           scope.id,
@@ -414,40 +411,75 @@ export class ScopeManagementService {
     }
   }
 
-  // When folder was moved in SharePoint, we will recreate it at a new location because we create
-  // scopes by path and not by id. Therefore if we find a scope with the same externalId, we mark it
-  // for deletion. It will happen after content sync, because we have to move files from old scopes
-  // to new ones.
-  private async markConflictingScope(
-    newScopeId: string,
-    externalId: Smeared,
-    logPrefix: string,
+  // Finds scopes owned by this site that are no longer referenced by any SharePoint item and marks
+  // them for deletion. Covers two cases at once:
+  //   1. Folders emptied or deleted in SharePoint — no new scope ID matches their externalId.
+  //   2. Folders moved in SharePoint — `createScopesBasedOnPaths` returned a different scope ID for
+  //      the new path, so the original scope ends up stale and gets renamed to free its externalId
+  //      before the new scope claims it.
+  //
+  // Actual deletion is deferred to `deleteStaleScopes` (runs after content sync) so that any
+  // files still attached to the stale scope get moved or removed first.
+  private async markStaleScopesForDeletion(
+    currentScopes: Scope[],
+    context: SharepointSyncContext,
   ): Promise<void> {
+    const logPrefix = `[Site: ${context.siteConfig.siteId}]`;
+
+    // All scopes for a given root site share the prefix `spc:{rootSiteId}/` — pending-delete scopes
+    // are excluded automatically because they live under `spc:pending-delete:{rootSiteId}/`.
+    const activePrefix = context.siteConfig.siteId.transform(
+      (value) => buildActiveScopesPrefix(value).value,
+    );
+
+    let existingScopes: Scope[];
     try {
-      const existingScope = await this.uniqueScopesService.getScopeByExternalId(externalId.value);
-
-      if (!existingScope || existingScope.id === newScopeId) {
-        return;
-      }
-
-      // New-format externalIds already embed the rootSiteId after `spc:`, so
-      // replacing the `spc:` prefix with `spc:pending-delete:` produces a
-      // prefix-matchable pending-delete marker without duplicating the site id.
-      const pendingDeleteExternalId = externalId.transform((value) =>
-        value.replace(EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX),
-      );
-      this.logger.log(
-        `${logPrefix} Marking conflicting scope ${existingScope.id} with pending-delete prefix`,
-      );
-      await this.uniqueScopesService.updateScopeExternalId(
-        existingScope.id,
-        pendingDeleteExternalId,
-      );
+      existingScopes = await this.uniqueScopesService.listScopesByExternalIdPrefix(activePrefix);
     } catch (error) {
       this.logger.warn({
-        msg: `${logPrefix} Failed to mark conflicting scope for externalId ${externalId}`,
+        msg: `${logPrefix} Failed to list existing scopes, skipping stale-scope marking`,
         error: sanitizeError(error),
       });
+      return;
+    }
+
+    const currentScopeIds = new Set(currentScopes.map((scope) => scope.id));
+    const configuredRootScopeId = context.siteConfig.scopeId;
+    const staleScopes = existingScopes.filter(
+      (scope) =>
+        isNonNullish(scope.externalId) &&
+        !currentScopeIds.has(scope.id) &&
+        // Paranoid guard: the configured root scope is managed by `initializeRootScope` and must
+        // never be renamed here, even if it somehow failed to appear in `currentScopes`.
+        scope.id !== configuredRootScopeId,
+    );
+
+    if (staleScopes.length === 0) {
+      return;
+    }
+
+    this.logger.log(`${logPrefix} Marking ${staleScopes.length} stale scopes for deletion`);
+    this.logger.debug({
+      msg: `${logPrefix} Stale scope details`,
+      staleScopes: staleScopes.map((scope) => ({
+        id: scope.id,
+        externalId: scope.externalId,
+      })),
+    });
+
+    for (const scope of staleScopes) {
+      assert.ok(scope.externalId, `Stale scope ${scope.id} unexpectedly has null externalId`);
+      const pendingDeleteExternalId = toPendingDeleteExternalId(scope.externalId);
+
+      try {
+        await this.uniqueScopesService.updateScopeExternalId(scope.id, pendingDeleteExternalId);
+        this.logger.debug(`${logPrefix} Marked stale scope ${scope.id} for deletion`);
+      } catch (error) {
+        this.logger.warn({
+          msg: `${logPrefix} Failed to mark stale scope ${scope.id} for deletion`,
+          error: sanitizeError(error),
+        });
+      }
     }
   }
 
