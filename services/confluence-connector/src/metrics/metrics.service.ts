@@ -4,14 +4,15 @@ import type { Counter, Histogram, ObservableGauge } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 import { getCurrentTenant } from '../tenant';
 
-export type SyncPhase =
-  | 'idle'
-  | 'scanning'
-  | 'diffing'
-  | 'ingesting_pages'
-  | 'ingesting_attachments'
-  | 'deleting'
-  | 'cleaning_up';
+export enum SyncPhase {
+  Idle = 'idle',
+  Scanning = 'scanning',
+  Diffing = 'diffing',
+  IngestingPages = 'ingesting_pages',
+  IngestingAttachments = 'ingesting_attachments',
+  Deleting = 'deleting',
+  CleaningUp = 'cleaning_up',
+}
 
 @Injectable()
 export class Metrics {

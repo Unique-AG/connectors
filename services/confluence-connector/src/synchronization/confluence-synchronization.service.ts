@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
-import type { Metrics } from '../metrics';
+import { SyncPhase, type Metrics } from '../metrics';
 import { getCurrentTenant } from '../tenant';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
@@ -43,7 +43,7 @@ export class ConfluenceSynchronizationService {
     try {
       this.logger.log({ tenantName: tenant.name, msg: 'Starting sync' });
 
-      this.metrics.setSyncPhase('scanning');
+      this.metrics.setSyncPhase(SyncPhase.Scanning);
       const rootScopePath = await this.scopeManagementService.initialize();
 
       const scanStartTime = Date.now();
@@ -55,7 +55,7 @@ export class ConfluenceSynchronizationService {
         msg: 'Discovery completed',
       });
 
-      this.metrics.setSyncPhase('diffing');
+      this.metrics.setSyncPhase(SyncPhase.Diffing);
       const allSpaceKeyToSpaceId = this.buildSpaceKeyToSpaceIdMap(
         discoveredPages,
         discoveredAttachments,
@@ -90,15 +90,15 @@ export class ConfluenceSynchronizationService {
 
         const concurrency = tenant.config.processing.concurrency;
 
-        this.metrics.setSyncPhase('ingesting_pages');
+        this.metrics.setSyncPhase(SyncPhase.IngestingPages);
         await this.fetchAndIngestPages(pagesToFetch, spaceScopes, concurrency);
 
-        this.metrics.setSyncPhase('ingesting_attachments');
+        this.metrics.setSyncPhase(SyncPhase.IngestingAttachments);
         await this.ingestAttachments(attachmentsToIngest, spaceScopes, concurrency);
       }
 
       if (diffResult.deletedItems.length > 0) {
-        this.metrics.setSyncPhase('deleting');
+        this.metrics.setSyncPhase(SyncPhase.Deleting);
         const contentKeys = diffResult.deletedItems.map((item) => `${item.partialKey}/${item.id}`);
         const deletedCount = await this.ingestionService.deleteContentByKeys(contentKeys);
         this.logger.log({
@@ -108,7 +108,7 @@ export class ConfluenceSynchronizationService {
         });
       }
 
-      this.metrics.setSyncPhase('cleaning_up');
+      this.metrics.setSyncPhase(SyncPhase.CleaningUp);
       await this.scopeManagementService.cleanupRemovedSpaces(new Set(allSpaceKeyToSpaceId.keys()));
 
       this.logger.log({ msg: 'Sync work done' });
@@ -117,7 +117,7 @@ export class ConfluenceSynchronizationService {
       this.logger.error({ err: error, msg: 'Sync failed' });
     } finally {
       tenant.isScanning = false;
-      this.metrics.setSyncPhase('idle');
+      this.metrics.setSyncPhase(SyncPhase.Idle);
       this.metrics.recordSyncDuration(elapsedSeconds(startTime), syncResult);
     }
   }
