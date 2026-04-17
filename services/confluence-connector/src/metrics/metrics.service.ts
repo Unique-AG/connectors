@@ -144,7 +144,7 @@ export class Metrics {
     this.scanDuration.record(durationSeconds, { tenant: this.tenantName });
   }
 
-  public recordPagesProcessed(count: number, result: 'success' | 'failure'): void {
+  public recordPagesProcessed(count: number, result: 'success' | 'failure' | 'skipped'): void {
     this.pagesProcessed.add(count, { tenant: this.tenantName, result });
   }
 
@@ -229,6 +229,7 @@ export class Metrics {
     const tenant = { tenant: this.tenantName };
     this.pagesProcessed.add(0, { ...tenant, result: 'success' });
     this.pagesProcessed.add(0, { ...tenant, result: 'failure' });
+    this.pagesProcessed.add(0, { ...tenant, result: 'skipped' });
     this.attachmentsProcessed.add(0, { ...tenant, result: 'success' });
     this.attachmentsProcessed.add(0, { ...tenant, result: 'failure' });
     this.contentDeleted.add(0, { ...tenant, result: 'success' });

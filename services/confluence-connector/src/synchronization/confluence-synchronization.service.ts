@@ -146,6 +146,7 @@ export class ConfluenceSynchronizationService {
 
           if (!fetched) {
             skipped++;
+            this.metrics.recordPagesProcessed(1, 'skipped');
             return;
           }
           const scopeId = spaceScopes.get(page.spaceKey);
