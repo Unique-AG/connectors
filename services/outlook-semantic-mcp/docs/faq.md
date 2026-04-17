@@ -272,7 +272,9 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 **Answer:** Email deletion detection is handled asynchronously via two mechanisms: individual email deletions are detected when Microsoft moves the email to Deleted Items (an ignored folder), and entire folder deletions are detected by directory sync on its 5-minute delta cycle. There may be a brief delay between deletion and removal from search results.
 
-**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Flows](./technical/flows.md)
+**Known limitation — bulk deletion with immediate permanent removal:** The server processes emails found in the Deleted Items folder and removes them from the Unique knowledge base. If the user permanently deletes emails from Deleted Items (e.g. via "Empty Folder") before the server finishes processing them, those emails are no longer visible to the server and cannot be cleaned up. They will persist in the Unique knowledge base until the content expiration policy removes them.
+
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Flows](./technical/flows.md) — [Limitations and Constraints](../README.md#Limitations-and-Constraints)
 
 ## Tool Usage
 
