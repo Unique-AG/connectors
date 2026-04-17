@@ -170,6 +170,7 @@ describe('ConfluenceSynchronizationService', () => {
       expect(mockLogger.log).toHaveBeenCalledWith({
         total: 1,
         ingested: 0,
+        skipped: 0,
         failed: 1,
         msg: 'Page ingestion summary',
       });

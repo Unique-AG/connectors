@@ -125,6 +125,7 @@ export class ConfluenceSynchronizationService {
 
     let processed = 0;
     let ingested = 0;
+    let skipped = 0;
     const total = pages.length;
 
     await Promise.allSettled(
@@ -133,6 +134,7 @@ export class ConfluenceSynchronizationService {
           const fetched = await this.contentFetcher.fetchPageContent(page);
 
           if (!fetched) {
+            skipped++;
             return;
           }
           const scopeId = spaceScopes.get(page.spaceKey);
@@ -156,11 +158,12 @@ export class ConfluenceSynchronizationService {
       ),
     );
 
-    const failed = pages.length - ingested;
+    const failed = pages.length - ingested - skipped;
 
     this.logger.log({
       total: pages.length,
       ingested,
+      skipped,
       failed,
       msg: 'Page ingestion summary',
     });
