@@ -156,7 +156,7 @@ describe('ConfluenceContentFetcher', () => {
     const result = await fetcher.fetchPageContent(discoveredPage);
 
     expect(result).toBeNull();
-    expect(mockLogger.log).toHaveBeenCalledWith({
+    expect(mockLogger.debug).toHaveBeenCalledWith({
       pageId: 'empty',
       title: new Smeared('Page empty', false),
       msg: 'Page has no body, skipping',
