@@ -274,7 +274,7 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 **Known limitation — bulk deletion with immediate permanent removal:** The server processes emails found in the Deleted Items folder and removes them from the Unique knowledge base. If the user permanently deletes emails from Deleted Items (e.g. via "Empty Folder") before the server finishes processing them, those emails are no longer visible to the server and cannot be cleaned up. They will persist in the Unique knowledge base until the content expiration policy removes them.
 
-**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Flows](./technical/flows.md) — [Limitations and Constraints](../README.md#Limitations-and-Constraints)
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Flows](./technical/flows.md) — [Limitations and Constraints](./README.md#Limitations-and-Constraints)
 
 ## Tool Usage
 
