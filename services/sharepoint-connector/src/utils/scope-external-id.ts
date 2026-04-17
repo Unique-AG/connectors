@@ -67,6 +67,11 @@ export function isLegacyExternalId(externalId: string): boolean {
 // grouping during migration so that partially-migrated sites still resolve
 // their children under the same root.
 export function extractRootSiteId(externalId: string): string | null {
+  // Pending-delete ids (`spc:pending-delete:...`) are rejected explicitly because without this
+  // guard `spc:pending-delete:{siteId}/site` would match NEW_ROOT_REGEX and yield a bogus root key.
+  if (externalId.startsWith(PENDING_DELETE_PREFIX)) {
+    return null;
+  }
   const legacy = parseLegacyExternalId(externalId);
   if (legacy?.type === 'root') {
     return legacy.siteId;

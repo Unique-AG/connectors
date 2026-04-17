@@ -89,4 +89,14 @@ describe('groupScopesByRootSiteId', () => {
     const groups = groupScopesByRootSiteId([root, child1, child2, grandchild]);
     expect(groups.get('memo-site')).toEqual([root, child1, child2, grandchild]);
   });
+
+  it('does not treat pending-delete roots as active-root grouping anchors', () => {
+    const pendingDeleteRoot = scope('pd', null, `spc:pending-delete:${ROOT_SITE_A}/site`);
+    const pendingDeleteChild = scope('pd-c', 'pd', `spc:pending-delete:${ROOT_SITE_A}/drive:x/y`);
+
+    const groups = groupScopesByRootSiteId([pendingDeleteRoot, pendingDeleteChild]);
+
+    expect(groups.has(`pending-delete:${ROOT_SITE_A}`)).toBe(false);
+    expect(groups.size).toBe(0);
+  });
 });

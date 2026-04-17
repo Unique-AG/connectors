@@ -101,6 +101,16 @@ describe('extractRootSiteId', () => {
     expect(extractRootSiteId('')).toBeNull();
     expect(extractRootSiteId('other:site:abc')).toBeNull();
   });
+
+  it('returns null for pending-delete root externalId', () => {
+    expect(extractRootSiteId(`spc:pending-delete:${ROOT_SITE_ID}/site`)).toBeNull();
+  });
+
+  it('returns null for pending-delete non-root externalId', () => {
+    expect(
+      extractRootSiteId(`spc:pending-delete:${ROOT_SITE_ID}/drive:site-id-abc/drive-id-456`),
+    ).toBeNull();
+  });
 });
 
 describe('parseLegacyExternalId', () => {
