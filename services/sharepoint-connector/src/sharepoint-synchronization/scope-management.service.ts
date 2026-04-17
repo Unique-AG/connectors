@@ -446,7 +446,7 @@ export class ScopeManagementService {
     const currentScopeIds = new Set(currentScopes.map((scope) => scope.id));
     const configuredRootScopeId = context.siteConfig.scopeId;
     const staleScopes = existingScopes.filter(
-      (scope) =>
+      (scope): scope is Scope & { externalId: string } =>
         isNonNullish(scope.externalId) &&
         !currentScopeIds.has(scope.id) &&
         // Paranoid guard: the configured root scope is managed by `initializeRootScope` and must
@@ -468,7 +468,6 @@ export class ScopeManagementService {
     });
 
     for (const scope of staleScopes) {
-      assert.ok(scope.externalId, `Stale scope ${scope.id} unexpectedly has null externalId`);
       const pendingDeleteExternalId = toPendingDeleteExternalId(scope.externalId);
 
       try {

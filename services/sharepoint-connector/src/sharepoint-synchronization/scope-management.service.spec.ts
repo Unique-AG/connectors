@@ -1326,6 +1326,28 @@ describe('ScopeManagementService', () => {
       expect(deleteScopeMock).toHaveBeenCalledTimes(2);
       expect(deleteScopeMock).toHaveBeenNthCalledWith(2, 'parent-scope');
     });
+
+    it('does nothing when no stale scopes are found', async () => {
+      listScopesByExternalIdPrefixMock.mockResolvedValue([]);
+
+      await service.deleteStaleScopes(new Smeared('site-123', false));
+
+      expect(deleteScopeMock).not.toHaveBeenCalled();
+    });
+
+    it('logs a warning and skips cleanup when listing stale scopes fails', async () => {
+      listScopesByExternalIdPrefixMock.mockRejectedValue(new Error('API unavailable'));
+
+      await service.deleteStaleScopes(new Smeared('site-123', false));
+
+      expect(deleteScopeMock).not.toHaveBeenCalled();
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: expect.stringContaining('Failed to query stale scopes'),
+        }),
+      );
+    });
   });
 
   describe('resetRootScope', () => {

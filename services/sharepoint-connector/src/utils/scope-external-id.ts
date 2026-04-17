@@ -179,8 +179,8 @@ export function buildStaleScopesPrefix(rootSiteId: string): Smeared {
   return createSmeared(`${PENDING_DELETE_PREFIX}${rootSiteId}/`);
 }
 
-// Moves an active externalId into the pending-delete namespace. Suffix is is preserved verbatim so
-// operators can still identify the original scope type/site from the marker.
+// Moves an active externalId into the pending-delete namespace. The suffix is preserved verbatim
+// so operators can still identify the original scope type/site from the marker.
 export function toPendingDeleteExternalId(activeExternalId: string): Smeared {
   return createSmeared(activeExternalId.replace(EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX));
 }
