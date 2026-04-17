@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
-import { SyncPhase, type Metrics } from '../metrics';
+import { type Metrics, SyncPhase } from '../metrics';
 import { getCurrentTenant } from '../tenant';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
@@ -154,19 +154,21 @@ export class ConfluenceSynchronizationService {
           await this.ingestionService.ingestPage(fetched, scopeId);
           ingested++;
           this.metrics.recordPagesProcessed(1, 'success');
-        }).catch((err) => {
-          this.metrics.recordPagesProcessed(1, 'failure');
-          throw err;
-        }).finally(() => {
-          processed++;
-          if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
-            this.logger.log({
-              processed,
-              total,
-              msg: 'Page ingestion in progress',
-            });
-          }
-        }),
+        })
+          .catch((err) => {
+            this.metrics.recordPagesProcessed(1, 'failure');
+            throw err;
+          })
+          .finally(() => {
+            processed++;
+            if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
+              this.logger.log({
+                processed,
+                total,
+                msg: 'Page ingestion in progress',
+              });
+            }
+          }),
       ),
     );
 
@@ -204,19 +206,21 @@ export class ConfluenceSynchronizationService {
           await this.ingestionService.ingestAttachment(attachment, scopeId);
           ingested++;
           this.metrics.recordAttachmentsProcessed(1, 'success');
-        }).catch((err) => {
-          this.metrics.recordAttachmentsProcessed(1, 'failure');
-          throw err;
-        }).finally(() => {
-          processed++;
-          if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
-            this.logger.log({
-              processed,
-              total,
-              msg: 'Attachment ingestion in progress',
-            });
-          }
-        }),
+        })
+          .catch((err) => {
+            this.metrics.recordAttachmentsProcessed(1, 'failure');
+            throw err;
+          })
+          .finally(() => {
+            processed++;
+            if (processed % INGESTION_PROGRESS_LOG_INTERVAL === 0) {
+              this.logger.log({
+                processed,
+                total,
+                msg: 'Attachment ingestion in progress',
+              });
+            }
+          }),
       ),
     );
 

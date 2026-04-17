@@ -1,6 +1,6 @@
 import { getHttpStatusCodeClass } from '@unique-ag/utils';
 import { Injectable } from '@nestjs/common';
-import type { Counter, Histogram, ObservableGauge } from '@opentelemetry/api';
+import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 import { getCurrentTenant } from '../tenant';
 
