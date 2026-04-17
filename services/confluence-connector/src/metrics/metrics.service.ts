@@ -28,10 +28,9 @@ export class Metrics {
   private readonly confluenceApiErrors: Counter;
   private readonly orphanedScopesCleaned: Counter;
   private readonly orphanedFilesCleaned: Counter;
-  private readonly syncPagesTotal: Counter;
-  private readonly syncAttachmentsTotal: Counter;
 
   private readonly syncPhaseState = new Map<string, SyncPhase>();
+  private readonly syncItemTotals = new Map<string, { pages: number; attachments: number }>();
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
@@ -97,21 +96,35 @@ export class Metrics {
       description: 'Number of files deleted during orphaned space cleanup',
     });
 
-    this.syncPagesTotal = metricService.getCounter('cfc_sync_pages_total', {
-      description: 'Total number of pages to process in the current sync cycle (set after diff)',
-    });
-
-    this.syncAttachmentsTotal = metricService.getCounter('cfc_sync_attachments_total', {
-      description:
-        'Total number of attachments to process in the current sync cycle (set after diff)',
-    });
-
     const syncPhaseGauge = metricService.getObservableGauge('cfc_sync_phase', {
-      description: 'Current sync phase (1 = active). Labels: tenant, phase',
+      description: 'Current sync phase (1 = active, 0 = inactive). Labels: tenant, phase',
     });
     syncPhaseGauge.addCallback((observable) => {
-      for (const [tenant, phase] of this.syncPhaseState) {
-        observable.observe(1, { tenant, phase });
+      for (const [tenant, currentPhase] of this.syncPhaseState) {
+        for (const phase of Object.values(SyncPhase)) {
+          observable.observe(phase === currentPhase ? 1 : 0, { tenant, phase });
+        }
+      }
+    });
+
+    const syncPagesTotalGauge = metricService.getObservableGauge('cfc_sync_pages_total', {
+      description: 'Number of pages to process in the current sync cycle',
+    });
+    syncPagesTotalGauge.addCallback((observable) => {
+      for (const [tenant, totals] of this.syncItemTotals) {
+        observable.observe(totals.pages, { tenant });
+      }
+    });
+
+    const syncAttachmentsTotalGauge = metricService.getObservableGauge(
+      'cfc_sync_attachments_total',
+      {
+        description: 'Number of attachments to process in the current sync cycle',
+      },
+    );
+    syncAttachmentsTotalGauge.addCallback((observable) => {
+      for (const [tenant, totals] of this.syncItemTotals) {
+        observable.observe(totals.attachments, { tenant });
       }
     });
   }
@@ -191,8 +204,7 @@ export class Metrics {
   }
 
   public recordSyncItemTotals(pages: number, attachments: number): void {
-    this.syncPagesTotal.add(pages, { tenant: this.tenantName });
-    this.syncAttachmentsTotal.add(attachments, { tenant: this.tenantName });
+    this.syncItemTotals.set(this.tenantName, { pages, attachments });
   }
 
   public recordApiThrottleEvent(): void {
