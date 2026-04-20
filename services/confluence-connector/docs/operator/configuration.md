@@ -485,7 +485,7 @@ To perform a complete re-ingestion of all synced Confluence content:
 
 ### Step 1: Delete Ingested Content
 
-Set the tenant status to `deleted` in its YAML configuration file and restart the connector. The cleanup runs immediately on startup and deletes all ingested files and child scopes while preserving the root scope. Other tenants continue running normally.
+Set the tenant status to `deleted` in its YAML configuration file and restart the connector. The cleanup runs immediately on startup and deletes all ingested files and child scopes while preserving the root scope. In a multi-tenant deployment, all other tenants configured in the same connector instance continue syncing normally and are not affected by this operation.
 
 **Warning:** This operation is irreversible. Ensure you have backups if needed.
 
