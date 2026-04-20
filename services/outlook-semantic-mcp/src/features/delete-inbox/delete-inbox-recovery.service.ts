@@ -2,7 +2,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, isNotNull, lt } from 'drizzle-orm';
+import { and, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 import { getThreshold } from '~/utils/get-threshold';
@@ -65,9 +65,16 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
       .select({ userProfileId: inboxConfigurations.userProfileId })
       .from(inboxConfigurations)
       .where(
-        and(
-          isNotNull(inboxConfigurations.deletingInboxStartedAt),
-          lt(inboxConfigurations.deletingHeartbeatAt, threshold),
+        or(
+          and(
+            isNotNull(inboxConfigurations.deletingInboxStartedAt),
+            lt(inboxConfigurations.deletingHeartbeatAt, threshold),
+          ),
+          and(
+            isNotNull(inboxConfigurations.deletingInboxStartedAt),
+            lt(inboxConfigurations.deletingInboxStartedAt, getThreshold(5)),
+            isNull(inboxConfigurations.deletingHeartbeatAt),
+          ),
         ),
       );
 
