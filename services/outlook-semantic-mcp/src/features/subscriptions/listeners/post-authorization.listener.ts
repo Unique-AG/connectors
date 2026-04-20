@@ -7,8 +7,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { UserAuthorizedEventDto } from '~/auth/dtos/user-authorized-event.dto';
-import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
 @Injectable()
@@ -35,7 +35,10 @@ export class PostAuthorizationListener {
     const { userProfileId } = event.payload;
 
     if (await this.isInboxDeleting.run(userProfileId)) {
-      this.logger.warn({ userProfileId, msg: 'Inbox deletion in progress, skipping post-authorization subscription' });
+      this.logger.warn({
+        userProfileId,
+        msg: 'Inbox deletion in progress, skipping post-authorization subscription',
+      });
       return;
     }
 

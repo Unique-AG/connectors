@@ -15,9 +15,9 @@ vi.mock('nestjs-otel', async (importOriginal) => {
 });
 
 import type { McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
-import type { IsInboxDeletingQuery } from '../is-inbox-deleting.query';
 import type { SubscriptionCreateService } from '../../subscriptions/subscription-create.service';
 import { ReconnectInboxTool } from '../../subscriptions/tools/reconnect-inbox.tool';
+import type { IsInboxDeletingQuery } from '../is-inbox-deleting.query';
 
 const userProfileId = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 

@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type { UniqueApiClient } from '@unique-ag/unique-api';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExecuteInboxDeletionCommand } from '../execute-inbox-deletion.command';
 
 const userProfileId = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';

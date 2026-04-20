@@ -2,8 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { DeleteInboxDataCommand } from '../delete-inbox-data.command';
 import type { SubscriptionRemoveService } from '../../subscriptions/subscription-remove.service';
+import { DeleteInboxDataCommand } from '../delete-inbox-data.command';
 
 const userProfileId = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 

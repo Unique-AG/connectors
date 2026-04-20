@@ -1,4 +1,8 @@
-import { defaultNackErrorHandler, RabbitPayload, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
+import {
+  defaultNackErrorHandler,
+  RabbitPayload,
+  RabbitSubscribe,
+} from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
@@ -23,7 +27,10 @@ export class DeleteInboxDataListener {
     const event = DeleteInboxDataEventDto.parse(payload);
     const { userProfileId } = event.payload;
 
-    this.logger.log({ userProfileId, msg: 'Delete inbox data event received, delegating to command' });
+    this.logger.log({
+      userProfileId,
+      msg: 'Delete inbox data event received, delegating to command',
+    });
 
     await this.executeInboxDeletion.run(userProfileId);
   }

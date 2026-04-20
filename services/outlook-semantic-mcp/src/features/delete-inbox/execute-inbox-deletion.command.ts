@@ -1,21 +1,21 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
+import { createSmeared } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import {
   DRIZZLE,
   DrizzleDatabase,
-  UserProfile,
   directories,
   directoriesSync,
   inboxConfigurations,
+  UserProfile,
   userProfiles,
 } from '~/db';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { SubscriptionRemoveService } from '../subscriptions/subscription-remove.service';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
-import { createSmeared } from '@unique-ag/utils';
+import { SubscriptionRemoveService } from '../subscriptions/subscription-remove.service';
 
 export const STALE_DELETE_INBOX_CONFIGURATION_THRESHOLD_IN_MINUTES = 20;
 

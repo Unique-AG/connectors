@@ -6,6 +6,8 @@ import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { OpenEmailTool, SearchEmailsTool, SearchModule } from './content';
 import { DeleteInboxModule } from './delete-inbox/delete-inbox.module';
+import { DeleteInboxDataTool } from './delete-inbox/delete-inbox-data.tool';
+import { InboxDeletingQueryModule } from './delete-inbox/inbox-deleting-query.module';
 import { DirectoriesSyncModule } from './directories-sync/directories-sync.module';
 import { ListFoldersTool } from './directories-sync/tools';
 import { EmailManagementModule } from './email-management/email-management.module';
@@ -25,8 +27,6 @@ import {
 import { FullSyncModule } from './sync/full-sync/full-sync.module';
 import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
-import { DeleteInboxDataTool } from './delete-inbox/delete-inbox-data.tool';
-import { InboxDeletingQueryModule } from './delete-inbox/inbox-deleting-query.module';
 
 const DEBUG_MODE_TOOLS =
   process.env.MCP_DEBUG_MODE === 'enabled'

@@ -5,8 +5,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
+import {
+  INBOX_DELETION_IN_PROGRESS_MESSAGE,
+  IsInboxDeletingQuery,
+} from '~/features/delete-inbox/is-inbox-deleting.query';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
-import { INBOX_DELETION_IN_PROGRESS_MESSAGE, IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { FullSyncEventDto } from '../full-sync-event.dto';
 import { FullSyncResetCommand } from '../full-sync-reset.command';

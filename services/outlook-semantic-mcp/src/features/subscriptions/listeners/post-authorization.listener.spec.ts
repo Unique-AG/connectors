@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import type { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 import { PostAuthorizationListener } from './post-authorization.listener';
 
