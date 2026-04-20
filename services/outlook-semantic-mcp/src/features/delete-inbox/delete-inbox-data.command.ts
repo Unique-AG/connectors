@@ -32,7 +32,7 @@ export class DeleteInboxDataCommand {
       .update(inboxConfigurations)
       .set({
         deletingInboxStartedAt: sql`NOW()`,
-        deletingHeartbeatAt: sql`NOW()`,
+        deletingHeartbeatAt: null,
         fullSyncVersion: version,
         fullSyncState: 'ready',
         liveCatchUpState: 'ready',
@@ -46,7 +46,7 @@ export class DeleteInboxDataCommand {
       })
       .where(
         and(
-          isNull(inboxConfigurations.fullSyncLastStartedAt),
+          isNull(inboxConfigurations.deletingInboxStartedAt),
           eq(inboxConfigurations.userProfileId, userProfileId),
         ),
       )
@@ -76,9 +76,19 @@ export class DeleteInboxDataCommand {
       .then((rows) => rows[0]);
 
     if (!inboxConfiguration) {
+      this.logger.log({
+        userProfileId,
+        version,
+        msg: 'Inbox Configuration already deleted',
+      });
       return 'inbox-already-deleted';
     }
 
+    this.logger.log({
+      userProfileId,
+      version,
+      msg: 'Inbox Configuration deletion in progress',
+    });
     return 'deletion-already-in-progress';
   }
 }

@@ -93,7 +93,9 @@ export class ExecuteInboxDeletionCommand {
     await this.db
       .delete(inboxConfigurations)
       .where(eq(inboxConfigurations.userProfileId, userProfileId));
-    this.logger.warn({ userProfileId, msg: 'Inbox Configuration deleted' });
+    this.logger.warn({ userProfileId, msg: 'InboxConfiguration deleted' });
+
+    this.logger.warn({ userProfileId, msg: 'Inbox deletion finished' });
   }
 
   private async deleteContentAndScope(
