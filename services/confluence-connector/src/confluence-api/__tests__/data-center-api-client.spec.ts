@@ -47,7 +47,7 @@ describe('DataCenterConfluenceApiClient', () => {
   });
 
   describe('resolveInstanceIdentifier', () => {
-    it('calls the applinks manifest endpoint with empty auth headers', async () => {
+    it('calls the applinks manifest endpoint with Accept: application/json and no auth header', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
         id: 'dc-instance-uuid',
         name: 'My Confluence',
@@ -57,7 +57,7 @@ describe('DataCenterConfluenceApiClient', () => {
 
       expect(mockHttpClient.rateLimitedRequest).toHaveBeenCalledWith(
         `${BASE_URL}/rest/applinks/1.0/manifest`,
-        {},
+        { Accept: 'application/json' },
       );
     });
 

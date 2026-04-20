@@ -67,9 +67,6 @@ import { StreetAccountNewsModule } from './street-account-news/street-account-ne
     OpenTelemetryModule.forRoot({
       metrics: {
         hostMetrics: true,
-        apiMetrics: {
-          enable: true,
-        },
       },
     }),
     McpOAuthModule.forRootAsync({

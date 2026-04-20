@@ -64,9 +64,6 @@ import { Redacted } from './utils/redacted';
     OpenTelemetryModule.forRoot({
       metrics: {
         hostMetrics: true,
-        apiMetrics: {
-          enable: true,
-        },
       },
     }),
   ],

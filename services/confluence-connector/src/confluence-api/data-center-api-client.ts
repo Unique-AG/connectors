@@ -37,9 +37,12 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
 
   public async resolveInstanceIdentifier(): Promise<InstanceIdentifier> {
     // The manifest endpoint is public and does not require authentication, so we
-    // pass empty headers intentionally (no Authorization header needed).
+    // omit the Authorization header intentionally. Accept must be set explicitly
+    // because the endpoint returns XML by default on Confluence 10.x.
     const url = `${this.config.baseUrl}/rest/applinks/1.0/manifest`;
-    const response = await this.httpClient.rateLimitedRequest(url, {});
+    const response = await this.httpClient.rateLimitedRequest(url, {
+      Accept: 'application/json',
+    });
 
     const manifest = z.object({ id: z.string().min(1) }).safeParse(response);
     assert.ok(
