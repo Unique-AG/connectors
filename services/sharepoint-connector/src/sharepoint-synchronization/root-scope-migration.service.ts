@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { sanitizeError } from '../utils/normalize-error';
-import { EXTERNAL_ID_PREFIX } from '../utils/scope-external-id';
+import { buildRootExternalId, EXTERNAL_ID_PREFIX } from '../utils/scope-external-id';
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
 
 export type MigrationResult =
@@ -16,11 +16,20 @@ export class RootScopeMigrationService {
   public constructor(private readonly uniqueScopesService: UniqueScopesService) {}
 
   public async migrateIfNeeded(newRootScopeId: string, siteId: Smeared): Promise<MigrationResult> {
-    const externalId = `${EXTERNAL_ID_PREFIX}site:${siteId.value}`;
+    const legacyExternalId = `${EXTERNAL_ID_PREFIX}site:${siteId.value}`;
+    const newFormatExternalId = buildRootExternalId(siteId.value).value;
     const logPrefix = `[Migration: ${siteId}]`;
 
     try {
-      const oldRoot = await this.uniqueScopesService.getScopeByExternalId(externalId);
+      // Try the legacy format first, then fall back to the new format. The fallback is required
+      // because `ScopeExternalIdMigrationService` runs earlier in `initializeRootScope` and
+      // rewrites any legacy `spc:site:{id}` root to `spc:{id}/site` before this service is
+      // called. Without the fallback, a user who reconfigures `rootScopeId` after the externalId
+      // migration has run would leave children stranded under the old root because the legacy
+      // lookup would always miss.
+      const oldRoot =
+        (await this.uniqueScopesService.getScopeByExternalId(legacyExternalId)) ??
+        (await this.uniqueScopesService.getScopeByExternalId(newFormatExternalId));
 
       if (!oldRoot) {
         this.logger.debug(`${logPrefix} No previous root scope found`);
