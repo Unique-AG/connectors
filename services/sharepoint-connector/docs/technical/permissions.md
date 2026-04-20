@@ -66,7 +66,7 @@ These APIs are only used when permission sync is enabled:
 | `/_api/web/sitegroups/getById({groupId})` | GET | Read site group details | `Sites.Selected` |
 | `/_api/web/sitegroups/getById({groupId})/users` | GET | Read site group members | `Sites.Selected`* |
 
-**Note:** *If "Who can view the membership of the group?" is **not** set to "Everyone", the connector cannot read group members. The app principal must be a member/owner of the group or hold Full Control.
+**Note:** If "Who can view the membership of the group?" is **not** set to **Everyone**, the connector cannot read group members. The app principal must be a member/owner of the group or hold Full Control.
 
 ### Public Sites and Tenant-Wide Visibility Groups
 
