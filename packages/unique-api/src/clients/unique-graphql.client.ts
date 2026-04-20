@@ -36,6 +36,7 @@ export class UniqueGraphqlClient {
     const graphqlUrl = `${this.config.baseUrl}/graphql`;
 
     this.graphQlClient = new GraphQLClient(graphqlUrl, {
+      // @ts-expect-error - undici Response is structurally compatible with globalThis.Response at runtime
       fetch: ((url: RequestInfo | URL, options?: RequestInit) =>
         undiciFetch(
           url as Parameters<typeof undiciFetch>[0],
@@ -43,7 +44,7 @@ export class UniqueGraphqlClient {
             ...options,
             dispatcher: this.dispatcher,
           } as Parameters<typeof undiciFetch>[1],
-        )) as unknown as typeof fetch,
+        )) as typeof fetch,
       requestMiddleware: async (request) => {
         const authHeaders = await this.auth.getAuthHeaders();
         const requestHeaders = request.headers as Headers;
