@@ -112,7 +112,7 @@ export class ExecuteInboxDeletionCommand {
 
     let deletedTotal = 0;
     while (true) {
-      const ids = await this.uniqueApi.files.getIdsByScope(rootScope.id, 100);
+      const ids = await this.uniqueApi.files.getIdsByScope(rootScope.id, 0, 100);
       if (ids.length === 0) {
         break;
       }

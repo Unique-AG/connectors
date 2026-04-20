@@ -349,13 +349,13 @@ export class FilesService implements UniqueFilesFacade {
     return successCount;
   }
 
-  public async getIdsByScope(scopeId: string, take: number): Promise<string[]> {
+  public async getIdsByScope(scopeId: string, skip: number, take: number): Promise<string[]> {
     this.logger.debug(`[Scope: ${scopeId}] Fetching up to ${take} file IDs`);
     const result = await this.ingestionClient.request<
       ContentByScopeAndMetadataKeyResult,
       ContentByScopeInput
     >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
-      skip: 0,
+      skip,
       take,
       where: {
         ownerId: { equals: scopeId },
