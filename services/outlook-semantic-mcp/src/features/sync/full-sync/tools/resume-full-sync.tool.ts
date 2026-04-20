@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
+import { INBOX_DELETION_IN_PROGRESS_MESSAGE, IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { ResumeFullSyncCommand } from '../resume-full-sync.command';
 
@@ -25,6 +26,7 @@ export class ResumeFullSyncTool {
   public constructor(
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     private readonly resumeFullSyncCommand: ResumeFullSyncCommand,
+    private readonly isInboxDeleting: IsInboxDeletingQuery,
   ) {}
 
   @Tool({
@@ -50,6 +52,10 @@ export class ResumeFullSyncTool {
     request: McpAuthenticatedRequest,
   ) {
     const userProfileTypeId = extractUserProfileId(request);
+
+    if (await this.isInboxDeleting.run(userProfileTypeId.toString())) {
+      return { success: false, message: INBOX_DELETION_IN_PROGRESS_MESSAGE };
+    }
 
     const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
     if (!subscriptionStatus.success) {

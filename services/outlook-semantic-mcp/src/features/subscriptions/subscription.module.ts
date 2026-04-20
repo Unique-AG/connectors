@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
+import { AMQPModule } from '~/amqp/amqp.module';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
+import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
+import { InboxDeletingQueryModule } from '../delete-inbox/inbox-deleting-query.module';
 import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';
 import { GetSubscriptionStatusQuery } from './get-subscription-status.query';
 import { PostAuthorizationListener } from './listeners/post-authorization.listener';
@@ -10,7 +13,14 @@ import { SubscriptionRemoveService } from './subscription-remove.service';
 import { MailSubscriptionUtilsService } from './subscription-utils.service';
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule, DirectoriesSyncModule],
+  imports: [
+    DrizzleModule,
+    MsGraphModule,
+    DirectoriesSyncModule,
+    AMQPModule,
+    UniqueApiFeatureModule,
+    InboxDeletingQueryModule,
+  ],
   providers: [
     MailSubscriptionUtilsService,
     SubscriptionCreateService,

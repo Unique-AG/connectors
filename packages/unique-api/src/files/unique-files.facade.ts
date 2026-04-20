@@ -16,4 +16,5 @@ export interface UniqueFilesFacade {
     metadataKey: string,
     metadataValue: unknown,
   ): Promise<string[]>;
+  getIdsByScope(scopeId: string, take: number): Promise<string[]>;
 }

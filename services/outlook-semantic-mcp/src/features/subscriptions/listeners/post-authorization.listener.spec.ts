@@ -1,11 +1,17 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import type { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { SubscriptionCreateService } from '../subscription-create.service';
 import { PostAuthorizationListener } from './post-authorization.listener';
 
-const makeListener = (subscriptionCreateService: Pick<SubscriptionCreateService, 'subscribe'>) =>
-  new PostAuthorizationListener(subscriptionCreateService as SubscriptionCreateService);
+const makeListener = (subscriptionCreateService: Pick<SubscriptionCreateService, 'subscribe'>) => {
+  const isInboxDeleting = { run: vi.fn().mockResolvedValue(false) };
+  return new PostAuthorizationListener(
+    subscriptionCreateService as SubscriptionCreateService,
+    isInboxDeleting as unknown as IsInboxDeletingQuery,
+  );
+};
 
 describe('PostAuthorizationListener', () => {
   const userProfileId = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
