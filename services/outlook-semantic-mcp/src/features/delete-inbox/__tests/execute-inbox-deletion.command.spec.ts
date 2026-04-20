@@ -7,14 +7,21 @@ import { ExecuteInboxDeletionCommand } from '../execute-inbox-deletion.command';
 const userProfileId = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 const providerUserId = 'provider-user-id-1';
 
-const makeCommand = (deps: { db?: any; uniqueApi?: any }) => {
-  return new ExecuteInboxDeletionCommand(deps.db, deps.uniqueApi as UniqueApiClient);
+const makeCommand = (deps: { subscriptionRemove?: any; db?: any; uniqueApi?: any }) => {
+  const subscriptionRemove = deps.subscriptionRemove ?? {
+    removeByUserProfileId: vi.fn().mockResolvedValue(undefined),
+  };
+  return new ExecuteInboxDeletionCommand(
+    subscriptionRemove,
+    deps.db,
+    deps.uniqueApi as UniqueApiClient,
+  );
 };
 
 const makeChainableUpdate = () => ({
   set: vi.fn().mockReturnThis(),
   where: vi.fn().mockReturnThis(),
-  execute: vi.fn().mockResolvedValue(undefined),
+  returning: vi.fn().mockResolvedValue([]),
 });
 
 const makeChainableDelete = () => ({
@@ -33,6 +40,13 @@ describe('ExecuteInboxDeletionCommand', () => {
       query: {
         userProfiles: {
           findFirst: vi.fn().mockResolvedValue({ id: userProfileId, providerUserId }),
+        },
+        inboxConfigurations: {
+          findFirst: vi.fn().mockResolvedValue({
+            userProfileId,
+            deletingInboxStartedAt: new Date(),
+            deletingHeartbeatAt: null,
+          }),
         },
       },
       update: vi.fn().mockReturnValue(makeChainableUpdate()),
@@ -58,7 +72,8 @@ describe('ExecuteInboxDeletionCommand', () => {
 
     expect(mockUniqueApi.files.deleteByIds).toHaveBeenCalledOnce();
     expect(mockUniqueApi.files.deleteByIds).toHaveBeenCalledWith(['id1', 'id2']);
-    expect(mockDb.update).toHaveBeenCalledOnce();
+    // 4 heartbeat updates: after subscription removal, after file batch, after directoriesSync, after directories
+    expect(mockDb.update).toHaveBeenCalledTimes(4);
   });
 
   it('deletes inboxConfigurations row on completion', async () => {
