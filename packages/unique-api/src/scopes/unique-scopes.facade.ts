@@ -6,8 +6,6 @@ export interface UniqueApiScopesFacade {
     opts?: {
       includePermissions?: boolean;
       inheritAccess?: boolean;
-      // This option should be removed once createFromPaths is fixed in the monorepo for integrations.
-      xUserRoles?: string[];
     },
   ): Promise<Scope[]>;
   getById(id: string): Promise<Scope | null>;
