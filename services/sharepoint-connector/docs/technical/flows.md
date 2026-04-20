@@ -194,7 +194,7 @@ sequenceDiagram
     Connector->>Unique: Create scopes<br/>(subsites as folders in parent's tree)
     Connector->>Unique: Content sync (new/modified/deleted)
     Connector->>Unique: Permission sync
-    Connector->>Unique: Delete orphaned scopes
+    Connector->>Unique: Delete stale scopes
 ```
 
 ### Key Behaviors
