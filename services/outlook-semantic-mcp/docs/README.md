@@ -237,6 +237,7 @@ See [Architecture — Authentication](./technical/architecture.md#Authentication
 |------------|---------|
 | **Delegated access scope** | Server syncs and searches only the signed-in user's own inbox (what Microsoft Graph `/me/messages` returns) |
 | **Draft only, no direct send** | `create_draft_email` creates drafts; sending requires a separate action by the user or a future tool |
+| **Bulk deletion with immediate permanent removal** | The server processes emails in the Deleted Items folder and removes them from the Unique knowledge base. If the user permanently deletes emails from Deleted Items (e.g. via "Empty Folder") before the server finishes processing them, those emails are no longer visible to the server and will not be removed. They remain in the Unique knowledge base until the content expiration window removes them. |
 
 ### Scaling Considerations
 

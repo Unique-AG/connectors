@@ -58,6 +58,80 @@ describe('RootScopeMigrationService', () => {
 
         expect(result).toEqual({ status: 'no_migration_needed' });
         expect(getScopeByExternalIdMock).toHaveBeenCalledWith('spc:site:site-456');
+        expect(getScopeByExternalIdMock).toHaveBeenCalledWith('spc:site-456/site');
+        expect(listChildrenScopesMock).not.toHaveBeenCalled();
+      });
+
+      it('falls back to new-format lookup when legacy lookup misses', async () => {
+        // After ScopeExternalIdMigrationService has run, the old root no longer carries the
+        // legacy `spc:site:{id}` externalId. RootScopeMigrationService must still find it via
+        // the new-format `spc:{id}/site` lookup so the root-reconfiguration path keeps working.
+        getScopeByExternalIdMock.mockResolvedValueOnce(null).mockResolvedValueOnce({
+          id: 'old-root-123',
+          name: 'OldSiteRoot',
+          externalId: 'spc:site-456/site',
+          parentId: null,
+        });
+        listChildrenScopesMock.mockResolvedValue([
+          { id: 'child-1', name: 'Folder1', parentId: 'old-root-123' },
+        ]);
+        updateScopeParentMock.mockResolvedValue({ id: 'child-1', parentId: 'new-root-123' });
+        deleteScopeMock.mockResolvedValue({
+          successFolders: [{ id: 'old-root-123', name: 'OldSiteRoot', path: '/OldSiteRoot' }],
+          failedFolders: [],
+        });
+
+        const result = await service.migrateIfNeeded(
+          'new-root-123',
+          new Smeared('site-456', false),
+        );
+
+        expect(result).toEqual({ status: 'migration_completed' });
+        expect(getScopeByExternalIdMock).toHaveBeenNthCalledWith(1, 'spc:site:site-456');
+        expect(getScopeByExternalIdMock).toHaveBeenNthCalledWith(2, 'spc:site-456/site');
+        expect(updateScopeParentMock).toHaveBeenCalledWith('child-1', 'new-root-123');
+        expect(deleteScopeMock).toHaveBeenCalledWith('old-root-123');
+      });
+
+      it('skips fallback lookup when legacy lookup hits', async () => {
+        // Backwards-compatibility: tenants whose externalId migration has not yet run (or has
+        // partially failed) still keep the legacy root externalId and must be picked up on the
+        // first call without an extra round-trip.
+        getScopeByExternalIdMock.mockResolvedValueOnce({
+          id: 'old-root-123',
+          name: 'OldSiteRoot',
+          externalId: 'spc:site:site-456',
+          parentId: null,
+        });
+        listChildrenScopesMock.mockResolvedValue([]);
+        deleteScopeMock.mockResolvedValue({
+          successFolders: [{ id: 'old-root-123', name: 'OldSiteRoot', path: '/OldSiteRoot' }],
+          failedFolders: [],
+        });
+
+        await service.migrateIfNeeded('new-root-123', new Smeared('site-456', false));
+
+        expect(getScopeByExternalIdMock).toHaveBeenCalledTimes(1);
+        expect(getScopeByExternalIdMock).toHaveBeenCalledWith('spc:site:site-456');
+      });
+
+      it('returns no_migration_needed when new-format lookup finds the configured root itself', async () => {
+        // Steady-state safety net: if the legacy lookup misses and the new-format lookup returns
+        // the currently-configured root (because it was claimed in a previous sync), the
+        // existing same-root guard must still prevent self-migration.
+        getScopeByExternalIdMock.mockResolvedValueOnce(null).mockResolvedValueOnce({
+          id: 'same-root-123',
+          name: 'SiteRoot',
+          externalId: 'spc:site-456/site',
+          parentId: null,
+        });
+
+        const result = await service.migrateIfNeeded(
+          'same-root-123',
+          new Smeared('site-456', false),
+        );
+
+        expect(result).toEqual({ status: 'no_migration_needed' });
         expect(listChildrenScopesMock).not.toHaveBeenCalled();
       });
 

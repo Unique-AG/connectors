@@ -387,13 +387,13 @@ export class SharepointSynchronizationService {
     }
 
     try {
-      await this.scopeManagementService.deleteOrphanedScopes(siteConfig.siteId);
+      await this.scopeManagementService.deleteStaleScopes(siteConfig.siteId);
     } catch (error) {
       this.logger.warn({
-        msg: `${logPrefix} Failed to clean up orphaned scopes`,
+        msg: `${logPrefix} Failed to clean up stale scopes`,
         error: sanitizeError(error),
       });
-      return { status: 'failure', step: SiteSyncStep.OrphanScopeCleanup };
+      return { status: 'failure', step: SiteSyncStep.StaleScopeCleanup };
     }
 
     return { status: 'success' };

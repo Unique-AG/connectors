@@ -36,7 +36,7 @@ export class ConfluenceContentFetcher {
 
     const body = fullPage.body?.storage?.value || '';
     if (!body) {
-      this.logger.log({
+      this.logger.debug({
         pageId: page.id,
         title: page.title,
         msg: 'Page has no body, skipping',

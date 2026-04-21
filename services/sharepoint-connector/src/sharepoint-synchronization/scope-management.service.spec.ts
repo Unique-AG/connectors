@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { IngestionMode } from '../constants/ingestion.constants';
@@ -5,6 +6,7 @@ import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { ScopeExternalIdMigrationService } from '../scope-external-id-migration/scope-external-id-migration.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
@@ -135,6 +137,7 @@ describe('ScopeManagementService', () => {
       .impl((stubFn) => ({
         ...stubFn(),
         createScopesBasedOnPaths: createScopesMock,
+        listScopesByExternalIdPrefix: vi.fn().mockResolvedValue([]),
       }))
       .compile();
 
@@ -162,14 +165,16 @@ describe('ScopeManagementService', () => {
     let createScopeAccessesMock: ReturnType<typeof vi.fn>;
     let getCurrentUserIdMock: ReturnType<typeof vi.fn>;
     let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
-    let migrateIfNeededMock: ReturnType<typeof vi.fn>;
+    let rootMigrationMock: ReturnType<typeof vi.fn>;
+    let externalIdMigrationMock: ReturnType<typeof vi.fn>;
 
     beforeEach(async () => {
       getScopeByIdMock = vi.fn();
       createScopeAccessesMock = vi.fn();
       getCurrentUserIdMock = vi.fn().mockResolvedValue('user-123');
       updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
-      migrateIfNeededMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
+      rootMigrationMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
+      externalIdMigrationMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
 
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
@@ -187,7 +192,12 @@ describe('ScopeManagementService', () => {
         .mock<RootScopeMigrationService>(RootScopeMigrationService)
         .impl((stubFn) => ({
           ...stubFn(),
-          migrateIfNeeded: migrateIfNeededMock,
+          migrateIfNeeded: rootMigrationMock,
+        }))
+        .mock<ScopeExternalIdMigrationService>(ScopeExternalIdMigrationService)
+        .impl((stubFn) => ({
+          ...stubFn(),
+          migrateIfNeeded: externalIdMigrationMock,
         }))
         .compile();
 
@@ -216,10 +226,10 @@ describe('ScopeManagementService', () => {
 
       const siteId = new Smeared('site-123', false);
       // As we do not patch env variable, Smeared external id constructed inside will be active.
-      const externalId = new Smeared(`spc:site:${siteId.value}`, true);
+      const externalId = new Smeared(`spc:${siteId.value}/site`, true);
       await service.initializeRootScope('root-scope-123', siteId, IngestionMode.Flat);
 
-      expect(migrateIfNeededMock).toHaveBeenCalledWith('root-scope-123', siteId);
+      expect(rootMigrationMock).toHaveBeenCalledWith('root-scope-123', siteId);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', externalId);
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].debug).toHaveBeenCalledWith(
@@ -234,7 +244,7 @@ describe('ScopeManagementService', () => {
         externalId: null,
         parentId: null,
       });
-      migrateIfNeededMock.mockResolvedValueOnce({
+      rootMigrationMock.mockResolvedValueOnce({
         status: 'migration_failed',
         error: 'Failed to move child scopes',
       });
@@ -318,6 +328,65 @@ describe('ScopeManagementService', () => {
       expect(createScopeAccessesMock).toHaveBeenCalledWith('parent-1', [
         { type: 'READ', entityId: 'user-123', entityType: 'USER' },
       ]);
+    });
+
+    it('accepts new-format root externalId as valid ownership', async () => {
+      getScopeByIdMock.mockResolvedValueOnce({
+        id: 'root-scope-123',
+        name: 'test1',
+        externalId: 'spc:site-123/site',
+        parentId: null,
+      });
+
+      const result = await service.initializeRootScope(
+        'root-scope-123',
+        new Smeared('site-123', false),
+        IngestionMode.Flat,
+      );
+
+      expect(result.isInitialSync).toBe(false);
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+    });
+
+    describe('scope externalId migration', () => {
+      it('delegates the migration decision to the migration service', async () => {
+        getScopeByIdMock.mockResolvedValueOnce({
+          id: 'root-scope-123',
+          name: 'test1',
+          externalId: 'spc:site:site-123',
+          parentId: null,
+        });
+
+        await service.initializeRootScope(
+          'root-scope-123',
+          new Smeared('site-123', false),
+          IngestionMode.Flat,
+        );
+
+        expect(externalIdMigrationMock).toHaveBeenCalledWith('site-123');
+      });
+
+      it('throws and aborts sync when migration reports failure', async () => {
+        getScopeByIdMock.mockResolvedValueOnce({
+          id: 'root-scope-123',
+          name: 'test1',
+          externalId: 'spc:site:site-123',
+          parentId: null,
+        });
+        externalIdMigrationMock.mockResolvedValueOnce({
+          status: 'migration_failed',
+          migratedCount: 3,
+          failedCount: 2,
+        });
+
+        await expect(
+          service.initializeRootScope(
+            'root-scope-123',
+            new Smeared('site-123', false),
+            IngestionMode.Flat,
+          ),
+        ).rejects.toThrow(/Scope externalId migration failed.*migrated=3.*failed=2/);
+      });
     });
   });
 
@@ -519,6 +588,7 @@ describe('ScopeManagementService', () => {
               })),
             ),
             updateScopeExternalId: updateScopeExternalIdMock,
+            listScopesByExternalIdPrefix: vi.fn().mockResolvedValue([]),
           }))
           .compile();
 
@@ -554,15 +624,15 @@ describe('ScopeManagementService', () => {
 
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+          expect.objectContaining({ value: `spc:site-123/subsite:${subASiteId}` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:drive:${subASiteId}/sub-drive` }),
+          expect.objectContaining({ value: `spc:site-123/drive:${subASiteId}/sub-drive` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:folder:${subASiteId}/sub-folder` }),
+          expect.objectContaining({ value: `spc:site-123/folder:${subASiteId}/sub-folder` }),
         );
       });
 
@@ -588,15 +658,15 @@ describe('ScopeManagementService', () => {
 
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+          expect.objectContaining({ value: `spc:site-123/subsite:${subASiteId}` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:subsite:${subBSiteId}` }),
+          expect.objectContaining({ value: `spc:site-123/subsite:${subBSiteId}` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:drive:${subBSiteId}/nested-drive` }),
+          expect.objectContaining({ value: `spc:site-123/drive:${subBSiteId}/nested-drive` }),
         );
       });
 
@@ -612,11 +682,11 @@ describe('ScopeManagementService', () => {
 
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+          expect.objectContaining({ value: `spc:site-123/subsite:${subASiteId}` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:drive:${subASiteId}/drive-1` }),
+          expect.objectContaining({ value: `spc:site-123/drive:${subASiteId}/drive-1` }),
         );
       });
 
@@ -655,23 +725,23 @@ describe('ScopeManagementService', () => {
 
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: 'spc:drive:site-123/root-drive' }),
+          expect.objectContaining({ value: 'spc:site-123/drive:site-123/root-drive' }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: 'spc:folder:site-123/root-folder' }),
+          expect.objectContaining({ value: 'spc:site-123/folder:site-123/root-folder' }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:subsite:${subASiteId}` }),
+          expect.objectContaining({ value: `spc:site-123/subsite:${subASiteId}` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:drive:${subASiteId}/sub-drive` }),
+          expect.objectContaining({ value: `spc:site-123/drive:${subASiteId}/sub-drive` }),
         );
         expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
           expect.any(String),
-          expect.objectContaining({ value: `spc:folder:${subASiteId}/sub-folder` }),
+          expect.objectContaining({ value: `spc:site-123/folder:${subASiteId}/sub-folder` }),
         );
       });
     });
@@ -842,7 +912,7 @@ describe('ScopeManagementService', () => {
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
       expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
         'scope-1',
-        expect.objectContaining({ value: 'spc:drive:site-123/drive-1' }),
+        expect.objectContaining({ value: 'spc:site-123/drive:site-123/drive-1' }),
       );
     });
 
@@ -874,166 +944,302 @@ describe('ScopeManagementService', () => {
 
       expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
       const [, externalId] = updateScopeExternalIdMock.mock.calls[0] as [string, Smeared];
-      expect(externalId.value).toMatch(/^spc:unknown:site-123::\/test1\/SubA\/UnknownLib-/);
-    });
-
-    describe('conflict marking', () => {
-      let getScopeByExternalIdMock: ReturnType<typeof vi.fn>;
-
-      beforeEach(async () => {
-        getScopeByExternalIdMock = vi.fn().mockResolvedValue(null);
-        updateScopeExternalIdMock = vi
-          .fn()
-          .mockResolvedValue({ externalId: 'updated-external-id' });
-
-        const { unit } = await TestBed.solitary(ScopeManagementService)
-          .mock<UniqueScopesService>(UniqueScopesService)
-          .impl((stubFn) => ({
-            ...stubFn(),
-            updateScopeExternalId: updateScopeExternalIdMock,
-            getScopeByExternalId: getScopeByExternalIdMock,
-          }))
-          .compile();
-
-        service = unit;
-
-        Object.defineProperty(service, 'logger', {
-          value: {
-            log: vi.fn(),
-            error: vi.fn(),
-            warn: vi.fn(),
-            debug: vi.fn(),
-            verbose: vi.fn(),
-          },
-          writable: true,
-        });
-      });
-
-      it('marks conflicting scope with pending-delete prefix and assigns externalId to new scope', async () => {
-        getScopeByExternalIdMock.mockResolvedValue({
-          id: 'old-scope-id',
-          name: 'OldScope',
-          parentId: null,
-          externalId: 'spc:folder:site-123/folder-1',
-        });
-
-        const scopes = [{ id: 'new-scope-id', name: 'TestScope', externalId: null }];
-        const paths = ['/test1/TestScope'];
-        const items: SharepointContentItem[] = [];
-        const directories: SharepointDirectoryItem[] = [];
-
-        // biome-ignore lint/suspicious/noExplicitAny: Testing private method
-        await (service as any).updateNewlyCreatedScopesWithExternalId(
-          scopes,
-          paths,
-          items,
-          directories,
-          mockContext,
-        );
-
-        expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
-
-        const [renameId, renameExternalId] = updateScopeExternalIdMock.mock.calls[0] as [
-          string,
-          Smeared,
-        ];
-        expect(renameId).toBe('old-scope-id');
-        expect(renameExternalId).toBeInstanceOf(Smeared);
-        expect(renameExternalId.value).toMatch(
-          /^spc:pending-delete:site-123\/unknown:site-123::\/test1\/TestScope-/,
-        );
-
-        expect(updateScopeExternalIdMock).toHaveBeenNthCalledWith(
-          2,
-          'new-scope-id',
-          expect.any(Smeared),
-        );
-      });
-
-      it('proceeds without marking when no conflicting scope exists', async () => {
-        getScopeByExternalIdMock.mockResolvedValue(null);
-
-        const scopes = [{ id: 'new-scope-id', name: 'TestScope', externalId: null }];
-        const paths = ['/test1/TestScope'];
-        const items: SharepointContentItem[] = [];
-        const directories: SharepointDirectoryItem[] = [];
-
-        // biome-ignore lint/suspicious/noExplicitAny: Testing private method
-        await (service as any).updateNewlyCreatedScopesWithExternalId(
-          scopes,
-          paths,
-          items,
-          directories,
-          mockContext,
-        );
-
-        expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
-        expect(updateScopeExternalIdMock).toHaveBeenCalledWith('new-scope-id', expect.any(Smeared));
-      });
-
-      it('logs warning and still updates new scope when marking conflicting scope fails', async () => {
-        getScopeByExternalIdMock.mockResolvedValue({
-          id: 'old-scope-id',
-          name: 'OldScope',
-          parentId: null,
-          externalId: 'spc:folder:site-123/folder-1',
-        });
-
-        updateScopeExternalIdMock
-          .mockRejectedValueOnce(new Error('Rename failed'))
-          .mockResolvedValue({ externalId: 'updated-external-id' });
-
-        const scopes = [{ id: 'new-scope-id', name: 'TestScope', externalId: null }];
-        const paths = ['/test1/TestScope'];
-        const items: SharepointContentItem[] = [];
-        const directories: SharepointDirectoryItem[] = [];
-
-        // biome-ignore lint/suspicious/noExplicitAny: Testing private method
-        await (service as any).updateNewlyCreatedScopesWithExternalId(
-          scopes,
-          paths,
-          items,
-          directories,
-          mockContext,
-        );
-
-        // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-        expect(service['logger'].warn).toHaveBeenCalledWith(
-          expect.objectContaining({
-            msg: expect.stringContaining('Failed to mark conflicting scope'),
-          }),
-        );
-        expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
-        expect(updateScopeExternalIdMock).toHaveBeenLastCalledWith(
-          'new-scope-id',
-          expect.any(Smeared),
-        );
-      });
-
-      it('skips conflict marking during initial sync', async () => {
-        const initialSyncContext = { ...mockContext, isInitialSync: true };
-        const scopes = [{ id: 'new-scope-id', name: 'TestScope', externalId: null }];
-        const paths = ['/test1/TestScope'];
-        const items: SharepointContentItem[] = [];
-        const directories: SharepointDirectoryItem[] = [];
-
-        // biome-ignore lint/suspicious/noExplicitAny: Testing private method
-        await (service as any).updateNewlyCreatedScopesWithExternalId(
-          scopes,
-          paths,
-          items,
-          directories,
-          initialSyncContext,
-        );
-
-        expect(getScopeByExternalIdMock).not.toHaveBeenCalled();
-        expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
-        expect(updateScopeExternalIdMock).toHaveBeenCalledWith('new-scope-id', expect.any(Smeared));
-      });
+      expect(externalId.value).toMatch(/^spc:site-123\/unknown:\/test1\/SubA\/UnknownLib-/);
     });
   });
 
-  describe('deleteOrphanedScopes', () => {
+  describe('markStaleScopesForDeletion', () => {
+    let listScopesByExternalIdPrefixMock: ReturnType<typeof vi.fn>;
+    let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      listScopesByExternalIdPrefixMock = vi.fn().mockResolvedValue([]);
+      updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated' });
+
+      const { unit } = await TestBed.solitary(ScopeManagementService)
+        .mock<UniqueScopesService>(UniqueScopesService)
+        .impl((stubFn) => ({
+          ...stubFn(),
+          listScopesByExternalIdPrefix: listScopesByExternalIdPrefixMock,
+          updateScopeExternalId: updateScopeExternalIdMock,
+        }))
+        .compile();
+
+      service = unit;
+
+      Object.defineProperty(service, 'logger', {
+        value: {
+          log: vi.fn(),
+          error: vi.fn(),
+          warn: vi.fn(),
+          debug: vi.fn(),
+          verbose: vi.fn(),
+        },
+        writable: true,
+      });
+    });
+
+    it('queries existing scopes using the active root-site prefix', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).markStaleScopesForDeletion([], mockContext);
+
+      expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledTimes(1);
+      expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledWith(
+        expect.objectContaining({ value: 'spc:site-123/' }),
+      );
+    });
+
+    it('marks scopes not present in the current sync with pending-delete prefix', async () => {
+      const staleScope: Scope = {
+        id: 'stale-scope',
+        name: 'Stale',
+        parentId: null,
+        externalId: 'spc:site-123/folder:site-123/folder-abc',
+      };
+      const activeScope: Scope = {
+        id: 'active-scope',
+        name: 'Active',
+        parentId: null,
+        externalId: 'spc:site-123/folder:site-123/folder-xyz',
+      };
+      listScopesByExternalIdPrefixMock.mockResolvedValue([staleScope, activeScope]);
+
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).markStaleScopesForDeletion([activeScope], mockContext);
+
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(1);
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+        'stale-scope',
+        expect.objectContaining({
+          value: 'spc:pending-delete:site-123/folder:site-123/folder-abc',
+        }),
+      );
+    });
+
+    it('does not mark anything when every existing scope is still current', async () => {
+      const scope: Scope = {
+        id: 'scope-a',
+        name: 'A',
+        parentId: null,
+        externalId: 'spc:site-123/folder:site-123/item-a',
+      };
+      listScopesByExternalIdPrefixMock.mockResolvedValue([scope]);
+
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).markStaleScopesForDeletion([scope], mockContext);
+
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+    });
+
+    it('preserves the original externalId suffix when producing the pending-delete marker', async () => {
+      const staleScope: Scope = {
+        id: 'stale-unknown',
+        name: 'Unknown',
+        parentId: null,
+        externalId: 'spc:site-123/unknown:/test1/Old-uuid-abc',
+      };
+      listScopesByExternalIdPrefixMock.mockResolvedValue([staleScope]);
+
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).markStaleScopesForDeletion([], mockContext);
+
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+        'stale-unknown',
+        expect.objectContaining({
+          value: 'spc:pending-delete:site-123/unknown:/test1/Old-uuid-abc',
+        }),
+      );
+    });
+
+    it('never marks the configured root scope even when it is missing from current scopes', async () => {
+      const rootScope: Scope = {
+        id: 'root-scope-123',
+        name: 'test1',
+        parentId: null,
+        externalId: 'spc:site-123/site',
+      };
+      listScopesByExternalIdPrefixMock.mockResolvedValue([rootScope]);
+
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).markStaleScopesForDeletion([], mockContext);
+
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+    });
+
+    it('skips scopes that have no externalId', async () => {
+      const scopeWithoutExternalId: Scope = {
+        id: 'scope-no-ext',
+        name: 'NoExt',
+        parentId: null,
+        externalId: null,
+      };
+      listScopesByExternalIdPrefixMock.mockResolvedValue([scopeWithoutExternalId]);
+
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).markStaleScopesForDeletion([], mockContext);
+
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+    });
+
+    it('continues marking remaining scopes when one mark call fails', async () => {
+      const staleA: Scope = {
+        id: 'scope-a',
+        name: 'A',
+        parentId: null,
+        externalId: 'spc:site-123/folder:site-123/a',
+      };
+      const staleB: Scope = {
+        id: 'scope-b',
+        name: 'B',
+        parentId: null,
+        externalId: 'spc:site-123/folder:site-123/b',
+      };
+      listScopesByExternalIdPrefixMock.mockResolvedValue([staleA, staleB]);
+      updateScopeExternalIdMock
+        .mockRejectedValueOnce(new Error('Mark failed'))
+        .mockResolvedValue({ externalId: 'updated' });
+
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).markStaleScopesForDeletion([], mockContext);
+
+      expect(updateScopeExternalIdMock).toHaveBeenCalledTimes(2);
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: expect.stringContaining('Failed to mark stale scope scope-a for deletion'),
+        }),
+      );
+    });
+
+    it('logs a warning and stops when listing existing scopes fails', async () => {
+      listScopesByExternalIdPrefixMock.mockRejectedValue(new Error('API unavailable'));
+
+      // biome-ignore lint/suspicious/noExplicitAny: Testing private method
+      await (service as any).markStaleScopesForDeletion([], mockContext);
+
+      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: expect.stringContaining('Failed to list existing scopes'),
+        }),
+      );
+    });
+  });
+
+  describe('batchCreateScopes stale marking', () => {
+    let listScopesByExternalIdPrefixMock: ReturnType<typeof vi.fn>;
+    let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      listScopesByExternalIdPrefixMock = vi.fn().mockResolvedValue([]);
+      updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated' });
+
+      const { unit } = await TestBed.solitary(ScopeManagementService)
+        .mock<UniqueScopesService>(UniqueScopesService)
+        .impl((stubFn) => ({
+          ...stubFn(),
+          createScopesBasedOnPaths: vi.fn().mockResolvedValue(
+            mockScopes.map(({ id, name, parentId, externalId }) => ({
+              id,
+              name,
+              parentId,
+              externalId,
+            })),
+          ),
+          listScopesByExternalIdPrefix: listScopesByExternalIdPrefixMock,
+          updateScopeExternalId: updateScopeExternalIdMock,
+        }))
+        .compile();
+
+      service = unit;
+
+      Object.defineProperty(service, 'logger', {
+        value: {
+          log: vi.fn(),
+          error: vi.fn(),
+          warn: vi.fn(),
+          debug: vi.fn(),
+          verbose: vi.fn(),
+        },
+        writable: true,
+      });
+    });
+
+    it('marks stale scopes before assigning externalIds to newly created scopes', async () => {
+      const stale: Scope = {
+        id: 'stale-scope',
+        name: 'OldFolder',
+        parentId: 'scope_2',
+        externalId: 'spc:site-123/folder:site-123/old-folder-id',
+      };
+      listScopesByExternalIdPrefixMock.mockResolvedValue([
+        stale,
+        ...mockScopes.map(({ id, name, parentId, externalId }) => ({
+          id,
+          name,
+          parentId,
+          externalId,
+        })),
+      ]);
+
+      await service.batchCreateScopes(
+        [createDriveContentItem('UniqueAG/SitePages')],
+        [],
+        mockContext,
+      );
+
+      const staleCallIndex = updateScopeExternalIdMock.mock.calls.findIndex(
+        ([scopeId]) => scopeId === 'stale-scope',
+      );
+      const firstNewAssignmentIndex = updateScopeExternalIdMock.mock.calls.findIndex(
+        ([scopeId]) => scopeId !== 'stale-scope',
+      );
+      expect(staleCallIndex).toBeGreaterThanOrEqual(0);
+      expect(firstNewAssignmentIndex).toBeGreaterThanOrEqual(0);
+
+      const staleCallOrder = updateScopeExternalIdMock.mock.invocationCallOrder[staleCallIndex];
+      const firstNewAssignmentOrder =
+        updateScopeExternalIdMock.mock.invocationCallOrder[firstNewAssignmentIndex];
+      assert.ok(staleCallOrder !== undefined && firstNewAssignmentOrder !== undefined);
+
+      expect(updateScopeExternalIdMock).toHaveBeenCalledWith(
+        'stale-scope',
+        expect.objectContaining({
+          value: 'spc:pending-delete:site-123/folder:site-123/old-folder-id',
+        }),
+      );
+      expect(staleCallOrder).toBeLessThan(firstNewAssignmentOrder);
+    });
+
+    it('continues assigning externalIds to new scopes when stale-mark call fails', async () => {
+      const stale: Scope = {
+        id: 'stale-scope',
+        name: 'OldFolder',
+        parentId: null,
+        externalId: 'spc:site-123/folder:site-123/old',
+      };
+      listScopesByExternalIdPrefixMock.mockResolvedValue([stale]);
+      updateScopeExternalIdMock.mockImplementation((scopeId: string) =>
+        scopeId === 'stale-scope'
+          ? Promise.reject(new Error('Mark failed'))
+          : Promise.resolve({ externalId: 'updated' }),
+      );
+
+      await service.batchCreateScopes(
+        [createDriveContentItem('UniqueAG/SitePages')],
+        [],
+        mockContext,
+      );
+
+      const newScopeAssignments = updateScopeExternalIdMock.mock.calls.filter(
+        ([scopeId]) => scopeId !== 'stale-scope',
+      );
+      expect(newScopeAssignments.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('deleteStaleScopes', () => {
     let listScopesByExternalIdPrefixMock: ReturnType<typeof vi.fn>;
     let deleteScopeMock: ReturnType<typeof vi.fn>;
 
@@ -1064,7 +1270,7 @@ describe('ScopeManagementService', () => {
       });
     });
 
-    it('deletes orphaned scopes children-first', async () => {
+    it('deletes stale scopes children-first', async () => {
       const parentScope: Scope = {
         id: 'parent-scope',
         name: 'Parent',
@@ -1079,7 +1285,7 @@ describe('ScopeManagementService', () => {
       };
       listScopesByExternalIdPrefixMock.mockResolvedValue([parentScope, childScope]);
 
-      await service.deleteOrphanedScopes(new Smeared('site-123', false));
+      await service.deleteStaleScopes(new Smeared('site-123', false));
 
       expect(listScopesByExternalIdPrefixMock).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1109,16 +1315,38 @@ describe('ScopeManagementService', () => {
         .mockRejectedValueOnce(new Error('Delete failed'))
         .mockResolvedValue(undefined);
 
-      await service.deleteOrphanedScopes(new Smeared('site-123', false));
+      await service.deleteStaleScopes(new Smeared('site-123', false));
 
       // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
       expect(service['logger'].warn).toHaveBeenCalledWith(
         expect.objectContaining({
-          msg: expect.stringContaining('Failed to delete orphaned scope child-scope'),
+          msg: expect.stringContaining('Failed to delete stale scope child-scope'),
         }),
       );
       expect(deleteScopeMock).toHaveBeenCalledTimes(2);
       expect(deleteScopeMock).toHaveBeenNthCalledWith(2, 'parent-scope');
+    });
+
+    it('does nothing when no stale scopes are found', async () => {
+      listScopesByExternalIdPrefixMock.mockResolvedValue([]);
+
+      await service.deleteStaleScopes(new Smeared('site-123', false));
+
+      expect(deleteScopeMock).not.toHaveBeenCalled();
+    });
+
+    it('logs a warning and skips cleanup when listing stale scopes fails', async () => {
+      listScopesByExternalIdPrefixMock.mockRejectedValue(new Error('API unavailable'));
+
+      await service.deleteStaleScopes(new Smeared('site-123', false));
+
+      expect(deleteScopeMock).not.toHaveBeenCalled();
+      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+      expect(service['logger'].warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          msg: expect.stringContaining('Failed to query stale scopes'),
+        }),
+      );
     });
   });
 
