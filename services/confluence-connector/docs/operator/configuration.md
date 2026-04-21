@@ -13,7 +13,7 @@ The following environment variables control application-level behavior. They are
 |--------------------------------|--------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
 | `NODE_ENV`                     | `production`                   | Environment mode (`development`, `production`, `test`)                                                                                        |
 | `PORT`                         | `51349`                        | HTTP port the application binds to                                                                                                            |
-| `LOG_LEVEL`                    | `info`                         | Log verbosity: `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`. See [Logging](#Logging)                                          |
+| `LOG_LEVEL`                    | `info`                         | Log verbosity: `error`, `warn`, `info`, `debug`. See [Logging](#Logging)                                                                      |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal`                      | Controls whether diagnostic data (emails, usernames, IDs) is logged in full (`disclose`) or partially masked (`conceal`). See [Logging](#Diagnostics-Data-Policy) |
 | `TENANT_CONFIG_PATH_PATTERN`   | -- (required; Helm chart sets `/app/tenant-configs/*-tenant-config.yaml`) | Glob pattern to tenant configuration YAML files                                                                              |
 | `OTEL_METRICS_EXPORTER`        | --                             | OpenTelemetry metrics exporter (e.g., `prometheus`). See [Metrics](#Metrics)                                                                  |
@@ -22,7 +22,16 @@ The following environment variables control application-level behavior. They are
 | `NODE_EXTRA_CA_CERTS`          | --                             | Path to a PEM file containing additional CA certificates for TLS verification if the pod's trust store doesn't have them                      |
 | `MAX_HEAP_MB`                  | `1920` (Helm) / `1024` (Docker) | Node.js V8 max old space size in MB                                                                                                         |
 
-Secret values in tenant YAML files are referenced via the `os.environ/` prefix (e.g., `os.environ/CONFLUENCE_CLIENT_SECRET`). The conventional environment variable names are `CONFLUENCE_CLIENT_SECRET`, `CONFLUENCE_PAT`, and `ZITADEL_CLIENT_SECRET`, but operators can use any variable name as long as the `os.environ/` reference in the tenant YAML matches. See [Authentication -- Secret Resolution](./authentication.md#Secret-Resolution) for the full resolution mechanism, supported fields, and Kubernetes integration.
+The following environment variables are typically loaded from Kubernetes Secrets:
+
+| Variable                  | Description                                                                                  |
+|---------------------------|----------------------------------------------------------------------------------------------|
+| `CONFLUENCE_CLIENT_SECRET` | OAuth 2.0 client secret (used when `confluence.auth.mode` is `oauth_2lo`)                   |
+| `CONFLUENCE_PAT`          | Personal Access Token (used when `confluence.auth.mode` is `pat`; Data Center below 10.1 only) |
+| `ZITADEL_CLIENT_SECRET`   | Zitadel client secret (required when `unique.serviceAuthMode` is `external`)                 |
+| `PROXY_PASSWORD`          | Proxy password (required when proxy `authMode` is `username_password`)                       |
+
+Secret values in tenant YAML files are referenced via the `os.environ/` prefix (e.g., `os.environ/CONFLUENCE_CLIENT_SECRET`). The conventional environment variable names are listed above, but operators can use any variable name as long as the `os.environ/` reference in the tenant YAML matches. See [Authentication -- Secret Resolution](./authentication.md#Secret-Resolution) for the full resolution mechanism, supported fields, and Kubernetes integration.
 
 ## Tenant Configuration File
 
@@ -30,7 +39,7 @@ Secret values in tenant YAML files are referenced via the `os.environ/` prefix (
 
 Tenant configuration files must follow the naming convention `{tenant-name}-tenant-config.yaml`. The tenant name is extracted from the filename by removing the `-tenant-config.yaml` suffix and must match the pattern `^[a-z0-9]+(-[a-z0-9]+)*$` (lowercase alphanumeric with hyphens). Duplicate tenant names cause a startup failure.
 
-The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at startup. At least one file must match the pattern, and at least one tenant must have `active` status. For details on how tenants are isolated at runtime, see [Architecture -- Multi-Tenancy Support](../technical/architecture.md#Multi-Tenancy-Support).
+The connector loads all files matching the `TENANT_CONFIG_PATH_PATTERN` glob at startup. At least one file must match the pattern, and at least one tenant must have `active` or `deleted` status. For details on how tenants are isolated at runtime, see [Architecture -- Multi-Tenancy Support](../technical/architecture.md#Multi-Tenancy-Support).
 
 ### Tenant Status
 
@@ -181,6 +190,52 @@ unique:
 
 The additional fields required for each auth mode (`serviceExtraHeaders` for `cluster_local`, Zitadel credentials for `external`) are documented in the [Authentication Guide -- Unique Platform Authentication Methods](./authentication.md#Unique-Platform-Authentication-Methods), which also covers setup instructions and token flows.
 
+## Proxy Configuration
+
+The connector supports HTTP/HTTPS forward proxies for environments where outbound internet access is only available through a proxy. Proxy settings are configured via environment variables (managed by the Helm chart's `proxyConfig` section).
+
+| Mode                  | Description                          |
+|-----------------------|--------------------------------------|
+| `none`                | Proxy disabled (default)             |
+| `no_auth`             | Proxy enabled without authentication |
+| `username_password`   | Basic authentication proxy           |
+| `ssl_tls`             | TLS client certificate proxy         |
+
+**Common options** (required for `no_auth`, `username_password`, and `ssl_tls` modes):
+
+| Variable                  | Description                                                          |
+|---------------------------|----------------------------------------------------------------------|
+| `PROXY_HOST`              | Proxy server hostname                                                |
+| `PROXY_PORT`              | Proxy server port                                                    |
+| `PROXY_PROTOCOL`          | `http` or `https`                                                    |
+| `PROXY_SSL_CA_BUNDLE_PATH` | (Optional) Path to CA bundle for verifying proxy TLS certificate    |
+| `PROXY_HEADERS`           | (Optional) JSON string of custom headers for CONNECT request         |
+
+**`username_password` mode** adds:
+
+| Variable         | Description                              |
+|------------------|------------------------------------------|
+| `PROXY_USERNAME` | Proxy username                           |
+| `PROXY_PASSWORD` | Proxy password (loaded from secret)      |
+
+**`ssl_tls` mode** adds:
+
+| Variable              | Description                    |
+|-----------------------|--------------------------------|
+| `PROXY_SSL_CERT_PATH` | Path to TLS client certificate |
+| `PROXY_SSL_KEY_PATH`  | Path to TLS client key         |
+
+### Traffic Routing
+
+When the proxy is enabled, traffic is routed as follows:
+
+| Target                                          | Routing                                                                                                     |
+|-------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| Confluence API (Cloud or Data Center)            | Always through the proxy                                                                                    |
+| Atlassian or Data Center OAuth token endpoint    | Always through the proxy                                                                                    |
+| Unique Ingestion and Scope Management services   | Through the proxy only when `unique.serviceAuthMode` is `external`. Bypassed in `cluster_local` mode       |
+| Attachment and content uploads to Unique         | Same routing as Unique API calls above                                                                      |
+
 ## Ingestion Settings
 
 The `ingestion` section configures how content is organized and stored in the Unique knowledge base:
@@ -208,7 +263,7 @@ ingestion:
 | Field            | Required | Default          | Description                                                                                                                                                         |
 |------------------|----------|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `ingestionMode`  | No       | `flat`           | Ingestion traversal mode. Currently only `flat` is supported (all pages from a space go into a single scope per space)                                              |
-| `scopeId`        | Yes      | --               | Root scope ID in the Unique platform. The scope must exist before the connector starts (see [Authentication -- Create the Root Scope in Unique](./authentication.md#2-create-the-root-scope-in-unique)) |
+| `scopeId`        | Yes      | --               | Root scope ID in the Unique platform. The scope must exist before the connector starts (see [Authentication -- Create the Root Scope in Unique](./authentication.md#2.-Create-the-Root-Scope-in-Unique)) |
 | `storeInternally` | No      | `enabled`        | Whether to store content internally in Unique (`enabled` or `disabled`)                                                                                             |
 | `useV1KeyFormat` | No       | `disabled`       | Use v1-compatible ingestion key format (`spaceId_spaceKey/pageId`) without tenant prefix (`enabled` or `disabled`). Only relevant when migrating from Confluence Connector v1 |
 | `attachments`    | No       | (see sub-fields) | Configuration for file attachment ingestion                                                                                                                          |
@@ -307,11 +362,62 @@ connector:
 
 The Helm chart ships these values by default.
 
-### Host and API Metrics
+### System Telemetry
 
-The connector exposes standard host metrics (CPU, memory, event loop) and HTTP API metrics.
+The connector exposes standard host metrics (CPU, memory, event loop) and HTTP API metrics collected by the OpenTelemetry host and API instrumentations.
 
-Unique API metrics and custom connector metrics will be documented in a future update.
+### Application Telemetry
+
+Custom connector metrics use the `cfc_` prefix (Confluence Connector). Unique platform interaction metrics use the `confluence_connector_unique_api_` prefix.
+
+#### Sync Cycle Metrics
+
+| Metric                                    | Type      | Labels            | Description                                              |
+|-------------------------------------------|-----------|-------------------|----------------------------------------------------------|
+| `cfc_sync_duration_seconds`               | Histogram | `tenant`, `result` | Duration of a full synchronization cycle per tenant     |
+| `cfc_scan_duration_seconds`               | Histogram | `tenant`          | Duration of the page discovery (scan) phase              |
+| `cfc_attachment_upload_duration_seconds`   | Histogram | `tenant`          | Duration of a single attachment upload to Unique         |
+
+Attachment upload histogram buckets: 100ms, 200ms, 500ms, 1s, 2s, 3s, 5s, 10s, 20s, 30s, 60s.
+
+#### Content Throughput Metrics
+
+| Metric                                | Type    | Labels                        | Description                                                                      |
+|---------------------------------------|---------|-------------------------------|----------------------------------------------------------------------------------|
+| `cfc_pages_processed_total`           | Counter | `tenant`, `result`            | Pages ingested per sync cycle                                                    |
+| `cfc_attachments_processed_total`     | Counter | `tenant`, `result`            | Attachments ingested per sync cycle                                              |
+| `cfc_content_deleted_total`           | Counter | `tenant`, `result`            | Content items deleted from Unique                                                |
+| `cfc_file_diff_events_total`         | Counter | `tenant`, `diff_result_type`  | File change detection events (`new`, `updated`, `deleted`, `moved`)              |
+| `cfc_orphaned_scopes_cleaned_total`   | Counter | `tenant`, `result`            | Space scopes removed after their Confluence space was removed or unlabeled       |
+| `cfc_orphaned_files_cleaned_total`    | Counter | `tenant`                      | Files removed during orphaned space cleanup                                      |
+
+#### Tenant Cleanup Metrics
+
+| Metric                                    | Type      | Labels            | Description                                              |
+|-------------------------------------------|-----------|-------------------|----------------------------------------------------------|
+| `cfc_cleanup_duration_seconds`            | Histogram | `tenant`, `result` | Duration of a deleted tenant content cleanup             |
+| `cfc_cleanup_content_deleted_total`       | Counter   | `tenant`, `result` | Content items deleted during tenant cleanup              |
+| `cfc_cleanup_scopes_deleted_total`        | Counter   | `tenant`, `result` | Scopes deleted during tenant cleanup                     |
+
+#### Confluence API Metrics
+
+| Metric                                            | Type      | Labels                            | Description                                                                            |
+|---------------------------------------------------|-----------|-----------------------------------|----------------------------------------------------------------------------------------|
+| `cfc_confluence_api_request_duration_seconds`     | Histogram | `tenant`, `endpoint`, `result`    | Request latency for Confluence API calls, keyed by a normalized endpoint path          |
+| `cfc_confluence_api_throttle_events_total`        | Counter   | `tenant`                          | Confluence API rate-limit (429) events                                                 |
+| `cfc_confluence_api_errors_total`                 | Counter   | `tenant`, `http_status_class`     | Confluence API error responses grouped by HTTP status class                            |
+
+Confluence API request histogram buckets: 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s.
+
+#### Unique API Metrics
+
+| Metric                                                      | Type      | Labels                                                          | Description                                                          |
+|-------------------------------------------------------------|-----------|-----------------------------------------------------------------|----------------------------------------------------------------------|
+| `confluence_connector_unique_api_requests_total`            | Counter   | `operation`, `target`, `tenant`, `result`                       | Total Unique API requests                                            |
+| `confluence_connector_unique_api_errors_total`              | Counter   | `operation`, `target`, `tenant`, `status_code_class`            | Total Unique API error responses                                     |
+| `confluence_connector_unique_api_request_duration_ms`       | Histogram | `operation`, `target`, `tenant`, `result`, `status_code_class`  | Request latency for Unique API calls in milliseconds                 |
+| `confluence_connector_unique_api_slow_requests_total`       | Counter   | `operation`, `target`, `tenant`, `duration_bucket`              | Slow Unique API requests                                             |
+| `confluence_connector_unique_api_auth_token_refresh_total`  | Counter   | --                                                              | Zitadel auth token refreshes (only emitted in `external` mode)       |
 
 ### Grafana Dashboard
 
@@ -379,13 +485,13 @@ To perform a complete re-ingestion of all synced Confluence content:
 
 ### Step 1: Delete Ingested Content
 
-Set the tenant status to `deleted` in its YAML configuration file and restart the connector. This deletes the tenant's ingested content from the Unique knowledge base and stops sync. Other tenants continue running.
+Set the tenant status to `deleted` in its YAML configuration file and restart the connector. The cleanup runs immediately on startup and deletes all ingested files and child scopes while preserving the root scope. In a multi-tenant deployment, all other tenants configured in the same connector instance continue syncing normally and are not affected by this operation.
 
 **Warning:** This operation is irreversible. Ensure you have backups if needed.
 
 ### Step 2: Re-enable the Tenant
 
-Set the tenant status back to `active` and restart the connector. The connector triggers an initial sync immediately on startup, re-ingesting all labeled content from scratch into the existing root scope.
+Set the tenant status back to `active` and restart the connector. The connector triggers an initial sync immediately on startup, re-ingesting all labeled content from scratch into the preserved root scope (no new scope needs to be created).
 
 ### Further Guidance
 

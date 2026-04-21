@@ -39,7 +39,7 @@
 
 ### What happens when a page has `ai-ingest` and its ancestor has `ai-ingest-all`?
 
-**Answer:** The page is discovered through both paths but deduplicated by ID, so it is ingested exactly once. See the [discovery flow](./technical/flows.md#Discovery-Sequence) for details on how deduplication works.
+**Answer:** The page is discovered through both paths but deduplicated by ID, so it is ingested exactly once. See [Descendant Discovery](./technical/flows.md#Descendant-Discovery) for details on how deduplication works.
 
 ### Which Confluence content types are synced?
 
@@ -81,9 +81,9 @@
 |---|---|
 | `active` | Tenant is loaded and sync is scheduled (default if not specified) |
 | `inactive` | Tenant config is validated but the tenant is not loaded |
-| `deleted` | Tenant is skipped entirely |
+| `deleted` | Ingested content is deleted from the Unique knowledge base and sync is stopped |
 
-At least one tenant must have `active` status for the connector to start.
+At least one tenant must have `active` or `deleted` status for the connector to start.
 
 ### What are the key configuration sections?
 
@@ -132,7 +132,7 @@ The response contains a `cloudId` field with the UUID.
 
 **Answer:** Each sync cycle follows these steps:
 
-1. Grant the service account access to the pre-existing root scope in Unique and resolve its path (the root scope must be created by an administrator before the connector can use it)
+1. Grant the service account access to the pre-existing root scope in Unique and resolve its path. On the first sync cycle the connector also marks the scope as owned by this tenant's Confluence instance; subsequent cycles verify that mark. The root scope must be created by an administrator before the connector can use it.
 2. Discover all pages matching the configured labels via CQL search
 3. Fetch descendant pages for any pages with the all-descendants label
 4. Extract allowed attachments from discovered pages
@@ -141,6 +141,7 @@ The response contains a `cloudId` field with the UUID.
 7. Fetch and ingest new or updated pages (HTML storage representation)
 8. Download and ingest new or updated attachments (streamed)
 9. Delete items from Unique that are no longer discovered
+10. Detect space scopes whose Confluence space is no longer discovered, and remove their files and scopes
 
 ### How does change detection work?
 
@@ -156,7 +157,7 @@ If the `ai-ingest-all` label is removed from a parent page, all descendant pages
 
 **Answer:** If the page's space is still discovered during the next sync cycle, the file diff detects the missing page and deletes the corresponding content (page and its attachments) from Unique.
 
-If an entire previously synced space disappears from discovery results (for example, because all its labels were removed or the space was deleted), the connector does not automatically clean up its content. This is because the file diff runs per-space and only executes for spaces that still appear in the current discovery results. Content from the disappeared space remains in Unique and requires manual deletion.
+If an entire previously synced space disappears from discovery results (for example, because all its labels were removed or the space was deleted), the connector detects the orphaned space scope at the end of the sync cycle and removes both the space's files and the space scope itself. See [Removed Space Cleanup](./technical/flows.md#Removed-Space-Cleanup) for details.
 
 ### What happens to attachments when their parent page is unlabeled?
 
@@ -170,7 +171,19 @@ If an entire previously synced space disappears from discovery results (for exam
 
 ### What safety guards does the connector have?
 
-**Answer:** The connector includes two safeguards -- a zero-submission guard and a full-deletion guard -- that abort the current tenant sync cycle when the file diff results indicate a likely error in discovery or key format for a space. To intentionally remove all content from a space, leave at least one page labeled for synchronization to avoid triggering these guards. See the [safety checks](./technical/flows.md#Safety-Checks) documentation for full details.
+**Answer:** The connector includes the following safeguards to prevent accidental data loss and misconfiguration:
+
+- **Zero-submission guard:** If discovery returns zero items for a space but the file diff would still delete content, the sync cycle is aborted. This prevents a transient Confluence error or a silent authentication failure from wiping ingested content.
+- **Full-deletion guard:** If the file diff would delete every file stored in Unique for a space, the sync cycle is aborted. If the connector determines the deletion is a legitimate full content replacement (rather than a misconfiguration), the sync proceeds with a warning instead of aborting.
+- **Root scope ownership validation:** Each root scope is tagged with the Confluence instance that owns it. If a scope was already claimed by a different Confluence instance, the sync for that tenant fails immediately, preventing two tenants from accidentally writing into the same scope.
+
+See the [safety checks](./technical/flows.md#Safety-Checks) and [root scope ownership validation](./technical/flows.md#Root-Scope-Ownership-Validation) documentation for full details.
+
+### What happens if I reassign the root scope to a different Confluence instance?
+
+**Answer:** This is not supported. On the first sync cycle, the connector marks the root scope as owned by this tenant's Confluence instance. If the tenant is later reconfigured to point at a different Confluence instance while keeping the same `scopeId`, the next sync cycle detects the mismatch and aborts with a fatal error.
+
+To move a tenant to a different Confluence instance, create a new root scope in Unique and configure it as the tenant's `scopeId`. The old scope and its content remain untouched and can be removed manually if no longer needed.
 
 ### Are concurrent syncs for the same tenant possible?
 
@@ -186,9 +199,9 @@ If an entire previously synced space disappears from discovery results (for exam
 2. Does the service account have access to the page's space? On Data Center, access can optionally be restricted to specific spaces. If space restrictions are configured, pages in excluded spaces are silently excluded from CQL results.
 3. Is the page in a global space? (Cloud: also includes collaboration spaces.)
 4. Is the page a standard page type? (Databases, whiteboards, and embeds are skipped.)
-4. Does the page have a non-empty body? Pages with empty bodies are discovered but skipped during content ingestion.
-5. Is the tenant status set to `active` in the YAML config?
-6. Check connector logs for errors related to authentication, API rate limits, or Unique API failures.
+5. Does the page have a non-empty body? Pages with empty bodies are discovered but skipped during content ingestion.
+6. Is the tenant status set to `active` in the YAML config?
+7. Check connector logs for errors related to authentication, API rate limits, or Unique API failures.
 
 ### Why aren't attachments being ingested?
 
@@ -202,7 +215,7 @@ If an entire previously synced space disappears from discovery results (for exam
 
 ### Why do I see "Aborting to prevent accidental full deletion" errors?
 
-**Answer:** This means the safety guard was triggered. Possible causes:
+**Answer:** This means the full-deletion safety guard was triggered. The guard aborts the sync when the file diff would delete every file stored for a space and the connector determines the deletion is not a legitimate content replacement. Possible causes:
 
 - A bug in page discovery returned zero results for a space (e.g., Confluence API issue, authentication failure for specific spaces)
 - The ingestion key format changed (e.g., `useV1KeyFormat` was toggled), causing the diff to see all existing keys as unrecognized
@@ -212,6 +225,8 @@ If an entire previously synced space disappears from discovery results (for exam
 1. Check Confluence API connectivity and authentication
 2. Verify that the `useV1KeyFormat` setting has not changed unexpectedly
 3. If the key format change was intentional, the old content must be cleaned up manually before switching formats
+
+If your intent really was to replace all pages in a space with a completely new set of pages, the connector detects this as a legitimate replacement and proceeds automatically. See [Safety Checks](./technical/flows.md#Safety-Checks) for full details.
 
 ### Why is sync taking too long?
 
@@ -280,7 +295,7 @@ The connector discovers pages via CQL search queries filtered by label. Only pag
 
 **Answer:** Pages in inaccessible spaces are silently excluded from CQL search results. The connector does not receive an error; it simply never discovers those pages.
 
-If a space that was previously accessible becomes inaccessible, the connector does not automatically clean up that space's already ingested content. The file diff runs per-space and only executes for spaces that still appear in discovery results, so a space that vanishes from CQL results is never diffed and its content remains in Unique. Manual cleanup is required in that situation.
+If a space that was previously accessible becomes inaccessible, its content is cleaned up automatically at the end of the sync cycle. The connector detects the orphaned space scope and removes both its files and its scope. See [Removed Space Cleanup](./technical/flows.md#Removed-Space-Cleanup) for details.
 
 ### How does Unique platform authentication work?
 
