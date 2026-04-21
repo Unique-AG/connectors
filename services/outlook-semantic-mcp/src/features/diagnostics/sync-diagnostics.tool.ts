@@ -1,6 +1,6 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, createMeta, Tool } from '@unique-ag/mcp-server-module';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
@@ -27,8 +27,6 @@ const OutputSchema = z.object({
 
 @Injectable()
 export class SyncDiagnosticsTool {
-  private readonly logger = new Logger(this.constructor.name);
-
   public constructor(private readonly runSyncDiagnosticsQuery: RunSyncDiagnosticsQuery) {}
 
   @Tool({
@@ -54,16 +52,6 @@ export class SyncDiagnosticsTool {
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof OutputSchema>> {
     const userProfileId = extractUserProfileId(request).toString();
-    const result = await this.runSyncDiagnosticsQuery.run(userProfileId);
-
-    this.logger.log({
-      userProfileId,
-      skippedCount: result.messageIdsSkippedBecauseOfFilters.length,
-      missingInUniqueCount: result.messageIdsFoundInMicrosoftButNotFoundInUnique.length,
-      missingInMicrosoftCount: result.messageIdsFoundInUniqueButNotFoundInMicrosoft.length,
-      msg: 'Sync diagnostics completed',
-    });
-
-    return result;
+    return await this.runSyncDiagnosticsQuery.run(userProfileId);
   }
 }

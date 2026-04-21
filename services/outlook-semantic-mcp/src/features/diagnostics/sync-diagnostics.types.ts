@@ -1,10 +1,10 @@
-export type EmailDiagnosticEntry = {
+export interface EmailDiagnosticEntry {
   messageId: string;
   fileKey: string;
-};
+}
 
-export type SyncDiagnosticsResult = {
+export interface SyncDiagnosticsResult {
   messageIdsSkippedBecauseOfFilters: EmailDiagnosticEntry[];
   messageIdsFoundInMicrosoftButNotFoundInUnique: EmailDiagnosticEntry[];
   messageIdsFoundInUniqueButNotFoundInMicrosoft: EmailDiagnosticEntry[];
-};
+}

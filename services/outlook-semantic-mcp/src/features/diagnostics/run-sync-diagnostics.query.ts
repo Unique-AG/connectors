@@ -1,11 +1,16 @@
 import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
-import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { createSmeared } from '@unique-ag/utils';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
-import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import { DRIZZLE, DrizzleDatabase, directories, inboxConfigurations, userProfiles } from '~/db';
 import {
+  InboxConfigurationMailFilters,
+  inboxConfigurationMailFilters,
+} from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import {
+  GraphMessage,
   GraphMessageFields,
   graphMessagesResponseSchema,
 } from '~/features/process-email/dtos/microsoft-graph.dtos';
@@ -20,6 +25,8 @@ import type { EmailDiagnosticEntry, SyncDiagnosticsResult } from './sync-diagnos
 
 @Injectable()
 export class RunSyncDiagnosticsQuery {
+  private logger = new Logger(this.constructor.name);
+
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
@@ -68,31 +75,43 @@ export class RunSyncDiagnosticsQuery {
         .get(),
     );
 
+    const ignoredDirectories = await this.db.query.directories.findMany({
+      where: and(
+        eq(directories.userProfileId, userProfileId),
+        eq(directories.ignoreForSync, true),
+      ),
+    });
+    const ignoredFolderIdSet = new Set(ignoredDirectories.map((d) => d.providerDirectoryId));
+
     const skipped: EmailDiagnosticEntry[] = [];
     const notSkipped: EmailDiagnosticEntry[] = [];
 
-    const classifyMessages = (messages: typeof response.value) => {
-      for (const message of messages) {
-        const fileKey = getUniqueKeyForMessage({
-          userEmail: userEmail,
-          messageId: message.id,
-        });
-        const skipResult = shouldSkipEmail(message, filters, { userProfileId });
-        if (skipResult.skip) {
-          skipped.push({ messageId: message.id, fileKey });
-        } else {
-          notSkipped.push({ messageId: message.id, fileKey });
-        }
-      }
-    };
-
-    classifyMessages(response.value);
+    this.processMessages({
+      userEmail: userEmail,
+      messages: response.value,
+      userProfileId: userProfile.id,
+      filters,
+      ignoredFolderIdSet,
+      skipped,
+      notSkipped,
+    });
 
     while (response['@odata.nextLink']) {
       response = graphMessagesResponseSchema.parse(
-        await client.api(response['@odata.nextLink']).header('Prefer', 'IdType="ImmutableId"').get(),
+        await client
+          .api(response['@odata.nextLink'])
+          .header('Prefer', 'IdType="ImmutableId"')
+          .get(),
       );
-      classifyMessages(response.value);
+      this.processMessages({
+        userEmail: userEmail,
+        messages: response.value,
+        userProfileId: userProfile.id,
+        filters,
+        ignoredFolderIdSet,
+        skipped,
+        notSkipped,
+      });
     }
 
     const rootScope = await this.uniqueApi.scopes.getByExternalId(
@@ -124,12 +143,50 @@ export class RunSyncDiagnosticsQuery {
       messageIdsFoundInUniqueButNotFoundInMicrosoft,
     };
 
+    this.logger.log({
+      userProfileId: userProfile.id,
+      providerUserId: userProfile.providerUserId,
+      email: createSmeared(userProfile.email ?? '').toString(),
+      ...result,
+    });
+
     traceAttrs({
-      skippedCount: skipped.length,
-      missingInUniqueCount: messageIdsFoundInMicrosoftButNotFoundInUnique.length,
-      missingInMicrosoftCount: messageIdsFoundInUniqueButNotFoundInMicrosoft.length,
+      skippedCount: result.messageIdsSkippedBecauseOfFilters.length,
+      missingInUniqueCount: result.messageIdsFoundInMicrosoftButNotFoundInUnique.length,
+      missingInMicrosoftCount: result.messageIdsFoundInUniqueButNotFoundInMicrosoft.length,
     });
 
     return result;
+  }
+
+  private processMessages({
+    userEmail,
+    userProfileId,
+    messages,
+    skipped,
+    notSkipped,
+    filters,
+    ignoredFolderIdSet,
+  }: {
+    userEmail: string;
+    messages: GraphMessage[];
+    skipped: EmailDiagnosticEntry[];
+    notSkipped: EmailDiagnosticEntry[];
+    userProfileId: string;
+    filters: InboxConfigurationMailFilters;
+    ignoredFolderIdSet: Set<string>;
+  }): void {
+    for (const message of messages) {
+      const fileKey = getUniqueKeyForMessage({
+        userEmail: userEmail,
+        messageId: message.id,
+      });
+      const skipResult = shouldSkipEmail(message, filters, { userProfileId });
+      if (skipResult.skip || ignoredFolderIdSet.has(message.parentFolderId)) {
+        skipped.push({ messageId: message.id, fileKey });
+      } else {
+        notSkipped.push({ messageId: message.id, fileKey });
+      }
+    }
   }
 }

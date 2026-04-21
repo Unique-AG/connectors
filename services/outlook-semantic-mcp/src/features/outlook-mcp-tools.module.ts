@@ -33,7 +33,13 @@ import { SyncRecoveryModule } from './sync/sync-recovery.module';
 
 const DEBUG_MODE_TOOLS =
   process.env.MCP_DEBUG_MODE === 'enabled'
-    ? [RunFullSyncTool, RestartFullSyncTool, PauseFullSyncTool, ResumeFullSyncTool, SyncDiagnosticsTool]
+    ? [
+        RunFullSyncTool,
+        RestartFullSyncTool,
+        PauseFullSyncTool,
+        ResumeFullSyncTool,
+        SyncDiagnosticsTool,
+      ]
     : [];
 
 const TOOLS = [

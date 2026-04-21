@@ -134,8 +134,7 @@ export const SearchConditionSchema = z
       .optional(),
   })
   .refine((obj) => Object.values(obj).some((v) => v !== undefined), {
-    message:
-      'At least one condition field must be provided. Example: { fromSenders: { value: "alice@example.com", operator: "equals" } }',
+    message: `Invalid search condition, the following fields are supported for conditions 'dateFrom', 'dateTo', 'fromSenders', 'toRecipients', 'ccRecipients', 'directories', 'hasAttachments', categories'. Example of valid condition: { fromSenders: { value: "alice@example.com", operator: "equals" } }`,
   })
   .describe(
     `Condition to narrow down the search, AND operator is applied between multiple conditions fields`,
