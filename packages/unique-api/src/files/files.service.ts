@@ -340,6 +340,30 @@ export class FilesService implements UniqueFilesFacade {
     return successCount;
   }
 
+  public async getFileKeysByScopeId(scopeId: string): Promise<string[]> {
+    this.logger.debug(`[ScopeId: ${scopeId}] Fetching file keys`);
+    let hasMore = true;
+    let skip = 0;
+    const keys: string[] = [];
+    while (hasMore) {
+      const batchResult = await this.ingestionClient.request<
+        PaginatedContentQueryResult,
+        PaginatedContentQueryInput
+      >(PAGINATED_CONTENT_QUERY, {
+        skip,
+        take: CONTENT_BATCH_SIZE,
+        where: {
+          ownerId: { equals: scopeId },
+          ownerType: { equals: 'SCOPE' },
+        },
+      });
+      keys.push(...batchResult.paginatedContent.nodes.map((node) => node.key));
+      skip += CONTENT_BATCH_SIZE;
+      hasMore = CONTENT_BATCH_SIZE === batchResult.paginatedContent.nodes.length;
+    }
+    return keys;
+  }
+
   public async getIdsByScopeAndMetadataKey(
     scopeId: string,
     metadataKey: string,

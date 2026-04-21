@@ -71,6 +71,8 @@ export interface PaginatedContentQueryInput {
       startsWith?: string;
       in?: string[];
     };
+    ownerId?: { equals: string };
+    ownerType?: { equals: string };
   };
 }
 
