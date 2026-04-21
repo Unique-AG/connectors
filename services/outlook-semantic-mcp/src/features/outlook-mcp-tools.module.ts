@@ -6,6 +6,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { OpenEmailTool, SearchEmailsTool, SearchModule } from './content';
 import { DiagnosticsModule } from './diagnostics/diagnostics.module';
+import { SearchRecallCheckTool } from './diagnostics/search-recall-check.tool';
 import { SyncDiagnosticsTool } from './diagnostics/sync-diagnostics.tool';
 import { DirectoriesSyncModule } from './directories-sync/directories-sync.module';
 import { ListFoldersTool } from './directories-sync/tools';
@@ -39,6 +40,7 @@ const DEBUG_MODE_TOOLS =
         PauseFullSyncTool,
         ResumeFullSyncTool,
         SyncDiagnosticsTool,
+        SearchRecallCheckTool,
       ]
     : [];
 
