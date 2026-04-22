@@ -1,3 +1,4 @@
+import { sanitizeError } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import type { ConfluenceConfig } from '../config';
 import type { ConfluenceApiClient, ConfluencePage } from '../confluence-api';
@@ -19,7 +20,7 @@ export class ConfluenceContentFetcher {
       this.logger.error({
         pageId: page.id,
         title: page.title,
-        err: error,
+        err: sanitizeError(error),
         msg: 'Failed to fetch page, possibly deleted in the meantime',
       });
       return null;
