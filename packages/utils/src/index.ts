@@ -5,6 +5,7 @@ export {
   getHttpStatusCodeClass,
   getSlowRequestDurationBucket,
 } from './metrics';
+export { normalizeError, sanitizeError } from './normalize-error';
 export {
   type BatchProcessorOptions,
   processInBatches,
