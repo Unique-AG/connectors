@@ -8,27 +8,29 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { RunSearchRecallCheckQuery } from './run-search-recall-check.query';
 import { RunSyncDiagnosticsQuery } from './run-sync-diagnostics.query';
 
-const InputSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('sync_diagnostics'),
-    params: z.object({}),
-  }),
-  z.object({
-    type: z.literal('search_recall_check'),
-    params: z.object({
-      cases: z
-        .array(
-          z.object({
-            id: z.string(),
-            expectedMessageIds: z.array(z.string()).min(1),
-            search: SearchEmailsInputSchema,
-          }),
-        )
-        .min(1)
-        .max(20),
+const InputSchema = z.object({
+  tool: z.discriminatedUnion('type', [
+    z.object({
+      type: z.literal('sync_diagnostics'),
+      params: z.object({}),
     }),
-  }),
-]);
+    z.object({
+      type: z.literal('search_recall_check'),
+      params: z.object({
+        cases: z
+          .array(
+            z.object({
+              id: z.string(),
+              expectedMessageIds: z.array(z.string()).min(1),
+              search: SearchEmailsInputSchema,
+            }),
+          )
+          .min(1)
+          .max(20),
+      }),
+    }),
+  ]),
+});
 
 @Injectable()
 export class AdminOpsTool {
@@ -50,11 +52,11 @@ export class AdminOpsTool {
     request: McpAuthenticatedRequest,
   ): Promise<unknown> {
     const userProfileId = extractUserProfileId(request).toString();
-    switch (input.type) {
+    switch (input.tool.type) {
       case 'sync_diagnostics':
         return await this.runSyncDiagnosticsQuery.run(userProfileId);
       case 'search_recall_check':
-        return await this.runSearchRecallCheckQuery.run(userProfileId, input.params.cases);
+        return await this.runSearchRecallCheckQuery.run(userProfileId, input.tool.params.cases);
     }
   }
 }
