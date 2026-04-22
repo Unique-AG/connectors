@@ -3,6 +3,7 @@ import {
   getErrorCodeFromGraphqlRequest,
   getHttpStatusCodeClass,
   getSlowRequestDurationBucket,
+  sanitizeError,
 } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
@@ -166,7 +167,10 @@ export class UniqueGraphqlClient {
         });
       }
 
-      this.logger.error({ msg: `Failed ${this.config.target} request (${operationName})`, error });
+      this.logger.error({
+        msg: `Failed ${this.config.target} request (${operationName})`,
+        error: sanitizeError(error),
+      });
 
       throw error;
     }
