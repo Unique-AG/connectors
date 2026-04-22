@@ -72,9 +72,9 @@ export class ConfluenceSynchronizationService {
         itemIdsToProcess.has(`${a.pageId}::${a.id}`),
       );
 
-      this.metrics.recordSyncItemTotals(pagesToFetch.length, attachmentsToIngest.length);
-
       if (pagesToFetch.length > 0 || attachmentsToIngest.length > 0) {
+        this.metrics.recordSyncItemTotals(pagesToFetch.length, attachmentsToIngest.length);
+
         const spaceKeys = [
           ...new Set([
             ...pagesToFetch.map((p) => p.spaceKey),

@@ -176,7 +176,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "Pages processed vs total pages to process in the current sync. Processed includes successful + failed + skipped.",
+      "description": "Pages processed vs total pages to process in the current sync. Processed includes successful + failed + skipped. Processed is summed over the dashboard time range ($__range) so widen the range to cover the full sync for long initial syncs (e.g. 24h). Total is a point-in-time gauge for the current or most recent sync that had work. It persists across no-change syncs.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -214,7 +214,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "Attachments processed vs total attachments to process in the current sync. Processed includes successful + failed.",
+      "description": "Attachments processed vs total attachments to process in the current sync. Processed includes successful + failed. Processed is summed over the dashboard time range ($__range) so widen the range to cover the full sync for long initial syncs (e.g. 24h). Total is a point-in-time gauge for the current or most recent sync that had work. It persists across no-change syncs.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },

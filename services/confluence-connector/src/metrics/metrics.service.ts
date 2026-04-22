@@ -223,10 +223,12 @@ export class Metrics {
   /**
    * Initializes all counters for the current tenant by recording a zero value. This ensures
    * Prometheus scrapes a baseline before the first sync, so that `increase()` can compute a
-   * correct delta from 0 -> N on the first sync cycle after startup.
+   * correct delta from 0 -> N on the first sync cycle after startup. Also seeds the
+   * observable-gauge state maps so the sync-progress panels have data before the first sync.
    */
   public initializeCounters(): void {
-    const tenant = { tenant: this.tenantName };
+    const tenantName = this.tenantName;
+    const tenant = { tenant: tenantName };
     this.pagesProcessed.add(0, { ...tenant, result: 'success' });
     this.pagesProcessed.add(0, { ...tenant, result: 'failure' });
     this.pagesProcessed.add(0, { ...tenant, result: 'skipped' });
@@ -242,5 +244,7 @@ export class Metrics {
     this.orphanedScopesCleaned.add(0, { ...tenant, result: 'success' });
     this.orphanedScopesCleaned.add(0, { ...tenant, result: 'failure' });
     this.orphanedFilesCleaned.add(0, tenant);
+    this.syncPhaseState.set(tenantName, SyncPhase.Idle);
+    this.syncItemTotals.set(tenantName, { pages: 0, attachments: 0 });
   }
 }
