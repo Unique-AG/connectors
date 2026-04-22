@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
@@ -11,4 +12,4 @@ import { RunSearchRecallCheckQuery } from './run-search-recall-check.query';
   providers: [RunSyncDiagnosticsQuery, RunSearchRecallCheckQuery],
   exports: [RunSyncDiagnosticsQuery, RunSearchRecallCheckQuery],
 })
-export class DiagnosticsModule {}
+export class AdminModule {}
