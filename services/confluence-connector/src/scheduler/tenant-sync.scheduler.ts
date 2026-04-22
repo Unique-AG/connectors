@@ -1,3 +1,4 @@
+import { sanitizeError } from '@unique-ag/utils';
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
@@ -38,7 +39,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
         job.stop();
       }
     } catch (error) {
-      this.logger.error({ err: error, msg: 'Error stopping cron jobs' });
+      this.logger.error({ err: sanitizeError(error), msg: 'Error stopping cron jobs' });
     }
   }
 
@@ -71,7 +72,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       try {
         await syncService.synchronize();
       } catch (error) {
-        this.logger.error({ err: error, msg: 'Unexpected sync error' });
+        this.logger.error({ err: sanitizeError(error), msg: 'Unexpected sync error' });
       }
     });
   }

@@ -191,7 +191,10 @@ describe('TenantSyncScheduler', () => {
       await (scheduler as any).syncTenant(tenantA);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.any(Error), msg: 'Unexpected sync error' }),
+        expect.objectContaining({
+          err: expect.objectContaining({ message: 'unexpected failure' }),
+          msg: 'Unexpected sync error',
+        }),
       );
     });
   });
