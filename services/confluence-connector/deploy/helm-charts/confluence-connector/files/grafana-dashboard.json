@@ -165,7 +165,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "cfc_sync_phase{job=~\"$job\", tenant=~\"$tenant\"} == 1",
+          "expr": "cfc_sync_phase{job=~\"$job\", tenant=~\"$tenant\", phase!=\"idle\"} == 1",
           "legendFormat": "{{tenant}}: {{phase}}",
           "refId": "A",
           "instant": true
@@ -274,7 +274,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 13 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 13 },
       "id": 2,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -308,7 +308,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 13 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 13 },
       "id": 3,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -323,6 +323,44 @@
         }
       ],
       "title": "Confluence scan duration per tenant",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Sync completion outcomes per tenant, recorded when each sync cycle finishes. Failure spikes may indicate auth, Confluence API, or ingestion errors. Cross-check the 'API errors and throttling' panel and application logs for root cause.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "stacking": { "mode": "normal" }
+          },
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 13 },
+      "id": 4,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_sync_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — success",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_sync_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\", result=\"failure\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — failure",
+          "refId": "B"
+        }
+      ],
+      "title": "Sync outcomes per tenant (in 1 minute)",
       "type": "timeseries"
     },
     {
@@ -866,7 +904,7 @@
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": { "from": "now-24h", "to": "now" },
   "timezone": "",
   "title": "Confluence Connector",
   "uid": "confluence-connector",
