@@ -3,6 +3,7 @@ import {
   elapsedMilliseconds,
   getHttpStatusCodeClass,
   getSlowRequestDurationBucket,
+  sanitizeError,
 } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
@@ -162,7 +163,7 @@ export class UniqueHttpClient {
         });
       }
 
-      this.logger.error({ msg: 'Failed ingestion HTTP request', error });
+      this.logger.error({ msg: 'Failed ingestion HTTP request', error: sanitizeError(error) });
 
       throw error;
     }
