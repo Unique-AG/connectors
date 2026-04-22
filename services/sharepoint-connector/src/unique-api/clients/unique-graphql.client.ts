@@ -141,9 +141,7 @@ export class UniqueGraphqlClient {
           });
         }
 
-        const loggableError = options?.errorTransform
-          ? options.errorTransform(error)
-          : error;
+        const loggableError = options?.errorTransform ? options.errorTransform(error) : error;
 
         this.logger.error({
           msg: `Failed ${this.clientTarget} request (${operationName})`,
