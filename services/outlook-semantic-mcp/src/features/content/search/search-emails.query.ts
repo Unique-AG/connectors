@@ -85,7 +85,7 @@ export class SearchEmailsQuery {
     const searchResults = await this.uniqueApi.content.search({
       prompt: input.search,
       metaDataFilter,
-      limit: 500, // input.limit,
+      limit: input.limit,
       scoreThreshold: 0,
     });
 
