@@ -1,9 +1,19 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ClientError } from 'graphql-request';
 import { isNullish } from 'remeda';
 import { Smeared } from 'src/utils/smeared';
 import { BatchProcessorService } from '../../shared/services/batch-processor.service';
-import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import { normalizeError } from '../../utils/normalize-error';
 import {
+  INGESTION_CLIENT,
+  SCOPE_MANAGEMENT_CLIENT,
+  UniqueGraphqlClient,
+} from '../clients/unique-graphql.client';
+import {
+  BULK_MOVE_LOG_SAFE_KEYS,
+  BULK_MOVE_MUTATION,
+  BulkMoveMutationInput,
+  BulkMoveMutationResult,
   CREATE_SCOPE_ACCESSES_MUTATION,
   CreateScopeAccessesMutationInput,
   CreateScopeAccessesMutationResult,
@@ -38,6 +48,8 @@ export class UniqueScopesService {
   public constructor(
     @Inject(SCOPE_MANAGEMENT_CLIENT)
     private readonly scopeManagementClient: UniqueGraphqlClient,
+    @Inject(INGESTION_CLIENT)
+    private readonly ingestionClient: UniqueGraphqlClient,
     private readonly batchProcessor: BatchProcessorService,
   ) {}
 
@@ -123,6 +135,36 @@ export class UniqueScopesService {
     );
 
     return result.updateScope;
+  }
+
+  public async bulkMoveScopes(
+    scopeIds: string[],
+    targetScopeId: string,
+  ): Promise<BulkMoveMutationResult['bulkMove']> {
+    this.logger.debug(`Bulk-moving ${scopeIds.length} scopes to target ${targetScopeId}`);
+
+    let result: BulkMoveMutationResult;
+    try {
+      result = await this.ingestionClient.request<BulkMoveMutationResult, BulkMoveMutationInput>(
+        BULK_MOVE_MUTATION,
+        {
+          input: {
+            scopeIds,
+            targetScopeId,
+          },
+        },
+        { logSafeKeys: BULK_MOVE_LOG_SAFE_KEYS, errorTransform: toSafeBulkMoveError },
+      );
+    } catch (error) {
+      throw toSafeBulkMoveError(error);
+    }
+
+    this.logger.debug({
+      msg: 'bulkMove response',
+      response: result.bulkMove,
+    });
+
+    return result.bulkMove;
   }
 
   public async createScopeAccesses(
@@ -310,4 +352,20 @@ export class UniqueScopesService {
 
     return result.deleteFolder;
   }
+}
+
+// bulkMove errors from node-ingestion embed filenames, folder names, and job IDs inside "(...)". Strip those.
+const BULK_MOVE_SENSITIVE_PAREN_PATTERN = /\s*\((?!s\))[^)]*\)/g;
+
+// Returns an Error whose message is safe to log
+export function toSafeBulkMoveError(error: unknown): Error {
+  if (!(error instanceof ClientError)) {
+    return normalizeError(error);
+  }
+  const serverMessage = error.response.errors?.[0]?.message;
+
+  if (!serverMessage) {
+    return new Error(`bulkMove failed with status ${error.response.status}`);
+  }
+  return new Error(serverMessage.replace(BULK_MOVE_SENSITIVE_PAREN_PATTERN, ''));
 }
