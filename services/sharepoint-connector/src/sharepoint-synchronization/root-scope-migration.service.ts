@@ -55,6 +55,13 @@ export class RootScopeMigrationService {
       // move, or switch the delete below to `recursive: true` once content has been
       // re-owned to the new root. Tracked as a follow-up.
       if (children.length > 0) {
+        /*
+          Depending on the number of files it has to move, bulkMove can be a sync operation or an async operation.
+          But it always returns *after the new parent was correctly set for scopes and files*.
+          What it actually does asynchronously is themetadata update where it computes the new folderIdPath, for example
+           - folderIdpath: "uniquepathid://scope_o5jr5ig8k4iugk8lhd8nq42e/scope_xrqbd1pjg71xq7o6r762w01o"
+          Recomputing the metadata is a slower process that's why for more files (default is 10) it'll be async
+         */
         await this.uniqueScopesService.bulkMoveScopes(
           children.map((c) => c.id),
           newRootScopeId,

@@ -155,7 +155,7 @@ export class UniqueScopesService {
       { logSafeKeys: BULK_MOVE_LOG_SAFE_KEYS },
     );
 
-    this.logger.log({
+    this.logger.debug({
       msg: 'bulkMove response',
       response: result.bulkMove,
     });
