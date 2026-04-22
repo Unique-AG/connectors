@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import type { Scope, UniqueApiClient } from '@unique-ag/unique-api';
+import { sanitizeError } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import type { IngestionConfig } from '../config/ingestion.schema';
 import type {
@@ -105,7 +106,7 @@ export class ScopeManagementService {
         this.logger.error({
           scopeId: rootScope.id,
           externalId: expectedExternalId,
-          err: error,
+          err: sanitizeError(error),
           msg: 'Failed to claim root scope ownership',
         });
         throw error;
@@ -200,7 +201,7 @@ export class ScopeManagementService {
         this.logger.error({
           scopeId: scope.id,
           spaceKey: parsed.spaceKey,
-          err: error,
+          err: sanitizeError(error),
           msg: 'Failed to clean up orphaned space scope',
         });
       }
