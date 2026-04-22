@@ -95,6 +95,7 @@ export const PAGINATED_CONTENT_QUERY = gql`
         metadata
         byteSize
         expiresAt
+        ingestionState
       }
       totalCount
     }

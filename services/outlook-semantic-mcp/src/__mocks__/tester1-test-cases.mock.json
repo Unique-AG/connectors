@@ -1,0 +1,277 @@
+{
+  "type": "search_recall_check",
+  "params": {
+    "cases": [
+      {
+        "id": "inbox_today",
+        "expectedMessageIds": [
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa4ppQgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa4qAwQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa4qCuQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa5p1yAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa5p5sgAA"
+        ],
+        "search": {
+          "search": "emails received today",
+          "conditions": [
+            {
+              "directories": { "value": ["Inbox"], "operator": "in" },
+              "dateFrom": { "value": "2026-04-16T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-17T00:00:00Z", "operator": "lessThan" }
+            }
+          ],
+          "limit": 100
+        }
+      },
+      {
+        "id": "sent_today",
+        "expectedMessageIds": [
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAASfxQeAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAASfxYbQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAASfyD9gAA"
+        ],
+        "search": {
+          "search": "emails sent today",
+          "conditions": [
+            {
+              "directories": { "value": ["Sent Items"], "operator": "in" },
+              "dateFrom": { "value": "2026-02-24T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-02-25T00:00:00Z", "operator": "lessThan" }
+            }
+          ],
+          "limit": 100
+        }
+      },
+      {
+        "id": "inbox_this_week",
+        "expectedMessageIds": [
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR62ewAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR8tZQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaw1g6QAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa4ppQgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa4qAwQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa4qCuQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa5p1yAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa5p5sgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa5u4QwAA"
+        ],
+        "search": {
+          "search": "emails from this week",
+          "conditions": [
+            {
+              "directories": { "value": ["Inbox"], "operator": "in" },
+              "dateFrom": { "value": "2026-04-13T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-20T00:00:00Z", "operator": "lessThan" }
+            }
+          ],
+          "limit": 100
+        }
+      },
+      {
+        "id": "from_exact_sender",
+        "expectedMessageIds": [
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6iigAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6imQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6i2gAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jFgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jNAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jUgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jiQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jogAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jrAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6kdAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6knAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6ktQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6k4gAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6mEwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6mHQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6mcgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6mmgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6nAwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6rGAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6rdwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6r0QAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6r1gAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6r2wAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6sJgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6wNgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6wTwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6wXgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6wmgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6xKwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6xPwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6xRAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6x6QAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6yEQAA"
+        ],
+        "search": {
+          "search": "emails from daniel.mercer@harborviewam.com",
+          "conditions": [
+            {
+              "fromSenders": { "value": "daniel.mercer@harborviewam.com", "operator": "equals" },
+              "dateFromTo": { "value": "2026-01-17T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-22T00:00:00Z", "operator": "lessThanOrEqual" }
+            }
+          ],
+          "limit": 100
+        }
+      },
+      {
+        "id": "from_domain",
+        "expectedMessageIds": [
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6rVAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6rcgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6w2wAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6ilAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6rXgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jDAAA"
+        ],
+        "search": {
+          "search": "emails from @northbridgeadvisory.com",
+          "conditions": [
+            {
+              "fromSenders": { "value": "@northbridgeadvisory.com", "operator": "contains" },
+              "dateFromTo": { "value": "2026-01-17T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-22T00:00:00Z", "operator": "lessThanOrEqual" }
+            }
+          ],
+          "limit": 100
+        }
+      },
+      {
+        "id": "from_multiple_senders",
+        "expectedMessageIds": [
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6rGAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6kdAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6imQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jiQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jrAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6wXgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jNAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6mHQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6sJgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jUgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6r1gAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6r2wAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6ktQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6wTwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6wNgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6mcgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jFgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6knAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6mEwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6k4gAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6wmgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6iigAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6rdwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6mmgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6i2gAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6xPwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6yEQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6x6QAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6nAwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6xKwAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6r0QAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jogAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6xRAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6lzQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6jPgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6xigAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6kJAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6i-QAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6x0AAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6q9QAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6wbQAA"
+        ],
+        "search": {
+          "search": "emails from daniel.mercer@harborviewam.com or evelyn.hart@northbridgeam.com",
+          "conditions": [
+            {
+              "fromSenders": {
+                "value": ["daniel.mercer@harborviewam.com", "evelyn.hart@northbridgeam.com"],
+                "operator": "in"
+              },
+              "dateFromTo": { "value": "2026-01-17T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-22T00:00:00Z", "operator": "lessThanOrEqual" }
+            }
+          ],
+          "limit": 100
+        }
+      },
+      {
+        "id": "with_attachments_recent",
+        "expectedMessageIds": [
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAUolITgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAVUoHUQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAVZK0nQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAVZLUBAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAVZLloAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAVZLplgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAV67CSAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAV67CTwAA"
+        ],
+        "search": {
+          "search": "emails with attachments",
+          "conditions": [
+            {
+              "hasAttachments": { "value": "true", "operator": "equals" },
+              "dateFrom": { "value": "2026-03-10T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-10T00:00:00Z", "operator": "lessThanOrEqual" }
+            }
+          ],
+          "limit": 100
+        }
+      },
+      {
+        "id": "from_sender_inbox_range",
+        "expectedMessageIds": [
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAaR6hPgAA"
+        ],
+        "search": {
+          "search": "emails from Elena Maurer in inbox this month",
+          "conditions": [
+            {
+              "directories": { "value": ["Inbox"], "operator": "in" },
+              "fromSenders": {
+                "value": "elena.maurer@customhousefs.com",
+                "operator": "equals"
+              },
+              "dateFrom": { "value": "2026-03-01T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-01T00:00:00Z", "operator": "lessThanOrEqual" }
+            }
+          ],
+          "limit": 100
+        }
+      },
+      {
+        "id": "inbox_or_sent_today",
+        "expectedMessageIds": [
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa4ppQgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa4qAwQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa4qCuQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa5p1yAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAAa5p5sgAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAASfxQeAAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAASfxYbQAA",
+          "AAkALgAAAAAAHYQDEapmEc2byACqAC-EWg0AyNAd4mgr7UG3aBNmNvr1hAAASfyD9gAA"
+        ],
+        "search": {
+          "search": "emails from inbox or sent today",
+          "conditions": [
+            {
+              "directories": { "value": ["Inbox"], "operator": "in" },
+              "dateFrom": { "value": "2026-04-16T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-17T00:00:00Z", "operator": "lessThan" }
+            },
+            {
+              "directories": { "value": ["Sent Items"], "operator": "in" },
+              "dateFrom": { "value": "2026-02-24T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-02-25T00:00:00Z", "operator": "lessThan" }
+            }
+          ],
+          "limit": 100
+        }
+      }
+    ]
+  }
+}

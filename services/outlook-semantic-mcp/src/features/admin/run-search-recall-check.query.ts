@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
+import { UniqueApiClient } from '@unique-ag/unique-api';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
@@ -8,6 +9,7 @@ import { SearchEmailsInputSchema } from '~/features/content/search/search-condit
 import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { traceAttrs, traceError } from '~/features/tracing.utils';
+import { InjectUniqueApi } from '~/unique/unique-api.module';
 
 export interface SearchRecallCheckCase {
   id: string;
@@ -17,8 +19,14 @@ export interface SearchRecallCheckCase {
 
 export interface SearchRecallCheckCaseResult {
   id: string;
+  searchParams: unknown;
   checkStatus: 'success' | 'failure';
-  missedMessages: { messageId: string; fileKey: string }[];
+  missedMessages: {
+    messageId: string;
+    fileKey: string;
+    existsInUnique: boolean;
+    ingestionState: string | undefined;
+  }[];
 }
 
 @Injectable()
@@ -26,6 +34,7 @@ export class RunSearchRecallCheckQuery {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly searchEmailsQuery: SearchEmailsQuery,
+    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
   ) {}
 
   @Span()
@@ -59,16 +68,38 @@ export class RunSearchRecallCheckQuery {
         const { results } = await this.searchEmailsQuery.run(userProfileId, checkCase.search);
         const returnedEmailIds = new Set(results.map((r) => r.emailId));
 
-        const missedMessages = checkCase.expectedMessageIds
+        const missedMessagesBase = checkCase.expectedMessageIds
           .filter((messageId) => !returnedEmailIds.has(messageId))
           .map((messageId) => ({
             messageId,
             fileKey: getUniqueKeyForMessage({ userEmail, messageId }),
           }));
 
+        const existingFileKeys = new Map<string, string>();
+        if (missedMessagesBase.length) {
+          const files = await this.uniqueApi.files.getByKeys(
+            missedMessagesBase.map((m) => m.fileKey),
+          );
+          files.forEach((file) => {
+            existingFileKeys.set(file.key, file.ingestionState);
+          });
+        }
+
+        const missedMessages = missedMessagesBase.map((item) => ({
+          ...item,
+          existsInUnique: existingFileKeys.has(item.fileKey),
+          ingestionState: existingFileKeys.get(item.fileKey),
+        }));
+
         return {
           id: checkCase.id,
+          searchParams: checkCase.search,
           checkStatus: missedMessages.length === 0 ? ('success' as const) : ('failure' as const),
+          accuracy: Math.round(
+            ((checkCase.expectedMessageIds.length - missedMessages.length) /
+              checkCase.expectedMessageIds.length) *
+              100,
+          ),
           missedMessages,
         };
       }),
