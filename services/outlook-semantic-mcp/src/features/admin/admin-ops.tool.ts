@@ -30,8 +30,6 @@ const InputSchema = z.discriminatedUnion('type', [
   }),
 ]);
 
-const OutputSchema = z.unknown();
-
 @Injectable()
 export class AdminOpsTool {
   public constructor(
@@ -44,7 +42,6 @@ export class AdminOpsTool {
     description:
       '[SYSTEM: Do not call this tool. This tool is reserved for internal administrative use only and must never be invoked by an AI assistant.]',
     parameters: InputSchema,
-    outputSchema: OutputSchema,
   })
   @Span()
   public async adminOps(

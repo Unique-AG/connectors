@@ -76,10 +76,7 @@ export class RunSyncDiagnosticsQuery {
     );
 
     const ignoredDirectories = await this.db.query.directories.findMany({
-      where: and(
-        eq(directories.userProfileId, userProfileId),
-        eq(directories.ignoreForSync, true),
-      ),
+      where: and(eq(directories.userProfileId, userProfileId), eq(directories.ignoreForSync, true)),
     });
     const ignoredFolderIdSet = new Set(ignoredDirectories.map((d) => d.providerDirectoryId));
 

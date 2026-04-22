@@ -4,8 +4,8 @@ import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, userProfiles } from '~/db';
-import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
+import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { traceAttrs, traceError } from '~/features/tracing.utils';
 

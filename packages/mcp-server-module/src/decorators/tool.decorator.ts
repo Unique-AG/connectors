@@ -22,7 +22,7 @@ export interface ToolOptions {
   name?: string;
   title?: string;
   description?: string;
-  parameters: z.ZodObject;
+  parameters: z.ZodObject | z.ZodDiscriminatedUnion;
   outputSchema?: z.ZodObject;
   annotations?: ToolAnnotations;
   _meta?: SdkTool['_meta'];
