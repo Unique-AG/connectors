@@ -241,7 +241,7 @@ export interface BulkMoveMutationResult {
   };
 }
 
-export const BULK_MOVE_LOG_SAFE_KEYS: VariableLogPolicy = ['input.targetScopeId'];
+export const BULK_MOVE_LOG_SAFE_KEYS: VariableLogPolicy = ['input.scopeIds', 'input.targetScopeId'];
 
 export const BULK_MOVE_MUTATION = gql`
   mutation BulkMove($input: BulkMoveInput!) {
