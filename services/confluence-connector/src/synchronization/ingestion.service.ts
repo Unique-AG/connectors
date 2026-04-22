@@ -5,7 +5,7 @@ import type {
   IngestionFinalizationRequest,
   UniqueApiClient,
 } from '@unique-ag/unique-api';
-import { createSmeared, elapsedSeconds } from '@unique-ag/utils';
+import { createSmeared, elapsedSeconds, sanitizeError } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { type Dispatcher, request } from 'undici';
 import type { TenantConfig } from '../config';
@@ -82,7 +82,7 @@ export class IngestionService {
       this.logger.error({
         pageId: page.id,
         title: page.title,
-        err: error,
+        err: sanitizeError(error),
         msg: 'Failed to ingest page, skipping',
       });
       if (contentId) {
@@ -137,7 +137,7 @@ export class IngestionService {
       this.logger.error({
         attachmentId: attachment.id,
         title: createSmeared(attachment.title),
-        err: error,
+        err: sanitizeError(error),
         msg: 'Failed to ingest attachment, skipping',
       });
       if (contentId) {
@@ -164,7 +164,7 @@ export class IngestionService {
       this.logger.error({
         ...logContext,
         contentId,
-        err: error,
+        err: sanitizeError(error),
         msg: 'Failed to clean up orphaned content after failed ingestion',
       });
     }
@@ -200,7 +200,11 @@ export class IngestionService {
       // in @unique-ag/unique-api to return { deleted, failed } based on the mutation response.
       return deletedCount;
     } catch (error) {
-      this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
+      this.logger.error({
+        contentKeys,
+        err: sanitizeError(error),
+        msg: 'Failed to delete content, skipping',
+      });
       return 0;
     }
   }
