@@ -1,4 +1,4 @@
-import { getErrorCodeFromGraphqlRequest } from '@unique-ag/utils';
+import { getErrorCodeFromGraphqlRequest, sanitizeError } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { chunk } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
@@ -272,7 +272,7 @@ export class FilesService implements UniqueFilesFacade {
               msg: `${logPrefix} Failed to add single file access`,
               scopeId,
               permission,
-              error: singleError,
+              error: sanitizeError(singleError),
             });
           }
         }
@@ -330,7 +330,7 @@ export class FilesService implements UniqueFilesFacade {
               msg: `${logPrefix} Failed to remove single file access`,
               scopeId,
               permission,
-              error: singleError,
+              error: sanitizeError(singleError),
             });
           }
         }
