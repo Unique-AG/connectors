@@ -21,6 +21,7 @@ export interface SearchRecallCheckCaseResult {
   id: string;
   searchParams: unknown;
   checkStatus: 'success' | 'failure';
+  accuracy: string;
   missedMessages: {
     messageId: string;
     fileKey: string;
@@ -91,15 +92,14 @@ export class RunSearchRecallCheckQuery {
           ingestionState: existingFileKeys.get(item.fileKey),
         }));
 
+        const foundEmails = checkCase.expectedMessageIds.length - missedMessages.length;
+        const accuracy = ((foundEmails / checkCase.expectedMessageIds.length) * 100).toFixed(2);
+
         return {
           id: checkCase.id,
           searchParams: checkCase.search,
           checkStatus: missedMessages.length === 0 ? ('success' as const) : ('failure' as const),
-          accuracy: Math.round(
-            ((checkCase.expectedMessageIds.length - missedMessages.length) /
-              checkCase.expectedMessageIds.length) *
-              100,
-          ),
+          accuracy: `Found ${foundEmails} out of ${checkCase.expectedMessageIds.length}, ${missedMessages.length} missing. Accuracy ${accuracy}%`,
           missedMessages,
         };
       }),
