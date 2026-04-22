@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { chunk } from 'remeda';
+import { sanitizeError } from './normalize-error';
 
 export interface BatchProcessorOptions<TInput, TOutput> {
   items: TInput[];
@@ -44,7 +45,7 @@ export async function processInBatches<TInput, TOutput>({
       logger.error({
         batchIndex: index,
         batchSize: batch.length,
-        err: error,
+        err: sanitizeError(error),
         msg: `${logPrefix} Failed to process batch ${index + 1}`,
       });
       throw error;
