@@ -2,7 +2,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { isNullish } from 'remeda';
 import { Smeared } from 'src/utils/smeared';
 import { BatchProcessorService } from '../../shared/services/batch-processor.service';
-import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import {
+  INGESTION_CLIENT,
+  SCOPE_MANAGEMENT_CLIENT,
+  UniqueGraphqlClient,
+} from '../clients/unique-graphql.client';
 import {
   BULK_MOVE_LOG_SAFE_KEYS,
   BULK_MOVE_MUTATION,
@@ -42,6 +46,8 @@ export class UniqueScopesService {
   public constructor(
     @Inject(SCOPE_MANAGEMENT_CLIENT)
     private readonly scopeManagementClient: UniqueGraphqlClient,
+    @Inject(INGESTION_CLIENT)
+    private readonly ingestionClient: UniqueGraphqlClient,
     private readonly batchProcessor: BatchProcessorService,
   ) {}
 
@@ -135,7 +141,7 @@ export class UniqueScopesService {
   ): Promise<BulkMoveMutationResult['bulkMove']> {
     this.logger.debug(`Bulk-moving ${scopeIds.length} scopes to target ${targetScopeId}`);
 
-    const result = await this.scopeManagementClient.request<
+    const result = await this.ingestionClient.request<
       BulkMoveMutationResult,
       BulkMoveMutationInput
     >(
