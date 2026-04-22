@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ClientError } from 'graphql-request';
 import { isNullish } from 'remeda';
 import { Smeared } from 'src/utils/smeared';
 import { BatchProcessorService } from '../../shared/services/batch-processor.service';
+import { normalizeError } from '../../utils/normalize-error';
 import {
   INGESTION_CLIENT,
   SCOPE_MANAGEMENT_CLIENT,
@@ -141,19 +143,21 @@ export class UniqueScopesService {
   ): Promise<BulkMoveMutationResult['bulkMove']> {
     this.logger.debug(`Bulk-moving ${scopeIds.length} scopes to target ${targetScopeId}`);
 
-    const result = await this.ingestionClient.request<
-      BulkMoveMutationResult,
-      BulkMoveMutationInput
-    >(
-      BULK_MOVE_MUTATION,
-      {
-        input: {
-          scopeIds,
-          targetScopeId,
+    let result: BulkMoveMutationResult;
+    try {
+      result = await this.ingestionClient.request<BulkMoveMutationResult, BulkMoveMutationInput>(
+        BULK_MOVE_MUTATION,
+        {
+          input: {
+            scopeIds,
+            targetScopeId,
+          },
         },
-      },
-      { logSafeKeys: BULK_MOVE_LOG_SAFE_KEYS },
-    );
+        { logSafeKeys: BULK_MOVE_LOG_SAFE_KEYS },
+      );
+    } catch (error) {
+      throw toSafeBulkMoveError(error);
+    }
 
     this.logger.debug({
       msg: 'bulkMove response',
@@ -348,4 +352,20 @@ export class UniqueScopesService {
 
     return result.deleteFolder;
   }
+}
+
+// bulkMove errors from node-ingestion embed filenames, folder names, and job IDs inside "(...)". Strip those.
+const BULK_MOVE_SENSITIVE_PAREN_PATTERN = /\s*\((?!s\))[^)]*\)/g;
+
+// Returns an Error whose message is safe to log
+export function toSafeBulkMoveError(error: unknown): Error {
+  if (!(error instanceof ClientError)) {
+    return normalizeError(error);
+  }
+  const serverMessage = error.response.errors?.[0]?.message;
+
+  if (!serverMessage) {
+    return new Error(`bulkMove failed with status ${error.response.status}`);
+  }
+  return new Error(serverMessage.replace(BULK_MOVE_SENSITIVE_PAREN_PATTERN, ''));
 }
