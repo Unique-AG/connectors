@@ -5,9 +5,8 @@ import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { OpenEmailTool, SearchEmailsTool, SearchModule } from './content';
-import { DiagnosticsModule } from './diagnostics/diagnostics.module';
-import { SearchRecallCheckTool } from './diagnostics/search-recall-check.tool';
-import { SyncDiagnosticsTool } from './diagnostics/sync-diagnostics.tool';
+import { AdminModule } from './admin/diagnostics.module';
+import { AdminOpsTool } from './admin/admin-ops.tool';
 import { DirectoriesSyncModule } from './directories-sync/directories-sync.module';
 import { ListFoldersTool } from './directories-sync/tools';
 import { EmailManagementModule } from './email-management/email-management.module';
@@ -39,8 +38,7 @@ const DEBUG_MODE_TOOLS =
         RestartFullSyncTool,
         PauseFullSyncTool,
         ResumeFullSyncTool,
-        SyncDiagnosticsTool,
-        SearchRecallCheckTool,
+        AdminOpsTool,
       ]
     : [];
 
@@ -77,7 +75,7 @@ const TOOLS = [
     SearchModule,
     UniqueApiFeatureModule,
     SyncRecoveryModule,
-    DiagnosticsModule,
+    AdminModule,
   ],
   providers: [MailSubscriptionController, ...TOOLS],
   controllers: [MailSubscriptionController],
