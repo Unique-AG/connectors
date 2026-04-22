@@ -1,6 +1,6 @@
 import assert from 'node:assert';
-import { Inject, Injectable } from '@nestjs/common';
 import { UniqueApiClient } from '@unique-ag/unique-api';
+import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
