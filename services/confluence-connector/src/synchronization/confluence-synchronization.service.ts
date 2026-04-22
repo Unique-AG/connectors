@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { elapsedSeconds } from '@unique-ag/utils';
+import { elapsedSeconds, sanitizeError } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
 import type { Metrics } from '../metrics';
@@ -104,7 +104,7 @@ export class ConfluenceSynchronizationService {
       this.logger.log({ msg: 'Sync work done' });
     } catch (error) {
       syncResult = 'failure';
-      this.logger.error({ err: error, msg: 'Sync failed' });
+      this.logger.error({ err: sanitizeError(error), msg: 'Sync failed' });
     } finally {
       tenant.isScanning = false;
       this.metrics.recordSyncDuration(elapsedSeconds(startTime), syncResult);
