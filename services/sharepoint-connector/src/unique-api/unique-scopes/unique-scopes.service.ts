@@ -4,6 +4,10 @@ import { Smeared } from 'src/utils/smeared';
 import { BatchProcessorService } from '../../shared/services/batch-processor.service';
 import { SCOPE_MANAGEMENT_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
+  BULK_MOVE_LOG_SAFE_KEYS,
+  BULK_MOVE_MUTATION,
+  BulkMoveMutationInput,
+  BulkMoveMutationResult,
   CREATE_SCOPE_ACCESSES_MUTATION,
   CreateScopeAccessesMutationInput,
   CreateScopeAccessesMutationResult,
@@ -123,6 +127,29 @@ export class UniqueScopesService {
     );
 
     return result.updateScope;
+  }
+
+  public async bulkMoveScopes(
+    scopeIds: string[],
+    targetScopeId: string,
+  ): Promise<BulkMoveMutationResult['bulkMove']> {
+    this.logger.debug(`Bulk-moving ${scopeIds.length} scopes to target ${targetScopeId}`);
+
+    const result = await this.scopeManagementClient.request<
+      BulkMoveMutationResult,
+      BulkMoveMutationInput
+    >(
+      BULK_MOVE_MUTATION,
+      {
+        input: {
+          scopeIds,
+          targetScopeId,
+        },
+      },
+      { logSafeKeys: BULK_MOVE_LOG_SAFE_KEYS },
+    );
+
+    return result.bulkMove;
   }
 
   public async createScopeAccesses(
