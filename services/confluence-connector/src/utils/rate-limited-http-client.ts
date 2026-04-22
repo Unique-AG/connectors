@@ -1,5 +1,5 @@
 import type { Readable } from 'node:stream';
-import { elapsedSeconds } from '@unique-ag/utils';
+import { elapsedSeconds, sanitizeError } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
@@ -118,7 +118,7 @@ export class RateLimitedHttpClient {
     });
 
     this.limiter.on('error', (error) => {
-      this.logger.error({ err: error, msg: 'Bottleneck error' });
+      this.logger.error({ err: sanitizeError(error), msg: 'Bottleneck error' });
     });
   }
 }
