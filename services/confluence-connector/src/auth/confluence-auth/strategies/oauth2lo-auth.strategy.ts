@@ -1,3 +1,4 @@
+import { sanitizeError } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { type Dispatcher, request } from 'undici';
 import { z } from 'zod';
@@ -60,7 +61,7 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
       return await this.requestToken();
     } catch (error) {
       this.logger.error({
-        err: error,
+        err: sanitizeError(error),
         msg: `Failed to acquire Confluence ${this.instanceType} token via OAuth 2.0 2LO`,
       });
 
