@@ -153,7 +153,7 @@ export class UniqueScopesService {
             targetScopeId,
           },
         },
-        { logSafeKeys: BULK_MOVE_LOG_SAFE_KEYS },
+        { logSafeKeys: BULK_MOVE_LOG_SAFE_KEYS, errorTransform: toSafeBulkMoveError },
       );
     } catch (error) {
       throw toSafeBulkMoveError(error);

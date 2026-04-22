@@ -84,7 +84,7 @@ export class UniqueGraphqlClient {
   public async request<T, V extends Variables = Variables>(
     document: RequestDocument,
     variables?: V,
-    options?: { logSafeKeys?: VariableLogPolicy },
+    options?: { logSafeKeys?: VariableLogPolicy; errorTransform?: (error: unknown) => Error },
   ): Promise<T> {
     return await this.limiter.schedule(async () => {
       const startTime = Date.now();
@@ -141,6 +141,10 @@ export class UniqueGraphqlClient {
           });
         }
 
+        const loggableError = options?.errorTransform
+          ? options.errorTransform(error)
+          : error;
+
         this.logger.error({
           msg: `Failed ${this.clientTarget} request (${operationName})`,
           operationName,
@@ -148,7 +152,7 @@ export class UniqueGraphqlClient {
             variables as Record<string, unknown> | undefined,
             options?.logSafeKeys,
           ),
-          error: sanitizeError(error),
+          error: sanitizeError(loggableError),
         });
         throw error;
       }
