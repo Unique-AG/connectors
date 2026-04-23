@@ -21,7 +21,8 @@ const InputSchema = z.object({
           .array(
             z.object({
               id: z.string(),
-              expectedMessageIds: z.array(z.string()).min(1),
+              graphFilter: z.string().optional(),
+              graphSearch: z.string().optional(),
               search: SearchEmailsInputSchema,
             }),
           )

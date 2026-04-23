@@ -1,39 +1,63 @@
-import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
-import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import { pick } from 'remeda';
 import * as z from 'zod';
-import { DRIZZLE, DrizzleDatabase, userProfiles } from '~/db';
 import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
 import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { traceAttrs, traceError } from '~/features/tracing.utils';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { FAILED_INGESTION_STATUSES } from '../sync/full-sync/get-scope-ingestion-stats.query';
+import { FetchMessagesFromGraphQuery } from './fetch-messages-from-graph.query';
 
 export interface SearchRecallCheckCase {
-  id: string;
-  expectedMessageIds: string[];
+  graphFilter?: string;
+  graphSearch?: string;
   search: z.infer<typeof SearchEmailsInputSchema>;
 }
 
-export interface SearchRecallCheckCaseResult {
-  id: string;
-  searchParams: unknown;
-  checkStatus: 'success' | 'failure';
+interface SearchRecallCommonResponse {
   accuracy: string;
-  missedMessages: {
-    messageId: string;
-    fileKey: string;
-    existsInUnique: boolean;
-    ingestionState: string | undefined;
-  }[];
+  stats: {
+    graphEmailsCount: number;
+    searchEmailsCount: number;
+    missedEmailsCount: number;
+    foundEmailsCount: number;
+  };
+  inputParams: {
+    graphFilter?: string;
+    graphSearch?: string;
+    search: z.infer<typeof SearchEmailsInputSchema>;
+  };
 }
+
+interface SearchRecallCheckSuccessResult extends SearchRecallCommonResponse {
+  checkStatus: 'success';
+}
+
+interface SearchRecallCheckFailureResult extends SearchRecallCommonResponse {
+  checkStatus: 'failure';
+  missedMessages: {
+    missedMessagesInUniqueCount: number;
+    missedMessagesInUniqueWithFailedIngestionCount: number;
+    items: {
+      messageId: string;
+      fileKey: string;
+      existsInUnique: boolean;
+      ingestionState: string | undefined;
+    }[];
+  };
+}
+
+export type SearchRecallCheckCaseResult =
+  | SearchRecallCheckSuccessResult
+  | SearchRecallCheckFailureResult;
 
 @Injectable()
 export class RunSearchRecallCheckQuery {
   public constructor(
-    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    private readonly fetchMessagesFromGraphQuery: FetchMessagesFromGraphQuery,
     private readonly searchEmailsQuery: SearchEmailsQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
   ) {}
@@ -56,20 +80,21 @@ export class RunSearchRecallCheckQuery {
     cases: SearchRecallCheckCase[],
   ): Promise<SearchRecallCheckCaseResult[]> {
     traceAttrs({ userProfileId });
-
-    const userProfile = await this.db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, userProfileId),
-    });
-    assert.ok(userProfile, `User profile not found: ${userProfileId}`);
-    const userEmail = userProfile.email;
-    assert.ok(userEmail, `User profile has no email: ${userProfileId}`);
+    const failedIngestionStates = new Set<string | undefined>(FAILED_INGESTION_STATUSES);
 
     return Promise.all(
-      cases.map(async (checkCase) => {
+      cases.map(async (checkCase): Promise<SearchRecallCheckCaseResult> => {
+        const { notSkipped, userEmail } = await this.fetchMessagesFromGraphQuery.run({
+          userProfileId,
+          filter: checkCase.graphFilter,
+          search: checkCase.graphSearch,
+        });
+
+        const expectedMessageIds = notSkipped.map((e) => e.messageId);
         const { results } = await this.searchEmailsQuery.run(userProfileId, checkCase.search);
         const returnedEmailIds = new Set(results.map((r) => r.emailId));
 
-        const missedMessagesBase = checkCase.expectedMessageIds
+        const missedMessagesBase = expectedMessageIds
           .filter((messageId) => !returnedEmailIds.has(messageId))
           .map((messageId) => ({
             messageId,
@@ -92,15 +117,38 @@ export class RunSearchRecallCheckQuery {
           ingestionState: existingFileKeys.get(item.fileKey),
         }));
 
-        const foundEmails = checkCase.expectedMessageIds.length - missedMessages.length;
-        const accuracy = ((foundEmails / checkCase.expectedMessageIds.length) * 100).toFixed(2);
+        const foundEmails = expectedMessageIds.length - missedMessages.length;
+        const accuracy =
+          expectedMessageIds.length === 0
+            ? '100.00'
+            : ((foundEmails / expectedMessageIds.length) * 100).toFixed(2);
+
+        const result: SearchRecallCommonResponse = {
+          accuracy,
+          inputParams: pick(checkCase, ['graphFilter', 'graphSearch', 'search']),
+          stats: {
+            graphEmailsCount: expectedMessageIds.length,
+            searchEmailsCount: returnedEmailIds.size,
+            missedEmailsCount: missedMessages.length,
+            foundEmailsCount: foundEmails,
+          },
+        };
+
+        if (missedMessages.length === 0) {
+          return { checkStatus: 'success', ...result };
+        }
 
         return {
-          id: checkCase.id,
-          searchParams: checkCase.search,
-          checkStatus: missedMessages.length === 0 ? ('success' as const) : ('failure' as const),
-          accuracy: `Found ${foundEmails} out of ${checkCase.expectedMessageIds.length}, ${missedMessages.length} missing. Accuracy ${accuracy}%`,
-          missedMessages,
+          checkStatus: 'failure',
+          ...result,
+          missedMessages: {
+            missedMessagesInUniqueCount: missedMessages.filter((item) => item.existsInUnique)
+              .length,
+            missedMessagesInUniqueWithFailedIngestionCount: missedMessages.filter(
+              (item) => item.existsInUnique && failedIngestionStates.has(item.ingestionState),
+            ).length,
+            items: missedMessages,
+          },
         };
       }),
     );

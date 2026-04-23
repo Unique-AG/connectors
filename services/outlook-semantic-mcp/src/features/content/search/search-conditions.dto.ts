@@ -156,11 +156,18 @@ export const SearchEmailsInputSchema = z.object({
   limit: z
     .number()
     .int()
-    .min(40)
-    .max(100)
+    .min(200)
+    .max(500)
     .optional()
-    .prefault(40)
-    .describe('Maximum number of results to return. Must be between 40 and 100.'),
+    .prefault(200)
+    .describe(
+      [
+        'Maximum number of results to return. Must be between 200 and 500.',
+        'If the search query is targeted (e.g. looking for a specific email or thread), the default of 200 is sufficient.',
+        'If the query is fuzzy or broad (e.g. "overview of all emails from alice@example.com", "list emails from last week", "what happened last week"), pick a limit between 300 and 500.',
+        'When the expected result set is large, always use 500.',
+      ].join(' '),
+    ),
 });
 
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
