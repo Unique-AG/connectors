@@ -15,12 +15,14 @@ import { FAILED_INGESTION_STATUSES } from '../sync/full-sync/get-scope-ingestion
 import { FetchMessagesFromGraphQuery } from './fetch-messages-from-graph.query';
 
 export interface SearchRecallCheckCase {
+  id: string;
   graphFilter?: string;
   graphSearch?: string;
   search: z.infer<typeof SearchEmailsInputSchema>;
 }
 
 interface SearchRecallCommonResponse {
+  id: string;
   accuracy: string;
   stats: {
     graphEmailsCount: number;
@@ -139,6 +141,7 @@ export class RunSearchRecallCheckQuery {
             : ((foundEmails / expectedMessageIds.length) * 100).toFixed(2);
 
         const result: SearchRecallCommonResponse = {
+          id: checkCase.id,
           accuracy,
           inputParams: pick(checkCase, ['graphFilter', 'graphSearch', 'search']),
           stats: {
