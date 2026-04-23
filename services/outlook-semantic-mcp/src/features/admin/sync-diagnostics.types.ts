@@ -1,6 +1,7 @@
 export interface EmailDiagnosticEntry {
   messageId: string;
   fileKey: string;
+  parentFolderId?: string;
 }
 
 export interface SyncDiagnosticsResult {

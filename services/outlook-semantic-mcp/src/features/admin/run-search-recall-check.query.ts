@@ -1,13 +1,16 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { pick } from 'remeda';
 import * as z from 'zod';
+import { DRIZZLE, DrizzleDatabase, directories } from '~/db';
 import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
 import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { traceAttrs, traceError } from '~/features/tracing.utils';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { Nullish } from '~/utils/nullish';
 import { FAILED_INGESTION_STATUSES } from '../sync/full-sync/get-scope-ingestion-stats.query';
 import { FetchMessagesFromGraphQuery } from './fetch-messages-from-graph.query';
 
@@ -46,6 +49,8 @@ interface SearchRecallCheckFailureResult extends SearchRecallCommonResponse {
       fileKey: string;
       existsInUnique: boolean;
       ingestionState: string | undefined;
+      directoryId: Nullish<string>;
+      directoryName: Nullish<string>;
     }[];
   };
 }
@@ -57,6 +62,7 @@ export type SearchRecallCheckCaseResult =
 @Injectable()
 export class RunSearchRecallCheckQuery {
   public constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly fetchMessagesFromGraphQuery: FetchMessagesFromGraphQuery,
     private readonly searchEmailsQuery: SearchEmailsQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
@@ -82,6 +88,11 @@ export class RunSearchRecallCheckQuery {
     traceAttrs({ userProfileId });
     const failedIngestionStates = new Set<string | undefined>(FAILED_INGESTION_STATUSES);
 
+    const allDirectories = await this.db.query.directories.findMany({
+      where: eq(directories.userProfileId, userProfileId),
+    });
+    const directoryByFolderId = new Map(allDirectories.map((d) => [d.providerDirectoryId, d]));
+
     return Promise.all(
       cases.map(async (checkCase): Promise<SearchRecallCheckCaseResult> => {
         const { notSkipped, userEmail } = await this.fetchMessagesFromGraphQuery.run({
@@ -94,11 +105,12 @@ export class RunSearchRecallCheckQuery {
         const { results } = await this.searchEmailsQuery.run(userProfileId, checkCase.search);
         const returnedEmailIds = new Set(results.map((r) => r.emailId));
 
-        const missedMessagesBase = expectedMessageIds
-          .filter((messageId) => !returnedEmailIds.has(messageId))
-          .map((messageId) => ({
-            messageId,
-            fileKey: getUniqueKeyForMessage({ userEmail, messageId }),
+        const missedMessagesBase = notSkipped
+          .filter((e) => !returnedEmailIds.has(e.messageId))
+          .map((e) => ({
+            messageId: e.messageId,
+            directoryId: e?.parentFolderId,
+            fileKey: getUniqueKeyForMessage({ userEmail, messageId: e.messageId }),
           }));
 
         const existingFileKeys = new Map<string, string>();
@@ -111,11 +123,14 @@ export class RunSearchRecallCheckQuery {
           });
         }
 
-        const missedMessages = missedMessagesBase.map((item) => ({
-          ...item,
-          existsInUnique: existingFileKeys.has(item.fileKey),
-          ingestionState: existingFileKeys.get(item.fileKey),
-        }));
+        const missedMessages = missedMessagesBase.map((item) => {
+          return {
+            ...item,
+            existsInUnique: existingFileKeys.has(item.fileKey),
+            ingestionState: existingFileKeys.get(item.fileKey),
+            directoryName: directoryByFolderId.get(item.directoryId ?? `__NOPE__`)?.displayName,
+          };
+        });
 
         const foundEmails = expectedMessageIds.length - missedMessages.length;
         const accuracy =

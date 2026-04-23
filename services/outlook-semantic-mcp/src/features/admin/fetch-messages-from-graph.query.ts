@@ -89,7 +89,7 @@ export class FetchMessagesFromGraphQuery {
 
     const filtersList = [`receivedDateTime ge ${cutoff.toISOString()}`];
     if (filter) {
-      filtersList.push(filter);
+      filtersList.push(`(${filter})`);
     }
 
     // $search responses ignore Prefer: IdType="ImmutableId"; IDs are translated after collection.
@@ -97,7 +97,7 @@ export class FetchMessagesFromGraphQuery {
       .api('me/messages')
       .select(fetchMessageFields)
       .top(999)
-      .filter(filtersList.join(' and '));
+      .filter(`(${filtersList.join(' and ')})`);
 
     if (!search) {
       apiCall = apiCall.header('Prefer', 'IdType="ImmutableId"');
@@ -198,7 +198,7 @@ export class FetchMessagesFromGraphQuery {
       if (skipResult.skip || ignoredFolderIdSet.has(message.parentFolderId)) {
         skipped.push({ messageId: message.id, fileKey });
       } else {
-        notSkipped.push({ messageId: message.id, fileKey });
+        notSkipped.push({ messageId: message.id, fileKey, parentFolderId: message.parentFolderId });
       }
     }
   }
