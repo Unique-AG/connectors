@@ -3,31 +3,21 @@ import { type Context, createMeta, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { RemoveRootScopeAndDirectoriesCommand } from '~/features/directories-sync/remove-root-scope-and-directories.command';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { SubscriptionRemoveService } from '../subscription-remove.service';
+import { DeleteInboxDataCommand, DeleteInboxDataResult } from './delete-inbox-data.command';
 
 const DeleteInboxDataInputSchema = z.object({});
 
 const DeleteInboxDataOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
-  subscription: z
-    .object({
-      id: z.string(),
-      status: z.enum(['removed', 'not_found']),
-    })
-    .nullable(),
 });
 
 @Injectable()
 export class DeleteInboxDataTool {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(
-    private readonly removeRootScopeAndDirectoriesCommand: RemoveRootScopeAndDirectoriesCommand,
-    private readonly subscriptionRemove: SubscriptionRemoveService,
-  ) {}
+  public constructor(private readonly deleteInboxDataCommand: DeleteInboxDataCommand) {}
 
   @Tool({
     name: 'delete_inbox_data',
@@ -60,27 +50,18 @@ export class DeleteInboxDataTool {
 
     this.logger.log({ userProfileId, msg: 'Deleting inbox data for user' });
 
-    await this.removeRootScopeAndDirectoriesCommand.run(userProfileTypeid);
-    const result = await this.subscriptionRemove.removeByUserProfileId(userProfileTypeid);
-    const { status, subscription } = result;
+    const result = await this.deleteInboxDataCommand.run(userProfileId);
 
-    const messages: Record<typeof status, string> = {
-      removed:
-        'Inbox data deleted successfully. All previously ingested emails have been removed from Unique and new emails will no longer be ingested.',
-      not_found: 'No active inbox connection found. Nothing to delete.',
+    const mapToolResultToMessage: Record<DeleteInboxDataResult, string> = {
+      'deletion-started':
+        'Inbox deletion started. All previously ingested emails will be removed from Unique. This may take a few minutes for large inboxes.',
+      'deletion-already-in-progress': 'Inbox deletion is already in progress.',
+      'inbox-already-deleted': 'Inbox has already been deleted.',
     };
 
-    this.logger.log({
-      msg: 'Inbox data deletion completed',
-      userProfileId,
-      subscriptionId: subscription?.id,
-      status,
-    });
-
     return {
-      success: true,
-      message: messages[status],
-      subscription: subscription ? { id: subscription.id, status } : null,
+      success: result === 'deletion-started',
+      message: mapToolResultToMessage[result],
     };
   }
 }

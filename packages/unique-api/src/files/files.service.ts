@@ -31,6 +31,15 @@ import {
 import type { ContentUpdateResult, FileAccessInput, UniqueFile } from './files.types';
 import { UniqueFilesFacade } from './unique-files.facade';
 
+interface ContentByScopeInput {
+  skip: number;
+  take: number;
+  where: {
+    ownerId: { equals: string };
+    ownerType: { equals: string };
+  };
+}
+
 const CONTENT_BATCH_SIZE = 100;
 const DELETE_BATCH_SIZE = 20;
 
@@ -338,6 +347,22 @@ export class FilesService implements UniqueFilesFacade {
     }
 
     return successCount;
+  }
+
+  public async getIdsByScope(scopeId: string, skip: number, take: number): Promise<string[]> {
+    this.logger.debug(`[Scope: ${scopeId}] Fetching up to ${take} file IDs`);
+    const result = await this.ingestionClient.request<
+      ContentByScopeAndMetadataKeyResult,
+      ContentByScopeInput
+    >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
+      skip,
+      take,
+      where: {
+        ownerId: { equals: scopeId },
+        ownerType: { equals: 'SCOPE' },
+      },
+    });
+    return result.paginatedContent.nodes.map((node) => node.id);
   }
 
   public async getFileKeysByScopeId(scopeId: string): Promise<string[]> {
