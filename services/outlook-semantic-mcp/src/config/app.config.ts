@@ -11,7 +11,9 @@ export const mcpDebugModeSchema = enabledDisabledBoolean(
 export const mcpBackendSchema = z
   .enum(['UniqueApi', 'MicrosoftGraph'])
   .prefault('UniqueApi')
-  .describe('Selects the search backend: UniqueApi (KB ingestion) or MicrosoftGraph (direct Graph search).');
+  .describe(
+    'Selects the search backend: UniqueApi (KB ingestion) or MicrosoftGraph (direct Graph search).',
+  );
 
 const ConfigSchema = z
   .object({

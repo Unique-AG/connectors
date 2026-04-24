@@ -74,9 +74,7 @@ describe('buildKqlQueryString', () => {
   it('skips notIn fromSenders silently', () => {
     const result = buildKqlQueryString({
       search: 'hello',
-      conditions: [
-        { fromSenders: { value: ['alice@example.com'], operator: 'notIn' } },
-      ],
+      conditions: [{ fromSenders: { value: ['alice@example.com'], operator: 'notIn' } }],
     });
     expect(result).toBe('hello');
   });
@@ -160,9 +158,7 @@ describe('buildKqlQueryString', () => {
   it('builds array in categories predicate joined with OR', () => {
     const result = buildKqlQueryString({
       search: 'tasks',
-      conditions: [
-        { categories: { value: ['Important', 'Project-X'], operator: 'in' } },
-      ],
+      conditions: [{ categories: { value: ['Important', 'Project-X'], operator: 'in' } }],
     });
     expect(result).toBe('tasks AND (category:"Important" OR category:"Project-X")');
   });
@@ -230,6 +226,8 @@ describe('buildKqlQueryString', () => {
         },
       ],
     });
-    expect(result).toBe('report AND (from:alice@example.com OR from:bob@example.com) AND hasAttachment:true');
+    expect(result).toBe(
+      'report AND (from:alice@example.com OR from:bob@example.com) AND hasAttachment:true',
+    );
   });
 });

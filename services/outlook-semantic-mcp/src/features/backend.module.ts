@@ -35,61 +35,63 @@ import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
 
 @Module({})
-class BackendModule {}
+export class BackendModule {
+  public static forRoot(): DynamicModule {
+    const isGraph = mcpBackendSchema.parse(process.env.MCP_BACKEND) === 'MicrosoftGraph';
+    const isDebug = mcpDebugModeSchema.parse(process.env.MCP_DEBUG_MODE);
 
-export function registerBackendModule(): DynamicModule {
-  const isGraph = mcpBackendSchema.parse(process.env.MCP_BACKEND) === 'MicrosoftGraph';
-  const isDebug = mcpDebugModeSchema.parse(process.env.MCP_DEBUG_MODE);
+    const uniqueAndMicrosoftBackendCommonTools = [
+      ListFoldersTool,
+      ListCategoriesTool,
+      CreateDraftEmailTool,
+      LookupContactsTool,
+    ];
 
-  return {
-    module: BackendModule,
-    imports: [
+    const uniqueBackendSpecificTools = [
+      SearchEmailsTool,
+      OpenEmailTool,
+      SyncProgressTool,
+      VerifyInboxConnectionTool,
+      DeleteInboxDataTool,
+      ReconnectInboxTool,
+      ...(!isDebug
+        ? []
+        : [
+            RunFullSyncTool,
+            RestartFullSyncTool,
+            PauseFullSyncTool,
+            ResumeFullSyncTool,
+            AdminOpsTool,
+          ]),
+    ];
+    const microsoftBackendSpecificTools = [GraphSearchEmailsTool, GraphOpenEmailTool];
+
+    return {
+      module: BackendModule,
+      imports: [
         DrizzleModule,
         MsGraphModule,
         SubscriptionModule,
         DirectoriesSyncModule,
         CategoriesModule,
         EmailManagementModule,
-        ...(isGraph
-          ? [GraphContentModule]
-          : [
-              InboxDeletingQueryModule,
-              DeleteInboxModule,
-              FullSyncModule,
-              LiveCatchUpModule,
-              ProcessEmailModule,
-              SyncRecoveryModule,
-              SearchModule,
-              UniqueApiFeatureModule,
-              ...(isDebug ? [AdminModule] : []),
-            ]),
+        GraphContentModule,
+        InboxDeletingQueryModule,
+        DeleteInboxModule,
+        FullSyncModule,
+        LiveCatchUpModule,
+        ProcessEmailModule,
+        SyncRecoveryModule,
+        SearchModule,
+        UniqueApiFeatureModule,
+        AdminModule,
       ],
       providers: [
         MailSubscriptionController,
-        ListFoldersTool,
-        ListCategoriesTool,
-        CreateDraftEmailTool,
-        LookupContactsTool,
-        ...(isGraph
-          ? [GraphSearchEmailsTool, GraphOpenEmailTool]
-          : [
-              SearchEmailsTool,
-              OpenEmailTool,
-              SyncProgressTool,
-              VerifyInboxConnectionTool,
-              DeleteInboxDataTool,
-              ReconnectInboxTool,
-              ...(isDebug
-                ? [
-                    RunFullSyncTool,
-                    RestartFullSyncTool,
-                    PauseFullSyncTool,
-                    ResumeFullSyncTool,
-                    AdminOpsTool,
-                  ]
-                : []),
-            ]),
+        ...uniqueAndMicrosoftBackendCommonTools,
+        ...(isGraph ? microsoftBackendSpecificTools : uniqueBackendSpecificTools),
       ],
       controllers: [MailSubscriptionController],
-  };
+    };
+  }
 }

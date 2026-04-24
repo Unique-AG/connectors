@@ -4,9 +4,9 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
-import { GraphSearchEmailsQuery } from './graph-search-emails.query';
-import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { META } from '~/features/content/search/search-emails-tool.meta';
+import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { GraphSearchEmailsQuery } from './graph-search-emails.query';
 
 const SearchEmailResultSchema = z.object({
   id: z.string(),
