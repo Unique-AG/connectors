@@ -137,11 +137,11 @@ export class RunSearchRecallCheckQuery {
           };
         });
 
-        const foundEmails = expectedMessageIds.length - missedMessages.length;
+        const foundEmailsCount = expectedMessageIds.length - missedMessages.length;
         const accuracy =
           expectedMessageIds.length === 0
             ? '100.00'
-            : ((foundEmails / expectedMessageIds.length) * 100).toFixed(2);
+            : ((foundEmailsCount / expectedMessageIds.length) * 100).toFixed(2);
 
         const result: SearchRecallCommonResponse = {
           id: checkCase.id,
@@ -151,7 +151,7 @@ export class RunSearchRecallCheckQuery {
             graphEmailsCount: expectedMessageIds.length,
             searchEmailsCount: returnedEmailIds.size,
             missedEmailsCount: missedMessages.length,
-            foundEmailsCount: foundEmails,
+            foundEmailsCount: foundEmailsCount,
           },
         };
 
