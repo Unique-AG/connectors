@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UniqueGraphqlClient } from '../../clients/unique-graphql.client';
-import { CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, type ContentByScopeResult } from '../files.queries';
+import { type ContentByScopeResult, PAGINATED_CONTENT_IDS_QUERY } from '../files.queries';
 import { FilesService } from '../files.service';
 
 const mockLogger = vi.hoisted(() => ({
@@ -66,7 +66,7 @@ describe('FilesService', () => {
       expect(result[100]).toBe('id-100');
       expect(result[149]).toBe('id-149');
       expect(client.request).toHaveBeenCalledTimes(2);
-      expect(client.request).toHaveBeenNthCalledWith(2, CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
+      expect(client.request).toHaveBeenNthCalledWith(2, PAGINATED_CONTENT_IDS_QUERY, {
         skip: 100,
         take: 100,
         where: { ownerId: { equals: 'scope-1' }, ownerType: { equals: 'SCOPE' } },

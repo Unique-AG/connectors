@@ -166,7 +166,7 @@ export const REMOVE_ACCESSES_MUTATION = gql`
   }
 `;
 
-export const CONTENT_ID_BY_SCOPE_AND_METADATA_KEY = gql`
+export const PAGINATED_CONTENT_IDS_QUERY = gql`
     query PaginatedContent($skip: Int!, $take: Int!, $where: ContentWhereInput) {
       paginatedContent(skip: $skip, take: $take, where: $where) {
         nodes {

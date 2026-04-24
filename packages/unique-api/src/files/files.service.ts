@@ -8,7 +8,6 @@ import {
   type AddAccessesMutationResult,
   CONTENT_DELETE_BY_IDS_MUTATION,
   CONTENT_DELETE_MUTATION,
-  CONTENT_ID_BY_SCOPE_AND_METADATA_KEY,
   CONTENT_UPDATE_MUTATION,
   type ContentByScopeInput,
   type ContentByScopeResult,
@@ -19,6 +18,7 @@ import {
   type ContentUpdateMutationInput,
   type ContentUpdateMutationResult,
   PAGINATED_CONTENT_COUNT_QUERY,
+  PAGINATED_CONTENT_IDS_QUERY,
   PAGINATED_CONTENT_QUERY,
   type PaginatedContentCountQueryInput,
   type PaginatedContentCountQueryResult,
@@ -349,7 +349,7 @@ export class FilesService implements UniqueFilesFacade {
       const batchResult = await this.ingestionClient.request<
         ContentByScopeResult,
         ContentByScopeInput
-      >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
+      >(PAGINATED_CONTENT_IDS_QUERY, {
         skip,
         take: CONTENT_BATCH_SIZE,
         where: {
@@ -378,7 +378,7 @@ export class FilesService implements UniqueFilesFacade {
       const batchResult = await this.ingestionClient.request<
         ContentByScopeResult,
         ContentByScopeInput
-      >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
+      >(PAGINATED_CONTENT_IDS_QUERY, {
         skip,
         take: CONTENT_BATCH_SIZE,
         where: {
