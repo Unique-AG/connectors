@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UniqueGraphqlClient } from '../../clients/unique-graphql.client';
-import {
-  PAGINATED_CONTENT_IDS_QUERY,
-  type PaginatedContentIdsQueryResult,
-} from '../files.queries';
+import { PAGINATED_CONTENT_IDS_QUERY, type PaginatedContentIdsQueryResult } from '../files.queries';
 import { FilesService } from '../files.service';
 
 const mockLogger = vi.hoisted(() => ({
