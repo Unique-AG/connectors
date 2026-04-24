@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
+import { isNullish } from 'remeda';
 import z from 'zod/v4';
 import { DRIZZLE, DrizzleDatabase, directories, inboxConfigurations, userProfiles } from '~/db';
 import {
@@ -13,7 +14,6 @@ import { shouldSkipEmail } from '~/features/process-email/utils/should-skip-emai
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import type { EmailDiagnosticEntry } from './sync-diagnostics.types';
-import { isNullish } from 'remeda';
 
 const fetchMessageSchema = z.object({
   id: z.string(),
