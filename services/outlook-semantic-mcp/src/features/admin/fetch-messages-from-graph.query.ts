@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNullish } from 'remeda';
+import { isNonNullish, isNullish, unique } from 'remeda';
 import z from 'zod/v4';
 import { DRIZZLE, DrizzleDatabase, directories, inboxConfigurations, userProfiles } from '~/db';
 import {
@@ -158,23 +158,45 @@ export class FetchMessagesFromGraphQuery {
       return;
     }
 
+    const folderIds = unique(
+      messages.map((message) => message.parentFolderId).filter(isNonNullish),
+    );
+    const folderIdToImmutableFolderId = new Map<string, string>();
+
     const CHUNK_SIZE = 1000;
-    for (let i = 0; i < messages.length; i += CHUNK_SIZE) {
-      const chunk = messages.slice(i, i + CHUNK_SIZE);
-      const inputIds = [...new Set(chunk.flatMap((m) => [m.id, m.parentFolderId]))];
+    for (let i = 0; i < folderIds.length; i += CHUNK_SIZE) {
+      const inputIds = folderIds.slice(i, i + CHUNK_SIZE);
       const raw = await client.api('me/translateExchangeIds').post({
         inputIds,
         sourceIdType: 'restId',
         targetIdType: 'restImmutableEntryId',
       });
       const { value } = translateIdsResponseSchema.parse(raw);
-      const idMap = new Map(value.map(({ sourceId, targetId }) => [sourceId, targetId]));
+      value.forEach((item) => {
+        folderIdToImmutableFolderId.set(item.sourceId, item.targetId);
+      });
+    }
+
+    for (let i = 0; i < messages.length; i += CHUNK_SIZE) {
+      const chunk = messages.slice(i, i + CHUNK_SIZE);
+      const raw = await client.api('me/translateExchangeIds').post({
+        inputIds: unique(messages.slice(i, i + CHUNK_SIZE).map((item) => item.id)),
+        sourceIdType: 'restId',
+        targetIdType: 'restImmutableEntryId',
+      });
+      const { value } = translateIdsResponseSchema.parse(raw);
+      const messageIdToImmutableMessageId = new Map(
+        value.map(({ sourceId, targetId }) => [sourceId, targetId]),
+      );
       for (const message of chunk) {
-        const immutableId = idMap.get(message.id);
+        const immutableId = messageIdToImmutableMessageId.get(message.id);
         if (immutableId) {
           message.id = immutableId;
         }
-        const immutableParentFolderId = message.parentFolderId && idMap.get(message.parentFolderId);
+        const immutableParentFolderId = message.parentFolderId
+          ? folderIdToImmutableFolderId.get(message.parentFolderId)
+          : null;
+
         if (immutableParentFolderId) {
           message.parentFolderId = immutableParentFolderId;
         }
