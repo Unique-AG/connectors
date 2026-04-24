@@ -84,7 +84,7 @@ export class ExecuteInboxDeletionCommand {
       const row = await tx
         .select({
           deletingHeartbeatAt: inboxConfigurations.deletingHeartbeatAt,
-          deletingInboxStartedAt: inboxConfigurations.deletingHeartbeatAt,
+          deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
         })
         .from(inboxConfigurations)
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
