@@ -14,6 +14,7 @@ export interface UniqueFile {
   ownerId: string;
   byteSize: number;
   expiresAt: string | null;
+  ingestionState: string;
   metadata: Record<string, string> | null;
 }
 

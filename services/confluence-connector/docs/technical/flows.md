@@ -74,7 +74,12 @@ sequenceDiagram
         Note over Connector: Skip (re-entrancy guard)
     end
 
-    Connector->>Unique: Initialize root scope<br/>(grant access, verify exists)
+    opt Data Center only
+        Connector->>Confluence: GET /rest/applinks/1.0/manifest
+        Confluence->>Connector: Instance identifier
+    end
+
+    Connector->>Unique: Initialize root scope<br/>(grant access, claim or verify ownership)
 
     rect rgb(200, 210, 240)
         Note over Connector,Confluence: Discovery Phase
@@ -124,6 +129,17 @@ sequenceDiagram
         Connector->>Unique: Delete content by IDs
     end
 
+    rect rgb(255, 235, 200)
+        Note over Connector,Unique: Cleanup Phase
+        Connector->>Unique: List root scope children
+        Unique->>Connector: Existing space scopes
+        Note over Connector: Detect scopes for spaces<br/>no longer discovered
+        opt Orphaned space scopes exist
+            Connector->>Unique: Delete files for each orphaned space
+            Connector->>Unique: Delete each orphaned space scope
+        end
+    end
+
     Note over Connector: Sync cycle complete
 ```
 
@@ -131,8 +147,17 @@ sequenceDiagram
 
 The connector manages a two-level scope hierarchy:
 
-1. **Root scope** -- Must pre-exist in the Unique platform. Configured via `ingestion.scopeId`. The connector grants itself access at initialization.
+1. **Root scope** -- Must pre-exist in the Unique platform. Configured via `ingestion.scopeId`. The connector grants itself access at initialization and marks the scope as owned by this Confluence instance on the first sync cycle. Subsequent sync cycles verify that the ownership mark still matches the configured Confluence instance.
 2. **Space scopes** -- Created automatically as children of the root scope, one per Confluence space key. Access is inherited from the root scope.
+
+### Root Scope Ownership Validation
+
+To prevent misconfiguration where the same Confluence instance is connected to multiple Unique organizations, or the same root scope is pointed at a different Confluence instance, the connector tags the root scope with an identifier derived from the Confluence instance on the first sync cycle:
+
+- **Cloud:** the identifier is derived from the `cloudId` configured in the tenant YAML.
+- **Data Center:** the identifier is fetched from the Data Center's application manifest endpoint (`/rest/applinks/1.0/manifest`). No authentication is required.
+
+On every subsequent sync cycle, the connector reads the ownership mark from the root scope and compares it against the current Confluence instance. A mismatch aborts the tenant sync cycle with a fatal error.
 
 ## Discovery Phase
 
@@ -238,10 +263,12 @@ Each item sent to the diff API contains:
 
 ### Safety Checks
 
-After each space's file diff is computed, guards run to prevent accidental full deletion of content:
+After each space's file diff is computed, two guards run to prevent accidental full deletion of content. Both abort the current tenant sync cycle when triggered.
 
-- **Zero-submission guard**: If discovery submitted zero items but the diff contains deletions, the sync cycle for that space is aborted. This prevents accidental full deletion due to a bug in page fetching or an authentication failure that returned no results.
-- **Full-deletion guard**: If the file diff would delete all files stored in Unique for a space, the sync cycle for that space is aborted. Legitimate content replacement (where new files have entirely different keys than deleted files) is allowed to proceed.
+| Guard | Trigger Condition | Rationale |
+|---|---|---|
+| **Zero-submission guard** | Discovery submitted 0 items but the diff contains deletions | Likely a bug in page fetching or an authentication failure that returned no results. Deleting all stored content would be destructive. |
+| **Full-deletion guard** | The diff would delete every file stored in Unique for the space and the connector determines the deletion is not a legitimate full content replacement | Likely a key format change (e.g., toggling `useV1KeyFormat`) that causes all existing content to appear unrecognized. If the connector determines the content was genuinely replaced rather than misidentified, the sync proceeds with a warning instead of aborting. |
 
 Partial deletions (removing some but not all files) are always allowed. To intentionally remove all content for a tenant, set the tenant status to `deleted` (see [Configuration -- Tenant Status](../operator/configuration.md#Tenant-Status)).
 
@@ -283,6 +310,12 @@ Deleted items identified by the file diff are processed after ingestion:
 
 If no content is found for the given keys, a warning is logged and no deletion occurs.
 
+### Removed Space Cleanup
+
+The file diff runs once per Confluence space that appears in the current discovery results. Spaces that have disappeared from discovery entirely (because the space was deleted in Confluence, or all ingest labels were removed from its pages) are not diffed and would otherwise leave orphaned content and scopes in Unique.
+
+After the per-item deletion step, the connector detects orphaned space scopes by comparing the root scope's children against the set of Confluence space keys discovered during the current sync. For each orphaned space, the connector deletes both the space's files and the space scope itself. A failure for one space does not prevent the cleanup of other orphaned spaces.
+
 ### Concurrency and Progress
 
 Ingestion concurrency is controlled by `processing.concurrency` (default: 1). Pages are ingested first, then attachments -- not in parallel. All items in a batch are attempted even if some fail.
@@ -299,6 +332,7 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 |---|---|---|
 | Sync already in progress | Overlapping cron triggers or long-running sync | Skip the cycle entirely (re-entrancy guard) |
 | Root scope not found | Misconfigured `scopeId` or scope deleted | Abort the entire sync cycle |
+| Root scope belongs to a different Confluence instance | `scopeId` reused across tenants or the tenant's Confluence instance was reassigned | Abort the entire tenant sync cycle |
 | Discovery failure | Error during page or attachment fetching from Confluence | Abort the sync cycle to avoid submitting partial results to file-diff, which could cause unnecessary deletions and re-ingestion costs |
 | Accidental full deletion detected | Bug in page fetching or key format change | Abort the entire tenant sync cycle |
 | Page unavailable | Page deleted between discovery and content fetch, or transient API error | Log, skip the page, continue other pages |
