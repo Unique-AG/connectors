@@ -29,6 +29,20 @@ const makeChainableDelete = () => ({
   execute: vi.fn().mockResolvedValue(undefined),
 });
 
+const makeTx = (
+  row: { deletingHeartbeatAt: Date | null; deletingInboxStartedAt: Date | null } = {
+    deletingHeartbeatAt: null,
+    deletingInboxStartedAt: new Date(),
+  },
+) => ({
+  select: vi.fn().mockReturnValue({
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    for: vi.fn().mockResolvedValue([row]),
+  }),
+  update: vi.fn().mockReturnValue(makeChainableUpdate()),
+});
+
 describe('ExecuteInboxDeletionCommand', () => {
   let mockDb: any;
   let mockUniqueApi: any;
@@ -51,6 +65,7 @@ describe('ExecuteInboxDeletionCommand', () => {
       },
       update: vi.fn().mockReturnValue(makeChainableUpdate()),
       delete: vi.fn().mockReturnValue(makeChainableDelete()),
+      transaction: vi.fn().mockImplementation(async (callback: any) => callback(makeTx())),
     };
 
     mockUniqueApi = {
