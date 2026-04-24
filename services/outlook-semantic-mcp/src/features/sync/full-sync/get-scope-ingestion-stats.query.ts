@@ -30,7 +30,7 @@ type FailedIngestionStates = Exclude<
   | IngestionState.ExtractingMetadata
 >;
 
-const FAILED_INGESTION_STATUSES = asAllOptions<FailedIngestionStates>()([
+export const FAILED_INGESTION_STATUSES = asAllOptions<FailedIngestionStates>()([
   IngestionState.Failed,
   IngestionState.FailedCreatingChunks,
   IngestionState.FailedEmbedding,

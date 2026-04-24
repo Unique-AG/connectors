@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
+import { AdminModule } from './admin/admin.module';
+import { AdminOpsTool } from './admin/admin-ops.tool';
 import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { OpenEmailTool, SearchEmailsTool, SearchModule } from './content';
@@ -31,7 +33,7 @@ import { SyncRecoveryModule } from './sync/sync-recovery.module';
 
 const DEBUG_MODE_TOOLS =
   process.env.MCP_DEBUG_MODE === 'enabled'
-    ? [RunFullSyncTool, RestartFullSyncTool, PauseFullSyncTool, ResumeFullSyncTool]
+    ? [RunFullSyncTool, RestartFullSyncTool, PauseFullSyncTool, ResumeFullSyncTool, AdminOpsTool]
     : [];
 
 const TOOLS = [
@@ -67,6 +69,7 @@ const TOOLS = [
     SearchModule,
     UniqueApiFeatureModule,
     SyncRecoveryModule,
+    AdminModule,
   ],
   providers: [MailSubscriptionController, ...TOOLS],
   controllers: [MailSubscriptionController],

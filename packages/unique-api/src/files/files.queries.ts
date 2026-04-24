@@ -71,6 +71,8 @@ export interface PaginatedContentQueryInput {
       startsWith?: string;
       in?: string[];
     };
+    ownerId?: { equals: string };
+    ownerType?: { equals: string };
   };
 }
 
@@ -93,6 +95,7 @@ export const PAGINATED_CONTENT_QUERY = gql`
         metadata
         byteSize
         expiresAt
+        ingestionState
       }
       totalCount
     }
