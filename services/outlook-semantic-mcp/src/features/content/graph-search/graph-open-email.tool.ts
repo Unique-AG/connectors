@@ -3,7 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { META } from '~/features/content/open-email-tool.meta';
+import { META } from '~/features/content/search/open-email-tool.meta';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { GraphOpenEmailQuery } from './graph-open-email.query';
 
