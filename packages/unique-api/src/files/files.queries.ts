@@ -177,7 +177,7 @@ export const PAGINATED_CONTENT_IDS_QUERY = gql`
     }
 `;
 
-export interface ContentByScopeInput {
+export interface PaginatedContentIdsQueryInput {
   skip: number;
   take: number;
   where: {
@@ -190,7 +190,7 @@ export interface ContentByScopeInput {
   };
 }
 
-export interface ContentByScopeResult {
+export interface PaginatedContentIdsQueryResult {
   paginatedContent: {
     nodes: {
       id: string;

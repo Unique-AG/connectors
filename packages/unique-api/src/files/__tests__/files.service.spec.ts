@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { UniqueGraphqlClient } from '../../clients/unique-graphql.client';
-import { type ContentByScopeResult, PAGINATED_CONTENT_IDS_QUERY } from '../files.queries';
+import {
+  PAGINATED_CONTENT_IDS_QUERY,
+  type PaginatedContentIdsQueryResult,
+} from '../files.queries';
 import { FilesService } from '../files.service';
 
 const mockLogger = vi.hoisted(() => ({
@@ -24,7 +27,7 @@ function createMockIngestionClient() {
   } as unknown as UniqueGraphqlClient;
 }
 
-function createBatchResponse(ids: string[]): ContentByScopeResult {
+function createBatchResponse(ids: string[]): PaginatedContentIdsQueryResult {
   return {
     paginatedContent: {
       nodes: ids.map((id) => ({ id })),
@@ -97,6 +100,34 @@ describe('FilesService', () => {
 
       expect(result).toEqual([]);
       expect(client.request).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getIdsByScopeAndMetadataKey', () => {
+    it('requests paginated ids with metadata filter', async () => {
+      const client = createMockIngestionClient();
+      vi.mocked(client.request).mockResolvedValueOnce(createBatchResponse(['id-1', 'id-2']));
+
+      const service = new FilesService(client, mockLogger as never);
+      const result = await service.getIdsByScopeAndMetadataKey(
+        'scope-1',
+        'sourceDocumentId',
+        'doc-123',
+      );
+
+      expect(result).toEqual(['id-1', 'id-2']);
+      expect(client.request).toHaveBeenCalledWith(PAGINATED_CONTENT_IDS_QUERY, {
+        skip: 0,
+        take: 100,
+        where: {
+          ownerId: { equals: 'scope-1' },
+          ownerType: { equals: 'SCOPE' },
+          metadata: {
+            path: ['sourceDocumentId'],
+            equals: 'doc-123',
+          },
+        },
+      });
     });
   });
 });
