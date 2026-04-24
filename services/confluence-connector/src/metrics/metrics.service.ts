@@ -4,6 +4,16 @@ import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 import { getCurrentTenant } from '../tenant';
 
+export enum SyncPhase {
+  Idle = 'idle',
+  Scanning = 'scanning',
+  Diffing = 'diffing',
+  IngestingPages = 'ingesting_pages',
+  IngestingAttachments = 'ingesting_attachments',
+  Deleting = 'deleting',
+  CleaningUp = 'cleaning_up',
+}
+
 @Injectable()
 export class Metrics {
   private readonly syncDuration: Histogram;
@@ -18,6 +28,9 @@ export class Metrics {
   private readonly confluenceApiErrors: Counter;
   private readonly orphanedScopesCleaned: Counter;
   private readonly orphanedFilesCleaned: Counter;
+
+  private readonly syncPhaseState = new Map<string, SyncPhase>();
+  private readonly syncItemTotals = new Map<string, { pages: number; attachments: number }>();
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
@@ -82,6 +95,38 @@ export class Metrics {
     this.orphanedFilesCleaned = metricService.getCounter('cfc_orphaned_files_cleaned_total', {
       description: 'Number of files deleted during orphaned space cleanup',
     });
+
+    const syncPhaseGauge = metricService.getObservableGauge('cfc_sync_phase', {
+      description: 'Current sync phase (1 = active, 0 = inactive). Labels: tenant, phase',
+    });
+    syncPhaseGauge.addCallback((observable) => {
+      for (const [tenant, currentPhase] of this.syncPhaseState) {
+        for (const phase of Object.values(SyncPhase)) {
+          observable.observe(phase === currentPhase ? 1 : 0, { tenant, phase });
+        }
+      }
+    });
+
+    const syncPagesTotalGauge = metricService.getObservableGauge('cfc_sync_pages_total', {
+      description: 'Number of pages to process in the current sync cycle',
+    });
+    syncPagesTotalGauge.addCallback((observable) => {
+      for (const [tenant, totals] of this.syncItemTotals) {
+        observable.observe(totals.pages, { tenant });
+      }
+    });
+
+    const syncAttachmentsTotalGauge = metricService.getObservableGauge(
+      'cfc_sync_attachments_total',
+      {
+        description: 'Number of attachments to process in the current sync cycle',
+      },
+    );
+    syncAttachmentsTotalGauge.addCallback((observable) => {
+      for (const [tenant, totals] of this.syncItemTotals) {
+        observable.observe(totals.attachments, { tenant });
+      }
+    });
   }
 
   private get tenantName(): string {
@@ -99,7 +144,7 @@ export class Metrics {
     this.scanDuration.record(durationSeconds, { tenant: this.tenantName });
   }
 
-  public recordPagesProcessed(count: number, result: 'success' | 'failure'): void {
+  public recordPagesProcessed(count: number, result: 'success' | 'failure' | 'skipped'): void {
     this.pagesProcessed.add(count, { tenant: this.tenantName, result });
   }
 
@@ -154,6 +199,14 @@ export class Metrics {
     this.orphanedFilesCleaned.add(count, { tenant: this.tenantName });
   }
 
+  public setSyncPhase(phase: SyncPhase): void {
+    this.syncPhaseState.set(this.tenantName, phase);
+  }
+
+  public recordSyncItemTotals(pages: number, attachments: number): void {
+    this.syncItemTotals.set(this.tenantName, { pages, attachments });
+  }
+
   public recordApiThrottleEvent(): void {
     // Bottleneck's reservoir-refresh timer can fire `depleted` outside any AsyncLocalStorage
     // context, so the tenantName getter (which asserts) may throw here.
@@ -170,12 +223,15 @@ export class Metrics {
   /**
    * Initializes all counters for the current tenant by recording a zero value. This ensures
    * Prometheus scrapes a baseline before the first sync, so that `increase()` can compute a
-   * correct delta from 0 -> N on the first sync cycle after startup.
+   * correct delta from 0 -> N on the first sync cycle after startup. Also seeds the
+   * observable-gauge state maps so the sync-progress panels have data before the first sync.
    */
   public initializeCounters(): void {
-    const tenant = { tenant: this.tenantName };
+    const tenantName = this.tenantName;
+    const tenant = { tenant: tenantName };
     this.pagesProcessed.add(0, { ...tenant, result: 'success' });
     this.pagesProcessed.add(0, { ...tenant, result: 'failure' });
+    this.pagesProcessed.add(0, { ...tenant, result: 'skipped' });
     this.attachmentsProcessed.add(0, { ...tenant, result: 'success' });
     this.attachmentsProcessed.add(0, { ...tenant, result: 'failure' });
     this.contentDeleted.add(0, { ...tenant, result: 'success' });
@@ -188,5 +244,7 @@ export class Metrics {
     this.orphanedScopesCleaned.add(0, { ...tenant, result: 'success' });
     this.orphanedScopesCleaned.add(0, { ...tenant, result: 'failure' });
     this.orphanedFilesCleaned.add(0, tenant);
+    this.syncPhaseState.set(tenantName, SyncPhase.Idle);
+    this.syncItemTotals.set(tenantName, { pages: 0, attachments: 0 });
   }
 }

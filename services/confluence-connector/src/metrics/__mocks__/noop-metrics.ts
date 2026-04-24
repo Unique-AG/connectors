@@ -24,6 +24,8 @@ export function createNoopMetrics(): Metrics {
     recordApiThrottleEvent: noop,
     recordOrphanedScopesCleaned: noop,
     recordOrphanedFilesCleaned: noop,
+    setSyncPhase: noop,
+    recordSyncItemTotals: noop,
     initializeCounters: noop,
   };
 
