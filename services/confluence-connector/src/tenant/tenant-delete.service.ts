@@ -54,23 +54,24 @@ export class TenantDeleteService {
       // tenant's top-level scope remains available for re-syncing without requiring
       // a new scope to be created on the Unique side.
       const childScopes = await this.uniqueClient.scopes.listChildren(this.scopeId);
-      if (childScopes.length === 0) {
-        this.logger.log({ tenantName: this.tenantName, msg: 'Already cleaned up, skipping' });
-        return { status: 'skipped', reason: DeleteSkipReason.AlreadyCleanedUp };
-      }
 
-      // Two-step deletion is intentional: deleteContentByScopes removes files in batches per
-      // scope, then deleteChildScopes with recursive:true catches anything that failed in the
-      // first step. This ensures no content is orphaned even if individual file deletions fail.
-      const contentFailures = await this.deleteContentByScopes(childScopes);
-      const scopeFailures = await this.deleteChildScopes(childScopes);
-      let totalFailures = contentFailures + scopeFailures;
+      let totalFailures = 0;
+      if (childScopes.length > 0) {
+        // Two-step deletion is intentional: deleteContentByScopes removes files in batches
+        // per scope, then deleteChildScopes with recursive:true catches anything that failed
+        // in the first step. This prevents orphaned content even if individual deletions fail.
+        totalFailures += await this.deleteContentByScopes(childScopes);
+        totalFailures += await this.deleteChildScopes(childScopes);
+      }
 
       // Clearing the externalId signals that cleanup completed and frees the user to delete
       // the root scope if they want. Only attempted when deletion succeeded: a still-set
       // externalId on a partially-cleaned tenant is a useful "retry me" marker.
-      if (totalFailures === 0 && rootScope.externalId !== null) {
-        totalFailures += await this.clearRootExternalId();
+      if (totalFailures === 0) {
+        const markerCleared = await this.clearRootExternalId();
+        if (!markerCleared) {
+          totalFailures++;
+        }
       }
 
       const result: DeleteResult =
@@ -86,21 +87,21 @@ export class TenantDeleteService {
     }
   }
 
-  private async clearRootExternalId(): Promise<number> {
+  private async clearRootExternalId(): Promise<boolean> {
     try {
       await this.uniqueClient.scopes.updateExternalId(this.scopeId, null);
       this.logger.log({
         tenantName: this.tenantName,
         msg: 'Cleared root scope externalId',
       });
-      return 0;
+      return true;
     } catch (error) {
       this.logger.error({
         tenantName: this.tenantName,
         err: error,
         msg: 'Failed to clear root scope externalId',
       });
-      return 1;
+      return false;
     }
   }
 
