@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { SearchConditionSchema, SearchEmailsInputSchema } from './search-conditions.dto';
-import { SearchEmailResult } from './search-emails.query';
+import { SearchConditionSchema, SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
+import { SearchEmailResult } from '~/features/content/search/search-emails.query';
 
 function extractDatePart(isoDatetime: string): string {
   return isoDatetime.slice(0, 10);
