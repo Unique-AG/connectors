@@ -33,7 +33,7 @@ export class GraphSearchEmailsTool {
   public constructor(private readonly graphSearchEmailsQuery: GraphSearchEmailsQuery) {}
 
   @Tool({
-    name: 'search_emails',
+    name: 'ms_graph_search_emails',
     title: 'Search Emails',
     description:
       "Search emails with optional structured filters. Returns matched emails with metadata.\n\nTo filter by folder, call `list_folders` first to obtain valid folder IDs. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` with the result's id.",

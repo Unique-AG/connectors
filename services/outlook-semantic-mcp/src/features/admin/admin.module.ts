@@ -6,9 +6,10 @@ import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { FetchMessagesFromGraphQuery } from './fetch-messages-from-graph.query';
 import { RunSearchRecallCheckQuery } from './run-search-recall-check.query';
 import { RunSyncDiagnosticsQuery } from './run-sync-diagnostics.query';
+import { GraphUtilsModule } from '../graph-utils/graph-utils.module';
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule, UniqueApiFeatureModule, SearchModule],
+  imports: [DrizzleModule, MsGraphModule, UniqueApiFeatureModule, SearchModule, GraphUtilsModule],
   providers: [FetchMessagesFromGraphQuery, RunSyncDiagnosticsQuery, RunSearchRecallCheckQuery],
   exports: [FetchMessagesFromGraphQuery, RunSyncDiagnosticsQuery, RunSearchRecallCheckQuery],
 })
