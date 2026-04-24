@@ -39,6 +39,17 @@ export class TenantDeleteService {
         return { status: 'skipped', reason: DeleteSkipReason.RootScopeNotFound };
       }
 
+      // A null externalId is our "cleanup completed" marker: it is only cleared after a
+      // fully successful deletion run, so its absence reliably signals there is no content
+      // left to remove.
+      if (rootScope.externalId === null) {
+        this.logger.log({
+          tenantName: this.tenantName,
+          msg: 'Root scope externalId already cleared, skipping',
+        });
+        return { status: 'skipped', reason: DeleteSkipReason.AlreadyCleanedUp };
+      }
+
       // Only child scopes are deleted. The root scope is intentionally preserved so the
       // tenant's top-level scope remains available for re-syncing without requiring
       // a new scope to be created on the Unique side.
