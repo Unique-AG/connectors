@@ -7,7 +7,6 @@ import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, directories } from '~/db';
 import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
 import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
-import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { traceAttrs, traceError } from '~/features/tracing.utils';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { Nullish } from '~/utils/nullish';
@@ -97,7 +96,7 @@ export class RunSearchRecallCheckQuery {
 
     return Promise.all(
       cases.map(async (checkCase): Promise<SearchRecallCheckCaseResult> => {
-        const { notSkipped, userEmail } = await this.fetchMessagesFromGraphQuery.run({
+        const { notSkipped } = await this.fetchMessagesFromGraphQuery.run({
           userProfileId,
           filter: checkCase.graphFilter,
           search: checkCase.graphSearch,
@@ -108,11 +107,11 @@ export class RunSearchRecallCheckQuery {
         const returnedEmailIds = new Set(results.map((r) => r.emailId));
 
         const missedMessagesBase = notSkipped
-          .filter((e) => !returnedEmailIds.has(e.messageId))
-          .map((e) => ({
-            messageId: e.messageId,
-            directoryId: e?.parentFolderId,
-            fileKey: getUniqueKeyForMessage({ userEmail, messageId: e.messageId }),
+          .filter((msg) => !returnedEmailIds.has(msg.messageId))
+          .map((msg) => ({
+            messageId: msg.messageId,
+            directoryId: msg.parentFolderId,
+            fileKey: msg.fileKey,
           }));
 
         const existingFileKeys = new Map<string, string>();
