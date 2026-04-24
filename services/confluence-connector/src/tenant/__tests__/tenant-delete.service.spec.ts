@@ -126,7 +126,7 @@ describe('TenantDeleteService', () => {
     client.files.getContentIdsByScope
       .mockResolvedValueOnce(['file-1', 'file-2'])
       .mockResolvedValueOnce(['file-3']);
-    client.files.deleteByIds.mockResolvedValue(2);
+    client.files.deleteByIds.mockResolvedValue({ deleted: 2, failed: 0 });
     client.scopes.delete.mockResolvedValue({
       successFolders: [{ id: 'id', name: 'name', path: '/path' }],
       failedFolders: [],
@@ -174,7 +174,7 @@ describe('TenantDeleteService', () => {
       .mockResolvedValueOnce(['file-1', 'file-2'])
       .mockResolvedValueOnce(['file-3'])
       .mockResolvedValueOnce([]);
-    client.files.deleteByIds.mockResolvedValue(2);
+    client.files.deleteByIds.mockResolvedValue({ deleted: 2, failed: 0 });
     client.scopes.delete.mockResolvedValue({
       successFolders: [{ id: 'id', name: 'name', path: '/path' }],
       failedFolders: [],
@@ -194,7 +194,7 @@ describe('TenantDeleteService', () => {
     client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
     client.scopes.listChildren.mockResolvedValue(childScopes);
     client.files.getContentIdsByScope.mockResolvedValue(['file-1']);
-    client.files.deleteByIds.mockResolvedValue(1);
+    client.files.deleteByIds.mockResolvedValue({ deleted: 1, failed: 0 });
     client.scopes.delete.mockResolvedValue({
       successFolders: [],
       failedFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
@@ -226,7 +226,7 @@ describe('TenantDeleteService', () => {
     client.files.getContentIdsByScope
       .mockRejectedValueOnce(new Error('API error'))
       .mockResolvedValueOnce(['file-1']);
-    client.files.deleteByIds.mockResolvedValue(1);
+    client.files.deleteByIds.mockResolvedValue({ deleted: 1, failed: 0 });
     client.scopes.delete.mockResolvedValue({
       successFolders: [{ id: 'id', name: 'name', path: '/path' }],
       failedFolders: [],
@@ -291,7 +291,7 @@ describe('TenantDeleteService', () => {
       { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
     ]);
     client.files.getContentIdsByScope.mockResolvedValue(['file-1', 'file-2']);
-    client.files.deleteByIds.mockResolvedValue(2);
+    client.files.deleteByIds.mockResolvedValue({ deleted: 2, failed: 0 });
     client.scopes.delete.mockResolvedValue({
       successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
       failedFolders: [],
@@ -385,7 +385,7 @@ describe('TenantDeleteService', () => {
       { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
     ]);
     client.files.getContentIdsByScope.mockResolvedValue(['file-1']);
-    client.files.deleteByIds.mockResolvedValue(1);
+    client.files.deleteByIds.mockResolvedValue({ deleted: 1, failed: 0 });
     client.scopes.delete.mockResolvedValue({
       successFolders: [{ id: 'sub-1', name: 'sub', path: '/root/space-a/sub' }],
       failedFolders: [
@@ -443,6 +443,30 @@ describe('TenantDeleteService', () => {
     expect(result).toEqual({ status: 'failure', failures: 1 });
     expect(durationSpy).toHaveBeenCalledTimes(1);
     expect(durationSpy).toHaveBeenCalledWith(expect.any(Number), 'failure');
+  });
+
+  it('records partial-success metrics when deleteByIds reports some failures', async () => {
+    const client = createMockUniqueApiClient();
+    const metrics = createNoopMetrics();
+    const contentSpy = vi.spyOn(metrics, 'recordCleanupContentDeleted');
+
+    client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
+    client.scopes.listChildren.mockResolvedValue([
+      { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
+    ]);
+    client.files.getContentIdsByScope.mockResolvedValue(['file-1', 'file-2', 'file-3', 'file-4']);
+    client.files.deleteByIds.mockResolvedValue({ deleted: 1, failed: 3 });
+    client.scopes.delete.mockResolvedValue({
+      successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
+      failedFolders: [],
+    });
+
+    const service = new TenantDeleteService('my-tenant', 'scope-1', client as never, metrics);
+    const result = await runInTenantContext(createTenant(), () => service.deleteTenantContent());
+
+    expect(result).toEqual({ status: 'failure', failures: 3 });
+    expect(contentSpy).toHaveBeenCalledWith(1, 'success');
+    expect(contentSpy).toHaveBeenCalledWith(3, 'failure');
   });
 
   it('clears root scope externalId after successful deletion', async () => {

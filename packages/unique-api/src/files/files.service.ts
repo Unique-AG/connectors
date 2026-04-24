@@ -152,26 +152,27 @@ export class FilesService implements UniqueFilesFacade {
     return result.contentDelete;
   }
 
-  public async deleteByIds(contentIds: string[]): Promise<number> {
+  public async deleteByIds(contentIds: string[]): Promise<{ deleted: number; failed: number }> {
     const logPrefix = `[Delete Contents]`;
 
-    let totalDeleted = 0;
+    let deleted = 0;
     const deleteBatches = chunk(contentIds, DELETE_BATCH_SIZE);
     for (const deleteBatch of deleteBatches) {
-      await this.ingestionClient.request<
+      const result = await this.ingestionClient.request<
         ContentDeleteByContentIdsMutationResult,
         ContentDeleteByContentIdsMutationInput
       >(CONTENT_DELETE_BY_IDS_MUTATION, {
         contentIds: deleteBatch,
       });
 
-      totalDeleted += deleteBatch.length;
+      const batchDeleted = result.contentDeleteByContentIds.length;
+      deleted += batchDeleted;
       this.logger.debug(
-        `${logPrefix} Deleted batch of ${deleteBatch.length} files (Total: ${totalDeleted})`,
+        `${logPrefix} Deleted ${batchDeleted}/${deleteBatch.length} files in batch (Total: ${deleted})`,
       );
     }
 
-    return totalDeleted;
+    return { deleted, failed: contentIds.length - deleted };
   }
 
   public async deleteByKeyPrefix(keyPrefix: string): Promise<number> {

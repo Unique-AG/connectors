@@ -110,12 +110,19 @@ export class TenantDeleteService {
       try {
         const contentIds = await this.uniqueClient.files.getContentIdsByScope(scope.id);
         if (contentIds.length > 0) {
-          await this.uniqueClient.files.deleteByIds(contentIds);
-          this.metrics.recordCleanupContentDeleted(contentIds.length, 'success');
+          const { deleted, failed } = await this.uniqueClient.files.deleteByIds(contentIds);
+          if (deleted > 0) {
+            this.metrics.recordCleanupContentDeleted(deleted, 'success');
+          }
+          if (failed > 0) {
+            failures += failed;
+            this.metrics.recordCleanupContentDeleted(failed, 'failure');
+          }
           this.logger.log({
             tenantName: this.tenantName,
             scopeName: scope.name,
-            deletedCount: contentIds.length,
+            deletedCount: deleted,
+            failedCount: failed,
             msg: 'Content deleted by scope ownership',
           });
         }
