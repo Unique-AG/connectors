@@ -143,6 +143,7 @@ function makeRow(
     fullSyncExpectedTotal: number | null;
     newestLastModifiedDateTime: Date | null;
     filters: Record<string, unknown>;
+    deletingInboxStartedAt: Date | null;
   }> = {},
 ) {
   return {
@@ -154,6 +155,7 @@ function makeRow(
     fullSyncExpectedTotal: null as number | null,
     newestLastModifiedDateTime: null as Date | null,
     filters: { retentionWindowInDays: 95 } as Record<string, unknown>,
+    deletingInboxStartedAt: null as Date | null,
     ...overrides,
   };
 }
@@ -325,6 +327,19 @@ describe('FullSyncCommand', () => {
       const result = await command.run(USER_PROFILE_ID);
 
       expect(result).toEqual({ status: 'skipped', reason: 'no-inbox-configuration' });
+      expect(batchCommand.run).not.toHaveBeenCalled();
+    });
+
+    it('skips when inbox deletion is in progress', async () => {
+      const batchCommand = createMockProcessFullSyncBatchCommand();
+      const db = createMockDb({
+        row: makeRow({ deletingInboxStartedAt: new Date() }),
+      });
+      const command = createCommand({ batchCommand, db });
+
+      const result = await command.run(USER_PROFILE_ID);
+
+      expect(result).toEqual({ status: 'skipped', reason: 'inbox-deletion-in-progress' });
       expect(batchCommand.run).not.toHaveBeenCalled();
     });
   });

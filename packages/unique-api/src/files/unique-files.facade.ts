@@ -11,10 +11,12 @@ export interface UniqueFilesFacade {
   addAccesses(scopeId: string, fileAccesses: FileAccessInput[]): Promise<number>;
   removeAccesses(scopeId: string, fileAccesses: FileAccessInput[]): Promise<number>;
   getContentIdsByScope(scopeId: string): Promise<string[]>;
+  getFileKeysByScopeId(scopeId: string): Promise<string[]>;
   // TODO: Check if we can avoid passing the scope id
   getIdsByScopeAndMetadataKey(
     scopeId: string,
     metadataKey: string,
-    metadataValue: unknown,
+    metadataValue: string,
   ): Promise<string[]>;
+  getIdsByScope(scopeId: string, skip: number, take: number): Promise<string[]>;
 }

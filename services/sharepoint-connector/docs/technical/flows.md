@@ -194,7 +194,7 @@ sequenceDiagram
     Connector->>Unique: Create scopes<br/>(subsites as folders in parent's tree)
     Connector->>Unique: Content sync (new/modified/deleted)
     Connector->>Unique: Permission sync
-    Connector->>Unique: Delete orphaned scopes
+    Connector->>Unique: Delete stale scopes
 ```
 
 ### Key Behaviors
@@ -360,6 +360,20 @@ Each item sent to the diff API contains:
 | `key`       | Unique key identifying the file (derived from SharePoint drive/item path) | Identity and change tracking |
 | `url`       | SharePoint URL of the file                                                | Location tracking            |
 | `updatedAt` | Last modification timestamp from SharePoint                               | Change detection             |
+
+### Ingestion error handling
+
+The connector **does not read Unique ingestion states**. Each sync cycle it only runs the download and ingest pipeline for keys returned in `newFiles` or `updatedFiles` from the [file diff](#file-diff-mechanism). If a key is in neither list, **no ingest attempt runs for that item in that cycle**; the rest of the site still syncs. Which keys appear in those lists is decided by the Unique platform (file diff, stored ingestion state, and timestamps). Successful and in-progress processing (for example `FINISHED`, `QUEUED`, `INGESTION_READING`) is opaque to the connector until the diff includes the key again.
+
+When Unique reports an item in one of the failure states below, the platform throttles re-ingestion so the key is re-offered at most every **24 hours**:
+
+- `FAILED`
+- `FAILED_MALWARE_SCAN_TIMEOUT`
+- `FAILED_PARSING`
+- `FAILED_CREATING_CHUNKS`
+- `FAILED_EMBEDDING`
+
+Any other terminal `FAILED_*` state (for example `FAILED_MALWARE_FOUND`, `FAILED_GETTING_FILE`, `FAILED_TIMEOUT`) is handled inside Unique; the connector still only ingests when the key appears in `newFiles` or `updatedFiles`, with **no** separate per-state policy. Retry cadence for those states is defined by the Unique platform and may differ from the 24-hour list above.
 
 ## ASPX Page Processing
 

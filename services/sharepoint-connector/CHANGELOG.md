@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.6.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.6.0...sharepoint-connector@2.6.1) (2026-04-22)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** use bulkMove for root scope migration [UN-19904] ([#490](https://github.com/Unique-AG/connectors/issues/490)) ([051508e](https://github.com/Unique-AG/connectors/commit/051508e2734eec44a5f6d37ebcda261dd8d35d15))
+
+## [2.6.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.5.0...sharepoint-connector@2.6.0) (2026-04-20)
+
+
+### Features
+
+* **sharepoint-connector:** stale scopes deletion ([#476](https://github.com/Unique-AG/connectors/issues/476)) ([edd84ae](https://github.com/Unique-AG/connectors/commit/edd84ae45c67d46fd63c2ef4e5f05f718e198e0e))
+
+
+### Bug Fixes
+
+* **deps:** upgrade nestjs-otel to v8 to resolve systeminformation CVEs ([#471](https://github.com/Unique-AG/connectors/issues/471)) ([ec584a9](https://github.com/Unique-AG/connectors/commit/ec584a95427b3a9989387c548d654c8b4fbbd775))
+
 ## [2.5.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.4.1...sharepoint-connector@2.5.0) (2026-04-15)
 
 

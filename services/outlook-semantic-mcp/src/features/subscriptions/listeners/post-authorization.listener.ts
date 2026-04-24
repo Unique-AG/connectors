@@ -7,6 +7,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { UserAuthorizedEventDto } from '~/auth/dtos/user-authorized-event.dto';
+import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
@@ -14,7 +15,10 @@ import { SubscriptionCreateService } from '../subscription-create.service';
 export class PostAuthorizationListener {
   private readonly logger = new Logger(PostAuthorizationListener.name);
 
-  public constructor(private readonly subscriptionCreateService: SubscriptionCreateService) {}
+  public constructor(
+    private readonly subscriptionCreateService: SubscriptionCreateService,
+    private readonly isInboxDeleting: IsInboxDeletingQuery,
+  ) {}
 
   @RabbitSubscribe({
     exchange: MAIN_EXCHANGE.name,
@@ -29,6 +33,15 @@ export class PostAuthorizationListener {
   public async onUserAuthorized(@RabbitPayload() payload: unknown): Promise<void> {
     const event = UserAuthorizedEventDto.parse(payload);
     const { userProfileId } = event.payload;
+
+    if (await this.isInboxDeleting.run(userProfileId)) {
+      this.logger.warn({
+        userProfileId,
+        msg: 'Inbox deletion in progress, skipping post-authorization subscription',
+      });
+      return;
+    }
+
     try {
       const result = await this.subscriptionCreateService.subscribe(
         convertUserProfileIdToTypeId(userProfileId),

@@ -20,7 +20,7 @@ export const SiteSyncStep = {
   FilePermissionsSync: 'file_permissions_sync',
   FolderPermissionsSync: 'folder_permissions_sync',
   UnknownPermissionsSync: 'unknown_permissions_sync',
-  OrphanScopeCleanup: 'orphan_scope_cleanup',
+  StaleScopeCleanup: 'stale_scope_cleanup',
 } as const;
 
 export type SiteSyncStep = (typeof SiteSyncStep)[keyof typeof SiteSyncStep];

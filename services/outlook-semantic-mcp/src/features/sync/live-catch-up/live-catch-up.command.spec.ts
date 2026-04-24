@@ -78,6 +78,7 @@ function createMockUniqueApi() {
 function createMockDb({
   subscription,
   lockResult,
+  betweenRoundsRow,
 }: {
   subscription?: { userProfileId: string; userEmail: string; providerUserId: string } | undefined;
   lockResult?: {
@@ -85,6 +86,11 @@ function createMockDb({
     newestLastModifiedDateTime: Date | null;
     liveCatchUpHeartbeatAt: Date | null;
     filters: Record<string, unknown>;
+    deletingInboxStartedAt?: Date | null;
+  };
+  betweenRoundsRow?: {
+    lastWebhookReceivedAt: Date | null;
+    deletingInboxStartedAt: Date | null;
   };
 }) {
   function createMockTx(selectRows: any[]) {
@@ -111,7 +117,11 @@ function createMockDb({
     };
   }
 
-  const lockTx = createMockTx(lockResult ? [lockResult] : []);
+  const normalizedLockResult = lockResult
+    ? { deletingInboxStartedAt: null, ...lockResult }
+    : undefined;
+
+  const lockTx = createMockTx(normalizedLockResult ? [normalizedLockResult] : []);
 
   const dbExecuteFn = vi.fn().mockResolvedValue(undefined);
   const db = {
@@ -120,7 +130,7 @@ function createMockDb({
         innerJoin: vi.fn().mockReturnValue({
           where: vi.fn().mockResolvedValue(subscription ? [subscription] : []),
         }),
-        where: vi.fn().mockResolvedValue([]),
+        where: vi.fn().mockResolvedValue(betweenRoundsRow ? [betweenRoundsRow] : []),
       }),
     }),
     transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(lockTx)),
@@ -459,6 +469,59 @@ describe('LiveCatchUpCommand', () => {
     expect(lastUpdateSetCall).toHaveBeenCalledWith(
       expect.objectContaining({ liveCatchUpState: 'failed' }),
     );
+  });
+
+  it('skips when inbox deletion is in progress at entry point', async () => {
+    const db = createMockDb({
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: null,
+        filters: DEFAULT_FILTERS,
+        deletingInboxStartedAt: new Date(),
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(graphApi.get).not.toHaveBeenCalled();
+    expect(ingestEmailCommand.run).not.toHaveBeenCalled();
+  });
+
+  it('stops additional rounds when deletingInboxStartedAt is set between rounds', async () => {
+    // lastWebhookReceivedAt in the future so without the deletion guard another round would start
+    const futureDate = new Date(Date.now() + 60_000);
+    graphApi.get.mockResolvedValue(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: {
+        userProfileId: USER_PROFILE_ID,
+        userEmail: 'user@example.com',
+        providerUserId: 'provider-id',
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: null,
+        filters: DEFAULT_FILTERS,
+      },
+      betweenRoundsRow: {
+        lastWebhookReceivedAt: futureDate,
+        deletingInboxStartedAt: new Date(),
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    // Only one round executed despite lastWebhookReceivedAt indicating more work
+    expect(graphApi.get).toHaveBeenCalledTimes(1);
   });
 
   it('applies the overlapping window to the watermark in the filter expression', async () => {
