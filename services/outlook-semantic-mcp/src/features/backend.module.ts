@@ -11,8 +11,8 @@ import { OpenEmailTool, SearchEmailsTool, SearchModule } from './content';
 import { GraphContentModule } from './content/graph-search/graph-content.module';
 import { GraphOpenEmailTool } from './content/graph-search/graph-open-email.tool';
 import { GraphSearchEmailsTool } from './content/graph-search/graph-search-emails.tool';
-import { DeleteInboxDataTool } from './delete-inbox/delete-inbox-data.tool';
 import { DeleteInboxModule } from './delete-inbox/delete-inbox.module';
+import { DeleteInboxDataTool } from './delete-inbox/delete-inbox-data.tool';
 import { InboxDeletingQueryModule } from './delete-inbox/inbox-deleting-query.module';
 import { DirectoriesSyncModule } from './directories-sync/directories-sync.module';
 import { ListFoldersTool } from './directories-sync/tools';
@@ -35,14 +35,15 @@ import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
 
 @Module({})
-export class BackendModule {
-  static forRoot(): DynamicModule {
-    const isGraph = mcpBackendSchema.parse(process.env.MCP_BACKEND) === 'MicrosoftGraph';
-    const isDebug = mcpDebugModeSchema.parse(process.env.MCP_DEBUG_MODE);
+class BackendModule {}
 
-    return {
-      module: BackendModule,
-      imports: [
+export function registerBackendModule(): DynamicModule {
+  const isGraph = mcpBackendSchema.parse(process.env.MCP_BACKEND) === 'MicrosoftGraph';
+  const isDebug = mcpDebugModeSchema.parse(process.env.MCP_DEBUG_MODE);
+
+  return {
+    module: BackendModule,
+    imports: [
         DrizzleModule,
         MsGraphModule,
         SubscriptionModule,
@@ -79,11 +80,16 @@ export class BackendModule {
               DeleteInboxDataTool,
               ReconnectInboxTool,
               ...(isDebug
-                ? [RunFullSyncTool, RestartFullSyncTool, PauseFullSyncTool, ResumeFullSyncTool, AdminOpsTool]
+                ? [
+                    RunFullSyncTool,
+                    RestartFullSyncTool,
+                    PauseFullSyncTool,
+                    ResumeFullSyncTool,
+                    AdminOpsTool,
+                  ]
                 : []),
             ]),
       ],
       controllers: [MailSubscriptionController],
-    };
-  }
+  };
 }

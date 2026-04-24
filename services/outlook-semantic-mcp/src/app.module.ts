@@ -36,7 +36,7 @@ import {
   uniqueConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
-import { BackendModule } from './features/backend.module';
+import { registerBackendModule } from './features/backend.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
@@ -170,7 +170,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         loggerContext: 'UniqueApi',
       },
     }),
-    BackendModule.forRoot(),
+    registerBackendModule(),
   ],
   controllers: [ManifestController],
   providers: [
