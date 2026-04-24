@@ -128,7 +128,6 @@ export class TenantDeleteService {
         }
       } catch (error) {
         failures++;
-        this.metrics.recordCleanupContentDeleted(0, 'failure');
         this.logger.error({
           tenantName: this.tenantName,
           scopeName: scope.name,

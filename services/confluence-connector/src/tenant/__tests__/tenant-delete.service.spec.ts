@@ -547,7 +547,7 @@ describe('TenantDeleteService', () => {
     );
   });
 
-  it('records content deletion failure metric when content deletion throws', async () => {
+  it('counts content deletion throw toward failures without recording a content metric', async () => {
     const client = createMockUniqueApiClient();
     const metrics = createNoopMetrics();
     const contentSpy = vi.spyOn(metrics, 'recordCleanupContentDeleted');
@@ -566,6 +566,9 @@ describe('TenantDeleteService', () => {
     const result = await runInTenantContext(createTenant(), () => service.deleteTenantContent());
 
     expect(result).toEqual({ status: 'failure', failures: 1 });
-    expect(contentSpy).toHaveBeenCalledWith(0, 'failure');
+    expect(contentSpy).not.toHaveBeenCalled();
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ msg: 'Failed to delete content for scope' }),
+    );
   });
 });

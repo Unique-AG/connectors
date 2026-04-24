@@ -186,19 +186,22 @@ export class IngestionService {
       }
 
       const contentIds = files.map((f) => f.id);
-      const deletedCount = await this.uniqueApiClient.files.deleteByIds(contentIds);
+      const { deleted, failed } = await this.uniqueApiClient.files.deleteByIds(contentIds);
+      if (deleted > 0) {
+        this.metrics.recordContentDeleted(deleted, 'success');
+      }
+      if (failed > 0) {
+        this.metrics.recordContentDeleted(failed, 'failure');
+      }
       this.logger.log({
         requestedCount: contentKeys.length,
         resolvedCount: files.length,
-        deletedCount,
+        deletedCount: deleted,
+        failedCount: failed,
         msg: 'Content deleted',
       });
 
-      // TODO: recordContentDeleted is disabled until deleteByIds returns accurate success/failure
-      // counts. Currently deleteByIds counts items sent, not items confirmed deleted by the API,
-      // and on failure we don't know how many were partially deleted. Follow-up: fix deleteByIds
-      // in @unique-ag/unique-api to return { deleted, failed } based on the mutation response.
-      return deletedCount;
+      return deleted;
     } catch (error) {
       this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
       return 0;
