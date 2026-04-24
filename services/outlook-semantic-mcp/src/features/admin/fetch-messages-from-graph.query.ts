@@ -13,6 +13,7 @@ import { shouldSkipEmail } from '~/features/process-email/utils/should-skip-emai
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import type { EmailDiagnosticEntry } from './sync-diagnostics.types';
+import { isNullish } from 'remeda';
 
 const fetchMessageSchema = z.object({
   id: z.string(),
@@ -68,6 +69,12 @@ export class FetchMessagesFromGraphQuery {
   @Span()
   public async run(input: FetchMessagesFromGraphInput): Promise<FetchMessagesFromGraphResult> {
     const { userProfileId, filter, search } = input;
+    if (filter) {
+      assert.ok(isNullish(search), `We can only use eigter search or filter`);
+    }
+    if (search) {
+      assert.ok(isNullish(filter), `We can only use eigter search or filter`);
+    }
 
     const userProfile = await this.db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
@@ -87,20 +94,18 @@ export class FetchMessagesFromGraphQuery {
 
     const cutoff = computeRetentionCutoffDate(filters.retentionWindowInDays);
 
-    const filtersList = [`receivedDateTime ge ${cutoff.toISOString()}`];
-    if (filter) {
-      filtersList.push(`(${filter})`);
-    }
-
-    // $search responses ignore Prefer: IdType="ImmutableId"; IDs are translated after collection.
-    let apiCall = client
-      .api('me/messages')
-      .select(fetchMessageFields)
-      .top(999)
-      .filter(`(${filtersList.join(' and ')})`);
+    // $search and $filter cannot be combined on the messages endpoint; when search is provided
+    // we skip the filter entirely (including the retention cutoff).
+    let apiCall = client.api('me/messages').select(fetchMessageFields).top(999);
 
     if (!search) {
-      apiCall = apiCall.header('Prefer', 'IdType="ImmutableId"');
+      const filtersList = [`receivedDateTime ge ${cutoff.toISOString()}`];
+      if (filter) {
+        filtersList.push(`(${filter})`);
+      }
+      apiCall = apiCall
+        .filter(`(${filtersList.join(' and ')})`)
+        .header('Prefer', 'IdType="ImmutableId"');
     } else {
       apiCall = apiCall.search(search);
     }
@@ -156,10 +161,11 @@ export class FetchMessagesFromGraphQuery {
     const CHUNK_SIZE = 1000;
     for (let i = 0; i < messages.length; i += CHUNK_SIZE) {
       const chunk = messages.slice(i, i + CHUNK_SIZE);
+      const inputIds = [...new Set(chunk.flatMap((m) => [m.id, m.parentFolderId]))];
       const raw = await client.api('me/translateExchangeIds').post({
-        inputFormat: 'restId',
-        outputFormat: 'restImmutableEntryId',
-        sourceIds: chunk.map((m) => m.id),
+        inputIds,
+        sourceIdType: 'restId',
+        targetIdType: 'restImmutableEntryId',
       });
       const { value } = translateIdsResponseSchema.parse(raw);
       const idMap = new Map(value.map(({ sourceId, targetId }) => [sourceId, targetId]));
@@ -167,6 +173,10 @@ export class FetchMessagesFromGraphQuery {
         const immutableId = idMap.get(message.id);
         if (immutableId) {
           message.id = immutableId;
+        }
+        const immutableParentFolderId = message.parentFolderId && idMap.get(message.parentFolderId);
+        if (immutableParentFolderId) {
+          message.parentFolderId = immutableParentFolderId;
         }
       }
     }
