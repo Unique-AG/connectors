@@ -3,6 +3,7 @@ import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import type { Metrics } from '../metrics';
 import { getCurrentTenant } from './tenant-context.storage';
+import { type DeleteResult, DeleteSkipReason } from './tenant-delete-result.types';
 
 export class TenantDeleteService {
   private readonly logger = new Logger(TenantDeleteService.name);
@@ -14,7 +15,7 @@ export class TenantDeleteService {
     private readonly metrics: Metrics,
   ) {}
 
-  public async deleteTenantContent(): Promise<void> {
+  public async deleteTenantContent(): Promise<DeleteResult> {
     const tenant = getCurrentTenant();
 
     if (tenant.isScanning) {
@@ -22,7 +23,7 @@ export class TenantDeleteService {
         tenantName: this.tenantName,
         msg: 'Cleanup already in progress, skipping',
       });
-      return;
+      return { status: 'skipped', reason: DeleteSkipReason.ScanInProgress };
     }
 
     tenant.isScanning = true;
@@ -35,7 +36,7 @@ export class TenantDeleteService {
           tenantName: this.tenantName,
           msg: `Root scope ${this.scopeId} not found, skipping`,
         });
-        return;
+        return { status: 'skipped', reason: DeleteSkipReason.RootScopeNotFound };
       }
 
       // Only child scopes are deleted. The root scope is intentionally preserved so the
@@ -44,15 +45,21 @@ export class TenantDeleteService {
       const childScopes = await this.uniqueClient.scopes.listChildren(this.scopeId);
       if (childScopes.length === 0) {
         this.logger.log({ tenantName: this.tenantName, msg: 'Already cleaned up, skipping' });
-        return;
+        return { status: 'skipped', reason: DeleteSkipReason.AlreadyCleanedUp };
       }
 
       // Two-step deletion is intentional: deleteContentByScopes removes files in batches per
       // scope, then deleteChildScopes with recursive:true catches anything that failed in the
       // first step. This ensures no content is orphaned even if individual file deletions fail.
-      await this.deleteContentByScopes(childScopes);
-      await this.deleteChildScopes(childScopes);
-      this.metrics.recordCleanupDuration(elapsedSeconds(startTime), 'success');
+      const contentFailures = await this.deleteContentByScopes(childScopes);
+      const scopeFailures = await this.deleteChildScopes(childScopes);
+      const totalFailures = contentFailures + scopeFailures;
+
+      const result: DeleteResult =
+        totalFailures > 0 ? { status: 'failure', failures: totalFailures } : { status: 'success' };
+
+      this.metrics.recordCleanupDuration(elapsedSeconds(startTime), result.status);
+      return result;
     } catch (error) {
       this.metrics.recordCleanupDuration(elapsedSeconds(startTime), 'failure');
       throw error;
@@ -61,7 +68,8 @@ export class TenantDeleteService {
     }
   }
 
-  private async deleteContentByScopes(scopes: Scope[]): Promise<void> {
+  private async deleteContentByScopes(scopes: Scope[]): Promise<number> {
+    let failures = 0;
     for (const scope of scopes) {
       try {
         const contentIds = await this.uniqueClient.files.getContentIdsByScope(scope.id);
@@ -76,6 +84,7 @@ export class TenantDeleteService {
           });
         }
       } catch (error) {
+        failures++;
         this.metrics.recordCleanupContentDeleted(0, 'failure');
         this.logger.error({
           tenantName: this.tenantName,
@@ -85,14 +94,19 @@ export class TenantDeleteService {
         });
       }
     }
+    return failures;
   }
 
-  private async deleteChildScopes(childScopes: Scope[]): Promise<void> {
+  private async deleteChildScopes(childScopes: Scope[]): Promise<number> {
+    let failures = 0;
     for (const child of childScopes) {
       try {
         const result = await this.uniqueClient.scopes.delete(child.id, { recursive: true });
-        if (result.failedFolders.length > 0) {
+        if (result.successFolders.length > 0) {
           this.metrics.recordCleanupScopesDeleted(result.successFolders.length, 'success');
+        }
+        if (result.failedFolders.length > 0) {
+          failures += result.failedFolders.length;
           this.metrics.recordCleanupScopesDeleted(result.failedFolders.length, 'failure');
           this.logger.warn({
             tenantName: this.tenantName,
@@ -102,7 +116,6 @@ export class TenantDeleteService {
             msg: 'Partial scope deletion failure',
           });
         } else {
-          this.metrics.recordCleanupScopesDeleted(result.successFolders.length, 'success');
           this.logger.log({
             tenantName: this.tenantName,
             scopeName: child.name,
@@ -111,6 +124,7 @@ export class TenantDeleteService {
           });
         }
       } catch (error) {
+        failures++;
         this.metrics.recordCleanupScopesDeleted(1, 'failure');
         this.logger.error({
           tenantName: this.tenantName,
@@ -120,5 +134,6 @@ export class TenantDeleteService {
         });
       }
     }
+    return failures;
   }
 }

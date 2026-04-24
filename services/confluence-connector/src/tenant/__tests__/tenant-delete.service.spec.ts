@@ -46,7 +46,7 @@ function createService(client: ReturnType<typeof createMockUniqueApiClient>) {
   return new TenantDeleteService('my-tenant', 'scope-1', client as never, createNoopMetrics());
 }
 
-function runInTenantContext(tenant: TenantContext, fn: () => Promise<void>): Promise<void> {
+function runInTenantContext<T>(tenant: TenantContext, fn: () => Promise<T>): Promise<T> {
   return tenantStorage.run(tenant, fn);
 }
 
@@ -59,8 +59,11 @@ describe('TenantDeleteService', () => {
     const client = createMockUniqueApiClient();
     client.scopes.getById.mockResolvedValue(null);
 
-    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
+    const result = await runInTenantContext(createTenant(), () =>
+      createService(client).deleteTenantContent(),
+    );
 
+    expect(result).toEqual({ status: 'skipped', reason: 'root_scope_not_found' });
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantName: 'my-tenant',
@@ -75,8 +78,11 @@ describe('TenantDeleteService', () => {
     client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
     client.scopes.listChildren.mockResolvedValue([]);
 
-    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
+    const result = await runInTenantContext(createTenant(), () =>
+      createService(client).deleteTenantContent(),
+    );
 
+    expect(result).toEqual({ status: 'skipped', reason: 'already_cleaned_up' });
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({ tenantName: 'my-tenant', msg: 'Already cleaned up, skipping' }),
     );
@@ -169,8 +175,11 @@ describe('TenantDeleteService', () => {
       failedFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
     });
 
-    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
+    const result = await runInTenantContext(createTenant(), () =>
+      createService(client).deleteTenantContent(),
+    );
 
+    expect(result).toEqual({ status: 'failure', failures: 1 });
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantName: 'my-tenant',
@@ -198,8 +207,11 @@ describe('TenantDeleteService', () => {
       failedFolders: [],
     });
 
-    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
+    const result = await runInTenantContext(createTenant(), () =>
+      createService(client).deleteTenantContent(),
+    );
 
+    expect(result).toEqual({ status: 'failure', failures: 1 });
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantName: 'my-tenant',
@@ -227,8 +239,11 @@ describe('TenantDeleteService', () => {
       failedFolders: [],
     });
 
-    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
+    const result = await runInTenantContext(createTenant(), () =>
+      createService(client).deleteTenantContent(),
+    );
 
+    expect(result).toEqual({ status: 'failure', failures: 1 });
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantName: 'my-tenant',
@@ -270,8 +285,11 @@ describe('TenantDeleteService', () => {
     const tenant = createTenant();
     tenant.isScanning = true;
 
-    await runInTenantContext(tenant, () => createService(client).deleteTenantContent());
+    const result = await runInTenantContext(tenant, () =>
+      createService(client).deleteTenantContent(),
+    );
 
+    expect(result).toEqual({ status: 'skipped', reason: 'scan_in_progress' });
     expect(mockLogger.log).toHaveBeenCalledWith(
       expect.objectContaining({ msg: 'Cleanup already in progress, skipping' }),
     );
@@ -352,8 +370,9 @@ describe('TenantDeleteService', () => {
     });
 
     const service = new TenantDeleteService('my-tenant', 'scope-1', client as never, metrics);
-    await runInTenantContext(createTenant(), () => service.deleteTenantContent());
+    const result = await runInTenantContext(createTenant(), () => service.deleteTenantContent());
 
+    expect(result).toEqual({ status: 'failure', failures: 2 });
     expect(scopesSpy).toHaveBeenCalledWith(1, 'success');
     expect(scopesSpy).toHaveBeenCalledWith(2, 'failure');
   });
@@ -370,9 +389,35 @@ describe('TenantDeleteService', () => {
       failedFolders: [],
     });
 
-    await runInTenantContext(createTenant(), () => createService(client).deleteTenantContent());
+    const result = await runInTenantContext(createTenant(), () =>
+      createService(client).deleteTenantContent(),
+    );
 
+    expect(result).toEqual({ status: 'failure', failures: 1 });
     expect(client.scopes.delete).toHaveBeenCalledWith('child-1', { recursive: true });
+  });
+
+  it('records cleanup duration as failure when any sub-operation failed', async () => {
+    const client = createMockUniqueApiClient();
+    const metrics = createNoopMetrics();
+    const durationSpy = vi.spyOn(metrics, 'recordCleanupDuration');
+
+    client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
+    client.scopes.listChildren.mockResolvedValue([
+      { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
+    ]);
+    client.files.getContentIdsByScope.mockResolvedValue([]);
+    client.scopes.delete.mockResolvedValue({
+      successFolders: [],
+      failedFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
+    });
+
+    const service = new TenantDeleteService('my-tenant', 'scope-1', client as never, metrics);
+    const result = await runInTenantContext(createTenant(), () => service.deleteTenantContent());
+
+    expect(result).toEqual({ status: 'failure', failures: 1 });
+    expect(durationSpy).toHaveBeenCalledTimes(1);
+    expect(durationSpy).toHaveBeenCalledWith(expect.any(Number), 'failure');
   });
 
   it('records content deletion failure metric when content deletion throws', async () => {
@@ -391,8 +436,9 @@ describe('TenantDeleteService', () => {
     });
 
     const service = new TenantDeleteService('my-tenant', 'scope-1', client as never, metrics);
-    await runInTenantContext(createTenant(), () => service.deleteTenantContent());
+    const result = await runInTenantContext(createTenant(), () => service.deleteTenantContent());
 
+    expect(result).toEqual({ status: 'failure', failures: 1 });
     expect(contentSpy).toHaveBeenCalledWith(0, 'failure');
   });
 });
