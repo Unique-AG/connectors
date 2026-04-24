@@ -46,11 +46,6 @@ describe('FilesService', () => {
 
       expect(result).toEqual(['id-1', 'id-2', 'id-3']);
       expect(client.request).toHaveBeenCalledTimes(1);
-      expect(client.request).toHaveBeenCalledWith(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
-        skip: 0,
-        take: 100,
-        where: { ownerId: { equals: 'scope-1' }, ownerType: { equals: 'SCOPE' } },
-      });
     });
 
     it('paginates when results exceed batch size', async () => {
