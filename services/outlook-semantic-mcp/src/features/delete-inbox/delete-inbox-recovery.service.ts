@@ -72,7 +72,6 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
           ),
           and(
             isNotNull(inboxConfigurations.deletingInboxStartedAt),
-            lt(inboxConfigurations.deletingInboxStartedAt, getThreshold(5)),
             isNull(inboxConfigurations.deletingHeartbeatAt),
           ),
         ),

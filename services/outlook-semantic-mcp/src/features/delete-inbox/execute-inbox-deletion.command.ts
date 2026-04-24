@@ -2,6 +2,7 @@ import { UniqueApiClient } from '@unique-ag/unique-api';
 import { createSmeared } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { isNullish } from 'remeda';
 import {
   DRIZZLE,
   DrizzleDatabase,
@@ -45,34 +46,12 @@ export class ExecuteInboxDeletionCommand {
       userEmail: createSmeared(userProfile.email ?? '').toString(),
     });
 
-    const inboxConfiguration = await this.db.query.inboxConfigurations.findFirst({
-      where: eq(inboxConfigurations.userProfileId, userProfile.id),
-    });
-
-    if (!inboxConfiguration) {
-      this.logger.log({ ...logContext, msg: 'No inbox configuration found, skipping deletion' });
+    const decision = await this.acuireLockAndDecide(userProfileId);
+    if (decision.action === 'skip') {
+      this.logger.log({ ...logContext, msg: decision.message });
       return;
     }
-    if (!inboxConfiguration.deletingInboxStartedAt) {
-      this.logger.log({
-        ...logContext,
-        msg: 'Inbox configuration deletingInboxStartedAt is null, skipping deletion',
-      });
-      return;
-    }
-    if (
-      isWithinCooldown(
-        inboxConfiguration.deletingHeartbeatAt,
-        STALE_DELETE_INBOX_CONFIGURATION_THRESHOLD_IN_MINUTES,
-      )
-    ) {
-      this.logger.log({
-        ...logContext,
-        msg: 'Inbox configuration deletingHeartbeatAt is within couldown, skipping deletion',
-      });
-      return;
-    }
-
+    this.logger.log({ ...logContext, msg: `Deletting inbox configuration` });
     await this.subscriptionRemove.removeByUserProfileId(
       convertUserProfileIdToTypeId(userProfile.id),
     );
@@ -96,6 +75,51 @@ export class ExecuteInboxDeletionCommand {
     this.logger.warn({ userProfileId, msg: 'InboxConfiguration deleted' });
 
     this.logger.warn({ userProfileId, msg: 'Inbox deletion finished' });
+  }
+
+  private async acuireLockAndDecide(
+    userProfileId: string,
+  ): Promise<{ action: 'skip'; message: string } | { action: 'proceed' }> {
+    return await this.db.transaction(async (tx) => {
+      const row = await tx
+        .select({
+          deletingHeartbeatAt: inboxConfigurations.deletingHeartbeatAt,
+          deletingInboxStartedAt: inboxConfigurations.deletingHeartbeatAt,
+        })
+        .from(inboxConfigurations)
+        .where(eq(inboxConfigurations.userProfileId, userProfileId))
+        .for('update')
+        .then((rows) => rows[0]);
+
+      if (!row) {
+        return { action: 'skip', message: 'No inbox configuration found, skipping deletion' };
+      }
+      if (!row.deletingInboxStartedAt) {
+        return {
+          action: 'skip',
+          message: 'Inbox configuration deletingInboxStartedAt is null, skipping deletion',
+        };
+      }
+      if (isNullish(row.deletingHeartbeatAt)) {
+        await tx
+          .update(inboxConfigurations)
+          .set({ deletingHeartbeatAt: sql`NOW()` })
+          .where(eq(inboxConfigurations.userProfileId, userProfileId));
+        return { action: 'proceed' };
+      }
+      if (
+        isWithinCooldown(
+          row.deletingHeartbeatAt,
+          STALE_DELETE_INBOX_CONFIGURATION_THRESHOLD_IN_MINUTES,
+        )
+      ) {
+        return {
+          action: 'skip',
+          message: 'Inbox configuration deletingHeartbeatAt is within couldown, skipping deletion',
+        };
+      }
+      return { action: 'proceed' };
+    });
   }
 
   private async deleteContentAndScope(
