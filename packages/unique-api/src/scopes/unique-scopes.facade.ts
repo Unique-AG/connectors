@@ -14,7 +14,7 @@ export interface UniqueApiScopesFacade {
   getByExternalId(externalId: string): Promise<Scope | null>;
   updateExternalId(
     scopeId: string,
-    externalId: string,
+    externalId: string | null,
   ): Promise<{ id: string; externalId: string | null }>;
   updateParent(
     scopeId: string,

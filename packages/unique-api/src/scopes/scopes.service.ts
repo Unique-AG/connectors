@@ -117,7 +117,7 @@ export class ScopesService implements UniqueApiScopesFacade {
 
   public async updateExternalId(
     scopeId: string,
-    externalId: string,
+    externalId: string | null,
   ): Promise<{ id: string; externalId: string | null }> {
     const result = await this.scopeManagementClient.request<
       UpdateScopeMutationResult,

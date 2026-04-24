@@ -53,7 +53,14 @@ export class TenantDeleteService {
       // first step. This ensures no content is orphaned even if individual file deletions fail.
       const contentFailures = await this.deleteContentByScopes(childScopes);
       const scopeFailures = await this.deleteChildScopes(childScopes);
-      const totalFailures = contentFailures + scopeFailures;
+      let totalFailures = contentFailures + scopeFailures;
+
+      // Clearing the externalId signals that cleanup completed and frees the user to delete
+      // the root scope if they want. Only attempted when deletion succeeded: a still-set
+      // externalId on a partially-cleaned tenant is a useful "retry me" marker.
+      if (totalFailures === 0 && rootScope.externalId !== null) {
+        totalFailures += await this.clearRootExternalId();
+      }
 
       const result: DeleteResult =
         totalFailures > 0 ? { status: 'failure', failures: totalFailures } : { status: 'success' };
@@ -65,6 +72,24 @@ export class TenantDeleteService {
       throw error;
     } finally {
       tenant.isScanning = false;
+    }
+  }
+
+  private async clearRootExternalId(): Promise<number> {
+    try {
+      await this.uniqueClient.scopes.updateExternalId(this.scopeId, null);
+      this.logger.log({
+        tenantName: this.tenantName,
+        msg: 'Cleared root scope externalId',
+      });
+      return 0;
+    } catch (error) {
+      this.logger.error({
+        tenantName: this.tenantName,
+        err: error,
+        msg: 'Failed to clear root scope externalId',
+      });
+      return 1;
     }
   }
 

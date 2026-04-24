@@ -25,6 +25,7 @@ function createMockUniqueApiClient() {
       getById: vi.fn(),
       listChildren: vi.fn(),
       delete: vi.fn(),
+      updateExternalId: vi.fn().mockResolvedValue({ id: 'scope-1', externalId: null }),
     },
     files: {
       getContentIdsByScope: vi.fn(),
@@ -418,6 +419,104 @@ describe('TenantDeleteService', () => {
     expect(result).toEqual({ status: 'failure', failures: 1 });
     expect(durationSpy).toHaveBeenCalledTimes(1);
     expect(durationSpy).toHaveBeenCalledWith(expect.any(Number), 'failure');
+  });
+
+  it('clears root scope externalId after successful deletion', async () => {
+    const client = createMockUniqueApiClient();
+    client.scopes.getById.mockResolvedValue({
+      id: 'scope-1',
+      name: 'root',
+      externalId: 'tenant:my-tenant',
+    });
+    client.scopes.listChildren.mockResolvedValue([
+      { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
+    ]);
+    client.files.getContentIdsByScope.mockResolvedValue([]);
+    client.scopes.delete.mockResolvedValue({
+      successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
+      failedFolders: [],
+    });
+
+    const result = await runInTenantContext(createTenant(), () =>
+      createService(client).deleteTenantContent(),
+    );
+
+    expect(result).toEqual({ status: 'success' });
+    expect(client.scopes.updateExternalId).toHaveBeenCalledWith('scope-1', null);
+  });
+
+  it('does not clear externalId when deletion had failures', async () => {
+    const client = createMockUniqueApiClient();
+    client.scopes.getById.mockResolvedValue({
+      id: 'scope-1',
+      name: 'root',
+      externalId: 'tenant:my-tenant',
+    });
+    client.scopes.listChildren.mockResolvedValue([
+      { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
+    ]);
+    client.files.getContentIdsByScope.mockResolvedValue([]);
+    client.scopes.delete.mockResolvedValue({
+      successFolders: [],
+      failedFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
+    });
+
+    const result = await runInTenantContext(createTenant(), () =>
+      createService(client).deleteTenantContent(),
+    );
+
+    expect(result).toEqual({ status: 'failure', failures: 1 });
+    expect(client.scopes.updateExternalId).not.toHaveBeenCalled();
+  });
+
+  it('does not clear externalId when it is already null', async () => {
+    const client = createMockUniqueApiClient();
+    client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root', externalId: null });
+    client.scopes.listChildren.mockResolvedValue([
+      { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
+    ]);
+    client.files.getContentIdsByScope.mockResolvedValue([]);
+    client.scopes.delete.mockResolvedValue({
+      successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
+      failedFolders: [],
+    });
+
+    const result = await runInTenantContext(createTenant(), () =>
+      createService(client).deleteTenantContent(),
+    );
+
+    expect(result).toEqual({ status: 'success' });
+    expect(client.scopes.updateExternalId).not.toHaveBeenCalled();
+  });
+
+  it('counts failure to clear externalId toward overall failure count', async () => {
+    const client = createMockUniqueApiClient();
+    client.scopes.getById.mockResolvedValue({
+      id: 'scope-1',
+      name: 'root',
+      externalId: 'tenant:my-tenant',
+    });
+    client.scopes.listChildren.mockResolvedValue([
+      { id: 'child-1', name: 'space-a', parentId: 'scope-1', externalId: null },
+    ]);
+    client.files.getContentIdsByScope.mockResolvedValue([]);
+    client.scopes.delete.mockResolvedValue({
+      successFolders: [{ id: 'child-1', name: 'space-a', path: '/root/space-a' }],
+      failedFolders: [],
+    });
+    client.scopes.updateExternalId.mockRejectedValue(new Error('API error'));
+
+    const result = await runInTenantContext(createTenant(), () =>
+      createService(client).deleteTenantContent(),
+    );
+
+    expect(result).toEqual({ status: 'failure', failures: 1 });
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantName: 'my-tenant',
+        msg: 'Failed to clear root scope externalId',
+      }),
+    );
   });
 
   it('records content deletion failure metric when content deletion throws', async () => {
