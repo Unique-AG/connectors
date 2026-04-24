@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { SearchConditionSchema, SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
+import {
+  SearchConditionSchema,
+  SearchEmailsInputSchema,
+} from '~/features/content/search/search-conditions.dto';
 import { SearchEmailResult } from '~/features/content/search/search-emails.query';
+import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 
 function extractDatePart(isoDatetime: string): string {
   return isoDatetime.slice(0, 10);
@@ -111,32 +114,36 @@ export function buildKqlQueryString(input: z.infer<typeof SearchEmailsInputSchem
   return `${input.search} AND ${conditionGroups.join(' AND ')}`;
 }
 
-interface GraphSearchHit {
-  summary: string;
-  resource: {
-    id: string;
-    subject: string;
-    from: { emailAddress: { address: string } };
-    receivedDateTime: string;
-    parentFolderId: string;
-    webLink: string;
-  };
-}
+const graphSearchHitSchema = z.object({
+  summary: z.string(),
+  resource: z.object({
+    id: z.string(),
+    subject: z.string(),
+    from: z.object({ emailAddress: z.object({ address: z.string() }) }),
+    receivedDateTime: z.string(),
+    parentFolderId: z.string(),
+    webLink: z.string(),
+  }),
+});
 
-interface GraphSearchResponse {
-  value: Array<{
-    hitsContainers: Array<{
-      hits?: GraphSearchHit[];
-    }>;
-  }>;
-}
+const graphSearchResponseSchema = z.object({
+  value: z.array(
+    z.object({
+      hitsContainers: z.array(
+        z.object({
+          hits: z.array(graphSearchHitSchema).optional(),
+        }),
+      ),
+    }),
+  ),
+});
 
 @Injectable()
 export class GraphSearchEmailsQuery {
-  constructor(private readonly graphClientFactory: GraphClientFactory) {}
+  public constructor(private readonly graphClientFactory: GraphClientFactory) {}
 
   @Span()
-  async run(
+  public async run(
     userProfileId: string,
     input: z.infer<typeof SearchEmailsInputSchema>,
   ): Promise<SearchEmailResult[]> {
@@ -144,7 +151,7 @@ export class GraphSearchEmailsQuery {
     const queryString = buildKqlQueryString(input);
     const size = Math.min(input.limit ?? 25, 25);
 
-    const response: GraphSearchResponse = await client.api('/search/query').post({
+    const raw = await client.api('/search/query').post({
       requests: [
         {
           entityTypes: ['message'],
@@ -156,7 +163,8 @@ export class GraphSearchEmailsQuery {
       ],
     });
 
-    const hits = response?.value?.[0]?.hitsContainers?.[0]?.hits ?? [];
+    const response = graphSearchResponseSchema.parse(raw);
+    const hits = response.value[0]?.hitsContainers[0]?.hits ?? [];
 
     return hits.map((hit) => ({
       id: hit.resource.id,
