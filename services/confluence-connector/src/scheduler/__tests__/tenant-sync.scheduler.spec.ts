@@ -1,9 +1,11 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TenantStatus } from '../../config';
 import { ConfluenceSynchronizationService } from '../../synchronization/confluence-synchronization.service';
 import { ServiceRegistry } from '../../tenant/service-registry';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
+import { TenantDeleteService } from '../../tenant/tenant-delete.service';
 import { TenantRegistry } from '../../tenant/tenant-registry';
 import { TenantSyncScheduler } from '../tenant-sync.scheduler';
 
@@ -30,6 +32,7 @@ function createMockSyncService() {
 function createMockTenant(name: string, overrides: Partial<TenantContext> = {}): TenantContext {
   return {
     name,
+    status: 'active',
     config: {
       processing: { scanIntervalCron: '*/5 * * * *' },
     },
@@ -47,6 +50,10 @@ function createMockSchedulerRegistry(): SchedulerRegistry {
   } as unknown as SchedulerRegistry;
 }
 
+function createMockDeleteService() {
+  return { deleteTenantContent: vi.fn().mockResolvedValue(undefined) };
+}
+
 function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
   return {
     getAllTenants: vi.fn().mockReturnValue(tenants),
@@ -62,11 +69,19 @@ function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
 function createMockServiceRegistry(tenants: TenantContext[]): ServiceRegistry {
   const serviceRegistry = new ServiceRegistry();
   for (const tenant of tenants) {
-    serviceRegistry.register(
-      tenant.name,
-      ConfluenceSynchronizationService,
-      createMockSyncService() as unknown as ConfluenceSynchronizationService,
-    );
+    if (tenant.status === TenantStatus.Deleted) {
+      serviceRegistry.register(
+        tenant.name,
+        TenantDeleteService,
+        createMockDeleteService() as unknown as TenantDeleteService,
+      );
+    } else {
+      serviceRegistry.register(
+        tenant.name,
+        ConfluenceSynchronizationService,
+        createMockSyncService() as unknown as ConfluenceSynchronizationService,
+      );
+    }
   }
   return serviceRegistry;
 }
@@ -91,15 +106,23 @@ describe('TenantSyncScheduler', () => {
   });
 
   describe('onModuleInit', () => {
-    it('registers a cron job per tenant', () => {
+    it('registers a cron job per tenant', async () => {
       scheduler.onModuleInit();
 
-      expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(2);
-      expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith('sync:tenant-a', expect.anything());
-      expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith('sync:tenant-b', expect.anything());
+      await vi.waitFor(() => {
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(2);
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+          'sync:tenant-a',
+          expect.anything(),
+        );
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+          'sync:tenant-b',
+          expect.anything(),
+        );
+      });
     });
 
-    it('triggers initial sync for each tenant', async () => {
+    it('triggers initial job for each tenant', async () => {
       scheduler.onModuleInit();
 
       await vi.waitFor(() => {
@@ -114,15 +137,17 @@ describe('TenantSyncScheduler', () => {
       });
     });
 
-    it('logs the scheduled cron expression', () => {
+    it('logs the scheduled cron expression', async () => {
       scheduler.onModuleInit();
 
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          tenantName: 'tenant-a',
-          msg: 'Scheduled sync with cron: */5 * * * *',
-        }),
-      );
+      await vi.waitFor(() => {
+        expect(mockLogger.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tenantName: 'tenant-a',
+            msg: 'Scheduled job with cron: */5 * * * *',
+          }),
+        );
+      });
     });
 
     it('skips scheduling when no tenants are registered', () => {
@@ -138,6 +163,23 @@ describe('TenantSyncScheduler', () => {
 
       expect(emptyRegistry.getAllTenants).not.toHaveBeenCalled();
       expect(schedulerRegistry.addCronJob).not.toHaveBeenCalled();
+    });
+
+    it('registers cron jobs for deleted tenants', async () => {
+      const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
+      tenantRegistry = createMockTenantRegistry([tenantA, deletedTenant]);
+      serviceRegistry = createMockServiceRegistry([tenantA, deletedTenant]);
+      scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
+
+      scheduler.onModuleInit();
+
+      await vi.waitFor(() => {
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledTimes(2);
+        expect(schedulerRegistry.addCronJob).toHaveBeenCalledWith(
+          'sync:deleted-tenant',
+          expect.anything(),
+        );
+      });
     });
   });
 
@@ -156,7 +198,7 @@ describe('TenantSyncScheduler', () => {
   });
 
   describe('syncTenant', () => {
-    it('delegates to ConfluenceSynchronizationService.synchronize()', async () => {
+    it('calls synchronize() for active tenants', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
@@ -166,22 +208,58 @@ describe('TenantSyncScheduler', () => {
       expect(syncService.synchronize).toHaveBeenCalledOnce();
     });
 
-    it('skips sync when shutting down', async () => {
-      scheduler.onModuleInit();
+    it('calls deleteTenantContent() for deleted tenants', async () => {
+      const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
+      tenantRegistry = createMockTenantRegistry([deletedTenant]);
+      serviceRegistry = createMockServiceRegistry([deletedTenant]);
+      scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
+
+      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
+      await (scheduler as any).syncTenant(deletedTenant);
+
+      const deleteService = tenantStorage.run(deletedTenant, () =>
+        serviceRegistry.getService(TenantDeleteService),
+      );
+      expect(deleteService.deleteTenantContent).toHaveBeenCalledOnce();
+    });
+
+    it('catches and logs cleanup errors with tenant name', async () => {
+      const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
+      tenantRegistry = createMockTenantRegistry([deletedTenant]);
+      serviceRegistry = createMockServiceRegistry([deletedTenant]);
+      scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
+
+      const deleteService = tenantStorage.run(deletedTenant, () =>
+        serviceRegistry.getService(TenantDeleteService),
+      );
+      vi.mocked(deleteService.deleteTenantContent).mockRejectedValue(new Error('cleanup exploded'));
+
+      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
+      await (scheduler as any).syncTenant(deletedTenant);
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantName: 'deleted-tenant',
+          err: expect.any(Error),
+          msg: 'Unexpected error in tenant job',
+        }),
+      );
+    });
+
+    it('skips job when shutting down', async () => {
       scheduler.onModuleDestroy();
-      vi.clearAllMocks();
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(tenantA);
 
-      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Skipping sync due to shutdown' });
+      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Skipping job due to shutdown' });
       const syncService = tenantStorage.run(tenantA, () =>
         serviceRegistry.getService(ConfluenceSynchronizationService),
       );
       expect(syncService.synchronize).not.toHaveBeenCalled();
     });
 
-    it('logs unexpected errors from synchronize()', async () => {
+    it('catches and logs sync errors with tenant name', async () => {
       const syncService = tenantStorage.run(tenantA, () =>
         serviceRegistry.getService(ConfluenceSynchronizationService),
       );
@@ -191,7 +269,11 @@ describe('TenantSyncScheduler', () => {
       await (scheduler as any).syncTenant(tenantA);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.any(Error), msg: 'Unexpected sync error' }),
+        expect.objectContaining({
+          tenantName: 'tenant-a',
+          err: expect.any(Error),
+          msg: 'Unexpected error in tenant job',
+        }),
       );
     });
   });

@@ -8,10 +8,7 @@ import {
   type AddAccessesMutationResult,
   CONTENT_DELETE_BY_IDS_MUTATION,
   CONTENT_DELETE_MUTATION,
-  CONTENT_ID_BY_SCOPE_AND_METADATA_KEY,
   CONTENT_UPDATE_MUTATION,
-  type ContentByScopeAndMetadataKeyInput,
-  type ContentByScopeAndMetadataKeyResult,
   type ContentDeleteByContentIdsMutationInput,
   type ContentDeleteByContentIdsMutationResult,
   type ContentDeleteMutationInput,
@@ -19,9 +16,12 @@ import {
   type ContentUpdateMutationInput,
   type ContentUpdateMutationResult,
   PAGINATED_CONTENT_COUNT_QUERY,
+  PAGINATED_CONTENT_IDS_QUERY,
   PAGINATED_CONTENT_QUERY,
   type PaginatedContentCountQueryInput,
   type PaginatedContentCountQueryResult,
+  type PaginatedContentIdsQueryInput,
+  type PaginatedContentIdsQueryResult,
   type PaginatedContentQueryInput,
   type PaginatedContentQueryResult,
   REMOVE_ACCESSES_MUTATION,
@@ -30,15 +30,6 @@ import {
 } from './files.queries';
 import type { ContentUpdateResult, FileAccessInput, UniqueFile } from './files.types';
 import { UniqueFilesFacade } from './unique-files.facade';
-
-interface ContentByScopeInput {
-  skip: number;
-  take: number;
-  where: {
-    ownerId: { equals: string };
-    ownerType: { equals: string };
-  };
-}
 
 const CONTENT_BATCH_SIZE = 100;
 const DELETE_BATCH_SIZE = 20;
@@ -161,26 +152,27 @@ export class FilesService implements UniqueFilesFacade {
     return result.contentDelete;
   }
 
-  public async deleteByIds(contentIds: string[]): Promise<number> {
+  public async deleteByIds(contentIds: string[]): Promise<{ deleted: number; failed: number }> {
     const logPrefix = `[Delete Contents]`;
 
-    let totalDeleted = 0;
+    let deleted = 0;
     const deleteBatches = chunk(contentIds, DELETE_BATCH_SIZE);
     for (const deleteBatch of deleteBatches) {
-      await this.ingestionClient.request<
+      const result = await this.ingestionClient.request<
         ContentDeleteByContentIdsMutationResult,
         ContentDeleteByContentIdsMutationInput
       >(CONTENT_DELETE_BY_IDS_MUTATION, {
         contentIds: deleteBatch,
       });
 
-      totalDeleted += deleteBatch.length;
+      const batchDeleted = result.contentDeleteByContentIds.length;
+      deleted += batchDeleted;
       this.logger.debug(
-        `${logPrefix} Deleted batch of ${deleteBatch.length} files (Total: ${totalDeleted})`,
+        `${logPrefix} Deleted ${batchDeleted}/${deleteBatch.length} files in batch (Total: ${deleted})`,
       );
     }
 
-    return totalDeleted;
+    return { deleted, failed: contentIds.length - deleted };
   }
 
   public async deleteByKeyPrefix(keyPrefix: string): Promise<number> {
@@ -349,12 +341,37 @@ export class FilesService implements UniqueFilesFacade {
     return successCount;
   }
 
+  public async getContentIdsByScope(scopeId: string): Promise<string[]> {
+    let hasMore = true;
+    let skip = 0;
+    const ids: string[] = [];
+    while (hasMore) {
+      const batchResult = await this.ingestionClient.request<
+        PaginatedContentIdsQueryResult,
+        PaginatedContentIdsQueryInput
+      >(PAGINATED_CONTENT_IDS_QUERY, {
+        skip,
+        take: CONTENT_BATCH_SIZE,
+        where: {
+          ownerId: { equals: scopeId },
+          ownerType: { equals: 'SCOPE' },
+        },
+      });
+      for (const node of batchResult.paginatedContent.nodes) {
+        ids.push(node.id);
+      }
+      skip += CONTENT_BATCH_SIZE;
+      hasMore = CONTENT_BATCH_SIZE === batchResult.paginatedContent.nodes.length;
+    }
+    return ids;
+  }
+
   public async getIdsByScope(scopeId: string, skip: number, take: number): Promise<string[]> {
     this.logger.debug(`[Scope: ${scopeId}] Fetching up to ${take} file IDs`);
     const result = await this.ingestionClient.request<
-      ContentByScopeAndMetadataKeyResult,
-      ContentByScopeInput
-    >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
+      PaginatedContentIdsQueryResult,
+      PaginatedContentIdsQueryInput
+    >(PAGINATED_CONTENT_IDS_QUERY, {
       skip,
       take,
       where: {
@@ -399,9 +416,9 @@ export class FilesService implements UniqueFilesFacade {
     const ids: string[] = [];
     while (hasMore) {
       const batchResult = await this.ingestionClient.request<
-        ContentByScopeAndMetadataKeyResult,
-        ContentByScopeAndMetadataKeyInput
-      >(CONTENT_ID_BY_SCOPE_AND_METADATA_KEY, {
+        PaginatedContentIdsQueryResult,
+        PaginatedContentIdsQueryInput
+      >(PAGINATED_CONTENT_IDS_QUERY, {
         skip,
         take: CONTENT_BATCH_SIZE,
         where: {
@@ -413,9 +430,9 @@ export class FilesService implements UniqueFilesFacade {
           },
         },
       });
-      batchResult.paginatedContent.nodes.forEach((node) => {
+      for (const node of batchResult.paginatedContent.nodes) {
         ids.push(node.id);
-      });
+      }
       skip += CONTENT_BATCH_SIZE;
       hasMore = CONTENT_BATCH_SIZE === batchResult.paginatedContent.nodes.length;
     }

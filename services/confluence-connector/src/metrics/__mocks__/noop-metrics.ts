@@ -22,11 +22,15 @@ export function createNoopMetrics(): Metrics {
     recordApiRequestDuration: noop,
     recordApiError: noop,
     recordApiThrottleEvent: noop,
+    recordCleanupDuration: noop,
+    recordCleanupContentDeleted: noop,
+    recordCleanupScopesDeleted: noop,
     recordOrphanedScopesCleaned: noop,
     recordOrphanedFilesCleaned: noop,
     setSyncPhase: noop,
     recordSyncItemTotals: noop,
     initializeCounters: noop,
+    initializeCleanupCounters: noop,
   };
 
   return noopRecord as unknown as Metrics;

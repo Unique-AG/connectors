@@ -169,7 +169,7 @@ export const REMOVE_ACCESSES_MUTATION = gql`
   }
 `;
 
-export const CONTENT_ID_BY_SCOPE_AND_METADATA_KEY = gql`
+export const PAGINATED_CONTENT_IDS_QUERY = gql`
     query PaginatedContent($skip: Int!, $take: Int!, $where: ContentWhereInput) {
       paginatedContent(skip: $skip, take: $take, where: $where) {
         nodes {
@@ -180,20 +180,20 @@ export const CONTENT_ID_BY_SCOPE_AND_METADATA_KEY = gql`
     }
 `;
 
-export interface ContentByScopeAndMetadataKeyInput {
+export interface PaginatedContentIdsQueryInput {
   skip: number;
   take: number;
   where: {
     ownerId: { equals: string };
     ownerType: { equals: string };
-    metadata: {
+    metadata?: {
       path: string[];
       equals: string;
     };
   };
 }
 
-export interface ContentByScopeAndMetadataKeyResult {
+export interface PaginatedContentIdsQueryResult {
   paginatedContent: {
     nodes: {
       id: string;

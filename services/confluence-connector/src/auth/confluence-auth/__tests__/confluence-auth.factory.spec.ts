@@ -38,6 +38,7 @@ const baseFields = {
 const mockTenant: TenantContext = {
   name: 'test-tenant',
   config: {} as TenantConfig,
+  status: 'active',
   isScanning: false,
 };
 

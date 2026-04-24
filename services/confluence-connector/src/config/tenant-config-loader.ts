@@ -13,11 +13,14 @@ import { UniqueConfigSchema } from './unique.schema';
 const TENANT_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const TENANT_CONFIG_SUFFIX = '-tenant-config.yaml';
 
-const TenantStatus = {
+export const TenantStatus = {
   Active: 'active',
   Inactive: 'inactive',
   Deleted: 'deleted',
 } as const;
+
+/** Statuses that survive config filtering (inactive tenants are skipped). */
+export type LoadedTenantStatus = typeof TenantStatus.Active | typeof TenantStatus.Deleted;
 
 const TenantStatusSchema = z.object({
   status: z
@@ -36,11 +39,13 @@ export type TenantConfig = z.infer<typeof TenantConfigSchema>;
 export interface NamedTenantConfig {
   name: string;
   config: TenantConfig;
+  status: LoadedTenantStatus;
 }
 
 const logger = new Logger('TenantConfigLoader');
 
 let cachedConfigs: NamedTenantConfig[] | null = null;
+
 export function getTenantConfigs(): NamedTenantConfig[] {
   if (cachedConfigs) {
     return cachedConfigs;
@@ -107,7 +112,7 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
 
   validateTenantNames(entries);
 
-  const activeConfigs: NamedTenantConfig[] = [];
+  const tenants: NamedTenantConfig[] = [];
 
   for (const entry of entries) {
     try {
@@ -119,13 +124,6 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
       );
 
       const { status } = TenantStatusSchema.parse(rawConfig);
-
-      if (status === TenantStatus.Deleted) {
-        // TODO implement deletion for ingested confluence-content
-        logger.log({ tenantName: entry.name, msg: `Tenant '${entry.name}' is deleted, skipping` });
-        continue;
-      }
-
       const config = TenantConfigSchema.parse(rawConfig);
 
       if (status === TenantStatus.Inactive) {
@@ -133,7 +131,7 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
         continue;
       }
 
-      activeConfigs.push({ name: entry.name, config });
+      tenants.push({ name: entry.name, config, status });
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(
@@ -145,12 +143,12 @@ function loadTenantConfigs(pathPattern: string): NamedTenantConfig[] {
     }
   }
 
-  validateUniqueConfluenceInstances(activeConfigs);
+  validateUniqueConfluenceInstances(tenants.filter(({ status }) => status === TenantStatus.Active));
 
   assert.ok(
-    activeConfigs.length > 0,
-    'No active tenant configurations found. At least one tenant must have status "active".',
+    tenants.length > 0,
+    'No tenant configurations found. At least one tenant must have status "active" or "deleted".',
   );
 
-  return activeConfigs;
+  return tenants;
 }

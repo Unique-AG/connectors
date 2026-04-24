@@ -26,6 +26,9 @@ export class Metrics {
   private readonly confluenceApiRequestDuration: Histogram;
   private readonly confluenceApiThrottleEvents: Counter;
   private readonly confluenceApiErrors: Counter;
+  private readonly cleanupDuration: Histogram;
+  private readonly cleanupContentDeleted: Counter;
+  private readonly cleanupScopesDeleted: Counter;
   private readonly orphanedScopesCleaned: Counter;
   private readonly orphanedFilesCleaned: Counter;
 
@@ -86,6 +89,18 @@ export class Metrics {
 
     this.confluenceApiErrors = metricService.getCounter('cfc_confluence_api_errors_total', {
       description: 'Number of Confluence API error responses',
+    });
+
+    this.cleanupDuration = metricService.getHistogram('cfc_cleanup_duration_seconds', {
+      description: 'Duration of deleted tenant content cleanup',
+    });
+
+    this.cleanupContentDeleted = metricService.getCounter('cfc_cleanup_content_deleted_total', {
+      description: 'Number of content items deleted during tenant cleanup',
+    });
+
+    this.cleanupScopesDeleted = metricService.getCounter('cfc_cleanup_scopes_deleted_total', {
+      description: 'Number of scopes deleted during tenant cleanup',
     });
 
     this.orphanedScopesCleaned = metricService.getCounter('cfc_orphaned_scopes_cleaned_total', {
@@ -191,6 +206,18 @@ export class Metrics {
     });
   }
 
+  public recordCleanupDuration(durationSeconds: number, result: 'success' | 'failure'): void {
+    this.cleanupDuration.record(durationSeconds, { tenant: this.tenantName, result });
+  }
+
+  public recordCleanupContentDeleted(count: number, result: 'success' | 'failure'): void {
+    this.cleanupContentDeleted.add(count, { tenant: this.tenantName, result });
+  }
+
+  public recordCleanupScopesDeleted(count: number, result: 'success' | 'failure'): void {
+    this.cleanupScopesDeleted.add(count, { tenant: this.tenantName, result });
+  }
+
   public recordOrphanedScopesCleaned(count: number, result: 'success' | 'failure'): void {
     this.orphanedScopesCleaned.add(count, { tenant: this.tenantName, result });
   }
@@ -246,5 +273,13 @@ export class Metrics {
     this.orphanedFilesCleaned.add(0, tenant);
     this.syncPhaseState.set(tenantName, SyncPhase.Idle);
     this.syncItemTotals.set(tenantName, { pages: 0, attachments: 0 });
+  }
+
+  public initializeCleanupCounters(): void {
+    const tenant = { tenant: this.tenantName };
+    this.cleanupContentDeleted.add(0, { ...tenant, result: 'success' });
+    this.cleanupContentDeleted.add(0, { ...tenant, result: 'failure' });
+    this.cleanupScopesDeleted.add(0, { ...tenant, result: 'success' });
+    this.cleanupScopesDeleted.add(0, { ...tenant, result: 'failure' });
   }
 }
