@@ -27,6 +27,11 @@ import {
   SearchEmailsInputSchema,
 } from './search-conditions.dto';
 
+export enum SearchBackend {
+  Unique = 'Unique',
+  MsGraph = 'MsGraph',
+}
+
 export interface SearchEmailResult {
   id: string;
   emailId: string;
@@ -37,6 +42,7 @@ export interface SearchEmailResult {
   receivedDateTime: string | null;
   text: string;
   url: string | undefined;
+  backend: SearchBackend;
 }
 
 @Injectable()
@@ -106,6 +112,7 @@ export class SemanticSearchEmailsQuery {
           folderId: metadata?.parentFolderId ?? '',
           from: metadata?.fromEmailAddress ?? '',
           receivedDateTime: metadata?.receivedDateTime ?? '',
+          backend: SearchBackend.Unique,
           textParts: [],
           index,
         };

@@ -5,7 +5,10 @@ import {
   SearchConditionSchema,
   SearchEmailsInputSchema,
 } from '~/features/content/search/search-conditions.dto';
-import { SearchEmailResult } from '~/features/content/search/semantic-search-emails.query';
+import {
+  SearchBackend,
+  SearchEmailResult,
+} from '~/features/content/search/semantic-search-emails.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 
 function extractDatePart(isoDatetime: string): string {
@@ -174,6 +177,7 @@ export class MsGraphKqlSearchEmailsQuery {
           outlookWebLink: hit.resource.webLink,
           folderId: hit.resource.parentFolderId,
           url: undefined,
+          backend: SearchBackend.MsGraph,
         }));
       }),
     );
