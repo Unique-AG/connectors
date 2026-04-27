@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { SearchBackend, SearchEmailResult } from './semantic-search-emails.query';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
 import { SearchEmailsQuery } from './search-emails.query';
+import {
+  SearchBackend,
+  SearchEmailResult,
+  SemanticSearchEmailsQuery,
+} from './semantic-search-emails.query';
 
 function makeGraphResult(emailId: string, overrides?: Partial<SearchEmailResult>): SearchEmailResult {
   return {
@@ -34,63 +39,118 @@ function makeUniqueResult(emailId: string, overrides?: Partial<SearchEmailResult
   };
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
-const mergeResults = (instance: SearchEmailsQuery, resultSets: SearchEmailResult[][]): SearchEmailResult[] =>
-  (instance as any).mergeResults(resultSets);
+describe('SearchEmailsQuery', () => {
+  let semanticSearchQuery: { run: ReturnType<typeof vi.fn> };
+  let msGraphKqlQuery: { run: ReturnType<typeof vi.fn> };
+  let instance: SearchEmailsQuery;
+  const originalMcpBackend = process.env.MCP_BACKEND;
 
-describe('SearchEmailsQuery.mergeResults', () => {
-  const instance = new SearchEmailsQuery(
-    // biome-ignore lint/suspicious/noExplicitAny: test stub
-    null as any,
-    // biome-ignore lint/suspicious/noExplicitAny: test stub
-    null as any,
-  );
-
-  it('returns graph-only results unmodified', () => {
-    const graphA = makeGraphResult('email-1');
-    const graphB = makeGraphResult('email-2');
-
-    const result = mergeResults(instance, [[graphA, graphB]]);
-
-    expect(result).toEqual([graphA, graphB]);
+  beforeEach(() => {
+    semanticSearchQuery = { run: vi.fn() };
+    msGraphKqlQuery = { run: vi.fn() };
+    instance = new SearchEmailsQuery(
+      semanticSearchQuery as unknown as SemanticSearchEmailsQuery,
+      msGraphKqlQuery as unknown as MsGraphKqlSearchEmailsQuery,
+    );
   });
 
-  it('returns unique-only results unmodified', () => {
-    const uniqueA = makeUniqueResult('email-1');
-    const uniqueB = makeUniqueResult('email-2');
-
-    const result = mergeResults(instance, [[uniqueA], [uniqueB]]);
-
-    expect(result).toEqual([uniqueA, uniqueB]);
+  afterEach(() => {
+    if (originalMcpBackend === undefined) {
+      delete process.env.MCP_BACKEND;
+    } else {
+      process.env.MCP_BACKEND = originalMcpBackend;
+    }
   });
 
-  it('drops unique duplicate when emailId overlaps with a graph result', () => {
-    const graphResult = makeGraphResult('email-shared');
-    const uniqueDuplicate = makeUniqueResult('email-shared');
+  describe('MicrosoftGraph backend', () => {
+    beforeEach(() => {
+      process.env.MCP_BACKEND = 'MicrosoftGraph';
+    });
 
-    const result = mergeResults(instance, [[graphResult], [uniqueDuplicate]]);
+    it('returns graph results and does not call the Unique backend', async () => {
+      const graphA = makeGraphResult('email-1');
+      const graphB = makeGraphResult('email-2');
+      msGraphKqlQuery.run.mockResolvedValue([graphA, graphB]);
 
-    expect(result).toHaveLength(1);
-    expect(result[0]).toEqual(graphResult);
+      const result = await instance.run('user-1', {
+        msGraphSearchParams: { queries: [{ kqlQuery: 'subject:test' }] },
+      });
+
+      expect(result).toEqual([graphA, graphB]);
+      expect(semanticSearchQuery.run).not.toHaveBeenCalled();
+    });
+
+    it('returns empty array when msGraphSearchParams is absent', async () => {
+      const result = await instance.run('user-1', {});
+
+      expect(result).toEqual([]);
+      expect(msGraphKqlQuery.run).not.toHaveBeenCalled();
+    });
   });
 
-  it('places graph results first and appends unique-only results after', () => {
-    const graphA = makeGraphResult('email-graph-only');
-    const graphShared = makeGraphResult('email-shared');
-    const uniqueShared = makeUniqueResult('email-shared');
-    const uniqueOnly = makeUniqueResult('email-unique-only');
+  describe('MicrosoftGraphAndUniqueApi backend', () => {
+    beforeEach(() => {
+      process.env.MCP_BACKEND = 'MicrosoftGraphAndUniqueApi';
+    });
 
-    const result = mergeResults(instance, [[graphA, graphShared], [uniqueShared, uniqueOnly]]);
+    it('places graph results first and appends unique-only results after', async () => {
+      const graphA = makeGraphResult('email-graph-only');
+      const graphShared = makeGraphResult('email-shared');
+      const uniqueShared = makeUniqueResult('email-shared');
+      const uniqueOnly = makeUniqueResult('email-unique-only');
 
-    expect(result).toHaveLength(3);
-    expect(result[0]).toEqual(graphA);
-    expect(result[1]).toEqual(graphShared);
-    expect(result[2]).toEqual(uniqueOnly);
-  });
+      semanticSearchQuery.run.mockResolvedValue({ results: [uniqueShared, uniqueOnly] });
+      msGraphKqlQuery.run.mockResolvedValue([graphA, graphShared]);
 
-  it('returns empty array when all result sets are empty', () => {
-    // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
-    const result = (instance as any).mergeResults([[], []]);
-    expect(result).toEqual([]);
+      const result = await instance.run('user-1', {
+        semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+        msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      });
+
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual(graphA);
+      expect(result[1]).toEqual(graphShared);
+      expect(result[2]).toEqual(uniqueOnly);
+    });
+
+    it('drops unique result when its emailId overlaps with a graph result', async () => {
+      const graphResult = makeGraphResult('email-shared');
+      const uniqueDuplicate = makeUniqueResult('email-shared');
+
+      semanticSearchQuery.run.mockResolvedValue({ results: [uniqueDuplicate] });
+      msGraphKqlQuery.run.mockResolvedValue([graphResult]);
+
+      const result = await instance.run('user-1', {
+        semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+        msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual(graphResult);
+    });
+
+    it('returns empty array when both backends return no results', async () => {
+      semanticSearchQuery.run.mockResolvedValue({ results: [] });
+      msGraphKqlQuery.run.mockResolvedValue([]);
+
+      const result = await instance.run('user-1', {
+        semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+        msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      });
+
+      expect(result).toEqual([]);
+    });
+
+    it('skips the Unique backend when semanticSearchParams is absent', async () => {
+      const graphA = makeGraphResult('email-1');
+      msGraphKqlQuery.run.mockResolvedValue([graphA]);
+
+      const result = await instance.run('user-1', {
+        msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      });
+
+      expect(result).toEqual([graphA]);
+      expect(semanticSearchQuery.run).not.toHaveBeenCalled();
+    });
   });
 });

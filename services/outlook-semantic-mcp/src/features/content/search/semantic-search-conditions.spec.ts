@@ -1,6 +1,6 @@
 import { UniqueQLOperator } from '@unique-ag/unique-api';
 import { describe, expect, it } from 'vitest';
-import { buildSearchFilter, CONTAINS_ANY_OPERATOR } from './search-conditions.dto';
+import { buildSearchFilter, CONTAINS_ANY_OPERATOR } from './semantic-search-conditions.dto';
 
 describe('buildSearchFilter', () => {
   it('returns undefined when conditions is undefined', () => {

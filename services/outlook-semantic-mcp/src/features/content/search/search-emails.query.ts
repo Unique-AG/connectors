@@ -2,17 +2,17 @@ import { Injectable } from '@nestjs/common';
 import * as z from 'zod';
 import { mcpBackendSchema } from '~/config/app.config';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
+import { SearchEmailsInputSchema } from './semantic-search-conditions.dto';
 import {
   SearchBackend,
   SearchEmailResult,
   SemanticSearchEmailsQuery,
 } from './semantic-search-emails.query';
-import { SearchEmailsInputSchema } from './search-conditions.dto';
 
-export type SearchEmailsToolInput = {
+export interface SearchEmailsToolInput {
   semanticSearchParams?: z.infer<typeof SearchEmailsInputSchema>;
   msGraphSearchParams?: { queries: Array<{ kqlQuery: string; limit?: number }> };
-};
+}
 
 type McpBackend = z.infer<typeof mcpBackendSchema>;
 
@@ -35,13 +35,17 @@ export class SearchEmailsQuery {
 
   private readonly executors: Record<SearchBackend, BackendExecutor> = {
     [SearchBackend.Unique]: (userProfileId, input) => {
-      if (!input.semanticSearchParams) return Promise.resolve([]);
+      if (!input.semanticSearchParams) {
+        return Promise.resolve([]);
+      }
       return this.semanticSearchQuery
         .run(userProfileId, input.semanticSearchParams)
         .then(({ results }) => results);
     },
     [SearchBackend.MsGraph]: (userProfileId, input) => {
-      if (!input.msGraphSearchParams) return Promise.resolve([]);
+      if (!input.msGraphSearchParams) {
+        return Promise.resolve([]);
+      }
       return this.msGraphKqlQuery.run(userProfileId, input.msGraphSearchParams.queries);
     },
   };

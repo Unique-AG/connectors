@@ -25,7 +25,7 @@ import {
   buildSearchFilter,
   type SearchCondition,
   SearchEmailsInputSchema,
-} from './search-conditions.dto';
+} from './semantic-search-conditions.dto';
 
 export enum SearchBackend {
   Unique = 'Unique',

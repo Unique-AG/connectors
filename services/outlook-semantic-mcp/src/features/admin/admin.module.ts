@@ -3,10 +3,10 @@ import { DrizzleModule } from '~/db/drizzle.module';
 import { SearchModule } from '~/features/content';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
+import { GraphUtilsModule } from '../graph-utils/graph-utils.module';
 import { FetchMessagesFromGraphQuery } from './fetch-messages-from-graph.query';
 import { RunSearchRecallCheckQuery } from './run-search-recall-check.query';
 import { RunSyncDiagnosticsQuery } from './run-sync-diagnostics.query';
-import { GraphUtilsModule } from '../graph-utils/graph-utils.module';
 
 @Module({
   imports: [DrizzleModule, MsGraphModule, UniqueApiFeatureModule, SearchModule, GraphUtilsModule],

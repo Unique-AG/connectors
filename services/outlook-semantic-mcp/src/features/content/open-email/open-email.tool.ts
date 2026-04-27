@@ -7,8 +7,8 @@ import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscri
 import { isGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SearchBackend } from '../search/semantic-search-emails.query';
-import { META } from './open-email-tool.meta';
 import { OpenEmailQuery } from './open-email.query';
+import { META } from './open-email-tool.meta';
 
 const IS_GRAPH_BACKEND = isGraphBackend();
 
@@ -16,10 +16,7 @@ const OpenEmailByIdInputSchema = z.object({
   id: z.string().describe('The id field from a search_emails result.'),
   backend: z
     .nativeEnum(SearchBackend)
-    .describe(
-      'The backend field from the search result. Required when MCP_BACKEND is MicrosoftGraphAndUniqueApi.',
-    )
-    .optional(),
+    .describe('The backend field from the search_emails result.'),
 });
 
 export const EmailDataChunkSchema = z.object({
@@ -73,7 +70,6 @@ export class OpenEmailTool {
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof OpenEmailByIdOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
-    const backend = input.backend ?? (IS_GRAPH_BACKEND ? SearchBackend.MsGraph : SearchBackend.Unique);
 
     if (!IS_GRAPH_BACKEND) {
       const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
@@ -82,7 +78,11 @@ export class OpenEmailTool {
       }
     }
 
-    const emailData = await this.openEmailQuery.run(userProfileTypeId.toString(), input.id, backend);
+    const emailData = await this.openEmailQuery.run(
+      userProfileTypeId.toString(),
+      input.id,
+      input.backend,
+    );
     return { success: true, emailData };
   }
 }

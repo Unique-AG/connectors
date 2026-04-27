@@ -6,14 +6,14 @@ import * as z from 'zod';
 import {
   SearchEmailsMsGraphInputSchema,
   SearchEmailsUnifiedInputSchema,
-} from '~/features/content/search/search-conditions.dto';
+} from '~/features/content/search/semantic-search-conditions.dto';
 import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { GetFullSyncStatsQuery } from '~/features/sync/full-sync/get-full-sync-stats.query';
 import { isGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { SearchBackend } from './semantic-search-emails.query';
 import { META } from './search-emails-tool.meta';
+import { SearchBackend } from './semantic-search-emails.query';
 
 const IS_GRAPH_BACKEND = isGraphBackend();
 

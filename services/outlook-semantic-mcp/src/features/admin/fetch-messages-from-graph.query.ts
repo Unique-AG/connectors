@@ -13,8 +13,8 @@ import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-uniqu
 import { shouldSkipEmail } from '~/features/process-email/utils/should-skip-email';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
-import type { EmailDiagnosticEntry } from './sync-diagnostics.types';
 import { TranslateGraphIdsToImmutableIdsQuery } from '../graph-utils/translate-graph-ids-to-immutable-ids.query';
+import type { EmailDiagnosticEntry } from './sync-diagnostics.types';
 
 const fetchMessageSchema = z.object({
   id: z.string(),
