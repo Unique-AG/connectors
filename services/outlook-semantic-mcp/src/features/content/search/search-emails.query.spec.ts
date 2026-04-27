@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
 import { SearchEmailsQuery } from './search-emails.query';
 import {
@@ -49,7 +49,6 @@ describe('SearchEmailsQuery', () => {
   let semanticSearchQuery: { run: ReturnType<typeof vi.fn> };
   let msGraphKqlQuery: { run: ReturnType<typeof vi.fn> };
   let instance: SearchEmailsQuery;
-  const originalMcpBackend = process.env.MCP_BACKEND;
 
   beforeEach(() => {
     semanticSearchQuery = { run: vi.fn() };
@@ -60,103 +59,159 @@ describe('SearchEmailsQuery', () => {
     );
   });
 
-  afterEach(() => {
-    if (originalMcpBackend === undefined) {
-      delete process.env.MCP_BACKEND;
-    } else {
-      process.env.MCP_BACKEND = originalMcpBackend;
-    }
+  it('returns only graph results when semanticSearchParams is absent', async () => {
+    const graphA = makeGraphResult('email-1');
+    const graphB = makeGraphResult('email-2');
+    msGraphKqlQuery.run.mockResolvedValue([graphA, graphB]);
+
+    const result = await instance.run('user-1', {
+      msGraphSearchParams: { queries: [{ kqlQuery: 'subject:test' }] },
+    });
+
+    expect(result).toHaveLength(2);
+    expect(result[0].emailId).toBe('email-1');
+    expect(result[1].emailId).toBe('email-2');
+    expect(semanticSearchQuery.run).not.toHaveBeenCalled();
   });
 
-  describe('MicrosoftGraph backend', () => {
-    beforeEach(() => {
-      process.env.MCP_BACKEND = 'MicrosoftGraph';
-    });
+  it('returns empty array when msGraphSearchParams is absent', async () => {
+    const result = await instance.run('user-1', {});
 
-    it('returns graph results and does not call the Unique backend', async () => {
-      const graphA = makeGraphResult('email-1');
-      const graphB = makeGraphResult('email-2');
-      msGraphKqlQuery.run.mockResolvedValue([graphA, graphB]);
-
-      const result = await instance.run('user-1', {
-        msGraphSearchParams: { queries: [{ kqlQuery: 'subject:test' }] },
-      });
-
-      expect(result).toEqual([graphA, graphB]);
-      expect(semanticSearchQuery.run).not.toHaveBeenCalled();
-    });
-
-    it('returns empty array when msGraphSearchParams is absent', async () => {
-      const result = await instance.run('user-1', {});
-
-      expect(result).toEqual([]);
-      expect(msGraphKqlQuery.run).not.toHaveBeenCalled();
-    });
+    expect(result).toEqual([]);
+    expect(msGraphKqlQuery.run).not.toHaveBeenCalled();
+    expect(semanticSearchQuery.run).not.toHaveBeenCalled();
   });
 
-  describe('MicrosoftGraphAndUniqueApi backend', () => {
-    beforeEach(() => {
-      process.env.MCP_BACKEND = 'MicrosoftGraphAndUniqueApi';
+  it('returns empty array when both backends return no results', async () => {
+    semanticSearchQuery.run.mockResolvedValue({ results: [] });
+    msGraphKqlQuery.run.mockResolvedValue([]);
+
+    const result = await instance.run('user-1', {
+      semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 
-    it('places graph results first and appends unique-only results after', async () => {
-      const graphA = makeGraphResult('email-graph-only');
-      const graphShared = makeGraphResult('email-shared');
-      const uniqueShared = makeUniqueResult('email-shared');
-      const uniqueOnly = makeUniqueResult('email-unique-only');
+    expect(result).toEqual([]);
+  });
 
-      semanticSearchQuery.run.mockResolvedValue({ results: [uniqueShared, uniqueOnly] });
-      msGraphKqlQuery.run.mockResolvedValue([graphA, graphShared]);
+  it('places top-20 semantic results first, common remainder second, semantic-only third, graph-only last', async () => {
+    // 22 semantic results: indices 0-19 overlap with graph, index 20 has no graph match (semanticOnly), index 21 overlaps with graph (commonRemainder)
+    const semanticResults = Array.from({ length: 22 }, (_, i) =>
+      makeUniqueResult(`email-${i}`, { text: `Unique body ${i}` }),
+    );
 
-      const result = await instance.run('user-1', {
-        semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
-        msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
-      });
+    // Graph matches for indices 0-19 and 21 (not 20)
+    const graphMatches = Array.from({ length: 20 }, (_, i) =>
+      makeGraphResult(`email-${i}`, { text: `Graph body ${i}` }),
+    );
+    graphMatches.push(makeGraphResult('email-21', { text: 'Graph body 21' }));
 
-      expect(result).toHaveLength(3);
-      expect(result[0]).toEqual(graphA);
-      expect(result[1]).toEqual(graphShared);
-      expect(result[2]).toEqual(uniqueOnly);
+    // One graph-only result
+    const graphOnly = makeGraphResult('email-graph-only');
+
+    semanticSearchQuery.run.mockResolvedValue({ results: semanticResults });
+    msGraphKqlQuery.run.mockResolvedValue([...graphMatches, graphOnly]);
+
+    const result = await instance.run('user-1', {
+      semanticSearchParams: { search: 'test', conditions: [], limit: 25 },
+      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 
-    it('drops unique result when its emailId overlaps with a graph result', async () => {
-      const graphResult = makeGraphResult('email-shared');
-      const uniqueDuplicate = makeUniqueResult('email-shared');
+    expect(result).toHaveLength(23);
+    // top20: indices 0-19 (enriched, hadGraphMatch)
+    expect(result[0].emailId).toBe('email-0');
+    expect(result[19].emailId).toBe('email-19');
+    // commonRemainder: index 21 (hadGraphMatch, beyond top20)
+    expect(result[20].emailId).toBe('email-21');
+    // semanticOnly: index 20 (no graph match, beyond top20)
+    expect(result[21].emailId).toBe('email-20');
+    // remainingGraph: graph-only
+    expect(result[22].emailId).toBe('email-graph-only');
+  });
 
-      semanticSearchQuery.run.mockResolvedValue({ results: [uniqueDuplicate] });
-      msGraphKqlQuery.run.mockResolvedValue([graphResult]);
+  it('semantic-only results beyond top-20 appear before graph-only results', async () => {
+    // 21 semantic results, none overlap with graph
+    const semanticResults = Array.from({ length: 21 }, (_, i) =>
+      makeUniqueResult(`email-semantic-${i}`),
+    );
+    const graphOnly = makeGraphResult('email-graph-only');
 
-      const result = await instance.run('user-1', {
-        semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
-        msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
-      });
+    semanticSearchQuery.run.mockResolvedValue({ results: semanticResults });
+    msGraphKqlQuery.run.mockResolvedValue([graphOnly]);
 
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(graphResult);
+    const result = await instance.run('user-1', {
+      semanticSearchParams: { search: 'test', conditions: [], limit: 25 },
+      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 
-    it('returns empty array when both backends return no results', async () => {
-      semanticSearchQuery.run.mockResolvedValue({ results: [] });
-      msGraphKqlQuery.run.mockResolvedValue([]);
+    expect(result).toHaveLength(22);
+    // top20: indices 0-19
+    expect(result[0].emailId).toBe('email-semantic-0');
+    expect(result[19].emailId).toBe('email-semantic-19');
+    // semanticOnly remainder: index 20
+    expect(result[20].emailId).toBe('email-semantic-20');
+    // graph-only last
+    expect(result[21].emailId).toBe('email-graph-only');
+  });
 
-      const result = await instance.run('user-1', {
-        semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
-        msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
-      });
+  it('enriches text with both sections when email matched by both backends', async () => {
+    const semanticResult = makeUniqueResult('email-1', { text: 'Semantic content' });
+    const graphResult = makeGraphResult('email-1', { text: 'Graph content' });
 
-      expect(result).toEqual([]);
+    semanticSearchQuery.run.mockResolvedValue({ results: [semanticResult] });
+    msGraphKqlQuery.run.mockResolvedValue([graphResult]);
+
+    const result = await instance.run('user-1', {
+      semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 
-    it('skips the Unique backend when semanticSearchParams is absent', async () => {
-      const graphA = makeGraphResult('email-1');
-      msGraphKqlQuery.run.mockResolvedValue([graphA]);
+    expect(result[0].text).toBe(
+      '## Semantically Matched Content\nSemantic content\n\n## Full Email Content Without Attachments\nGraph content',
+    );
+  });
 
-      const result = await instance.run('user-1', {
-        msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
-      });
+  it('retains original text for semantic-only result', async () => {
+    const semanticResult = makeUniqueResult('email-1', { text: 'Unique body' });
 
-      expect(result).toEqual([graphA]);
-      expect(semanticSearchQuery.run).not.toHaveBeenCalled();
+    semanticSearchQuery.run.mockResolvedValue({ results: [semanticResult] });
+    msGraphKqlQuery.run.mockResolvedValue([]);
+
+    const result = await instance.run('user-1', {
+      semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
+
+    expect(result[0].text).toBe('Unique body');
+  });
+
+  it('sets formatted graph section text for graph-only result', async () => {
+    const graphResult = makeGraphResult('email-1', { text: 'Graph body' });
+
+    semanticSearchQuery.run.mockResolvedValue({ results: [] });
+    msGraphKqlQuery.run.mockResolvedValue([graphResult]);
+
+    const result = await instance.run('user-1', {
+      semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+    });
+
+    expect(result[0].text).toBe('## Full Email Content Without Attachments\nGraph body');
+  });
+
+  it('email matched by both backends appears exactly once in output', async () => {
+    const semanticResult = makeUniqueResult('email-shared');
+    const graphResult = makeGraphResult('email-shared');
+
+    semanticSearchQuery.run.mockResolvedValue({ results: [semanticResult] });
+    msGraphKqlQuery.run.mockResolvedValue([graphResult]);
+
+    const result = await instance.run('user-1', {
+      semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].backend).toBe(SearchBackend.Unique);
   });
 });
