@@ -55,7 +55,7 @@ export function normalizeError(error: unknown): Error {
  * stripped and replaced with structured `graphqlErrors` and `statusCode`
  * fields, so unsanitised variables never reach the logs.
  */
-export function sanitizeError(error: unknown): object {
+export function sanitizeError(error: unknown): SanitizedError {
   if (error instanceof ClientError) {
     const jsonDumpStart = error.message.indexOf(': {"response":');
     const baseMessage = jsonDumpStart >= 0 ? error.message.slice(0, jsonDumpStart) : error.message;
@@ -63,7 +63,7 @@ export function sanitizeError(error: unknown): object {
     return {
       name: error.name,
       message: baseMessage,
-      stack: error.stack?.replace(error.message, baseMessage),
+      stack: error.stack?.replace(error.message, () => baseMessage),
       graphqlErrors: error.response.errors?.map((e) => ({
         message: e.message,
         path: e.path,
