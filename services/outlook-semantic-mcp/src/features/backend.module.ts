@@ -49,11 +49,21 @@ export function registerBackendModule(): DynamicModule {
 
   const uniqueOnlyTools = isGraph
     ? []
-    : [SyncProgressTool, VerifyInboxConnectionTool, DeleteInboxDataTool, ReconnectInboxTool];
-
-  const debugTools = isDebug
-    ? [RunFullSyncTool, RestartFullSyncTool, PauseFullSyncTool, ResumeFullSyncTool, AdminOpsTool]
-    : [];
+    : [
+        SyncProgressTool,
+        VerifyInboxConnectionTool,
+        DeleteInboxDataTool,
+        ReconnectInboxTool,
+        ...(!isDebug
+          ? []
+          : [
+              RunFullSyncTool,
+              RestartFullSyncTool,
+              PauseFullSyncTool,
+              ResumeFullSyncTool,
+              AdminOpsTool,
+            ]),
+      ];
 
   return {
     module: BackendModule,
@@ -76,12 +86,11 @@ export function registerBackendModule(): DynamicModule {
       AdminModule,
     ],
     providers: [
-      MailSubscriptionController,
       ...uniqueAndMicrosoftBackendCommonTools,
+      ...uniqueOnlyTools,
+      MailSubscriptionController,
       SearchEmailsTool,
       OpenEmailTool,
-      ...uniqueOnlyTools,
-      ...debugTools,
     ],
     controllers: [MailSubscriptionController],
   };

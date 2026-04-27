@@ -187,9 +187,9 @@
             },
             "mcpBackend": {
               "type": "string",
-              "enum": ["UniqueApi", "MicrosoftGraph"],
-              "description": "Selects the search backend. UniqueApi: full KB ingestion + semantic search (default). MicrosoftGraph: direct Graph search, no ingestion.",
-              "default": "UniqueApi"
+              "enum": ["MicrosoftGraphAndUniqueApi", "MicrosoftGraph"],
+              "description": "Selects the search backend. MicrosoftGraphAndUniqueApi: dual backend, KB ingestion + semantic search (default). MicrosoftGraph: direct Graph search, no ingestion.",
+              "default": "MicrosoftGraphAndUniqueApi"
             }
           },
           "required": ["selfUrl"]
