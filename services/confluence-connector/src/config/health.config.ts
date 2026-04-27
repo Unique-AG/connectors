@@ -10,9 +10,7 @@ import { coercedPositiveIntSchema } from '../utils/zod.util';
 export const HealthConfigSchema = z.object({
   syncHistorySize: coercedPositiveIntSchema
     .prefault(DEFAULT_HEALTH_SYNC_HISTORY_SIZE)
-    .describe(
-      'Number of recent sync runs kept per tenant in the sliding window for health checks',
-    ),
+    .describe('Number of recent sync runs kept per tenant in the sliding window for health checks'),
   syncTenantFailureThreshold: z.coerce
     .number()
     .min(0)

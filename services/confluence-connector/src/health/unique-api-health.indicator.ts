@@ -38,9 +38,7 @@ export class UniqueApiHealthIndicator {
     const indicator = this.healthIndicatorService.check(key);
     const tenants = this.tenantRegistry.getAllTenants();
 
-    const tenantResults = await Promise.all(
-      tenants.map((tenant) => this.checkTenant(tenant)),
-    );
+    const tenantResults = await Promise.all(tenants.map((tenant) => this.checkTenant(tenant)));
 
     const ingestion = tenantResults.map((r) => formatEntry(r.tenantName, r.ingestion));
     const scopeManagement = tenantResults.map((r) => formatEntry(r.tenantName, r.scopeManagement));
@@ -66,7 +64,9 @@ export class UniqueApiHealthIndicator {
 
     let authHeaders: Record<string, string>;
     try {
-      authHeaders = await this.tenantRegistry.run(tenant, () => this.buildAuthHeaders(uniqueConfig));
+      authHeaders = await this.tenantRegistry.run(tenant, () =>
+        this.buildAuthHeaders(uniqueConfig),
+      );
     } catch {
       return {
         tenantName: tenant.name,

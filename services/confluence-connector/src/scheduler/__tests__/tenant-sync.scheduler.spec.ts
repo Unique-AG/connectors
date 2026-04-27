@@ -1,6 +1,8 @@
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TenantStatus } from '../../config';
+import { SyncStep } from '../../health/sync-result.types';
+import { SyncStatusStore } from '../../health/sync-status.store';
 import { ConfluenceSynchronizationService } from '../../synchronization/confluence-synchronization.service';
 import { ServiceRegistry } from '../../tenant/service-registry';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
@@ -26,7 +28,11 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 });
 
 function createMockSyncService() {
-  return { synchronize: vi.fn().mockResolvedValue(undefined) };
+  return { synchronize: vi.fn().mockResolvedValue({ status: 'success' }) };
+}
+
+function createMockSyncStatusStore(): SyncStatusStore {
+  return { record: vi.fn() } as unknown as SyncStatusStore;
 }
 
 function createMockTenant(name: string, overrides: Partial<TenantContext> = {}): TenantContext {
@@ -91,6 +97,7 @@ describe('TenantSyncScheduler', () => {
   let tenantRegistry: TenantRegistry;
   let serviceRegistry: ServiceRegistry;
   let schedulerRegistry: SchedulerRegistry;
+  let syncStatusStore: SyncStatusStore;
   let tenantA: TenantContext;
   let tenantB: TenantContext;
 
@@ -102,7 +109,13 @@ describe('TenantSyncScheduler', () => {
     tenantRegistry = createMockTenantRegistry([tenantA, tenantB]);
     serviceRegistry = createMockServiceRegistry([tenantA, tenantB]);
     schedulerRegistry = createMockSchedulerRegistry();
-    scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
+    syncStatusStore = createMockSyncStatusStore();
+    scheduler = new TenantSyncScheduler(
+      tenantRegistry,
+      serviceRegistry,
+      schedulerRegistry,
+      syncStatusStore,
+    );
   });
 
   describe('onModuleInit', () => {
@@ -157,6 +170,7 @@ describe('TenantSyncScheduler', () => {
         emptyRegistry,
         emptyServiceRegistry,
         schedulerRegistry,
+        syncStatusStore,
       );
 
       emptyScheduler.onModuleInit();
@@ -169,7 +183,12 @@ describe('TenantSyncScheduler', () => {
       const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
       tenantRegistry = createMockTenantRegistry([tenantA, deletedTenant]);
       serviceRegistry = createMockServiceRegistry([tenantA, deletedTenant]);
-      scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
+      scheduler = new TenantSyncScheduler(
+        tenantRegistry,
+        serviceRegistry,
+        schedulerRegistry,
+        syncStatusStore,
+      );
 
       scheduler.onModuleInit();
 
@@ -212,7 +231,12 @@ describe('TenantSyncScheduler', () => {
       const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
       tenantRegistry = createMockTenantRegistry([deletedTenant]);
       serviceRegistry = createMockServiceRegistry([deletedTenant]);
-      scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
+      scheduler = new TenantSyncScheduler(
+        tenantRegistry,
+        serviceRegistry,
+        schedulerRegistry,
+        syncStatusStore,
+      );
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(deletedTenant);
@@ -227,7 +251,12 @@ describe('TenantSyncScheduler', () => {
       const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
       tenantRegistry = createMockTenantRegistry([deletedTenant]);
       serviceRegistry = createMockServiceRegistry([deletedTenant]);
-      scheduler = new TenantSyncScheduler(tenantRegistry, serviceRegistry, schedulerRegistry);
+      scheduler = new TenantSyncScheduler(
+        tenantRegistry,
+        serviceRegistry,
+        schedulerRegistry,
+        syncStatusStore,
+      );
 
       const deleteService = tenantStorage.run(deletedTenant, () =>
         serviceRegistry.getService(TenantDeleteService),
@@ -275,6 +304,51 @@ describe('TenantSyncScheduler', () => {
           msg: 'Unexpected error in tenant job',
         }),
       );
+    });
+
+    it('records the sync result in the status store on success', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
+      await (scheduler as any).syncTenant(tenantA);
+
+      expect(syncStatusStore.record).toHaveBeenCalledOnce();
+      expect(syncStatusStore.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantName: 'tenant-a',
+          result: { status: 'success' },
+        }),
+      );
+    });
+
+    it('records an Unknown failure when synchronize() throws', async () => {
+      const syncService = tenantStorage.run(tenantA, () =>
+        serviceRegistry.getService(ConfluenceSynchronizationService),
+      );
+      vi.mocked(syncService.synchronize).mockRejectedValue(new Error('unexpected failure'));
+
+      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
+      await (scheduler as any).syncTenant(tenantA);
+
+      expect(syncStatusStore.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantName: 'tenant-a',
+          result: { status: 'failure', step: SyncStep.Unknown },
+        }),
+      );
+    });
+
+    it('does not record sync_in_progress skips so they do not dilute the window', async () => {
+      const syncService = tenantStorage.run(tenantA, () =>
+        serviceRegistry.getService(ConfluenceSynchronizationService),
+      );
+      vi.mocked(syncService.synchronize).mockResolvedValue({
+        status: 'skipped',
+        reason: 'sync_in_progress',
+      });
+
+      // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
+      await (scheduler as any).syncTenant(tenantA);
+
+      expect(syncStatusStore.record).not.toHaveBeenCalled();
     });
   });
 });

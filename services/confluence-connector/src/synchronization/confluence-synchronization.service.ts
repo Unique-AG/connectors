@@ -2,6 +2,8 @@ import assert from 'node:assert';
 import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
+import type { SyncResult } from '../health/sync-result.types';
+import { SyncStep } from '../health/sync-result.types';
 import { type Metrics, SyncPhase } from '../metrics';
 import { getCurrentTenant } from '../tenant';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
@@ -25,7 +27,7 @@ export class ConfluenceSynchronizationService {
     private readonly metrics: Metrics,
   ) {}
 
-  public async synchronize(): Promise<void> {
+  public async synchronize(): Promise<SyncResult> {
     const tenant = getCurrentTenant();
 
     if (tenant.isScanning) {
@@ -33,19 +35,22 @@ export class ConfluenceSynchronizationService {
         tenantName: tenant.name,
         msg: 'Sync already in progress, skipping',
       });
-      return;
+      return { status: 'skipped', reason: 'sync_in_progress' };
     }
 
     tenant.isScanning = true;
     const startTime = Date.now();
+    let currentStep: SyncStep = SyncStep.Unknown;
     let syncResult: 'success' | 'failure' = 'success';
 
     try {
       this.logger.log({ tenantName: tenant.name, msg: 'Starting sync' });
 
       this.metrics.setSyncPhase(SyncPhase.Scanning);
+      currentStep = SyncStep.ScopeInit;
       const rootScopePath = await this.scopeManagementService.initialize();
 
+      currentStep = SyncStep.Discovery;
       const scanStartTime = Date.now();
       const { pages: discoveredPages, attachments: discoveredAttachments } =
         await this.scanner.discoverPages();
@@ -61,6 +66,7 @@ export class ConfluenceSynchronizationService {
         discoveredAttachments,
       );
 
+      currentStep = SyncStep.Diff;
       const diffResult = await this.fileDiffService.computeDiff(
         discoveredPages,
         discoveredAttachments,
@@ -82,6 +88,7 @@ export class ConfluenceSynchronizationService {
             ...attachmentsToIngest.map((a) => a.spaceKey),
           ]),
         ];
+        currentStep = SyncStep.SpaceScopes;
         const spaceScopes = await this.scopeManagementService.ensureSpaceScopes(
           rootScopePath,
           spaceKeys,
@@ -91,14 +98,17 @@ export class ConfluenceSynchronizationService {
         const concurrency = tenant.config.processing.concurrency;
 
         this.metrics.setSyncPhase(SyncPhase.IngestingPages);
+        currentStep = SyncStep.PageIngestion;
         await this.fetchAndIngestPages(pagesToFetch, spaceScopes, concurrency);
 
         this.metrics.setSyncPhase(SyncPhase.IngestingAttachments);
+        currentStep = SyncStep.AttachmentIngestion;
         await this.ingestAttachments(attachmentsToIngest, spaceScopes, concurrency);
       }
 
       if (diffResult.deletedItems.length > 0) {
         this.metrics.setSyncPhase(SyncPhase.Deleting);
+        currentStep = SyncStep.Deletion;
         const contentKeys = diffResult.deletedItems.map((item) => `${item.partialKey}/${item.id}`);
         const deletedCount = await this.ingestionService.deleteContentByKeys(contentKeys);
         this.logger.log({
@@ -109,12 +119,15 @@ export class ConfluenceSynchronizationService {
       }
 
       this.metrics.setSyncPhase(SyncPhase.CleaningUp);
+      currentStep = SyncStep.Cleanup;
       await this.scopeManagementService.cleanupRemovedSpaces(new Set(allSpaceKeyToSpaceId.keys()));
 
       this.logger.log({ msg: 'Sync work done' });
+      return { status: 'success' };
     } catch (error) {
       syncResult = 'failure';
       this.logger.error({ err: error, msg: 'Sync failed' });
+      return { status: 'failure', step: currentStep };
     } finally {
       tenant.isScanning = false;
       this.metrics.setSyncPhase(SyncPhase.Idle);
