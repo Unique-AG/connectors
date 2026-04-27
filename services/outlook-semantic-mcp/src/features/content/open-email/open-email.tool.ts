@@ -16,9 +16,13 @@ const OpenEmailByIdInputSchema = z.object({
   id: z
     .string()
     .describe(
-      'The identifier from the search_emails result. Use `uniqueContentId` when backend is `Unique`, use `msGraphMessageId` when backend is `MsGraph`.',
+      'The email identifier from a `search_emails` result. Use `uniqueContentId` when it is available; otherwise use `msGraphMessageId`.',
     ),
-  backend: z.nativeEnum(SearchBackend).describe('The backend field from the search_emails result.'),
+  idType: z
+    .nativeEnum(SearchBackend)
+    .describe(
+      'Indicates which identifier is being passed, derived from the `search_emails` result. Use `Unique` when passing `uniqueContentId`; use `MsGraph` when passing `msGraphMessageId`.',
+    ),
 });
 
 export const EmailDataSchema = z.object({
@@ -46,7 +50,7 @@ export class OpenEmailTool {
     name: 'open_email_by_id',
     title: 'Open Email by ID',
     description:
-      'Retrieve the full body of an email from a search_emails result. Always pass the `backend` field exactly as returned. Then pass the matching identifier: `uniqueContentId` when backend is `Unique`, `msGraphMessageId` when backend is `MsGraph`.',
+      'Retrieve the full body of an email. Both `id` and `idType` must come from a `search_emails` result: pass `uniqueContentId` as `id` and `Unique` as `idType` when `uniqueContentId` is available; otherwise pass `msGraphMessageId` as `id` and `MsGraph` as `idType`.',
     parameters: OpenEmailByIdInputSchema,
     outputSchema: OpenEmailByIdOutputSchema,
     annotations: {
@@ -76,7 +80,7 @@ export class OpenEmailTool {
     const emailData = await this.openEmailQuery.run(
       userProfileTypeId.toString(),
       input.id,
-      input.backend,
+      input.idType,
     );
     return { success: true, emailData };
   }
