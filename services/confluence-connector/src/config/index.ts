@@ -1,6 +1,11 @@
 export { type AppConfig, type AppConfigNamespaced, appConfig } from './app.config';
 export type { ConfluenceConfig } from './confluence.schema';
 export { AuthMode } from './confluence.schema';
+export {
+  type HealthConfig,
+  type HealthConfigNamespaced,
+  healthConfig,
+} from './health.config';
 export type { ProcessingConfig } from './processing.schema';
 export {
   type BasicProxyConfig,
