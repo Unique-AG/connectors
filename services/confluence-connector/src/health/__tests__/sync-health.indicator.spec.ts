@@ -91,6 +91,22 @@ describe('SyncHealthIndicator', () => {
     });
   });
 
+  it('reports only tenants that have sync records', () => {
+    store.record(makeRecord({ tenantName: 'tenant-a', result: { status: 'success' } }));
+
+    const result = indicator.check('sync');
+
+    expect(result).toEqual({
+      sync: {
+        status: 'up',
+        lastSyncAt: '2026-04-27T10:15:00.000Z',
+        tenants: {
+          'tenant-a': { failures: 0, total: 1 },
+        },
+      },
+    });
+  });
+
   it('returns down when a tenant exceeds the failure threshold', () => {
     // tenant-a: 3/4 failures = 0.75 > 0.5
     store.record(
