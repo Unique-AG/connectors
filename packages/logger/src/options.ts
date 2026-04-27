@@ -30,7 +30,7 @@ export const defaultLoggerOptions: Params = {
       censor: () => '[Redacted]',
     },
     serializers: {
-      err: sanitizeError,
+      err: sanitizePinoError,
     },
     customProps: (req: IncomingMessage) => {
       const operationName = getOperationName(req);
@@ -70,4 +70,16 @@ function getOperationName(req: IncomingMessage): string | undefined {
   }
 
   return typeof body.operationName === 'string' ? body.operationName : undefined;
+}
+
+function sanitizePinoError(error: unknown): unknown {
+  if (hasRawError(error)) {
+    return sanitizeError(error.raw);
+  }
+
+  return sanitizeError(error);
+}
+
+function hasRawError(error: unknown): error is { raw: unknown } {
+  return typeof error === 'object' && error !== null && 'raw' in error;
 }
