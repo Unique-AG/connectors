@@ -32,7 +32,6 @@ export enum SearchBackend {
 export interface SearchEmailResult {
   uniqueContentId?: string;
   msGraphMessageId?: string;
-  emailId: string;
   folderId: string;
   title: string;
   from: string;
@@ -106,7 +105,7 @@ export class SemanticSearchEmailsQuery {
           uniqueContentId: item.id,
           uniqueContentUrl: item.url ?? undefined,
           outlookWebLink: metadata?.webLink ?? '',
-          emailId: metadata?.id ?? '',
+          msGraphMessageId: metadata?.id || undefined,
           folderId: metadata?.parentFolderId ?? '',
           from: metadata?.fromEmailAddress ?? '',
           receivedDateTime: metadata?.receivedDateTime ?? '',

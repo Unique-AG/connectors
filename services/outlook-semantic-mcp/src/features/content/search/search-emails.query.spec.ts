@@ -13,7 +13,6 @@ function makeGraphResult(
 ): SearchEmailResult {
   return {
     msGraphMessageId: emailId,
-    emailId,
     folderId: 'folder-1',
     title: 'Graph Email',
     from: 'sender@example.com',
@@ -32,7 +31,7 @@ function makeUniqueResult(
 ): SearchEmailResult {
   return {
     uniqueContentId: `content-${emailId}`,
-    emailId,
+    msGraphMessageId: emailId,
     folderId: 'folder-2',
     title: 'Unique Email',
     from: 'sender@example.com',
@@ -69,8 +68,8 @@ describe('SearchEmailsQuery', () => {
     });
 
     expect(result).toHaveLength(2);
-    expect(result[0]?.emailId).toBe('email-1');
-    expect(result[1]?.emailId).toBe('email-2');
+    expect(result[0]?.msGraphMessageId).toBe('email-1');
+    expect(result[1]?.msGraphMessageId).toBe('email-2');
     expect(semanticSearchQuery.run).not.toHaveBeenCalled();
   });
 
@@ -119,14 +118,14 @@ describe('SearchEmailsQuery', () => {
 
     expect(result).toHaveLength(23);
     // top20: indices 0-19 (enriched, hadGraphMatch)
-    expect(result[0]?.emailId).toBe('email-0');
-    expect(result[19]?.emailId).toBe('email-19');
+    expect(result[0]?.msGraphMessageId).toBe('email-0');
+    expect(result[19]?.msGraphMessageId).toBe('email-19');
     // commonRemainder: index 21 (hadGraphMatch, beyond top20)
-    expect(result[20]?.emailId).toBe('email-21');
+    expect(result[20]?.msGraphMessageId).toBe('email-21');
     // semanticOnly: index 20 (no graph match, beyond top20)
-    expect(result[21]?.emailId).toBe('email-20');
+    expect(result[21]?.msGraphMessageId).toBe('email-20');
     // remainingGraph: graph-only
-    expect(result[22]?.emailId).toBe('email-graph-only');
+    expect(result[22]?.msGraphMessageId).toBe('email-graph-only');
   });
 
   it('semantic-only results beyond top-20 appear before graph-only results', async () => {
@@ -146,12 +145,12 @@ describe('SearchEmailsQuery', () => {
 
     expect(result).toHaveLength(22);
     // top20: indices 0-19
-    expect(result[0]?.emailId).toBe('email-semantic-0');
-    expect(result[19]?.emailId).toBe('email-semantic-19');
+    expect(result[0]?.msGraphMessageId).toBe('email-semantic-0');
+    expect(result[19]?.msGraphMessageId).toBe('email-semantic-19');
     // semanticOnly remainder: index 20
-    expect(result[20]?.emailId).toBe('email-semantic-20');
+    expect(result[20]?.msGraphMessageId).toBe('email-semantic-20');
     // graph-only last
-    expect(result[21]?.emailId).toBe('email-graph-only');
+    expect(result[21]?.msGraphMessageId).toBe('email-graph-only');
   });
 
   it('enriches text with both sections when email matched by both backends', async () => {

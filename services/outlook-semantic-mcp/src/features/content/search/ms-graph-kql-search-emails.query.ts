@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import { isNonNullish } from 'remeda';
 import * as z from 'zod';
 import {
   SearchBackend,
@@ -8,9 +9,9 @@ import {
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 
 const graphSearchHitSchema = z.object({
+  hitId: z.string(),
   summary: z.string(),
   resource: z.object({
-    id: z.string(),
     subject: z.string(),
     from: z.object({ emailAddress: z.object({ address: z.string() }) }),
     receivedDateTime: z.string(),
@@ -59,10 +60,11 @@ export class MsGraphKqlSearchEmailsQuery {
             ],
           });
         const response = graphSearchResponseSchema.parse(raw);
-        const hits = response.value[0]?.hitsContainers[0]?.hits ?? [];
+        const hits = response.value
+          .flatMap((item) => item.hitsContainers.flatMap((container) => container.hits ?? []))
+          .filter(isNonNullish);
         return hits.map((hit) => ({
-          msGraphMessageId: hit.resource.id,
-          emailId: hit.resource.id,
+          msGraphMessageId: hit.hitId,
           title: hit.resource.subject,
           from: hit.resource.from.emailAddress.address,
           receivedDateTime: hit.resource.receivedDateTime,
@@ -79,8 +81,8 @@ export class MsGraphKqlSearchEmailsQuery {
     const deduplicated: SearchEmailResult[] = [];
     for (const results of allResults) {
       for (const result of results) {
-        if (!seen.has(result.emailId)) {
-          seen.add(result.emailId);
+        if (!seen.has(result.msGraphMessageId ?? '')) {
+          seen.add(result.msGraphMessageId ?? '');
           deduplicated.push(result);
         }
       }

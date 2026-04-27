@@ -97,13 +97,15 @@ export class SearchEmailsQuery {
     semanticResults: SearchEmailResult[],
     graphResults: SearchEmailResult[],
   ): SearchEmailResult[] {
-    const graphById = new Map(graphResults.map((r) => [r.emailId, r]));
+    const graphById = new Map(graphResults.map((r) => [r.msGraphMessageId ?? '', r]));
 
     const enriched: Array<{ result: SearchEmailResult; hadGraphMatch: boolean }> =
       semanticResults.map((semanticResult) => {
-        const graphResult = graphById.get(semanticResult.emailId);
+        const graphResult = semanticResult.msGraphMessageId
+          ? graphById.get(semanticResult.msGraphMessageId)
+          : undefined;
         if (graphResult) {
-          graphById.delete(semanticResult.emailId);
+          graphById.delete(semanticResult.msGraphMessageId ?? '');
           return {
             result: {
               ...semanticResult,

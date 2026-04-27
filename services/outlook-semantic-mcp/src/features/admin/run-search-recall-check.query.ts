@@ -104,7 +104,7 @@ export class RunSearchRecallCheckQuery {
 
         const expectedMessageIds = notSkipped.map((e) => e.messageId);
         const { results } = await this.searchEmailsQuery.run(userProfileId, checkCase.search);
-        const returnedEmailIds = new Set(results.map((r) => r.emailId));
+        const returnedEmailIds = new Set(results.map((r) => r.msGraphMessageId));
 
         const missedMessagesBase = notSkipped
           .filter((msg) => !returnedEmailIds.has(msg.messageId))

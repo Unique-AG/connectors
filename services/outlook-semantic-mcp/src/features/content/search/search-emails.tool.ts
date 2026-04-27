@@ -24,7 +24,6 @@ const SearchEmailsToolInputSchema = IS_GRAPH_BACKEND
 const SearchEmailResultSchema = z.object({
   uniqueContentId: z.string().optional(),
   msGraphMessageId: z.string().optional(),
-  emailId: z.string(),
   folderId: z.string(),
   title: z.string(),
   from: z.string(),
