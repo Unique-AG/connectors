@@ -58,7 +58,7 @@ export class MsGraphKqlSearchEmailsQuery {
         const response = graphSearchResponseSchema.parse(raw);
         const hits = response.value[0]?.hitsContainers[0]?.hits ?? [];
         return hits.map((hit) => ({
-          id: hit.resource.id,
+          msGraphMessageId: hit.resource.id,
           emailId: hit.resource.id,
           title: hit.resource.subject,
           from: hit.resource.from.emailAddress.address,
@@ -66,7 +66,7 @@ export class MsGraphKqlSearchEmailsQuery {
           text: hit.summary,
           outlookWebLink: hit.resource.webLink,
           folderId: hit.resource.parentFolderId,
-          url: undefined,
+          uniqueContentUrl: undefined,
           backend: SearchBackend.MsGraph,
         }));
       }),
@@ -76,8 +76,8 @@ export class MsGraphKqlSearchEmailsQuery {
     const deduplicated: SearchEmailResult[] = [];
     for (const results of allResults) {
       for (const result of results) {
-        if (!seen.has(result.id)) {
-          seen.add(result.id);
+        if (!seen.has(result.emailId)) {
+          seen.add(result.emailId);
           deduplicated.push(result);
         }
       }

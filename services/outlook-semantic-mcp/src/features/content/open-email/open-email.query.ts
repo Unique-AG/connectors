@@ -27,13 +27,7 @@ export interface OpenEmailResult {
   id: string;
   title: string | null;
   metadata: unknown;
-  chunks: Array<{
-    id: string;
-    startPage: null | number;
-    endPage: null | number;
-    order: number;
-    text: string;
-  }>;
+  text: string;
 }
 
 @Injectable()
@@ -85,15 +79,7 @@ export class OpenEmailQuery {
         webLink: message.webLink,
         hasAttachments: message.hasAttachments,
       },
-      chunks: [
-        {
-          id: message.id,
-          startPage: null,
-          endPage: null,
-          order: 0,
-          text: message.body?.content ?? '',
-        },
-      ],
+      text: message.body?.content ?? '',
     };
   }
 
@@ -103,13 +89,11 @@ export class OpenEmailQuery {
       id: emailData.id,
       title: emailData.title ?? null,
       metadata: emailData.metadata as unknown,
-      chunks: (emailData.chunks ?? []).map((chunk) => ({
-        id: chunk.id,
-        startPage: null,
-        endPage: null,
-        order: chunk.order ?? 0,
-        text: chunk.text,
-      })),
+      text: (emailData.chunks ?? [])
+        .slice()
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+        .map((chunk) => chunk.text)
+        .join('\n'),
     };
   }
 }

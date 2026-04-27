@@ -13,25 +13,21 @@ import { META } from './open-email-tool.meta';
 const IS_GRAPH_BACKEND = isGraphBackend();
 
 const OpenEmailByIdInputSchema = z.object({
-  id: z.string().describe('The id field from a search_emails result.'),
+  id: z
+    .string()
+    .describe(
+      'The identifier from the search_emails result. Use `uniqueContentId` when backend is `Unique`, use `msGraphMessageId` when backend is `MsGraph`.',
+    ),
   backend: z
     .nativeEnum(SearchBackend)
     .describe('The backend field from the search_emails result.'),
-});
-
-export const EmailDataChunkSchema = z.object({
-  id: z.string(),
-  startPage: z.number().nullable(),
-  endPage: z.number().nullable(),
-  order: z.number().nullable(),
-  text: z.string(),
 });
 
 export const EmailDataSchema = z.object({
   id: z.string(),
   title: z.string().nullable(),
   metadata: z.unknown().nullable(),
-  chunks: z.array(EmailDataChunkSchema).optional(),
+  text: z.string(),
 });
 
 const OpenEmailByIdOutputSchema = z.object({
@@ -51,7 +47,8 @@ export class OpenEmailTool {
   @Tool({
     name: 'open_email_by_id',
     title: 'Open Email by ID',
-    description: 'Retrieve the full content of an email by its ID returned from search_emails.',
+    description:
+      'Retrieve the full body of an email from a search_emails result. Always pass the `backend` field exactly as returned. Then pass the matching identifier: `uniqueContentId` when backend is `Unique`, `msGraphMessageId` when backend is `MsGraph`.',
     parameters: OpenEmailByIdInputSchema,
     outputSchema: OpenEmailByIdOutputSchema,
     annotations: {

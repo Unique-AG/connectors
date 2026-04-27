@@ -30,7 +30,7 @@ Set via `mcpConfig.app` in Helm values:
 | `SELF_URL` | `mcpConfig.app.selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
 | `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
 | `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
-| `MCP_BACKEND` | `mcpConfig.app.mcpBackend` | `UniqueApi` | Selects the search backend — see [MCP_BACKEND](#MCP_BACKEND) |
+| `MCP_BACKEND` | `mcpConfig.app.mcpBackend` | `MicrosoftGraphAndUniqueApi` | Selects the search backend — see [MCP_BACKEND](#MCP_BACKEND) |
 | `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
 | `LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.app.liveCatchupOverlappingWindowMinutes` | `3` (application) / `5` (Helm) | Minutes to overlap each live catch-up sync run to account for Office 365 eventual consistency. Minimum: `2` — see [LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES](#LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES) |
 | `LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.app.liveCatchupRecheckOverlappingWindowMinutes` | `10` | Minutes to overlap live catch-up ready-recheck runs. Uses a larger window for higher-latency scenarios. Minimum: `10` — see [LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES](#LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES) |
@@ -360,10 +360,10 @@ The server listens on `PORT` (default `9542`). In Helm deployments, `server.port
 
 Selects the search and email-open backend at deploy time. Two values are accepted:
 
-- **`UniqueApi`** (default) — existing behaviour. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` queries the KB for semantic results; all sync tools (`sync_progress`, `run_full_sync`, etc.) are registered.
+- **`MicrosoftGraphAndUniqueApi`** (default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; all sync tools (`sync_progress`, `run_full_sync`, etc.) are registered.
 - **`MicrosoftGraph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email_by_id` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not registered. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate.
 
-Existing deployments that do not set this variable are unaffected — `UniqueApi` is the default.
+Existing deployments that do not set this variable are unaffected — `MicrosoftGraphAndUniqueApi` is the default.
 
 ### MCP_DEBUG_MODE
 

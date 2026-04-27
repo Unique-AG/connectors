@@ -9,7 +9,7 @@ import {
 
 function makeGraphResult(emailId: string, overrides?: Partial<SearchEmailResult>): SearchEmailResult {
   return {
-    id: emailId,
+    msGraphMessageId: emailId,
     emailId,
     folderId: 'folder-1',
     title: 'Graph Email',
@@ -17,7 +17,7 @@ function makeGraphResult(emailId: string, overrides?: Partial<SearchEmailResult>
     outlookWebLink: 'https://outlook.com/msg/1',
     receivedDateTime: '2024-01-01T00:00:00Z',
     text: 'Graph body',
-    url: undefined,
+    uniqueContentUrl: undefined,
     backend: SearchBackend.MsGraph,
     ...overrides,
   };
@@ -25,7 +25,7 @@ function makeGraphResult(emailId: string, overrides?: Partial<SearchEmailResult>
 
 function makeUniqueResult(emailId: string, overrides?: Partial<SearchEmailResult>): SearchEmailResult {
   return {
-    id: emailId,
+    uniqueContentId: `content-${emailId}`,
     emailId,
     folderId: 'folder-2',
     title: 'Unique Email',
@@ -33,7 +33,7 @@ function makeUniqueResult(emailId: string, overrides?: Partial<SearchEmailResult
     outlookWebLink: 'https://outlook.com/msg/2',
     receivedDateTime: '2024-01-01T00:00:00Z',
     text: 'Unique body',
-    url: 'https://unique.example.com/doc/1',
+    uniqueContentUrl: 'https://unique.example.com/doc/1',
     backend: SearchBackend.Unique,
     ...overrides,
   };

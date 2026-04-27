@@ -33,7 +33,8 @@ export enum SearchBackend {
 }
 
 export interface SearchEmailResult {
-  id: string;
+  uniqueContentId?: string;
+  msGraphMessageId?: string;
   emailId: string;
   folderId: string;
   title: string;
@@ -41,7 +42,7 @@ export interface SearchEmailResult {
   outlookWebLink: string;
   receivedDateTime: string | null;
   text: string;
-  url: string | undefined;
+  uniqueContentUrl: string | undefined;
   backend: SearchBackend;
 }
 
@@ -105,8 +106,8 @@ export class SemanticSearchEmailsQuery {
         const metadata = item.metadata as MessageMetadata | undefined;
         const itemRef = acc[item.id] ?? {
           title: item.title ?? '',
-          id: item.id,
-          url: item.url ?? undefined,
+          uniqueContentId: item.id,
+          uniqueContentUrl: item.url ?? undefined,
           outlookWebLink: metadata?.webLink ?? '',
           emailId: metadata?.id ?? '',
           folderId: metadata?.parentFolderId ?? '',

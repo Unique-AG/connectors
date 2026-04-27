@@ -34,7 +34,10 @@ export class SearchEmailsQuery {
   ) {}
 
   private readonly executors: Record<SearchBackend, BackendExecutor> = {
-    [SearchBackend.Unique]: (userProfileId, input) => {
+    [SearchBackend.Unique]: (
+      userProfileId: string,
+      input: SearchEmailsToolInput,
+    ): Promise<SearchEmailResult[]> => {
       if (!input.semanticSearchParams) {
         return Promise.resolve([]);
       }
@@ -42,7 +45,10 @@ export class SearchEmailsQuery {
         .run(userProfileId, input.semanticSearchParams)
         .then(({ results }) => results);
     },
-    [SearchBackend.MsGraph]: (userProfileId, input) => {
+    [SearchBackend.MsGraph]: (
+      userProfileId: string,
+      input: SearchEmailsToolInput,
+    ): Promise<SearchEmailResult[]> => {
       if (!input.msGraphSearchParams) {
         return Promise.resolve([]);
       }

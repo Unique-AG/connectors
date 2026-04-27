@@ -22,7 +22,8 @@ const SearchEmailsToolInputSchema = IS_GRAPH_BACKEND
   : SearchEmailsUnifiedInputSchema;
 
 const SearchEmailResultSchema = z.object({
-  id: z.string(),
+  uniqueContentId: z.string().optional(),
+  msGraphMessageId: z.string().optional(),
   emailId: z.string(),
   folderId: z.string(),
   title: z.string(),
@@ -30,7 +31,7 @@ const SearchEmailResultSchema = z.object({
   receivedDateTime: z.string().optional().nullable(),
   text: z.string(),
   outlookWebLink: z.string().optional(),
-  url: z.string().optional(),
+  uniqueContentUrl: z.string().optional(),
   backend: z.nativeEnum(SearchBackend),
 });
 
