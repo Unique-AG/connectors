@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNullish, isNullish, unique } from 'remeda';
+import { isNonNullish, isNullish } from 'remeda';
 import z from 'zod/v4';
 import { DRIZZLE, DrizzleDatabase, directories, inboxConfigurations, userProfiles } from '~/db';
 import {
@@ -156,13 +156,6 @@ export class FetchMessagesFromGraphQuery {
       return;
     }
 
-    const folderIds = unique(
-      messages.map((message) => message.parentFolderId).filter(isNonNullish),
-    );
-    const folderIdToImmutableFolderId = await this.translateGraphIdsToImmutableIdsQuery.run(
-      userProfileId,
-      folderIds,
-    );
     const messageIdsMap = await this.translateGraphIdsToImmutableIdsQuery.run(
       userProfileId,
       messages.map((message) => message.id).filter(isNonNullish),
@@ -171,13 +164,6 @@ export class FetchMessagesFromGraphQuery {
       const immutableId = messageIdsMap.get(message.id);
       if (immutableId) {
         message.id = immutableId;
-      }
-      const immutableParentFolderId = message.parentFolderId
-        ? folderIdToImmutableFolderId.get(message.parentFolderId)
-        : null;
-
-      if (immutableParentFolderId) {
-        message.parentFolderId = immutableParentFolderId;
       }
     }
   }

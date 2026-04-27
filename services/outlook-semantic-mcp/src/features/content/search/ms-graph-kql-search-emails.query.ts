@@ -6,6 +6,7 @@ import {
   SearchBackend,
   SearchEmailResult,
 } from '~/features/content/search/semantic-search-emails.query';
+import { TranslateGraphIdsToImmutableIdsQuery } from '~/features/graph-utils/translate-graph-ids-to-immutable-ids.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 
 const graphSearchHitSchema = z.object({
@@ -34,7 +35,10 @@ const graphSearchResponseSchema = z.object({
 
 @Injectable()
 export class MsGraphKqlSearchEmailsQuery {
-  public constructor(private readonly graphClientFactory: GraphClientFactory) {}
+  public constructor(
+    private readonly graphClientFactory: GraphClientFactory,
+    private readonly translateGraphIdsToImmutableIdsQuery: TranslateGraphIdsToImmutableIdsQuery,
+  ) {}
 
   @Span()
   public async run(
@@ -45,20 +49,17 @@ export class MsGraphKqlSearchEmailsQuery {
 
     const allResults = await Promise.all(
       queries.map(async (query) => {
-        const raw = await client
-          .api('/search/query')
-          .header('Prefer', 'IdType="ImmutableId"')
-          .post({
-            requests: [
-              {
-                entityTypes: ['message'],
-                query: { queryString: query.kqlQuery },
-                enableTopResults: true,
-                from: 0,
-                size: Math.min(query.limit ?? 25, 50),
-              },
-            ],
-          });
+        const raw = await client.api('/search/query').post({
+          requests: [
+            {
+              entityTypes: ['message'],
+              query: { queryString: query.kqlQuery },
+              enableTopResults: true,
+              from: 0,
+              size: Math.min(query.limit ?? 25, 50),
+            },
+          ],
+        });
         const response = graphSearchResponseSchema.parse(raw);
         const hits = response.value
           .flatMap((item) => item.hitsContainers.flatMap((container) => container.hits ?? []))
@@ -79,15 +80,22 @@ export class MsGraphKqlSearchEmailsQuery {
 
     const seen = new Set<string>();
     const deduplicated: SearchEmailResult[] = [];
-    for (const results of allResults) {
-      for (const result of results) {
-        if (result.msGraphMessageId && !seen.has(result.msGraphMessageId)) {
-          seen.add(result.msGraphMessageId);
-          deduplicated.push(result);
-        }
+    for (const result of allResults.flat()) {
+      if (result.msGraphMessageId && !seen.has(result.msGraphMessageId)) {
+        seen.add(result.msGraphMessageId);
+        deduplicated.push(result);
       }
     }
 
-    return deduplicated;
+    const folderMessageIdsMap = await this.translateGraphIdsToImmutableIdsQuery.run(
+      userProfileId,
+      deduplicated.map((r) => r.msGraphMessageId),
+    );
+    return deduplicated.map((result) => ({
+      ...result,
+      msGraphMessageId: result.msGraphMessageId
+        ? (folderMessageIdsMap.get(result.msGraphMessageId) ?? result.msGraphMessageId)
+        : result.msGraphMessageId,
+    }));
   }
 }

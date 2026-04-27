@@ -1,21 +1,25 @@
 import { Injectable } from '@nestjs/common';
+import { filter, isNonNullish, pipe, unique } from 'remeda';
 import z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 
 const translateIdsResponseSchema = z.object({
-  value: z.array(z.object({ sourceId: z.string(), targetId: z.string() })),
+  value: z.array(z.object({ sourceId: z.string(), targetId: z.string().optional().nullish() })),
 });
+
+type IdValue = string | null | undefined;
 
 @Injectable()
 export class TranslateGraphIdsToImmutableIdsQuery {
   public constructor(private readonly graphClientFactory: GraphClientFactory) {}
 
-  public async run(userProfileId: string, ids: string[]): Promise<Map<string, string>> {
+  public async run(userProfileId: string, ids: IdValue[]): Promise<Map<string, string>> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const idsMap = new Map<string, string>();
+    const idsList = unique(pipe(ids, filter(isNonNullish)));
     const CHUNK_SIZE = 1000;
-    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
-      const inputIds = ids.slice(i, i + CHUNK_SIZE);
+    for (let i = 0; i < idsList.length; i += CHUNK_SIZE) {
+      const inputIds = idsList.slice(i, i + CHUNK_SIZE);
       const raw = await client.api('me/translateExchangeIds').post({
         inputIds,
         sourceIdType: 'restId',
@@ -23,7 +27,9 @@ export class TranslateGraphIdsToImmutableIdsQuery {
       });
       const { value } = translateIdsResponseSchema.parse(raw);
       value.forEach((item) => {
-        idsMap.set(item.sourceId, item.targetId);
+        if (item.targetId) {
+          idsMap.set(item.sourceId, item.targetId);
+        }
       });
     }
     return idsMap;
