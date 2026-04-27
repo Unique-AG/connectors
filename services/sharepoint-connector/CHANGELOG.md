@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.6.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.6.0...sharepoint-connector@2.6.1) (2026-04-22)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** use bulkMove for root scope migration [UN-19904] ([#490](https://github.com/Unique-AG/connectors/issues/490)) ([051508e](https://github.com/Unique-AG/connectors/commit/051508e2734eec44a5f6d37ebcda261dd8d35d15))
+
 ## [2.6.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.5.0...sharepoint-connector@2.6.0) (2026-04-20)
 
 

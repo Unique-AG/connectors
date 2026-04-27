@@ -183,6 +183,13 @@
       "when": 1775543871115,
       "tag": "0025_sparkling_blue_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1776668866459,
+      "tag": "0026_natural_whirlwind",
+      "breakpoints": true
     }
   ]
 }

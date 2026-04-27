@@ -64,6 +64,9 @@ export const inboxConfigurations = pgTable('inbox_configurations', {
   newestReceivedEmailDateTime: timestamp(`newest_received_email_date_time`),
   newestLastModifiedDateTime: timestamp(`newest_last_modified_date_time`).notNull().defaultNow(),
 
+  deletingInboxStartedAt: timestamp('deleting_inbox_started_at'),
+  deletingHeartbeatAt: timestamp('deleting_heartbeat_at'),
+
   ...timestamps,
 });
 

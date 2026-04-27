@@ -12,8 +12,10 @@ export {
 } from './proxy.config';
 export {
   getTenantConfigs,
+  type LoadedTenantStatus,
   type NamedTenantConfig,
   type TenantConfig,
+  TenantStatus,
 } from './tenant-config-loader';
 export type { UniqueConfig } from './unique.schema';
 export { UniqueAuthMode } from './unique.schema';

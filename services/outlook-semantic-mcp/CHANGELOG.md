@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.3.0...outlook-semantic-mcp@0.3.1) (2026-04-24)
+
+
+### Features
+
+* **outlook-semantic-mcp,unique-api:** add tools to test search recall ([#489](https://github.com/Unique-AG/connectors/issues/489)) ([576d54c](https://github.com/Unique-AG/connectors/commit/576d54cec4356c89b3754f00ae168d8bab694d37))
+
+
+### Bug Fixes
+
+* **deps:** upgrade nestjs-otel to v8 to resolve systeminformation CVEs ([#471](https://github.com/Unique-AG/connectors/issues/471)) ([ec584a9](https://github.com/Unique-AG/connectors/commit/ec584a95427b3a9989387c548d654c8b4fbbd775))
+* **outlook-semantic-mcp,unique-api:** remove hacky way to pass permissions ([#332](https://github.com/Unique-AG/connectors/issues/332)) ([65c0da3](https://github.com/Unique-AG/connectors/commit/65c0da33ac27dc50e89724a20bb96e0ca7c55166))
+* **outlook-semantic-mcp,unique-api:** un-19456 fix delete inbox and reconnect inbox race condition ([#486](https://github.com/Unique-AG/connectors/issues/486)) ([38fe724](https://github.com/Unique-AG/connectors/commit/38fe72441c1d49c628566000d9292fd8e158c49e))
+
 ## [0.3.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.2.18...outlook-semantic-mcp@0.3.0) (2026-04-14)
 
 

@@ -141,6 +141,118 @@
     {
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 70,
+      "title": "Sync progress",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Current sync phase per tenant. Shows what the connector is doing right now.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "noValue": "Idle"
+        }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 7 },
+      "id": 71,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "name"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "cfc_sync_phase{job=~\"$job\", tenant=~\"$tenant\", phase!=\"idle\"} == 1",
+          "legendFormat": "{{tenant}}: {{phase}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "Current sync phase",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Pages processed vs total pages to process in the current sync. Processed includes successful + failed + skipped. Processed is summed over the dashboard time range ($__range) so widen the range to cover the full sync for long initial syncs (e.g. 24h). Total is a point-in-time gauge for the current or most recent sync that had work. It persists across no-change syncs.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 7 },
+      "id": 72,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_pages_processed_total{job=~\"$job\", tenant=~\"$tenant\"}[$__range]))) or vector(0)",
+          "legendFormat": "Processed",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(cfc_sync_pages_total{job=~\"$job\", tenant=~\"$tenant\"}) or vector(0)",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ],
+      "title": "Pages: processed / total",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Attachments processed vs total attachments to process in the current sync. Processed includes successful + failed. Processed is summed over the dashboard time range ($__range) so widen the range to cover the full sync for long initial syncs (e.g. 24h). Total is a point-in-time gauge for the current or most recent sync that had work. It persists across no-change syncs.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "green", "value": null }]
+          },
+          "noValue": "0"
+        }
+      },
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 7 },
+      "id": 73,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_attachments_processed_total{job=~\"$job\", tenant=~\"$tenant\"}[$__range]))) or vector(0)",
+          "legendFormat": "Processed",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "sum(cfc_sync_attachments_total{job=~\"$job\", tenant=~\"$tenant\"}) or vector(0)",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ],
+      "title": "Attachments: processed / total",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
       "id": 1,
       "title": "Sync pipeline",
       "type": "row"
@@ -162,7 +274,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 7 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 13 },
       "id": 2,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -196,7 +308,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 7 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 13 },
       "id": 3,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -214,8 +326,46 @@
       "type": "timeseries"
     },
     {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Sync completion outcomes per tenant, recorded when each sync cycle finishes. Failure spikes may indicate auth, Confluence API, or ingestion errors. Cross-check the 'API errors and throttling' panel and application logs for root cause.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "stacking": { "mode": "normal" }
+          },
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 13 },
+      "id": 4,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_sync_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\", result=\"success\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — success",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "round(sum(increase(cfc_sync_duration_seconds_count{job=~\"$job\", tenant=~\"$tenant\", result=\"failure\"}[1m])) by (tenant))",
+          "legendFormat": "{{tenant}} — failure",
+          "refId": "B"
+        }
+      ],
+      "title": "Sync outcomes per tenant (in 1 minute)",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
       "id": 10,
       "title": "Content throughput",
       "type": "row"
@@ -235,7 +385,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 17 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 23 },
       "id": 11,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
@@ -273,7 +423,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 17 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 23 },
       "id": 12,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
@@ -304,7 +454,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
       "id": 60,
       "title": "Space cleanup",
       "type": "row"
@@ -324,7 +474,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 27 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 33 },
       "id": 61,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
@@ -362,7 +512,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 27 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 33 },
       "id": 62,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
@@ -381,7 +531,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
       "id": 20,
       "title": "Attachment uploads",
       "type": "row"
@@ -403,7 +553,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 37 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 43 },
       "id": 21,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -446,7 +596,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 46 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 52 },
       "id": 30,
       "title": "Confluence API performance",
       "type": "row"
@@ -468,7 +618,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 47 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 53 },
       "id": 31,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -500,7 +650,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 47 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 53 },
       "id": 32,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
@@ -525,7 +675,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 62 },
       "id": 35,
       "title": "Unique API performance",
       "type": "row"
@@ -547,7 +697,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 57 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 63 },
       "id": 36,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -579,7 +729,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 57 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 63 },
       "id": 37,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["sum"] },
@@ -598,7 +748,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 66 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 72 },
       "id": 50,
       "panels": [],
       "title": "Node.js runtime",
@@ -620,7 +770,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 67 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 73 },
       "id": 51,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -653,7 +803,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 67 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 73 },
       "id": 52,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -686,7 +836,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 67 },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 73 },
       "id": 53,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -726,12 +876,12 @@
       },
       {
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(cfc_sync_duration_seconds_count, job)",
+        "definition": "label_values(cfc_pages_processed_total, job)",
         "includeAll": false,
         "label": "Job",
         "name": "job",
         "query": {
-          "query": "label_values(cfc_sync_duration_seconds_count, job)",
+          "query": "label_values(cfc_pages_processed_total, job)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -740,12 +890,12 @@
       },
       {
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(cfc_sync_duration_seconds_count, tenant)",
+        "definition": "label_values(cfc_pages_processed_total, tenant)",
         "includeAll": true,
         "label": "Tenant",
         "name": "tenant",
         "query": {
-          "query": "label_values(cfc_sync_duration_seconds_count, tenant)",
+          "query": "label_values(cfc_pages_processed_total, tenant)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -754,7 +904,7 @@
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": { "from": "now-24h", "to": "now" },
   "timezone": "",
   "title": "Confluence Connector",
   "uid": "confluence-connector",

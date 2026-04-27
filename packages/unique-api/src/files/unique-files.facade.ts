@@ -6,14 +6,17 @@ export interface UniqueFilesFacade {
   getCountByKeyPrefix(keyPrefix: string): Promise<number>;
   move(contentId: string, newOwnerId: string, newUrl: string): Promise<ContentUpdateResult>;
   delete(contentId: string): Promise<boolean>;
-  deleteByIds(contentId: string[]): Promise<number>;
+  deleteByIds(contentId: string[]): Promise<{ deleted: number; failed: number }>;
   deleteByKeyPrefix(keyPrefix: string): Promise<number>;
   addAccesses(scopeId: string, fileAccesses: FileAccessInput[]): Promise<number>;
   removeAccesses(scopeId: string, fileAccesses: FileAccessInput[]): Promise<number>;
+  getContentIdsByScope(scopeId: string): Promise<string[]>;
+  getFileKeysByScopeId(scopeId: string): Promise<string[]>;
   // TODO: Check if we can avoid passing the scope id
   getIdsByScopeAndMetadataKey(
     scopeId: string,
     metadataKey: string,
-    metadataValue: unknown,
+    metadataValue: string,
   ): Promise<string[]>;
+  getIdsByScope(scopeId: string, skip: number, take: number): Promise<string[]>;
 }

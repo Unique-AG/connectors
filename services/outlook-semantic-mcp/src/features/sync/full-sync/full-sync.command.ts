@@ -187,6 +187,7 @@ export class FullSyncCommand {
           fullSyncExpectedTotal: inboxConfigurations.fullSyncExpectedTotal,
           newestLastModifiedDateTime: inboxConfigurations.newestLastModifiedDateTime,
           filters: inboxConfigurations.filters,
+          deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
         })
         .from(inboxConfigurations)
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
@@ -195,6 +196,10 @@ export class FullSyncCommand {
 
       if (!row) {
         return { action: 'skip' as const, reason: 'no-inbox-configuration' };
+      }
+
+      if (row.deletingInboxStartedAt !== null) {
+        return { action: 'skip' as const, reason: 'inbox-deletion-in-progress' };
       }
 
       const decision = this.decideAction(row);
