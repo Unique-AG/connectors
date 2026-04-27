@@ -148,7 +148,7 @@ export class MsGraphKqlSearchEmailsQuery {
   @Span()
   public async run(
     userProfileId: string,
-    queries: Array<{ kqlQuery: string; limit: number }>,
+    queries: Array<{ kqlQuery: string; limit?: number }>,
   ): Promise<SearchEmailResult[]> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
@@ -161,7 +161,7 @@ export class MsGraphKqlSearchEmailsQuery {
               query: { queryString: query.kqlQuery },
               enableTopResults: true,
               from: 0,
-              size: Math.min(query.limit, 50),
+              size: Math.min(query.limit ?? 25, 50),
             },
           ],
         });

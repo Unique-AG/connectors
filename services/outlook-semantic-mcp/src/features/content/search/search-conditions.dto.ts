@@ -172,6 +172,36 @@ export const SearchEmailsInputSchema = z.object({
 
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
 
+export const MsGraphKqlQuerySchema = z.object({
+  kqlQuery: z
+    .string()
+    .nonempty()
+    .describe(
+      'KQL (Keyword Query Language) query string. Supports fields: from:, to:, cc:, subject:, ' +
+        'received>=YYYY-MM-DD, received<=YYYY-MM-DD, hasAttachment:true/false, category:"label". ' +
+        'Multiple clauses are joined with AND/OR. See: ' +
+        'https://support.microsoft.com/en-us/office/how-to-search-in-outlook-d824d1e9-a255-4c8a-8553-276fb895a8da',
+    ),
+  limit: z.number().int().min(1).max(50).optional().prefault(25),
+});
+
+export const MsGraphSearchParamsSchema = z.object({
+  queries: z
+    .array(MsGraphKqlQuerySchema)
+    .min(1)
+    .max(20)
+    .describe('List of KQL queries to execute in parallel. Maximum 20.'),
+});
+
+export const SearchEmailsMsGraphInputSchema = z.object({
+  msGraphSearchParams: MsGraphSearchParamsSchema,
+});
+
+export const SearchEmailsUnifiedInputSchema = z.object({
+  semanticSearchParams: SearchEmailsInputSchema,
+  msGraphSearchParams: MsGraphSearchParamsSchema.optional(),
+});
+
 const METADATA_PATH: Record<keyof SearchCondition, (keyof MessageMetadata)[]> = {
   dateFrom: ['receivedDateTime'],
   dateTo: ['receivedDateTime'],

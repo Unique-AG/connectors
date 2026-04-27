@@ -11,7 +11,7 @@ import { SearchEmailsInputSchema } from './search-conditions.dto';
 
 export type SearchEmailsToolInput = {
   semanticSearchParams?: z.infer<typeof SearchEmailsInputSchema>;
-  msGraphSearchParams?: { queries: Array<{ kqlQuery: string; limit: number }> };
+  msGraphSearchParams?: { queries: Array<{ kqlQuery: string; limit?: number }> };
 };
 
 type McpBackend = z.infer<typeof mcpBackendSchema>;
