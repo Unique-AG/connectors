@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { type SyncRecord, SyncStep } from '../sync-result.types';
+import type { SyncRecord } from '../sync-result.types';
 import { SyncStatusStore } from '../sync-status.store';
 
 const HISTORY_SIZE = 3;
@@ -84,14 +84,14 @@ describe('SyncStatusStore', () => {
       expect(store.getRecordsByTenant().get('tenant-a')).toHaveLength(HISTORY_SIZE);
     });
 
-    it('stores failure step on the record', () => {
+    it('stores failure status on the record', () => {
       const record = makeRecord({
-        result: { status: 'failure', step: SyncStep.PageIngestion },
+        result: { status: 'failure' },
       });
       store.record(record);
 
       const stored = store.getRecordsByTenant().get('tenant-a')?.[0];
-      expect(stored?.result).toEqual({ status: 'failure', step: SyncStep.PageIngestion });
+      expect(stored?.result).toEqual({ status: 'failure' });
     });
   });
 

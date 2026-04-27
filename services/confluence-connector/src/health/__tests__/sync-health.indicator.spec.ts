@@ -3,7 +3,7 @@ import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SyncHealthIndicator } from '../sync-health.indicator';
-import { type SyncRecord, SyncStep } from '../sync-result.types';
+import type { SyncRecord } from '../sync-result.types';
 import { SyncStatusStore } from '../sync-status.store';
 
 const HISTORY_SIZE = 10;
@@ -72,7 +72,7 @@ describe('SyncHealthIndicator', () => {
     store.record(
       makeRecord({
         tenantName: 'tenant-a',
-        result: { status: 'failure', step: SyncStep.PageIngestion },
+        result: { status: 'failure' },
       }),
     );
     store.record(makeRecord({ tenantName: 'tenant-b', result: { status: 'success' } }));
@@ -96,19 +96,19 @@ describe('SyncHealthIndicator', () => {
     store.record(
       makeRecord({
         tenantName: 'tenant-a',
-        result: { status: 'failure', step: SyncStep.Discovery },
+        result: { status: 'failure' },
       }),
     );
     store.record(
       makeRecord({
         tenantName: 'tenant-a',
-        result: { status: 'failure', step: SyncStep.PageIngestion },
+        result: { status: 'failure' },
       }),
     );
     store.record(
       makeRecord({
         tenantName: 'tenant-a',
-        result: { status: 'failure', step: SyncStep.Cleanup },
+        result: { status: 'failure' },
       }),
     );
     store.record(makeRecord({ tenantName: 'tenant-a', result: { status: 'success' } }));

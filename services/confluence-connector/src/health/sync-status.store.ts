@@ -3,8 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { HealthConfigNamespaced } from '../config';
 import type { SyncRecord } from './sync-result.types';
 
-export type { SyncRecord, SyncResult, SyncStep } from './sync-result.types';
-export { SyncStep as SyncStepValues } from './sync-result.types';
+export type { SyncRecord, SyncResult } from './sync-result.types';
 
 @Injectable()
 export class SyncStatusStore {

@@ -1,16 +1,22 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
+import { createMock } from '@golevelup/ts-vitest';
 import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Response as UndiciResponse } from 'undici';
+import { beforeEach, describe, expect, it, type MockedFunction, vi } from 'vitest';
+import { type TenantConfig, TenantStatus, UniqueAuthMode } from '../../config';
+import { AuthMode } from '../../config/confluence.schema';
 import { ProxyService } from '../../proxy/proxy.service';
 import { ServiceRegistry } from '../../tenant/service-registry';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
 import { TenantRegistry } from '../../tenant/tenant-registry';
+import { Redacted } from '../../utils/redacted';
 import { UniqueApiHealthIndicator } from '../unique-api-health.indicator';
 
 const TIMEOUT_MS = 3000;
+type UndiciFetch = typeof import('undici').fetch;
 
 vi.mock('undici', async (importOriginal) => {
   const actual = await importOriginal<typeof import('undici')>();
@@ -20,9 +26,9 @@ vi.mock('undici', async (importOriginal) => {
   };
 });
 
-async function getUndiciFetch(): Promise<ReturnType<typeof vi.fn>> {
+async function getUndiciFetch(): Promise<MockedFunction<UndiciFetch>> {
   const { fetch } = await import('undici');
-  return fetch as unknown as ReturnType<typeof vi.fn>;
+  return vi.mocked(fetch);
 }
 
 interface TenantSetup {
@@ -34,6 +40,37 @@ interface TenantSetup {
   tokenProvider?: () => Promise<string>;
   status?: 'active' | 'deleted';
 }
+
+const baseTenantConfig = {
+  confluence: {
+    instanceType: 'cloud',
+    baseUrl: 'https://tenant.atlassian.net',
+    cloudId: 'cloud-id',
+    apiRateLimitPerMinute: 100,
+    ingestSingleLabel: 'ai-ingest',
+    ingestAllLabel: 'ai-ingest-all',
+    auth: {
+      mode: AuthMode.OAuth2Lo,
+      clientId: 'client-id',
+      clientSecret: new Redacted('client-secret'),
+    },
+  },
+  unique: {
+    serviceAuthMode: UniqueAuthMode.ClusterLocal,
+    serviceExtraHeaders: { 'x-company-id': 'company-id', 'x-user-id': 'user-id' },
+    ingestionServiceBaseUrl: 'http://ingestion.local:8091',
+    scopeManagementServiceBaseUrl: 'http://scope-management.local:8094',
+    apiRateLimitPerMinute: 100,
+  },
+  processing: { scanIntervalCron: '*/5 * * * *', concurrency: 1 },
+  ingestion: {
+    ingestionMode: 'flat',
+    scopeId: 'scope-id',
+    storeInternally: true,
+    useV1KeyFormat: false,
+    attachments: { enabled: true, allowedExtensions: ['pdf'], maxFileSizeMb: 200 },
+  },
+} satisfies TenantConfig;
 
 function makeTenant(setup: TenantSetup): TenantContext {
   const ingestionUrl = setup.ingestionUrl ?? 'http://ingestion.local:8091';
@@ -53,18 +90,29 @@ function makeTenant(setup: TenantSetup): TenantContext {
           serviceAuthMode: 'external' as const,
           ingestionServiceBaseUrl: ingestionUrl,
           scopeManagementServiceBaseUrl: scopeManagementUrl,
+          zitadelOauthTokenUrl: 'https://idp.example.com/oauth/v2/token',
+          zitadelProjectId: new Redacted('project-id'),
+          zitadelClientId: 'client-id',
+          zitadelClientSecret: new Redacted('client-secret'),
+          apiRateLimitPerMinute: 100,
         };
   return {
     name: setup.name,
-    status: setup.status ?? 'active',
+    status: setup.status ?? TenantStatus.Active,
     isScanning: false,
-    config: { unique: uniqueConfig },
-  } as unknown as TenantContext;
+    config: {
+      ...baseTenantConfig,
+      unique: {
+        ...uniqueConfig,
+        apiRateLimitPerMinute: 100,
+      },
+    },
+  } satisfies TenantContext;
 }
 
 describe('UniqueApiHealthIndicator', () => {
   let indicator: UniqueApiHealthIndicator;
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: MockedFunction<UndiciFetch>;
   let tenants: TenantContext[];
   let serviceRegistry: ServiceRegistry;
   const mockDispatcher = Symbol('dispatcher');
@@ -112,7 +160,7 @@ describe('UniqueApiHealthIndicator', () => {
   }
 
   function registerExternalClient(tenantName: string, getToken: () => Promise<string>): void {
-    const client = { auth: { getToken } } as unknown as UniqueApiClient;
+    const client = createMock<UniqueApiClient>({ auth: { getToken } });
     serviceRegistry.register(tenantName, UniqueApiClient, client);
   }
 
@@ -131,7 +179,7 @@ describe('UniqueApiHealthIndicator', () => {
       }),
     ];
     await buildIndicator();
-    mockFetch.mockResolvedValue(new Response('{}'));
+    mockFetch.mockResolvedValue(new UndiciResponse('{}'));
 
     const result = await indicator.check('uniqueApi');
 
@@ -163,7 +211,7 @@ describe('UniqueApiHealthIndicator', () => {
     tenants = [makeTenant({ name: 'ext-tenant', authMode: 'external' })];
     await buildIndicator();
     registerExternalClient('ext-tenant', () => Promise.resolve('zitadel-token'));
-    mockFetch.mockResolvedValue(new Response('{}'));
+    mockFetch.mockResolvedValue(new UndiciResponse('{}'));
 
     await indicator.check('uniqueApi');
 
@@ -198,8 +246,8 @@ describe('UniqueApiHealthIndicator', () => {
     tenants = [makeTenant({ name: 'tenant-a', authMode: 'cluster_local' })];
     await buildIndicator();
     mockFetch
-      .mockResolvedValueOnce(new Response('{}', { status: 503 }))
-      .mockResolvedValueOnce(new Response('{}'));
+      .mockResolvedValueOnce(new UndiciResponse('{}', { status: 503 }))
+      .mockResolvedValueOnce(new UndiciResponse('{}'));
 
     const result = await indicator.check('uniqueApi');
 

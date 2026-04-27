@@ -1,7 +1,9 @@
+import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import { SchedulerRegistry } from '@nestjs/schedule';
+import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TenantStatus } from '../../config';
-import { SyncStep } from '../../health/sync-result.types';
+import { type TenantConfig, TenantStatus, UniqueAuthMode } from '../../config';
+import { AuthMode } from '../../config/confluence.schema';
 import { SyncStatusStore } from '../../health/sync-status.store';
 import { ConfluenceSynchronizationService } from '../../synchronization/confluence-synchronization.service';
 import { ServiceRegistry } from '../../tenant/service-registry';
@@ -9,6 +11,7 @@ import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
 import { TenantDeleteService } from '../../tenant/tenant-delete.service';
 import { TenantRegistry } from '../../tenant/tenant-registry';
+import { Redacted } from '../../utils/redacted';
 import { TenantSyncScheduler } from '../tenant-sync.scheduler';
 
 const mockLogger = vi.hoisted(() => ({
@@ -27,41 +30,75 @@ vi.mock('@nestjs/common', async (importOriginal) => {
   };
 });
 
-function createMockSyncService() {
-  return { synchronize: vi.fn().mockResolvedValue({ status: 'success' }) };
+const tenantConfig = {
+  confluence: {
+    instanceType: 'cloud',
+    baseUrl: 'https://tenant.atlassian.net',
+    cloudId: 'cloud-id',
+    apiRateLimitPerMinute: 100,
+    ingestSingleLabel: 'ai-ingest',
+    ingestAllLabel: 'ai-ingest-all',
+    auth: {
+      mode: AuthMode.OAuth2Lo,
+      clientId: 'client-id',
+      clientSecret: new Redacted('client-secret'),
+    },
+  },
+  unique: {
+    serviceAuthMode: UniqueAuthMode.ClusterLocal,
+    serviceExtraHeaders: { 'x-company-id': 'company-id', 'x-user-id': 'user-id' },
+    ingestionServiceBaseUrl: 'http://ingestion.local:8091',
+    scopeManagementServiceBaseUrl: 'http://scope-management.local:8094',
+    apiRateLimitPerMinute: 100,
+  },
+  processing: { scanIntervalCron: '*/5 * * * *', concurrency: 1 },
+  ingestion: {
+    ingestionMode: 'flat',
+    scopeId: 'scope-id',
+    storeInternally: true,
+    useV1KeyFormat: false,
+    attachments: {
+      enabled: true,
+      allowedExtensions: ['pdf'],
+      maxFileSizeMb: 200,
+    },
+  },
+} satisfies TenantConfig;
+
+function createMockSyncService(): DeepMocked<ConfluenceSynchronizationService> {
+  return createMock<ConfluenceSynchronizationService>({
+    synchronize: vi.fn().mockResolvedValue({ status: 'success' }),
+  });
 }
 
-function createMockSyncStatusStore(): SyncStatusStore {
-  return { record: vi.fn() } as unknown as SyncStatusStore;
+function createMockDeleteService(): DeepMocked<TenantDeleteService> {
+  return createMock<TenantDeleteService>({
+    deleteTenantContent: vi.fn().mockResolvedValue({ status: 'success' }),
+  });
 }
 
-function createMockTenant(name: string, overrides: Partial<TenantContext> = {}): TenantContext {
+function createTestTenant(name: string, overrides: Partial<TenantContext> = {}): TenantContext {
   return {
     name,
-    status: 'active',
-    config: {
-      processing: { scanIntervalCron: '*/5 * * * *' },
-    },
+    status: TenantStatus.Active,
+    config: tenantConfig,
+    isScanning: false,
     ...overrides,
-  } as unknown as TenantContext;
+  } satisfies TenantContext;
 }
 
-function createMockSchedulerRegistry(): SchedulerRegistry {
-  const jobs = new Map<string, { stop: ReturnType<typeof vi.fn> }>();
-  return {
-    addCronJob: vi.fn((name: string, job: unknown) => {
-      jobs.set(name, job as { stop: ReturnType<typeof vi.fn> });
+function createMockSchedulerRegistry(): DeepMocked<SchedulerRegistry> {
+  const jobs: ReturnType<SchedulerRegistry['getCronJobs']> = new Map();
+  return createMock<SchedulerRegistry>({
+    addCronJob: vi.fn((name: string, job: Parameters<SchedulerRegistry['addCronJob']>[1]) => {
+      jobs.set(name, job);
     }),
     getCronJobs: vi.fn(() => jobs),
-  } as unknown as SchedulerRegistry;
+  });
 }
 
-function createMockDeleteService() {
-  return { deleteTenantContent: vi.fn().mockResolvedValue(undefined) };
-}
-
-function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
-  return {
+function createMockTenantRegistry(tenants: TenantContext[]): DeepMocked<TenantRegistry> {
+  return createMock<TenantRegistry>({
     getAllTenants: vi.fn().mockReturnValue(tenants),
     tenantCount: tenants.length,
     run: vi
@@ -69,23 +106,19 @@ function createMockTenantRegistry(tenants: TenantContext[]): TenantRegistry {
       .mockImplementation(
         <R>(tenant: TenantContext, fn: () => R): R => tenantStorage.run(tenant, fn),
       ),
-  } as unknown as TenantRegistry;
+  });
 }
 
 function createMockServiceRegistry(tenants: TenantContext[]): ServiceRegistry {
   const serviceRegistry = new ServiceRegistry();
   for (const tenant of tenants) {
     if (tenant.status === TenantStatus.Deleted) {
-      serviceRegistry.register(
-        tenant.name,
-        TenantDeleteService,
-        createMockDeleteService() as unknown as TenantDeleteService,
-      );
+      serviceRegistry.register(tenant.name, TenantDeleteService, createMockDeleteService());
     } else {
       serviceRegistry.register(
         tenant.name,
         ConfluenceSynchronizationService,
-        createMockSyncService() as unknown as ConfluenceSynchronizationService,
+        createMockSyncService(),
       );
     }
   }
@@ -94,28 +127,39 @@ function createMockServiceRegistry(tenants: TenantContext[]): ServiceRegistry {
 
 describe('TenantSyncScheduler', () => {
   let scheduler: TenantSyncScheduler;
-  let tenantRegistry: TenantRegistry;
+  let tenantRegistry: DeepMocked<TenantRegistry>;
   let serviceRegistry: ServiceRegistry;
-  let schedulerRegistry: SchedulerRegistry;
-  let syncStatusStore: SyncStatusStore;
+  let schedulerRegistry: DeepMocked<SchedulerRegistry>;
+  let syncStatusStore: DeepMocked<SyncStatusStore>;
   let tenantA: TenantContext;
   let tenantB: TenantContext;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    tenantA = createMockTenant('tenant-a');
-    tenantB = createMockTenant('tenant-b');
-
-    tenantRegistry = createMockTenantRegistry([tenantA, tenantB]);
-    serviceRegistry = createMockServiceRegistry([tenantA, tenantB]);
+  async function buildScheduler(tenants: TenantContext[]): Promise<void> {
+    tenantRegistry = createMockTenantRegistry(tenants);
+    serviceRegistry = createMockServiceRegistry(tenants);
     schedulerRegistry = createMockSchedulerRegistry();
-    syncStatusStore = createMockSyncStatusStore();
-    scheduler = new TenantSyncScheduler(
-      tenantRegistry,
-      serviceRegistry,
-      schedulerRegistry,
-      syncStatusStore,
-    );
+    syncStatusStore = createMock<SyncStatusStore>();
+
+    const { unit } = await TestBed.solitary(TenantSyncScheduler)
+      .mock(TenantRegistry)
+      .final(tenantRegistry)
+      .mock(ServiceRegistry)
+      .final(serviceRegistry)
+      .mock(SchedulerRegistry)
+      .final(schedulerRegistry)
+      .mock(SyncStatusStore)
+      .final(syncStatusStore)
+      .compile();
+
+    scheduler = unit;
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    tenantA = createTestTenant('tenant-a');
+    tenantB = createTestTenant('tenant-b');
+
+    await buildScheduler([tenantA, tenantB]);
   });
 
   describe('onModuleInit', () => {
@@ -163,32 +207,18 @@ describe('TenantSyncScheduler', () => {
       });
     });
 
-    it('skips scheduling when no tenants are registered', () => {
-      const emptyRegistry = createMockTenantRegistry([]);
-      const emptyServiceRegistry = createMockServiceRegistry([]);
-      const emptyScheduler = new TenantSyncScheduler(
-        emptyRegistry,
-        emptyServiceRegistry,
-        schedulerRegistry,
-        syncStatusStore,
-      );
+    it('skips scheduling when no tenants are registered', async () => {
+      await buildScheduler([]);
 
-      emptyScheduler.onModuleInit();
+      scheduler.onModuleInit();
 
-      expect(emptyRegistry.getAllTenants).not.toHaveBeenCalled();
+      expect(tenantRegistry.getAllTenants).not.toHaveBeenCalled();
       expect(schedulerRegistry.addCronJob).not.toHaveBeenCalled();
     });
 
     it('registers cron jobs for deleted tenants', async () => {
-      const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
-      tenantRegistry = createMockTenantRegistry([tenantA, deletedTenant]);
-      serviceRegistry = createMockServiceRegistry([tenantA, deletedTenant]);
-      scheduler = new TenantSyncScheduler(
-        tenantRegistry,
-        serviceRegistry,
-        schedulerRegistry,
-        syncStatusStore,
-      );
+      const deletedTenant = createTestTenant('deleted-tenant', { status: TenantStatus.Deleted });
+      await buildScheduler([tenantA, deletedTenant]);
 
       scheduler.onModuleInit();
 
@@ -228,15 +258,8 @@ describe('TenantSyncScheduler', () => {
     });
 
     it('calls deleteTenantContent() for deleted tenants', async () => {
-      const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
-      tenantRegistry = createMockTenantRegistry([deletedTenant]);
-      serviceRegistry = createMockServiceRegistry([deletedTenant]);
-      scheduler = new TenantSyncScheduler(
-        tenantRegistry,
-        serviceRegistry,
-        schedulerRegistry,
-        syncStatusStore,
-      );
+      const deletedTenant = createTestTenant('deleted-tenant', { status: TenantStatus.Deleted });
+      await buildScheduler([deletedTenant]);
 
       // biome-ignore lint/suspicious/noExplicitAny: Access private method for testing
       await (scheduler as any).syncTenant(deletedTenant);
@@ -248,15 +271,8 @@ describe('TenantSyncScheduler', () => {
     });
 
     it('catches and logs cleanup errors with tenant name', async () => {
-      const deletedTenant = createMockTenant('deleted-tenant', { status: 'deleted' });
-      tenantRegistry = createMockTenantRegistry([deletedTenant]);
-      serviceRegistry = createMockServiceRegistry([deletedTenant]);
-      scheduler = new TenantSyncScheduler(
-        tenantRegistry,
-        serviceRegistry,
-        schedulerRegistry,
-        syncStatusStore,
-      );
+      const deletedTenant = createTestTenant('deleted-tenant', { status: TenantStatus.Deleted });
+      await buildScheduler([deletedTenant]);
 
       const deleteService = tenantStorage.run(deletedTenant, () =>
         serviceRegistry.getService(TenantDeleteService),
@@ -319,7 +335,7 @@ describe('TenantSyncScheduler', () => {
       );
     });
 
-    it('records an Unknown failure when synchronize() throws', async () => {
+    it('records a failure when synchronize() throws', async () => {
       const syncService = tenantStorage.run(tenantA, () =>
         serviceRegistry.getService(ConfluenceSynchronizationService),
       );
@@ -331,7 +347,7 @@ describe('TenantSyncScheduler', () => {
       expect(syncStatusStore.record).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantName: 'tenant-a',
-          result: { status: 'failure', step: SyncStep.Unknown },
+          result: { status: 'failure' },
         }),
       );
     });

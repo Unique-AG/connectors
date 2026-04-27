@@ -2,7 +2,6 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { TenantStatus } from '../config';
-import { SyncStep } from '../health/sync-result.types';
 import { SyncStatusStore } from '../health/sync-status.store';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import type { TenantContext } from '../tenant';
@@ -101,12 +100,11 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
         });
       });
     } catch (error) {
-      // Reaching here means synchronize() itself threw before producing a SyncResult — record
-      // an Unknown failure so the health window still reflects the outage.
+      // Reaching here means synchronize() itself threw before producing a SyncResult.
       this.syncStatusStore.record({
         timestamp: new Date(),
         tenantName: tenant.name,
-        result: { status: 'failure', step: SyncStep.Unknown },
+        result: { status: 'failure' },
       });
       this.logger.error({
         tenantName: tenant.name,

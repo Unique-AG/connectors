@@ -1,13 +1,18 @@
 import { ConfigService } from '@nestjs/config';
 import { HealthIndicatorService } from '@nestjs/terminus';
 import { TestBed } from '@suites/unit';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Response as UndiciResponse } from 'undici';
+import { beforeEach, describe, expect, it, type MockedFunction, vi } from 'vitest';
+import { type TenantConfig, TenantStatus, UniqueAuthMode } from '../../config';
+import { AuthMode } from '../../config/confluence.schema';
 import { ProxyService } from '../../proxy/proxy.service';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { TenantRegistry } from '../../tenant/tenant-registry';
+import { Redacted } from '../../utils/redacted';
 import { ConnectivityHealthIndicator } from '../connectivity-health.indicator';
 
 const TIMEOUT_MS = 3000;
+type UndiciFetch = typeof import('undici').fetch;
 
 vi.mock('undici', async (importOriginal) => {
   const actual = await importOriginal<typeof import('undici')>();
@@ -17,53 +22,84 @@ vi.mock('undici', async (importOriginal) => {
   };
 });
 
-async function getUndiciFetch(): Promise<ReturnType<typeof vi.fn>> {
+async function getUndiciFetch(): Promise<MockedFunction<UndiciFetch>> {
   const { fetch } = await import('undici');
-  return fetch as unknown as ReturnType<typeof vi.fn>;
+  return vi.mocked(fetch);
 }
 
-function makeCloudTenant(name: string, baseUrl = `https://${name}.atlassian.net`): TenantContext {
+const baseTenantConfig = {
+  confluence: {
+    instanceType: 'cloud',
+    baseUrl: 'https://tenant.atlassian.net',
+    cloudId: 'cloud-id',
+    apiRateLimitPerMinute: 100,
+    ingestSingleLabel: 'ai-ingest',
+    ingestAllLabel: 'ai-ingest-all',
+    auth: {
+      mode: AuthMode.OAuth2Lo,
+      clientId: 'client-id',
+      clientSecret: new Redacted('client-secret'),
+    },
+  },
+  unique: {
+    serviceAuthMode: UniqueAuthMode.ClusterLocal,
+    serviceExtraHeaders: { 'x-company-id': 'company-id', 'x-user-id': 'user-id' },
+    ingestionServiceBaseUrl: 'http://ingestion.local:8091',
+    scopeManagementServiceBaseUrl: 'http://scope-management.local:8094',
+    apiRateLimitPerMinute: 100,
+  },
+  processing: { scanIntervalCron: '*/5 * * * *', concurrency: 1 },
+  ingestion: {
+    ingestionMode: 'flat',
+    scopeId: 'scope-id',
+    storeInternally: true,
+    useV1KeyFormat: false,
+    attachments: { enabled: true, allowedExtensions: ['pdf'], maxFileSizeMb: 200 },
+  },
+} satisfies TenantConfig;
+
+function makeCloudTenant(
+  name: string,
+  baseUrl = `https://${name}.atlassian.net`,
+  status: TenantContext['status'] = TenantStatus.Active,
+): TenantContext {
   return {
     name,
-    status: 'active',
+    status,
     isScanning: false,
     config: {
-      confluence: {
-        instanceType: 'cloud',
-        baseUrl,
-      },
+      ...baseTenantConfig,
+      confluence: { ...baseTenantConfig.confluence, baseUrl },
     },
-  } as unknown as TenantContext;
+  } satisfies TenantContext;
 }
 
 function makeDataCenterTenant(name: string, baseUrl: string): TenantContext {
   return {
     name,
-    status: 'active',
+    status: TenantStatus.Active,
     isScanning: false,
     config: {
+      ...baseTenantConfig,
       confluence: {
         instanceType: 'data-center',
         baseUrl,
+        apiRateLimitPerMinute: 100,
+        ingestSingleLabel: 'ai-ingest',
+        ingestAllLabel: 'ai-ingest-all',
+        auth: { mode: AuthMode.Pat, token: new Redacted('pat-token') },
       },
     },
-  } as unknown as TenantContext;
+  } satisfies TenantContext;
 }
 
 function makeDeletedTenant(name: string, baseUrl: string): TenantContext {
-  return {
-    name,
-    status: 'deleted',
-    isScanning: false,
-    config: {
-      confluence: { instanceType: 'cloud', baseUrl },
-    },
-  } as unknown as TenantContext;
+  return makeCloudTenant(name, baseUrl, TenantStatus.Deleted);
 }
 
 describe('ConnectivityHealthIndicator', () => {
   let indicator: ConnectivityHealthIndicator;
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: MockedFunction<UndiciFetch>;
   let tenants: TenantContext[];
   const mockDispatcher = Symbol('dispatcher');
 
@@ -109,7 +145,7 @@ describe('ConnectivityHealthIndicator', () => {
   it('returns up when atlassian and tenant base URLs are reachable', async () => {
     tenants = [makeCloudTenant('tenant-a', 'https://acme.atlassian.net')];
     await buildIndicator();
-    mockFetch.mockResolvedValue(new Response());
+    mockFetch.mockResolvedValue(new UndiciResponse());
 
     const result = await indicator.check('connectivity');
 
@@ -125,7 +161,7 @@ describe('ConnectivityHealthIndicator', () => {
   it('omits the atlassian check when no cloud tenants exist', async () => {
     tenants = [makeDataCenterTenant('dc-tenant', 'https://confluence.acme.com')];
     await buildIndicator();
-    mockFetch.mockResolvedValue(new Response());
+    mockFetch.mockResolvedValue(new UndiciResponse());
 
     const result = await indicator.check('connectivity');
 
@@ -148,7 +184,7 @@ describe('ConnectivityHealthIndicator', () => {
       makeCloudTenant('tenant-b', 'https://acme.atlassian.net'),
     ];
     await buildIndicator();
-    mockFetch.mockResolvedValue(new Response());
+    mockFetch.mockResolvedValue(new UndiciResponse());
 
     const result = await indicator.check('connectivity');
 
@@ -173,7 +209,7 @@ describe('ConnectivityHealthIndicator', () => {
       makeDeletedTenant('gone', 'https://gone.atlassian.net'),
     ];
     await buildIndicator();
-    mockFetch.mockResolvedValue(new Response());
+    mockFetch.mockResolvedValue(new UndiciResponse());
 
     const result = await indicator.check('connectivity');
 
@@ -190,7 +226,7 @@ describe('ConnectivityHealthIndicator', () => {
     tenants = [makeCloudTenant('tenant-a', 'https://acme.atlassian.net')];
     await buildIndicator();
     const dnsError = Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' });
-    mockFetch.mockRejectedValueOnce(dnsError).mockResolvedValueOnce(new Response());
+    mockFetch.mockRejectedValueOnce(dnsError).mockResolvedValueOnce(new UndiciResponse());
 
     const result = await indicator.check('connectivity');
 
@@ -213,9 +249,9 @@ describe('ConnectivityHealthIndicator', () => {
     const timeoutError = Object.assign(new Error('connect ETIMEDOUT'), { code: 'ETIMEDOUT' });
     mockFetch
       // atlassian ping
-      .mockResolvedValueOnce(new Response())
+      .mockResolvedValueOnce(new UndiciResponse())
       // healthy ping
-      .mockResolvedValueOnce(new Response())
+      .mockResolvedValueOnce(new UndiciResponse())
       // broken ping
       .mockRejectedValueOnce(timeoutError);
 
