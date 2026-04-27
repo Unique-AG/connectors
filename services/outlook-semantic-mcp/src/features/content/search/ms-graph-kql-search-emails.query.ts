@@ -81,8 +81,8 @@ export class MsGraphKqlSearchEmailsQuery {
     const deduplicated: SearchEmailResult[] = [];
     for (const results of allResults) {
       for (const result of results) {
-        if (!seen.has(result.msGraphMessageId ?? '')) {
-          seen.add(result.msGraphMessageId ?? '');
+        if (result.msGraphMessageId && !seen.has(result.msGraphMessageId)) {
+          seen.add(result.msGraphMessageId);
           deduplicated.push(result);
         }
       }

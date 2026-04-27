@@ -97,27 +97,37 @@ export class SearchEmailsQuery {
     semanticResults: SearchEmailResult[],
     graphResults: SearchEmailResult[],
   ): SearchEmailResult[] {
-    const graphById = new Map(graphResults.map((r) => [r.msGraphMessageId ?? '', r]));
+    const graphById = new Map(
+      graphResults
+        .filter(
+          (item): item is SearchEmailResult & { msGraphMessageId: string } =>
+            !!item.msGraphMessageId,
+        )
+        .map((item) => [item.msGraphMessageId, item]),
+    );
 
     const enriched: Array<{ result: SearchEmailResult; hadGraphMatch: boolean }> =
       semanticResults.map((semanticResult) => {
-        const graphResult = semanticResult.msGraphMessageId
-          ? graphById.get(semanticResult.msGraphMessageId)
-          : undefined;
-        if (graphResult) {
-          graphById.delete(semanticResult.msGraphMessageId ?? '');
-          return {
-            result: {
-              ...semanticResult,
-              text: this.formatText({
-                semanticText: semanticResult.text,
-                graphText: graphResult.text,
-              }),
-            },
-            hadGraphMatch: true,
-          };
+        const { msGraphMessageId } = semanticResult;
+        const graphResult = msGraphMessageId ? graphById.get(msGraphMessageId) : null;
+
+        if (!graphResult) {
+          return { result: semanticResult, hadGraphMatch: false };
         }
-        return { result: semanticResult, hadGraphMatch: false };
+
+        if (msGraphMessageId) {
+          graphById.delete(msGraphMessageId);
+        }
+        return {
+          result: {
+            ...semanticResult,
+            text: this.formatText({
+              semanticText: semanticResult.text,
+              graphText: graphResult.text,
+            }),
+          },
+          hadGraphMatch: true,
+        };
       });
 
     const top20 = enriched.slice(0, 20).map((e) => e.result);

@@ -2,7 +2,7 @@ import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { pick } from 'remeda';
+import { filter, isNonNullish, map, pick, pipe } from 'remeda';
 import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, directories } from '~/db';
 import { SearchEmailsInputSchema } from '~/features/content/search/semantic-search-conditions.dto';
@@ -104,7 +104,13 @@ export class RunSearchRecallCheckQuery {
 
         const expectedMessageIds = notSkipped.map((e) => e.messageId);
         const { results } = await this.searchEmailsQuery.run(userProfileId, checkCase.search);
-        const returnedEmailIds = new Set(results.map((r) => r.msGraphMessageId));
+        const returnedEmailIds = new Set(
+          pipe(
+            results,
+            map((result) => result.msGraphMessageId),
+            filter(isNonNullish),
+          ),
+        );
 
         const missedMessagesBase = notSkipped
           .filter((msg) => !returnedEmailIds.has(msg.messageId))
