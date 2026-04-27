@@ -1,8 +1,8 @@
 import { type DynamicModule, Module } from '@nestjs/common';
-import { mcpBackendSchema, mcpDebugModeSchema } from '~/config/app.config';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
+import { isDebugMode, isGraphBackend } from '~/utils/backend-config.utils';
 import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
 import { CategoriesModule } from './categories/categories.module';
@@ -37,8 +37,8 @@ import { SyncRecoveryModule } from './sync/sync-recovery.module';
 @Module({})
 export class BackendModule {
   public static forRoot(): DynamicModule {
-    const isGraph = mcpBackendSchema.parse(process.env.MCP_BACKEND) === 'MicrosoftGraph';
-    const isDebug = mcpDebugModeSchema.parse(process.env.MCP_DEBUG_MODE);
+    const isGraph = isGraphBackend();
+    const isDebug = isDebugMode();
 
     const uniqueAndMicrosoftBackendCommonTools = [
       ListFoldersTool,
