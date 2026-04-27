@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildKqlQueryString } from './graph-search-emails.query';
+import { buildKqlQueryString } from './ms-graph-kql-search-emails.query';
 
 describe('buildKqlQueryString', () => {
   it('returns just the search string when there are no conditions', () => {
