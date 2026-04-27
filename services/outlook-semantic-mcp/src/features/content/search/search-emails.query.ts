@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import * as z from 'zod';
-import { mcpBackendSchema } from '~/config/app.config';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
 import { SearchEmailsInputSchema } from './semantic-search-conditions.dto';
 import {
@@ -14,17 +13,10 @@ export interface SearchEmailsToolInput {
   msGraphSearchParams?: { queries: Array<{ kqlQuery: string; limit?: number }> };
 }
 
-type McpBackend = z.infer<typeof mcpBackendSchema>;
-
 type BackendExecutor = (
   userProfileId: string,
   input: SearchEmailsToolInput,
 ) => Promise<SearchEmailResult[]>;
-
-const BACKENDS_FOR_CONFIG: Record<McpBackend, SearchBackend[]> = {
-  MicrosoftGraph: [SearchBackend.MsGraph],
-  MicrosoftGraphAndUniqueApi: [SearchBackend.Unique, SearchBackend.MsGraph],
-};
 
 @Injectable()
 export class SearchEmailsQuery {
@@ -60,25 +52,54 @@ export class SearchEmailsQuery {
     userProfileId: string,
     input: SearchEmailsToolInput,
   ): Promise<SearchEmailResult[]> {
-    const mcpBackend = mcpBackendSchema.parse(process.env.MCP_BACKEND);
-    const backendsToRun = BACKENDS_FOR_CONFIG[mcpBackend];
+    const [semanticResults, graphResults] = await Promise.all([
+      this.executors[SearchBackend.Unique](userProfileId, input),
+      this.executors[SearchBackend.MsGraph](userProfileId, input),
+    ]);
 
-    const resultSets = await Promise.all(
-      backendsToRun.map((backend) => this.executors[backend](userProfileId, input)),
-    );
-
-    return this.mergeResults(resultSets);
+    return this.mergeResults(semanticResults, graphResults);
   }
 
-  private mergeResults(resultSets: SearchEmailResult[][]): SearchEmailResult[] {
-    const flat = resultSets.flat();
-    const graphResults = flat.filter((r) => r.backend === SearchBackend.MsGraph);
-    const uniqueResults = flat.filter((r) => r.backend === SearchBackend.Unique);
+  private formatText(semanticText: string | undefined, graphText: string | undefined): string {
+    const sections: string[] = [];
+    if (semanticText) {
+      sections.push(`## Semantically Matched Content\n${semanticText}`);
+    }
+    if (graphText) {
+      sections.push(`## Full Email Content Without Attachments\n${graphText}`);
+    }
+    return sections.join('\n\n');
+  }
 
+  private mergeResults(
+    semanticResults: SearchEmailResult[],
+    graphResults: SearchEmailResult[],
+  ): SearchEmailResult[] {
     const graphById = new Map(graphResults.map((r) => [r.emailId, r]));
-    const uniqueOnly = uniqueResults.filter((r) => !graphById.has(r.emailId));
 
-    // Graph results first (full body, better ranking), then Unique-only appended
-    return [...graphResults, ...uniqueOnly];
+    const enriched: Array<{ result: SearchEmailResult; hadGraphMatch: boolean }> =
+      semanticResults.map((semanticResult) => {
+        const graphResult = graphById.get(semanticResult.emailId);
+        if (graphResult) {
+          graphById.delete(semanticResult.emailId);
+          return {
+            result: { ...semanticResult, text: this.formatText(semanticResult.text, graphResult.text) },
+            hadGraphMatch: true,
+          };
+        }
+        return { result: semanticResult, hadGraphMatch: false };
+      });
+
+    const top20 = enriched.slice(0, 20).map((e) => e.result);
+    const remainder = enriched.slice(20);
+    const commonRemainder = remainder.filter((e) => e.hadGraphMatch).map((e) => e.result);
+    const semanticOnly = remainder.filter((e) => !e.hadGraphMatch).map((e) => e.result);
+
+    const remainingGraph = Array.from(graphById.values()).map((graphResult) => ({
+      ...graphResult,
+      text: this.formatText(undefined, graphResult.text),
+    }));
+
+    return [...top20, ...commonRemainder, ...semanticOnly, ...remainingGraph];
   }
 }
