@@ -5,7 +5,7 @@ import {
   SearchConditionSchema,
   SearchEmailsInputSchema,
 } from '~/features/content/search/search-conditions.dto';
-import { SearchEmailResult } from '~/features/content/search/search-emails.query';
+import { SearchEmailResult } from '~/features/content/search/semantic-search-emails.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 
 function extractDatePart(isoDatetime: string): string {

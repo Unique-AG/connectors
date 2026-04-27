@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { SearchEmailsQuery } from './search-emails.query';
+import { SemanticSearchEmailsQuery } from './semantic-search-emails.query';
 
 // biome-ignore lint/suspicious/noExplicitAny: constructor args not needed for this private method
-const query = new SearchEmailsQuery(null as any, null as any);
+const query = new SemanticSearchEmailsQuery(null as any, null as any);
 
 interface MockDirectory {
   providerDirectoryId: string;
@@ -12,7 +12,7 @@ interface MockDirectory {
 const inboxDir: MockDirectory = { providerDirectoryId: 'inbox-id-123', displayName: 'Inbox' };
 const sentDir: MockDirectory = { providerDirectoryId: 'sent-id-456', displayName: 'Sent Items' };
 
-describe('SearchEmailsQuery.sanitizeWrongDirectoryIds', () => {
+describe('SemanticSearchEmailsQuery.sanitizeWrongDirectoryIds', () => {
   it('returns the ID unchanged when it exactly matches a providerDirectoryId', () => {
     // biome-ignore lint/suspicious/noExplicitAny: accessing private method for testing
     const result = (query as any).sanitizeWrongDirectoryIds(['inbox-id-123'], [inboxDir]);

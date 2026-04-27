@@ -2,9 +2,9 @@ import { Module } from '@nestjs/common';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { FullSyncModule } from '../sync/full-sync';
-import { SearchEmailsQuery } from './search/search-emails.query';
+import { SemanticSearchEmailsQuery } from './search/semantic-search-emails.query';
 
-const QUERIES = [SearchEmailsQuery];
+const QUERIES = [SemanticSearchEmailsQuery];
 
 @Module({
   imports: [DrizzleModule, UniqueApiFeatureModule, FullSyncModule],

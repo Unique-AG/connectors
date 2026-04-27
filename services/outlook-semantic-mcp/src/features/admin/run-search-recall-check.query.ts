@@ -6,7 +6,7 @@ import { pick } from 'remeda';
 import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, directories } from '~/db';
 import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
-import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
+import { SemanticSearchEmailsQuery } from '~/features/content/search/semantic-search-emails.query';
 import { traceAttrs, traceError } from '~/features/tracing.utils';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { Nullish } from '~/utils/nullish';
@@ -65,7 +65,7 @@ export class RunSearchRecallCheckQuery {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly fetchMessagesFromGraphQuery: FetchMessagesFromGraphQuery,
-    private readonly searchEmailsQuery: SearchEmailsQuery,
+    private readonly searchEmailsQuery: SemanticSearchEmailsQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
   ) {}
 

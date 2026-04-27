@@ -40,7 +40,7 @@ export interface SearchEmailResult {
 }
 
 @Injectable()
-export class SearchEmailsQuery {
+export class SemanticSearchEmailsQuery {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,

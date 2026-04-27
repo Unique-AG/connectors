@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
-import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
+import { SemanticSearchEmailsQuery } from '~/features/content/search/semantic-search-emails.query';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { GetFullSyncStatsQuery } from '~/features/sync/full-sync/get-full-sync-stats.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
@@ -35,7 +35,7 @@ const SearchEmailsOutputSchema = z.object({
 export class SearchEmailsTool {
   public constructor(
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
-    private readonly searchEmailsQuery: SearchEmailsQuery,
+    private readonly searchEmailsQuery: SemanticSearchEmailsQuery,
     private readonly getFullSyncStatsQuery: GetFullSyncStatsQuery,
   ) {}
 
