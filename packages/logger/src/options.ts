@@ -1,9 +1,9 @@
 import { IncomingMessage } from 'node:http';
 import path from 'node:path';
+import { sanitizeError } from '@unique-ag/utils';
 import { RequestMethod } from '@nestjs/common';
 import type { Params } from 'nestjs-pino';
 import { isPlainObject } from 'remeda';
-import { sanitizeError } from './sanitize-error';
 
 export const productionTarget = {
   target: 'pino/file',

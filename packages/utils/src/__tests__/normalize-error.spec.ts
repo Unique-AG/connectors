@@ -1,4 +1,3 @@
-import { ClientError, type GraphQLResponse } from 'graphql-request';
 import { describe, expect, it } from 'vitest';
 import { normalizeError, sanitizeError } from '../normalize-error';
 
@@ -121,8 +120,14 @@ describe('sanitizeError', () => {
   function createGraphqlClientError(
     baseMessage: string,
     variables: Record<string, unknown>,
-  ): ClientError {
-    const response = {
+  ): Error & { response: Record<string, unknown>; request: Record<string, unknown> } {
+    const error = new Error(
+      `${baseMessage}: ${JSON.stringify({
+        response: { errors: [] },
+        request: { variables },
+      })}`,
+    ) as Error & { response: Record<string, unknown>; request: Record<string, unknown> };
+    error.response = {
       errors: [
         {
           message: baseMessage,
@@ -131,13 +136,9 @@ describe('sanitizeError', () => {
         },
       ],
       status: 200,
-    } as unknown as GraphQLResponse;
-
-    return new ClientError(response, {
-      query:
-        'mutation ContentUpsert($input: ContentCreateInput!) { contentUpsert(input: $input) { id } }',
-      variables,
-    });
+    };
+    error.request = { variables };
+    return error;
   }
 
   it('serialises a plain Error', () => {
@@ -207,15 +208,38 @@ describe('sanitizeError', () => {
   });
 
   it('handles GraphQL client error with no response errors array', () => {
-    const error = new ClientError({ status: 500 } as unknown as GraphQLResponse, {
-      query: 'query {}',
-      variables: {},
-    });
+    const error = createGraphqlClientError('Internal server error', {});
+    delete error.response.errors;
+    error.response.status = 500;
 
     const result = sanitizeError(error) as Record<string, unknown>;
 
     expect(result.graphqlErrors).toBeUndefined();
     expect(result.statusCode).toBe(500);
+  });
+
+  it('sanitizes structurally matching GraphQL client errors', () => {
+    const error = new Error(
+      'Upstream failed: {"response":{"errors":[]},"request":{"variables":{"token":"secret-token"}}}',
+    ) as Error & { response: Record<string, unknown>; request: Record<string, unknown> };
+    error.response = {
+      errors: [{ message: 'Upstream failed', path: ['query'], extensions: { code: 'FAILED' } }],
+      status: 502,
+    };
+    error.request = { variables: { token: 'secret-token' } };
+
+    const result = sanitizeError(error) as Record<string, unknown>;
+
+    expect(result.message).toBe('Upstream failed');
+    expect(JSON.stringify(result)).not.toContain('secret-token');
+    expect(result.graphqlErrors).toEqual([
+      {
+        message: 'Upstream failed',
+        path: ['query'],
+        code: 'FAILED',
+      },
+    ]);
+    expect(result.statusCode).toBe(502);
   });
 
   it('does not treat non-ClientError with response/request as GraphQL error', () => {

@@ -16,7 +16,6 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "graphql-request": "7.2.0",
     "remeda": "2.32.0",
     "serialize-error-cjs": "0.2.0"
   },

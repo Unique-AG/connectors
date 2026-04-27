@@ -119,6 +119,9 @@ importers:
       '@nestjs/common':
         specifier: ^11
         version: 11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@unique-ag/utils':
+        specifier: workspace:*
+        version: link:../utils
       nestjs-pino:
         specifier: ^4.6.0
         version: 4.6.1(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
@@ -355,9 +358,6 @@ importers:
 
   packages/utils:
     dependencies:
-      graphql-request:
-        specifier: 7.2.0
-        version: 7.2.0(graphql@16.11.0)
       remeda:
         specifier: 2.32.0
         version: 2.32.0
