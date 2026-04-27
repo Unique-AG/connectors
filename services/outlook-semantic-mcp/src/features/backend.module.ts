@@ -34,55 +34,55 @@ import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
 
 @Module({})
-export class BackendModule {
-  public static forRoot(): DynamicModule {
-    const isGraph = isGraphBackend();
-    const isDebug = isDebugMode();
+export class BackendModule {}
 
-    const uniqueAndMicrosoftBackendCommonTools = [
-      ListFoldersTool,
-      ListCategoriesTool,
-      CreateDraftEmailTool,
-      LookupContactsTool,
-    ];
+export function registerBackendModule(): DynamicModule {
+  const isGraph = isGraphBackend();
+  const isDebug = isDebugMode();
 
-    const uniqueOnlyTools = isGraph
-      ? []
-      : [SyncProgressTool, VerifyInboxConnectionTool, DeleteInboxDataTool, ReconnectInboxTool];
+  const uniqueAndMicrosoftBackendCommonTools = [
+    ListFoldersTool,
+    ListCategoriesTool,
+    CreateDraftEmailTool,
+    LookupContactsTool,
+  ];
 
-    const debugTools = isDebug
-      ? [RunFullSyncTool, RestartFullSyncTool, PauseFullSyncTool, ResumeFullSyncTool, AdminOpsTool]
-      : [];
+  const uniqueOnlyTools = isGraph
+    ? []
+    : [SyncProgressTool, VerifyInboxConnectionTool, DeleteInboxDataTool, ReconnectInboxTool];
 
-    return {
-      module: BackendModule,
-      imports: [
-        DrizzleModule,
-        MsGraphModule,
-        SubscriptionModule,
-        DirectoriesSyncModule,
-        CategoriesModule,
-        EmailManagementModule,
-        OpenEmailModule,
-        InboxDeletingQueryModule,
-        DeleteInboxModule,
-        FullSyncModule,
-        LiveCatchUpModule,
-        ProcessEmailModule,
-        SyncRecoveryModule,
-        SearchModule,
-        UniqueApiFeatureModule,
-        AdminModule,
-      ],
-      providers: [
-        MailSubscriptionController,
-        ...uniqueAndMicrosoftBackendCommonTools,
-        SearchEmailsTool,
-        OpenEmailTool,
-        ...uniqueOnlyTools,
-        ...debugTools,
-      ],
-      controllers: [MailSubscriptionController],
-    };
-  }
+  const debugTools = isDebug
+    ? [RunFullSyncTool, RestartFullSyncTool, PauseFullSyncTool, ResumeFullSyncTool, AdminOpsTool]
+    : [];
+
+  return {
+    module: BackendModule,
+    imports: [
+      DrizzleModule,
+      MsGraphModule,
+      SubscriptionModule,
+      DirectoriesSyncModule,
+      CategoriesModule,
+      EmailManagementModule,
+      OpenEmailModule,
+      InboxDeletingQueryModule,
+      DeleteInboxModule,
+      FullSyncModule,
+      LiveCatchUpModule,
+      ProcessEmailModule,
+      SyncRecoveryModule,
+      SearchModule,
+      UniqueApiFeatureModule,
+      AdminModule,
+    ],
+    providers: [
+      MailSubscriptionController,
+      ...uniqueAndMicrosoftBackendCommonTools,
+      SearchEmailsTool,
+      OpenEmailTool,
+      ...uniqueOnlyTools,
+      ...debugTools,
+    ],
+    controllers: [MailSubscriptionController],
+  };
 }

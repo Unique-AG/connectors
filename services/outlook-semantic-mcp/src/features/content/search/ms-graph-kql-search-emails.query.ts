@@ -44,17 +44,20 @@ export class MsGraphKqlSearchEmailsQuery {
 
     const allResults = await Promise.all(
       queries.map(async (query) => {
-        const raw = await client.api('/search/query').post({
-          requests: [
-            {
-              entityTypes: ['message'],
-              query: { queryString: query.kqlQuery },
-              enableTopResults: true,
-              from: 0,
-              size: Math.min(query.limit ?? 25, 50),
-            },
-          ],
-        });
+        const raw = await client
+          .api('/search/query')
+          .header('Prefer', 'IdType="ImmutableId"')
+          .post({
+            requests: [
+              {
+                entityTypes: ['message'],
+                query: { queryString: query.kqlQuery },
+                enableTopResults: true,
+                from: 0,
+                size: Math.min(query.limit ?? 25, 50),
+              },
+            ],
+          });
         const response = graphSearchResponseSchema.parse(raw);
         const hits = response.value[0]?.hitsContainers[0]?.hits ?? [];
         return hits.map((hit) => ({

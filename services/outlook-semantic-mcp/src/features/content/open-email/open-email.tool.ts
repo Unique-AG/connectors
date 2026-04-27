@@ -18,9 +18,7 @@ const OpenEmailByIdInputSchema = z.object({
     .describe(
       'The identifier from the search_emails result. Use `uniqueContentId` when backend is `Unique`, use `msGraphMessageId` when backend is `MsGraph`.',
     ),
-  backend: z
-    .nativeEnum(SearchBackend)
-    .describe('The backend field from the search_emails result.'),
+  backend: z.nativeEnum(SearchBackend).describe('The backend field from the search_emails result.'),
 });
 
 export const EmailDataSchema = z.object({

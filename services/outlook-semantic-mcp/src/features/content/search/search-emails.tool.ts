@@ -3,11 +3,11 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
+import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import {
   SearchEmailsMsGraphInputSchema,
   SearchEmailsUnifiedInputSchema,
 } from '~/features/content/search/semantic-search-conditions.dto';
-import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { GetFullSyncStatsQuery } from '~/features/sync/full-sync/get-full-sync-stats.query';
 import { isGraphBackend } from '~/utils/backend-config.utils';
@@ -30,7 +30,7 @@ const SearchEmailResultSchema = z.object({
   from: z.string(),
   receivedDateTime: z.string().optional().nullable(),
   text: z.string(),
-  outlookWebLink: z.string().optional(),
+  outlookWebLink: z.string(),
   uniqueContentUrl: z.string().optional(),
   backend: z.nativeEnum(SearchBackend),
 });
@@ -55,7 +55,7 @@ export class SearchEmailsTool {
     name: 'search_emails',
     title: 'Search Emails',
     description:
-      "Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by folder, call `list_folders` first to obtain valid folder ids. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` with the result's id. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete.",
+      "Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by folder, call `list_folders` first to obtain valid folder ids. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` with the result's `id` and `backend` fields. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete.",
     parameters: SearchEmailsToolInputSchema,
     outputSchema: SearchEmailsOutputSchema,
     annotations: {

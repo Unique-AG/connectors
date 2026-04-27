@@ -267,7 +267,7 @@ function buildConditionGroup(condition: SearchCondition): MetadataFilter {
   return wrapConditions(leaves, 'and');
 }
 
-// Keys within a single condition are OR-combined; multiple conditions in the array are AND-combined.
+// Fields within a single condition are AND-combined; multiple conditions in the array are OR-combined.
 export function buildSearchFilter(
   conditions: SearchCondition[] | null | undefined,
 ): MetadataFilter | undefined {

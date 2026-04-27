@@ -7,7 +7,10 @@ import {
   SemanticSearchEmailsQuery,
 } from './semantic-search-emails.query';
 
-function makeGraphResult(emailId: string, overrides?: Partial<SearchEmailResult>): SearchEmailResult {
+function makeGraphResult(
+  emailId: string,
+  overrides?: Partial<SearchEmailResult>,
+): SearchEmailResult {
   return {
     msGraphMessageId: emailId,
     emailId,
@@ -23,7 +26,10 @@ function makeGraphResult(emailId: string, overrides?: Partial<SearchEmailResult>
   };
 }
 
-function makeUniqueResult(emailId: string, overrides?: Partial<SearchEmailResult>): SearchEmailResult {
+function makeUniqueResult(
+  emailId: string,
+  overrides?: Partial<SearchEmailResult>,
+): SearchEmailResult {
   return {
     uniqueContentId: `content-${emailId}`,
     emailId,
