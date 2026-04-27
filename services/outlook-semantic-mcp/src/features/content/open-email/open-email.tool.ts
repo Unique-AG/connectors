@@ -1,20 +1,25 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
-import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { isGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { SearchBackend } from '../search/semantic-search-emails.query';
 import { META } from './open-email-tool.meta';
+import { OpenEmailQuery } from './open-email.query';
+
+const IS_GRAPH_BACKEND = isGraphBackend();
 
 const OpenEmailByIdInputSchema = z.object({
-  id: z
-    .string()
+  id: z.string().describe('The id field from a search_emails result.'),
+  backend: z
+    .nativeEnum(SearchBackend)
     .describe(
-      'The content ID returned by the search_emails tool, e.g. "cont_zwgng9aoz0gbo6qxgnwese7g".',
-    ),
+      'The backend field from the search result. Required when MCP_BACKEND is MicrosoftGraphAndUniqueApi.',
+    )
+    .optional(),
 });
 
 export const EmailDataChunkSchema = z.object({
@@ -43,7 +48,7 @@ const OpenEmailByIdOutputSchema = z.object({
 export class OpenEmailTool {
   public constructor(
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
-    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
+    private readonly openEmailQuery: OpenEmailQuery,
   ) {}
 
   @Tool({
@@ -66,18 +71,18 @@ export class OpenEmailTool {
     input: z.infer<typeof OpenEmailByIdInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
-  ) {
+  ): Promise<z.infer<typeof OpenEmailByIdOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
+    const backend = input.backend ?? (IS_GRAPH_BACKEND ? SearchBackend.MsGraph : SearchBackend.Unique);
 
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
-    if (!subscriptionStatus.success) {
-      return subscriptionStatus;
+    if (!IS_GRAPH_BACKEND) {
+      const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
+      if (!subscriptionStatus.success) {
+        return subscriptionStatus;
+      }
     }
 
-    const emailData = await this.uniqueApi.content.getContentById({ contentId: input.id });
-    return OpenEmailByIdOutputSchema.encode({
-      success: true,
-      emailData,
-    });
+    const emailData = await this.openEmailQuery.run(userProfileTypeId.toString(), input.id, backend);
+    return { success: true, emailData };
   }
 }
