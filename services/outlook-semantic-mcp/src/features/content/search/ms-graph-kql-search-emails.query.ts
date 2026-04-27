@@ -117,7 +117,7 @@ export function buildKqlQueryString(input: z.infer<typeof SearchEmailsInputSchem
   return `${input.search} AND ${conditionGroups.join(' AND ')}`;
 }
 
-export const graphSearchHitSchema = z.object({
+const graphSearchHitSchema = z.object({
   summary: z.string(),
   resource: z.object({
     id: z.string(),
@@ -129,7 +129,7 @@ export const graphSearchHitSchema = z.object({
   }),
 });
 
-export const graphSearchResponseSchema = z.object({
+const graphSearchResponseSchema = z.object({
   value: z.array(
     z.object({
       hitsContainers: z.array(

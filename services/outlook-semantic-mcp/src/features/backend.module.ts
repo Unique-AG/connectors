@@ -7,10 +7,9 @@ import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
 import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
-import { OpenEmailTool, SearchEmailsTool, SearchModule } from './content';
-import { GraphContentModule } from './content/graph-search/graph-content.module';
-import { GraphOpenEmailTool } from './content/graph-search/graph-open-email.tool';
-import { GraphSearchEmailsTool } from './content/graph-search/graph-search-emails.tool';
+import { SearchEmailsTool, SearchModule } from './content';
+import { OpenEmailModule } from './content/open-email/open-email.module';
+import { OpenEmailTool } from './content/open-email/open-email.tool';
 import { DeleteInboxModule } from './delete-inbox/delete-inbox.module';
 import { DeleteInboxDataTool } from './delete-inbox/delete-inbox-data.tool';
 import { InboxDeletingQueryModule } from './delete-inbox/inbox-deleting-query.module';
@@ -47,24 +46,13 @@ export class BackendModule {
       LookupContactsTool,
     ];
 
-    const uniqueBackendSpecificTools = [
-      SearchEmailsTool,
-      OpenEmailTool,
-      SyncProgressTool,
-      VerifyInboxConnectionTool,
-      DeleteInboxDataTool,
-      ReconnectInboxTool,
-      ...(!isDebug
-        ? []
-        : [
-            RunFullSyncTool,
-            RestartFullSyncTool,
-            PauseFullSyncTool,
-            ResumeFullSyncTool,
-            AdminOpsTool,
-          ]),
-    ];
-    const microsoftBackendSpecificTools = [GraphSearchEmailsTool, GraphOpenEmailTool];
+    const uniqueOnlyTools = isGraph
+      ? []
+      : [SyncProgressTool, VerifyInboxConnectionTool, DeleteInboxDataTool, ReconnectInboxTool];
+
+    const debugTools = isDebug
+      ? [RunFullSyncTool, RestartFullSyncTool, PauseFullSyncTool, ResumeFullSyncTool, AdminOpsTool]
+      : [];
 
     return {
       module: BackendModule,
@@ -75,7 +63,7 @@ export class BackendModule {
         DirectoriesSyncModule,
         CategoriesModule,
         EmailManagementModule,
-        GraphContentModule,
+        OpenEmailModule,
         InboxDeletingQueryModule,
         DeleteInboxModule,
         FullSyncModule,
@@ -89,7 +77,10 @@ export class BackendModule {
       providers: [
         MailSubscriptionController,
         ...uniqueAndMicrosoftBackendCommonTools,
-        ...(isGraph ? microsoftBackendSpecificTools : uniqueBackendSpecificTools),
+        SearchEmailsTool,
+        OpenEmailTool,
+        ...uniqueOnlyTools,
+        ...debugTools,
       ],
       controllers: [MailSubscriptionController],
     };
