@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { sanitizeError } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
 import { UniqueAuthConfig, UniqueAuthExternalConfig } from '../config/unique-api-auth-schema';
@@ -98,12 +97,12 @@ export class UniqueAuth implements UniqueAuthFacade {
       this.metrics.authTokenRefreshTotal.add(1);
 
       return tokenData.access_token;
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         msg: 'Failed to acquire Unique API token from Zitadel',
-        error: sanitizeError(error),
+        err,
       });
-      throw error;
+      throw err;
     }
   }
 

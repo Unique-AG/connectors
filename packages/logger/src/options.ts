@@ -2,6 +2,8 @@ import { IncomingMessage } from 'node:http';
 import path from 'node:path';
 import { RequestMethod } from '@nestjs/common';
 import type { Params } from 'nestjs-pino';
+import { isPlainObject } from 'remeda';
+import { sanitizeError } from './sanitize-error';
 
 export const productionTarget = {
   target: 'pino/file',
@@ -27,10 +29,14 @@ export const defaultLoggerOptions: Params = {
       ],
       censor: () => '[Redacted]',
     },
+    serializers: {
+      err: sanitizeError,
+    },
     customProps: (req: IncomingMessage) => {
-      if ((req as unknown as { body: { operationName: string } })?.body?.operationName) {
+      const operationName = getOperationName(req);
+      if (operationName) {
         return {
-          operationName: (req as unknown as { body: { operationName: string } }).body.operationName,
+          operationName,
         };
       }
       return {};
@@ -52,3 +58,16 @@ export const defaultLoggerOptions: Params = {
     },
   ],
 };
+
+function getOperationName(req: IncomingMessage): string | undefined {
+  if (!('body' in req)) {
+    return undefined;
+  }
+
+  const { body } = req;
+  if (!isPlainObject(body)) {
+    return undefined;
+  }
+
+  return typeof body.operationName === 'string' ? body.operationName : undefined;
+}

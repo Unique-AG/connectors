@@ -180,6 +180,17 @@ describe('sanitizeError', () => {
     expect(stack).toContain('at ');
   });
 
+  it('treats GraphQL stack replacement text literally', () => {
+    const error = createGraphqlClientError("Failed $& $' $`", {
+      input: { token: 'secret-token' },
+    });
+
+    const result = sanitizeError(error);
+
+    expect(result.stack).not.toContain('secret-token');
+    expect(result.stack).toContain("Failed $& $' $`");
+  });
+
   it('extracts structured graphqlErrors from GraphQL client error response', () => {
     const error = createGraphqlClientError('Internal server error', { input: {} });
 

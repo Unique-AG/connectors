@@ -5,7 +5,7 @@ import type {
   IngestionFinalizationRequest,
   UniqueApiClient,
 } from '@unique-ag/unique-api';
-import { createSmeared, elapsedSeconds, sanitizeError } from '@unique-ag/utils';
+import { createSmeared, elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { type Dispatcher, request } from 'undici';
 import type { TenantConfig } from '../config';
@@ -78,11 +78,11 @@ export class IngestionService {
         registrationResponse.readUrl,
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         pageId: page.id,
         title: page.title,
-        err: sanitizeError(error),
+        err,
         msg: 'Failed to ingest page, skipping',
       });
       if (contentId) {
@@ -132,12 +132,12 @@ export class IngestionService {
         registrationResponse.readUrl,
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
-    } catch (error) {
+    } catch (err) {
       stream?.destroy();
       this.logger.error({
         attachmentId: attachment.id,
         title: createSmeared(attachment.title),
-        err: sanitizeError(error),
+        err,
         msg: 'Failed to ingest attachment, skipping',
       });
       if (contentId) {
@@ -160,11 +160,11 @@ export class IngestionService {
         contentId,
         msg: 'Deleted orphaned content after failed ingestion',
       });
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         ...logContext,
         contentId,
-        err: sanitizeError(error),
+        err,
         msg: 'Failed to clean up orphaned content after failed ingestion',
       });
     }
@@ -199,10 +199,10 @@ export class IngestionService {
       // and on failure we don't know how many were partially deleted. Follow-up: fix deleteByIds
       // in @unique-ag/unique-api to return { deleted, failed } based on the mutation response.
       return deletedCount;
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         contentKeys,
-        err: sanitizeError(error),
+        err,
         msg: 'Failed to delete content, skipping',
       });
       return 0;

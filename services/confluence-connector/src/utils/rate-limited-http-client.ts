@@ -1,5 +1,5 @@
 import type { Readable } from 'node:stream';
-import { elapsedSeconds, sanitizeError } from '@unique-ag/utils';
+import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import Bottleneck from 'bottleneck';
 import { Agent, type Dispatcher, interceptors, request } from 'undici';
@@ -91,10 +91,10 @@ export class RateLimitedHttpClient {
 
         this.recordRequestDuration(startTime, endpoint, 'success');
         return response.body;
-      } catch (error) {
+      } catch (err) {
         this.recordRequestDuration(startTime, endpoint, 'error');
         this.metrics.recordApiError(statusCode);
-        throw error;
+        throw err;
       }
     });
   }
@@ -117,8 +117,8 @@ export class RateLimitedHttpClient {
       this.logger.error({ msg: 'Request dropped due to rate limiter queue overflow' });
     });
 
-    this.limiter.on('error', (error) => {
-      this.logger.error({ err: sanitizeError(error), msg: 'Bottleneck error' });
+    this.limiter.on('error', (err) => {
+      this.logger.error({ err, msg: 'Bottleneck error' });
     });
   }
 }

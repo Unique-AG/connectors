@@ -1,6 +1,21 @@
 import { ClientError } from 'graphql-request';
 import { serializeError } from 'serialize-error-cjs';
 
+export interface SanitizedGraphqlError {
+  message: string;
+  path?: ReadonlyArray<string | number>;
+  code?: unknown;
+}
+
+export interface SanitizedError {
+  name?: string;
+  message?: string;
+  stack?: string;
+  graphqlErrors?: SanitizedGraphqlError[];
+  statusCode?: number;
+  [key: string]: unknown;
+}
+
 export function normalizeError(error: unknown): Error {
   if (error instanceof Error) {
     return error;

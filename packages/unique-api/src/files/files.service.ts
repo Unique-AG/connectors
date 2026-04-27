@@ -1,4 +1,4 @@
-import { getErrorCodeFromGraphqlRequest, sanitizeError } from '@unique-ag/utils';
+import { getErrorCodeFromGraphqlRequest } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { chunk } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
@@ -243,11 +243,11 @@ export class FilesService implements UniqueFilesFacade {
           },
         );
         successCount += batch.length;
-      } catch (error) {
-        const statusCode = getErrorCodeFromGraphqlRequest(error);
+      } catch (err) {
+        const statusCode = getErrorCodeFromGraphqlRequest(err);
 
         if (statusCode !== 400) {
-          throw error;
+          throw err;
         }
 
         this.logger.warn({
@@ -272,7 +272,7 @@ export class FilesService implements UniqueFilesFacade {
               msg: `${logPrefix} Failed to add single file access`,
               scopeId,
               permission,
-              error: sanitizeError(singleError),
+              err: singleError,
             });
           }
         }
@@ -301,11 +301,11 @@ export class FilesService implements UniqueFilesFacade {
           fileAccesses: batch,
         });
         successCount += batch.length;
-      } catch (error) {
-        const statusCode = getErrorCodeFromGraphqlRequest(error);
+      } catch (err) {
+        const statusCode = getErrorCodeFromGraphqlRequest(err);
 
         if (statusCode !== 400) {
-          throw error;
+          throw err;
         }
 
         this.logger.warn({
@@ -330,7 +330,7 @@ export class FilesService implements UniqueFilesFacade {
               msg: `${logPrefix} Failed to remove single file access`,
               scopeId,
               permission,
-              error: sanitizeError(singleError),
+              err: singleError,
             });
           }
         }
