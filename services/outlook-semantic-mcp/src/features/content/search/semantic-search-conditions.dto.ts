@@ -1,8 +1,5 @@
-import assert from 'node:assert';
-import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
-import { first } from 'remeda';
+import { UniqueQLOperator } from '@unique-ag/unique-api';
 import { z } from 'zod';
-import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { clampToValidDate } from '~/utils/clamp-to-valid-date';
 
 export const CONTAINS_ANY_OPERATOR = 'containsAny' as const;
@@ -197,83 +194,21 @@ export const SearchEmailsMsGraphInputSchema = z.object({
   msGraphSearchParams: MsGraphSearchParamsSchema,
 });
 
-export const SearchEmailsUnifiedInputSchema = z.object({
-  semanticSearchParams: SearchEmailsInputSchema,
-  msGraphSearchParams: MsGraphSearchParamsSchema.optional(),
-});
-
-const METADATA_PATH: Record<keyof SearchCondition, (keyof MessageMetadata)[]> = {
-  dateFrom: ['receivedDateTime'],
-  dateTo: ['receivedDateTime'],
-  fromSenders: ['fromEmailAddress'],
-  toRecipients: ['toRecipientsEmailAddresses'],
-  ccRecipients: ['ccRecipientsEmailAddresses'],
-  directories: ['parentFolderId'],
-  hasAttachments: ['hasAttachments'],
-  categories: ['categories'],
-};
-
-function wrapConditions(filters: MetadataFilter[], operator: 'and' | 'or'): MetadataFilter {
-  const firstElement = first(filters);
-  if (firstElement && filters.length === 1) {
-    return firstElement;
-  }
-  if (operator === 'and') {
-    return { and: filters };
-  }
-  return { or: filters };
-}
-
-function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
-  const leaves: MetadataFilter[] = [];
-
-  for (const key of Object.keys(conditions) as Array<keyof SearchCondition>) {
-    const field = conditions[key];
-    if (field === undefined) {
-      continue;
-    }
-
-    const path = METADATA_PATH[key];
-    const operator = field.operator as UniqueQLOperator | typeof CONTAINS_ANY_OPERATOR;
-    const { value } = field;
-    if (operator === CONTAINS_ANY_OPERATOR) {
-      // We use assert here as type guard because zod already validates this but typescript does not infer that we can
-      // have just array as value.
-      assert.ok(
-        Array.isArray(value),
-        `Invalid value for operator: ${CONTAINS_ANY_OPERATOR}. Value: ${value} must be an array`,
-      );
-      const conditions = value.map((value) => ({
-        path,
-        operator: UniqueQLOperator.CONTAINS,
-        value,
-      }));
-      // We do not break if conditions length is empty we skip it beause there is no point
-      // in applying this condition.
-      if (conditions.length > 0) {
-        leaves.push(wrapConditions(conditions, 'or'));
-      }
-    } else {
-      leaves.push({ path, operator, value });
-    }
-  }
-
-  return leaves;
-}
-
-function buildConditionGroup(condition: SearchCondition): MetadataFilter {
-  const leaves: MetadataFilter[] = [];
-  leaves.push(...getConditionsArray(condition));
-  return wrapConditions(leaves, 'and');
-}
-
-// Fields within a single condition are AND-combined; multiple conditions in the array are OR-combined.
-export function buildSearchFilter(
-  conditions: SearchCondition[] | null | undefined,
-): MetadataFilter | undefined {
-  if (!conditions?.length) {
-    return undefined;
-  }
-  const conditionGroups = conditions.map(buildConditionGroup);
-  return wrapConditions(conditionGroups, 'or');
-}
+export const SearchEmailsUnifiedInputSchema = z
+  .object({
+    semanticSearchParams: SearchEmailsInputSchema,
+    msGraphSearchParams: MsGraphSearchParamsSchema.optional().describe(
+      'KQL queries that answer the same question as semanticSearchParams. ' +
+        'When provided, results from both backends are merged: semantic results are anchored first ' +
+        'and enriched with the Graph body excerpt when the same email was matched by both. ' +
+        'Always try to fill this alongside semanticSearchParams — the combined result gives a ' +
+        'more complete picture than either search alone.',
+    ),
+  })
+  .describe(
+    'Both semanticSearchParams and msGraphSearchParams should express the same search intent ' +
+      "using each backend's own query language. The two searches run in parallel and their " +
+      'results are merged to provide a broader and more reliable overview: semantic search ' +
+      'covers natural-language relevance and attachment content, while KQL covers lexical ' +
+      'precision and full email-body excerpts.',
+  );

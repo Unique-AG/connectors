@@ -60,7 +60,13 @@ export class SearchEmailsQuery {
     return this.mergeResults(semanticResults, graphResults);
   }
 
-  private formatText(semanticText: string | undefined, graphText: string | undefined): string {
+  private formatText({
+    semanticText,
+    graphText,
+  }: {
+    semanticText?: string;
+    graphText?: string;
+  }): string {
     const sections: string[] = [];
     if (semanticText) {
       sections.push(`## Semantically Matched Content\n${semanticText}`);
@@ -71,6 +77,22 @@ export class SearchEmailsQuery {
     return sections.join('\n\n');
   }
 
+  // We trust our semantic search more than KQL, so the top 20 semantic results are
+  // anchored first. When Graph returned the same email, we enrich the semantic result
+  // with the KQL body excerpt so the LLM sees both the attachment chunks and the full
+  // email body.
+  //
+  // Beyond position 20 we treat a match in both backends as a stronger signal than a
+  // semantic-only match, so common results are ranked above semantic-only stragglers.
+  // Graph-only results come last as the weakest signal.
+  //
+  // Tier ordering (strongest → weakest confidence):
+  //   1. Top-20 semantic results — anchored first, enriched with Graph body if available.
+  //   2. Common remainder — matched by both backends but outside top-20.
+  //   3. Semantic-only remainder — semantic match beyond top-20 with no Graph hit.
+  //   4. Graph-only — lexical match with no semantic counterpart.
+  //
+  // Output is capped at 500 results to keep LLM context small.
   private mergeResults(
     semanticResults: SearchEmailResult[],
     graphResults: SearchEmailResult[],
@@ -83,7 +105,13 @@ export class SearchEmailsQuery {
         if (graphResult) {
           graphById.delete(semanticResult.emailId);
           return {
-            result: { ...semanticResult, text: this.formatText(semanticResult.text, graphResult.text) },
+            result: {
+              ...semanticResult,
+              text: this.formatText({
+                semanticText: semanticResult.text,
+                graphText: graphResult.text,
+              }),
+            },
             hadGraphMatch: true,
           };
         }
@@ -91,15 +119,15 @@ export class SearchEmailsQuery {
       });
 
     const top20 = enriched.slice(0, 20).map((e) => e.result);
-    const remainder = enriched.slice(20);
+    const remainder = enriched.slice(top20.length);
     const commonRemainder = remainder.filter((e) => e.hadGraphMatch).map((e) => e.result);
     const semanticOnly = remainder.filter((e) => !e.hadGraphMatch).map((e) => e.result);
 
     const remainingGraph = Array.from(graphById.values()).map((graphResult) => ({
       ...graphResult,
-      text: this.formatText(undefined, graphResult.text),
+      text: this.formatText({ graphText: graphResult.text }),
     }));
 
-    return [...top20, ...commonRemainder, ...semanticOnly, ...remainingGraph];
+    return [...top20, ...commonRemainder, ...semanticOnly, ...remainingGraph].slice(0, 500);
   }
 }

@@ -21,11 +21,8 @@ import {
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { findBestMatch } from '~/utils/find-best-match';
 import { stripChunkTags } from '~/utils/strip-chunk-tags';
-import {
-  buildSearchFilter,
-  type SearchCondition,
-  SearchEmailsInputSchema,
-} from './semantic-search-conditions.dto';
+import { buildSearchFilter } from './build-unique-ql-search-filter.util';
+import { type SearchCondition, SearchEmailsInputSchema } from './semantic-search-conditions.dto';
 
 export enum SearchBackend {
   Unique = 'Unique',
