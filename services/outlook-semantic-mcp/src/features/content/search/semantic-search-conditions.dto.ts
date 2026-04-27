@@ -174,10 +174,23 @@ export const MsGraphKqlQuerySchema = z.object({
     .string()
     .nonempty()
     .describe(
-      'KQL (Keyword Query Language) query string. Supports fields: from:, to:, cc:, subject:, ' +
-        'received>=YYYY-MM-DD, received<=YYYY-MM-DD, hasAttachment:true/false, category:"label". ' +
-        'Multiple clauses are joined with AND/OR. See: ' +
-        'https://support.microsoft.com/en-us/office/how-to-search-in-outlook-d824d1e9-a255-4c8a-8553-276fb895a8da',
+      'KQL (Keyword Query Language) query string for Microsoft Graph email search.\n' +
+        'Supported property filters:\n' +
+        '  from:<email>              — sender address (exact or domain, e.g. from:alice@example.com)\n' +
+        '  to:<email>                — recipient in To field\n' +
+        '  cc:<email>                — recipient in CC field\n' +
+        '  subject:<words>           — words in the subject line (phrase: subject:"budget report")\n' +
+        '  body:<words>              — words in the message body\n' +
+        '  received>=YYYY-MM-DD      — received on or after date\n' +
+        '  received<=YYYY-MM-DD      — received on or before date\n' +
+        '  hasAttachment:true/false  — whether the email has attachments\n' +
+        '  category:"label"          — Outlook category label\n' +
+        'Free-text terms (no property prefix) perform a full-text search across subject and body.\n' +
+        'Combine clauses with AND / OR; use double quotes for phrases.\n' +
+        'Examples:\n' +
+        '  "from:alice@example.com subject:\\"Q2 budget\\" received>=2024-01-01"\n' +
+        '  "project proposal hasAttachment:true received>=2024-03-01 received<=2024-03-31"\n' +
+        '  "from:hr@acme.com OR from:payroll@acme.com subject:salary"',
     ),
   limit: z.number().int().min(1).max(50).optional().prefault(25),
 });
