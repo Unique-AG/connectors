@@ -80,8 +80,16 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     try {
       await this.tenantRegistry.run(tenant, async () => {
         if (tenant.status === TenantStatus.Deleted) {
-          const deleteService = this.serviceRegistry.getService(TenantDeleteService);
-          await deleteService.deleteTenantContent();
+          try {
+            const deleteService = this.serviceRegistry.getService(TenantDeleteService);
+            await deleteService.deleteTenantContent();
+          } catch (error) {
+            this.logger.error({
+              tenantName: tenant.name,
+              err: error,
+              msg: 'Unexpected error in tenant cleanup job',
+            });
+          }
           return;
         }
 

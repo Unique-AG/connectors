@@ -270,7 +270,7 @@ describe('TenantSyncScheduler', () => {
       expect(deleteService.deleteTenantContent).toHaveBeenCalledOnce();
     });
 
-    it('catches and logs cleanup errors with tenant name', async () => {
+    it('catches and logs cleanup errors without recording sync health', async () => {
       const deletedTenant = createTestTenant('deleted-tenant', { status: TenantStatus.Deleted });
       await buildScheduler([deletedTenant]);
 
@@ -286,9 +286,10 @@ describe('TenantSyncScheduler', () => {
         expect.objectContaining({
           tenantName: 'deleted-tenant',
           err: expect.any(Error),
-          msg: 'Unexpected error in tenant job',
+          msg: 'Unexpected error in tenant cleanup job',
         }),
       );
+      expect(syncStatusStore.record).not.toHaveBeenCalled();
     });
 
     it('skips job when shutting down', async () => {
