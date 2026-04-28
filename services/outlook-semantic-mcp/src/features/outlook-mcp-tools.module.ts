@@ -27,6 +27,7 @@ import {
 } from './sync/full-sync';
 import { FullSyncModule } from './sync/full-sync/full-sync.module';
 import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
+import { DelegatedAccessModule } from './delegated-access/delegated-access.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
 
 const DEBUG_MODE_TOOLS =
@@ -67,6 +68,7 @@ const TOOLS = [
     SearchModule,
     UniqueApiFeatureModule,
     SyncRecoveryModule,
+    DelegatedAccessModule,
   ],
   providers: [MailSubscriptionController, ...TOOLS],
   controllers: [MailSubscriptionController],

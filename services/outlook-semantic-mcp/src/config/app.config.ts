@@ -50,6 +50,14 @@ const ConfigSchema = z
       .min(2)
       .prefault(3)
       .describe('How many minutes should each live catchup run overlap the previous one'),
+    delegatedAccessDiscoveryCronSchedule: z
+      .string()
+      .prefault('0 */6 * * *')
+      .describe('Cron schedule for delegated access discovery. Default: every 6 hours.'),
+    delegatedAccessVerificationCronSchedule: z
+      .string()
+      .prefault('0 */4 * * *')
+      .describe('Cron schedule for delegated access verification. Default: every 4 hours.'),
   })
   .transform((c) => ({
     ...c,
@@ -67,6 +75,8 @@ export const appConfig = registerConfig('app', ConfigSchema, {
     'MCP_DEBUG_MODE',
     'LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES',
     'LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES',
+    'DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE',
+    'DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE',
   ]),
 });
 

@@ -3,10 +3,9 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
+import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, delegatedAccessPipeline } from '~/db';
 import { VerifyDelegatedAccessEventDto } from './verify-delegated-access-event.dto';
-
-const VERIFICATION_CRON_SCHEDULE = '0 */4 * * *';
 
 @Injectable()
 export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -17,6 +16,7 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
   ) {}
 
   public onModuleInit() {
@@ -34,7 +34,7 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
   }
 
   private setupCronJob(): void {
-    const job = new CronJob(VERIFICATION_CRON_SCHEDULE, async () => {
+    const job = new CronJob(this.config.delegatedAccessVerificationCronSchedule, async () => {
       try {
         await this.triggerVerificationForPipelineRows();
       } catch (err) {

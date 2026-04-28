@@ -36,12 +36,17 @@ function createMockDb({ rows = [] as Array<{ userProfileId: string }> } = {}) {
   return { select };
 }
 
+function createMockConfig() {
+  return { delegatedAccessDiscoveryCronSchedule: '0 */6 * * *' };
+}
+
 function createService({ amqp = createMockAmqp(), db = createMockDb() } = {}) {
   const schedulerRegistry = createMockSchedulerRegistry();
   return new DiscoverDelegatedAccessSchedulerService(
     schedulerRegistry as any,
     amqp as any,
     db as any,
+    createMockConfig() as any,
   );
 }
 
@@ -176,6 +181,7 @@ describe('DiscoverDelegatedAccessSchedulerService', () => {
         schedulerRegistry as any,
         createMockAmqp() as any,
         createMockDb() as any,
+        createMockConfig() as any,
       );
 
       service.onModuleInit();
@@ -194,6 +200,7 @@ describe('DiscoverDelegatedAccessSchedulerService', () => {
         schedulerRegistry as any,
         createMockAmqp() as any,
         createMockDb() as any,
+        createMockConfig() as any,
       );
 
       service.onModuleDestroy();

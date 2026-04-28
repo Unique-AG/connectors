@@ -151,6 +151,14 @@ mcpConfig:
     # window than the standard run to account for higher latency during recheck scenarios.
     # Minimum: 10. To override set env var directly: LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES=10
     liveCatchupRecheckOverlappingWindowMinutes: 10
+    # -- Optional. Cron schedule for delegated access discovery.
+    # Default: '0 */6 * * *' (every 6 hours). To override set env var directly:
+    # DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE='0 */3 * * *'
+    delegatedAccessDiscoveryCronSchedule: '0 */6 * * *'
+    # -- Optional. Cron schedule for delegated access verification.
+    # Default: '0 */4 * * *' (every 4 hours). To override set env var directly:
+    # DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE='0 */2 * * *'
+    delegatedAccessVerificationCronSchedule: '0 */4 * * *'
 
   # -- Optional log settings. To override:
   # logs:

@@ -4,10 +4,9 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { gt, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
+import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { DiscoverDelegatedAccessEventDto } from './discover-delegated-access-event.dto';
-
-const DISCOVERY_CRON_SCHEDULE = '0 */6 * * *';
 
 @Injectable()
 export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -18,6 +17,7 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
   ) {}
 
   public onModuleInit() {
@@ -36,7 +36,7 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
   }
 
   private setupCronJob(): void {
-    const job = new CronJob(DISCOVERY_CRON_SCHEDULE, async () => {
+    const job = new CronJob(this.config.delegatedAccessDiscoveryCronSchedule, async () => {
       try {
         await this.triggerDiscoveryForConnectedUsers();
       } catch (err) {
