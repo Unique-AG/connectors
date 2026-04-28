@@ -259,6 +259,7 @@ ingestion:
       - image/png
       - image/jpeg
     maxFileSizeMb: 200
+    imageOcr: enabled
 ```
 
 | Field            | Required | Default          | Description                                                                                                                                                         |
@@ -276,8 +277,9 @@ The `attachments` sub-section controls ingestion of file attachments from Conflu
 | Field                          | Required | Default                          | Description                                                                        |
 |--------------------------------|----------|----------------------------------|------------------------------------------------------------------------------------|
 | `attachments.mode`             | No       | `enabled`                        | Whether to ingest file attachments (`enabled` or `disabled`)                       |
-| `attachments.allowedMimeTypes` | No       | See [Default Allowed MIME Types](#Default-Allowed-MIME-Types) | MIME types to include when ingesting attachments. Matched against the `mediaType` reported by the Confluence API, case-insensitive. Image MIME types require the destination scope's `ingestionConfig.jpgReadMode` to be `DOC_INTELLIGENCE_DEFAULT` for chunks to be produced |
+| `attachments.allowedMimeTypes` | No       | See [Default Allowed MIME Types](#Default-Allowed-MIME-Types) | MIME types to include when ingesting attachments. Matched against the `mediaType` reported by the Confluence API, case-insensitive |
 | `attachments.maxFileSizeMb`    | No       | `200`                            | Maximum file size in megabytes. Attachments larger than this are skipped           |
+| `attachments.imageOcr`         | No       | `enabled`                        | Whether the connector should request OCR-based ingestion for image attachments by attaching `ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT` to each create-content request. When `disabled`, the destination scope's own `jpgReadMode` is used instead |
 
 #### Default Allowed MIME Types
 
@@ -299,7 +301,7 @@ These are matched against the `mediaType` reported by the Confluence API. Operat
 
 Images embedded in Confluence pages (drag/drop, paste, or "Insert image") are stored as regular page attachments by Confluence and are ingested through this same configuration when `image/png` or `image/jpeg` is in `allowedMimeTypes`. Both formats are in the default list, so enabling attachment ingestion is sufficient to ingest embedded images out of the box.
 
-For images to produce searchable chunks, the destination scope must have `ingestionConfig.jpgReadMode` set to `DOC_INTELLIGENCE_DEFAULT` (this is a scope-level setting in Unique, not a connector setting). Without this, image uploads succeed but Document Intelligence is not invoked and the content yields zero chunks.
+For images to produce searchable chunks, the Unique ingestion worker must run them through Document Intelligence (`jpgReadMode = DOC_INTELLIGENCE_DEFAULT`). The connector handles this automatically: with `attachments.imageOcr = enabled` (the default), each image content registration is sent with `ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT`, which overrides the scope-level default (`NO_INGESTION`). Set `attachments.imageOcr = disabled` to leave the decision to the destination scope's own `ingestionConfig`.
 
 Images inserted as external URLs (rather than uploaded to Confluence) are stored as plain URL references in the page body, not as attachments, and are therefore not ingested.
 

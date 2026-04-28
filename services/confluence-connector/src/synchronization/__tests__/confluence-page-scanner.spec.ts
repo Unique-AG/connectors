@@ -49,12 +49,14 @@ const disabledAttachmentConfig: AttachmentConfig = {
   enabled: false,
   allowedMimeTypes: ['application/pdf', 'image/png'],
   maxFileSizeMb: 10,
+  imageOcrEnabled: true,
 };
 
 const enabledAttachmentConfig: AttachmentConfig = {
   enabled: true,
   allowedMimeTypes: ['application/pdf', 'image/png'],
   maxFileSizeMb: 10,
+  imageOcrEnabled: true,
 };
 
 function makeAttachment(

@@ -198,6 +198,8 @@ An attachment is accepted if:
 
 Images embedded in a page body (via the editor's drag/drop, paste, or "Insert image" actions) are stored by Confluence as regular page attachments and surface in the same `expand=children.attachment` results, so they are ingested through this path when `image/png` or `image/jpeg` is in `allowedMimeTypes`. Images inserted as external URLs are not attachments and are not ingested.
 
+When `attachments.imageOcr` is `enabled` (default), each image content registration includes `ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT`, which the Unique ingestion service merges over its environment defaults and the destination scope's own config (request body has highest precedence). This forces OCR-based processing on the worker so chunks are produced; without it, the worker default (`NO_INGESTION`) returns zero chunks and the worker raises `FAILED_IMAGE`.
+
 ### Content Type Ingestion Map
 
 The connector uses label-based discovery via CQL. After fetching, it skips three content types: database, whiteboard, and embed.

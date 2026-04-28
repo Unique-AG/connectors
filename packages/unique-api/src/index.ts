@@ -36,6 +36,7 @@ export type {
   IngestionFinalizationRequest,
 } from './ingestion/ingestion.types';
 export { IngestionState } from './ingestion/ingestion.types';
+export type { IngestionConfig } from './ingestion/ingestion.queries';
 export type {
   DeleteFolderResult,
   Scope,

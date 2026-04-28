@@ -114,11 +114,11 @@ See the [Configuration Guide](./operator/configuration.md) for all available opt
 
 ### What attachment MIME types are allowed by default?
 
-**Answer:** The defaults cover PDF (`application/pdf`), the major Office formats (DOCX, XLSX, PPTX), plain text, CSV, HTML, PNG, and JPEG. These can be overridden via `ingestion.attachments.allowedMimeTypes` (case-insensitive). The connector matches against the `mediaType` reported by the Confluence API rather than the filename extension, so renamed files are caught correctly. Note that image ingestion (`image/png`, `image/jpeg`) requires the destination scope's `ingestionConfig.jpgReadMode` to be set to `DOC_INTELLIGENCE_DEFAULT`; otherwise the upload succeeds but no chunks are produced. See [Configuration -- Attachment Configuration](./operator/configuration.md#Attachment-Configuration) for the full list.
+**Answer:** The defaults cover PDF (`application/pdf`), the major Office formats (DOCX, XLSX, PPTX), plain text, CSV, HTML, PNG, and JPEG. These can be overridden via `ingestion.attachments.allowedMimeTypes` (case-insensitive). The connector matches against the `mediaType` reported by the Confluence API rather than the filename extension, so renamed files are caught correctly. See [Configuration -- Attachment Configuration](./operator/configuration.md#Attachment-Configuration) for the full list.
 
 ### Are embedded images ingested?
 
-**Answer:** Yes. Images embedded in a Confluence page (drag/drop, paste, or "Insert image") are stored by Confluence as regular page attachments, so they flow through the same path as PDFs and Office files. With attachment ingestion enabled, PNG and JPEG images are ingested out of the box because both MIME types are in the default `allowedMimeTypes` list. For images to produce searchable chunks, the destination scope must have `ingestionConfig.jpgReadMode` set to `DOC_INTELLIGENCE_DEFAULT`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service. Images inserted as external URLs (rather than uploaded) are not attachments and are not ingested.
+**Answer:** Yes. Images embedded in a Confluence page (drag/drop, paste, or "Insert image") are stored by Confluence as regular page attachments, so they flow through the same path as PDFs and Office files. With attachment ingestion enabled, PNG and JPEG images are ingested out of the box because both MIME types are in the default `allowedMimeTypes` list. The connector also requests OCR-based processing for each image (`jpgReadMode = DOC_INTELLIGENCE_DEFAULT`) by default, so chunks are produced without further scope-side configuration; this can be turned off via `attachments.imageOcr = disabled`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service. Images inserted as external URLs (rather than uploaded) are not attachments and are not ingested.
 
 ### How do I find my Atlassian Cloud ID?
 
@@ -215,7 +215,7 @@ To move a tenant to a different Confluence instance, create a new root scope in 
 2. Does the attachment's `mediaType` appear in the `allowedMimeTypes` list?
 3. Is the file at most the configured `maxFileSizeMb` (default: 200 MB)?
 4. Is the file size greater than 0 bytes? (Zero-byte attachments are skipped.)
-5. If the attachment is an image (PNG or JPEG), is the destination scope's `ingestionConfig.jpgReadMode` set to `DOC_INTELLIGENCE_DEFAULT`? Without it, image uploads succeed but produce zero chunks.
+5. If the attachment is an image (PNG or JPEG) and chunks are missing, check that `attachments.imageOcr` is `enabled` (default). When disabled, the connector defers to the destination scope's own `ingestionConfig.jpgReadMode`, which defaults to `NO_INGESTION` and produces zero chunks.
 6. Check connector logs for attachment-specific errors.
 
 ### Why do I see "Aborting to prevent accidental full deletion" errors?

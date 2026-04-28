@@ -61,7 +61,12 @@ function createMockTenantConfig(): TenantConfig {
       scopeId: 'scope-1',
       storeInternally: true,
       useV1KeyFormat: false,
-      attachments: { enabled: false, allowedMimeTypes: [], maxFileSizeMb: 10 },
+      attachments: {
+        enabled: false,
+        allowedMimeTypes: [],
+        maxFileSizeMb: 10,
+        imageOcrEnabled: true,
+      },
     },
     processing: {},
   });

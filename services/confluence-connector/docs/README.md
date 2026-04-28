@@ -72,7 +72,7 @@ The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and 
 
 When attachment ingestion is enabled, images embedded in Confluence pages (PNG and JPEG) are ingested as attachments. Confluence stores editor-inserted images (drag/drop, paste, "Insert image") as regular page attachments, so they flow through the same path as PDFs and Office files. Images inserted as external URLs (rather than uploaded) are not attachments and are not ingested.
 
-For images to produce searchable chunks, the destination scope's `ingestionConfig.jpgReadMode` must be set to `DOC_INTELLIGENCE_DEFAULT`. Otherwise the upload succeeds but no chunks are produced. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service and should be left out of `allowedMimeTypes`.
+The connector also requests OCR-based ingestion for each image automatically (`attachments.imageOcr` is `enabled` by default), so chunks are produced without any scope-side configuration. Set `attachments.imageOcr = disabled` to defer to the destination scope's own `ingestionConfig.jpgReadMode`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service and should be left out of `allowedMimeTypes`.
 
 **Skipped Content Types**
 

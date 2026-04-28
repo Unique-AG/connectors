@@ -24,10 +24,17 @@ const AttachmentConfigSchema = z
       .positive()
       .prefault(DEFAULT_MAX_FILE_SIZE_MB)
       .describe('Maximum file size in megabytes for attachment ingestion'),
+    imageOcr: z
+      .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+      .prefault(EnabledDisabledMode.Enabled)
+      .describe(
+        'Whether to request OCR-based ingestion for image attachments (jpgReadMode = DOC_INTELLIGENCE_DEFAULT). Set to disabled to defer to the destination scope ingestion config',
+      ),
   })
-  .transform(({ mode, ...rest }) => ({
+  .transform(({ mode, imageOcr, ...rest }) => ({
     ...rest,
     enabled: mode === EnabledDisabledMode.Enabled,
+    imageOcrEnabled: imageOcr === EnabledDisabledMode.Enabled,
   }));
 
 export const IngestionConfigSchema = z.object({
