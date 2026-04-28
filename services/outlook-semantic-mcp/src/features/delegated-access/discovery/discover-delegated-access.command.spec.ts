@@ -7,11 +7,12 @@ import { DiscoverDelegatedAccessCommand } from './discover-delegated-access.comm
 // Constants
 // ---------------------------------------------------------------------------
 
-const DELEGATE_USER_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef1';
-const OWNER_USER_ID_1 = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
-const OWNER_USER_ID_2 = 'user_profile_01jxk5r1s2fq9att23mp4z5ef3';
-const OWNER_EMAIL_1 = 'owner1@example.com';
-const OWNER_EMAIL_2 = 'owner2@example.com';
+const USER_ID_A = 'user_profile_01jxk5r1s2fq9att23mp4z5ef1';
+const USER_ID_B = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
+const USER_ID_C = 'user_profile_01jxk5r1s2fq9att23mp4z5ef3';
+const EMAIL_A = 'user-a@example.com';
+const EMAIL_B = 'user-b@example.com';
+const EMAIL_C = 'user-c@example.com';
 
 // ---------------------------------------------------------------------------
 // Mock factories
@@ -97,23 +98,23 @@ describe('DiscoverDelegatedAccessCommand', () => {
     vi.clearAllMocks();
   });
 
-  it('upserts row when owner has mail folders', async () => {
+  it('upserts rows for all user pairs when access is granted', async () => {
     graphApi.get.mockResolvedValue({ value: [{ id: 'folder-1' }] });
 
     const db = createMockDb({
-      connectedUsers: [{ userProfileId: OWNER_USER_ID_1, email: OWNER_EMAIL_1 }],
+      connectedUsers: [
+        { userProfileId: USER_ID_A, email: EMAIL_A },
+        { userProfileId: USER_ID_B, email: EMAIL_B },
+      ],
     });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
+    await command.run();
 
-    expect(db.__insert).toHaveBeenCalledOnce();
+    // A→B and B→A: 2 pairs → 2 upserts
+    expect(db.__insert).toHaveBeenCalledTimes(2);
     expect(db.__insertValues).toHaveBeenCalledWith(
-      expect.objectContaining({
-        delegateUserId: DELEGATE_USER_ID,
-        ownerUserId: OWNER_USER_ID_1,
-        lastDiscoveredAt: expect.any(Date),
-      }),
+      expect.objectContaining({ lastDiscoveredAt: expect.any(Date) }),
     );
     expect(db.__insertOnConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -127,154 +128,166 @@ describe('DiscoverDelegatedAccessCommand', () => {
     graphApi.get.mockRejectedValue(new Error('Network failure'));
 
     const db = createMockDb({
-      connectedUsers: [{ userProfileId: OWNER_USER_ID_1, email: OWNER_EMAIL_1 }],
+      connectedUsers: [
+        { userProfileId: USER_ID_A, email: EMAIL_A },
+        { userProfileId: USER_ID_B, email: EMAIL_B },
+      ],
     });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
+    await command.run();
 
     expect(db.__insert).not.toHaveBeenCalled();
     expect(db.__deleteWhere).not.toHaveBeenCalled();
   });
 
-  it('deletes pipeline row on 403 response', async () => {
+  it('deletes pipeline rows on 403 response', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(403));
 
     const db = createMockDb({
-      connectedUsers: [{ userProfileId: OWNER_USER_ID_1, email: OWNER_EMAIL_1 }],
+      connectedUsers: [
+        { userProfileId: USER_ID_A, email: EMAIL_A },
+        { userProfileId: USER_ID_B, email: EMAIL_B },
+      ],
     });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
+    await command.run();
 
-    expect(db.__delete).toHaveBeenCalledOnce();
+    expect(db.__delete).toHaveBeenCalledTimes(2);
     expect(db.__insert).not.toHaveBeenCalled();
   });
 
-  it('deletes pipeline row on 404 response', async () => {
+  it('deletes pipeline rows on 404 response', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(404));
 
     const db = createMockDb({
-      connectedUsers: [{ userProfileId: OWNER_USER_ID_1, email: OWNER_EMAIL_1 }],
+      connectedUsers: [
+        { userProfileId: USER_ID_A, email: EMAIL_A },
+        { userProfileId: USER_ID_B, email: EMAIL_B },
+      ],
     });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
+    await command.run();
 
-    expect(db.__delete).toHaveBeenCalledOnce();
+    expect(db.__delete).toHaveBeenCalledTimes(2);
     expect(db.__insert).not.toHaveBeenCalled();
   });
 
-  it('leaves row untouched on 429 rate limit', async () => {
+  it('leaves rows untouched on 429 rate limit', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(429));
 
     const db = createMockDb({
-      connectedUsers: [{ userProfileId: OWNER_USER_ID_1, email: OWNER_EMAIL_1 }],
+      connectedUsers: [
+        { userProfileId: USER_ID_A, email: EMAIL_A },
+        { userProfileId: USER_ID_B, email: EMAIL_B },
+      ],
     });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
+    await command.run();
 
     expect(db.__insert).not.toHaveBeenCalled();
     expect(db.__delete).not.toHaveBeenCalled();
   });
 
-  it('leaves row untouched on 500 transient error', async () => {
+  it('leaves rows untouched on 500 transient error', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(500));
 
     const db = createMockDb({
-      connectedUsers: [{ userProfileId: OWNER_USER_ID_1, email: OWNER_EMAIL_1 }],
+      connectedUsers: [
+        { userProfileId: USER_ID_A, email: EMAIL_A },
+        { userProfileId: USER_ID_B, email: EMAIL_B },
+      ],
     });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
+    await command.run();
 
     expect(db.__insert).not.toHaveBeenCalled();
     expect(db.__delete).not.toHaveBeenCalled();
   });
 
-  it('leaves row untouched on 503 transient error', async () => {
+  it('leaves rows untouched on 503 transient error', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(503));
 
     const db = createMockDb({
-      connectedUsers: [{ userProfileId: OWNER_USER_ID_1, email: OWNER_EMAIL_1 }],
+      connectedUsers: [
+        { userProfileId: USER_ID_A, email: EMAIL_A },
+        { userProfileId: USER_ID_B, email: EMAIL_B },
+      ],
     });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
+    await command.run();
 
     expect(db.__insert).not.toHaveBeenCalled();
     expect(db.__delete).not.toHaveBeenCalled();
   });
 
-  it('skips owner with null email', async () => {
+  it('skips all pairs when all owners have null email', async () => {
     const db = createMockDb({
-      connectedUsers: [{ userProfileId: OWNER_USER_ID_1, email: null }],
+      connectedUsers: [
+        { userProfileId: USER_ID_A, email: null },
+        { userProfileId: USER_ID_B, email: null },
+      ],
     });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
+    await command.run();
 
     expect(graphApi.get).not.toHaveBeenCalled();
     expect(db.__insert).not.toHaveBeenCalled();
     expect(db.__delete).not.toHaveBeenCalled();
   });
 
-  it('processes owners in batches of 100 — 150 owners produce 2 batches', async () => {
-    graphApi.get.mockResolvedValue({ value: [{ id: 'folder-1' }] });
-
-    const owners = Array.from({ length: 150 }, (_, i) => ({
-      userProfileId: `user_profile_${String(i).padStart(26, '0')}`,
-      email: `owner${i}@example.com`,
-    }));
-
-    const db = createMockDb({ connectedUsers: owners });
-    const command = createCommand({ graphApi, db });
-
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
-
-    // Each of 150 owners gets a mailFolders call
-    expect(graphApi.get).toHaveBeenCalledTimes(150);
-    // Each succeeded → 150 upserts
-    expect(db.__insert).toHaveBeenCalledTimes(150);
-  });
-
-  it('processes all owners across batches — first batch 100, second batch 50', async () => {
-    graphApi.get.mockResolvedValue({ value: [{ id: 'folder-1' }] });
-
-    const firstBatch = Array.from({ length: 100 }, (_, i) => ({
-      userProfileId: `user_profile_a${String(i).padStart(25, '0')}`,
-      email: `a${i}@example.com`,
-    }));
-    const secondBatch = Array.from({ length: 50 }, (_, i) => ({
-      userProfileId: `user_profile_b${String(i).padStart(25, '0')}`,
-      email: `b${i}@example.com`,
-    }));
-
-    const db = createMockDb({ connectedUsers: [...firstBatch, ...secondBatch] });
-    const command = createCommand({ graphApi, db });
-
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
-
-    expect(graphApi.get).toHaveBeenCalledTimes(150);
-  });
-
-  it('processes both owners independently — one upserts, one deletes on 403', async () => {
+  it('processes users independently — one upserts, one deletes on 403', async () => {
     graphApi.get
-      .mockResolvedValueOnce({ value: [{ id: 'folder-1' }] }) // OWNER_USER_ID_1 succeeds
-      .mockRejectedValueOnce(makeGraphError(403)); // OWNER_USER_ID_2 is 403
+      .mockResolvedValueOnce({ value: [{ id: 'folder-1' }] }) // A→B succeeds
+      .mockRejectedValueOnce(makeGraphError(403)); // B→A fails
 
     const db = createMockDb({
       connectedUsers: [
-        { userProfileId: OWNER_USER_ID_1, email: OWNER_EMAIL_1 },
-        { userProfileId: OWNER_USER_ID_2, email: OWNER_EMAIL_2 },
+        { userProfileId: USER_ID_A, email: EMAIL_A },
+        { userProfileId: USER_ID_B, email: EMAIL_B },
       ],
     });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ delegateUserId: DELEGATE_USER_ID });
+    await command.run();
 
     expect(db.__insert).toHaveBeenCalledOnce();
     expect(db.__delete).toHaveBeenCalledOnce();
+  });
+
+  it('processes all user pairs across all connected users', async () => {
+    graphApi.get.mockResolvedValue({ value: [{ id: 'folder-1' }] });
+
+    const db = createMockDb({
+      connectedUsers: [
+        { userProfileId: USER_ID_A, email: EMAIL_A },
+        { userProfileId: USER_ID_B, email: EMAIL_B },
+        { userProfileId: USER_ID_C, email: EMAIL_C },
+      ],
+    });
+    const command = createCommand({ graphApi, db });
+
+    await command.run();
+
+    // 3 users → 3*2 = 6 directed pairs → 6 graph calls, 6 upserts
+    expect(graphApi.get).toHaveBeenCalledTimes(6);
+    expect(db.__insert).toHaveBeenCalledTimes(6);
+  });
+
+  it('does nothing when no connected users exist', async () => {
+    const db = createMockDb({ connectedUsers: [] });
+    const command = createCommand({ graphApi, db });
+
+    await command.run();
+
+    expect(graphApi.get).not.toHaveBeenCalled();
+    expect(db.__insert).not.toHaveBeenCalled();
+    expect(db.__delete).not.toHaveBeenCalled();
   });
 });

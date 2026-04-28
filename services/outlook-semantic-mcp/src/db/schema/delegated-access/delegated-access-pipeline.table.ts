@@ -30,20 +30,17 @@ export const delegatedAccessPipeline = pgTable(
   (t) => [unique('unique_delegate_owner_pair').on(t.delegateUserId, t.ownerUserId)],
 );
 
-export const delegatedAccessPipelineRelations = relations(
-  delegatedAccessPipeline,
-  ({ one }) => ({
-    delegateUser: one(userProfiles, {
-      fields: [delegatedAccessPipeline.delegateUserId],
-      references: [userProfiles.id],
-      relationName: 'delegateUser',
-    }),
-    ownerUser: one(userProfiles, {
-      fields: [delegatedAccessPipeline.ownerUserId],
-      references: [userProfiles.id],
-      relationName: 'ownerUser',
-    }),
+export const delegatedAccessPipelineRelations = relations(delegatedAccessPipeline, ({ one }) => ({
+  delegateUser: one(userProfiles, {
+    fields: [delegatedAccessPipeline.delegateUserId],
+    references: [userProfiles.id],
+    relationName: 'delegateUser',
   }),
-);
+  ownerUser: one(userProfiles, {
+    fields: [delegatedAccessPipeline.ownerUserId],
+    references: [userProfiles.id],
+    relationName: 'ownerUser',
+  }),
+}));
 
 export type DelegatedAccessPipeline = typeof delegatedAccessPipeline.$inferSelect;

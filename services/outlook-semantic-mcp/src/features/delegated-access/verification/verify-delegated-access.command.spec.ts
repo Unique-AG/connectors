@@ -40,11 +40,11 @@ function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGrap
   };
 }
 
-type DbOptions = {
+interface DbOptions {
   pipeline?: { delegateUserId: string; ownerUserId: string } | null;
   ownerEmail?: string | null;
   directoryCount?: number;
-};
+}
 
 function createMockDb({
   pipeline = { delegateUserId: DELEGATE_USER_ID, ownerUserId: OWNER_USER_ID },
@@ -110,10 +110,7 @@ function createCommand({
   graphApi?: ReturnType<typeof createMockGraphApi>;
   db?: ReturnType<typeof createMockDb>;
 } = {}): VerifyDelegatedAccessCommand {
-  return new VerifyDelegatedAccessCommand(
-    createMockGraphClientFactory(graphApi) as any,
-    db as any,
-  );
+  return new VerifyDelegatedAccessCommand(createMockGraphClientFactory(graphApi) as any, db as any);
 }
 
 // ---------------------------------------------------------------------------
@@ -293,10 +290,12 @@ describe('VerifyDelegatedAccessCommand', () => {
 
   it('processes multiple folders — upserts accessible ones, deletes inaccessible ones', async () => {
     graphApi.get
-      .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }, { id: FOLDER_ID_2 }, { id: FOLDER_ID_3 }] })
-      .mockResolvedValueOnce({ value: [] })           // FOLDER_ID_1: 200
-      .mockRejectedValueOnce(makeGraphError(403))      // FOLDER_ID_2: 403
-      .mockResolvedValueOnce({ value: [] });           // FOLDER_ID_3: 200
+      .mockResolvedValueOnce({
+        value: [{ id: FOLDER_ID_1 }, { id: FOLDER_ID_2 }, { id: FOLDER_ID_3 }],
+      })
+      .mockResolvedValueOnce({ value: [] }) // FOLDER_ID_1: 200
+      .mockRejectedValueOnce(makeGraphError(403)) // FOLDER_ID_2: 403
+      .mockResolvedValueOnce({ value: [] }); // FOLDER_ID_3: 200
 
     const db = createMockDb({ directoryCount: 2 });
     const command = createCommand({ graphApi, db });
@@ -304,17 +303,18 @@ describe('VerifyDelegatedAccessCommand', () => {
     await command.run({ pipelineId: PIPELINE_ID });
 
     expect(db.__insert).toHaveBeenCalledTimes(2); // FOLDER_ID_1 and FOLDER_ID_3
-    expect(db.__delete).toHaveBeenCalledOnce();   // FOLDER_ID_2 directory delete
-    expect(db.__update).toHaveBeenCalledOnce();   // lastVerifiedAt update
+    expect(db.__delete).toHaveBeenCalledOnce(); // FOLDER_ID_2 directory delete
+    expect(db.__update).toHaveBeenCalledOnce(); // lastVerifiedAt update
   });
 
   it('paginates folder list when @odata.nextLink is present', async () => {
-    const nextLinkUrl = 'https://graph.microsoft.com/v1.0/users/owner@example.com/mailFolders?$skiptoken=abc';
+    const nextLinkUrl =
+      'https://graph.microsoft.com/v1.0/users/owner@example.com/mailFolders?$skiptoken=abc';
 
     graphApi.get
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }], '@odata.nextLink': nextLinkUrl })
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_2 }] }) // next page (no nextLink)
-      .mockResolvedValueOnce({ value: [] })  // FOLDER_ID_1 messages
+      .mockResolvedValueOnce({ value: [] }) // FOLDER_ID_1 messages
       .mockResolvedValueOnce({ value: [] }); // FOLDER_ID_2 messages
 
     const db = createMockDb({ directoryCount: 2 });

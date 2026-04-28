@@ -57,7 +57,9 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
 
     this.logger.log({ msg: 'Delegated access verification scan triggered' });
 
-    const rows = await this.db.select({ id: delegatedAccessPipeline.id }).from(delegatedAccessPipeline);
+    const rows = await this.db
+      .select({ id: delegatedAccessPipeline.id })
+      .from(delegatedAccessPipeline);
 
     for (const { id } of rows) {
       const event = VerifyDelegatedAccessEventDto.parse({

@@ -13,9 +13,7 @@ import { VerifyDelegatedAccessEventDto } from './verify-delegated-access-event.d
 export class VerifyDelegatedAccessListener {
   private readonly logger = new Logger(VerifyDelegatedAccessListener.name);
 
-  public constructor(
-    private readonly verifyDelegatedAccessCommand: VerifyDelegatedAccessCommand,
-  ) {}
+  public constructor(private readonly verifyDelegatedAccessCommand: VerifyDelegatedAccessCommand) {}
 
   @RabbitSubscribe({
     exchange: MAIN_EXCHANGE.name,

@@ -5,6 +5,7 @@ import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ListCategoriesTool } from './categories/list-categories.tool';
 import { OpenEmailTool, SearchEmailsTool, SearchModule } from './content';
+import { DelegatedAccessModule } from './delegated-access/delegated-access.module';
 import { DirectoriesSyncModule } from './directories-sync/directories-sync.module';
 import { ListFoldersTool } from './directories-sync/tools';
 import { EmailManagementModule } from './email-management/email-management.module';
@@ -27,7 +28,6 @@ import {
 } from './sync/full-sync';
 import { FullSyncModule } from './sync/full-sync/full-sync.module';
 import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
-import { DelegatedAccessModule } from './delegated-access/delegated-access.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
 
 const DEBUG_MODE_TOOLS =

@@ -20,7 +20,7 @@ export class DiscoverDelegatedAccessListener {
   @RabbitSubscribe({
     exchange: MAIN_EXCHANGE.name,
     queue: 'unique.outlook-semantic-mcp.delegated-access.discover',
-    routingKey: ['unique.outlook-semantic-mcp.delegated-access.discover.*'],
+    routingKey: ['unique.outlook-semantic-mcp.delegated-access.discover'],
     createQueueIfNotExists: true,
     queueOptions: { deadLetterExchange: DEAD_EXCHANGE.name },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
@@ -28,8 +28,6 @@ export class DiscoverDelegatedAccessListener {
   public async onDiscoverDelegatedAccessEvent(@RabbitPayload() payload: unknown): Promise<void> {
     const event = DiscoverDelegatedAccessEventDto.parse(payload);
     this.logger.log({ msg: 'Delegated access discovery event received', type: event.type });
-    await this.discoverDelegatedAccessCommand.run({
-      delegateUserId: event.payload.delegateUserId,
-    });
+    await this.discoverDelegatedAccessCommand.run();
   }
 }
