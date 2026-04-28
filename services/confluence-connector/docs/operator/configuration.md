@@ -21,6 +21,9 @@ The following environment variables control application-level behavior. They are
 | `OTEL_EXPORTER_PROMETHEUS_PORT` | --                            | Prometheus exporter bind port                                                                                                                 |
 | `NODE_EXTRA_CA_CERTS`          | --                             | Path to a PEM file containing additional CA certificates for TLS verification if the pod's trust store doesn't have them                      |
 | `MAX_HEAP_MB`                  | `1920` (Helm) / `1024` (Docker) | Node.js V8 max old space size in MB                                                                                                         |
+| `HEALTH_SYNC_HISTORY_SIZE`     | `5`                            | Number of recent sync runs kept per tenant in the sliding window for health evaluation. See [Health Endpoint](#Health-Endpoint)               |
+| `HEALTH_SYNC_TENANT_FAILURE_THRESHOLD` | `0.5`                  | Per-tenant failure ratio (0--1) across the window that marks the service unhealthy when exceeded. See [Health Endpoint](#Health-Endpoint)     |
+| `HEALTH_CONNECTIVITY_TIMEOUT_MS` | `3000`                       | Timeout in milliseconds for each reachability ping used by the health endpoint. See [Health Endpoint](#Health-Endpoint)                       |
 
 The following environment variables are typically loaded from Kubernetes Secrets:
 
@@ -502,6 +505,98 @@ alerts:
 ```
 
 Alerts require the `monitoring.coreos.com/v1` API (Prometheus Operator) to be available in the cluster.
+
+## Health Endpoint
+
+The connector exposes a `GET /health` endpoint that reports operational health. It is separate from the existing `GET /probe` endpoint used for K8s liveness/readiness probes. `GET /health` is intended for external monitoring and SRE tooling.
+
+The endpoint returns HTTP `200` when all checks pass and HTTP `503` when any check fails. The response follows the `@nestjs/terminus` format with `status`, `info`, `error`, and `details` fields.
+
+### Health Checks
+
+The endpoint runs three checks on every request:
+
+**Sync** -- Evaluates each active tenant's sync history from a sliding window of the last N runs (configurable via `HEALTH_SYNC_HISTORY_SIZE`). Each tenant's failure ratio is computed independently as `failures / appearances`. If any tenant exceeds `HEALTH_SYNC_TENANT_FAILURE_THRESHOLD`, the check is `down`. When no sync has completed yet (e.g. shortly after startup), this check reports `up` with `message: "No sync records yet"`. A single transient failure is absorbed by the window and does not trigger an alert. Skipped runs caused by an in-progress sync overlap are not recorded so they cannot dilute the window.
+
+Sync health is evaluated at tenant level. In the Confluence connector, each tenant owns its own cron job, configuration, credentials, and operational lifecycle, so a tenant is the smallest unit that can independently fail or recover. Per-item ingestion failures are exposed through logs and metrics; `/health.sync` answers whether each active tenant's scheduled sync is consistently succeeding.
+
+**Connectivity** -- Performs unauthenticated HTTP requests to the Atlassian API host (`https://api.atlassian.com/`, only when at least one Cloud tenant is configured) and to each unique active tenant `confluence.baseUrl`. Any HTTP response (including 401/403) proves the endpoint is reachable -- only transport-level failures (DNS, TLS, timeout, connection refused) are treated as unhealthy. Deleted tenants are excluded because they no longer talk to Confluence.
+
+**Unique API** -- Sends a minimal `{ __typename }` GraphQL query to each tenant's ingestion and scope-management endpoints, using the same auth and proxy routing the connector uses for production traffic. Non-2xx responses (401/403/500) are treated as unhealthy because they indicate the API is not functioning correctly. If token acquisition itself fails (Zitadel outage), the tenant's entry reports `error: "AUTH_FAILURE"`. These requests bypass the per-tenant rate limiter to avoid queuing behind sync traffic.
+
+### Response Examples
+
+**Healthy (200):**
+
+```json
+{
+  "status": "ok",
+  "info": {
+    "sync": {
+      "status": "up",
+      "lastSyncAt": "2026-04-27T10:15:00.000Z",
+      "tenants": {
+        "tenant-a": { "failures": 0, "total": 5 },
+        "tenant-b": { "failures": 1, "total": 5 }
+      }
+    },
+    "connectivity": {
+      "status": "up",
+      "atlassian": "reachable",
+      "confluence": [
+        { "tenant": "tenant-a", "status": "reachable" },
+        { "tenant": "tenant-b", "status": "reachable" }
+      ]
+    },
+    "uniqueApi": {
+      "status": "up",
+      "ingestion": [
+        { "tenant": "tenant-a", "status": "reachable" },
+        { "tenant": "tenant-b", "status": "reachable" }
+      ],
+      "scopeManagement": [
+        { "tenant": "tenant-a", "status": "reachable" },
+        { "tenant": "tenant-b", "status": "reachable" }
+      ]
+    }
+  },
+  "error": {},
+  "details": { "...same as info when healthy..." }
+}
+```
+
+**Unhealthy (503) -- a tenant exceeds the sync failure threshold:**
+
+```json
+{
+  "status": "error",
+  "info": {
+    "connectivity": { "status": "up", "...": "..." },
+    "uniqueApi": { "status": "up", "...": "..." }
+  },
+  "error": {
+    "sync": {
+      "status": "down",
+      "lastSyncAt": "2026-04-27T10:15:00.000Z",
+      "threshold": 0.5,
+      "failingTenants": ["tenant-b"],
+      "tenants": {
+        "tenant-a": { "failures": 0, "total": 5 },
+        "tenant-b": { "failures": 4, "total": 5 }
+      }
+    }
+  },
+  "details": { "...all checks combined..." }
+}
+```
+
+### Configuration
+
+| Variable                                | Default | Description                                                              |
+|-----------------------------------------|---------|--------------------------------------------------------------------------|
+| `HEALTH_SYNC_HISTORY_SIZE`              | `5`     | Number of recent sync runs kept per tenant in the sliding window         |
+| `HEALTH_SYNC_TENANT_FAILURE_THRESHOLD`  | `0.5`   | Per-tenant failure ratio (0--1) that triggers unhealthy when exceeded    |
+| `HEALTH_CONNECTIVITY_TIMEOUT_MS`        | `3000`  | Timeout in milliseconds for each reachability ping (connectivity checks) |
 
 ## Complete Re-ingestion
 

@@ -65,6 +65,9 @@ spec:
 | alerts.defaultAlerts.uniqueApi.disabled | object | `{}` | Disable specific alerts by setting them to true |
 | alerts.enabled | bool | `false` | Enable PrometheusRule resource creation |
 | connector.deployment.metadata.annotations."reloader.stakater.com/auto" | string | `"true"` |  |
+| connector.env.HEALTH_CONNECTIVITY_TIMEOUT_MS | string | `"3000"` |  |
+| connector.env.HEALTH_SYNC_HISTORY_SIZE | string | `"5"` |  |
+| connector.env.HEALTH_SYNC_TENANT_FAILURE_THRESHOLD | string | `"0.5"` |  |
 | connector.env.LOGS_DIAGNOSTICS_DATA_POLICY | string | `"conceal"` |  |
 | connector.env.LOG_LEVEL | string | `"info"` |  |
 | connector.env.MAX_FILE_SIZE_BYTES | string | `"209715200"` |  |

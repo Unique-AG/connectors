@@ -4,6 +4,9 @@ connector:
       annotations:
         reloader.stakater.com/auto: "true"
   env:
+    HEALTH_CONNECTIVITY_TIMEOUT_MS: "3000"
+    HEALTH_SYNC_HISTORY_SIZE: "5"
+    HEALTH_SYNC_TENANT_FAILURE_THRESHOLD: "0.5"
     LOG_LEVEL: info
     LOGS_DIAGNOSTICS_DATA_POLICY: conceal
     MAX_HEAP_MB: 1920
