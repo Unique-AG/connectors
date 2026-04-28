@@ -195,18 +195,24 @@ connectorConfig:
         # attachments:
         #   # -- Enable attachment ingestion (default: enabled)
         #   mode: enabled
-        #   # -- File extensions to include (default: pdf, docx, xlsx, ppt, pptx, txt, csv, html)
-        #   allowedExtensions:
-        #     - pdf
-        #     - docx
-        #     - xlsx
-        #     - ppt
-        #     - pptx
-        #     - txt
-        #     - csv
-        #     - html
+        #   # -- MIME types to include, matched against the mediaType from the Confluence API
+        #   # -- (default: PDF, DOCX, XLSX, PPTX, plain text, CSV, HTML, PNG, JPEG)
+        #   allowedMimeTypes:
+        #     - application/pdf
+        #     - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+        #     - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+        #     - application/vnd.openxmlformats-officedocument.presentationml.presentation
+        #     - text/plain
+        #     - text/csv
+        #     - text/html
+        #     - image/png
+        #     - image/jpeg
         #   # -- Maximum file size in megabytes (default: 200)
         #   maxFileSizeMb: 200
+        #   # -- Auto-attach ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT to image
+        #   # -- registrations so chunks are produced without scope-side configuration
+        #   # -- (default: enabled)
+        #   imageOcr: enabled
 
 # -- HTTP proxy configuration for external API calls
 # Required for environments where internet access is only available through a proxy.

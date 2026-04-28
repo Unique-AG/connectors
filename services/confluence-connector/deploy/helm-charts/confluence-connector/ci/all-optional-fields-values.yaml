@@ -35,11 +35,12 @@ connectorConfig:
         useV1KeyFormat: disabled
         attachments:
           mode: enabled
-          allowedExtensions:
-            - pdf
-            - docx
-            - xlsx
+          allowedMimeTypes:
+            - application/pdf
+            - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+            - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
           maxFileSizeMb: 100
+          imageOcr: enabled
 
 proxyConfig:
   enabled: true
