@@ -7,7 +7,8 @@ import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
-import { type AppConfig, appConfig, proxyConfig } from './config';
+import { type AppConfig, appConfig, healthConfig, proxyConfig } from './config';
+import { HealthModule } from './health/health.module';
 import { ProxyModule } from './proxy';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { TenantModule, tenantStorage } from './tenant';
@@ -18,7 +19,7 @@ import { Redacted } from './utils/redacted';
     ConfigModule.forRoot({
       isGlobal: true,
       ignoreEnvFile: true,
-      load: [appConfig, proxyConfig],
+      load: [appConfig, proxyConfig, healthConfig],
     }),
     ProxyModule,
     UniqueApiModule.forRoot({
@@ -28,6 +29,7 @@ import { Redacted } from './utils/redacted';
       },
     }),
     TenantModule,
+    HealthModule,
     SchedulerModule,
     LoggerModule.forRootAsync({
       useFactory(appConfigValue: AppConfig) {
