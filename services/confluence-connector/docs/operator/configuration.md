@@ -248,15 +248,16 @@ ingestion:
   useV1KeyFormat: disabled
   attachments:
     mode: enabled
-    allowedExtensions:
-      - pdf
-      - docx
-      - xlsx
-      - ppt
-      - pptx
-      - txt
-      - csv
-      - html
+    allowedMimeTypes:
+      - application/pdf
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      - application/vnd.openxmlformats-officedocument.presentationml.presentation
+      - text/plain
+      - text/csv
+      - text/html
+      - image/png
+      - image/jpeg
     maxFileSizeMb: 200
 ```
 
@@ -275,8 +276,18 @@ The `attachments` sub-section controls ingestion of file attachments from Conflu
 | Field                          | Required | Default                                                  | Description                                                                        |
 |--------------------------------|----------|----------------------------------------------------------|------------------------------------------------------------------------------------|
 | `attachments.mode`             | No       | `enabled`                                                | Whether to ingest file attachments (`enabled` or `disabled`)                       |
-| `attachments.allowedExtensions` | No      | `pdf`, `docx`, `xlsx`, `ppt`, `pptx`, `txt`, `csv`, `html` | File extensions to include when ingesting attachments. Values are case-insensitive |
+| `attachments.allowedMimeTypes` | No      | `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`, `application/vnd.openxmlformats-officedocument.presentationml.presentation`, `text/plain`, `text/csv`, `text/html`, `image/png`, `image/jpeg` | MIME types to include when ingesting attachments. Matched against the `mediaType` reported by the Confluence API, case-insensitive. Image MIME types require the destination scope's `ingestionConfig.jpgReadMode` to be `DOC_INTELLIGENCE_DEFAULT` for chunks to be produced |
 | `attachments.maxFileSizeMb`    | No       | `200`                                                    | Maximum file size in megabytes. Attachments larger than this are skipped           |
+
+#### Image Attachments
+
+Images embedded in Confluence pages (drag/drop, paste, or "Insert image") are stored as regular page attachments by Confluence and are ingested through this same configuration when `image/png` or `image/jpeg` is in `allowedMimeTypes`. Both formats are in the default list, so enabling attachment ingestion is sufficient to ingest embedded images out of the box.
+
+For images to produce searchable chunks, the destination scope must have `ingestionConfig.jpgReadMode` set to `DOC_INTELLIGENCE_DEFAULT` (this is a scope-level setting in Unique, not a connector setting). Without this, image uploads succeed but Document Intelligence is not invoked and the content yields zero chunks.
+
+Images inserted as external URLs (rather than uploaded to Confluence) are stored as plain URL references in the page body, not as attachments, and are therefore not ingested.
+
+Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service. Adding them to `allowedMimeTypes` will cause uploads to be rejected with HTTP 400.
 
 ## Processing Settings
 

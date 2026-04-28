@@ -47,13 +47,13 @@ const baseProcessingConfig: ProcessingConfig = {
 
 const disabledAttachmentConfig: AttachmentConfig = {
   enabled: false,
-  allowedExtensions: ['pdf', 'docx'],
+  allowedMimeTypes: ['application/pdf', 'image/png'],
   maxFileSizeMb: 10,
 };
 
 const enabledAttachmentConfig: AttachmentConfig = {
   enabled: true,
-  allowedExtensions: ['pdf', 'docx'],
+  allowedMimeTypes: ['application/pdf', 'image/png'],
   maxFileSizeMb: 10,
 };
 
@@ -430,9 +430,11 @@ describe('ConfluencePageScanner', () => {
       expect(result.attachments).toEqual([]);
     });
 
-    it('filters out attachments with disallowed extensions', async () => {
-      const allowed = makeAttachment('att-1', 'report.pdf');
-      const disallowed = makeAttachment('att-2', 'image.png');
+    it('filters out attachments with disallowed mime types', async () => {
+      const allowed = makeAttachment('att-1', 'report.pdf', { mediaType: 'application/pdf' });
+      const disallowed = makeAttachment('att-2', 'archive.zip', {
+        mediaType: 'application/zip',
+      });
 
       const page = makePage('page-1', {
         labels: ['ai-ingest'],
@@ -484,11 +486,11 @@ describe('ConfluencePageScanner', () => {
       expect(result.attachments.map((a) => a.id)).toEqual(['att-1']);
     });
 
-    it('filters out attachments with no file extension', async () => {
-      const noExt = makeAttachment('att-1', 'README');
+    it('filters out attachments with no mime type', async () => {
+      const noMime = makeAttachment('att-1', 'README', { mediaType: '' });
       const page = makePage('page-1', {
         labels: ['ai-ingest'],
-        attachments: [noExt],
+        attachments: [noMime],
       });
 
       const apiClient = {
@@ -562,8 +564,8 @@ describe('ConfluencePageScanner', () => {
       expect(result.attachments[0]?.pageId).toBe('child');
     });
 
-    it('normalizes file extension to lowercase for filtering', async () => {
-      const attachment = makeAttachment('att-1', 'Report.PDF');
+    it('normalizes mime type to lowercase for filtering', async () => {
+      const attachment = makeAttachment('att-1', 'Report.PDF', { mediaType: 'APPLICATION/PDF' });
       const page = makePage('page-1', {
         labels: ['ai-ingest'],
         attachments: [attachment],
@@ -585,6 +587,87 @@ describe('ConfluencePageScanner', () => {
       const result = await scanner.discoverPages();
 
       expect(result.attachments.map((a) => a.id)).toEqual(['att-1']);
+    });
+
+    it('strips charset/parameter suffix from mediaType before filtering', async () => {
+      const attachment = makeAttachment('att-1', 'image.png', {
+        mediaType: 'image/png; charset=binary',
+      });
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [attachment],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments.map((a) => a.id)).toEqual(['att-1']);
+    });
+
+    it('trims whitespace around mediaType before filtering', async () => {
+      const attachment = makeAttachment('att-1', 'report.pdf', {
+        mediaType: '  application/pdf  ',
+      });
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [attachment],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments.map((a) => a.id)).toEqual(['att-1']);
+    });
+
+    it('rejects application/octet-stream attachments by default', async () => {
+      const attachment = makeAttachment('att-1', 'unknown.bin', {
+        mediaType: 'application/octet-stream',
+      });
+      const page = makePage('page-1', {
+        labels: ['ai-ingest'],
+        attachments: [attachment],
+      });
+
+      const apiClient = {
+        searchPagesByLabel: vi.fn().mockResolvedValue([page]),
+        getDescendantPages: vi.fn().mockResolvedValue([]),
+        buildPageWebUrl: vi.fn(
+          (p: ConfluencePage) => `https://confluence.example.com/wiki/${p.id}`,
+        ),
+        buildAttachmentWebUrl: vi.fn(
+          (pageId: string, attachmentId: string, attachmentTitle: string) =>
+            `https://confluence.example.com/attachments/${pageId}/${attachmentId}/${attachmentTitle}`,
+        ),
+      };
+
+      const scanner = createScanner(apiClient, baseProcessingConfig, enabledAttachmentConfig);
+      const result = await scanner.discoverPages();
+
+      expect(result.attachments).toEqual([]);
     });
 
     it('counts attachments toward maxItemsToScan limit', async () => {

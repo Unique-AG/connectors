@@ -6,7 +6,7 @@ The Confluence Connector is a Node.js-based service that synchronizes page conte
 **Core Capabilities:**
 
 - Discovers pages via Confluence Query Language (CQL) label searches
-- Fetches page content in HTML (Confluence storage representation) and downloads file attachments
+- Fetches page content in HTML (Confluence storage representation) and downloads file attachments (including embedded images)
 - Computes per-space file diffs against previously ingested state to detect new, updated, and deleted items
 - Ingests content into the Unique knowledge base via the Unique API
 - Manages scope hierarchies automatically (root scope plus one child scope per Confluence space)
