@@ -8,6 +8,7 @@ import { Nullish } from '~/utils/nullish';
 import { SyncDelegatedAccessCommand } from './sync-delegated-access.command';
 
 const CACHE_KEY = `SyncDelegatedAccessForAllUsers`;
+const NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES = 10;
 
 type SyncDelegatedAccessForAllUsersDecision =
   | { action: 'proceed'; lastProcessedPipelineId: Nullish<string> }
@@ -34,9 +35,29 @@ export class SyncDelegatedAccessForAllUsersCommand {
     let batch = await this.fetchBatch({ lastProcessedPipelineId });
 
     while (batch.length) {
+      this.logger.log({
+        msg: `Running delegated access sync for batch: ${batch.length}`,
+        pipelineIds: batch.map((item) => item.id).join(', '),
+      });
       await Promise.all(
-        batch.map((pipeline) => this.syncDelegatedAccessCommand.run({ pipelineId: pipeline.id })),
+        batch.map(async (pipeline) => {
+          await this.syncDelegatedAccessCommand.run({ pipelineId: pipeline.id });
+          await this.persistentCacheService.setWith(
+            CACHE_KEY,
+            async ({ currentValue, update }): Promise<void> => {
+              assert.ok(currentValue);
+              await update({
+                dataType: 'DelegatedAccessVerification',
+                payload: {
+                  ...currentValue.payload,
+                  lastProgressRegisteredAt: Date.now(),
+                },
+              });
+            },
+          );
+        }),
       );
+
       lastProcessedPipelineId = last(batch)?.id;
       await this.persistentCacheService.setWith(
         CACHE_KEY,
@@ -121,7 +142,9 @@ export class SyncDelegatedAccessForAllUsersCommand {
         }
 
         const currentTime = new Date();
-        currentTime.setMinutes(currentTime.getMinutes() - 10);
+        currentTime.setMinutes(
+          currentTime.getMinutes() - NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES,
+        );
 
         if (currentValue.payload.lastProgressRegisteredAt <= currentTime.getTime()) {
           await update({
