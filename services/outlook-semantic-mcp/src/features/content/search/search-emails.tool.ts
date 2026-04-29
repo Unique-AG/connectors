@@ -12,7 +12,7 @@ import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscri
 import { GetFullSyncStatsQuery } from '~/features/sync/full-sync/get-full-sync-stats.query';
 import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { META } from './search-emails-tool.meta';
+import { META_MS_GRAPH, META_UNIQUE_AND_MS_GRAPH } from './search-emails-tool.meta';
 import { SearchBackend } from './semantic-search-emails.query';
 
 const IS_MICROSOFT_GRAPH_BACKEND = isMicrosoftGraphBackend();
@@ -20,6 +20,10 @@ const IS_MICROSOFT_GRAPH_BACKEND = isMicrosoftGraphBackend();
 const SearchEmailsToolInputSchema = IS_MICROSOFT_GRAPH_BACKEND
   ? SearchEmailsMsGraphInputSchema
   : SearchEmailsUnifiedInputSchema;
+
+const SearchEmailsToolDescription = IS_MICROSOFT_GRAPH_BACKEND
+  ? 'Search emails using Microsoft Graph with optional structured filters. Returns matched emails with an id per result.\n\nTo filter by folder, call `list_folders` first to obtain valid folder ids. To read the full body of a result, call `open_email_by_id` passing `msGraphMessageId` as `id` and `MsGraph` as `idType`.'
+  : 'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by folder, call `list_folders` first to obtain valid folder ids. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` passing `uniqueContentId` (or `msGraphMessageId` if unavailable) as `id`, and `Unique` (or `MsGraph`) as `idType`. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete.';
 
 const SearchEmailResultSchema = z.object({
   uniqueContentId: z.string().optional(),
@@ -53,8 +57,7 @@ export class SearchEmailsTool {
   @Tool({
     name: 'search_emails',
     title: 'Search Emails',
-    description:
-      'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by folder, call `list_folders` first to obtain valid folder ids. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` passing `uniqueContentId` (or `msGraphMessageId` if unavailable) as `id`, and `Unique` (or `MsGraph`) as `idType`. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete.',
+    description: SearchEmailsToolDescription,
     parameters: SearchEmailsToolInputSchema,
     outputSchema: SearchEmailsOutputSchema,
     annotations: {
@@ -64,7 +67,7 @@ export class SearchEmailsTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: META,
+    _meta: IS_MICROSOFT_GRAPH_BACKEND ? META_MS_GRAPH : META_UNIQUE_AND_MS_GRAPH,
   })
   @Span()
   public async searchEmails(

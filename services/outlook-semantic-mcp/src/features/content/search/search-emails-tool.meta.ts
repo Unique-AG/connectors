@@ -1,19 +1,6 @@
 import { createMeta } from '@unique-ag/mcp-server-module';
 
-export const META = createMeta({
-  icon: 'search',
-  systemPrompt: `Searches ingested Outlook emails semantically. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns matched passages from emails with metadata.
-
-  By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
-  After returning results, inform the user that they can narrow the search to a specific folder if needed.
-
-  To filter by folder, pass its name directly to the \`directories\` parameter — no need to call \`list_folders\` for well-known folders.
-  Use these exact names: "Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History".
-  Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized — searching through them will not return results.
-  For custom user-defined folders, call \`list_folders\` first to get the folder ID.
-
-  If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.`,
-  toolFormatInformation: `## Email Display Rules
+const TOOL_FORMAT_INFORMATION = `## Email Display Rules
   ALWAYS follow these rules when displaying results from \`search_emails\` or when referencing information extracted from emails.
   ### Format for listing emails
   When listing multiple emails, use a markdown table with exactly 3 columns: Time, Sender, Subject.
@@ -50,5 +37,32 @@ export const META = createMeta({
   | Mar 6, 2026 9:00 AM | HR Team (hr@acme.com) | [📩 Onboarding Schedule - New Hires March 2026](https://outlook.office.com/owa/?ItemID=AAkALgCC...&exvsurl=1&viewmodel=ReadMessageItem) |
   | Mar 5, 2026 4:30 PM | Priya Patel (priya.patel@acme.com) | [📩 Accepted: Product Roadmap Review](https://outlook.office.com/owa/?ItemID=AAkALgDD...&exvsurl=1&viewmodel=ReadMessageItem) |
   | Mar 4, 2026 8:00 AM | DevOps (devops-alerts@acme.com) | [📩 Server Maintenance Window - March 12](https://outlook.office.com/owa/?ItemID=AAkALgEE...&exvsurl=1&viewmodel=ReadMessageItem) |
-`,
+`;
+
+export const META_UNIQUE_AND_MS_GRAPH = createMeta({
+  icon: 'search',
+  systemPrompt: `Searches ingested Outlook emails semantically. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns matched passages from emails with metadata.
+
+  By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
+  After returning results, inform the user that they can narrow the search to a specific folder if needed.
+
+  To filter by folder, pass its name directly to the \`directories\` parameter — no need to call \`list_folders\` for well-known folders.
+  Use these exact names: "Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History".
+  Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized — searching through them will not return results.
+  For custom user-defined folders, call \`list_folders\` first to get the folder ID.
+
+  If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.`,
+  toolFormatInformation: TOOL_FORMAT_INFORMATION,
+});
+
+export const META_MS_GRAPH = createMeta({
+  icon: 'search',
+  systemPrompt: `Searches Outlook emails using Microsoft Graph KQL queries. Returns matched emails with metadata.
+
+  By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
+  After returning results, inform the user that they can narrow the search with more specific KQL terms if needed.
+
+  Build precise KQL queries using supported property filters: from:, to:, cc:, subject:, body:, received>=, received<=, hasAttachment:, category:.
+  Combine clauses with AND/OR for complex searches. You can run multiple KQL queries in parallel (up to 20) for broader coverage.`,
+  toolFormatInformation: TOOL_FORMAT_INFORMATION,
 });

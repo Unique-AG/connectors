@@ -130,8 +130,8 @@ export class SearchEmailsQuery {
         };
       });
 
-    const top20 = enriched.slice(0, 20).map((e) => e.result);
-    const remainder = enriched.slice(top20.length);
+    const topSemanticMatches = enriched.slice(0, 20).map((e) => e.result);
+    const remainder = enriched.slice(topSemanticMatches.length);
     const commonRemainder = remainder.filter((e) => e.hadGraphMatch).map((e) => e.result);
     const semanticOnly = remainder.filter((e) => !e.hadGraphMatch).map((e) => e.result);
 
@@ -140,6 +140,9 @@ export class SearchEmailsQuery {
       text: this.formatText({ graphText: graphResult.text }),
     }));
 
-    return [...top20, ...commonRemainder, ...semanticOnly, ...remainingGraph].slice(0, 500);
+    return [...topSemanticMatches, ...commonRemainder, ...semanticOnly, ...remainingGraph].slice(
+      0,
+      500,
+    );
   }
 }

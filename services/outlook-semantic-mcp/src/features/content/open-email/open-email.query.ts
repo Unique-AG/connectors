@@ -3,8 +3,10 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, map, pipe, sortBy } from 'remeda';
 import * as z from 'zod';
+import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { Nullish } from '~/utils/nullish';
 import { SearchBackend } from '../search/semantic-search-emails.query';
 
 const recipientSchema = z.object({
@@ -26,7 +28,14 @@ const graphMessageSchema = z.object({
 export interface OpenEmailResult {
   id: string;
   title: string | null;
-  metadata: unknown;
+  metadata: {
+    from: Nullish<string>;
+    toRecipients: Nullish<string[]>;
+    ccRecipients: Nullish<string[]>;
+    receivedDateTime: Nullish<string>;
+    webLink: Nullish<string>;
+    hasAttachments: boolean;
+  };
   text: string;
 }
 
@@ -80,7 +89,7 @@ export class OpenEmailQuery {
         ),
         receivedDateTime: message.receivedDateTime,
         webLink: message.webLink,
-        hasAttachments: message.hasAttachments,
+        hasAttachments: message.hasAttachments === true,
       },
       text: message.body?.content ?? '',
     };
@@ -88,10 +97,18 @@ export class OpenEmailQuery {
 
   private async readMessageFromUnique(id: string): Promise<OpenEmailResult> {
     const emailData = await this.uniqueApi.content.getContentById({ contentId: id });
+    const metadata = emailData.metadata as MessageMetadata | undefined;
     return {
       id: emailData.id,
       title: emailData.title ?? null,
-      metadata: emailData.metadata as unknown,
+      metadata: {
+        from: metadata?.fromEmailAddress,
+        toRecipients: metadata?.toRecipientsEmailAddresses,
+        ccRecipients: metadata?.ccRecipientsEmailAddresses,
+        receivedDateTime: metadata?.receivedDateTime,
+        webLink: metadata?.webLink,
+        hasAttachments: metadata?.hasAttachments === 'true',
+      },
       text: pipe(
         emailData.chunks ?? [],
         sortBy((chunk) => chunk.order ?? 0),
