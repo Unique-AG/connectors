@@ -27,6 +27,7 @@ function makeGraphError(statusCode: number): GraphError {
 function createMockGraphApi() {
   return {
     top: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
     get: vi.fn(),
   };
 }
