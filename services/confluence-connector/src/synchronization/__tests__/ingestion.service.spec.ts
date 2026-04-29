@@ -118,6 +118,12 @@ function makeService(): {
     ingestion: {
       storeInternally: true,
       useV1KeyFormat: false,
+      attachments: {
+        enabled: true,
+        allowedMimeTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+        maxFileSizeMb: 200,
+        imageOcrEnabled: true,
+      },
     },
   } as unknown as TenantConfig;
 
@@ -449,6 +455,87 @@ describe('IngestionService', () => {
       });
     });
 
+    it('forces jpgReadMode=DOC_INTELLIGENCE_DEFAULT on image attachments when imageOcr is enabled', async () => {
+      const { service, uniqueApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+
+      await service.ingestAttachment(
+        { ...attachmentFixture, mediaType: 'image/jpeg', title: 'photo.jpg' },
+        'space-scope-1',
+      );
+
+      expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mimeType: 'image/jpeg',
+          ingestionConfig: { jpgReadMode: 'DOC_INTELLIGENCE_DEFAULT' },
+        }),
+      );
+      expect(uniqueApiClient.ingestion.finalizeIngestion).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ingestionConfig: { jpgReadMode: 'DOC_INTELLIGENCE_DEFAULT' },
+        }),
+      );
+    });
+
+    it('does not set ingestionConfig on non-image attachments', async () => {
+      const { service, uniqueApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+
+      await service.ingestAttachment(
+        { ...attachmentFixture, mediaType: 'application/pdf', title: 'report.pdf' },
+        'space-scope-1',
+      );
+
+      const registerCall = vi.mocked(uniqueApiClient.ingestion.registerContent).mock.calls[0]?.[0];
+      expect(registerCall?.ingestionConfig).toBeUndefined();
+    });
+
+    it('does not set ingestionConfig on images when imageOcr is disabled', async () => {
+      const tenantConfig = {
+        confluence: { instanceType: 'cloud', baseUrl: CONFLUENCE_BASE_URL },
+        unique: {
+          serviceAuthMode: 'external',
+          ingestionServiceBaseUrl: 'http://node-ingestion:8091',
+        },
+        ingestion: {
+          storeInternally: true,
+          useV1KeyFormat: false,
+          attachments: {
+            enabled: true,
+            allowedMimeTypes: ['image/png'],
+            maxFileSizeMb: 200,
+            imageOcrEnabled: false,
+          },
+        },
+      } as unknown as TenantConfig;
+
+      const uniqueApiClient = {
+        ingestion: {
+          registerContent: vi.fn().mockResolvedValue(makeRegistrationResponse()),
+          finalizeIngestion: vi.fn().mockResolvedValue({ id: 'id-1' }),
+        },
+        files: { getByKeys: vi.fn(), deleteByIds: vi.fn() },
+      } as unknown as UniqueApiClient;
+
+      const confluenceApiClient = {
+        getAttachmentDownloadStream: vi.fn().mockResolvedValue(makeMockStream()),
+      } as unknown as ConfluenceApiClient;
+
+      const service = new IngestionService(
+        tenantConfig,
+        TENANT_NAME,
+        uniqueApiClient,
+        confluenceApiClient,
+        createNoopMetrics(),
+      );
+
+      mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+      await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+
+      const registerCall = vi.mocked(uniqueApiClient.ingestion.registerContent).mock.calls[0]?.[0];
+      expect(registerCall?.ingestionConfig).toBeUndefined();
+    });
+
     it('registers, streams download, uploads, and finalizes attachment ingestion', async () => {
       const { service, uniqueApiClient, confluenceApiClient } = makeService();
       mockRequest.mockResolvedValueOnce({ statusCode: 201 });
@@ -602,7 +689,16 @@ describe('IngestionService', () => {
           serviceAuthMode: 'cluster_local',
           ingestionServiceBaseUrl: 'http://node-ingestion:8091',
         },
-        ingestion: { storeInternally: true, useV1KeyFormat: false },
+        ingestion: {
+          storeInternally: true,
+          useV1KeyFormat: false,
+          attachments: {
+            enabled: true,
+            allowedMimeTypes: ['application/pdf'],
+            maxFileSizeMb: 200,
+            imageOcrEnabled: true,
+          },
+        },
       } as unknown as TenantConfig;
 
       const uniqueApiClient = {

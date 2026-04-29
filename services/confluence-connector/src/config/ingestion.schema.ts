@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  DEFAULT_ALLOWED_EXTENSIONS,
+  DEFAULT_ALLOWED_MIME_TYPES,
   DEFAULT_MAX_FILE_SIZE_MB,
 } from '../constants/defaults.constants';
 import { EnabledDisabledMode, IngestionMode } from '../constants/ingestion.constants';
@@ -13,21 +13,28 @@ const AttachmentConfigSchema = z
       .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
       .prefault(EnabledDisabledMode.Enabled)
       .describe('Whether to ingest file attachments from Confluence pages'),
-    allowedExtensions: z
+    allowedMimeTypes: z
       .array(z.string().min(1))
-      .prefault([...DEFAULT_ALLOWED_EXTENSIONS])
-      .transform((exts) => exts.map((ext) => ext.toLowerCase()))
-      .describe('File extensions to include when ingesting attachments'),
+      .prefault([...DEFAULT_ALLOWED_MIME_TYPES])
+      .transform((types) => types.map((type) => type.toLowerCase()))
+      .describe('MIME types to include when ingesting attachments'),
     maxFileSizeMb: z
       .number()
       .int()
       .positive()
       .prefault(DEFAULT_MAX_FILE_SIZE_MB)
       .describe('Maximum file size in megabytes for attachment ingestion'),
+    imageOcr: z
+      .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+      .prefault(EnabledDisabledMode.Enabled)
+      .describe(
+        'Whether to request OCR-based ingestion for image attachments (jpgReadMode = DOC_INTELLIGENCE_DEFAULT). Set to disabled to defer to the destination scope ingestion config',
+      ),
   })
-  .transform(({ mode, ...rest }) => ({
+  .transform(({ mode, imageOcr, ...rest }) => ({
     ...rest,
     enabled: mode === EnabledDisabledMode.Enabled,
+    imageOcrEnabled: imageOcr === EnabledDisabledMode.Enabled,
   }));
 
 export const IngestionConfigSchema = z.object({
