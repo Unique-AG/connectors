@@ -645,7 +645,7 @@ describe('ConfluencePageScanner', () => {
       expect(result.attachments.map((a) => a.id)).toEqual(['att-1']);
     });
 
-    it('rejects application/octet-stream attachments by default', async () => {
+    it('skips application/octet-stream attachments by default', async () => {
       const attachment = makeAttachment('att-1', 'unknown.bin', {
         mediaType: 'application/octet-stream',
       });
