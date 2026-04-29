@@ -3,6 +3,10 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
+import {
+  INBOX_DELETION_IN_PROGRESS_MESSAGE,
+  IsInboxDeletingQuery,
+} from '~/features/delete-inbox/is-inbox-deleting.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 import { META } from './reconnect-inbox-tool.meta';
@@ -26,7 +30,10 @@ const ReconnectInboxOutputSchema = z.object({
 export class ReconnectInboxTool {
   private readonly logger = new Logger(this.constructor.name);
 
-  public constructor(private readonly subscriptionCreate: SubscriptionCreateService) {}
+  public constructor(
+    private readonly subscriptionCreate: SubscriptionCreateService,
+    private readonly isInboxDeleting: IsInboxDeletingQuery,
+  ) {}
 
   @Tool({
     name: 'reconnect_inbox',
@@ -52,6 +59,10 @@ export class ReconnectInboxTool {
   ) {
     const userProfileTypeid = extractUserProfileId(request);
     const userProfileId = userProfileTypeid.toString();
+
+    if (await this.isInboxDeleting.run(userProfileId)) {
+      return { success: false, message: INBOX_DELETION_IN_PROGRESS_MESSAGE, subscription: null };
+    }
 
     this.logger.log({ userProfileId, msg: 'Reconnecting inbox subscription for user' });
 

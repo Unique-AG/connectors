@@ -71,6 +71,8 @@ The connector requires a pre-existing root scope in Unique. The root scope ID is
 
 At startup, the connector automatically grants itself access on the root scope and will create child scopes for each Confluence space that has content to ingest. See the [Scope Hierarchy](../technical/flows.md#Scope-Hierarchy) for details.
 
+On the first sync cycle, the connector marks the root scope as owned by this tenant's Confluence instance. Every subsequent sync cycle verifies this ownership mark before ingesting content, and the sync fails whenever the recorded owner does not match the Confluence instance configured in `connection.baseUrl`. The most common misconfiguration that causes this is two tenants being configured with the same `ingestion.scopeId` while pointing to different Confluence instances: the one whose sync runs first claims ownership, and the others fail on their next sync. See [Root Scope Ownership Validation](../technical/flows.md#Root-Scope-Ownership-Validation) for details.
+
 **External mode with Gatekeeper enforced:** If the Unique platform has Gatekeeper in `enforce` mode, the connector's self-grant may be blocked. In that case, an administrator must pre-grant the service user access on the root scope before starting the connector:
 
 ```graphql
@@ -96,7 +98,7 @@ Replace `<root-scope-id>` with the scope ID from `ingestion.scopeId` and `<servi
 2. Create a new service account 
 3. Add User Role to the Confluence App
 4. Now Create Credentials and select OAuth 2.0
-3. Grant the service account access to the Confluence application and assign the following scopes:
+5. Grant the service account access to the Confluence application and assign the following scopes:
 
 | Scope | Type | Purpose |
 |-------|------|---------|
@@ -124,7 +126,7 @@ The `clientSecret` field uses the `os.environ/` prefix to resolve the value from
 
 #### Option B: OAuth 2.0 (2LO) -- Data Center
 
-1. In the [Atlassian Admin Console](https://<data-center-confluence-url>), go to **Settings** > **User Management** > **Service Accounts**.
+1. In your Confluence Data Center admin console, go to **Settings** > **User Management** > **Service Accounts**.
 2. Create a new service account and generate credentials.
 3. Grant the service account access to the Confluence application and assign the `READ` (View content) scope. Space selection is optional. **When no spaces are specified, the service account has read access to all spaces.**
 

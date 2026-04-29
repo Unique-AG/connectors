@@ -1,9 +1,11 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { TenantStatus } from '../config';
+import { SyncStatusStore } from '../health/sync-status.store';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import type { TenantContext } from '../tenant';
-import { ServiceRegistry, TenantRegistry } from '../tenant';
+import { ServiceRegistry, TenantDeleteService, TenantRegistry } from '../tenant';
 
 @Injectable()
 export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
@@ -14,19 +16,11 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     private readonly tenantRegistry: TenantRegistry,
     private readonly serviceRegistry: ServiceRegistry,
     private readonly schedulerRegistry: SchedulerRegistry,
+    private readonly syncStatusStore: SyncStatusStore,
   ) {}
 
   public onModuleInit(): void {
-    if (this.tenantRegistry.tenantCount === 0) {
-      this.logger.warn({ msg: 'No tenants registered — no sync jobs will be scheduled' });
-      return;
-    }
-
-    for (const tenant of this.tenantRegistry.getAllTenants()) {
-      this.logger.log({ tenantName: tenant.name, msg: 'Triggering initial sync' });
-      void this.syncTenant(tenant);
-      this.registerCronJob(tenant);
-    }
+    this.scheduleTenantJobs();
   }
 
   public onModuleDestroy(): void {
@@ -42,6 +36,24 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private scheduleTenantJobs(): void {
+    if (this.isShuttingDown) {
+      this.logger.log({ msg: 'Shutdown in progress, skipping job scheduling' });
+      return;
+    }
+
+    if (this.tenantRegistry.tenantCount === 0) {
+      this.logger.warn({ msg: 'No tenants registered — no jobs will be scheduled' });
+      return;
+    }
+
+    for (const tenant of this.tenantRegistry.getAllTenants()) {
+      this.logger.log({ tenantName: tenant.name, msg: 'Triggering first sync on startup' });
+      void this.syncTenant(tenant);
+      this.registerCronJob(tenant);
+    }
+  }
+
   private registerCronJob(tenant: TenantContext): void {
     const cronExpression = tenant.config.processing.scanIntervalCron;
 
@@ -54,25 +66,59 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     this.tenantRegistry.run(tenant, () => {
       this.logger.log({
         tenantName: tenant.name,
-        msg: `Scheduled sync with cron: ${cronExpression}`,
+        msg: `Scheduled job with cron: ${cronExpression}`,
       });
     });
   }
 
   private async syncTenant(tenant: TenantContext): Promise<void> {
-    await this.tenantRegistry.run(tenant, async () => {
-      const syncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
+    if (this.isShuttingDown) {
+      this.logger.log({ msg: 'Skipping job due to shutdown' });
+      return;
+    }
 
-      if (this.isShuttingDown) {
-        this.logger.log({ msg: 'Skipping sync due to shutdown' });
-        return;
-      }
+    try {
+      await this.tenantRegistry.run(tenant, async () => {
+        if (tenant.status === TenantStatus.Deleted) {
+          try {
+            const deleteService = this.serviceRegistry.getService(TenantDeleteService);
+            await deleteService.deleteTenantContent();
+          } catch (error) {
+            this.logger.error({
+              tenantName: tenant.name,
+              err: error,
+              msg: 'Unexpected error in tenant cleanup job',
+            });
+          }
+          return;
+        }
 
-      try {
-        await syncService.synchronize();
-      } catch (error) {
-        this.logger.error({ err: error, msg: 'Unexpected sync error' });
-      }
-    });
+        const syncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
+        const result = await syncService.synchronize();
+
+        // Skip recording the in-progress overlap so an inactive cron tick doesn't dilute
+        // the failure ratio in the sliding window.
+        if (result.status === 'skipped' && result.reason === 'sync_in_progress') {
+          return;
+        }
+        this.syncStatusStore.record({
+          timestamp: new Date(),
+          tenantName: tenant.name,
+          result,
+        });
+      });
+    } catch (error) {
+      // Reaching here means synchronize() itself threw before producing a SyncResult.
+      this.syncStatusStore.record({
+        timestamp: new Date(),
+        tenantName: tenant.name,
+        result: { status: 'failure' },
+      });
+      this.logger.error({
+        tenantName: tenant.name,
+        err: error,
+        msg: 'Unexpected error in tenant job',
+      });
+    }
   }
 }

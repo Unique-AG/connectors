@@ -98,7 +98,7 @@ function makeService(): {
     },
     files: {
       getByKeys: vi.fn().mockResolvedValue([]),
-      deleteByIds: vi.fn().mockResolvedValue(0),
+      deleteByIds: vi.fn().mockResolvedValue({ deleted: 0, failed: 0 }),
     },
   } as unknown as UniqueApiClient;
 
@@ -220,13 +220,48 @@ describe('IngestionService', () => {
         id: 'content-2',
       },
     ] as never);
-    vi.mocked(uniqueApiClient.files.deleteByIds).mockResolvedValue(2);
+    vi.mocked(uniqueApiClient.files.deleteByIds).mockResolvedValue({ deleted: 2, failed: 0 });
 
     const result = await service.deleteContentByKeys(['k1', 'k2']);
 
     expect(result).toBe(2);
     expect(uniqueApiClient.files.getByKeys).toHaveBeenCalledWith(['k1', 'k2']);
     expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['content-1', 'content-2']);
+  });
+
+  it('records recordContentDeleted with success and failure counts for partial delete', async () => {
+    const { service, uniqueApiClient } = makeService();
+    const metrics = (service as unknown as { metrics: ReturnType<typeof createNoopMetrics> })
+      .metrics;
+    const recordSpy = vi.spyOn(metrics, 'recordContentDeleted');
+    vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([
+      { id: 'content-1' },
+      { id: 'content-2' },
+      { id: 'content-3' },
+    ] as never);
+    vi.mocked(uniqueApiClient.files.deleteByIds).mockResolvedValue({ deleted: 1, failed: 2 });
+
+    const result = await service.deleteContentByKeys(['k1', 'k2', 'k3']);
+
+    expect(result).toBe(1);
+    expect(recordSpy).toHaveBeenCalledWith(1, 'success');
+    expect(recordSpy).toHaveBeenCalledWith(2, 'failure');
+  });
+
+  it('does not record recordContentDeleted when delete throws (no confirmed count)', async () => {
+    const { service, uniqueApiClient } = makeService();
+    const metrics = (service as unknown as { metrics: ReturnType<typeof createNoopMetrics> })
+      .metrics;
+    const recordSpy = vi.spyOn(metrics, 'recordContentDeleted');
+    vi.mocked(uniqueApiClient.files.getByKeys).mockRejectedValue(new Error('API error'));
+
+    const result = await service.deleteContentByKeys(['k1']);
+
+    expect(result).toBe(0);
+    expect(recordSpy).not.toHaveBeenCalled();
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ msg: 'Failed to delete content, skipping' }),
+    );
   });
 
   it('logs warning and returns 0 when no content is found for delete keys', async () => {

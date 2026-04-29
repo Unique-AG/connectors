@@ -123,10 +123,17 @@ export class LiveCatchUpCommand {
       }
 
       const inboxConfiguration = await this.db
-        .select({ lastWebhookReceivedAt: inboxConfigurations.lastWebhookReceivedAt })
+        .select({
+          lastWebhookReceivedAt: inboxConfigurations.lastWebhookReceivedAt,
+          deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
+        })
         .from(inboxConfigurations)
         .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
         .then((rows) => rows[0]);
+
+      if (inboxConfiguration?.deletingInboxStartedAt) {
+        break;
+      }
 
       if (
         !inboxConfiguration?.lastWebhookReceivedAt ||
@@ -156,6 +163,7 @@ export class LiveCatchUpCommand {
           newestLastModifiedDateTime: inboxConfigurations.newestLastModifiedDateTime,
           liveCatchUpHeartbeatAt: inboxConfigurations.liveCatchUpHeartbeatAt,
           filters: inboxConfigurations.filters,
+          deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
         })
         .from(inboxConfigurations)
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
@@ -164,6 +172,14 @@ export class LiveCatchUpCommand {
 
       if (!inboxConfig) {
         this.logger.warn({ userProfileId, msg: 'No inbox configuration found, skipping' });
+        return { status: 'skip' };
+      }
+
+      if (inboxConfig.deletingInboxStartedAt !== null) {
+        this.logger.log({
+          userProfileId,
+          msg: 'Inbox deletion in progress, skipping live catch-up',
+        });
         return { status: 'skip' };
       }
 

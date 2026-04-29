@@ -7,6 +7,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '~': path.resolve(__dirname, './src'),
+      '@unique-ag/mcp-server-module': path.resolve(
+        __dirname,
+        '../../packages/mcp-server-module/src/index.ts',
+      ),
     },
   },
   test: {

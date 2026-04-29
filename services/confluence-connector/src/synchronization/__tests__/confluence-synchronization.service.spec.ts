@@ -1,5 +1,6 @@
 import { Smeared } from '@unique-ag/utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { type Metrics, SyncPhase } from '../../metrics';
 import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
@@ -47,6 +48,7 @@ function createService(
     IngestionService,
     'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'
   >,
+  metrics: Metrics = createNoopMetrics(),
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
     scanner as ConfluencePageScanner,
@@ -54,8 +56,17 @@ function createService(
     fileDiffService as FileDiffService,
     ingestionService as IngestionService,
     mockScopeManagementService,
-    createNoopMetrics(),
+    metrics,
   );
+}
+
+function createMetricsSpy(): Metrics {
+  const base = createNoopMetrics();
+  const spy = { ...base } as Record<string, unknown>;
+  for (const key of Object.keys(spy)) {
+    spy[key] = vi.fn();
+  }
+  return spy as unknown as Metrics;
 }
 
 describe('ConfluenceSynchronizationService', () => {
@@ -170,6 +181,7 @@ describe('ConfluenceSynchronizationService', () => {
       expect(mockLogger.log).toHaveBeenCalledWith({
         total: 1,
         ingested: 0,
+        skipped: 0,
         failed: 1,
         msg: 'Page ingestion summary',
       });
@@ -458,6 +470,199 @@ describe('ConfluenceSynchronizationService', () => {
         msg: 'Attachment ingestion summary',
       });
       expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Sync work done' });
+    });
+  });
+
+  describe('metrics', () => {
+    it('records pages per item with success, failure, and skipped results', async () => {
+      // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction
+      const baseDiscovered = discoveredPagesFixture[0]!;
+      const discovered = [
+        { ...baseDiscovered, id: 'ok' },
+        { ...baseDiscovered, id: 'skip' },
+        { ...baseDiscovered, id: 'fail' },
+      ];
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: discovered,
+        attachments: [],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['ok', 'skip', 'fail'],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+      // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction
+      const baseFetched = fetchedPagesFixture[0]!;
+      vi.mocked(mockContentFetcher.fetchPageContent).mockImplementation((page: { id: string }) => {
+        if (page.id === 'skip') {
+          return Promise.resolve(null);
+        }
+        return Promise.resolve({ ...baseFetched, id: page.id });
+      });
+      vi.mocked(mockIngestionService.ingestPage).mockImplementation(
+        ({ id }: { id: string }): Promise<void> => {
+          if (id === 'fail') {
+            return Promise.reject(new Error('boom'));
+          }
+          return Promise.resolve();
+        },
+      );
+
+      const metrics = createMetricsSpy();
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        metrics,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(metrics.recordPagesProcessed).toHaveBeenCalledWith(1, 'success');
+      expect(metrics.recordPagesProcessed).toHaveBeenCalledWith(1, 'skipped');
+      expect(metrics.recordPagesProcessed).toHaveBeenCalledWith(1, 'failure');
+      expect(vi.mocked(metrics.recordPagesProcessed).mock.calls).toHaveLength(3);
+    });
+
+    it('records attachments per item with success and failure results', async () => {
+      const mkAttachment = (id: string): DiscoveredAttachment => ({
+        id,
+        title: `${id}.pdf`,
+        mediaType: 'application/pdf',
+        fileSize: 1,
+        downloadPath: `/download/attachments/1/${id}.pdf`,
+        versionTimestamp: '2026-02-01T00:00:00.000Z',
+        pageId: '1',
+        spaceId: 'space-1',
+        spaceKey: 'SP',
+        spaceName: 'Space',
+        webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/${id}`,
+      });
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: [],
+        attachments: [mkAttachment('ok'), mkAttachment('fail')],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['1::ok', '1::fail'],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+      vi.mocked(mockIngestionService.ingestAttachment).mockImplementation(
+        (attachment: { id: string }): Promise<void> => {
+          if (attachment.id === 'fail') {
+            return Promise.reject(new Error('boom'));
+          }
+          return Promise.resolve();
+        },
+      );
+
+      const metrics = createMetricsSpy();
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        metrics,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(metrics.recordAttachmentsProcessed).toHaveBeenCalledWith(1, 'success');
+      expect(metrics.recordAttachmentsProcessed).toHaveBeenCalledWith(1, 'failure');
+      expect(vi.mocked(metrics.recordAttachmentsProcessed).mock.calls).toHaveLength(2);
+    });
+
+    it('walks through sync phases and ends on Idle', async () => {
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['1'],
+        updatedItemIds: [],
+        deletedItems: [{ id: '9', partialKey: 'test-tenant/space-1_SP' }],
+        movedItemIds: [],
+      });
+
+      const metrics = createMetricsSpy();
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        metrics,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      const phaseCalls = vi
+        .mocked(metrics.setSyncPhase)
+        .mock.calls.map((args: unknown[]) => args[0]);
+      expect(phaseCalls).toEqual([
+        SyncPhase.Scanning,
+        SyncPhase.Diffing,
+        SyncPhase.IngestingPages,
+        SyncPhase.IngestingAttachments,
+        SyncPhase.Deleting,
+        SyncPhase.CleaningUp,
+        SyncPhase.Idle,
+      ]);
+    });
+
+    it('ends on Idle even when sync fails mid-way', async () => {
+      vi.mocked(mockFileDiffService.computeDiff).mockRejectedValue(new Error('diff boom'));
+
+      const metrics = createMetricsSpy();
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        metrics,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      const phaseCalls = vi
+        .mocked(metrics.setSyncPhase)
+        .mock.calls.map((args: unknown[]) => args[0]);
+      expect(phaseCalls.at(-1)).toBe(SyncPhase.Idle);
+    });
+
+    it('records sync item totals when there is work to do', async () => {
+      const metrics = createMetricsSpy();
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        metrics,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(metrics.recordSyncItemTotals).toHaveBeenCalledWith(1, 0);
+    });
+
+    it('does not reset sync item totals on a no-change sync', async () => {
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: [],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+
+      const metrics = createMetricsSpy();
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        metrics,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(metrics.recordSyncItemTotals).not.toHaveBeenCalled();
     });
   });
 });

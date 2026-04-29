@@ -1,6 +1,11 @@
 export { type AppConfig, type AppConfigNamespaced, appConfig } from './app.config';
 export type { ConfluenceConfig } from './confluence.schema';
 export { AuthMode } from './confluence.schema';
+export {
+  type HealthConfig,
+  type HealthConfigNamespaced,
+  healthConfig,
+} from './health.config';
 export type { ProcessingConfig } from './processing.schema';
 export {
   type BasicProxyConfig,
@@ -12,8 +17,10 @@ export {
 } from './proxy.config';
 export {
   getTenantConfigs,
+  type LoadedTenantStatus,
   type NamedTenantConfig,
   type TenantConfig,
+  TenantStatus,
 } from './tenant-config-loader';
 export type { UniqueConfig } from './unique.schema';
 export { UniqueAuthMode } from './unique.schema';

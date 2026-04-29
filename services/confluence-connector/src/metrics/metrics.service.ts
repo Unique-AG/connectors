@@ -4,6 +4,16 @@ import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 import { getCurrentTenant } from '../tenant';
 
+export enum SyncPhase {
+  Idle = 'idle',
+  Scanning = 'scanning',
+  Diffing = 'diffing',
+  IngestingPages = 'ingesting_pages',
+  IngestingAttachments = 'ingesting_attachments',
+  Deleting = 'deleting',
+  CleaningUp = 'cleaning_up',
+}
+
 @Injectable()
 export class Metrics {
   private readonly syncDuration: Histogram;
@@ -16,8 +26,14 @@ export class Metrics {
   private readonly confluenceApiRequestDuration: Histogram;
   private readonly confluenceApiThrottleEvents: Counter;
   private readonly confluenceApiErrors: Counter;
+  private readonly cleanupDuration: Histogram;
+  private readonly cleanupContentDeleted: Counter;
+  private readonly cleanupScopesDeleted: Counter;
   private readonly orphanedScopesCleaned: Counter;
   private readonly orphanedFilesCleaned: Counter;
+
+  private readonly syncPhaseState = new Map<string, SyncPhase>();
+  private readonly syncItemTotals = new Map<string, { pages: number; attachments: number }>();
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
@@ -75,12 +91,56 @@ export class Metrics {
       description: 'Number of Confluence API error responses',
     });
 
+    this.cleanupDuration = metricService.getHistogram('cfc_cleanup_duration_seconds', {
+      description: 'Duration of deleted tenant content cleanup',
+    });
+
+    this.cleanupContentDeleted = metricService.getCounter('cfc_cleanup_content_deleted_total', {
+      description: 'Number of content items deleted during tenant cleanup',
+    });
+
+    this.cleanupScopesDeleted = metricService.getCounter('cfc_cleanup_scopes_deleted_total', {
+      description: 'Number of scopes deleted during tenant cleanup',
+    });
+
     this.orphanedScopesCleaned = metricService.getCounter('cfc_orphaned_scopes_cleaned_total', {
       description: 'Number of orphaned space scopes cleaned up after space removal',
     });
 
     this.orphanedFilesCleaned = metricService.getCounter('cfc_orphaned_files_cleaned_total', {
       description: 'Number of files deleted during orphaned space cleanup',
+    });
+
+    const syncPhaseGauge = metricService.getObservableGauge('cfc_sync_phase', {
+      description: 'Current sync phase (1 = active, 0 = inactive). Labels: tenant, phase',
+    });
+    syncPhaseGauge.addCallback((observable) => {
+      for (const [tenant, currentPhase] of this.syncPhaseState) {
+        for (const phase of Object.values(SyncPhase)) {
+          observable.observe(phase === currentPhase ? 1 : 0, { tenant, phase });
+        }
+      }
+    });
+
+    const syncPagesTotalGauge = metricService.getObservableGauge('cfc_sync_pages_total', {
+      description: 'Number of pages to process in the current sync cycle',
+    });
+    syncPagesTotalGauge.addCallback((observable) => {
+      for (const [tenant, totals] of this.syncItemTotals) {
+        observable.observe(totals.pages, { tenant });
+      }
+    });
+
+    const syncAttachmentsTotalGauge = metricService.getObservableGauge(
+      'cfc_sync_attachments_total',
+      {
+        description: 'Number of attachments to process in the current sync cycle',
+      },
+    );
+    syncAttachmentsTotalGauge.addCallback((observable) => {
+      for (const [tenant, totals] of this.syncItemTotals) {
+        observable.observe(totals.attachments, { tenant });
+      }
     });
   }
 
@@ -99,7 +159,7 @@ export class Metrics {
     this.scanDuration.record(durationSeconds, { tenant: this.tenantName });
   }
 
-  public recordPagesProcessed(count: number, result: 'success' | 'failure'): void {
+  public recordPagesProcessed(count: number, result: 'success' | 'failure' | 'skipped'): void {
     this.pagesProcessed.add(count, { tenant: this.tenantName, result });
   }
 
@@ -146,12 +206,32 @@ export class Metrics {
     });
   }
 
+  public recordCleanupDuration(durationSeconds: number, result: 'success' | 'failure'): void {
+    this.cleanupDuration.record(durationSeconds, { tenant: this.tenantName, result });
+  }
+
+  public recordCleanupContentDeleted(count: number, result: 'success' | 'failure'): void {
+    this.cleanupContentDeleted.add(count, { tenant: this.tenantName, result });
+  }
+
+  public recordCleanupScopesDeleted(count: number, result: 'success' | 'failure'): void {
+    this.cleanupScopesDeleted.add(count, { tenant: this.tenantName, result });
+  }
+
   public recordOrphanedScopesCleaned(count: number, result: 'success' | 'failure'): void {
     this.orphanedScopesCleaned.add(count, { tenant: this.tenantName, result });
   }
 
   public recordOrphanedFilesCleaned(count: number): void {
     this.orphanedFilesCleaned.add(count, { tenant: this.tenantName });
+  }
+
+  public setSyncPhase(phase: SyncPhase): void {
+    this.syncPhaseState.set(this.tenantName, phase);
+  }
+
+  public recordSyncItemTotals(pages: number, attachments: number): void {
+    this.syncItemTotals.set(this.tenantName, { pages, attachments });
   }
 
   public recordApiThrottleEvent(): void {
@@ -170,12 +250,15 @@ export class Metrics {
   /**
    * Initializes all counters for the current tenant by recording a zero value. This ensures
    * Prometheus scrapes a baseline before the first sync, so that `increase()` can compute a
-   * correct delta from 0 -> N on the first sync cycle after startup.
+   * correct delta from 0 -> N on the first sync cycle after startup. Also seeds the
+   * observable-gauge state maps so the sync-progress panels have data before the first sync.
    */
   public initializeCounters(): void {
-    const tenant = { tenant: this.tenantName };
+    const tenantName = this.tenantName;
+    const tenant = { tenant: tenantName };
     this.pagesProcessed.add(0, { ...tenant, result: 'success' });
     this.pagesProcessed.add(0, { ...tenant, result: 'failure' });
+    this.pagesProcessed.add(0, { ...tenant, result: 'skipped' });
     this.attachmentsProcessed.add(0, { ...tenant, result: 'success' });
     this.attachmentsProcessed.add(0, { ...tenant, result: 'failure' });
     this.contentDeleted.add(0, { ...tenant, result: 'success' });
@@ -188,5 +271,15 @@ export class Metrics {
     this.orphanedScopesCleaned.add(0, { ...tenant, result: 'success' });
     this.orphanedScopesCleaned.add(0, { ...tenant, result: 'failure' });
     this.orphanedFilesCleaned.add(0, tenant);
+    this.syncPhaseState.set(tenantName, SyncPhase.Idle);
+    this.syncItemTotals.set(tenantName, { pages: 0, attachments: 0 });
+  }
+
+  public initializeCleanupCounters(): void {
+    const tenant = { tenant: this.tenantName };
+    this.cleanupContentDeleted.add(0, { ...tenant, result: 'success' });
+    this.cleanupContentDeleted.add(0, { ...tenant, result: 'failure' });
+    this.cleanupScopesDeleted.add(0, { ...tenant, result: 'success' });
+    this.cleanupScopesDeleted.add(0, { ...tenant, result: 'failure' });
   }
 }

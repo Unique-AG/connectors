@@ -1,2 +1,2 @@
 export { MetricsModule } from './metrics.module';
-export { Metrics } from './metrics.service';
+export { Metrics, SyncPhase } from './metrics.service';
