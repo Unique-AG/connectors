@@ -58,17 +58,33 @@ function createMockDb() {
   };
 }
 
+function createMockPersistentCacheService() {
+  return {
+    setWith: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
 function createCommand({
   graphApi = createMockGraphApi(),
   db = createMockDb(),
+  persistentCacheService = createMockPersistentCacheService(),
 }: {
   graphApi?: ReturnType<typeof createMockGraphApi>;
   db?: ReturnType<typeof createMockDb>;
+  persistentCacheService?: ReturnType<typeof createMockPersistentCacheService>;
 } = {}): DiscoverDelegatedAccessCommand {
-  return new DiscoverDelegatedAccessCommand(
+  const command = new DiscoverDelegatedAccessCommand(
     createMockGraphClientFactory(graphApi) as any,
     db as any,
+    persistentCacheService as any,
   );
+  // Stub decide() so unit tests bypass cache logic and test graph/db behavior directly
+  vi.spyOn(command, 'decide').mockResolvedValue({
+    action: 'proceed',
+    lastProcessedDelegateId: null,
+    lastProcessedOwnerIdForDelegate: null,
+  });
+  return command;
 }
 
 /**

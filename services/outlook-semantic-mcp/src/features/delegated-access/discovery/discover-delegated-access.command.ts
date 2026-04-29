@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, gt, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
@@ -10,8 +11,21 @@ import {
   subscriptions,
   userProfiles,
 } from '~/db';
+import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { Nullish } from '~/utils/nullish';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+
+const CACHE_KEY = `DiscoverDelegatedAccess`;
+const NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES = 10;
+
+type DiscoverDelegatedAccessDecision =
+  | {
+      action: 'proceed';
+      lastProcessedDelegateId: Nullish<string>;
+      lastProcessedOwnerIdForDelegate: Nullish<string>;
+    }
+  | { action: 'skip'; reason: string };
 
 @Injectable()
 export class DiscoverDelegatedAccessCommand {
@@ -20,52 +34,251 @@ export class DiscoverDelegatedAccessCommand {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    private readonly persistentCacheService: PersistentCacheService,
   ) {}
 
   @Span()
   public async run(): Promise<void> {
-    let lastProcessedUserId: string | undefined;
-    let usersBatch = await this.fetchBatch({});
+    const decision = await this.decide();
+    if (decision.action === 'skip') {
+      this.logger.log({
+        msg: `Skipped running delegated access discovery. Reason: ${decision.reason}`,
+      });
+      return;
+    }
 
-    while (usersBatch.length) {
-      for (const { userProfileId: delegateUserId } of usersBatch) {
-        const client = this.graphClientFactory.createClientForUser(delegateUserId);
-        let ownersLastFetchedId: string | undefined;
-        let ownersBatch = await this.fetchBatch({
-          lastFetchedId: ownersLastFetchedId,
-          excludedProfileIds: [delegateUserId],
+    let finalState: 'ready' | 'failed';
+    try {
+      await this.runDiscoveryInBatches(
+        decision.lastProcessedDelegateId,
+        decision.lastProcessedOwnerIdForDelegate,
+      );
+      finalState = 'ready';
+    } catch (error) {
+      this.logger.error({ msg: `Failed to run delegated access discovery`, err: error });
+      finalState = 'failed';
+    }
+    await this.persistentCacheService.setWith(
+      CACHE_KEY,
+      async ({ currentValue, update }): Promise<void> => {
+        assert.ok(currentValue);
+        assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+        await update({
+          dataType: 'DelegatedAccessDiscovery',
+          payload: {
+            ...currentValue.payload,
+            state: finalState,
+            lastProgressRegisteredAt: Date.now(),
+          },
         });
+      },
+    );
+  }
 
-        while (ownersBatch.length) {
-          await Promise.all(
-            ownersBatch.map(({ userProfileId: ownerUserId, email: ownerEmail }) => {
-              return withRetryAttempts({
-                fn: async () => {
-                  await this.updateDelegatedAccess({
-                    ownerUserId,
-                    ownerEmail,
-                    client,
-                    delegateUserId,
-                  });
-                  return { status: 'success' };
-                },
-                onError: rethrowRateLimitError,
-                getResultFailure: (error) => ({ status: 'failed', error }),
-              });
-            }),
-          );
+  @Span()
+  private async runDiscoveryInBatches(
+    lastProcessedDelegateId: Nullish<string>,
+    lastProcessedOwnerIdForDelegate: Nullish<string>,
+  ): Promise<void> {
+    // If we have an in-progress delegate, resume its inner loop first
+    if (lastProcessedDelegateId && lastProcessedOwnerIdForDelegate) {
+      await this.runInnerLoop({
+        delegateUserId: lastProcessedDelegateId,
+        lastProcessedOwnerIdForDelegate,
+        lastProcessedDelegateId,
+      });
+    }
 
-          ownersLastFetchedId = last(ownersBatch)?.userProfileId;
-          ownersBatch = await this.fetchBatch({
-            lastFetchedId: ownersLastFetchedId,
-            excludedProfileIds: [delegateUserId],
-          });
-        }
+    // Continue outer loop from the last processed delegate
+    let delegatesBatch = await this.fetchBatch({ lastFetchedId: lastProcessedDelegateId ?? undefined });
+
+    while (delegatesBatch.length) {
+      for (const { userProfileId: delegateUserId } of delegatesBatch) {
+        await this.runInnerLoop({
+          delegateUserId,
+          lastProcessedOwnerIdForDelegate: null,
+          lastProcessedDelegateId: delegateUserId,
+        });
+        lastProcessedDelegateId = delegateUserId;
       }
 
-      lastProcessedUserId = last(usersBatch)?.userProfileId;
-      usersBatch = await this.fetchBatch({ lastFetchedId: lastProcessedUserId });
+      delegatesBatch = await this.fetchBatch({ lastFetchedId: lastProcessedDelegateId ?? undefined });
     }
+  }
+
+  @Span()
+  private async runInnerLoop({
+    delegateUserId,
+    lastProcessedOwnerIdForDelegate,
+    lastProcessedDelegateId,
+  }: {
+    delegateUserId: string;
+    lastProcessedOwnerIdForDelegate: Nullish<string>;
+    lastProcessedDelegateId: Nullish<string>;
+  }): Promise<void> {
+    const client = this.graphClientFactory.createClientForUser(delegateUserId);
+    let ownersLastFetchedId: Nullish<string> = lastProcessedOwnerIdForDelegate;
+    let ownersBatch = await this.fetchBatch({
+      lastFetchedId: ownersLastFetchedId ?? undefined,
+      excludedProfileIds: [delegateUserId],
+    });
+
+    while (ownersBatch.length) {
+      await Promise.all(
+        ownersBatch.map(({ userProfileId: ownerUserId, email: ownerEmail }) => {
+          return withRetryAttempts({
+            fn: async () => {
+              await this.updateDelegatedAccess({
+                ownerUserId,
+                ownerEmail,
+                client,
+                delegateUserId,
+              });
+              return { status: 'success' };
+            },
+            onError: rethrowRateLimitError,
+            getResultFailure: (error) => ({ status: 'failed', error }),
+          });
+        }),
+      );
+
+      ownersLastFetchedId = last(ownersBatch)?.userProfileId;
+      await this.persistentCacheService.setWith(
+        CACHE_KEY,
+        async ({ currentValue, update }): Promise<void> => {
+          assert.ok(currentValue);
+          assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+          await update({
+            dataType: 'DelegatedAccessDiscovery',
+            payload: {
+              ...currentValue.payload,
+              lastProcessedDelegateId,
+              lastProcessedOwnerIdForDelegate: ownersLastFetchedId,
+              lastProgressRegisteredAt: Date.now(),
+            },
+          });
+        },
+      );
+
+      ownersBatch = await this.fetchBatch({
+        lastFetchedId: ownersLastFetchedId ?? undefined,
+        excludedProfileIds: [delegateUserId],
+      });
+    }
+
+    // Inner loop complete for this delegate — clear the owner cursor
+    await this.persistentCacheService.setWith(
+      CACHE_KEY,
+      async ({ currentValue, update }): Promise<void> => {
+        assert.ok(currentValue);
+        assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+        await update({
+          dataType: 'DelegatedAccessDiscovery',
+          payload: {
+            ...currentValue.payload,
+            lastProcessedDelegateId,
+            lastProcessedOwnerIdForDelegate: null,
+            lastProgressRegisteredAt: Date.now(),
+          },
+        });
+      },
+    );
+  }
+
+  @Span()
+  public async decide(): Promise<DiscoverDelegatedAccessDecision> {
+    return this.persistentCacheService.setWith(
+      CACHE_KEY,
+      async ({
+        currentValue,
+        create,
+        update,
+      }): Promise<DiscoverDelegatedAccessDecision> => {
+        if (!currentValue) {
+          await create({
+            dataType: 'DelegatedAccessDiscovery',
+            payload: {
+              state: 'running',
+              lastProcessedDelegateId: null,
+              lastProcessedOwnerIdForDelegate: null,
+              lastProgressRegisteredAt: Date.now(),
+            },
+          });
+          return {
+            action: 'proceed',
+            lastProcessedDelegateId: null,
+            lastProcessedOwnerIdForDelegate: null,
+          };
+        }
+
+        assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+
+        if (currentValue.payload.state === 'ready') {
+          await update({
+            dataType: 'DelegatedAccessDiscovery',
+            payload: {
+              state: 'running',
+              lastProcessedDelegateId: null,
+              lastProcessedOwnerIdForDelegate: null,
+              lastProgressRegisteredAt: Date.now(),
+            },
+          });
+          return {
+            action: 'proceed',
+            lastProcessedDelegateId: null,
+            lastProcessedOwnerIdForDelegate: null,
+          };
+        }
+
+        if (currentValue.payload.state === 'failed') {
+          await update({
+            dataType: 'DelegatedAccessDiscovery',
+            payload: {
+              state: 'running',
+              lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
+              lastProcessedOwnerIdForDelegate:
+                currentValue.payload.lastProcessedOwnerIdForDelegate,
+              lastProgressRegisteredAt: Date.now(),
+            },
+          });
+          return {
+            action: 'proceed',
+            lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
+            lastProcessedOwnerIdForDelegate:
+              currentValue.payload.lastProcessedOwnerIdForDelegate,
+          };
+        }
+
+        const currentTime = new Date();
+        currentTime.setMinutes(
+          currentTime.getMinutes() - NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES,
+        );
+
+        if (currentValue.payload.lastProgressRegisteredAt <= currentTime.getTime()) {
+          await update({
+            dataType: 'DelegatedAccessDiscovery',
+            payload: {
+              state: 'running',
+              lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
+              lastProcessedOwnerIdForDelegate:
+                currentValue.payload.lastProcessedOwnerIdForDelegate,
+              lastProgressRegisteredAt: Date.now(),
+            },
+          });
+          return {
+            action: 'proceed',
+            lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
+            lastProcessedOwnerIdForDelegate:
+              currentValue.payload.lastProcessedOwnerIdForDelegate,
+          };
+        }
+
+        return {
+          action: 'skip',
+          reason: `Skipped running discovery for delegated permissions, another discovery in progress`,
+        };
+      },
+    );
   }
 
   private async fetchBatch({

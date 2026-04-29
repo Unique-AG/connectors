@@ -134,6 +134,8 @@ export class SyncDelegatedAccessForAllUsersCommand {
           return { action: 'proceed', lastProcessedPipelineId: null };
         }
 
+        assert.ok(currentValue.dataType === 'DelegatedAccessVerification');
+
         if (currentValue.payload.state === 'ready') {
           await update({
             dataType: 'DelegatedAccessVerification',
