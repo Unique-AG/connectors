@@ -190,6 +190,13 @@
       "when": 1776668866459,
       "tag": "0026_natural_whirlwind",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1777462313358,
+      "tag": "0027_needy_wasp",
+      "breakpoints": true
     }
   ]
 }
