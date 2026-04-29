@@ -1,7 +1,7 @@
 import { type UniqueApiClient } from '@unique-ag/unique-api';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { filter, isNonNullish, map, pipe } from 'remeda';
+import { filter, isNonNullish, map, pipe, sortBy } from 'remeda';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
@@ -41,15 +41,18 @@ export class OpenEmailQuery {
   public async run(
     userProfileId: string,
     id: string,
-    backend: SearchBackend,
+    idType: SearchBackend,
   ): Promise<OpenEmailResult> {
-    if (backend === SearchBackend.MsGraph) {
-      return this.runGraph(userProfileId, id);
+    if (idType === SearchBackend.MsGraph) {
+      return this.readMessageFromMsGraph(userProfileId, id);
     }
-    return this.runUnique(id);
+    return this.readMessageFromUnique(id);
   }
 
-  private async runGraph(userProfileId: string, messageId: string): Promise<OpenEmailResult> {
+  private async readMessageFromMsGraph(
+    userProfileId: string,
+    messageId: string,
+  ): Promise<OpenEmailResult> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const raw = await client
       .api(`/me/messages/${messageId}`)
@@ -83,17 +86,17 @@ export class OpenEmailQuery {
     };
   }
 
-  private async runUnique(id: string): Promise<OpenEmailResult> {
+  private async readMessageFromUnique(id: string): Promise<OpenEmailResult> {
     const emailData = await this.uniqueApi.content.getContentById({ contentId: id });
     return {
       id: emailData.id,
       title: emailData.title ?? null,
       metadata: emailData.metadata as unknown,
-      text: (emailData.chunks ?? [])
-        .slice()
-        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-        .map((chunk) => chunk.text)
-        .join('\n'),
+      text: pipe(
+        emailData.chunks ?? [],
+        sortBy((chunk) => chunk.order ?? 0),
+        map((chunk) => chunk.text),
+      ).join('\n'),
     };
   }
 }

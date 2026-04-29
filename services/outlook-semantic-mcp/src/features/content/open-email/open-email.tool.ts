@@ -4,13 +4,13 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
-import { isGraphBackend } from '~/utils/backend-config.utils';
+import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SearchBackend } from '../search/semantic-search-emails.query';
 import { OpenEmailQuery } from './open-email.query';
 import { META } from './open-email-tool.meta';
 
-const IS_GRAPH_BACKEND = isGraphBackend();
+const IS_MICROSOFT_GRAPH_BACKEND = isMicrosoftGraphBackend();
 
 const OpenEmailByIdInputSchema = z.object({
   id: z
@@ -70,7 +70,7 @@ export class OpenEmailTool {
   ): Promise<z.infer<typeof OpenEmailByIdOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
 
-    if (!IS_GRAPH_BACKEND) {
+    if (!IS_MICROSOFT_GRAPH_BACKEND) {
       const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
       if (!subscriptionStatus.success) {
         return subscriptionStatus;

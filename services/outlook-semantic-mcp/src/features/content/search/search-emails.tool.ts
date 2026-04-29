@@ -10,14 +10,14 @@ import {
 } from '~/features/content/search/semantic-search-conditions.dto';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { GetFullSyncStatsQuery } from '~/features/sync/full-sync/get-full-sync-stats.query';
-import { isGraphBackend } from '~/utils/backend-config.utils';
+import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { META } from './search-emails-tool.meta';
 import { SearchBackend } from './semantic-search-emails.query';
 
-const IS_GRAPH_BACKEND = isGraphBackend();
+const IS_MICROSOFT_GRAPH_BACKEND = isMicrosoftGraphBackend();
 
-const SearchEmailsToolInputSchema = IS_GRAPH_BACKEND
+const SearchEmailsToolInputSchema = IS_MICROSOFT_GRAPH_BACKEND
   ? SearchEmailsMsGraphInputSchema
   : SearchEmailsUnifiedInputSchema;
 
@@ -74,7 +74,7 @@ export class SearchEmailsTool {
   ): Promise<z.infer<typeof SearchEmailsOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
 
-    if (!IS_GRAPH_BACKEND) {
+    if (!IS_MICROSOFT_GRAPH_BACKEND) {
       const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
       if (!subscriptionStatus.success) {
         return subscriptionStatus;
@@ -83,7 +83,7 @@ export class SearchEmailsTool {
 
     const results = await this.searchEmailsQuery.run(userProfileTypeId.toString(), input);
 
-    if (!IS_GRAPH_BACKEND) {
+    if (!IS_MICROSOFT_GRAPH_BACKEND) {
       const stats = await this.getFullSyncStatsQuery.run(userProfileTypeId);
 
       if (stats.state === 'error') {

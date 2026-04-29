@@ -2,7 +2,7 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
-import { isDebugMode, isGraphBackend } from '~/utils/backend-config.utils';
+import { isDebugMode, isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
 import { CategoriesModule } from './categories/categories.module';
@@ -37,7 +37,7 @@ import { SyncRecoveryModule } from './sync/sync-recovery.module';
 export class BackendModule {}
 
 export function registerBackendModule(): DynamicModule {
-  const isGraph = isGraphBackend();
+  const isGraph = isMicrosoftGraphBackend();
   const isDebug = isDebugMode();
 
   const uniqueAndMicrosoftBackendCommonTools = [
