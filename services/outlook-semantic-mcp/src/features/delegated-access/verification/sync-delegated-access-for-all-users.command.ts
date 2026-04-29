@@ -1,11 +1,12 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, gt } from 'drizzle-orm';
-import { last } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, delegatedAccessPipelines } from '~/db';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { Nullish } from '~/utils/nullish';
 import { SyncDelegatedAccessCommand } from './sync-delegated-access.command';
+import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { Span } from 'nestjs-otel';
 
 const CACHE_KEY = `SyncDelegatedAccessForAllUsers`;
 const NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES = 10;
@@ -24,6 +25,7 @@ export class SyncDelegatedAccessForAllUsersCommand {
     private syncDelegatedAccessCommand: SyncDelegatedAccessCommand,
   ) {}
 
+  @Span()
   public async run(): Promise<void> {
     const decision = await this.decide();
     if (decision.action === 'skip') {
@@ -31,7 +33,32 @@ export class SyncDelegatedAccessForAllUsersCommand {
       return;
     }
 
-    let lastProcessedPipelineId: Nullish<string> = decision.lastProcessedPipelineId;
+    let finalState: 'ready' | 'failed';
+    try {
+      await this.runSyncInBatches(decision.lastProcessedPipelineId);
+      finalState = 'ready';
+    } catch (error) {
+      this.logger.error({ msg: `Failed to run deleagted access sync`, err: error });
+      finalState = 'failed';
+    }
+    await this.persistentCacheService.setWith(
+      CACHE_KEY,
+      async ({ currentValue, update }): Promise<void> => {
+        assert.ok(currentValue);
+        await update({
+          dataType: 'DelegatedAccessVerification',
+          payload: {
+            ...currentValue.payload,
+            state: finalState,
+            lastProgressRegisteredAt: Date.now(),
+          },
+        });
+      },
+    );
+  }
+
+  @Span()
+  private async runSyncInBatches(lastProcessedPipelineId: Nullish<string>): Promise<void> {
     let batch = await this.fetchBatch({ lastProcessedPipelineId });
 
     while (batch.length) {
@@ -39,44 +66,37 @@ export class SyncDelegatedAccessForAllUsersCommand {
         msg: `Running delegated access sync for batch: ${batch.length}`,
         pipelineIds: batch.map((item) => item.id).join(', '),
       });
-      await Promise.all(
-        batch.map(async (pipeline) => {
-          await this.syncDelegatedAccessCommand.run({ pipelineId: pipeline.id });
-          await this.persistentCacheService.setWith(
-            CACHE_KEY,
-            async ({ currentValue, update }): Promise<void> => {
-              assert.ok(currentValue);
-              await update({
-                dataType: 'DelegatedAccessVerification',
-                payload: {
-                  ...currentValue.payload,
-                  lastProgressRegisteredAt: Date.now(),
-                },
-              });
-            },
-          );
-        }),
-      );
+      for (const pipeline of batch) {
+        withRetryAttempts({
+          fn: async () => {
+            await this.syncDelegatedAccessCommand.run({ pipelineId: pipeline.id });
+            return { status: 'success' };
+          },
+          onError: rethrowRateLimitError,
+          getResultFailure: (error) => ({ status: 'failed', error }),
+        });
+        await this.persistentCacheService.setWith(
+          CACHE_KEY,
+          async ({ currentValue, update }): Promise<void> => {
+            assert.ok(currentValue);
+            await update({
+              dataType: 'DelegatedAccessVerification',
+              payload: {
+                ...currentValue.payload,
+                lastProcessedPipelineId: lastProcessedPipelineId,
+                lastProgressRegisteredAt: Date.now(),
+              },
+            });
+          },
+        );
+        lastProcessedPipelineId = pipeline.id;
+      }
 
-      lastProcessedPipelineId = last(batch)?.id;
-      await this.persistentCacheService.setWith(
-        CACHE_KEY,
-        async ({ currentValue, update }): Promise<void> => {
-          assert.ok(currentValue);
-          await update({
-            dataType: 'DelegatedAccessVerification',
-            payload: {
-              ...currentValue.payload,
-              lastProcessedPipelineId: lastProcessedPipelineId,
-              lastProgressRegisteredAt: Date.now(),
-            },
-          });
-        },
-      );
       batch = await this.fetchBatch({ lastProcessedPipelineId });
     }
   }
 
+  @Span()
   private async fetchBatch({
     lastProcessedPipelineId,
   }: {
@@ -93,10 +113,10 @@ export class SyncDelegatedAccessForAllUsersCommand {
         ),
       )
       .orderBy(delegatedAccessPipelines.id)
-      // We process at most 5 pipelines in pharalel
-      .limit(5);
+      .limit(50);
   }
 
+  @Span()
   public async decide(): Promise<SyncDelegatedAccessForAllUsersDecision> {
     return this.persistentCacheService.setWith(
       CACHE_KEY,

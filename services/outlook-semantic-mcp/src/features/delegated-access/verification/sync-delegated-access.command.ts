@@ -1,6 +1,6 @@
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { count, eq, notInArray } from 'drizzle-orm';
+import { and, count, eq, notInArray } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { chunk } from 'remeda';
 import {
@@ -11,11 +11,19 @@ import {
   userProfiles,
 } from '~/db';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { GenericRateLimitError } from '~/utils/is-rate-limit-error';
 
 interface FolderNode {
   id: string;
   childFolderCount: number;
   childFolders?: FolderNode[];
+}
+
+interface FolderWithErrors {
+  canRead: boolean;
+  folderId: string;
+  reason: string;
+  error: unknown;
 }
 
 @Injectable()
@@ -63,56 +71,75 @@ export class SyncDelegatedAccessCommand {
 
     const client = this.graphClientFactory.createClientForUser(delegateUserId);
 
-    let hasTransientError = false;
     const folderIds = await this.readAllFolders({ client, ownerEmail });
-
-    const accesibleFolderIds: string[] = [];
+    let foldersWithErrors: FolderWithErrors[] = [];
+    const accessibleFolderIds: string[] = [];
     for (const folderIdsChunk of chunk(folderIds, 100)) {
       const foldersWithAccessFetched = await Promise.all(
-        folderIdsChunk.map(async (folderId) => {
-          try {
-            await client
-              .api(`/users/${ownerEmail}/mailFolders/${folderId}/messages`)
-              .select('id')
-              .top(1)
-              .get();
-            return { canRead: true, folderId };
-          } catch (error) {
-            if (error instanceof GraphError) {
-              if (error.statusCode === 403 || error.statusCode === 404) {
-                return { canRead: false, folderId, reason: 'no-access', error };
+        folderIdsChunk.map(
+          async (folderId): Promise<{ canRead: true; folderId: string } | FolderWithErrors> => {
+            try {
+              await client
+                .api(`/users/${ownerEmail}/mailFolders/${folderId}/messages`)
+                .select('id')
+                .top(1)
+                .get();
+              return { canRead: true, folderId };
+            } catch (error) {
+              if (error instanceof GraphError) {
+                if (error.statusCode === 403 || error.statusCode === 404) {
+                  return { canRead: false, folderId, reason: 'no-access', error };
+                }
+                if (
+                  error.statusCode === 429 ||
+                  (error.statusCode >= 500 && error.statusCode < 600)
+                ) {
+                  return { canRead: false, folderId, reason: 'transient-error', error };
+                }
               }
-              if (error.statusCode === 429 || (error.statusCode >= 500 && error.statusCode < 600)) {
-                hasTransientError = true;
-                return { canRead: false, folderId, reason: 'transient-error', error };
-              }
+              return { canRead: false, folderId, reason: 'unexpected-error', error };
             }
-            return { canRead: false, folderId, reason: 'unexpected-error', error };
-          }
-        }),
+          },
+        ),
       );
-      accesibleFolderIds.push(
+      foldersWithErrors = foldersWithAccessFetched.filter(
+        (item) => !item.canRead && item.reason !== 'no-access',
+      ) as FolderWithErrors[];
+      accessibleFolderIds.push(
         ...foldersWithAccessFetched.filter((item) => item.canRead).map((item) => item.folderId),
       );
 
-      if (hasTransientError) {
+      if (foldersWithErrors.length > 0) {
+        const error = new Error(`Stop delegated access sync. Some ms graph api calles failed`, {
+          cause: foldersWithErrors,
+        });
+        this.logger.error(error);
         break;
       }
     }
 
     await this.db
       .delete(delegatedAccessDirectories)
-      .where(notInArray(delegatedAccessDirectories.directoryId, accesibleFolderIds));
+      .where(
+        and(
+          eq(delegatedAccessDirectories.pipelineId, pipelineId),
+          accessibleFolderIds.length > 0
+            ? notInArray(delegatedAccessDirectories.directoryId, accessibleFolderIds)
+            : undefined,
+        ),
+      );
 
-    await this.db
-      .insert(delegatedAccessDirectories)
-      .values(
-        accesibleFolderIds.map((directoryId) => ({
-          pipelineId,
-          directoryId,
-        })),
-      )
-      .onConflictDoNothing();
+    if (accessibleFolderIds.length > 0) {
+      await this.db
+        .insert(delegatedAccessDirectories)
+        .values(
+          accessibleFolderIds.map((directoryId) => ({
+            pipelineId,
+            directoryId,
+          })),
+        )
+        .onConflictDoNothing();
+    }
 
     const [result] = await this.db
       .select({ count: count() })
@@ -120,7 +147,7 @@ export class SyncDelegatedAccessCommand {
       .where(eq(delegatedAccessDirectories.pipelineId, pipelineId));
     const dirCount = result?.count ?? 0;
 
-    if (dirCount === 0 && !hasTransientError) {
+    if (dirCount === 0 && !foldersWithErrors.length) {
       await this.db
         .delete(delegatedAccessPipelines)
         .where(eq(delegatedAccessPipelines.id, pipelineId));
@@ -128,13 +155,24 @@ export class SyncDelegatedAccessCommand {
       return;
     }
 
-    if (!hasTransientError) {
+    if (!foldersWithErrors.length) {
       await this.db
         .update(delegatedAccessPipelines)
         .set({ lastVerifiedAt: new Date() })
         .where(eq(delegatedAccessPipelines.id, pipelineId));
       this.logger.log({ pipelineId, dirCount, msg: 'Pipeline lastVerifiedAt updated' });
+      return;
     }
+
+    if (foldersWithErrors.every((error) => error.reason === 'transient-error')) {
+      throw new GenericRateLimitError(`Delegated access sync failed because of rate limitting`, {
+        cause: foldersWithErrors,
+      });
+    }
+
+    throw new Error(`Delegated access sync failed with some errors`, {
+      cause: foldersWithErrors,
+    });
   }
 
   private async readAllFolders({

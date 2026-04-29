@@ -7,6 +7,6 @@ export const caches = pgTable('caches', {
   key: varchar()
     .primaryKey()
     .$default(() => typeid('cache').toString()),
-  data: jsonb(`filters`).$type<CacheData>().notNull(),
+  data: jsonb(`data`).$type<CacheData>().notNull(),
   ...timestamps,
 });

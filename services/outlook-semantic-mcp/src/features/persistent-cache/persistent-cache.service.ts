@@ -73,10 +73,7 @@ export class PersistentCacheService {
     });
   }
 
-  public async get<DataType extends CacheData['dataType']>(
-    key: string,
-    dataType: DataType,
-  ): Promise<Extract<CacheData, { type: DataType }> | null> {
+  public async get(key: string): Promise<CacheData | null> {
     const row = await this.db.query.caches.findFirst({
       where: eq(caches.key, this.getKey(key).toString()),
     });
@@ -84,16 +81,11 @@ export class PersistentCacheService {
       return null;
     }
 
-    const rowParsed = cacheData.parse(row);
-    assert.ok(
-      rowParsed.dataType === dataType,
-      `Row type: ${rowParsed.dataType} does not equal the expected row type: ${dataType} for key: ${key}`,
-    );
-    return rowParsed as unknown as Extract<CacheData, { type: DataType }> | null;
+    return cacheData.parse(row);
   }
 
   private getKey(key: string): TypeID<'cache'> {
-    const tid = fromString(key, 'cache');
+    const tid = fromString(`cache_${key}`, 'cache');
     const pid = parseTypeId(tid);
     return typeid(pid.prefix, pid.suffix);
   }

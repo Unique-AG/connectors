@@ -11,6 +11,7 @@ import {
   userProfiles,
 } from '~/db';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 
 @Injectable()
 export class DiscoverDelegatedAccessCommand {
@@ -38,11 +39,18 @@ export class DiscoverDelegatedAccessCommand {
         while (ownersBatch.length) {
           await Promise.all(
             ownersBatch.map(({ userProfileId: ownerUserId, email: ownerEmail }) => {
-              return this.updateDelegatedAccess({
-                ownerUserId,
-                ownerEmail,
-                client,
-                delegateUserId,
+              return withRetryAttempts({
+                fn: async () => {
+                  await this.updateDelegatedAccess({
+                    ownerUserId,
+                    ownerEmail,
+                    client,
+                    delegateUserId,
+                  });
+                  return { status: 'success' };
+                },
+                onError: rethrowRateLimitError,
+                getResultFailure: (error) => ({ status: 'failed', error }),
               });
             }),
           );
@@ -152,7 +160,7 @@ export class DiscoverDelegatedAccessCommand {
             statusCode: error.statusCode,
             msg: 'Transient error during discovery, skipping',
           });
-          return;
+          throw error;
         }
       }
 
@@ -162,6 +170,8 @@ export class DiscoverDelegatedAccessCommand {
         error,
         msg: 'Unexpected error during delegated access discovery',
       });
+
+      throw error;
     }
   }
 }
