@@ -38,13 +38,14 @@ export class SyncDelegatedAccessForAllUsersCommand {
       await this.runSyncInBatches(decision.lastProcessedPipelineId);
       finalState = 'ready';
     } catch (error) {
-      this.logger.error({ msg: `Failed to run deleagted access sync`, err: error });
+      this.logger.error({ msg: `Failed to run delegated access sync`, err: error });
       finalState = 'failed';
     }
     await this.persistentCacheService.setWith(
       CACHE_KEY,
       async ({ currentValue, update }): Promise<void> => {
         assert.ok(currentValue);
+        assert.ok(currentValue.dataType === 'DelegatedAccessVerification');
         await update({
           dataType: 'DelegatedAccessVerification',
           payload: {
@@ -80,6 +81,7 @@ export class SyncDelegatedAccessForAllUsersCommand {
           CACHE_KEY,
           async ({ currentValue, update }): Promise<void> => {
             assert.ok(currentValue);
+            assert.ok(currentValue.dataType === 'DelegatedAccessVerification');
             await update({
               dataType: 'DelegatedAccessVerification',
               payload: {

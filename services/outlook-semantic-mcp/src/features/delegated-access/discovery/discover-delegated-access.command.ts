@@ -90,7 +90,9 @@ export class DiscoverDelegatedAccessCommand {
     }
 
     // Continue outer loop from the last processed delegate
-    let delegatesBatch = await this.fetchBatch({ lastFetchedId: lastProcessedDelegateId ?? undefined });
+    let delegatesBatch = await this.fetchBatch({
+      lastFetchedId: lastProcessedDelegateId ?? undefined,
+    });
 
     while (delegatesBatch.length) {
       for (const { userProfileId: delegateUserId } of delegatesBatch) {
@@ -102,7 +104,9 @@ export class DiscoverDelegatedAccessCommand {
         lastProcessedDelegateId = delegateUserId;
       }
 
-      delegatesBatch = await this.fetchBatch({ lastFetchedId: lastProcessedDelegateId ?? undefined });
+      delegatesBatch = await this.fetchBatch({
+        lastFetchedId: lastProcessedDelegateId ?? undefined,
+      });
     }
   }
 
@@ -189,11 +193,7 @@ export class DiscoverDelegatedAccessCommand {
   public async decide(): Promise<DiscoverDelegatedAccessDecision> {
     return this.persistentCacheService.setWith(
       CACHE_KEY,
-      async ({
-        currentValue,
-        create,
-        update,
-      }): Promise<DiscoverDelegatedAccessDecision> => {
+      async ({ currentValue, create, update }): Promise<DiscoverDelegatedAccessDecision> => {
         if (!currentValue) {
           await create({
             dataType: 'DelegatedAccessDiscovery',
@@ -236,16 +236,14 @@ export class DiscoverDelegatedAccessCommand {
             payload: {
               state: 'running',
               lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
-              lastProcessedOwnerIdForDelegate:
-                currentValue.payload.lastProcessedOwnerIdForDelegate,
+              lastProcessedOwnerIdForDelegate: currentValue.payload.lastProcessedOwnerIdForDelegate,
               lastProgressRegisteredAt: Date.now(),
             },
           });
           return {
             action: 'proceed',
             lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
-            lastProcessedOwnerIdForDelegate:
-              currentValue.payload.lastProcessedOwnerIdForDelegate,
+            lastProcessedOwnerIdForDelegate: currentValue.payload.lastProcessedOwnerIdForDelegate,
           };
         }
 
@@ -260,16 +258,14 @@ export class DiscoverDelegatedAccessCommand {
             payload: {
               state: 'running',
               lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
-              lastProcessedOwnerIdForDelegate:
-                currentValue.payload.lastProcessedOwnerIdForDelegate,
+              lastProcessedOwnerIdForDelegate: currentValue.payload.lastProcessedOwnerIdForDelegate,
               lastProgressRegisteredAt: Date.now(),
             },
           });
           return {
             action: 'proceed',
             lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
-            lastProcessedOwnerIdForDelegate:
-              currentValue.payload.lastProcessedOwnerIdForDelegate,
+            lastProcessedOwnerIdForDelegate: currentValue.payload.lastProcessedOwnerIdForDelegate,
           };
         }
 

@@ -32,8 +32,7 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
   }
 
   private setupCronJob(): void {
-    const frequency = Math.floor(24 / this.config.delegatedAccessSyncFrequencyPerDay);
-    const job = new CronJob(`0 */${frequency} * * *`, async () => {
+    const job = new CronJob(this.config.delegatedAccessVerificationCronSchedule, async () => {
       try {
         await this.triggerVerificationForPipelineRows();
       } catch (err) {

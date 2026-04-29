@@ -27,7 +27,9 @@ function makeGraphError(statusCode: number): GraphError {
 
 function createMockGraphApi() {
   return {
+    select: vi.fn().mockReturnThis(),
     top: vi.fn().mockReturnThis(),
+    expand: vi.fn().mockReturnThis(),
     get: vi.fn(),
   };
 }
@@ -72,8 +74,8 @@ function createMockDb({
   const select = vi.fn().mockReturnValue({ from: selectFrom });
 
   // insert chain
-  const insertOnConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
-  const insertValues = vi.fn().mockReturnValue({ onConflictDoUpdate: insertOnConflictDoUpdate });
+  const insertOnConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+  const insertValues = vi.fn().mockReturnValue({ onConflictDoNothing: insertOnConflictDoNothing });
   const insert = vi.fn().mockReturnValue({ values: insertValues });
 
   // delete chain
@@ -94,7 +96,7 @@ function createMockDb({
     __selectWhere: selectWhere,
     __insert: insert,
     __insertValues: insertValues,
-    __insertOnConflictDoUpdate: insertOnConflictDoUpdate,
+    __insertOnConflictDoNothing: insertOnConflictDoNothing,
     __delete: deleteFn,
     __deleteWhere: deleteWhere,
     __update: update,
@@ -150,11 +152,11 @@ describe('SyncDelegatedAccessCommand', () => {
 
     expect(db.__insert).toHaveBeenCalledOnce();
     expect(db.__insertValues).toHaveBeenCalledWith(
-      expect.objectContaining({ pipelineId: PIPELINE_ID, directoryId: FOLDER_ID_1 }),
+      expect.arrayContaining([
+        expect.objectContaining({ pipelineId: PIPELINE_ID, directoryId: FOLDER_ID_1 }),
+      ]),
     );
-    expect(db.__insertOnConflictDoUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ set: expect.objectContaining({ updatedAt: expect.any(Date) }) }),
-    );
+    expect(db.__insertOnConflictDoNothing).toHaveBeenCalledOnce();
   });
 
   it('deletes directory row on 403 response from message fetch', async () => {
@@ -185,7 +187,7 @@ describe('SyncDelegatedAccessCommand', () => {
     expect(db.__insert).not.toHaveBeenCalled();
   });
 
-  it('skips folder on 429 — no upsert, no delete', async () => {
+  it('skips folder on 429 — no upsert, throws transient error', async () => {
     graphApi.get
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
       .mockRejectedValueOnce(makeGraphError(429));
@@ -193,13 +195,12 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
 
     expect(db.__insert).not.toHaveBeenCalled();
-    expect(db.__delete).not.toHaveBeenCalled();
   });
 
-  it('skips folder on 5xx — no upsert, no delete', async () => {
+  it('skips folder on 5xx — no upsert, throws transient error', async () => {
     graphApi.get
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
       .mockRejectedValueOnce(makeGraphError(503));
@@ -207,10 +208,9 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
 
     expect(db.__insert).not.toHaveBeenCalled();
-    expect(db.__delete).not.toHaveBeenCalled();
   });
 
   it('does NOT update lastVerifiedAt when a 429 transient error occurred on any folder', async () => {
@@ -222,7 +222,7 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
 
     expect(db.__update).not.toHaveBeenCalled();
   });
@@ -236,7 +236,7 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
 
     expect(db.__update).not.toHaveBeenCalled();
   });
@@ -266,9 +266,10 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 0 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
 
-    expect(db.__delete).not.toHaveBeenCalled();
+    // Only the directory delete is called, not the pipeline delete
+    expect(db.__delete).toHaveBeenCalledOnce();
     expect(db.__update).not.toHaveBeenCalled();
   });
 
@@ -302,8 +303,8 @@ describe('SyncDelegatedAccessCommand', () => {
 
     await command.run({ pipelineId: PIPELINE_ID });
 
-    expect(db.__insert).toHaveBeenCalledTimes(2); // FOLDER_ID_1 and FOLDER_ID_3
-    expect(db.__delete).toHaveBeenCalledOnce(); // FOLDER_ID_2 directory delete
+    expect(db.__insert).toHaveBeenCalledOnce(); // batch insert of FOLDER_ID_1 and FOLDER_ID_3
+    expect(db.__delete).toHaveBeenCalledOnce(); // directories delete
     expect(db.__update).toHaveBeenCalledOnce(); // lastVerifiedAt update
   });
 
@@ -322,6 +323,6 @@ describe('SyncDelegatedAccessCommand', () => {
 
     await command.run({ pipelineId: PIPELINE_ID });
 
-    expect(db.__insert).toHaveBeenCalledTimes(2);
+    expect(db.__insert).toHaveBeenCalledOnce();
   });
 });

@@ -22,8 +22,8 @@ export const isRateLimitError = (error: unknown): boolean => {
   if (isBottleneckRateLimit) {
     return true;
   }
-  const isGeneraticRateLimitError = error instanceof GenericRateLimitError;
-  if (isGeneraticRateLimitError) {
+  const isGenericRateLimitError = error instanceof GenericRateLimitError;
+  if (isGenericRateLimitError) {
     return true;
   }
   return false;

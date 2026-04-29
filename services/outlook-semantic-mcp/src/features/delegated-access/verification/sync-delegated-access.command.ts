@@ -118,6 +118,11 @@ export class SyncDelegatedAccessCommand {
       }
     }
 
+    // Intentional: we flush the DB to the confirmed-accessible state even when a transient error
+    // caused an early loop exit. This is safer than leaving stale access grants in place — the
+    // next retry will re-confirm all folders and restore any that were missed.  If the very first
+    // chunk fails (accessibleFolderIds is empty) all directories are removed; the subsequent
+    // GenericRateLimitError will trigger a retry that rebuilds them from scratch.
     await this.db
       .delete(delegatedAccessDirectories)
       .where(
