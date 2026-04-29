@@ -1,12 +1,12 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, gt } from 'drizzle-orm';
+import { Span } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, delegatedAccessPipelines } from '~/db';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { Nullish } from '~/utils/nullish';
-import { SyncDelegatedAccessCommand } from './sync-delegated-access.command';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
-import { Span } from 'nestjs-otel';
+import { SyncDelegatedAccessCommand } from './sync-delegated-access.command';
 
 const CACHE_KEY = `SyncDelegatedAccessForAllUsers`;
 const NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES = 10;
@@ -67,7 +67,7 @@ export class SyncDelegatedAccessForAllUsersCommand {
         pipelineIds: batch.map((item) => item.id).join(', '),
       });
       for (const pipeline of batch) {
-        withRetryAttempts({
+        await withRetryAttempts({
           fn: async () => {
             await this.syncDelegatedAccessCommand.run({ pipelineId: pipeline.id });
             return { status: 'success' };
@@ -75,6 +75,7 @@ export class SyncDelegatedAccessForAllUsersCommand {
           onError: rethrowRateLimitError,
           getResultFailure: (error) => ({ status: 'failed', error }),
         });
+        lastProcessedPipelineId = pipeline.id;
         await this.persistentCacheService.setWith(
           CACHE_KEY,
           async ({ currentValue, update }): Promise<void> => {
@@ -89,7 +90,6 @@ export class SyncDelegatedAccessForAllUsersCommand {
             });
           },
         );
-        lastProcessedPipelineId = pipeline.id;
       }
 
       batch = await this.fetchBatch({ lastProcessedPipelineId });

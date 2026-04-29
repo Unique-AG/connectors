@@ -164,7 +164,7 @@ export class SyncDelegatedAccessCommand {
       return;
     }
 
-    if (foldersWithErrors.every((error) => error.reason === 'transient-error')) {
+    if (foldersWithErrors.some((error) => error.reason === 'transient-error')) {
       throw new GenericRateLimitError(`Delegated access sync failed because of rate limitting`, {
         cause: foldersWithErrors,
       });

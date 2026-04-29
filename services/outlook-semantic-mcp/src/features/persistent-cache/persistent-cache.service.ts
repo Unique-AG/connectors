@@ -1,7 +1,6 @@
 import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { fromString, parseTypeId, TypeID, typeid } from 'typeid-js';
 import { caches, DRIZZLE, DrizzleDatabase } from '~/db';
 import { CacheData, cacheData } from '~/db/schema/cache/cache.data';
 
@@ -84,9 +83,7 @@ export class PersistentCacheService {
     return cacheData.parse(row);
   }
 
-  private getKey(key: string): TypeID<'cache'> {
-    const tid = fromString(`cache_${key}`, 'cache');
-    const pid = parseTypeId(tid);
-    return typeid(pid.prefix, pid.suffix);
+  private getKey(key: string): string {
+    return `cacheKey_${key}`;
   }
 }

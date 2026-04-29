@@ -19,8 +19,8 @@ export class VerifyDelegatedAccessListener {
 
   @RabbitSubscribe({
     exchange: MAIN_EXCHANGE.name,
-    queue: 'unique.outlook-semantic-mcp.delegated-access.verify',
-    routingKey: ['unique.outlook-semantic-mcp.delegated-access.verify.*'],
+    queue: 'unique.outlook-semantic-mcp.delegated-access.sync',
+    routingKey: ['unique.outlook-semantic-mcp.delegated-access.sync'],
     createQueueIfNotExists: true,
     queueOptions: { deadLetterExchange: DEAD_EXCHANGE.name },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
