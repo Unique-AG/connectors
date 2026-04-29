@@ -9,6 +9,19 @@ const DelegatedAccessVerificationCache = z.object({
   }),
 });
 
-export const cacheData = z.discriminatedUnion('dataType', [DelegatedAccessVerificationCache]);
+const DelegatedAccessDiscoveryCache = z.object({
+  dataType: z.literal('DelegatedAccessDiscovery'),
+  payload: z.object({
+    state: z.enum(['running', 'failed', 'ready']),
+    lastProcessedDelegateId: z.string().nullish(),
+    lastProcessedOwnerIdForDelegate: z.string().nullish(),
+    lastProgressRegisteredAt: z.number(),
+  }),
+});
+
+export const cacheData = z.discriminatedUnion('dataType', [
+  DelegatedAccessVerificationCache,
+  DelegatedAccessDiscoveryCache,
+]);
 
 export type CacheData = z.infer<typeof cacheData>;
