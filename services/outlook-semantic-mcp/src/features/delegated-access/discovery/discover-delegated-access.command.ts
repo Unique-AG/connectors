@@ -326,7 +326,7 @@ export class DiscoverDelegatedAccessCommand {
     }
 
     try {
-      await client.api(`/users/${ownerEmail}/mailFolders`).top(1).get();
+      await client.api(`/users/${ownerEmail}/mailFolders`).top(1).select('id').get();
 
       const now = new Date();
       await this.db
