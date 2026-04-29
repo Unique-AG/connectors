@@ -1,8 +1,8 @@
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, gt, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { chunk } from 'remeda';
+import { last } from 'remeda';
 import {
   DRIZZLE,
   DrizzleDatabase,
@@ -23,26 +23,73 @@ export class DiscoverDelegatedAccessCommand {
 
   @Span()
   public async run(): Promise<void> {
-    const connectedUsers = await this.db
-      .select({ userProfileId: subscriptions.userProfileId, email: userProfiles.email })
-      .from(subscriptions)
-      .innerJoin(userProfiles, eq(subscriptions.userProfileId, userProfiles.id))
-      .where(gt(subscriptions.expiresAt, sql`NOW()`))
-      .groupBy(subscriptions.userProfileId, userProfiles.email);
+    let lastProcessedUserId: string | undefined;
+    let usersBatch = await this.fetchBatch({});
 
-    for (const { userProfileId: delegateUserId } of connectedUsers) {
-      const owners = connectedUsers.filter((u) => u.userProfileId !== delegateUserId);
-      const client = this.graphClientFactory.createClientForUser(delegateUserId);
-      const batches = chunk(owners, 100);
+    while (usersBatch.length) {
+      for (const { userProfileId: delegateUserId } of usersBatch) {
+        const client = this.graphClientFactory.createClientForUser(delegateUserId);
+        let ownersLastFetchedId: string | undefined;
+        let ownersBatch = await this.fetchBatch({
+          lastFetchedId: ownersLastFetchedId,
+          excludedProfileIds: [delegateUserId],
+        });
 
-      for (const batch of batches) {
-        await Promise.all(
-          batch.map(({ userProfileId: ownerUserId, email: ownerEmail }) => {
-            return this.updateDelegatedAccess({ ownerUserId, ownerEmail, client, delegateUserId });
-          }),
-        );
+        while (ownersBatch.length) {
+          await Promise.all(
+            ownersBatch.map(({ userProfileId: ownerUserId, email: ownerEmail }) => {
+              return this.updateDelegatedAccess({
+                ownerUserId,
+                ownerEmail,
+                client,
+                delegateUserId,
+              });
+            }),
+          );
+
+          ownersLastFetchedId = last(ownersBatch)?.userProfileId;
+          ownersBatch = await this.fetchBatch({
+            lastFetchedId: ownersLastFetchedId,
+            excludedProfileIds: [delegateUserId],
+          });
+        }
       }
+
+      lastProcessedUserId = last(usersBatch)?.userProfileId;
+      usersBatch = await this.fetchBatch({ lastFetchedId: lastProcessedUserId });
     }
+  }
+
+  private async fetchBatch({
+    lastFetchedId,
+    excludedProfileIds,
+  }: {
+    lastFetchedId?: string;
+    excludedProfileIds?: string[];
+  }): Promise<{ userProfileId: string; email: string }[]> {
+    const activeSubscriptions = this.db
+      .select({ userProfileId: subscriptions.userProfileId })
+      .from(subscriptions)
+      .where(and(gt(subscriptions.expiresAt, sql`NOW()`)));
+
+    const items = await this.db
+      .select({ userProfileId: userProfiles.id, email: userProfiles.email })
+      .from(userProfiles)
+      .where(
+        and(
+          lastFetchedId ? gt(userProfiles.id, lastFetchedId) : undefined,
+          isNotNull(userProfiles.email),
+          excludedProfileIds && excludedProfileIds.length > 0
+            ? notInArray(userProfiles.id, excludedProfileIds)
+            : undefined,
+          inArray(userProfiles.id, activeSubscriptions),
+        ),
+      )
+      .orderBy(userProfiles.id)
+      .limit(100);
+
+    // Type casting is safe because isNotNull(userProfiles.email) ensures the email is not null
+    return items as { userProfileId: string; email: string }[];
   }
 
   private async updateDelegatedAccess({
