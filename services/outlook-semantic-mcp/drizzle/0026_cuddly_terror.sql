@@ -1,6 +1,6 @@
 CREATE TABLE "caches" (
 	"key" varchar PRIMARY KEY NOT NULL,
-	"filters" jsonb NOT NULL,
+	"data" jsonb NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
