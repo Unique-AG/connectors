@@ -39,9 +39,7 @@ function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGrap
   };
 }
 
-function createMockDb({
-  connectedUsers = [] as Array<{ userProfileId: string; email: string | null }>,
-} = {}) {
+function createMockDb() {
   const insertOnConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
   const insertValues = vi.fn().mockReturnValue({ onConflictDoUpdate: insertOnConflictDoUpdate });
   const insert = vi.fn().mockReturnValue({ values: insertValues });
@@ -49,18 +47,7 @@ function createMockDb({
   const deleteWhere = vi.fn().mockResolvedValue(undefined);
   const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });
 
-  const selectGroupBy = vi.fn().mockResolvedValue(connectedUsers);
-  const selectWhere = vi.fn().mockReturnValue({ groupBy: selectGroupBy });
-  const select = vi.fn().mockReturnValue({
-    from: vi.fn().mockReturnValue({
-      innerJoin: vi.fn().mockReturnValue({
-        where: selectWhere,
-      }),
-    }),
-  });
-
   return {
-    select,
     insert,
     delete: deleteFn,
     __insertOnConflictDoUpdate: insertOnConflictDoUpdate,
@@ -68,8 +55,6 @@ function createMockDb({
     __insert: insert,
     __deleteWhere: deleteWhere,
     __delete: deleteFn,
-    __selectWhere: selectWhere,
-    __selectGroupBy: selectGroupBy,
   };
 }
 
@@ -86,6 +71,25 @@ function createCommand({
   );
 }
 
+/**
+ * Mocks fetchBatch so all users arrive in a single delegates batch and each
+ * delegate's owners arrive in a single owners batch. Avoids the need to mock
+ * the Drizzle query chain inside fetchBatch.
+ */
+function mockFetchBatchForUsers(
+  command: DiscoverDelegatedAccessCommand,
+  users: Array<{ userProfileId: string; email: string | null }>,
+) {
+  const spy = vi.spyOn(command as any, 'fetchBatch');
+  spy.mockResolvedValueOnce(users);
+  for (const { userProfileId } of users) {
+    spy.mockResolvedValueOnce(users.filter((u) => u.userProfileId !== userProfileId));
+    spy.mockResolvedValueOnce([]);
+  }
+  spy.mockResolvedValueOnce([]);
+  return spy;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -98,16 +102,26 @@ describe('DiscoverDelegatedAccessCommand', () => {
     vi.clearAllMocks();
   });
 
-  it('upserts rows for all user pairs when access is granted', async () => {
-    graphApi.get.mockResolvedValue({ value: [{ id: 'folder-1' }] });
-
-    const db = createMockDb({
-      connectedUsers: [
-        { userProfileId: USER_ID_A, email: EMAIL_A },
-        { userProfileId: USER_ID_B, email: EMAIL_B },
-      ],
-    });
+  it('does nothing when no users exist', async () => {
+    const db = createMockDb();
     const command = createCommand({ graphApi, db });
+    vi.spyOn(command as any, 'fetchBatch').mockResolvedValue([]);
+
+    await command.run();
+
+    expect(graphApi.get).not.toHaveBeenCalled();
+    expect(db.__insert).not.toHaveBeenCalled();
+    expect(db.__delete).not.toHaveBeenCalled();
+  });
+
+  it('upserts rows for all user pairs when access is granted', async () => {
+    graphApi.get.mockResolvedValue(undefined);
+    const db = createMockDb();
+    const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
 
     await command.run();
 
@@ -121,36 +135,49 @@ describe('DiscoverDelegatedAccessCommand', () => {
         set: expect.objectContaining({ lastDiscoveredAt: expect.any(Date) }),
       }),
     );
-    expect(db.__deleteWhere).not.toHaveBeenCalled();
+    expect(db.__delete).not.toHaveBeenCalled();
   });
 
-  it('does not upsert when a non-GraphError is thrown', async () => {
-    graphApi.get.mockRejectedValue(new Error('Network failure'));
-
-    const db = createMockDb({
-      connectedUsers: [
-        { userProfileId: USER_ID_A, email: EMAIL_A },
-        { userProfileId: USER_ID_B, email: EMAIL_B },
-      ],
-    });
+  it('processes all directed pairs across three users', async () => {
+    graphApi.get.mockResolvedValue(undefined);
+    const db = createMockDb();
     const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+      { userProfileId: USER_ID_C, email: EMAIL_C },
+    ]);
+
+    await command.run();
+
+    // 3 users → 6 directed pairs → 6 graph calls, 6 upserts
+    expect(graphApi.get).toHaveBeenCalledTimes(6);
+    expect(db.__insert).toHaveBeenCalledTimes(6);
+  });
+
+  it('does not upsert or delete when a non-GraphError is thrown', async () => {
+    graphApi.get.mockRejectedValue(new Error('Network failure'));
+    const db = createMockDb();
+    const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
 
     await command.run();
 
     expect(db.__insert).not.toHaveBeenCalled();
-    expect(db.__deleteWhere).not.toHaveBeenCalled();
+    expect(db.__delete).not.toHaveBeenCalled();
   });
 
   it('deletes pipeline rows on 403 response', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(403));
-
-    const db = createMockDb({
-      connectedUsers: [
-        { userProfileId: USER_ID_A, email: EMAIL_A },
-        { userProfileId: USER_ID_B, email: EMAIL_B },
-      ],
-    });
+    const db = createMockDb();
     const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
 
     await command.run();
 
@@ -160,14 +187,12 @@ describe('DiscoverDelegatedAccessCommand', () => {
 
   it('deletes pipeline rows on 404 response', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(404));
-
-    const db = createMockDb({
-      connectedUsers: [
-        { userProfileId: USER_ID_A, email: EMAIL_A },
-        { userProfileId: USER_ID_B, email: EMAIL_B },
-      ],
-    });
+    const db = createMockDb();
     const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
 
     await command.run();
 
@@ -177,14 +202,12 @@ describe('DiscoverDelegatedAccessCommand', () => {
 
   it('leaves rows untouched on 429 rate limit', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(429));
-
-    const db = createMockDb({
-      connectedUsers: [
-        { userProfileId: USER_ID_A, email: EMAIL_A },
-        { userProfileId: USER_ID_B, email: EMAIL_B },
-      ],
-    });
+    const db = createMockDb();
     const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
 
     await command.run();
 
@@ -194,14 +217,12 @@ describe('DiscoverDelegatedAccessCommand', () => {
 
   it('leaves rows untouched on 500 transient error', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(500));
-
-    const db = createMockDb({
-      connectedUsers: [
-        { userProfileId: USER_ID_A, email: EMAIL_A },
-        { userProfileId: USER_ID_B, email: EMAIL_B },
-      ],
-    });
+    const db = createMockDb();
     const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
 
     await command.run();
 
@@ -211,49 +232,30 @@ describe('DiscoverDelegatedAccessCommand', () => {
 
   it('leaves rows untouched on 503 transient error', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(503));
-
-    const db = createMockDb({
-      connectedUsers: [
-        { userProfileId: USER_ID_A, email: EMAIL_A },
-        { userProfileId: USER_ID_B, email: EMAIL_B },
-      ],
-    });
+    const db = createMockDb();
     const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
 
     await command.run();
 
-    expect(db.__insert).not.toHaveBeenCalled();
-    expect(db.__delete).not.toHaveBeenCalled();
-  });
-
-  it('skips all pairs when all owners have null email', async () => {
-    const db = createMockDb({
-      connectedUsers: [
-        { userProfileId: USER_ID_A, email: null },
-        { userProfileId: USER_ID_B, email: null },
-      ],
-    });
-    const command = createCommand({ graphApi, db });
-
-    await command.run();
-
-    expect(graphApi.get).not.toHaveBeenCalled();
     expect(db.__insert).not.toHaveBeenCalled();
     expect(db.__delete).not.toHaveBeenCalled();
   });
 
   it('processes users independently — one upserts, one deletes on 403', async () => {
     graphApi.get
-      .mockResolvedValueOnce({ value: [{ id: 'folder-1' }] }) // A→B succeeds
+      .mockResolvedValueOnce(undefined) // A→B succeeds
       .mockRejectedValueOnce(makeGraphError(403)); // B→A fails
 
-    const db = createMockDb({
-      connectedUsers: [
-        { userProfileId: USER_ID_A, email: EMAIL_A },
-        { userProfileId: USER_ID_B, email: EMAIL_B },
-      ],
-    });
+    const db = createMockDb();
     const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
 
     await command.run();
 
@@ -261,33 +263,75 @@ describe('DiscoverDelegatedAccessCommand', () => {
     expect(db.__delete).toHaveBeenCalledOnce();
   });
 
-  it('processes all user pairs across all connected users', async () => {
-    graphApi.get.mockResolvedValue({ value: [{ id: 'folder-1' }] });
-
-    const db = createMockDb({
-      connectedUsers: [
-        { userProfileId: USER_ID_A, email: EMAIL_A },
-        { userProfileId: USER_ID_B, email: EMAIL_B },
-        { userProfileId: USER_ID_C, email: EMAIL_C },
-      ],
-    });
+  it('skips owner with null email without making a graph call', async () => {
+    graphApi.get.mockResolvedValue(undefined);
+    const db = createMockDb();
     const command = createCommand({ graphApi, db });
+    // A has email, B has null — A→B skipped, B→A proceeds
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: null },
+    ]);
 
     await command.run();
 
-    // 3 users → 3*2 = 6 directed pairs → 6 graph calls, 6 upserts
-    expect(graphApi.get).toHaveBeenCalledTimes(6);
-    expect(db.__insert).toHaveBeenCalledTimes(6);
+    expect(graphApi.get).toHaveBeenCalledTimes(1);
+    expect(db.__insert).toHaveBeenCalledTimes(1);
   });
 
-  it('does nothing when no connected users exist', async () => {
-    const db = createMockDb({ connectedUsers: [] });
+  // --- Pagination ---
+
+  it('paginates through multiple delegate batches using cursor', async () => {
+    graphApi.get.mockResolvedValue(undefined);
+    const db = createMockDb();
     const command = createCommand({ graphApi, db });
+
+    const spy = vi.spyOn(command as any, 'fetchBatch');
+    spy.mockResolvedValueOnce([{ userProfileId: USER_ID_A, email: EMAIL_A }]); // first delegates batch
+    spy.mockResolvedValueOnce([{ userProfileId: USER_ID_B, email: EMAIL_B }]); // A's owners
+    spy.mockResolvedValueOnce([]); // no more A's owners
+    spy.mockResolvedValueOnce([{ userProfileId: USER_ID_C, email: EMAIL_C }]); // second delegates batch
+    spy.mockResolvedValueOnce([{ userProfileId: USER_ID_B, email: EMAIL_B }]); // C's owners
+    spy.mockResolvedValueOnce([]); // no more C's owners
+    spy.mockResolvedValueOnce([]); // no more delegates
 
     await command.run();
 
-    expect(graphApi.get).not.toHaveBeenCalled();
-    expect(db.__insert).not.toHaveBeenCalled();
-    expect(db.__delete).not.toHaveBeenCalled();
+    expect(db.__insert).toHaveBeenCalledTimes(2); // A→B and C→B
+    expect(spy).toHaveBeenCalledWith({ lastFetchedId: USER_ID_A });
+    expect(spy).toHaveBeenCalledWith({ lastFetchedId: USER_ID_C });
+  });
+
+  it('paginates through multiple owner batches for a single delegate', async () => {
+    graphApi.get.mockResolvedValue(undefined);
+    const db = createMockDb();
+    const command = createCommand({ graphApi, db });
+
+    const spy = vi.spyOn(command as any, 'fetchBatch');
+    spy.mockResolvedValueOnce([{ userProfileId: USER_ID_A, email: EMAIL_A }]); // delegates
+    spy.mockResolvedValueOnce([{ userProfileId: USER_ID_B, email: EMAIL_B }]); // A's owners first batch
+    spy.mockResolvedValueOnce([{ userProfileId: USER_ID_C, email: EMAIL_C }]); // A's owners second batch
+    spy.mockResolvedValueOnce([]); // no more A's owners
+    spy.mockResolvedValueOnce([]); // no more delegates
+
+    await command.run();
+
+    expect(db.__insert).toHaveBeenCalledTimes(2); // A→B and A→C
+    expect(spy).toHaveBeenCalledWith({ lastFetchedId: USER_ID_B, excludedProfileIds: [USER_ID_A] });
+    expect(spy).toHaveBeenCalledWith({ lastFetchedId: USER_ID_C, excludedProfileIds: [USER_ID_A] });
+  });
+
+  it('excludes the delegate from its own owner query', async () => {
+    const db = createMockDb();
+    const command = createCommand({ graphApi, db });
+
+    const spy = vi.spyOn(command as any, 'fetchBatch');
+    spy.mockResolvedValueOnce([{ userProfileId: USER_ID_A, email: EMAIL_A }]); // delegates
+    spy.mockResolvedValueOnce([]); // A's owners (empty)
+    spy.mockResolvedValueOnce([]); // no more delegates
+
+    await command.run();
+
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ excludedProfileIds: [USER_ID_A] }));
   });
 });

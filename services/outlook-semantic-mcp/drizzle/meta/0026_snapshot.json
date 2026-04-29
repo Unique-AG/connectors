@@ -1,5 +1,5 @@
 {
-  "id": "34d86cf8-953a-466e-a956-5bbe4b135824",
+  "id": "f3ca157a-9532-4342-b206-a88bee121baa",
   "prevId": "c405f3c9-b309-4534-8826-479aa0d8da03",
   "version": "7",
   "dialect": "postgresql",
@@ -507,6 +507,45 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.caches": {
+      "name": "caches",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "varchar",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "filters": {
+          "name": "filters",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.delegated_access_directories": {
       "name": "delegated_access_directories",
       "schema": "",
@@ -546,10 +585,10 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "delegated_access_directories_pipeline_id_delegated_access_pipeline_id_fk": {
-          "name": "delegated_access_directories_pipeline_id_delegated_access_pipeline_id_fk",
+        "delegated_access_directories_pipeline_id_delegated_access_pipelines_id_fk": {
+          "name": "delegated_access_directories_pipeline_id_delegated_access_pipelines_id_fk",
           "tableFrom": "delegated_access_directories",
-          "tableTo": "delegated_access_pipeline",
+          "tableTo": "delegated_access_pipelines",
           "columnsFrom": [
             "pipeline_id"
           ],
@@ -575,8 +614,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.delegated_access_pipeline": {
-      "name": "delegated_access_pipeline",
+    "public.delegated_access_pipelines": {
+      "name": "delegated_access_pipelines",
       "schema": "",
       "columns": {
         "id": {
@@ -626,9 +665,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "delegated_access_pipeline_delegate_user_id_user_profiles_id_fk": {
-          "name": "delegated_access_pipeline_delegate_user_id_user_profiles_id_fk",
-          "tableFrom": "delegated_access_pipeline",
+        "delegated_access_pipelines_delegate_user_id_user_profiles_id_fk": {
+          "name": "delegated_access_pipelines_delegate_user_id_user_profiles_id_fk",
+          "tableFrom": "delegated_access_pipelines",
           "tableTo": "user_profiles",
           "columnsFrom": [
             "delegate_user_id"
@@ -639,9 +678,9 @@
           "onDelete": "cascade",
           "onUpdate": "cascade"
         },
-        "delegated_access_pipeline_owner_user_id_user_profiles_id_fk": {
-          "name": "delegated_access_pipeline_owner_user_id_user_profiles_id_fk",
-          "tableFrom": "delegated_access_pipeline",
+        "delegated_access_pipelines_owner_user_id_user_profiles_id_fk": {
+          "name": "delegated_access_pipelines_owner_user_id_user_profiles_id_fk",
+          "tableFrom": "delegated_access_pipelines",
           "tableTo": "user_profiles",
           "columnsFrom": [
             "owner_user_id"

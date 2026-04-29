@@ -33,7 +33,8 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
   }
 
   private setupCronJob(): void {
-    const job = new CronJob(this.config.delegatedAccessDiscoveryCronSchedule, async () => {
+    const frequency = Math.floor(24 / this.config.delegatedAccessDiscoveryFrequencyPerDay);
+    const job = new CronJob(`0 */${frequency} * * *`, async () => {
       try {
         await this.triggerDiscovery();
       } catch (err) {

@@ -50,14 +50,18 @@ const ConfigSchema = z
       .min(2)
       .prefault(3)
       .describe('How many minutes should each live catchup run overlap the previous one'),
-    delegatedAccessDiscoveryCronSchedule: z
-      .string()
-      .prefault('0 */6 * * *')
-      .describe('Cron schedule for delegated access discovery. Default: every 6 hours.'),
-    delegatedAccessVerificationCronSchedule: z
-      .string()
-      .prefault('0 */4 * * *')
-      .describe('Cron schedule for delegated access verification. Default: every 4 hours.'),
+    delegatedAccessDiscoveryFrequencyPerDay: z
+      .int()
+      .min(2)
+      .max(24)
+      .prefault(4)
+      .describe('Number times to run delegated access discovery. Default: twice per day.'),
+    delegatedAccessSyncFrequencyPerDay: z
+      .int()
+      .min(2)
+      .max(24)
+      .prefault(6)
+      .describe('Number times to run the delegated access sync per day'),
   })
   .transform((c) => ({
     ...c,

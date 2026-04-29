@@ -1,2 +1,2 @@
 export * from './delegated-access-directories.table';
-export * from './delegated-access-pipeline.table';
+export * from './delegated-access-pipelines.table';

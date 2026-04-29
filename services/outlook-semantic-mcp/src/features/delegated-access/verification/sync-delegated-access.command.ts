@@ -7,7 +7,7 @@ import {
   DRIZZLE,
   DrizzleDatabase,
   delegatedAccessDirectories,
-  delegatedAccessPipeline,
+  delegatedAccessPipelines,
   userProfiles,
 } from '~/db';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -19,7 +19,7 @@ interface FolderNode {
 }
 
 @Injectable()
-export class VerifyDelegatedAccessCommand {
+export class SyncDelegatedAccessCommand {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
@@ -33,11 +33,11 @@ export class VerifyDelegatedAccessCommand {
 
     const [pipeline] = await this.db
       .select({
-        delegateUserId: delegatedAccessPipeline.delegateUserId,
-        ownerUserId: delegatedAccessPipeline.ownerUserId,
+        delegateUserId: delegatedAccessPipelines.delegateUserId,
+        ownerUserId: delegatedAccessPipelines.ownerUserId,
       })
-      .from(delegatedAccessPipeline)
-      .where(eq(delegatedAccessPipeline.id, pipelineId));
+      .from(delegatedAccessPipelines)
+      .where(eq(delegatedAccessPipelines.id, pipelineId));
 
     if (!pipeline) {
       this.logger.warn({ pipelineId, msg: 'Pipeline not found, skipping verification' });
@@ -122,17 +122,17 @@ export class VerifyDelegatedAccessCommand {
 
     if (dirCount === 0 && !hasTransientError) {
       await this.db
-        .delete(delegatedAccessPipeline)
-        .where(eq(delegatedAccessPipeline.id, pipelineId));
+        .delete(delegatedAccessPipelines)
+        .where(eq(delegatedAccessPipelines.id, pipelineId));
       this.logger.log({ pipelineId, msg: 'No accessible directories, pipeline deleted' });
       return;
     }
 
     if (!hasTransientError) {
       await this.db
-        .update(delegatedAccessPipeline)
+        .update(delegatedAccessPipelines)
         .set({ lastVerifiedAt: new Date() })
-        .where(eq(delegatedAccessPipeline.id, pipelineId));
+        .where(eq(delegatedAccessPipelines.id, pipelineId));
       this.logger.log({ pipelineId, dirCount, msg: 'Pipeline lastVerifiedAt updated' });
     }
   }

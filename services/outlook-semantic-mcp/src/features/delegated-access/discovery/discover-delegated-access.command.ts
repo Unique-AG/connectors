@@ -6,7 +6,7 @@ import { last } from 'remeda';
 import {
   DRIZZLE,
   DrizzleDatabase,
-  delegatedAccessPipeline,
+  delegatedAccessPipelines,
   subscriptions,
   userProfiles,
 } from '~/db';
@@ -113,14 +113,14 @@ export class DiscoverDelegatedAccessCommand {
 
       const now = new Date();
       await this.db
-        .insert(delegatedAccessPipeline)
+        .insert(delegatedAccessPipelines)
         .values({
           delegateUserId,
           ownerUserId,
           lastDiscoveredAt: now,
         })
         .onConflictDoUpdate({
-          target: [delegatedAccessPipeline.delegateUserId, delegatedAccessPipeline.ownerUserId],
+          target: [delegatedAccessPipelines.delegateUserId, delegatedAccessPipelines.ownerUserId],
           set: { lastDiscoveredAt: now },
         });
 
@@ -129,11 +129,11 @@ export class DiscoverDelegatedAccessCommand {
       if (error instanceof GraphError) {
         if (error.statusCode === 403 || error.statusCode === 404) {
           await this.db
-            .delete(delegatedAccessPipeline)
+            .delete(delegatedAccessPipelines)
             .where(
               and(
-                eq(delegatedAccessPipeline.delegateUserId, delegateUserId),
-                eq(delegatedAccessPipeline.ownerUserId, ownerUserId),
+                eq(delegatedAccessPipelines.delegateUserId, delegateUserId),
+                eq(delegatedAccessPipelines.ownerUserId, ownerUserId),
               ),
             );
           this.logger.log({

@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { VerifyDelegatedAccessCommand } from './verify-delegated-access.command';
+import { SyncDelegatedAccessCommand } from './sync-delegated-access.command';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -109,15 +109,15 @@ function createCommand({
 }: {
   graphApi?: ReturnType<typeof createMockGraphApi>;
   db?: ReturnType<typeof createMockDb>;
-} = {}): VerifyDelegatedAccessCommand {
-  return new VerifyDelegatedAccessCommand(createMockGraphClientFactory(graphApi) as any, db as any);
+} = {}): SyncDelegatedAccessCommand {
+  return new SyncDelegatedAccessCommand(createMockGraphClientFactory(graphApi) as any, db as any);
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('VerifyDelegatedAccessCommand', () => {
+describe('SyncDelegatedAccessCommand', () => {
   let graphApi: ReturnType<typeof createMockGraphApi>;
 
   beforeEach(() => {

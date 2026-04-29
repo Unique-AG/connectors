@@ -4,8 +4,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { AppConfig, appConfig } from '~/config';
-import { DRIZZLE, DrizzleDatabase, delegatedAccessPipeline } from '~/db';
-import { VerifyDelegatedAccessEventDto } from './verify-delegated-access-event.dto';
+import { SyncDelegatedAccessEventDto } from './sync-delegated-access-event';
 
 @Injectable()
 export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -15,7 +14,6 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
-    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
   ) {}
 
@@ -27,14 +25,15 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
     this.logger.log({ msg: 'VerifyDelegatedAccessSchedulerService is shutting down...' });
     this.isShuttingDown = true;
     try {
-      this.schedulerRegistry.getCronJob('delegated-access-verification').stop();
+      this.schedulerRegistry.getCronJob('delegated-access-sync').stop();
     } catch (err) {
       this.logger.error({ msg: 'Error stopping cron job', err });
     }
   }
 
   private setupCronJob(): void {
-    const job = new CronJob(this.config.delegatedAccessVerificationCronSchedule, async () => {
+    const frequency = Math.floor(24 / this.config.delegatedAccessSyncFrequencyPerDay);
+    const job = new CronJob(`0 */${frequency} * * *`, async () => {
       try {
         await this.triggerVerificationForPipelineRows();
       } catch (err) {
@@ -45,7 +44,7 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
       }
     });
 
-    this.schedulerRegistry.addCronJob('delegated-access-verification', job);
+    this.schedulerRegistry.addCronJob('delegated-access-sync', job);
     job.start();
   }
 
@@ -55,22 +54,11 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
       return;
     }
 
-    this.logger.log({ msg: 'Delegated access verification scan triggered' });
-
-    const rows = await this.db
-      .select({ id: delegatedAccessPipeline.id })
-      .from(delegatedAccessPipeline);
-
-    for (const { id } of rows) {
-      const event = VerifyDelegatedAccessEventDto.parse({
-        type: 'unique.outlook-semantic-mcp.delegated-access.verify',
-        payload: { pipelineId: id },
-      });
-      await this.amqp.publish(
-        MAIN_EXCHANGE.name,
-        `unique.outlook-semantic-mcp.delegated-access.verify.${id}`,
-        event,
-      );
-    }
+    const event = SyncDelegatedAccessEventDto.parse({
+      type: 'unique.outlook-semantic-mcp.delegated-access.sync',
+      payload: {},
+    });
+    await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
+    this.logger.log({ msg: 'Delegated access sync triggered' });
   }
 }
