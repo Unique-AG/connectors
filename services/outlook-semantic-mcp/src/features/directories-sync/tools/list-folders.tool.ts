@@ -5,7 +5,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { ListDirectoriesQuery, type UserDirectory } from '../list-directories.query';
+import { ListDirectoriesQuery, type UserDirectory, type UserMailbox } from '../list-directories.query';
 import { SyncDirectoriesCommand } from '../sync-directories.command';
 import { META } from './list-folders-tool.meta';
 
@@ -19,11 +19,18 @@ const UserDirectorySchema: z.ZodType<UserDirectory> = z.lazy(() =>
   }),
 );
 
+const UserMailboxSchema: z.ZodType<UserMailbox> = z.object({
+  email: z.string().nullable(),
+  displayName: z.string().nullable(),
+  isOwn: z.boolean(),
+  folders: z.array(UserDirectorySchema),
+});
+
 const OutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   status: z.string().optional(),
-  folders: z.array(UserDirectorySchema).optional(),
+  mailboxes: z.array(UserMailboxSchema).optional(),
 });
 
 @Injectable()
@@ -59,7 +66,7 @@ export class ListFoldersTool {
     request: McpAuthenticatedRequest,
   ): Promise<
     | { success: boolean; message: string }
-    | { success: boolean; message: string; folders: UserDirectory[] }
+    | { success: boolean; message: string; mailboxes: UserMailbox[] }
   > {
     const userProfileTypeId = extractUserProfileId(request);
     const userProfileTypeIdString = userProfileTypeId.toString();
@@ -76,12 +83,12 @@ export class ListFoldersTool {
     });
     await this.syncDirectoriesCommand.run(userProfileTypeId);
 
-    const folders = await this.listDirectoriesQuery.run(userProfileTypeIdString);
+    const mailboxes = await this.listDirectoriesQuery.run(userProfileTypeIdString);
 
     return {
       success: true,
       message: 'Directories available',
-      folders,
+      mailboxes,
     };
   }
 }

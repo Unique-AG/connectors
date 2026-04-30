@@ -2,13 +2,34 @@ import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { unique } from 'remeda';
-import { Directory, DRIZZLE, type DrizzleDatabase, directories } from '~/db';
+import { isNullish, unique } from 'remeda';
+import {
+  DRIZZLE,
+  type DrizzleDatabase,
+  delegatedAccessDirectories,
+  delegatedAccessPipelines,
+  directories,
+  userProfiles,
+} from '~/db';
+
+interface DirectoryNode {
+  id: string;
+  displayName: string;
+  parentId: string | null;
+  providerDirectoryId: string;
+}
 
 export interface UserDirectory {
   id: string;
   displayName: string;
   children: UserDirectory[];
+}
+
+export interface UserMailbox {
+  email: string | null;
+  displayName: string | null;
+  isOwn: boolean;
+  folders: UserDirectory[];
 }
 
 @Injectable()
@@ -18,8 +39,14 @@ export class ListDirectoriesQuery {
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
   @Span()
-  public async run(userProfileId: string): Promise<UserDirectory[]> {
-    const allDirectories = await this.db.query.directories.findMany({
+  public async run(userProfileId: string): Promise<UserMailbox[]> {
+    // Fetch own user profile for identity info
+    const ownProfile = await this.db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userProfileId),
+    });
+
+    // Fetch own directories
+    const ownDirectories = await this.db.query.directories.findMany({
       where: and(
         eq(directories.userProfileId, userProfileId),
         // We filter out directories ignored for sync because they cannot be used in searches.
@@ -27,21 +54,93 @@ export class ListDirectoriesQuery {
       ),
     });
 
-    const { directoryTree, paths } = this.buildTree(allDirectories);
+    const { directoryTree: ownTree, paths: ownPaths } = this.buildTree(ownDirectories);
     this.logger.debug({
-      msg: `Returned Directories: ${paths.length}`,
+      msg: `Returned Directories: ${ownPaths.length}`,
       userProfileId,
-      directories: paths.map((item) => smearPath(createSmeared(item))).join('\r\n'),
+      directories: ownPaths.map((item) => smearPath(createSmeared(item))).join('\r\n'),
     });
 
-    return directoryTree;
+    const ownMailbox: UserMailbox = {
+      email: ownProfile?.email ?? null,
+      displayName: ownProfile?.displayName ?? null,
+      isOwn: true,
+      folders: ownTree,
+    };
+
+    // Single query: join pipelines → allowed directory IDs → owner profiles → actual directories
+    const delegatedDirectoryRows = await this.db
+      .select({
+        ownerUserId: delegatedAccessPipelines.ownerUserId,
+        ownerEmail: userProfiles.email,
+        ownerDisplayName: userProfiles.displayName,
+        dirId: directories.id,
+        dirDisplayName: directories.displayName,
+        dirParentId: directories.parentId,
+        dirProviderDirectoryId: directories.providerDirectoryId,
+      })
+      .from(delegatedAccessPipelines)
+      .innerJoin(
+        delegatedAccessDirectories,
+        eq(delegatedAccessDirectories.pipelineId, delegatedAccessPipelines.id),
+      )
+      .innerJoin(userProfiles, eq(userProfiles.id, delegatedAccessPipelines.ownerUserId))
+      .innerJoin(
+        directories,
+        and(
+          eq(directories.userProfileId, delegatedAccessPipelines.ownerUserId),
+          eq(directories.providerDirectoryId, delegatedAccessDirectories.directoryId),
+          eq(directories.ignoreForSync, false),
+        ),
+      )
+      .where(eq(delegatedAccessPipelines.delegateUserId, userProfileId));
+
+    if (delegatedDirectoryRows.length === 0) {
+      return [ownMailbox];
+    }
+
+    const ownerDirs = new Map<
+      string,
+      { email: string | null; displayName: string | null; dirs: DirectoryNode[] }
+    >();
+    for (const row of delegatedDirectoryRows) {
+      let directoriesRef = ownerDirs.get(row.ownerUserId)?.dirs;
+      if (isNullish(directoriesRef)) {
+        directoriesRef = [];
+        ownerDirs.set(row.ownerUserId, {
+          email: row.ownerEmail ?? null,
+          displayName: row.ownerDisplayName ?? null,
+          dirs: directoriesRef,
+        });
+      }
+
+      directoriesRef.push({
+        id: row.dirId,
+        displayName: row.dirDisplayName,
+        parentId: row.dirParentId,
+        providerDirectoryId: row.dirProviderDirectoryId,
+      });
+    }
+
+    const delegatedMailboxes: UserMailbox[] = [];
+    for (const [, ownerInfo] of ownerDirs) {
+      const { directoryTree } = this.buildTree(ownerInfo.dirs);
+      delegatedMailboxes.push({
+        email: ownerInfo.email,
+        displayName: ownerInfo.displayName,
+        isOwn: false,
+        folders: directoryTree,
+      });
+    }
+
+    return [ownMailbox, ...delegatedMailboxes];
   }
 
-  private buildTree(allDirectories: Directory[]): {
+  private buildTree(allDirectories: DirectoryNode[]): {
     directoryTree: UserDirectory[];
     paths: string[];
   } {
-    const directoriesByParentId = allDirectories.reduce<Map<string | null, Directory[]>>(
+    const directoriesByParentId = allDirectories.reduce<Map<string | null, DirectoryNode[]>>(
       (acc, item) => {
         if (acc.has(item.parentId)) {
           acc.get(item.parentId)?.push(item);
