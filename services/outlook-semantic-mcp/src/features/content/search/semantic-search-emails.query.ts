@@ -145,7 +145,11 @@ export class SemanticSearchEmailsQuery {
           eq(delegatedAccessPipelines.delegateUserId, userProfile.id),
         ),
       )
-      .groupBy(userProfiles.providerUserId);
+      .groupBy(
+        userProfiles.providerUserId,
+        userProfiles.email,
+        delegatedAccessPipelines.ownerUserId,
+      );
 
     const scopes = await this.uniqueApi.scopes.getByExternalIds([
       getRootScopeExternalId(),
