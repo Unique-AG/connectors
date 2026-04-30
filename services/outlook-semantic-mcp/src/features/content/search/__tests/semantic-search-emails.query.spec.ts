@@ -1,5 +1,46 @@
 import { describe, expect, it } from 'vitest';
+import { SearchConditionSchema } from '../semantic-search-conditions.dto';
 import { SanitizeSearchConditionsForUserQuery } from '../sanitize-search-conditions-for-user.query';
+import { filterConditionsForMailbox } from '../filter-conditions-for-mailbox';
+
+describe('SearchConditionSchema', () => {
+  it('accepts a valid mailbox email alongside another filter field', () => {
+    const result = SearchConditionSchema.safeParse({
+      mailbox: 'alice@example.com',
+      hasAttachments: { value: 'true', operator: 'equals' },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a non-email value for mailbox', () => {
+    const result = SearchConditionSchema.safeParse({
+      mailbox: 'not-an-email',
+      hasAttachments: { value: 'true', operator: 'equals' },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a condition without mailbox (existing behavior)', () => {
+    const result = SearchConditionSchema.safeParse({
+      hasAttachments: { value: 'false', operator: 'equals' },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('fails the refine when mailbox is the only field provided', () => {
+    const result = SearchConditionSchema.safeParse({
+      mailbox: 'alice@example.com',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toMatch(/Invalid search condition/);
+    }
+  });
+});
 
 // biome-ignore lint/suspicious/noExplicitAny: constructor args not needed for this private method
 const query = new SanitizeSearchConditionsForUserQuery(null as any);
@@ -65,5 +106,77 @@ describe('SanitizeSearchConditionsForUserQuery.sanitizeWrongDirectoryIds', () =>
     const result = (query as any).sanitizeWrongDirectoryIds(['foo', 'bar'], [inboxDir, sentDir]);
 
     expect(result).toEqual({ resolvedIds: [], unrecognized: ['foo', 'bar'] });
+  });
+});
+
+const attachment = { value: 'true' as const, operator: 'equals' as const };
+
+describe('filterConditionsForMailbox', () => {
+  it('keeps a matching-mailbox condition and strips the mailbox key', () => {
+    const result = filterConditionsForMailbox(
+      [{ mailbox: 'alice@example.com', hasAttachments: attachment }],
+      'alice@example.com',
+    );
+
+    expect(result).toEqual([{ hasAttachments: attachment }]);
+    expect(result[0]).not.toHaveProperty('mailbox');
+  });
+
+  it('drops a condition whose mailbox does not match the branch email', () => {
+    const result = filterConditionsForMailbox(
+      [{ mailbox: 'bob@example.com', hasAttachments: attachment }],
+      'alice@example.com',
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it('keeps a condition that has no mailbox field', () => {
+    const result = filterConditionsForMailbox(
+      [{ hasAttachments: attachment }],
+      'alice@example.com',
+    );
+
+    expect(result).toEqual([{ hasAttachments: attachment }]);
+    expect(result[0]).not.toHaveProperty('mailbox');
+  });
+
+  it('returns the correct subset for a mixed list', () => {
+    const aliceAttachment = { value: 'true' as const, operator: 'equals' as const };
+    const globalAttachment = { value: 'false' as const, operator: 'equals' as const };
+
+    const result = filterConditionsForMailbox(
+      [
+        { mailbox: 'alice@example.com', hasAttachments: aliceAttachment },
+        { mailbox: 'bob@example.com', hasAttachments: attachment },
+        { hasAttachments: globalAttachment },
+      ],
+      'alice@example.com',
+    );
+
+    expect(result).toEqual([
+      { hasAttachments: aliceAttachment },
+      { hasAttachments: globalAttachment },
+    ]);
+  });
+
+  it('returns [] for an empty list', () => {
+    expect(filterConditionsForMailbox([], 'alice@example.com')).toEqual([]);
+  });
+
+  it('returns [] when all conditions are filtered out', () => {
+    const result = filterConditionsForMailbox(
+      [
+        { mailbox: 'bob@example.com', hasAttachments: attachment },
+        { mailbox: 'carol@example.com', hasAttachments: attachment },
+      ],
+      'alice@example.com',
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it('returns [] for undefined input', () => {
+    expect(filterConditionsForMailbox(undefined, 'alice@example.com')).toEqual([]);
   });
 });
