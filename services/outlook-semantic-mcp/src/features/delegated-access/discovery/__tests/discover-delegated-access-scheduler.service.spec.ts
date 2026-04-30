@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DiscoverDelegatedAccessSchedulerService } from './discover-delegated-access-scheduler.service';
+import { DiscoverDelegatedAccessSchedulerService } from '../discover-delegated-access-scheduler.service';
 
 // ---------------------------------------------------------------------------
 // Mock factories

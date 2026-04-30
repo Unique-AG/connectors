@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DiscoverDelegatedAccessCommand } from './discover-delegated-access.command';
+import { DiscoverDelegatedAccessCommand } from '../discover-delegated-access.command';
 
 // ---------------------------------------------------------------------------
 // Constants
