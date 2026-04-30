@@ -10,6 +10,7 @@ import { ListCategoriesTool } from './categories/list-categories.tool';
 import { SearchEmailsTool, SearchModule } from './content';
 import { OpenEmailModule } from './content/open-email/open-email.module';
 import { OpenEmailTool } from './content/open-email/open-email.tool';
+import { DelegatedAccessModule } from './delegated-access/delegated-access.module';
 import { DeleteInboxModule } from './delete-inbox/delete-inbox.module';
 import { DeleteInboxDataTool } from './delete-inbox/delete-inbox-data.tool';
 import { InboxDeletingQueryModule } from './delete-inbox/inbox-deleting-query.module';
@@ -32,7 +33,6 @@ import {
 import { FullSyncModule } from './sync/full-sync/full-sync.module';
 import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
-import { DelegatedAccessModule } from './delegated-access/delegated-access.module';
 
 @Module({})
 export class BackendModule {}

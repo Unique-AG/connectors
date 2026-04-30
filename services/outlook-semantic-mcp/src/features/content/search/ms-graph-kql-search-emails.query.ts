@@ -8,6 +8,7 @@ import {
 } from '~/features/content/search/semantic-search-emails.query';
 import { TranslateGraphIdsToImmutableIdsQuery } from '~/features/graph-utils/translate-graph-ids-to-immutable-ids.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 
 const graphSearchHitSchema = z.object({
   hitId: z.string(),
@@ -42,10 +43,10 @@ export class MsGraphKqlSearchEmailsQuery {
 
   @Span()
   public async run(
-    userProfileId: string,
+    userProfileTypeId: UserProfileTypeID,
     queries: Array<{ kqlQuery: string; limit?: number }>,
   ): Promise<SearchEmailResult[]> {
-    const client = this.graphClientFactory.createClientForUser(userProfileId);
+    const client = this.graphClientFactory.createClientForUser(userProfileTypeId.toString());
 
     const allResults = await Promise.all(
       queries.map(async (query) => {
@@ -88,7 +89,7 @@ export class MsGraphKqlSearchEmailsQuery {
     }
 
     const folderMessageIdsMap = await this.translateGraphIdsToImmutableIdsQuery.run(
-      userProfileId,
+      userProfileTypeId.toString(),
       deduplicated.map((r) => r.msGraphMessageId),
     );
     return deduplicated.map((result) => ({

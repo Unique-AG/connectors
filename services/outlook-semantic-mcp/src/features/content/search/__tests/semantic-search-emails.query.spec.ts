@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SemanticSearchEmailsQuery } from './semantic-search-emails.query';
+import { SemanticSearchEmailsQuery } from '../semantic-search-emails.query';
 
 // biome-ignore lint/suspicious/noExplicitAny: constructor args not needed for this private method
 const query = new SemanticSearchEmailsQuery(null as any, null as any);

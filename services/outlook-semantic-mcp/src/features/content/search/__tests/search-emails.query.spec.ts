@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
-import { SearchEmailsQuery } from './search-emails.query';
+import type { MsGraphKqlSearchEmailsQuery } from '../ms-graph-kql-search-emails.query';
+import { SearchEmailsQuery } from '../search-emails.query';
 import {
   SearchBackend,
   SearchEmailResult,
   SemanticSearchEmailsQuery,
-} from './semantic-search-emails.query';
+} from '../semantic-search-emails.query';
 
 function makeGraphResult(
   emailId: string,

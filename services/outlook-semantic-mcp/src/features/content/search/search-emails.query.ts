@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as z from 'zod';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
 import { SearchEmailsInputSchema } from './semantic-search-conditions.dto';
 import {
@@ -14,7 +15,7 @@ export interface SearchEmailsToolInput {
 }
 
 type BackendExecutor = (
-  userProfileId: string,
+  userProfileTypeId: UserProfileTypeID,
   input: SearchEmailsToolInput,
 ) => Promise<SearchEmailResult[]>;
 
@@ -27,34 +28,34 @@ export class SearchEmailsQuery {
 
   private readonly executors: Record<SearchBackend, BackendExecutor> = {
     [SearchBackend.Unique]: (
-      userProfileId: string,
+      userProfileTypeId: UserProfileTypeID,
       input: SearchEmailsToolInput,
     ): Promise<SearchEmailResult[]> => {
       if (!input.semanticSearchParams) {
         return Promise.resolve([]);
       }
       return this.semanticSearchQuery
-        .run(userProfileId, input.semanticSearchParams)
+        .run(userProfileTypeId, input.semanticSearchParams)
         .then(({ results }) => results);
     },
     [SearchBackend.MsGraph]: (
-      userProfileId: string,
+      userProfileTypeId: UserProfileTypeID,
       input: SearchEmailsToolInput,
     ): Promise<SearchEmailResult[]> => {
       if (!input.msGraphSearchParams) {
         return Promise.resolve([]);
       }
-      return this.msGraphKqlQuery.run(userProfileId, input.msGraphSearchParams.queries);
+      return this.msGraphKqlQuery.run(userProfileTypeId, input.msGraphSearchParams.queries);
     },
   };
 
   public async run(
-    userProfileId: string,
+    userProfileTypeId: UserProfileTypeID,
     input: SearchEmailsToolInput,
   ): Promise<SearchEmailResult[]> {
     const [semanticResults, graphResults] = await Promise.all([
-      this.executors[SearchBackend.Unique](userProfileId, input),
-      this.executors[SearchBackend.MsGraph](userProfileId, input),
+      this.executors[SearchBackend.Unique](userProfileTypeId, input),
+      this.executors[SearchBackend.MsGraph](userProfileTypeId, input),
     ]);
 
     return this.mergeResults(semanticResults, graphResults);

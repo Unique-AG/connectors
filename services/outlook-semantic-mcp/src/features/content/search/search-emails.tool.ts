@@ -84,7 +84,7 @@ export class SearchEmailsTool {
       }
     }
 
-    const results = await this.searchEmailsQuery.run(userProfileTypeId.toString(), input);
+    const results = await this.searchEmailsQuery.run(userProfileTypeId, input);
 
     if (!IS_MICROSOFT_GRAPH_BACKEND) {
       const stats = await this.getFullSyncStatsQuery.run(userProfileTypeId);
