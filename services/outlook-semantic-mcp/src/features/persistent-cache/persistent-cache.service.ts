@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import { isNullish } from 'remeda';
 import { caches, DRIZZLE, DrizzleDatabase } from '~/db';
 import { CacheData, cacheData } from '~/db/schema/cache/cache.data';
 
@@ -76,11 +77,11 @@ export class PersistentCacheService {
     const row = await this.db.query.caches.findFirst({
       where: eq(caches.key, this.getKey(key).toString()),
     });
-    if (!row) {
+    if (!row || isNullish(row.data)) {
       return null;
     }
 
-    return cacheData.parse(row);
+    return cacheData.parse(row.data);
   }
 
   private getKey(key: string): string {

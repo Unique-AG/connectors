@@ -187,31 +187,33 @@ export class SyncDelegatedAccessCommand {
     client: Client;
     ownerEmail: string;
   }): Promise<string[]> {
-    const shouldExpand = (folder: FolderNode) =>
-      folder.childFolderCount > 0 &&
-      (!folder.childFolders || folder.childFolders.length !== folder.childFolderCount);
+    const fetchChildFolders = async (folderId: string): Promise<FolderNode[]> => {
+      const children: FolderNode[] = [];
+      let response = await client
+        .api(`/users/${ownerEmail}/mailFolders/${folderId}/childFolders`)
+        .top(500)
+        .get();
+      children.push(...(response?.value ?? []));
+
+      while (response?.['@odata.nextLink']) {
+        response = await client.api(response['@odata.nextLink']).get();
+        children.push(...(response?.value ?? []));
+      }
+
+      return children;
+    };
 
     const expandRecursive = async (folder: FolderNode): Promise<void> => {
-      if (!shouldExpand(folder)) {
+      if (!folder.childFolderCount) {
         return;
       }
 
-      const expanded = await client
-        .api(`/users/${ownerEmail}/mailFolders/${folder.id}`)
-        .top(500)
-        .expand('childFolders')
-        .get();
-      folder.childFolders = expanded?.childFolders ?? [];
-
-      await Promise.all(folder.childFolders?.filter(shouldExpand).map(expandRecursive) ?? []);
+      folder.childFolders = await fetchChildFolders(folder.id);
+      await Promise.all(folder.childFolders.map(expandRecursive));
     };
 
     const rootFolders: FolderNode[] = [];
-    let response = await client
-      .api(`/users/${ownerEmail}/mailFolders`)
-      .top(500)
-      .expand('childFolders')
-      .get();
+    let response = await client.api(`/users/${ownerEmail}/mailFolders`).top(500).get();
     rootFolders.push(...(response?.value ?? []));
 
     while (response?.['@odata.nextLink']) {
@@ -219,11 +221,7 @@ export class SyncDelegatedAccessCommand {
       rootFolders.push(...(response?.value ?? []));
     }
 
-    await Promise.all(
-      rootFolders.flatMap((root) =>
-        (root.childFolders ?? []).filter(shouldExpand).map(expandRecursive),
-      ),
-    );
+    await Promise.all(rootFolders.map(expandRecursive));
 
     const flattenFolders = (items: FolderNode[]): Array<string> =>
       items.flatMap((item) => [item.id, ...flattenFolders(item.childFolders ?? [])]);
