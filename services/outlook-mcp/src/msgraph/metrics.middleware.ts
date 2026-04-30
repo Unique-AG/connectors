@@ -43,7 +43,7 @@ export class MetricsMiddleware implements Middleware {
 
     return endpoint
       .split('/')
-      .map(segment => (isId(segment) ? ':id' : segment))
+      .map((segment) => (isId(segment) ? ':id' : segment))
       .join('/');
   }
 
