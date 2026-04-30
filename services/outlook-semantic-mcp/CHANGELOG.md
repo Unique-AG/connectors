@@ -1,5 +1,64 @@
 # Changelog
 
+## [0.4.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.3.2...outlook-semantic-mcp@0.4.0) (2026-04-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **outlook-semantic-mcp,unique-api:** Replace ignoredBefore date with retention window in days
+* **sharepoint-connector,outlook-mcp,factset-mcp:** all git tags no longer include the version 'v'. In a future version, all releases will also not include the v anymore.
+
+### Features
+
+* **confluence-connector,unique-api,utils,deps:** implement ingestion pipeline ([#305](https://github.com/Unique-AG/connectors/issues/305)) ([7d2c64c](https://github.com/Unique-AG/connectors/commit/7d2c64c1f4248e06a822a7d827715c4ae001eeec))
+* **outlook-semantic-mcp,ci,main:** UN-16559 set up outlook mcp deployment infrastructure ([#310](https://github.com/Unique-AG/connectors/issues/310)) ([8ea02e1](https://github.com/Unique-AG/connectors/commit/8ea02e1051a02f8826e84bc818d16aebb5d5490b))
+* **outlook-semantic-mcp,deps:** improve full sync to not overwhelm ingestion, to allow users to sync in parallel ([#382](https://github.com/Unique-AG/connectors/issues/382)) ([2f2466e](https://github.com/Unique-AG/connectors/commit/2f2466ec7b665e21cc91470576daa62e2af32f6d))
+* **outlook-semantic-mcp,unique-api,deps,mcp-server-module,aes-gcm-encryption:** add support for inbox filtering, add inbox sync progress ([#343](https://github.com/Unique-AG/connectors/issues/343)) ([0591a3a](https://github.com/Unique-AG/connectors/commit/0591a3a7ec7afff5847964482eb132d7c94d57b1))
+* **outlook-semantic-mcp,unique-api,utils:** Implement MCP tools for email search, folder management, and draft creation ([#299](https://github.com/Unique-AG/connectors/issues/299)) ([c84ce92](https://github.com/Unique-AG/connectors/commit/c84ce92cdeb7a62c222ea05bab4deddd5d970081))
+* **outlook-semantic-mcp,unique-api:** add tools to test search recall ([#489](https://github.com/Unique-AG/connectors/issues/489)) ([576d54c](https://github.com/Unique-AG/connectors/commit/576d54cec4356c89b3754f00ae168d8bab694d37))
+* **outlook-semantic-mcp,unique-api:** Fix mail ingestion, handle unknown parent directory, fix lifecycle notification ([#289](https://github.com/Unique-AG/connectors/issues/289)) ([9475591](https://github.com/Unique-AG/connectors/commit/9475591bff0d988cd2076227d5bac012b3f294ad))
+* **outlook-semantic-mcp,unique-api:** Implement content expiration ([#434](https://github.com/Unique-AG/connectors/issues/434)) ([9df76f6](https://github.com/Unique-AG/connectors/commit/9df76f6f01e69391d12157fb7063edb1e7280bcc))
+* **outlook-semantic-mcp,unique-api:** replace base64 attachments with content ID-based attachments ([#380](https://github.com/Unique-AG/connectors/issues/380)) ([329cea1](https://github.com/Unique-AG/connectors/commit/329cea13ceb23e6fd428f9be8bbf743d9e6c2a0b))
+* **outlook-semantic-mcp:** add lookup_contacts tool ([#377](https://github.com/Unique-AG/connectors/issues/377)) ([5aafbc6](https://github.com/Unique-AG/connectors/commit/5aafbc68b6545aaba32b9ce62343e6123cc1bc93))
+* **outlook-semantic-mcp:** base setup for MCP server and outlook email monitoring ([#261](https://github.com/Unique-AG/connectors/issues/261)) ([18e1305](https://github.com/Unique-AG/connectors/commit/18e1305ec93af40d9dd19036203a508f75c768d9))
+* **outlook-semantic-mcp:** refactor live catch-up recovery, tune prefetch count ([#406](https://github.com/Unique-AG/connectors/issues/406)) ([358aeef](https://github.com/Unique-AG/connectors/commit/358aeef141cb6f18f8dc87a15e855dff483a15b1))
+* **outlook-semantic-mcp:** un-19787 implement search powered by ms graph ([#492](https://github.com/Unique-AG/connectors/issues/492)) ([c7c630f](https://github.com/Unique-AG/connectors/commit/c7c630f5b5aede312ddfe0c227577a099f0f5aee))
+* **sharepoint-connector,outlook-mcp,factset-mcp:** remove v in tags ([#168](https://github.com/Unique-AG/connectors/issues/168)) ([2f56700](https://github.com/Unique-AG/connectors/commit/2f5670000c968d8bf0e0051eeb47766f586c84cc))
+* **unique-api,utils,outlook-semantic-mcp,main:** implement initial mail ingestion and shared libraries ([#286](https://github.com/Unique-AG/connectors/issues/286)) ([b287021](https://github.com/Unique-AG/connectors/commit/b287021246c7f184a1c974734f949f2b7a08e54d))
+
+
+### Bug Fixes
+
+* **deps:** Declare all dependencies for docker build ([#317](https://github.com/Unique-AG/connectors/issues/317)) ([daa0f45](https://github.com/Unique-AG/connectors/commit/daa0f45efe26e6fd8335af88ecd8094556a1e100))
+* **deps:** enable stripLeadingPaths in SWC builder for all services ([#458](https://github.com/Unique-AG/connectors/issues/458)) ([caa3abc](https://github.com/Unique-AG/connectors/commit/caa3abc26b9aea44dede0ce89101df64b3f97b77))
+* **deps:** resolve Dependabot security alerts for multiple transitive dependencies ([#449](https://github.com/Unique-AG/connectors/issues/449)) ([c800b51](https://github.com/Unique-AG/connectors/commit/c800b51439145282cababd491a6fba1a84a748a9))
+* **deps:** resolve Dependabot security alerts for undici, path-to-regexp, orval, minimatch, and brace-expansion ([#432](https://github.com/Unique-AG/connectors/issues/432)) ([5cd9c0f](https://github.com/Unique-AG/connectors/commit/5cd9c0fdc3230de591b28574fccabb7df2cd2cce))
+* **deps:** resolve Dependabot security alerts related to jsonwebtoken, js-yaml and @nestjs/ libraries ([#446](https://github.com/Unique-AG/connectors/issues/446)) ([44835ec](https://github.com/Unique-AG/connectors/commit/44835ec851589e2288fd2e1551ca22edb148190e))
+* **deps:** upgrade nestjs-otel to v8 to resolve systeminformation CVEs ([#471](https://github.com/Unique-AG/connectors/issues/471)) ([ec584a9](https://github.com/Unique-AG/connectors/commit/ec584a95427b3a9989387c548d654c8b4fbbd775))
+* **outlook-mcp,outlook-semantic-mcp:** reduce metrics cardinality by sanitizing endpoint IDs ([#497](https://github.com/Unique-AG/connectors/issues/497)) ([38ee132](https://github.com/Unique-AG/connectors/commit/38ee1327439d030fdccd42713bf63d76a9653e09))
+* **outlook-semantic-mcp,main:** cleanup helm templates, expose all configurable vars ([#387](https://github.com/Unique-AG/connectors/issues/387)) ([d6d5a98](https://github.com/Unique-AG/connectors/commit/d6d5a9873d703856ae510a38d7def755212b9841))
+* **outlook-semantic-mcp,mcp-server-module:** UN-18240 fix search conditions to be more permissive, reduce the number of permissions ([#398](https://github.com/Unique-AG/connectors/issues/398)) ([b4a903e](https://github.com/Unique-AG/connectors/commit/b4a903e9f83033d22768d5e4e7c4330e179e364f))
+* **outlook-semantic-mcp,unique-api:** change expected attachment uri ([#392](https://github.com/Unique-AG/connectors/issues/392)) ([83a8db7](https://github.com/Unique-AG/connectors/commit/83a8db78c857bb351c76bd9b1348f304a2c43667))
+* **outlook-semantic-mcp,unique-api:** remove hacky way to pass permissions ([#332](https://github.com/Unique-AG/connectors/issues/332)) ([65c0da3](https://github.com/Unique-AG/connectors/commit/65c0da33ac27dc50e89724a20bb96e0ca7c55166))
+* **outlook-semantic-mcp,unique-api:** split sync into full sync and live catch-up with resume and buffering ([#360](https://github.com/Unique-AG/connectors/issues/360)) ([c6ee0bb](https://github.com/Unique-AG/connectors/commit/c6ee0bb4f9c1ba986f827ae6b4fa663f7c4b9ab7))
+* **outlook-semantic-mcp,unique-api:** un-19456 fix delete inbox and reconnect inbox race condition ([#486](https://github.com/Unique-AG/connectors/issues/486)) ([38fe724](https://github.com/Unique-AG/connectors/commit/38fe72441c1d49c628566000d9292fd8e158c49e))
+* **outlook-semantic-mcp,unique-api:** update headers passing and root scope creation ([#329](https://github.com/Unique-AG/connectors/issues/329)) ([00bdb1a](https://github.com/Unique-AG/connectors/commit/00bdb1a7c855b6f6e219528ce3ef0c5d4ab09e1f))
+* **outlook-semantic-mcp:** address bugbot comment regarding parameter labels ([#351](https://github.com/Unique-AG/connectors/issues/351)) ([e7e91ca](https://github.com/Unique-AG/connectors/commit/e7e91ca1523fd008935d2a7dd3ced941d2f22cf1))
+* **outlook-semantic-mcp:** Cleanup logging, add email to logs using smeared ([#331](https://github.com/Unique-AG/connectors/issues/331)) ([6ce957d](https://github.com/Unique-AG/connectors/commit/6ce957dd83b0611445efdf44d3529d7f7afacdf8))
+* **outlook-semantic-mcp:** email sync total + add user email to sync progress ([#384](https://github.com/Unique-AG/connectors/issues/384)) ([b418066](https://github.com/Unique-AG/connectors/commit/b418066f43584020d25a6df6f6ece259901ec3ed))
+* **outlook-semantic-mcp:** Fix directory structure naming ([#322](https://github.com/Unique-AG/connectors/issues/322)) ([ca5a92d](https://github.com/Unique-AG/connectors/commit/ca5a92da75b104a7058b4fc305452d0f0b929b78))
+* **outlook-semantic-mcp:** fix env vars in charts ([#319](https://github.com/Unique-AG/connectors/issues/319)) ([1a60d91](https://github.com/Unique-AG/connectors/commit/1a60d91a50f5d72efad1fe52a4e6bfd5b70c9700))
+* **outlook-semantic-mcp:** fix equals operator, describe search fields better for the llm ([#349](https://github.com/Unique-AG/connectors/issues/349)) ([29702ce](https://github.com/Unique-AG/connectors/commit/29702ce5a485ecb8d09c2c2d8ea45cb87f4f24e6))
+* **outlook-semantic-mcp:** fix progress and synchronize missing system directories ([#433](https://github.com/Unique-AG/connectors/issues/433)) ([4416738](https://github.com/Unique-AG/connectors/commit/4416738c2c16d0bafac0390575b37460f2188d07))
+* **outlook-semantic-mcp:** fix search emails tool formatting ([#453](https://github.com/Unique-AG/connectors/issues/453)) ([fca7ac4](https://github.com/Unique-AG/connectors/commit/fca7ac474d1216c8be20b7fd3ae8dde8978383ea))
+* **outlook-semantic-mcp:** implemented UN-16563 tools audit ([#375](https://github.com/Unique-AG/connectors/issues/375)) ([d42c3bb](https://github.com/Unique-AG/connectors/commit/d42c3bbd7bbf60b21b090ad72075a1b0615062ca))
+* **outlook-semantic-mcp:** include hidden folders log full directory structure from microsoft ([#334](https://github.com/Unique-AG/connectors/issues/334)) ([087a298](https://github.com/Unique-AG/connectors/commit/087a2988229f4b619f87f7ae3cb36748288f8c21))
+* **outlook-semantic-mcp:** live-catchup improvements and search improvements UN-18240 ([#417](https://github.com/Unique-AG/connectors/issues/417)) ([88143fe](https://github.com/Unique-AG/connectors/commit/88143fe5d8182629d000b5eaca32cd3a0c3a904d))
+* **outlook-semantic-mcp:** remove buffered logs ([#326](https://github.com/Unique-AG/connectors/issues/326)) ([596ca58](https://github.com/Unique-AG/connectors/commit/596ca581e14506e4f8fcf6df18eb089ca2a164c3))
+* **outlook-semantic-mcp:** remove network policy since monorepo will configure it ([#325](https://github.com/Unique-AG/connectors/issues/325)) ([0b1148b](https://github.com/Unique-AG/connectors/commit/0b1148b0cdd1ea9e69281cb72ce1c4f2610f78ad))
+* **outlook-semantic-mcp:** renamed inbox_configuration to inbox_configurations table ([#388](https://github.com/Unique-AG/connectors/issues/388)) ([97868f1](https://github.com/Unique-AG/connectors/commit/97868f1cfe49ae4c0cb2f631f8c0cf901a121abc))
+* **outlook-semantic-mcp:** UN-17418  check why we need content length up front ([#408](https://github.com/Unique-AG/connectors/issues/408)) ([56d5bd5](https://github.com/Unique-AG/connectors/commit/56d5bd58d6d84e4eab5ca9942892eecaf8d28b3e))
+
 ## [0.3.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.3.1...outlook-semantic-mcp@0.3.2) (2026-04-30)
 
 
