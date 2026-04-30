@@ -4,6 +4,7 @@ import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { GraphUtilsModule } from '../graph-utils/graph-utils.module';
 import { FullSyncModule } from '../sync/full-sync';
+import { UserUtilsModule } from '../user-utils/user-utils.module';
 import { MsGraphKqlSearchEmailsQuery } from './search/ms-graph-kql-search-emails.query';
 import { SanitizeSearchConditionsForUserQuery } from './search/sanitize-search-conditions-for-user.query';
 import { SearchEmailsQuery } from './search/search-emails.query';
@@ -17,7 +18,14 @@ const QUERIES = [
 ];
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule, UniqueApiFeatureModule, FullSyncModule, GraphUtilsModule],
+  imports: [
+    DrizzleModule,
+    MsGraphModule,
+    UniqueApiFeatureModule,
+    FullSyncModule,
+    GraphUtilsModule,
+    UserUtilsModule,
+  ],
   providers: [...QUERIES],
   exports: [...QUERIES],
 })

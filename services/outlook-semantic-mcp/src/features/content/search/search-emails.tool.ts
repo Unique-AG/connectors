@@ -34,6 +34,7 @@ const SearchEmailResultSchema = z.object({
   receivedDateTime: z.string().optional().nullable(),
   text: z.string(),
   outlookWebLink: z.string(),
+  sourceMailbox: z.string().nullish(),
   uniqueContentUrl: z.string().optional(),
   backend: z.nativeEnum(SearchBackend),
 });

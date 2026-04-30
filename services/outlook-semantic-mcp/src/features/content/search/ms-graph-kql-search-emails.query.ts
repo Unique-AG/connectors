@@ -7,6 +7,7 @@ import {
   SearchEmailResult,
 } from '~/features/content/search/semantic-search-emails.query';
 import { TranslateGraphIdsToImmutableIdsQuery } from '~/features/graph-utils/translate-graph-ids-to-immutable-ids.query';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 
@@ -38,6 +39,7 @@ const graphSearchResponseSchema = z.object({
 export class MsGraphKqlSearchEmailsQuery {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
+    private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly translateGraphIdsToImmutableIdsQuery: TranslateGraphIdsToImmutableIdsQuery,
   ) {}
 
@@ -46,6 +48,7 @@ export class MsGraphKqlSearchEmailsQuery {
     userProfileTypeId: UserProfileTypeID,
     queries: Array<{ kqlQuery: string; limit?: number }>,
   ): Promise<SearchEmailResult[]> {
+    const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
     const client = this.graphClientFactory.createClientForUser(userProfileTypeId.toString());
 
     const allResults = await Promise.all(
@@ -67,6 +70,7 @@ export class MsGraphKqlSearchEmailsQuery {
           .filter(isNonNullish);
         return hits.map((hit) => ({
           msGraphMessageId: hit.hitId,
+          sourceMailbox: userProfile.email,
           title: hit.resource.subject,
           from: hit.resource.from.emailAddress.address,
           receivedDateTime: hit.resource.receivedDateTime,

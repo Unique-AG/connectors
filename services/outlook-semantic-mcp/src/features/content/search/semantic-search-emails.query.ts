@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { MetadataFilter, type UniqueApiClient, UniqueQLOperator } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, notInArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { filter, isNonNull, isNullish, map, omit, pipe, sortBy } from 'remeda';
 import * as z from 'zod';
@@ -10,6 +10,7 @@ import {
   type DrizzleDatabase,
   delegatedAccessDirectories,
   delegatedAccessPipelines,
+  directories,
   UserProfile,
   userProfiles,
 } from '~/db';
@@ -39,6 +40,7 @@ export interface SearchEmailResult {
   folderId: string;
   title: string;
   from: string;
+  sourceMailbox: Nullish<string>;
   outlookWebLink: string;
   receivedDateTime: string | null;
   text: string;
@@ -62,7 +64,11 @@ export class SemanticSearchEmailsQuery {
   ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
 
-    const { filter: metaDataFilter, searchSummary } = await this.builsSearchConditions({
+    const {
+      filter: metaDataFilter,
+      searchSummary,
+      mapUniqueFolderPathToOwnerEmail,
+    } = await this.builsSearchConditions({
       userProfile,
       conditions: input.conditions,
     });
@@ -80,12 +86,18 @@ export class SemanticSearchEmailsQuery {
 
     const resultsDeduplicated = searchResults.reduce<Record<string, DeduplicatedResult>>(
       (acc, item, index) => {
-        const metadata = item.metadata as MessageMetadata | undefined;
+        const metadata = item.metadata as (MessageMetadata & { folderIdPath?: string }) | undefined;
+        const sourceMailbox =
+          mapUniqueFolderPathToOwnerEmail.find(({ uniqueFolderIdPath }) => {
+            return metadata?.folderIdPath?.startsWith(uniqueFolderIdPath);
+          })?.ownerEmail ?? null;
+
         const itemRef = acc[item.id] ?? {
           title: item.title ?? '',
           uniqueContentId: item.id,
           uniqueContentUrl: item.url ?? undefined,
           outlookWebLink: metadata?.webLink ?? '',
+          sourceMailbox,
           msGraphMessageId: metadata?.id || undefined,
           folderId: metadata?.parentFolderId ?? '',
           from: metadata?.fromEmailAddress ?? '',
@@ -124,7 +136,13 @@ export class SemanticSearchEmailsQuery {
   }): Promise<{
     filter: MetadataFilter;
     searchSummary: string | undefined;
+    mapUniqueFolderPathToOwnerEmail: { uniqueFolderIdPath: string; ownerEmail: string }[];
   }> {
+    const directoriesIgnoredForSync = this.db
+      .selectDistinct({ microsoftDirectoryId: directories.providerDirectoryId })
+      .from(directories)
+      .where(eq(directories.ignoreForSync, true));
+
     const delegatedAcceses = await this.db
       .select({
         ownerUserEmail: sql<string>`${userProfiles.email}`,
@@ -143,6 +161,7 @@ export class SemanticSearchEmailsQuery {
           isNotNull(userProfiles.providerUserId),
           isNotNull(userProfiles.email),
           eq(delegatedAccessPipelines.delegateUserId, userProfile.id),
+          notInArray(delegatedAccessDirectories.directoryId, directoriesIgnoredForSync),
         ),
       )
       .groupBy(
@@ -172,9 +191,16 @@ export class SemanticSearchEmailsQuery {
     assert.ok(rootScopeForUserId, `Root scope not found for user: ${userProfile.providerUserId}`);
 
     const finalFilters: MetadataFilter = { or: [] };
+    const mapUniqueFolderPathToOwnerEmail: Map<string, string> = new Map();
+
+    const currentUserScopeIdsFromRoot = [rootScopeId, rootScopeForUserId];
+    mapUniqueFolderPathToOwnerEmail.set(
+      this.getUniqueFolderPath(currentUserScopeIdsFromRoot),
+      userProfile.email,
+    );
 
     const userConditions = await this.scopeSearchToUserProfile({
-      scopeIds: [rootScopeId, rootScopeForUserId],
+      scopeIdsFromRoot: currentUserScopeIdsFromRoot,
       userProfileId: userProfile.id,
       conditions,
     });
@@ -208,8 +234,14 @@ export class SemanticSearchEmailsQuery {
         continue;
       }
 
+      const ownerScopeIdsFromRoot = [rootScopeId, ownerRootScopeId];
+      mapUniqueFolderPathToOwnerEmail.set(
+        this.getUniqueFolderPath(ownerScopeIdsFromRoot),
+        ownerUserEmail,
+      );
+
       const delegatedAccessFilter = await this.scopeSearchToUserProfile({
-        scopeIds: [rootScopeId, ownerRootScopeId],
+        scopeIdsFromRoot: ownerScopeIdsFromRoot,
         userProfileId: ownerUserId,
         conditions,
         delegatedAccessFilters: { msGraphDirectoryIds },
@@ -225,18 +257,22 @@ export class SemanticSearchEmailsQuery {
 
     return {
       filter: finalFilters,
+      mapUniqueFolderPathToOwnerEmail: Array.from(mapUniqueFolderPathToOwnerEmail).map((item) => ({
+        uniqueFolderIdPath: item[0],
+        ownerEmail: item[1],
+      })),
       searchSummary: searchSummary.length > 0 ? searchSummary.join(`\r\n`) : undefined,
     };
   }
 
   private async scopeSearchToUserProfile({
-    scopeIds,
+    scopeIdsFromRoot,
     userProfileId,
     conditions,
     delegatedAccessFilters,
   }: {
     userProfileId: string;
-    scopeIds: string[];
+    scopeIdsFromRoot: string[];
     conditions: z.infer<typeof SearchEmailsInputSchema>['conditions'];
     delegatedAccessFilters?: {
       msGraphDirectoryIds: string[];
@@ -250,7 +286,7 @@ export class SemanticSearchEmailsQuery {
       and: [
         {
           operator: UniqueQLOperator.CONTAINS,
-          value: `uniquepathid://${scopeIds.join('/')}`,
+          value: this.getUniqueFolderPath(scopeIdsFromRoot),
           path: [`folderIdPath`],
         },
       ],
@@ -272,5 +308,9 @@ export class SemanticSearchEmailsQuery {
     }
 
     return { filter: scopedMetadataFilter, searchSummary };
+  }
+
+  private getUniqueFolderPath(scopeIdsFromRoot: string[]): string {
+    return `uniquepathid://${scopeIdsFromRoot.join('/')}`;
   }
 }

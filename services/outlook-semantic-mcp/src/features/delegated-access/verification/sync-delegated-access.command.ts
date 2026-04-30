@@ -192,11 +192,15 @@ export class SyncDelegatedAccessCommand {
       let response = await client
         .api(`/users/${ownerEmail}/mailFolders/${folderId}/childFolders`)
         .top(500)
+        .header('Prefer', 'IdType="ImmutableId"')
         .get();
       children.push(...(response?.value ?? []));
 
       while (response?.['@odata.nextLink']) {
-        response = await client.api(response['@odata.nextLink']).get();
+        response = await client
+          .api(response['@odata.nextLink'])
+          .header('Prefer', 'IdType="ImmutableId"')
+          .get();
         children.push(...(response?.value ?? []));
       }
 
@@ -213,11 +217,18 @@ export class SyncDelegatedAccessCommand {
     };
 
     const rootFolders: FolderNode[] = [];
-    let response = await client.api(`/users/${ownerEmail}/mailFolders`).top(500).get();
+    let response = await client
+      .api(`/users/${ownerEmail}/mailFolders`)
+      .header('Prefer', 'IdType="ImmutableId"')
+      .top(500)
+      .get();
     rootFolders.push(...(response?.value ?? []));
 
     while (response?.['@odata.nextLink']) {
-      response = await client.api(response['@odata.nextLink']).get();
+      response = await client
+        .api(response['@odata.nextLink'])
+        .header('Prefer', 'IdType="ImmutableId"')
+        .get();
       rootFolders.push(...(response?.value ?? []));
     }
 

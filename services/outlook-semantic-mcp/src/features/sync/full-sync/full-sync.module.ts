@@ -4,7 +4,7 @@ import { DirectoriesSyncModule } from '~/features/directories-sync/directories-s
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { ProcessEmailModule } from '../../process-email/process-email.module';
-import { SubscriptionUtilsModule } from '../../user-utils/subscription-utils.module';
+import { UserUtilsModule } from '../../user-utils/user-utils.module';
 import { FindInboxConfigByVersionQuery } from './find-inbox-config-by-version.query';
 import { FullSyncCommand } from './full-sync.command';
 import { FullSyncListener } from './full-sync.listener';
@@ -20,7 +20,7 @@ import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-vers
   imports: [
     DrizzleModule,
     MsGraphModule,
-    SubscriptionUtilsModule,
+    UserUtilsModule,
     UniqueApiFeatureModule,
     ProcessEmailModule,
     DirectoriesSyncModule,

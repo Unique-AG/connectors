@@ -8,4 +8,4 @@ import { GetUserProfileQuery } from './get-user-profile.query';
   providers: [GetSubscriptionAndUserProfileQuery, GetUserProfileQuery],
   exports: [GetSubscriptionAndUserProfileQuery, GetUserProfileQuery],
 })
-export class SubscriptionUtilsModule {}
+export class UserUtilsModule {}
