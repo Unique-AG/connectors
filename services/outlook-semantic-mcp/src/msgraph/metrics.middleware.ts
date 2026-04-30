@@ -2,6 +2,7 @@ import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
+import { z } from 'zod';
 
 export class MetricsMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
@@ -33,6 +34,17 @@ export class MetricsMiddleware implements Middleware {
     } catch {
       return 'unknown';
     }
+  }
+
+  private sanitizeEndpointForMetrics(endpoint: string): string {
+    const uuid = z.string().uuid();
+    const isId = (segment: string) =>
+      uuid.safeParse(segment).success || (segment.length > 15 && /\d/.test(segment));
+
+    return endpoint
+      .split('/')
+      .map(segment => (isId(segment) ? ':id' : segment))
+      .join('/');
   }
 
   private extractMethod(options: RequestInit | undefined): string {
@@ -99,6 +111,7 @@ export class MetricsMiddleware implements Middleware {
     }
 
     const endpoint = this.extractEndpoint(context.request);
+    const metricEndpoint = this.sanitizeEndpointForMetrics(endpoint);
     const method = this.extractMethod(context.options);
     const startTime = Date.now();
 
@@ -110,13 +123,13 @@ export class MetricsMiddleware implements Middleware {
       const statusClass = this.getStatusClass(statusCode);
 
       this.msgraphRequestCounter.add(1, {
-        endpoint,
+        endpoint: metricEndpoint,
         method,
         status_class: statusClass,
       });
 
       this.msgraphRequestDuration.record(duration / 1000, {
-        endpoint,
+        endpoint: metricEndpoint,
         method,
       });
 
@@ -149,13 +162,13 @@ export class MetricsMiddleware implements Middleware {
       const duration = Date.now() - startTime;
 
       this.msgraphRequestCounter.add(1, {
-        endpoint,
+        endpoint: metricEndpoint,
         method,
         status_class: '5xx',
       });
 
       this.msgraphRequestDuration.record(duration / 1000, {
-        endpoint,
+        endpoint: metricEndpoint,
         method,
       });
 
