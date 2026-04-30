@@ -11,13 +11,14 @@ export const DEFAULT_HEALTH_SYNC_TENANT_FAILURE_THRESHOLD = 0.5 as const;
 export const DEFAULT_HEALTH_CONNECTIVITY_TIMEOUT_MS = 3000 as const;
 
 export const DEFAULT_MAX_FILE_SIZE_MB = 200 as const;
-export const DEFAULT_ALLOWED_EXTENSIONS = [
-  'pdf',
-  'docx',
-  'xlsx',
-  'ppt',
-  'pptx',
-  'txt',
-  'csv',
-  'html',
+export const DEFAULT_ALLOWED_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'text/html',
+  'image/png',
+  'image/jpeg',
 ] as const;

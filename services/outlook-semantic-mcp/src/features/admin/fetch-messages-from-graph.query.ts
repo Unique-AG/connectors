@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { isNonNullish, isNullish, unique } from 'remeda';
+import { isNonNullish, isNullish } from 'remeda';
 import z from 'zod/v4';
 import { DRIZZLE, DrizzleDatabase, directories, inboxConfigurations, userProfiles } from '~/db';
 import {
@@ -13,6 +13,7 @@ import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-uniqu
 import { shouldSkipEmail } from '~/features/process-email/utils/should-skip-email';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
+import { TranslateGraphIdsToImmutableIdsQuery } from '../graph-utils/translate-graph-ids-to-immutable-ids.query';
 import type { EmailDiagnosticEntry } from './sync-diagnostics.types';
 
 const fetchMessageSchema = z.object({
@@ -43,10 +44,6 @@ const fetchMessagesResponseSchema = z.object({
   value: z.array(fetchMessageSchema),
 });
 
-const translateIdsResponseSchema = z.object({
-  value: z.array(z.object({ sourceId: z.string(), targetId: z.string() })),
-});
-
 interface FetchMessagesFromGraphInput {
   userProfileId: string;
   filter?: string;
@@ -64,6 +61,7 @@ export class FetchMessagesFromGraphQuery {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
+    private readonly translateGraphIdsToImmutableIdsQuery: TranslateGraphIdsToImmutableIdsQuery,
   ) {}
 
   @Span()
@@ -126,7 +124,7 @@ export class FetchMessagesFromGraphQuery {
     }
 
     if (search) {
-      await this.translateToImmutableIds(client, allMessages);
+      await this.translateToImmutableIds(userProfile.id, allMessages);
     }
 
     const ignoredDirectories = await this.db.query.directories.findMany({
@@ -151,55 +149,21 @@ export class FetchMessagesFromGraphQuery {
   }
 
   private async translateToImmutableIds(
-    client: ReturnType<GraphClientFactory['createClientForUser']>,
+    userProfileId: string,
     messages: FetchMessage[],
   ): Promise<void> {
     if (messages.length === 0) {
       return;
     }
 
-    const folderIds = unique(
-      messages.map((message) => message.parentFolderId).filter(isNonNullish),
+    const messageIdsMap = await this.translateGraphIdsToImmutableIdsQuery.run(
+      userProfileId,
+      messages.map((message) => message.id).filter(isNonNullish),
     );
-    const folderIdToImmutableFolderId = new Map<string, string>();
-
-    const CHUNK_SIZE = 1000;
-    for (let i = 0; i < folderIds.length; i += CHUNK_SIZE) {
-      const inputIds = folderIds.slice(i, i + CHUNK_SIZE);
-      const raw = await client.api('me/translateExchangeIds').post({
-        inputIds,
-        sourceIdType: 'restId',
-        targetIdType: 'restImmutableEntryId',
-      });
-      const { value } = translateIdsResponseSchema.parse(raw);
-      value.forEach((item) => {
-        folderIdToImmutableFolderId.set(item.sourceId, item.targetId);
-      });
-    }
-
-    for (let i = 0; i < messages.length; i += CHUNK_SIZE) {
-      const chunk = messages.slice(i, i + CHUNK_SIZE);
-      const raw = await client.api('me/translateExchangeIds').post({
-        inputIds: unique(messages.slice(i, i + CHUNK_SIZE).map((item) => item.id)),
-        sourceIdType: 'restId',
-        targetIdType: 'restImmutableEntryId',
-      });
-      const { value } = translateIdsResponseSchema.parse(raw);
-      const messageIdToImmutableMessageId = new Map(
-        value.map(({ sourceId, targetId }) => [sourceId, targetId]),
-      );
-      for (const message of chunk) {
-        const immutableId = messageIdToImmutableMessageId.get(message.id);
-        if (immutableId) {
-          message.id = immutableId;
-        }
-        const immutableParentFolderId = message.parentFolderId
-          ? folderIdToImmutableFolderId.get(message.parentFolderId)
-          : null;
-
-        if (immutableParentFolderId) {
-          message.parentFolderId = immutableParentFolderId;
-        }
+    for (const message of messages) {
+      const immutableId = messageIdsMap.get(message.id);
+      if (immutableId) {
+        message.id = immutableId;
       }
     }
   }

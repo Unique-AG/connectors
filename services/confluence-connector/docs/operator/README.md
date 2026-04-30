@@ -46,7 +46,7 @@ flowchart TB
     Connector -->|"HTTPS"| ScopeMgmt
 ```
 
-The Confluence Connector runs as a **single pod** that periodically scans Confluence spaces for labeled pages and synchronizes their content (and optionally file attachments) to the Unique knowledge base.
+The Confluence Connector runs as a **single pod** that periodically scans Confluence spaces for labeled pages and synchronizes their content (and optionally file attachments, including embedded images) to the Unique knowledge base.
 
 ### Cluster-Internal Deployment
 

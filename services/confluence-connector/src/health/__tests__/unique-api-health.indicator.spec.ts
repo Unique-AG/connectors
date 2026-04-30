@@ -68,7 +68,12 @@ const baseTenantConfig = {
     scopeId: 'scope-id',
     storeInternally: true,
     useV1KeyFormat: false,
-    attachments: { enabled: true, allowedExtensions: ['pdf'], maxFileSizeMb: 200 },
+    attachments: {
+      enabled: true,
+      allowedMimeTypes: ['application/pdf'],
+      imageOcrEnabled: false,
+      maxFileSizeMb: 200,
+    },
   },
 } satisfies TenantConfig;
 

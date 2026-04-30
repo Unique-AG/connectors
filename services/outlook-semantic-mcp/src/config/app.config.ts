@@ -3,6 +3,18 @@ import { z } from 'zod/v4';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { enabledDisabledBoolean, json, stringToURL } from '~/utils/zod';
 
+export const mcpDebugModeSchema = enabledDisabledBoolean(
+  `Enables debug mode. In debug mode tools responses contain debugging data.`,
+  'disabled',
+);
+
+export const mcpBackendSchema = z
+  .enum(['MicrosoftGraphAndUniqueApi', 'MicrosoftGraph'])
+  .prefault('MicrosoftGraphAndUniqueApi')
+  .describe(
+    'Selects the search backend: MicrosoftGraphAndUniqueApi (KB ingestion) or MicrosoftGraph (direct Graph search).',
+  );
+
 const ConfigSchema = z
   .object({
     bufferLogs: enabledDisabledBoolean('If the nestjs app should buffer the logs on startup.'),
@@ -25,10 +37,8 @@ const ConfigSchema = z
     defaultMailFilters: json(inboxConfigurationMailFilters).describe(
       'Default mail filters applied when syncing emails (e.g. {"retentionWindowInDays":95, "ignoredSenders": [], "ignoredContents": [] }). ',
     ),
-    mcpDebugMode: enabledDisabledBoolean(
-      `Enables debug mode. In debug mode tools responses contain debugging data.`,
-      'disabled',
-    ),
+    mcpDebugMode: mcpDebugModeSchema,
+    mcpBackend: mcpBackendSchema,
     // During our tests we noticed that if a user with a lot of emails in their inbox drags and drops a bunch of emails in another folder
     // we will lose this emails. This is because office365 is a distributed system and the rely on eventul concistency which means. You
     // can query via {{updatedAt}} le {someDate} and get 5 messages but and in the next second you query again and you get 10 messages
@@ -75,6 +85,7 @@ export const appConfig = registerConfig('app', ConfigSchema, {
     'SELF_URL',
     'DEFAULT_MAIL_FILTERS',
     'MCP_DEBUG_MODE',
+    'MCP_BACKEND',
     'LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES',
     'LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES',
     'DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE',

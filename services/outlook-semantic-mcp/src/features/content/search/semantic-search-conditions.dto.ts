@@ -1,8 +1,5 @@
-import assert from 'node:assert';
-import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
-import { first } from 'remeda';
+import { UniqueQLOperator } from '@unique-ag/unique-api';
 import { z } from 'zod';
-import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { clampToValidDate } from '~/utils/clamp-to-valid-date';
 
 export const CONTAINS_ANY_OPERATOR = 'containsAny' as const;
@@ -172,78 +169,59 @@ export const SearchEmailsInputSchema = z.object({
 
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
 
-const METADATA_PATH: Record<keyof SearchCondition, (keyof MessageMetadata)[]> = {
-  dateFrom: ['receivedDateTime'],
-  dateTo: ['receivedDateTime'],
-  fromSenders: ['fromEmailAddress'],
-  toRecipients: ['toRecipientsEmailAddresses'],
-  ccRecipients: ['ccRecipientsEmailAddresses'],
-  directories: ['parentFolderId'],
-  hasAttachments: ['hasAttachments'],
-  categories: ['categories'],
-};
+export const MsGraphKqlQuerySchema = z.object({
+  kqlQuery: z
+    .string()
+    .nonempty()
+    .describe(
+      'KQL (Keyword Query Language) query string for Microsoft Graph email search.\n' +
+        'Supported property filters:\n' +
+        '  from:<email>              — sender address (exact or domain, e.g. from:alice@example.com)\n' +
+        '  to:<email>                — recipient in To field\n' +
+        '  cc:<email>                — recipient in CC field\n' +
+        '  subject:<words>           — words in the subject line (phrase: subject:"budget report")\n' +
+        '  body:<words>              — words in the message body\n' +
+        '  received>=YYYY-MM-DD      — received on or after date\n' +
+        '  received<=YYYY-MM-DD      — received on or before date\n' +
+        '  hasAttachment:true/false  — whether the email has attachments\n' +
+        '  category:"label"          — Outlook category label\n' +
+        'Free-text terms (no property prefix) perform a full-text search across subject and body.\n' +
+        'Combine clauses with AND / OR; use double quotes for phrases.\n' +
+        'Examples:\n' +
+        '  "from:alice@example.com subject:\\"Q2 budget\\" received>=2024-01-01"\n' +
+        '  "project proposal hasAttachment:true received>=2024-03-01 received<=2024-03-31"\n' +
+        '  "from:hr@acme.com OR from:payroll@acme.com subject:salary"',
+    ),
+  limit: z.number().int().min(1).max(50).optional().prefault(25),
+});
 
-function wrapConditions(filters: MetadataFilter[], operator: 'and' | 'or'): MetadataFilter {
-  const firstElement = first(filters);
-  if (firstElement && filters.length === 1) {
-    return firstElement;
-  }
-  if (operator === 'and') {
-    return { and: filters };
-  }
-  return { or: filters };
-}
+export const MsGraphSearchParamsSchema = z.object({
+  queries: z
+    .array(MsGraphKqlQuerySchema)
+    .min(1)
+    .max(20)
+    .describe('List of KQL queries to execute in parallel. Maximum 20.'),
+});
 
-function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
-  const leaves: MetadataFilter[] = [];
+export const SearchEmailsMsGraphInputSchema = z.object({
+  msGraphSearchParams: MsGraphSearchParamsSchema,
+});
 
-  for (const key of Object.keys(conditions) as Array<keyof SearchCondition>) {
-    const field = conditions[key];
-    if (field === undefined) {
-      continue;
-    }
-
-    const path = METADATA_PATH[key];
-    const operator = field.operator as UniqueQLOperator | typeof CONTAINS_ANY_OPERATOR;
-    const { value } = field;
-    if (operator === CONTAINS_ANY_OPERATOR) {
-      // We use assert here as type guard because zod already validates this but typescript does not infer that we can
-      // have just array as value.
-      assert.ok(
-        Array.isArray(value),
-        `Invalid value for operator: ${CONTAINS_ANY_OPERATOR}. Value: ${value} must be an array`,
-      );
-      const conditions = value.map((value) => ({
-        path,
-        operator: UniqueQLOperator.CONTAINS,
-        value,
-      }));
-      // We do not break if conditions length is empty we skip it beause there is no point
-      // in applying this condition.
-      if (conditions.length > 0) {
-        leaves.push(wrapConditions(conditions, 'or'));
-      }
-    } else {
-      leaves.push({ path, operator, value });
-    }
-  }
-
-  return leaves;
-}
-
-function buildConditionGroup(condition: SearchCondition): MetadataFilter {
-  const leaves: MetadataFilter[] = [];
-  leaves.push(...getConditionsArray(condition));
-  return wrapConditions(leaves, 'and');
-}
-
-// Keys within a single condition are OR-combined; multiple conditions in the array are AND-combined.
-export function buildSearchFilter(
-  conditions: SearchCondition[] | null | undefined,
-): MetadataFilter | undefined {
-  if (!conditions?.length) {
-    return undefined;
-  }
-  const conditionGroups = conditions.map(buildConditionGroup);
-  return wrapConditions(conditionGroups, 'or');
-}
+export const SearchEmailsUnifiedInputSchema = z
+  .object({
+    semanticSearchParams: SearchEmailsInputSchema,
+    msGraphSearchParams: MsGraphSearchParamsSchema.optional().describe(
+      'KQL queries that answer the same question as semanticSearchParams. ' +
+        'When provided, results from both backends are merged: semantic results are anchored first ' +
+        'and enriched with the Graph body excerpt when the same email was matched by both. ' +
+        'Always try to fill this alongside semanticSearchParams — the combined result gives a ' +
+        'more complete picture than either search alone.',
+    ),
+  })
+  .describe(
+    'Both semanticSearchParams and msGraphSearchParams should express the same search intent ' +
+      "using each backend's own query language. The two searches run in parallel and their " +
+      'results are merged to provide a broader and more reliable overview: semantic search ' +
+      'covers natural-language relevance and attachment content, while KQL covers lexical ' +
+      'precision and full email-body excerpts.',
+  );

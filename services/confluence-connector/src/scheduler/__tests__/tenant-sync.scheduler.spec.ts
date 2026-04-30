@@ -59,7 +59,8 @@ const tenantConfig = {
     useV1KeyFormat: false,
     attachments: {
       enabled: true,
-      allowedExtensions: ['pdf'],
+      allowedMimeTypes: ['application/pdf'],
+      imageOcrEnabled: false,
       maxFileSizeMb: 200,
     },
   },

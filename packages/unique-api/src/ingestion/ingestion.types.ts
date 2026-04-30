@@ -1,4 +1,5 @@
 import type { FileAccessKey } from '../files/files.types';
+import type { IngestionConfig } from './ingestion.queries';
 
 export interface AuthorMetadata {
   email: string;
@@ -34,6 +35,7 @@ export interface ContentRegistrationRequest {
   metadata: ContentMetadata;
   storeInternally: boolean;
   expiresAt?: Date;
+  ingestionConfig?: IngestionConfig;
 }
 
 export interface IngestionFinalizationRequest {
@@ -52,6 +54,7 @@ export interface IngestionFinalizationRequest {
   metadata?: ContentMetadata;
   storeInternally: boolean;
   expiresAt?: Date;
+  ingestionConfig?: IngestionConfig;
 }
 
 export interface IngestionApiResponse {

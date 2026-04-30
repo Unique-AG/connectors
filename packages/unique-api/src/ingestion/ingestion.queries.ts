@@ -8,6 +8,7 @@ export interface IngestionConfig {
     | 'INGESTION'
     | 'SKIP_EXCEL_INGESTION'
     | 'EXTERNAL_INGESTION';
+  jpgReadMode?: 'DOC_INTELLIGENCE_DEFAULT' | 'NO_INGESTION';
 }
 
 export interface ContentUpsertMutationInput {

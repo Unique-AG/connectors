@@ -66,11 +66,13 @@ The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and 
 - File attachments on labeled pages are discovered and ingested alongside page content
 - Attachment ingestion can be enabled or disabled
 - Configurable file size limit (default: 200 MB)
-- Configurable allowed file extensions (defaults listed below)
+- Configurable allowed MIME types. Defaults cover PDF, the major Office formats, plain text, CSV, HTML, PNG, and JPEG. See [Configuration](./operator/configuration.md#Attachment-Configuration) for the full list.
 
-**Default Allowed Attachment Extensions**
+**Image Ingestion**
 
-Configurable allowed file types (default: pdf, docx, xlsx, ppt, pptx, txt, csv, html). See [Configuration](./operator/configuration.md#Attachment-Configuration) for details.
+When attachment ingestion is enabled, images embedded in Confluence pages (PNG and JPEG) are ingested as attachments. Confluence stores editor-inserted images (drag/drop, paste, "Insert image") as regular page attachments, so they flow through the same path as PDFs and Office files. Images inserted as external URLs (rather than uploaded) are not attachments and are not ingested.
+
+The connector also requests OCR-based ingestion for each image automatically (`attachments.imageOcr` is `enabled` by default), so chunks are produced without any scope-side configuration. Set `attachments.imageOcr = disabled` to defer to the destination scope's own `ingestionConfig.jpgReadMode`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service and should be left out of `allowedMimeTypes`.
 
 **Skipped Content Types**
 

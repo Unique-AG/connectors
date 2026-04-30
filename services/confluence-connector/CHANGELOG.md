@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.0.0-alpha.7](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.6...confluence-connector@2.0.0-alpha.7) (2026-04-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **confluence-connector,unique-api:** `ingestion.attachments.allowedExtensions` has been renamed to `ingestion.attachments.allowedMimeTypes` and now expects MIME type strings instead of file extensions. Operators with custom values in their tenant YAML must migrate. Default values are now MIME types covering PDF, DOCX, XLSX, PPTX, plain text, CSV, HTML, PNG, and JPEG. Legacy `.ppt` (Office 97-2003, `application/vnd.ms-powerpoint`) is no longer in defaults; it was previously matched by extension but rejected by `node-ingestion`'s public API gate, so it was already non-functional end-to-end. The connector is still alpha (`prerelease: true`), so no compatibility shim is provided.
+
+### Features
+
+* **confluence-connector,deps:** add /health endpoint with sync, connectivity, and Unique API indicators ([#493](https://github.com/Unique-AG/connectors/issues/493)) ([e41c707](https://github.com/Unique-AG/connectors/commit/e41c70723dcd9104e3432b6cfa0c1aa852618f40))
+* **confluence-connector,unique-api:** implement content cleanup for deleted tenants ([#370](https://github.com/Unique-AG/connectors/issues/370)) ([0fbcbdf](https://github.com/Unique-AG/connectors/commit/0fbcbdf0e4ecaeef4bf86aa7f4562efc315a7162))
+* **confluence-connector,unique-api:** ingest images and switch attachment filter to MIME types ([#494](https://github.com/Unique-AG/connectors/issues/494)) ([530caee](https://github.com/Unique-AG/connectors/commit/530caeeb4735ef19bda8e246ec2c9b0811eb29de))
+
+
+### Bug Fixes
+
+* **confluence-connector:** downgrade noisy skip logs to debug level ([#481](https://github.com/Unique-AG/connectors/issues/481)) ([8233745](https://github.com/Unique-AG/connectors/commit/82337452a50fbc4986ddd04be3a67c5443f5ce5a))
+* **confluence-connector:** improve observability during long syncs ([#482](https://github.com/Unique-AG/connectors/issues/482)) ([cb5310e](https://github.com/Unique-AG/connectors/commit/cb5310e877a8b9024859dcff073aaf6d696a5a4d))
+* **confluence-connector:** namespace dashboard configmap key to avoid sidecar file collision ([#483](https://github.com/Unique-AG/connectors/issues/483)) ([c45627a](https://github.com/Unique-AG/connectors/commit/c45627ae82521df46a9299973cd8331cb2656a55))
+* **confluence-connector:** request JSON from DC applinks manifest endpoint ([#484](https://github.com/Unique-AG/connectors/issues/484)) ([bd3cd23](https://github.com/Unique-AG/connectors/commit/bd3cd23233881d66ba0b823c7062dac4ebeef4e6))
+
 ## [2.0.0-alpha.6](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.5...confluence-connector@2.0.0-alpha.6) (2026-04-17)
 
 

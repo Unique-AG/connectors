@@ -1,244 +1,148 @@
-import assert from 'node:assert';
-import { MetadataFilter, type UniqueApiClient, UniqueQLOperator } from '@unique-ag/unique-api';
-import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
-import { Span } from 'nestjs-otel';
-import { isNonNull, join, map, omit, pipe, prop, sortBy } from 'remeda';
+import { Injectable } from '@nestjs/common';
 import * as z from 'zod';
+import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
+import { SearchEmailsInputSchema } from './semantic-search-conditions.dto';
 import {
-  type Directory,
-  DRIZZLE,
-  type DrizzleDatabase,
-  directories,
-  systemDirectories,
-  userProfiles,
-} from '~/db';
-import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
-import {
-  getRootScopeExternalId,
-  getRootScopeExternalIdForUser,
-} from '~/unique/get-root-scope-path';
-import { InjectUniqueApi } from '~/unique/unique-api.module';
-import { findBestMatch } from '~/utils/find-best-match';
-import { stripChunkTags } from '~/utils/strip-chunk-tags';
-import {
-  buildSearchFilter,
-  type SearchCondition,
-  SearchEmailsInputSchema,
-} from './search-conditions.dto';
+  SearchBackend,
+  SearchEmailResult,
+  SemanticSearchEmailsQuery,
+} from './semantic-search-emails.query';
 
-export interface SearchEmailResult {
-  id: string;
-  emailId: string;
-  folderId: string;
-  title: string;
-  from: string;
-  outlookWebLink: string;
-  receivedDateTime: string | null;
-  text: string;
-  url: string | undefined;
+export interface SearchEmailsToolInput {
+  semanticSearchParams?: z.infer<typeof SearchEmailsInputSchema>;
+  msGraphSearchParams?: { queries: Array<{ kqlQuery: string; limit?: number }> };
 }
+
+type BackendExecutor = (
+  userProfileId: string,
+  input: SearchEmailsToolInput,
+) => Promise<SearchEmailResult[]>;
 
 @Injectable()
 export class SearchEmailsQuery {
   public constructor(
-    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
+    private readonly semanticSearchQuery: SemanticSearchEmailsQuery,
+    private readonly msGraphKqlQuery: MsGraphKqlSearchEmailsQuery,
   ) {}
 
-  @Span()
+  private readonly executors: Record<SearchBackend, BackendExecutor> = {
+    [SearchBackend.Unique]: (
+      userProfileId: string,
+      input: SearchEmailsToolInput,
+    ): Promise<SearchEmailResult[]> => {
+      if (!input.semanticSearchParams) {
+        return Promise.resolve([]);
+      }
+      return this.semanticSearchQuery
+        .run(userProfileId, input.semanticSearchParams)
+        .then(({ results }) => results);
+    },
+    [SearchBackend.MsGraph]: (
+      userProfileId: string,
+      input: SearchEmailsToolInput,
+    ): Promise<SearchEmailResult[]> => {
+      if (!input.msGraphSearchParams) {
+        return Promise.resolve([]);
+      }
+      return this.msGraphKqlQuery.run(userProfileId, input.msGraphSearchParams.queries);
+    },
+  };
+
   public async run(
     userProfileId: string,
-    input: z.infer<typeof SearchEmailsInputSchema>,
-  ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
-    const userProfile = await this.db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, userProfileId),
-    });
-    assert.ok(userProfile, `User profile not found: ${userProfileId}`);
-    assert.ok(userProfile.providerUserId, `providerUserId missing for: ${userProfileId}`);
+    input: SearchEmailsToolInput,
+  ): Promise<SearchEmailResult[]> {
+    const [semanticResults, graphResults] = await Promise.all([
+      this.executors[SearchBackend.Unique](userProfileId, input),
+      this.executors[SearchBackend.MsGraph](userProfileId, input),
+    ]);
 
-    const rootScope = await this.uniqueApi.scopes.getByExternalId(getRootScopeExternalId());
-    assert.ok(rootScope, `Root scope not found for user: ${userProfile.providerUserId}`);
-    const rootScopeForUser = await this.uniqueApi.scopes.getByExternalId(
-      getRootScopeExternalIdForUser(userProfile.providerUserId),
-    );
-    assert.ok(rootScopeForUser, `Root scope not found for user: ${userProfile.providerUserId}`);
-
-    const { conditions: resolvedConditions, searchSummary } = await this.sanitizeSearchConditions(
-      userProfileId,
-      input.conditions,
-    );
-
-    const uniqueQlMetadataFilter = buildSearchFilter(resolvedConditions);
-    const metaDataFilter: MetadataFilter = {
-      and: [
-        {
-          operator: UniqueQLOperator.CONTAINS,
-          value: `uniquepathid://${rootScope.id}/${rootScopeForUser.id}`,
-          path: [`folderIdPath`],
-        },
-      ],
-    };
-    if (uniqueQlMetadataFilter) {
-      metaDataFilter.and.push(uniqueQlMetadataFilter);
-    }
-    const searchResults = await this.uniqueApi.content.search({
-      prompt: input.search,
-      metaDataFilter,
-      limit: input.limit,
-      scoreThreshold: 0,
-    });
-
-    type DeduplicatedResult = Omit<SearchEmailResult, 'text'> & {
-      textParts: { order: number; text: string }[];
-      index: number;
-    };
-
-    const resultsDeduplicated = searchResults.reduce<Record<string, DeduplicatedResult>>(
-      (acc, item, index) => {
-        const metadata = item.metadata as MessageMetadata | undefined;
-        const itemRef = acc[item.id] ?? {
-          title: item.title ?? '',
-          id: item.id,
-          url: item.url ?? undefined,
-          outlookWebLink: metadata?.webLink ?? '',
-          emailId: metadata?.id ?? '',
-          folderId: metadata?.parentFolderId ?? '',
-          from: metadata?.fromEmailAddress ?? '',
-          receivedDateTime: metadata?.receivedDateTime ?? '',
-          textParts: [],
-          index,
-        };
-        itemRef.textParts.push({ order: item.order, text: item.text });
-        acc[item.id] = itemRef;
-        return acc;
-      },
-      {},
-    );
-
-    const results: SearchEmailResult[] = pipe(
-      Object.values(resultsDeduplicated),
-      sortBy((item) => item.index),
-      map(({ textParts, ...searchResult }) => {
-        const text = pipe(
-          textParts,
-          sortBy(prop('order')),
-          // We keep the chunk tags on the first chunk but remove them from others.
-          map((item, index) => (index === 0 ? item.text : stripChunkTags(item.text))),
-          join('\n'),
-        );
-
-        return {
-          ...omit(searchResult, ['index']),
-          text,
-        };
-      }),
-    );
-
-    return { results, searchSummary };
+    return this.mergeResults(semanticResults, graphResults);
   }
 
-  private async sanitizeSearchConditions(
-    userProfileId: string,
-    conditions: SearchCondition[] | undefined,
-  ): Promise<{ conditions: SearchCondition[] | undefined; searchSummary: string | undefined }> {
-    const hasDirectoriesCondition = conditions?.some((condition) =>
-      isNonNull(condition.directories),
-    );
-    if (!hasDirectoriesCondition) {
-      return { conditions, searchSummary: undefined };
+  private formatText({
+    semanticText,
+    graphText,
+  }: {
+    semanticText?: string;
+    graphText?: string;
+  }): string {
+    const sections: string[] = [];
+    if (semanticText) {
+      sections.push(`## Semantically Matched Content\n${semanticText}`);
     }
+    if (graphText) {
+      sections.push(`## Full Email Content Without Attachments\n${graphText}`);
+    }
+    return sections.join('\n\n');
+  }
 
-    const userDirectories = await this.db
-      .select()
-      .from(directories)
-      .where(
-        and(eq(directories.userProfileId, userProfileId), eq(directories.ignoreForSync, false)),
-      );
+  // We trust our semantic search more than KQL, so the top 20 semantic results are
+  // anchored first. When Graph returned the same email, we enrich the semantic result
+  // with the KQL body excerpt so the LLM sees both the attachment chunks and the full
+  // email body.
+  //
+  // Beyond position 20 we treat a match in both backends as a stronger signal than a
+  // semantic-only match, so common results are ranked above semantic-only stragglers.
+  // Graph-only results come last as the weakest signal.
+  //
+  // Tier ordering (strongest → weakest confidence):
+  //   1. Top-20 semantic results — anchored first, enriched with Graph body if available.
+  //   2. Common remainder — matched by both backends but outside top-20.
+  //   3. Semantic-only remainder — semantic match beyond top-20 with no Graph hit.
+  //   4. Graph-only — lexical match with no semantic counterpart.
+  //
+  // Output is capped at 500 results to keep LLM context small.
+  private mergeResults(
+    semanticResults: SearchEmailResult[],
+    graphResults: SearchEmailResult[],
+  ): SearchEmailResult[] {
+    const graphById = new Map(
+      graphResults
+        .filter(
+          (item): item is SearchEmailResult & { msGraphMessageId: string } =>
+            !!item.msGraphMessageId,
+        )
+        .map((item) => [item.msGraphMessageId, item]),
+    );
 
-    const allUnrecognized: string[] = [];
-    const resolvedConditions: SearchCondition[] = [];
+    const enriched: Array<{ result: SearchEmailResult; hadGraphMatch: boolean }> =
+      semanticResults.map((semanticResult) => {
+        const { msGraphMessageId } = semanticResult;
+        const graphResult = msGraphMessageId ? graphById.get(msGraphMessageId) : null;
 
-    for (const condition of conditions ?? []) {
-      if (!condition.directories) {
-        resolvedConditions.push(condition);
-        continue;
-      }
-      const rawDirectoryIds = Array.isArray(condition.directories.value)
-        ? condition.directories.value
-        : [condition.directories.value];
-
-      const { resolvedIds, unrecognized } = this.sanitizeWrongDirectoryIds(
-        rawDirectoryIds,
-        userDirectories,
-      );
-      allUnrecognized.push(...unrecognized);
-
-      if (resolvedIds.length === 0) {
-        delete condition.directories;
-        if (Object.keys(condition).length > 0) {
-          resolvedConditions.push(condition);
+        if (!graphResult) {
+          return { result: semanticResult, hadGraphMatch: false };
         }
-        continue;
-      }
 
-      resolvedConditions.push({
-        ...condition,
-        directories: {
-          ...condition.directories,
-          value: resolvedIds,
-        },
+        if (msGraphMessageId) {
+          graphById.delete(msGraphMessageId);
+        }
+        return {
+          result: {
+            ...semanticResult,
+            text: this.formatText({
+              semanticText: semanticResult.text,
+              graphText: graphResult.text,
+            }),
+          },
+          hadGraphMatch: true,
+        };
       });
-    }
 
-    let searchSummary: string | undefined;
-    if (allUnrecognized.length > 0) {
-      const quoted = allUnrecognized.map((f) => `\`"${f}"\``).join(', ');
-      searchSummary = `> **Note:** The following folder(s) were not recognized and were excluded from the search: ${quoted}. The search ran across all available folders instead.`;
-    }
+    const topSemanticMatches = enriched.slice(0, 20).map((e) => e.result);
+    const remainder = enriched.slice(topSemanticMatches.length);
+    const commonRemainder = remainder.filter((e) => e.hadGraphMatch).map((e) => e.result);
+    const semanticOnly = remainder.filter((e) => !e.hadGraphMatch).map((e) => e.result);
 
-    return { conditions: resolvedConditions, searchSummary };
-  }
+    const remainingGraph = Array.from(graphById.values()).map((graphResult) => ({
+      ...graphResult,
+      text: this.formatText({ graphText: graphResult.text }),
+    }));
 
-  private sanitizeWrongDirectoryIds(
-    rawDirectoryIds: string[],
-    userDirectories: Directory[],
-  ): { resolvedIds: string[]; unrecognized: string[] } {
-    const resolvedIds: string[] = [];
-    const unrecognized: string[] = [];
-
-    for (const rawDirectoryId of rawDirectoryIds) {
-      if (!rawDirectoryId.trim().length) {
-        continue;
-      }
-      const exactMatch = userDirectories.find(
-        ({ providerDirectoryId }) => providerDirectoryId === rawDirectoryId,
-      );
-      if (exactMatch) {
-        resolvedIds.push(rawDirectoryId);
-        continue;
-      }
-
-      const bestDirectory = findBestMatch({
-        items: userDirectories,
-        getLabel: (directory) => directory.displayName,
-        query: rawDirectoryId,
-        threshold: 0.8,
-        isNewItemBetter: (newItem, currentBestItem) => {
-          if (systemDirectories.includes(currentBestItem.internalType)) {
-            return false;
-          }
-
-          return systemDirectories.includes(newItem.internalType);
-        },
-      });
-      if (bestDirectory) {
-        resolvedIds.push(bestDirectory.providerDirectoryId);
-      } else {
-        unrecognized.push(rawDirectoryId);
-      }
-    }
-
-    return { resolvedIds, unrecognized };
+    return [...topSemanticMatches, ...commonRemainder, ...semanticOnly, ...remainingGraph].slice(
+      0,
+      500,
+    );
   }
 }

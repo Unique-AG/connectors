@@ -394,18 +394,34 @@
                         "description": "Enable attachment ingestion",
                         "default": "enabled"
                       },
-                      "allowedExtensions": {
+                      "allowedMimeTypes": {
                         "type": "array",
                         "items": {
                           "type": "string"
                         },
-                        "description": "File extensions to include when ingesting attachments",
-                        "default": ["pdf", "docx", "ppt", "pptx", "txt", "csv", "html"]
+                        "description": "MIME types to include when ingesting attachments. Matched against the mediaType reported by the Confluence API",
+                        "default": [
+                          "application/pdf",
+                          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                          "text/plain",
+                          "text/csv",
+                          "text/html",
+                          "image/png",
+                          "image/jpeg"
+                        ]
                       },
                       "maxFileSizeMb": {
                         "type": "integer",
                         "description": "Maximum file size in megabytes for attachment ingestion",
                         "default": 200
+                      },
+                      "imageOcr": {
+                        "type": "string",
+                        "enum": ["enabled", "disabled"],
+                        "description": "Whether the connector should request OCR-based ingestion for image attachments by attaching ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT to each create-content request",
+                        "default": "enabled"
                       }
                     },
                     "additionalProperties": false
