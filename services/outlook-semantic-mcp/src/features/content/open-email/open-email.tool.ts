@@ -1,35 +1,35 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
-import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { SearchBackend } from '../search/semantic-search-emails.query';
+import { OpenEmailQuery } from './open-email.query';
 import { META } from './open-email-tool.meta';
+
+const IS_MICROSOFT_GRAPH_BACKEND = isMicrosoftGraphBackend();
 
 const OpenEmailByIdInputSchema = z.object({
   id: z
     .string()
     .describe(
-      'The content ID returned by the search_emails tool, e.g. "cont_zwgng9aoz0gbo6qxgnwese7g".',
+      'The email identifier from a `search_emails` result. Use `uniqueContentId` when it is available; otherwise use `msGraphMessageId`.',
     ),
-});
-
-export const EmailDataChunkSchema = z.object({
-  id: z.string(),
-  startPage: z.number().nullable(),
-  endPage: z.number().nullable(),
-  order: z.number().nullable(),
-  text: z.string(),
+  idType: z
+    .nativeEnum(SearchBackend)
+    .describe(
+      'Indicates which identifier is being passed, derived from the `search_emails` result. Use `Unique` when passing `uniqueContentId`; use `MsGraph` when passing `msGraphMessageId`.',
+    ),
 });
 
 export const EmailDataSchema = z.object({
   id: z.string(),
   title: z.string().nullable(),
   metadata: z.unknown().nullable(),
-  chunks: z.array(EmailDataChunkSchema).optional(),
+  text: z.string(),
 });
 
 const OpenEmailByIdOutputSchema = z.object({
@@ -43,13 +43,14 @@ const OpenEmailByIdOutputSchema = z.object({
 export class OpenEmailTool {
   public constructor(
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
-    @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
+    private readonly openEmailQuery: OpenEmailQuery,
   ) {}
 
   @Tool({
     name: 'open_email_by_id',
     title: 'Open Email by ID',
-    description: 'Retrieve the full content of an email by its ID returned from search_emails.',
+    description:
+      'Retrieve the full body of an email. Both `id` and `idType` must come from a `search_emails` result: pass `uniqueContentId` as `id` and `Unique` as `idType` when `uniqueContentId` is available; otherwise pass `msGraphMessageId` as `id` and `MsGraph` as `idType`.',
     parameters: OpenEmailByIdInputSchema,
     outputSchema: OpenEmailByIdOutputSchema,
     annotations: {
@@ -66,18 +67,21 @@ export class OpenEmailTool {
     input: z.infer<typeof OpenEmailByIdInputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
-  ) {
+  ): Promise<z.infer<typeof OpenEmailByIdOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
 
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
-    if (!subscriptionStatus.success) {
-      return subscriptionStatus;
+    if (!IS_MICROSOFT_GRAPH_BACKEND) {
+      const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
+      if (!subscriptionStatus.success) {
+        return subscriptionStatus;
+      }
     }
 
-    const emailData = await this.uniqueApi.content.getContentById({ contentId: input.id });
-    return OpenEmailByIdOutputSchema.encode({
-      success: true,
-      emailData,
-    });
+    const emailData = await this.openEmailQuery.run(
+      userProfileTypeId.toString(),
+      input.id,
+      input.idType,
+    );
+    return { success: true, emailData };
   }
 }

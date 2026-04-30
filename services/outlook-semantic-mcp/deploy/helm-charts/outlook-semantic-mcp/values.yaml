@@ -142,6 +142,9 @@ mcpConfig:
     #    1. Debugging tools
     #    2. Extra debugging data in tool responses.
     mcpDebugMode: disabled
+    # -- Search backend. MicrosoftGraphAndUniqueApi: dual backend, KB ingestion + semantic search (default).
+    # MicrosoftGraph: direct Graph search, no ingestion, sync tools not registered.
+    mcpBackend: MicrosoftGraphAndUniqueApi
     # -- Optional. Overlapping window in minutes for standard live catch-up sync runs. Office 365
     # uses eventual consistency, so messages can appear with a delayed updatedAt timestamp after
     # the actual event. Re-querying an overlapping window ensures late-arriving messages are not
