@@ -129,10 +129,24 @@ export const SearchConditionSchema = z
         ),
       )
       .optional(),
+    mailbox: z
+      .email()
+      .describe(
+        `Scope this condition to a specific mailbox (exact email address match, no wildcards). ` +
+          `When set, this condition only applies to the matching mailbox branch; when omitted, the condition applies to every accessible mailbox (own + delegated). ` +
+          `Use the \`list_folders\` tool to discover which mailboxes are available for the current user.`,
+      )
+      .optional(),
   })
-  .refine((obj) => Object.values(obj).some((v) => v !== undefined), {
-    message: `Invalid search condition, the following fields are supported for conditions 'dateFrom', 'dateTo', 'fromSenders', 'toRecipients', 'ccRecipients', 'directories', 'hasAttachments', 'categories'. Example of valid condition: { fromSenders: { value: "alice@example.com", operator: "equals" } }`,
-  })
+  .refine(
+    (obj) =>
+      Object.entries(obj)
+        .filter(([k]) => k !== 'mailbox')
+        .some(([, v]) => v !== undefined),
+    {
+      message: `Invalid search condition, the following fields are supported for conditions 'dateFrom', 'dateTo', 'fromSenders', 'toRecipients', 'ccRecipients', 'directories', 'hasAttachments', 'categories'. Example of valid condition: { fromSenders: { value: "alice@example.com", operator: "equals" } }`,
+    },
+  )
   .describe(
     `Condition to narrow down the search, AND operator is applied between multiple conditions fields`,
   );
