@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { SearchConditionSchema } from '../semantic-search-conditions.dto';
-import { SanitizeSearchConditionsForUserQuery } from '../sanitize-search-conditions-for-user.query';
 import { filterConditionsForMailbox } from '../filter-conditions-for-mailbox';
+import { SanitizeSearchConditionsForUserQuery } from '../sanitize-search-conditions-for-user.query';
+import { SearchConditionSchema } from '../semantic-search-conditions.dto';
 
 describe('SearchConditionSchema', () => {
   it('accepts a valid mailbox email alongside another filter field', () => {

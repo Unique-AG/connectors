@@ -5,7 +5,11 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { ListDirectoriesQuery, type UserDirectory, type UserMailbox } from '../list-directories.query';
+import {
+  ListDirectoriesQuery,
+  type UserDirectory,
+  type UserMailbox,
+} from '../list-directories.query';
 import { SyncDirectoriesCommand } from '../sync-directories.command';
 import { META } from './list-folders-tool.meta';
 
@@ -47,7 +51,7 @@ export class ListFoldersTool {
     name: 'list_folders',
     title: 'List Folders',
     description:
-      'List all Outlook mail folders available for the user, grouped by mailbox. Returns the user\'s own mailbox and any delegated (shared) mailboxes they have access to. Each mailbox contains a hierarchical folder tree. Each folder has an id that can be passed to the `directories` filter in `search_emails`.',
+      "List all Outlook mail folders available for the user, grouped by mailbox. Returns the user's own mailbox and any delegated (shared) mailboxes they have access to. Each mailbox contains a hierarchical folder tree. Each folder has an id that can be passed to the `directories` filter in `search_emails`.",
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {
