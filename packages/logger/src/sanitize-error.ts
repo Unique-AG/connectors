@@ -6,13 +6,13 @@ interface GraphqlClientErrorLike extends Error {
   request: Record<string, unknown>;
 }
 
-export interface SanitizedGraphqlError {
+interface SanitizedGraphqlError {
   message: string;
   path?: ReadonlyArray<string | number>;
   code?: unknown;
 }
 
-export interface SanitizedError {
+interface SanitizedError {
   name?: string;
   message?: string;
   stack?: string;
