@@ -3,11 +3,11 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import {
   SearchEmailsMsGraphInputSchema,
   SearchEmailsUnifiedInputSchema,
 } from '~/features/content/search/search-conditions.dto';
+import { SearchEmailsQuery } from '~/features/content/search/search-emails.query';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { GetFullSyncStatsQuery } from '~/features/sync/full-sync/get-full-sync-stats.query';
 import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
@@ -38,7 +38,11 @@ const SearchEmailResultSchema = z.object({
     .describe(
       'Microsoft Graph message ID. Pass as `id` with `idType: "MsGraph"` to `open_email_by_id`. Present for Graph-backend results; also present for semantic results when both backends matched the same email.',
     ),
-  folderId: z.string().describe('ID of the folder containing this email. Internal identifier — do not display to the user.'),
+  folderId: z
+    .string()
+    .describe(
+      'ID of the folder containing this email. Internal identifier — do not display to the user.',
+    ),
   title: z.string().describe('Subject line of the email.'),
   from: z.string().describe('Sender of the email, in "Name <email>" or plain "email" format.'),
   receivedDateTime: z
@@ -59,11 +63,15 @@ const SearchEmailResultSchema = z.object({
   sourceMailbox: z
     .string()
     .nullish()
-    .describe('Mailbox this email belongs to (own or delegated). Useful when results span multiple mailboxes.'),
+    .describe(
+      'Mailbox this email belongs to (own or delegated). Useful when results span multiple mailboxes.',
+    ),
   uniqueContentUrl: z
     .string()
     .optional()
-    .describe('Internal URL for the semantic-backend content. For user-facing links, prefer `outlookWebLink`.'),
+    .describe(
+      'Internal URL for the semantic-backend content. For user-facing links, prefer `outlookWebLink`.',
+    ),
   backend: z
     .nativeEnum(SearchBackend)
     .describe(
@@ -72,10 +80,23 @@ const SearchEmailResultSchema = z.object({
 });
 
 const SearchEmailsOutputSchema = z.object({
-  success: z.boolean().describe('`true` if the search completed; `false` if it was blocked (e.g. subscription not active).'),
-  message: z.string().optional().describe('Human-readable error description when `success` is `false`.'),
-  results: z.array(SearchEmailResultSchema).optional().describe('Matched emails. Present when `success` is `true`.'),
-  status: z.string().optional().describe('Additional subscription or backend status detail. Informational only.'),
+  success: z
+    .boolean()
+    .describe(
+      '`true` if the search completed; `false` if it was blocked (e.g. subscription not active).',
+    ),
+  message: z
+    .string()
+    .optional()
+    .describe('Human-readable error description when `success` is `false`.'),
+  results: z
+    .array(SearchEmailResultSchema)
+    .optional()
+    .describe('Matched emails. Present when `success` is `true`.'),
+  status: z
+    .string()
+    .optional()
+    .describe('Additional subscription or backend status detail. Informational only.'),
   syncWarning: z
     .string()
     .optional()

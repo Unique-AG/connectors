@@ -182,7 +182,7 @@ export const MsGraphKqlQuerySchema = z.object({
     .email()
     .optional()
     .describe(
-      'Scope this KQL query to a specific mailbox (exact email address). When omitted, searches the current user\'s primary mailbox. Note: Microsoft Graph KQL search does not support delegated-access mailboxes — only the current user\'s own mailbox is searchable.',
+      "Scope this KQL query to a specific mailbox (exact email address). When omitted, searches the current user's primary mailbox. Note: Microsoft Graph KQL search does not support delegated-access mailboxes — only the current user's own mailbox is searchable.",
     ),
   kqlQuery: z
     .string()
