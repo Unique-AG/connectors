@@ -192,9 +192,13 @@ Pages labeled with `ingestAllLabel` trigger a descendant search:
 When `attachments.mode` is `enabled` (default), attachments are extracted from the already-fetched page objects. Confluence inlines up to 25 attachments per page via the `expand=children.attachment` parameter during the CQL search. If a page has more than 25 attachments, additional attachments are fetched via pagination (Cloud uses the v2 attachments endpoint; Data Center uses v1 pagination via `_links.next`).
 
 An attachment is accepted if:
-- Its file extension is in the `allowedExtensions` list (default: `pdf`, `docx`, `xlsx`, `ppt`, `pptx`, `txt`, `csv`, `html`)
+- Its `mediaType` (reported by the Confluence API) is in the `allowedMimeTypes` list (defaults cover PDF, the major Office formats, plain text, CSV, HTML, PNG, and JPEG)
 - Its file size does not exceed `maxFileSizeMb` (default: 200 MB)
 - The `maxItemsToScan` capacity has not been exhausted (pages count first, attachments use remaining capacity)
+
+Images embedded in a page body (via the editor's drag/drop, paste, or "Insert image" actions) are stored by Confluence as regular page attachments and surface in the same `expand=children.attachment` results, so they are ingested through this path when `image/png` or `image/jpeg` is in `allowedMimeTypes`. Images inserted as external URLs are not attachments and are not ingested.
+
+When `attachments.imageOcr` is `enabled` (default), each image content registration includes `ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT`, which the Unique ingestion service merges over its environment defaults and the destination scope's own config (request body has highest precedence). This forces OCR-based processing on the worker so chunks are produced; without it, the worker default (`NO_INGESTION`) returns zero chunks and the worker raises `FAILED_IMAGE`.
 
 ### Content Type Ingestion Map
 
@@ -208,7 +212,7 @@ Content that passes the filter has its `body.storage` HTML extracted and ingeste
 |---|---|---|---|
 | Page | **Yes** | Yes (`body.storage` / ADF) | Primary content type. Full body ingestion. |
 | Blog Post | **Yes** | Yes (`body.storage` / ADF) | Treated identically to pages by the connector. |
-| Attachment | **Yes** (conditional) | No (binary) | Only when `attachments.mode=enabled`. Filtered by extension and size. |
+| Attachment | **Yes** (conditional) | No (binary) | Only when `attachments.mode=enabled`. Filtered by MIME type and size. Includes embedded images (PNG, JPEG). |
 | Whiteboard | **No** | No (no body via API) | Explicitly skipped. API returns no body content. Descendants are still discovered. |
 | Database | **No** | No (structured data, not exposed) | Explicitly skipped. No body via API. Descendants (sub-pages) are still discovered and ingested. |
 | Embed / Smart Link | **No** | No (only has `embedUrl`) | Explicitly skipped. Only contains a URL reference, no renderable body. |

@@ -151,27 +151,18 @@ export class ConfluencePageScanner {
       return false;
     }
 
-    const extension = this.extractExtension(attachment.title);
-    if (!extension || !this.attachmentConfig.allowedExtensions.includes(extension)) {
+    const mimeType = attachment.extensions.mediaType?.split(';')[0]?.trim().toLowerCase();
+    if (!mimeType || !this.attachmentConfig.allowedMimeTypes.includes(mimeType)) {
       this.logger.debug({
         attachmentId: attachment.id,
         title: createSmeared(attachment.title),
-        extension,
-        msg: 'Attachment extension not allowed',
+        mimeType,
+        msg: 'Attachment mime type not allowed',
       });
       return false;
     }
 
     return true;
-  }
-
-  // TODO switch to mime type instead of checking the file extension
-  private extractExtension(filename: string): string | undefined {
-    const lastDot = filename.lastIndexOf('.');
-    if (lastDot === -1 || lastDot === filename.length - 1) {
-      return undefined;
-    }
-    return filename.slice(lastDot + 1).toLowerCase();
   }
 
   private hasIngestAllLabel(page: ConfluencePage): boolean {

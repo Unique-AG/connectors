@@ -3,7 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
+import { SearchEmailsInputSchema } from '~/features/content/search/semantic-search-conditions.dto';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { RunSearchRecallCheckQuery } from './run-search-recall-check.query';
 import { RunSyncDiagnosticsQuery } from './run-sync-diagnostics.query';

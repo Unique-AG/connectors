@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
+import type { SyncResult } from '../health/sync-result.types';
 import { type Metrics, SyncPhase } from '../metrics';
 import { getCurrentTenant } from '../tenant';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
@@ -25,7 +26,7 @@ export class ConfluenceSynchronizationService {
     private readonly metrics: Metrics,
   ) {}
 
-  public async synchronize(): Promise<void> {
+  public async synchronize(): Promise<SyncResult> {
     const tenant = getCurrentTenant();
 
     if (tenant.isScanning) {
@@ -33,7 +34,7 @@ export class ConfluenceSynchronizationService {
         tenantName: tenant.name,
         msg: 'Sync already in progress, skipping',
       });
-      return;
+      return { status: 'skipped', reason: 'sync_in_progress' };
     }
 
     tenant.isScanning = true;
@@ -112,9 +113,11 @@ export class ConfluenceSynchronizationService {
       await this.scopeManagementService.cleanupRemovedSpaces(new Set(allSpaceKeyToSpaceId.keys()));
 
       this.logger.log({ msg: 'Sync work done' });
+      return { status: 'success' };
     } catch (err) {
       syncResult = 'failure';
       this.logger.error({ err, msg: 'Sync failed' });
+      return { status: 'failure' };
     } finally {
       tenant.isScanning = false;
       this.metrics.setSyncPhase(SyncPhase.Idle);

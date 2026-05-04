@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import type { Readable } from 'node:stream';
 import type {
   ContentRegistrationRequest,
+  IngestionConfig,
   IngestionFinalizationRequest,
   UniqueApiClient,
 } from '@unique-ag/unique-api';
@@ -212,9 +213,6 @@ export class IngestionService {
     }
   }
 
-  // TODO: Wire `this.config.unique.ingestionConfig` into registration requests.
-  // The config field and GraphQL mutation (`ContentUpsertMutationInput.input.ingestionConfig`)
-  // both exist, but `ContentRegistrationRequest` in @unique-ag/unique-api lacks the field.
   private buildPageRegistrationRequest(
     page: FetchedPage,
     key: string,
@@ -264,7 +262,19 @@ export class IngestionService {
         spaceName: attachment.spaceName,
       },
       storeInternally: this.config.ingestion.storeInternally,
+      ingestionConfig: this.buildAttachmentIngestionConfig(attachment.mediaType),
     };
+  }
+
+  private buildAttachmentIngestionConfig(mediaType: string): IngestionConfig | undefined {
+    if (!this.config.ingestion.attachments.imageOcrEnabled) {
+      return undefined;
+    }
+    const normalized = mediaType?.split(';')[0]?.trim().toLowerCase();
+    if (normalized === 'image/jpeg' || normalized === 'image/png') {
+      return { jpgReadMode: 'DOC_INTELLIGENCE_DEFAULT' };
+    }
+    return undefined;
   }
 
   private buildFinalizationRequest(

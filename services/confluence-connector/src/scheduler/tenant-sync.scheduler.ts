@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { TenantStatus } from '../config';
+import { SyncStatusStore } from '../health/sync-status.store';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import type { TenantContext } from '../tenant';
 import { ServiceRegistry, TenantDeleteService, TenantRegistry } from '../tenant';
@@ -15,6 +16,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     private readonly tenantRegistry: TenantRegistry,
     private readonly serviceRegistry: ServiceRegistry,
     private readonly schedulerRegistry: SchedulerRegistry,
+    private readonly syncStatusStore: SyncStatusStore,
   ) {}
 
   public onModuleInit(): void {
@@ -78,15 +80,40 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
     try {
       await this.tenantRegistry.run(tenant, async () => {
         if (tenant.status === TenantStatus.Deleted) {
-          const deleteService = this.serviceRegistry.getService(TenantDeleteService);
-          await deleteService.deleteTenantContent();
+          try {
+            const deleteService = this.serviceRegistry.getService(TenantDeleteService);
+            await deleteService.deleteTenantContent();
+          } catch (error) {
+            this.logger.error({
+              tenantName: tenant.name,
+              err: error,
+              msg: 'Unexpected error in tenant cleanup job',
+            });
+          }
           return;
         }
 
         const syncService = this.serviceRegistry.getService(ConfluenceSynchronizationService);
-        await syncService.synchronize();
+        const result = await syncService.synchronize();
+
+        // Skip recording the in-progress overlap so an inactive cron tick doesn't dilute
+        // the failure ratio in the sliding window.
+        if (result.status === 'skipped' && result.reason === 'sync_in_progress') {
+          return;
+        }
+        this.syncStatusStore.record({
+          timestamp: new Date(),
+          tenantName: tenant.name,
+          result,
+        });
       });
     } catch (err) {
+      // Reaching here means synchronize() itself threw before producing a SyncResult.
+      this.syncStatusStore.record({
+        timestamp: new Date(),
+        tenantName: tenant.name,
+        result: { status: 'failure' },
+      });
       this.logger.error({
         tenantName: tenant.name,
         err,

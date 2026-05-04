@@ -184,6 +184,12 @@
             "selfUrl": {
               "type": "string",
               "description": "The URL of the MCP Server. Used for OAuth callbacks. Example: https://outlook.mcp.unique.app"
+            },
+            "mcpBackend": {
+              "type": "string",
+              "enum": ["MicrosoftGraphAndUniqueApi", "MicrosoftGraph"],
+              "description": "Selects the search backend. MicrosoftGraphAndUniqueApi: dual backend, KB ingestion + semantic search (default). MicrosoftGraph: direct Graph search, no ingestion.",
+              "default": "MicrosoftGraphAndUniqueApi"
             }
           },
           "required": ["selfUrl"]

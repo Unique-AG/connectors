@@ -25,6 +25,7 @@ export type {
   UniqueFile,
 } from './files/files.types';
 export type { Group, GroupWithMembers } from './groups/groups.types';
+export type { IngestionConfig } from './ingestion/ingestion.queries';
 export type {
   AuthorMetadata,
   ContentMetadata,
