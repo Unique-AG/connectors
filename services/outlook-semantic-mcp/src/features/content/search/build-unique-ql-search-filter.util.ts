@@ -4,10 +4,7 @@ import { first } from 'remeda';
 import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { CONTAINS_ANY_OPERATOR, SearchCondition } from './search-conditions.dto';
 
-const METADATA_PATH: Record<
-  Exclude<keyof SearchCondition, 'mailbox'>,
-  (keyof MessageMetadata)[]
-> = {
+const METADATA_PATH: Record<keyof SearchCondition, (keyof MessageMetadata)[]> = {
   dateFrom: ['receivedDateTime'],
   dateTo: ['receivedDateTime'],
   fromSenders: ['fromEmailAddress'],
@@ -34,14 +31,11 @@ function getConditionsArray(conditions: SearchCondition): MetadataFilter[] {
 
   for (const key of Object.keys(conditions) as Array<keyof SearchCondition>) {
     const field = conditions[key];
-    if (field === undefined || typeof field === 'string') {
+    if (field === undefined) {
       continue;
     }
 
-    const path = METADATA_PATH[key as Exclude<keyof SearchCondition, 'mailbox'>];
-    if (!path) {
-      continue;
-    }
+    const path = METADATA_PATH[key];
     const operator = field.operator as UniqueQLOperator | typeof CONTAINS_ANY_OPERATOR;
     const { value } = field;
     if (operator === CONTAINS_ANY_OPERATOR) {

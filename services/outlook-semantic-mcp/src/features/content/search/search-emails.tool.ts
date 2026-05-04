@@ -22,7 +22,7 @@ const SearchEmailsToolInputSchema = IS_MICROSOFT_GRAPH_BACKEND
   : SearchEmailsUnifiedInputSchema;
 
 const SearchEmailsToolDescription = IS_MICROSOFT_GRAPH_BACKEND
-  ? 'Search emails using Microsoft Graph KQL queries. Returns matched emails with an id per result.\n\nIMPORTANT: KQL search only filters the current user\'s own inbox — delegated-access mailboxes are NOT supported.\n\nTo read the full body of a result, call `open_email_by_id` passing `msGraphMessageId` as `id` and `MsGraph` as `idType`.'
+  ? "Search emails using Microsoft Graph KQL queries. Returns matched emails with an id per result.\n\nIMPORTANT: KQL search only filters the current user's own inbox — delegated-access mailboxes are NOT supported.\n\nTo read the full body of a result, call `open_email_by_id` passing `msGraphMessageId` as `id` and `MsGraph` as `idType`."
   : 'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by a well-known folder (Inbox, Sent Items, Drafts, etc.) pass the name directly in `directories` — no need to call `list_folders`. For custom folders, call `list_folders` first to get the folder id. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` passing `uniqueContentId` (or `msGraphMessageId` if unavailable) as `id`, and `Unique` (or `MsGraph`) as `idType`. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete.';
 
 const SearchEmailResultSchema = z.object({

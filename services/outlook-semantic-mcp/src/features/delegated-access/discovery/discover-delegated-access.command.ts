@@ -85,7 +85,6 @@ export class DiscoverDelegatedAccessCommand {
       await this.runInnerLoop({
         delegateUserId: lastProcessedDelegateId,
         lastProcessedOwnerIdForDelegate,
-        lastProcessedDelegateId,
       });
     }
 
@@ -99,7 +98,6 @@ export class DiscoverDelegatedAccessCommand {
         await this.runInnerLoop({
           delegateUserId,
           lastProcessedOwnerIdForDelegate: null,
-          lastProcessedDelegateId: delegateUserId,
         });
         lastProcessedDelegateId = delegateUserId;
       }
@@ -114,11 +112,9 @@ export class DiscoverDelegatedAccessCommand {
   private async runInnerLoop({
     delegateUserId,
     lastProcessedOwnerIdForDelegate,
-    lastProcessedDelegateId,
   }: {
     delegateUserId: string;
     lastProcessedOwnerIdForDelegate: Nullish<string>;
-    lastProcessedDelegateId: Nullish<string>;
   }): Promise<void> {
     const client = this.graphClientFactory.createClientForUser(delegateUserId);
     let ownersLastFetchedId: Nullish<string> = lastProcessedOwnerIdForDelegate;
@@ -160,7 +156,7 @@ export class DiscoverDelegatedAccessCommand {
             dataType: 'DelegatedAccessDiscovery',
             payload: {
               ...currentValue.payload,
-              lastProcessedDelegateId,
+              lastProcessedDelegateId: delegateUserId,
               lastProcessedOwnerIdForDelegate: ownersLastFetchedId,
               lastProgressRegisteredAt: Date.now(),
             },
@@ -184,7 +180,7 @@ export class DiscoverDelegatedAccessCommand {
           dataType: 'DelegatedAccessDiscovery',
           payload: {
             ...currentValue.payload,
-            lastProcessedDelegateId,
+            lastProcessedDelegateId: delegateUserId,
             lastProcessedOwnerIdForDelegate: null,
             lastProgressRegisteredAt: Date.now(),
           },

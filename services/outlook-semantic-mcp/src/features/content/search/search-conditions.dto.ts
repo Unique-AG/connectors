@@ -183,7 +183,7 @@ export const MsGraphKqlQuerySchema = z.object({
     .nonempty()
     .describe(
       'KQL (Keyword Query Language) query string for Microsoft Graph email search.\n' +
-        'IMPORTANT: KQL search only filters the current user\'s own inbox — delegated-access mailboxes are NOT supported.\n' +
+        "IMPORTANT: KQL search only filters the current user's own inbox — delegated-access mailboxes are NOT supported.\n" +
         'Supported property filters:\n' +
         '  from:<email>              — sender address (exact or domain, e.g. from:alice@example.com)\n' +
         '  to:<email>                — recipient in To field\n' +

@@ -8,7 +8,7 @@ import {
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNotNull, notInArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { filter, isNonNull, isNonNullish, isNullish, map, pick, pipe, sortBy } from 'remeda';
+import { filter, isNonNullish, isNullish, map, pick, pipe, sortBy } from 'remeda';
 import * as z from 'zod';
 import {
   DRIZZLE,
@@ -232,7 +232,7 @@ export class SemanticSearchEmailsQuery {
     const scopeIds = pipe(
       scopes,
       map((scope): [Nullish<string>, string] => [scope.externalId, scope.id]),
-      filter((items) => items.every(isNonNull)),
+      filter((items) => items.every(isNonNullish)),
     ) as [string, string][];
     const scopeExternalIdToScopeId = new Map<string, string>(scopeIds);
 
