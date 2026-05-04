@@ -2,6 +2,7 @@ import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import pLimit from 'p-limit';
 import { clone, sumBy, unique } from 'remeda';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
@@ -37,15 +38,18 @@ export class FetchAllDirectoriesFromOutlookQuery {
       msg: `Directories from microsoft before expansion`,
     });
 
+    const limit = pLimit(10);
     const expandDirectoryRecursive = async (directory: GraphOutlookDirectory): Promise<void> => {
       if (!directory.childFolderCount) {
         return;
       }
 
-      directory.childFolders = await this.fetchChildDirectories({
-        parentDirectoryId: directory.id,
-        client,
-      });
+      directory.childFolders = await limit(() =>
+        this.fetchChildDirectories({
+          parentDirectoryId: directory.id,
+          client,
+        }),
+      );
       await Promise.all(directory.childFolders.map(expandDirectoryRecursive));
     };
 

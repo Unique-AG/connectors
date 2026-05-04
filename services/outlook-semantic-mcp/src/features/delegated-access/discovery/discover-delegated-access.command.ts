@@ -128,7 +128,7 @@ export class DiscoverDelegatedAccessCommand {
     });
 
     while (ownersBatch.length) {
-      await Promise.all(
+      const batchResults = await Promise.all(
         ownersBatch.map(({ userProfileId: ownerUserId, email: ownerEmail }) => {
           return withRetryAttempts({
             fn: async () => {
@@ -138,13 +138,17 @@ export class DiscoverDelegatedAccessCommand {
                 client,
                 delegateUserId,
               });
-              return { status: 'success' };
+              return { status: 'success' as const };
             },
             onError: rethrowRateLimitError,
-            getResultFailure: (error) => ({ status: 'failed', error }),
+            getResultFailure: (error) => ({ status: 'failed' as const, error }),
           });
         }),
       );
+
+      const successCount = batchResults.filter((r) => r.status === 'success').length;
+      const failedCount = batchResults.filter((r) => r.status === 'failed').length;
+      this.logger.log({ delegateUserId, successCount, failedCount, msg: 'Owner batch processed' });
 
       ownersLastFetchedId = last(ownersBatch)?.userProfileId;
       await this.persistentCacheService.setWith(

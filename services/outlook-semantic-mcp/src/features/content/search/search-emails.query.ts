@@ -133,7 +133,7 @@ export class SearchEmailsQuery {
       });
 
     const topSemanticMatches = enriched.slice(0, 20).map((e) => e.result);
-    const remainder = enriched.slice(topSemanticMatches.length);
+    const remainder = enriched.slice(20);
     const commonRemainder = remainder.filter((e) => e.hadGraphMatch).map((e) => e.result);
     const semanticOnly = remainder.filter((e) => !e.hadGraphMatch).map((e) => e.result);
 

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { clone, isNonNull } from 'remeda';
+import { clone, isNonNullish } from 'remeda';
 import { Directory, DRIZZLE, DrizzleDatabase, directories, systemDirectories } from '~/db';
 import { findBestMatch } from '~/utils/find-best-match';
 import { SearchCondition } from './search-conditions.dto';
@@ -16,7 +16,7 @@ export class SanitizeSearchConditionsForUserQuery {
     // We mutate conditions in the sanitization process and to ensure we do not mutate the input we clone them.
     conditions = clone(conditions);
     const hasDirectoriesCondition = conditions?.some((condition) =>
-      isNonNull(condition.directories),
+      isNonNullish(condition.directories),
     );
     if (!hasDirectoriesCondition) {
       return { conditions, searchSummary: undefined };

@@ -46,12 +46,12 @@ export class ExecuteInboxDeletionCommand {
       userEmail: createSmeared(userProfile.email ?? '').toString(),
     });
 
-    const decision = await this.acuireLockAndDecide(userProfileId);
+    const decision = await this.acquireLockAndDecide(userProfileId);
     if (decision.action === 'skip') {
       this.logger.log({ ...logContext, msg: decision.message });
       return;
     }
-    this.logger.log({ ...logContext, msg: `Deletting inbox configuration` });
+    this.logger.log({ ...logContext, msg: `Deleting inbox configuration` });
     await this.subscriptionRemove.removeByUserProfileId(
       convertUserProfileIdToTypeId(userProfile.id),
     );
@@ -77,7 +77,7 @@ export class ExecuteInboxDeletionCommand {
     this.logger.warn({ userProfileId, msg: 'Inbox deletion finished' });
   }
 
-  private async acuireLockAndDecide(
+  private async acquireLockAndDecide(
     userProfileId: string,
   ): Promise<{ action: 'skip'; message: string } | { action: 'proceed' }> {
     return await this.db.transaction(async (tx) => {
@@ -100,11 +100,15 @@ export class ExecuteInboxDeletionCommand {
           message: 'Inbox configuration deletingInboxStartedAt is null, skipping deletion',
         };
       }
-      if (isNullish(row.deletingHeartbeatAt)) {
+      const updateHeartbeat = async (): Promise<void> => {
         await tx
           .update(inboxConfigurations)
           .set({ deletingHeartbeatAt: sql`NOW()` })
           .where(eq(inboxConfigurations.userProfileId, userProfileId));
+      };
+
+      if (isNullish(row.deletingHeartbeatAt)) {
+        await updateHeartbeat();
         return { action: 'proceed' };
       }
       if (
@@ -115,9 +119,10 @@ export class ExecuteInboxDeletionCommand {
       ) {
         return {
           action: 'skip',
-          message: 'Inbox configuration deletingHeartbeatAt is within couldown, skipping deletion',
+          message: 'Inbox configuration deletingHeartbeatAt is within cooldown, skipping deletion',
         };
       }
+      await updateHeartbeat();
       return { action: 'proceed' };
     });
   }

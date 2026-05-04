@@ -2,6 +2,7 @@ import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, notInArray } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
+import pLimit from 'p-limit';
 import { chunk } from 'remeda';
 import {
   DRIZZLE,
@@ -110,7 +111,7 @@ export class SyncDelegatedAccessCommand {
       );
 
       if (foldersWithErrors.length > 0) {
-        const error = new Error(`Stop delegated access sync. Some ms graph api calles failed`, {
+        const error = new Error(`Stop delegated access sync. Some ms graph api calls failed`, {
           cause: foldersWithErrors,
         });
         this.logger.error(error);
@@ -207,12 +208,13 @@ export class SyncDelegatedAccessCommand {
       return children;
     };
 
+    const limit = pLimit(10);
     const expandRecursive = async (folder: FolderNode): Promise<void> => {
       if (!folder.childFolderCount) {
         return;
       }
 
-      folder.childFolders = await fetchChildFolders(folder.id);
+      folder.childFolders = await limit(() => fetchChildFolders(folder.id));
       await Promise.all(folder.childFolders.map(expandRecursive));
     };
 
