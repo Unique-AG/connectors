@@ -251,5 +251,27 @@ describe('RootScopeMigrationService', () => {
         error: 'string error',
       });
     });
+
+    it('converts non-Error thrown from updateParent to string in error result', async () => {
+      const { service, scopes } = makeService();
+      scopes.getByExternalId.mockResolvedValue({
+        id: OLD_ROOT_ID,
+        name: 'OldConfluence',
+        parentId: null,
+        externalId: EXTERNAL_ID,
+      });
+      scopes.listChildren.mockResolvedValue([
+        { id: 'child-1', name: 'Space1', parentId: OLD_ROOT_ID },
+      ]);
+      scopes.updateParent.mockRejectedValue('string reparent error');
+
+      const result = await service.migrateIfNeeded(NEW_ROOT_ID, EXTERNAL_ID);
+
+      expect(result).toEqual({
+        status: 'migration_failed',
+        error: expect.stringContaining('string reparent error'),
+      });
+      expect(scopes.delete).not.toHaveBeenCalled();
+    });
   });
 });

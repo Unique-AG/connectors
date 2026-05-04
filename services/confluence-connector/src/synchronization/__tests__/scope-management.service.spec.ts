@@ -224,6 +224,28 @@ describe('ScopeManagementService', () => {
       expect(callOrder).toEqual(['migrateIfNeeded', 'updateExternalId']);
     });
 
+    it('proceeds to claim when migration returns migration_completed', async () => {
+      const { service, scopes, migrationService } = makeService();
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: null,
+      });
+      migrationService.migrateIfNeeded.mockResolvedValueOnce({ status: 'migration_completed' });
+      scopes.updateExternalId.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        externalId: `confc:cloud:${INSTANCE_ID}`,
+      });
+
+      await service.initialize();
+
+      expect(scopes.updateExternalId).toHaveBeenCalledWith(
+        ROOT_SCOPE_ID,
+        `confc:cloud:${INSTANCE_ID}`,
+      );
+    });
+
     it('throws when root-scope migration fails and does not call updateExternalId', async () => {
       const { service, scopes, migrationService } = makeService();
       scopes.getById.mockResolvedValueOnce({
