@@ -45,6 +45,15 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   - \`conditions\`: structured filters (sender, date range, folder, attachments, etc.) applied on top of the semantic search.
   - \`limit\`: increase toward 300 when the query is fuzzy or broad, or when you expect a large result set.
 
+  ## Multi-angle semantic search
+  You can pass up to 10 entries in \`uniqueSemanticSearchQueries\` — they all run in parallel and results are merged and deduplicated.
+  Use this to approach the same question from multiple angles and ensure full coverage:
+  - **Different phrasings / synonyms**: e.g. "project kick-off" and "project launch" and "project start".
+  - **Narrower vs. broader scope**: e.g. one entry with tight conditions (specific sender + date range) and another with no conditions but a more descriptive search term.
+  - **Different condition combinations**: e.g. one entry filtering by folder "Inbox", another filtering by folder "Sent Items", to capture both sides of a conversation.
+  - **Perspective shift**: e.g. "emails I sent about the merger" alongside "emails I received about the merger".
+  A single search with a single phrasing will often miss relevant emails — when full coverage matters, always compose 2–4 parallel entries.
+
   ## Strategy for broad or unfocused queries
   If the user's question is too broad for semantic search to be meaningful on its own (e.g. "show me all emails from last week", "list everything from alice@example.com"):
   1. Keep a broad or descriptive \`search\` term, OR use the most relevant keyword you can derive.
@@ -53,7 +62,7 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   This combination is more reliable than relying on semantic relevance alone for listing or enumeration tasks.
 
   ## Complementing semantic search with KQL (msGraphKeywordSearchQueries)
-  Always fill \`msGraphKeywordSearchQueries\` alongside \`uniqueSemanticSearchQueries\` unless the query is scoped to a delegated mailbox (KQL only works on the user's own mailbox).
+  ALWAYS include at least one entry in both \`uniqueSemanticSearchQueries\` and \`msGraphKeywordSearchQueries\` — the only exception is when the query is explicitly scoped to a delegated mailbox (KQL does not support delegated access). A single backend alone will miss results: semantic search may miss exact keyword hits; KQL will miss conceptual matches and attachment content.
 
   The two backends cover different ground and their results are merged — semantic results are ranked first, then enriched with the KQL body excerpt when the same email was matched by both:
   - **Semantic** excels at: conceptual relevance, synonyms, natural-language intent, content inside attachments.

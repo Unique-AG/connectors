@@ -236,7 +236,7 @@ export const SearchEmailsUnifiedInputSchema = z
           'IMPORTANT: uniqueSemanticSearchQueries supports delegated-access mailboxes — use the mailbox field to scope searches to specific mailboxes including delegated ones. ' +
           'Results from all searches are merged and deduplicated by email ID.',
       ),
-    msGraphKeywordSearchQueries: MsGraphSearchParamsSchema.optional().describe(
+    msGraphKeywordSearchQueries: MsGraphSearchParamsSchema.describe(
       'KQL queries that address the SAME single user question as uniqueSemanticSearchQueries, expressed using keyword/lexical search. ' +
         'Use multiple entries to approach the same question from different angles (e.g. different keyword combinations, subject vs. body focus). ' +
         "IMPORTANT: Microsoft Graph keyword search does NOT support delegated-access mailboxes — it only searches the current user's own mailbox. " +
