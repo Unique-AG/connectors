@@ -1,4 +1,4 @@
-import { omit } from 'remeda';
+import { isNullish, omit } from 'remeda';
 import { SearchCondition } from './semantic-search-conditions.dto';
 
 export function filterConditionsForMailbox(
@@ -10,6 +10,6 @@ export function filterConditionsForMailbox(
   }
 
   return conditions
-    .filter((c) => c.mailbox === undefined || c.mailbox === branchEmail)
-    .map((c) => omit(c, ['mailbox']));
+    .filter((condition) => isNullish(condition.mailbox) || condition.mailbox === branchEmail)
+    .map((condition) => omit(condition, ['mailbox']));
 }

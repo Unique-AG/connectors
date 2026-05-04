@@ -26,7 +26,7 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
 import { buildSearchFilter } from './build-unique-ql-search-filter.util';
-import { filterConditionsForMailbox } from './filter-conditions-for-mailbox';
+import { filterConditionsForMailbox as filterConditionsForMailbox } from './filter-conditions-for-mailbox';
 import { SanitizeSearchConditionsForUserQuery } from './sanitize-search-conditions-for-user.query';
 import { SearchEmailsInputSchema } from './semantic-search-conditions.dto';
 
@@ -209,7 +209,7 @@ export class SemanticSearchEmailsQuery {
     const userConditions = await this.scopeSearchToUserProfile({
       scopeIdsFromRoot: currentUserScopeIdsFromRoot,
       userProfileId: userProfile.id,
-      branchEmail: userProfile.email,
+      userEmail: userProfile.email,
       conditions,
     });
 
@@ -253,7 +253,7 @@ export class SemanticSearchEmailsQuery {
       const delegatedAccessFilter = await this.scopeSearchToUserProfile({
         scopeIdsFromRoot: ownerScopeIdsFromRoot,
         userProfileId: ownerUserId,
-        branchEmail: ownerUserEmail,
+        userEmail: ownerUserEmail,
         conditions,
         delegatedAccessFilters: { msGraphDirectoryIds },
       });
@@ -287,26 +287,29 @@ export class SemanticSearchEmailsQuery {
   private async scopeSearchToUserProfile({
     scopeIdsFromRoot,
     userProfileId,
-    branchEmail,
+    userEmail,
     conditions,
     delegatedAccessFilters,
   }: {
     userProfileId: string;
     scopeIdsFromRoot: string[];
-    branchEmail: string;
+    userEmail: string;
     conditions: z.infer<typeof SearchEmailsInputSchema>['conditions'];
     delegatedAccessFilters?: {
       msGraphDirectoryIds: string[];
     };
   }): Promise<{ filter: MetadataFilter | null; searchSummary: string | undefined }> {
-    const filteredConditions = filterConditionsForMailbox(conditions, branchEmail);
+    const conditionsForCurrentMailbox = filterConditionsForMailbox(conditions, userEmail);
 
-    if (conditions?.length && !filteredConditions.length) {
+    if (conditions?.length && !conditionsForCurrentMailbox.length) {
       return { filter: null, searchSummary: undefined };
     }
 
     const { conditions: resolvedConditions, searchSummary } =
-      await this.sanitizeSearchConditionsForUserQuery.run(userProfileId, filteredConditions);
+      await this.sanitizeSearchConditionsForUserQuery.run(
+        userProfileId,
+        conditionsForCurrentMailbox,
+      );
 
     const uniqueQlMetadataFilter = buildSearchFilter(resolvedConditions);
     const scopedMetadataFilter: MetadataFilter = {
