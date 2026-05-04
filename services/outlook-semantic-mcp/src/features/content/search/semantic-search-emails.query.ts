@@ -170,7 +170,10 @@ export class SemanticSearchEmailsQuery {
           title: item.content.title ?? '',
           uniqueContentId: item.content.id,
           uniqueContentUrl: item.content.url ?? undefined,
-          outlookWebLink: metadata?.webLink ?? '',
+          // OWA deep links require full mailbox access. Folder-level delegates receive an
+          // AccessDeniedException when following them. Since we cannot distinguish full from
+          // folder-level access at query time, we suppress the link for all delegated mailboxes.
+          outlookWebLink: userProfile.email === sourceMailbox ? (metadata?.webLink ?? '') : '',
           sourceMailbox,
           msGraphMessageId: metadata?.id || undefined,
           folderId: metadata?.parentFolderId ?? '',
