@@ -178,17 +178,12 @@ export const SearchEmailsInputSchema = z.object({
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
 
 export const MsGraphKqlQuerySchema = z.object({
-  mailbox: z
-    .email()
-    .optional()
-    .describe(
-      "Scope this KQL query to a specific mailbox (exact email address). When omitted, searches the current user's primary mailbox. Note: Microsoft Graph KQL search does not support delegated-access mailboxes — only the current user's own mailbox is searchable.",
-    ),
   kqlQuery: z
     .string()
     .nonempty()
     .describe(
       'KQL (Keyword Query Language) query string for Microsoft Graph email search.\n' +
+        'IMPORTANT: KQL search only filters the current user\'s own inbox — delegated-access mailboxes are NOT supported.\n' +
         'Supported property filters:\n' +
         '  from:<email>              — sender address (exact or domain, e.g. from:alice@example.com)\n' +
         '  to:<email>                — recipient in To field\n' +
