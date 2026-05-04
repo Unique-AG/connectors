@@ -168,7 +168,7 @@ export const SearchEmailsInputSchema = z.object({
     .describe(
       [
         'Maximum number of results to return. Must be between 150 and 300.',
-        'If the search query is targeted (e.g. looking for a specific email or thread), the default of 150 is sufficient.',
+        'If the search query is targeted (e.g. looking for a specific email or thread), pass 150 (the minimum).',
         'If the query is fuzzy or broad (e.g. "overview of all emails from alice@example.com", "list emails from last week", "what happened last week"), pick a limit between 200 and 300.',
         'When the expected result set is large, always use 300.',
       ].join(' '),
@@ -178,7 +178,12 @@ export const SearchEmailsInputSchema = z.object({
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
 
 export const MsGraphKqlQuerySchema = z.object({
-  mailbox: z.email().optional(),
+  mailbox: z
+    .email()
+    .optional()
+    .describe(
+      'Scope this KQL query to a specific mailbox (exact email address). When omitted, searches the current user\'s primary mailbox. Note: Microsoft Graph KQL search does not support delegated-access mailboxes — only the current user\'s own mailbox is searchable.',
+    ),
   kqlQuery: z
     .string()
     .nonempty()
@@ -201,7 +206,16 @@ export const MsGraphKqlQuerySchema = z.object({
         '  "project proposal hasAttachment:true received>=2024-03-01 received<=2024-03-31"\n' +
         '  "from:hr@acme.com OR from:payroll@acme.com subject:salary"',
     ),
-  limit: z.number().int().min(1).max(50).optional().prefault(25),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .optional()
+    .prefault(25)
+    .describe(
+      'Maximum number of results to return for this query. Must be between 1 and 50. Default is 25. Use a higher value (up to 50) for broad or exploratory queries; the default is sufficient for targeted searches.',
+    ),
 });
 
 export const MsGraphSearchParamsSchema = z
