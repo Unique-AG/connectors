@@ -14,6 +14,7 @@ import {
   type ParsedExternalId,
   parseScopeExternalId,
 } from '../utils/key-format';
+import { RootScopeMigrationService } from './root-scope-migration.service';
 
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
@@ -25,6 +26,7 @@ export class ScopeManagementService {
     private readonly confluenceApiClient: ConfluenceApiClient,
     private readonly uniqueApiClient: UniqueApiClient,
     private readonly metrics: Metrics,
+    private readonly rootScopeMigrationService: RootScopeMigrationService,
   ) {}
 
   private async getInstanceIdentifier(): Promise<InstanceIdentifier> {
@@ -86,6 +88,20 @@ export class ScopeManagementService {
     if (!rootScope.externalId) {
       // Claim fails fatally: if updateExternalId rejects (e.g. the externalId is already
       // taken within this org), the sync must not proceed to avoid data conflicts.
+      const migrationResult = await this.rootScopeMigrationService.migrateIfNeeded(
+        rootScope.id,
+        expectedExternalId,
+      );
+      if (migrationResult.status === 'migration_failed') {
+        throw new Error(`Root scope migration failed: ${migrationResult.error}`);
+      }
+      if (migrationResult.status === 'migration_completed') {
+        this.logger.log({
+          scopeId: rootScope.id,
+          externalId: expectedExternalId,
+          msg: 'Root scope migration completed before claiming',
+        });
+      }
       try {
         const updatedScope = await this.uniqueApiClient.scopes.updateExternalId(
           rootScope.id,

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestionConfig } from '../../config/ingestion.schema';
 import type { ConfluenceApiClient } from '../../confluence-api/confluence-api-client';
 import type { Metrics } from '../../metrics';
+import type { RootScopeMigrationService } from '../root-scope-migration.service';
 import { ScopeManagementService } from '../scope-management.service';
 
 const TENANT_NAME = 'dogfood-cloud';
@@ -28,6 +29,9 @@ interface MockDeps {
   metrics: {
     recordOrphanedScopesCleaned: ReturnType<typeof vi.fn>;
     recordOrphanedFilesCleaned: ReturnType<typeof vi.fn>;
+  };
+  migrationService: {
+    migrateIfNeeded: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -65,6 +69,10 @@ function makeService(options?: { useV1KeyFormat?: boolean }): MockDeps {
     recordOrphanedFilesCleaned: vi.fn(),
   };
 
+  const migrationService = {
+    migrateIfNeeded: vi.fn().mockResolvedValue({ status: 'no_migration_needed' }),
+  };
+
   return {
     service: new ScopeManagementService(
       ingestionConfig,
@@ -72,11 +80,13 @@ function makeService(options?: { useV1KeyFormat?: boolean }): MockDeps {
       confluenceApi as unknown as ConfluenceApiClient,
       uniqueApiClient,
       metrics as unknown as Metrics,
+      migrationService as unknown as RootScopeMigrationService,
     ),
     scopes,
     files,
     confluenceApi,
     metrics,
+    migrationService,
   };
 }
 
@@ -184,6 +194,65 @@ describe('ScopeManagementService', () => {
         ROOT_SCOPE_ID,
         `confc:cloud:${INSTANCE_ID}`,
       );
+    });
+
+    it('runs root-scope migration before claiming when externalId is null', async () => {
+      const { service, scopes, migrationService } = makeService();
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: null,
+      });
+
+      const callOrder: string[] = [];
+      migrationService.migrateIfNeeded.mockImplementationOnce(async () => {
+        callOrder.push('migrateIfNeeded');
+        return { status: 'no_migration_needed' };
+      });
+      scopes.updateExternalId.mockImplementationOnce(async () => {
+        callOrder.push('updateExternalId');
+        return { id: ROOT_SCOPE_ID, externalId: `confc:cloud:${INSTANCE_ID}` };
+      });
+
+      await service.initialize();
+
+      expect(migrationService.migrateIfNeeded).toHaveBeenCalledWith(
+        ROOT_SCOPE_ID,
+        `confc:cloud:${INSTANCE_ID}`,
+      );
+      expect(callOrder).toEqual(['migrateIfNeeded', 'updateExternalId']);
+    });
+
+    it('throws when root-scope migration fails and does not call updateExternalId', async () => {
+      const { service, scopes, migrationService } = makeService();
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: null,
+      });
+      migrationService.migrateIfNeeded.mockResolvedValueOnce({
+        status: 'migration_failed',
+        error: 'boom',
+      });
+
+      await expect(service.initialize()).rejects.toThrow('Root scope migration failed: boom');
+      expect(scopes.updateExternalId).not.toHaveBeenCalled();
+    });
+
+    it('skips migration when externalId already matches', async () => {
+      const { service, scopes, migrationService } = makeService();
+      scopes.getById.mockResolvedValueOnce({
+        id: ROOT_SCOPE_ID,
+        name: 'Confluence',
+        parentId: null,
+        externalId: `confc:cloud:${INSTANCE_ID}`,
+      });
+
+      await service.initialize();
+
+      expect(migrationService.migrateIfNeeded).not.toHaveBeenCalled();
     });
 
     it('skips claim when externalId already matches', async () => {
