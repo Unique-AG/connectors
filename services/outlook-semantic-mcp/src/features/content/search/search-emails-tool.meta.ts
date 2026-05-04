@@ -39,6 +39,36 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   icon: 'search',
   systemPrompt: `Searches ingested Outlook emails semantically. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns matched passages from emails with metadata.
 
+  ## Combining search + conditions + limit
+  The \`search\` field and the \`conditions\` array work together — always try to use both:
+  - \`search\`: natural-language relevance query (e.g. "budget report from Alice").
+  - \`conditions\`: structured filters (sender, date range, folder, attachments, etc.) applied on top of the semantic search.
+  - \`limit\`: increase toward 300 when the query is fuzzy or broad, or when you expect a large result set.
+
+  ## Strategy for broad or unfocused queries
+  If the user's question is too broad for semantic search to be meaningful on its own (e.g. "show me all emails from last week", "list everything from alice@example.com"):
+  1. Keep a broad or descriptive \`search\` term, OR use the most relevant keyword you can derive.
+  2. Add precise \`conditions\` (e.g. dateFrom/dateTo, fromSenders) to narrow the candidate set.
+  3. Set \`limit\` to 300 to capture as many matching emails as possible.
+  This combination is more reliable than relying on semantic relevance alone for listing or enumeration tasks.
+
+  ## Complementing semantic search with KQL (msGraphKeywordSearchQueries)
+  Always fill \`msGraphKeywordSearchQueries\` alongside \`uniqueSemanticSearchQueries\` unless the query is scoped to a delegated mailbox (KQL only works on the user's own mailbox).
+
+  The two backends cover different ground and their results are merged — semantic results are ranked first, then enriched with the KQL body excerpt when the same email was matched by both:
+  - **Semantic** excels at: conceptual relevance, synonyms, natural-language intent, content inside attachments.
+  - **KQL** excels at: exact keyword matches, precise property filters, full body text excerpts.
+
+  **How to translate a semantic query into complementary KQL:**
+  1. Extract the most specific keywords from the semantic query and express them as \`subject:\` and/or \`body:\` filters.
+  2. Mirror any structured conditions as KQL property filters (e.g. \`fromSenders\` → \`from:\`, date range → \`received>=\`/\`received<=\`, attachments → \`hasAttachment:true\`).
+  3. Run multiple KQL queries in parallel for different angles: synonyms, subject-focus vs. body-focus, alternative keyword combinations.
+
+  Example — user asks "Q2 budget report from Alice":
+  - Semantic: \`search: "Q2 budget report"\`, condition \`fromSenders: { value: "alice@example.com", operator: "equals" }\`
+  - KQL query 1: \`from:alice@example.com subject:"Q2 budget"\`
+  - KQL query 2: \`from:alice@example.com body:"budget report" received>=2024-04-01 received<=2024-06-30\`
+
   By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
   After returning results, inform the user that they can narrow the search to a specific folder if needed.
 
