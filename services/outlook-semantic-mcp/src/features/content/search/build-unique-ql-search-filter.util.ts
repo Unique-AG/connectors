@@ -76,7 +76,7 @@ function buildConditionGroup(condition: SearchCondition): MetadataFilter {
 }
 
 // Fields within a single condition are AND-combined; multiple conditions in the array are OR-combined.
-export function buildSearchFilter(
+export function buildUniqueQlSearchFilter(
   conditions: SearchCondition[] | null | undefined,
 ): MetadataFilter | undefined {
   if (!conditions?.length) {

@@ -1,23 +1,23 @@
 import { UniqueQLOperator } from '@unique-ag/unique-api';
 import { describe, expect, it } from 'vitest';
-import { buildSearchFilter } from '../build-unique-ql-search-filter.util';
+import { buildUniqueQlSearchFilter } from '../build-unique-ql-search-filter.util';
 import { CONTAINS_ANY_OPERATOR } from '../search-conditions.dto';
 
-describe('buildSearchFilter', () => {
+describe('buildUniqueQlSearchFilter', () => {
   it('returns undefined when conditions is undefined', () => {
-    const result = buildSearchFilter(undefined);
+    const result = buildUniqueQlSearchFilter(undefined);
 
     expect(result).toBeUndefined();
   });
 
   it('returns undefined when conditions is an empty array', () => {
-    const result = buildSearchFilter([]);
+    const result = buildUniqueQlSearchFilter([]);
 
     expect(result).toBeUndefined();
   });
 
   it('builds a scalar filter for dateFrom', () => {
-    const result = buildSearchFilter([
+    const result = buildUniqueQlSearchFilter([
       { dateFrom: { value: '2024-01-01', operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL } },
     ]);
 
@@ -29,7 +29,7 @@ describe('buildSearchFilter', () => {
   });
 
   it('builds a scalar filter for dateTo', () => {
-    const result = buildSearchFilter([
+    const result = buildUniqueQlSearchFilter([
       { dateTo: { value: '2024-12-31', operator: UniqueQLOperator.LESS_THAN_OR_EQUAL } },
     ]);
 
@@ -41,7 +41,7 @@ describe('buildSearchFilter', () => {
   });
 
   it('passes array value as-is for an array field', () => {
-    const result = buildSearchFilter([
+    const result = buildUniqueQlSearchFilter([
       { fromSenders: { value: ['alice@example.com'], operator: UniqueQLOperator.IN } },
     ]);
 
@@ -53,7 +53,7 @@ describe('buildSearchFilter', () => {
   });
 
   it('passes multiple array values as-is', () => {
-    const result = buildSearchFilter([
+    const result = buildUniqueQlSearchFilter([
       {
         fromSenders: {
           value: ['alice@example.com', 'bob@example.com'],
@@ -70,7 +70,7 @@ describe('buildSearchFilter', () => {
   });
 
   it('ANDs multiple keys within a single condition group', () => {
-    const result = buildSearchFilter([
+    const result = buildUniqueQlSearchFilter([
       {
         dateFrom: { value: '2024-01-01', operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL },
         fromSenders: { value: ['alice@example.com'], operator: UniqueQLOperator.IN },
@@ -94,7 +94,7 @@ describe('buildSearchFilter', () => {
   });
 
   it('ORs multiple condition groups', () => {
-    const result = buildSearchFilter([
+    const result = buildUniqueQlSearchFilter([
       { dateFrom: { value: '2024-01-01', operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL } },
       { directories: { value: ['inbox-id'], operator: UniqueQLOperator.IN } },
     ]);
@@ -116,7 +116,7 @@ describe('buildSearchFilter', () => {
   });
 
   it('uses correct metadata paths for toRecipients, ccRecipients, and categories', () => {
-    const result = buildSearchFilter([
+    const result = buildUniqueQlSearchFilter([
       {
         toRecipients: { value: ['carol@example.com'], operator: UniqueQLOperator.IN },
         ccRecipients: { value: ['dave@example.com'], operator: UniqueQLOperator.IN },
@@ -146,7 +146,7 @@ describe('buildSearchFilter', () => {
   });
 
   it('expands containsAny with multiple emails to an or of contains leaves', () => {
-    const result = buildSearchFilter([
+    const result = buildUniqueQlSearchFilter([
       {
         fromSenders: {
           value: ['alice@example.com', 'bob@example.com'],
@@ -172,7 +172,7 @@ describe('buildSearchFilter', () => {
   });
 
   it('unwraps containsAny with a single value to a bare contains leaf', () => {
-    const result = buildSearchFilter([
+    const result = buildUniqueQlSearchFilter([
       {
         fromSenders: {
           value: ['alice@example.com'],
@@ -189,7 +189,7 @@ describe('buildSearchFilter', () => {
   });
 
   it('ANDs containsAny with other conditions in the same group', () => {
-    const result = buildSearchFilter([
+    const result = buildUniqueQlSearchFilter([
       {
         dateFrom: { value: '2024-01-01', operator: UniqueQLOperator.GREATER_THAN_OR_EQUAL },
         fromSenders: {
@@ -225,7 +225,7 @@ describe('buildSearchFilter', () => {
   });
 
   it('passes hasAttachments boolean value as-is', () => {
-    const resultTrue = buildSearchFilter([
+    const resultTrue = buildUniqueQlSearchFilter([
       { hasAttachments: { value: 'true', operator: UniqueQLOperator.EQUALS } },
     ]);
 
@@ -235,7 +235,7 @@ describe('buildSearchFilter', () => {
       value: 'true',
     });
 
-    const resultFalse = buildSearchFilter([
+    const resultFalse = buildUniqueQlSearchFilter([
       { hasAttachments: { value: 'false', operator: UniqueQLOperator.EQUALS } },
     ]);
 

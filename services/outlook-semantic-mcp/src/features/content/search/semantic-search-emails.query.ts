@@ -31,7 +31,7 @@ import { concatChunks } from '~/utils/concat-chunks';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
-import { buildSearchFilter } from './build-unique-ql-search-filter.util';
+import { buildUniqueQlSearchFilter } from './build-unique-ql-search-filter.util';
 import { SanitizeSearchConditionsForUserQuery } from './sanitize-search-conditions-for-user.query';
 import { SearchEmailsInputSchema } from './search-conditions.dto';
 
@@ -377,7 +377,7 @@ export class SemanticSearchEmailsQuery {
     const { conditions: resolvedConditions, searchSummary } =
       await this.sanitizeSearchConditionsForUserQuery.run(userProfileId, conditions);
 
-    const uniqueQlMetadataFilter = buildSearchFilter(resolvedConditions);
+    const uniqueQlMetadataFilter = buildUniqueQlSearchFilter(resolvedConditions);
     const scopedMetadataFilter: MetadataFilter = {
       and: [
         {
