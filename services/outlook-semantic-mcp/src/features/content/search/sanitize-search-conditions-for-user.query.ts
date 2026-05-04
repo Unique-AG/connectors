@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { clone, isNonNull } from 'remeda';
 import { Directory, DRIZZLE, DrizzleDatabase, directories, systemDirectories } from '~/db';
 import { findBestMatch } from '~/utils/find-best-match';
-import { SearchCondition } from './semantic-search-conditions.dto';
+import { SearchCondition } from './search-conditions.dto';
 
 @Injectable()
 export class SanitizeSearchConditionsForUserQuery {

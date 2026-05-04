@@ -7,7 +7,7 @@ import { SearchEmailsQuery } from '~/features/content/search/search-emails.query
 import {
   SearchEmailsMsGraphInputSchema,
   SearchEmailsUnifiedInputSchema,
-} from '~/features/content/search/semantic-search-conditions.dto';
+} from '~/features/content/search/search-conditions.dto';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { GetFullSyncStatsQuery } from '~/features/sync/full-sync/get-full-sync-stats.query';
 import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';

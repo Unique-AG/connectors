@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { MetadataFilter, UniqueQLOperator } from '@unique-ag/unique-api';
 import { first } from 'remeda';
 import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
-import { CONTAINS_ANY_OPERATOR, SearchCondition } from './semantic-search-conditions.dto';
+import { CONTAINS_ANY_OPERATOR, SearchCondition } from './search-conditions.dto';
 
 const METADATA_PATH: Record<
   Exclude<keyof SearchCondition, 'mailbox'>,

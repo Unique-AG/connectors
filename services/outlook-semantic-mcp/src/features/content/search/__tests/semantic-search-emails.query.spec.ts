@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SanitizeSearchConditionsForUserQuery } from '../sanitize-search-conditions-for-user.query';
-import { SearchConditionSchema, SearchEmailsInputSchema } from '../semantic-search-conditions.dto';
+import { SearchConditionSchema, SearchEmailsInputSchema } from '../search-conditions.dto';
 import { SemanticSearchEmailsQuery } from '../semantic-search-emails.query';
 
 describe('SearchConditionSchema', () => {
@@ -245,7 +245,7 @@ describe('SemanticSearchEmailsQuery', () => {
       await instance.run(testUserId, [baseInput]);
 
       expect(contentSearch).toHaveBeenCalledOnce();
-      const { metaDataFilter } = contentSearch.mock.calls[0][0];
+      const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
       expect(metaDataFilter.or).toHaveLength(2);
     });
 
@@ -258,7 +258,7 @@ describe('SemanticSearchEmailsQuery', () => {
       await instance.run(testUserId, [{ ...baseInput, mailbox: OWN_EMAIL }]);
 
       expect(contentSearch).toHaveBeenCalledOnce();
-      const { metaDataFilter } = contentSearch.mock.calls[0][0];
+      const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
       expect(metaDataFilter.or).toHaveLength(1);
       expect(metaDataFilter.or[0].and[0].value).toContain(OWN_PROVIDER_ID);
     });
@@ -272,7 +272,7 @@ describe('SemanticSearchEmailsQuery', () => {
       await instance.run(testUserId, [{ ...baseInput, mailbox: DELEGATED_EMAIL }]);
 
       expect(contentSearch).toHaveBeenCalledOnce();
-      const { metaDataFilter } = contentSearch.mock.calls[0][0];
+      const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
       expect(metaDataFilter.or).toHaveLength(1);
       expect(metaDataFilter.or[0].and[0].value).toContain(DELEGATED_PROVIDER_ID);
     });

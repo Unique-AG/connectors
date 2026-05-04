@@ -204,13 +204,11 @@ export const MsGraphKqlQuerySchema = z.object({
   limit: z.number().int().min(1).max(50).optional().prefault(25),
 });
 
-export const MsGraphSearchParamsSchema = z.object({
-  queries: z
-    .array(MsGraphKqlQuerySchema)
-    .min(1)
-    .max(20)
-    .describe('List of KQL queries to execute in parallel. Maximum 20.'),
-});
+export const MsGraphSearchParamsSchema = z
+  .array(MsGraphKqlQuerySchema)
+  .min(1)
+  .max(20)
+  .describe('List of KQL queries to execute in parallel. Maximum 20.');
 
 export const SearchEmailsMsGraphInputSchema = z.object({
   msGraphKeywordSearchQueries: MsGraphSearchParamsSchema,
@@ -223,23 +221,27 @@ export const SearchEmailsUnifiedInputSchema = z
       .min(1)
       .max(10)
       .describe(
-        'List of independent semantic searches to execute in parallel (at most 10). ' +
-          'Use multiple entries when the user intent spans distinct, non-overlapping search intents ' +
-          '(e.g. looking for emails from Alice AND separately for invoices from Bob). ' +
+        'List of semantic searches to execute in parallel (at most 10). ALL entries must address the SAME single user question — do NOT pack unrelated questions into this array. ' +
+          'Use multiple entries only to approach the same question from different angles ' +
+          '(e.g. trying different phrasings, synonyms, or narrower vs. broader terms for the same intent). ' +
+          'IMPORTANT: uniqueSemanticSearchQueries supports delegated-access mailboxes — use the mailbox field to scope searches to specific mailboxes including delegated ones. ' +
           'Results from all searches are merged and deduplicated by email ID.',
       ),
-    msGraphSearchParams: MsGraphSearchParamsSchema.optional().describe(
-      'KQL queries that answer the same question as semanticSearchParams. ' +
+    msGraphKeywordSearchQueries: MsGraphSearchParamsSchema.optional().describe(
+      'KQL queries that address the SAME single user question as uniqueSemanticSearchQueries, expressed using keyword/lexical search. ' +
+        'Use multiple entries to approach the same question from different angles (e.g. different keyword combinations, subject vs. body focus). ' +
+        'IMPORTANT: Microsoft Graph keyword search does NOT support delegated-access mailboxes — it only searches the current user\'s own mailbox. ' +
         'When provided, results from both backends are merged: semantic results are anchored first ' +
         'and enriched with the Graph body excerpt when the same email was matched by both. ' +
-        'Always try to fill this alongside semanticSearchParams — the combined result gives a ' +
+        'Always try to fill this alongside uniqueSemanticSearchQueries — the combined result gives a ' +
         'more complete picture than either search alone.',
     ),
   })
   .describe(
-    'Both semanticSearchParams and msGraphSearchParams should express the same search intent ' +
-      "using each backend's own query language. The two searches run in parallel and their " +
-      'results are merged to provide a broader and more reliable overview: semantic search ' +
-      'covers natural-language relevance and attachment content, while KQL covers lexical ' +
-      'precision and full email-body excerpts.',
+    'IMPORTANT: uniqueSemanticSearchQueries and msGraphKeywordSearchQueries must both address the SAME single user question — ' +
+      'each using its own query language and approaching the question from different angles. ' +
+      'Do NOT spread multiple unrelated user questions across the two fields. ' +
+      'The two searches run in parallel and their results are merged to provide a broader and more reliable overview: ' +
+      'semantic search covers natural-language relevance, attachment content, and delegated-access mailboxes; ' +
+      'KQL covers lexical precision and full email-body excerpts (own mailbox only, no delegated access).',
   );

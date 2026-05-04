@@ -33,7 +33,7 @@ import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
 import { buildSearchFilter } from './build-unique-ql-search-filter.util';
 import { SanitizeSearchConditionsForUserQuery } from './sanitize-search-conditions-for-user.query';
-import { SearchEmailsInputSchema } from './semantic-search-conditions.dto';
+import { SearchEmailsInputSchema } from './search-conditions.dto';
 
 export enum SearchBackend {
   Unique = 'Unique',
@@ -140,7 +140,9 @@ export class SemanticSearchEmailsQuery {
         const itemRef = accumulated.get(item.id);
         if (itemRef) {
           itemRef.index = Math.min(itemRef.index, index);
-          itemRef.chunks.set(item.chunkId, item);
+          if (!itemRef.chunks.has(item.chunkId)) {
+            itemRef.chunks.set(item.chunkId, item);
+          }
           return;
         }
         accumulated.set(item.id, {

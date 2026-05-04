@@ -67,13 +67,13 @@ describe('SearchEmailsQuery', () => {
     );
   });
 
-  it('returns only graph results when semanticSearchParams is absent', async () => {
+  it('returns only graph results when uniqueSemanticSearchQueries is absent', async () => {
     const graphA = makeGraphResult('email-1');
     const graphB = makeGraphResult('email-2');
     msGraphKqlQuery.run.mockResolvedValue([graphA, graphB]);
 
     const result = await instance.run(testUserId, {
-      msGraphSearchParams: { queries: [{ kqlQuery: 'subject:test' }] },
+      msGraphKeywordSearchQueries: [{ kqlQuery: 'subject:test' }],
     });
 
     expect(result).toHaveLength(2);
@@ -82,7 +82,7 @@ describe('SearchEmailsQuery', () => {
     expect(semanticSearchQuery.run).not.toHaveBeenCalled();
   });
 
-  it('returns empty array when msGraphSearchParams is absent', async () => {
+  it('returns empty array when msGraphKeywordSearchQueries is absent', async () => {
     const result = await instance.run(testUserId, {});
 
     expect(result).toEqual([]);
@@ -95,8 +95,8 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: [{ search: 'test', conditions: [], limit: 10 }],
-      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 10 }],
+      msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
     });
 
     expect(result).toEqual([]);
@@ -121,8 +121,8 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([...graphMatches, graphOnly]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: [{ search: 'test', conditions: [], limit: 25 }],
-      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 25 }],
+      msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
     });
 
     expect(result).toHaveLength(23);
@@ -148,8 +148,8 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([graphOnly]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: [{ search: 'test', conditions: [], limit: 25 }],
-      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 25 }],
+      msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
     });
 
     expect(result).toHaveLength(22);
@@ -170,8 +170,8 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([graphResult]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: [{ search: 'test', conditions: [], limit: 10 }],
-      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 10 }],
+      msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
     });
 
     expect(result[0]?.text).toBe(
@@ -186,8 +186,8 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: [{ search: 'test', conditions: [], limit: 10 }],
-      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 10 }],
+      msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
     });
 
     expect(result[0]?.text).toBe('Unique body');
@@ -200,8 +200,8 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([graphResult]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: [{ search: 'test', conditions: [], limit: 10 }],
-      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 10 }],
+      msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
     });
 
     expect(result[0]?.text).toBe('## Full Email Content Without Attachments\nGraph body');
@@ -215,8 +215,8 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([graphResult]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: [{ search: 'test', conditions: [], limit: 10 }],
-      msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
+      uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 10 }],
+      msGraphKeywordSearchQueries: [{ kqlQuery: 'test' }],
     });
 
     expect(result).toHaveLength(1);

@@ -30,6 +30,7 @@ function createMockGraphApi() {
     select: vi.fn().mockReturnThis(),
     top: vi.fn().mockReturnThis(),
     expand: vi.fn().mockReturnThis(),
+    header: vi.fn().mockReturnThis(),
     get: vi.fn(),
   };
 }
