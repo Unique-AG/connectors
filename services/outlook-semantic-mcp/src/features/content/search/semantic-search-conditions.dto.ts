@@ -129,24 +129,10 @@ export const SearchConditionSchema = z
         ),
       )
       .optional(),
-    mailbox: z
-      .email()
-      .describe(
-        `Scope this condition to a specific mailbox (exact email address match, no wildcards). ` +
-          `When set, this condition only applies to the matching mailbox branch; when omitted, the condition applies to every accessible mailbox (own + delegated). ` +
-          `Use the \`list_folders\` tool to discover which mailboxes are available for the current user.`,
-      )
-      .optional(),
   })
-  .refine(
-    (obj) =>
-      Object.entries(obj)
-        .filter(([k]) => k !== 'mailbox')
-        .some(([, v]) => v !== undefined),
-    {
-      message: `Invalid search condition, the following fields are supported for conditions 'dateFrom', 'dateTo', 'fromSenders', 'toRecipients', 'ccRecipients', 'directories', 'hasAttachments', 'categories'. Example of valid condition: { fromSenders: { value: "alice@example.com", operator: "equals" } }`,
-    },
-  )
+  .refine((obj) => Object.values(obj).some((v) => v !== undefined), {
+    message: `Invalid search condition, the following fields are supported for conditions 'dateFrom', 'dateTo', 'fromSenders', 'toRecipients', 'ccRecipients', 'directories', 'hasAttachments', 'categories'. Example of valid condition: { fromSenders: { value: "alice@example.com", operator: "equals" } }`,
+  })
   .describe(
     `Condition to narrow down the search, AND operator is applied between multiple conditions fields`,
   );
@@ -158,6 +144,14 @@ export const SearchEmailsInputSchema = z.object({
     .string()
     .nonempty()
     .describe('Search query, e.g. "quarterly report from Alice" or "meeting invitation next week"'),
+  mailbox: z
+    .email()
+    .describe(
+      `Scope this entire search to one mailbox (exact email address match, no wildcards). ` +
+        `When omitted, all accessible mailboxes (own + delegated) are searched. ` +
+        `Use the \`list_folders\` tool to discover which mailboxes are available for the current user.`,
+    )
+    .optional(),
   conditions: z
     .array(SearchConditionSchema)
     .optional()
@@ -184,6 +178,7 @@ export const SearchEmailsInputSchema = z.object({
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
 
 export const MsGraphKqlQuerySchema = z.object({
+  mailbox: z.email().optional(),
   kqlQuery: z
     .string()
     .nonempty()
@@ -218,12 +213,21 @@ export const MsGraphSearchParamsSchema = z.object({
 });
 
 export const SearchEmailsMsGraphInputSchema = z.object({
-  msGraphSearchParams: MsGraphSearchParamsSchema,
+  msGraphKeywordSearchQueries: MsGraphSearchParamsSchema,
 });
 
 export const SearchEmailsUnifiedInputSchema = z
   .object({
-    semanticSearchParams: SearchEmailsInputSchema,
+    uniqueSemanticSearchQueries: z
+      .array(SearchEmailsInputSchema)
+      .min(1)
+      .max(10)
+      .describe(
+        'List of independent semantic searches to execute in parallel (at most 10). ' +
+          'Use multiple entries when the user intent spans distinct, non-overlapping search intents ' +
+          '(e.g. looking for emails from Alice AND separately for invoices from Bob). ' +
+          'Results from all searches are merged and deduplicated by email ID.',
+      ),
     msGraphSearchParams: MsGraphSearchParamsSchema.optional().describe(
       'KQL queries that answer the same question as semanticSearchParams. ' +
         'When provided, results from both backends are merged: semantic results are anchored first ' +

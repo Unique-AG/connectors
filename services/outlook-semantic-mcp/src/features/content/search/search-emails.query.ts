@@ -10,7 +10,7 @@ import {
 } from './semantic-search-emails.query';
 
 export interface SearchEmailsToolInput {
-  semanticSearchParams?: z.infer<typeof SearchEmailsInputSchema>;
+  semanticSearchParams?: z.infer<typeof SearchEmailsInputSchema>[];
   msGraphSearchParams?: { queries: Array<{ kqlQuery: string; limit?: number }> };
 }
 

@@ -106,7 +106,7 @@ export class RunSearchRecallCheckQuery {
         const expectedMessageIds = notSkipped.map((e) => e.messageId);
         const { results } = await this.searchEmailsQuery.run(
           convertUserProfileIdToTypeId(userProfileId),
-          checkCase.search,
+          [checkCase.search],
         );
         const returnedEmailIds = new Set(
           pipe(

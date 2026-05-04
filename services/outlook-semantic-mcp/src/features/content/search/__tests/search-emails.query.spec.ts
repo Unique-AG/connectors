@@ -95,7 +95,7 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+      semanticSearchParams: [{ search: 'test', conditions: [], limit: 10 }],
       msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 
@@ -121,7 +121,7 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([...graphMatches, graphOnly]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: { search: 'test', conditions: [], limit: 25 },
+      semanticSearchParams: [{ search: 'test', conditions: [], limit: 25 }],
       msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 
@@ -148,7 +148,7 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([graphOnly]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: { search: 'test', conditions: [], limit: 25 },
+      semanticSearchParams: [{ search: 'test', conditions: [], limit: 25 }],
       msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 
@@ -170,7 +170,7 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([graphResult]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+      semanticSearchParams: [{ search: 'test', conditions: [], limit: 10 }],
       msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 
@@ -186,7 +186,7 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+      semanticSearchParams: [{ search: 'test', conditions: [], limit: 10 }],
       msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 
@@ -200,7 +200,7 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([graphResult]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+      semanticSearchParams: [{ search: 'test', conditions: [], limit: 10 }],
       msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 
@@ -215,7 +215,7 @@ describe('SearchEmailsQuery', () => {
     msGraphKqlQuery.run.mockResolvedValue([graphResult]);
 
     const result = await instance.run(testUserId, {
-      semanticSearchParams: { search: 'test', conditions: [], limit: 10 },
+      semanticSearchParams: [{ search: 'test', conditions: [], limit: 10 }],
       msGraphSearchParams: { queries: [{ kqlQuery: 'test' }] },
     });
 

@@ -1,9 +1,14 @@
 import assert from 'node:assert';
-import { MetadataFilter, type UniqueApiClient, UniqueQLOperator } from '@unique-ag/unique-api';
+import {
+  MetadataFilter,
+  SearchResultItem,
+  type UniqueApiClient,
+  UniqueQLOperator,
+} from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNotNull, notInArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { filter, isNonNull, isNullish, map, omit, pipe, sortBy } from 'remeda';
+import { filter, isNonNull, isNonNullish, isNullish, map, pick, pipe, sortBy } from 'remeda';
 import * as z from 'zod';
 import {
   DRIZZLE,
@@ -15,6 +20,7 @@ import {
   userProfiles,
 } from '~/db';
 import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
+import { traceError } from '~/features/tracing.utils';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import {
   getRootScopeExternalId,
@@ -26,7 +32,6 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
 import { buildSearchFilter } from './build-unique-ql-search-filter.util';
-import { filterConditionsForMailbox as filterConditionsForMailbox } from './filter-conditions-for-mailbox';
 import { SanitizeSearchConditionsForUserQuery } from './sanitize-search-conditions-for-user.query';
 import { SearchEmailsInputSchema } from './semantic-search-conditions.dto';
 
@@ -49,6 +54,31 @@ export interface SearchEmailResult {
   backend: SearchBackend;
 }
 
+interface DelegatedAccess {
+  ownerUserEmail: string;
+  ownerUserId: string;
+  ownerProviderUserId: string;
+  msGraphDirectoryIds: string[];
+}
+
+interface AccessContext {
+  rootScopeId: string;
+  rootScopeForUserId: string;
+  delegatedAccesses: DelegatedAccess[];
+  scopeExternalIdToScopeId: Map<string, string>;
+  mapUniqueFolderPathToOwnerEmail: { uniqueFolderIdPath: string; ownerEmail: string }[];
+}
+
+interface ValidSearchJobInput {
+  search: string;
+  limit: number | undefined;
+  filter: MetadataFilter;
+  isScoped: true;
+  searchSummary: string | undefined;
+}
+
+type SearchJobInput = { isScoped: false } | ValidSearchJobInput;
+
 @Injectable()
 export class SemanticSearchEmailsQuery {
   public constructor(
@@ -61,51 +91,83 @@ export class SemanticSearchEmailsQuery {
   @Span()
   public async run(
     userProfileTypeId: UserProfileTypeID,
-    input: z.infer<typeof SearchEmailsInputSchema>,
+    inputs: z.infer<typeof SearchEmailsInputSchema>[],
   ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
+    const context = await this.loadAccessContext(userProfile);
 
-    const {
-      filter: metaDataFilter,
-      hasActiveBranches,
-      searchSummary,
-      mapUniqueFolderPathToOwnerEmail,
-    } = await this.builsSearchConditions({
-      userProfile,
-      conditions: input.conditions,
-    });
+    const searchJobsInputs = await Promise.all(
+      inputs.map((input) => this.buildUniqueQlSearchInput(input, userProfile, context)),
+    );
+    const searchJobs = searchJobsInputs.filter((job): job is ValidSearchJobInput => job.isScoped);
 
-    if (!hasActiveBranches) {
-      return {
-        results: [],
-        searchSummary: 'No accessible mailbox matched the requested mailbox filter(s)',
-      };
+    const uniqueQlSearchResults = await Promise.allSettled(
+      searchJobs.map((job) =>
+        this.uniqueApi.content.search({
+          prompt: job.search,
+          metaDataFilter: job.filter,
+          limit: job.limit,
+          scoreThreshold: 0,
+        }),
+      ),
+    );
+
+    const accumulated = new Map<
+      string,
+      {
+        index: number;
+        content: Pick<SearchResultItem, 'metadata' | 'id' | 'title' | 'url'>;
+        chunks: Map<string, SearchResultItem>;
+      }
+    >();
+    const summaries: string[] = [];
+
+    for (const [i, settledItem] of uniqueQlSearchResults.entries()) {
+      const job = searchJobs[i];
+      if (isNullish(job)) {
+        continue;
+      }
+
+      if (job.searchSummary) {
+        summaries.push(job.searchSummary);
+      }
+
+      if (settledItem.status === 'rejected') {
+        traceError(settledItem.reason);
+        continue;
+      }
+      settledItem.value.forEach((item, index) => {
+        const itemRef = accumulated.get(item.id);
+        if (itemRef) {
+          itemRef.index = Math.min(itemRef.index, index);
+          itemRef.chunks.set(item.chunkId, item);
+          return;
+        }
+        accumulated.set(item.id, {
+          index,
+          content: pick(item, ['id', 'title', 'url', 'metadata']),
+          chunks: new Map([[item.chunkId, item]]),
+        });
+      });
     }
 
-    const searchResults = await this.uniqueApi.content.search({
-      prompt: input.search,
-      metaDataFilter,
-      limit: input.limit,
-      scoreThreshold: 0,
-    });
+    const results = pipe(
+      Array.from(accumulated.values()),
+      sortBy((item) => item.index),
+      map((item): SearchEmailResult => {
+        const metadata = item.content?.metadata as
+          | (MessageMetadata & { folderIdPath?: string })
+          | undefined;
 
-    type DeduplicatedResult = Omit<SearchEmailResult, 'text'> & {
-      textParts: { order: number; text: string }[];
-      index: number;
-    };
-
-    const resultsDeduplicated = searchResults.reduce<Record<string, DeduplicatedResult>>(
-      (acc, item, index) => {
-        const metadata = item.metadata as (MessageMetadata & { folderIdPath?: string }) | undefined;
         const sourceMailbox =
-          mapUniqueFolderPathToOwnerEmail.find(({ uniqueFolderIdPath }) => {
+          context.mapUniqueFolderPathToOwnerEmail.find(({ uniqueFolderIdPath }) => {
             return metadata?.folderIdPath?.startsWith(uniqueFolderIdPath);
           })?.ownerEmail ?? null;
 
-        const itemRef = acc[item.id] ?? {
-          title: item.title ?? '',
-          uniqueContentId: item.id,
-          uniqueContentUrl: item.url ?? undefined,
+        return {
+          title: item.content.title ?? '',
+          uniqueContentId: item.content.id,
+          uniqueContentUrl: item.content.url ?? undefined,
           outlookWebLink: metadata?.webLink ?? '',
           sourceMailbox,
           msGraphMessageId: metadata?.id || undefined,
@@ -113,48 +175,26 @@ export class SemanticSearchEmailsQuery {
           from: metadata?.fromEmailAddress ?? '',
           receivedDateTime: metadata?.receivedDateTime ?? '',
           backend: SearchBackend.Unique,
-          textParts: [],
-          index,
-        };
-        itemRef.textParts.push({ order: item.order, text: item.text });
-        acc[item.id] = itemRef;
-        return acc;
-      },
-      {},
-    );
-
-    const results: SearchEmailResult[] = pipe(
-      Object.values(resultsDeduplicated),
-      sortBy((item) => item.index),
-      map(({ textParts, ...searchResult }) => {
-        return {
-          ...omit(searchResult, ['index']),
-          text: concatChunks(textParts),
+          text: concatChunks(Array.from(item.chunks.values())),
         };
       }),
     );
 
-    return { results, searchSummary };
+    return {
+      results: results.slice(0, 500),
+      searchSummary: summaries.length > 0 ? summaries.join('\r\n') : undefined,
+    };
   }
 
-  private async builsSearchConditions({
-    userProfile,
-    conditions,
-  }: {
-    conditions: z.infer<typeof SearchEmailsInputSchema>['conditions'];
-    userProfile: NonNullishProps<UserProfile, 'email'>;
-  }): Promise<{
-    filter: MetadataFilter;
-    hasActiveBranches: boolean;
-    searchSummary: string | undefined;
-    mapUniqueFolderPathToOwnerEmail: { uniqueFolderIdPath: string; ownerEmail: string }[];
-  }> {
+  private async loadAccessContext(
+    userProfile: NonNullishProps<UserProfile, 'email'>,
+  ): Promise<AccessContext> {
     const directoriesIgnoredForSync = this.db
       .selectDistinct({ microsoftDirectoryId: directories.providerDirectoryId })
       .from(directories)
       .where(eq(directories.ignoreForSync, true));
 
-    const delegatedAcceses = await this.db
+    const delegatedAccesses = await this.db
       .select({
         ownerUserEmail: sql<string>`${userProfiles.email}`,
         ownerUserId: delegatedAccessPipelines.ownerUserId,
@@ -184,7 +224,7 @@ export class SemanticSearchEmailsQuery {
     const scopes = await this.uniqueApi.scopes.getByExternalIds([
       getRootScopeExternalId(),
       getRootScopeExternalIdForUser(userProfile.providerUserId),
-      ...delegatedAcceses.map((item) => getRootScopeExternalIdForUser(item.ownerProviderUserId)),
+      ...delegatedAccesses.map((item) => getRootScopeExternalIdForUser(item.ownerProviderUserId)),
     ]);
 
     const scopeIds = pipe(
@@ -201,29 +241,68 @@ export class SemanticSearchEmailsQuery {
     );
     assert.ok(rootScopeForUserId, `Root scope not found for user: ${userProfile.providerUserId}`);
 
-    const finalFilters: MetadataFilter = { or: [] };
-    let hasActiveBranches = false;
-    const mapUniqueFolderPathToOwnerEmail: Map<string, string> = new Map();
+    const mapUniqueFolderPathToOwnerEmail: { uniqueFolderIdPath: string; ownerEmail: string }[] = [
+      {
+        uniqueFolderIdPath: this.getUniqueFolderPath([rootScopeId, rootScopeForUserId]),
+        ownerEmail: userProfile.email,
+      },
+    ];
 
-    const currentUserScopeIdsFromRoot = [rootScopeId, rootScopeForUserId];
-    const userConditions = await this.scopeSearchToUserProfile({
-      scopeIdsFromRoot: currentUserScopeIdsFromRoot,
-      userProfileId: userProfile.id,
-      userEmail: userProfile.email,
-      conditions,
-    });
-
-    const searchSummary: string[] = [];
-    if (userConditions.filter !== null) {
-      hasActiveBranches = true;
-      mapUniqueFolderPathToOwnerEmail.set(
-        this.getUniqueFolderPath(currentUserScopeIdsFromRoot),
-        userProfile.email,
+    for (const {
+      ownerUserEmail,
+      ownerUserId,
+      ownerProviderUserId,
+      msGraphDirectoryIds,
+    } of delegatedAccesses) {
+      const ownerRootScopeId = scopeExternalIdToScopeId.get(
+        getRootScopeExternalIdForUser(ownerProviderUserId),
       );
-      finalFilters.or.push(userConditions.filter);
+      if (
+        !msGraphDirectoryIds.length ||
+        isNullish(ownerProviderUserId) ||
+        isNullish(ownerUserEmail) ||
+        isNullish(ownerUserId) ||
+        isNullish(ownerRootScopeId)
+      ) {
+        continue;
+      }
+      mapUniqueFolderPathToOwnerEmail.push({
+        uniqueFolderIdPath: this.getUniqueFolderPath([rootScopeId, ownerRootScopeId]),
+        ownerEmail: ownerUserEmail,
+      });
     }
-    if (userConditions.searchSummary) {
-      searchSummary.push(`${userProfile.email}: ${userConditions.searchSummary}`);
+
+    return {
+      rootScopeId,
+      rootScopeForUserId,
+      delegatedAccesses,
+      scopeExternalIdToScopeId,
+      mapUniqueFolderPathToOwnerEmail,
+    };
+  }
+
+  private async buildUniqueQlSearchInput(
+    input: z.infer<typeof SearchEmailsInputSchema>,
+    userProfile: NonNullishProps<UserProfile, 'email'>,
+    context: AccessContext,
+  ): Promise<SearchJobInput> {
+    const { rootScopeId, rootScopeForUserId, delegatedAccesses, scopeExternalIdToScopeId } =
+      context;
+
+    const finalFilters: MetadataFilter = { or: [] };
+    const searchSummaryParts: string[] = [];
+
+    if (!input.mailbox || input.mailbox === userProfile.email) {
+      const userConditions = await this.scopeSearchToUserProfile({
+        scopeIdsFromRoot: [rootScopeId, rootScopeForUserId],
+        userProfileId: userProfile.id,
+        conditions: input.conditions,
+      });
+
+      finalFilters.or.push(userConditions.filter);
+      if (userConditions.searchSummary) {
+        searchSummaryParts.push(`${userProfile.email}: ${userConditions.searchSummary}`);
+      }
     }
 
     for (const {
@@ -231,14 +310,14 @@ export class SemanticSearchEmailsQuery {
       ownerUserId,
       ownerProviderUserId,
       msGraphDirectoryIds,
-    } of delegatedAcceses) {
+    } of delegatedAccesses) {
+      if (input.mailbox && input.mailbox !== ownerUserEmail) {
+        continue;
+      }
+
       const ownerRootScopeId = scopeExternalIdToScopeId.get(
         getRootScopeExternalIdForUser(ownerProviderUserId),
       );
-      // To ensure we build a valid set of filters and that the current user
-      // has delegated access we double check in memory every variable which would
-      // affect the delegated access filtering to avoid filtering on an inbox which
-      // you should not have access.
       if (
         !msGraphDirectoryIds.length ||
         isNullish(ownerProviderUserId) ||
@@ -249,67 +328,52 @@ export class SemanticSearchEmailsQuery {
         continue;
       }
 
-      const ownerScopeIdsFromRoot = [rootScopeId, ownerRootScopeId];
-      const delegatedAccessFilter = await this.scopeSearchToUserProfile({
-        scopeIdsFromRoot: ownerScopeIdsFromRoot,
+      const delegatedFilter = await this.scopeSearchToUserProfile({
+        scopeIdsFromRoot: [rootScopeId, ownerRootScopeId],
         userProfileId: ownerUserId,
-        userEmail: ownerUserEmail,
-        conditions,
+        conditions: input.conditions,
         delegatedAccessFilters: { msGraphDirectoryIds },
       });
 
-      if (delegatedAccessFilter.filter !== null) {
-        hasActiveBranches = true;
-        mapUniqueFolderPathToOwnerEmail.set(
-          this.getUniqueFolderPath(ownerScopeIdsFromRoot),
-          ownerUserEmail,
-        );
-        finalFilters.or.push(delegatedAccessFilter.filter);
-      }
-      if (delegatedAccessFilter.searchSummary) {
-        searchSummary.push(
-          `Delegated access to mailbox ${ownerUserEmail}: ${delegatedAccessFilter.searchSummary}`,
-        );
+      if (isNonNullish(delegatedFilter.filter)) {
+        finalFilters.or.push(delegatedFilter.filter);
+
+        if (delegatedFilter.searchSummary) {
+          searchSummaryParts.push(
+            `Delegated access to mailbox ${ownerUserEmail}: ${delegatedFilter.searchSummary}`,
+          );
+        }
       }
     }
 
+    if (!finalFilters.or.length) {
+      return { isScoped: false };
+    }
+
     return {
+      search: input.search,
+      limit: input.limit,
       filter: finalFilters,
-      hasActiveBranches,
-      mapUniqueFolderPathToOwnerEmail: Array.from(mapUniqueFolderPathToOwnerEmail).map((item) => ({
-        uniqueFolderIdPath: item[0],
-        ownerEmail: item[1],
-      })),
-      searchSummary: searchSummary.length > 0 ? searchSummary.join(`\r\n`) : undefined,
+      isScoped: true,
+      searchSummary: searchSummaryParts.length > 0 ? searchSummaryParts.join('\r\n') : undefined,
     };
   }
 
   private async scopeSearchToUserProfile({
     scopeIdsFromRoot,
     userProfileId,
-    userEmail,
     conditions,
     delegatedAccessFilters,
   }: {
     userProfileId: string;
     scopeIdsFromRoot: string[];
-    userEmail: string;
     conditions: z.infer<typeof SearchEmailsInputSchema>['conditions'];
     delegatedAccessFilters?: {
       msGraphDirectoryIds: string[];
     };
-  }): Promise<{ filter: MetadataFilter | null; searchSummary: string | undefined }> {
-    const conditionsForCurrentMailbox = filterConditionsForMailbox(conditions, userEmail);
-
-    if (conditions?.length && !conditionsForCurrentMailbox.length) {
-      return { filter: null, searchSummary: undefined };
-    }
-
+  }): Promise<{ filter: MetadataFilter; searchSummary: string | undefined }> {
     const { conditions: resolvedConditions, searchSummary } =
-      await this.sanitizeSearchConditionsForUserQuery.run(
-        userProfileId,
-        conditionsForCurrentMailbox,
-      );
+      await this.sanitizeSearchConditionsForUserQuery.run(userProfileId, conditions);
 
     const uniqueQlMetadataFilter = buildSearchFilter(resolvedConditions);
     const scopedMetadataFilter: MetadataFilter = {
