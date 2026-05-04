@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.3.1...outlook-semantic-mcp@0.3.2) (2026-04-30)
+
+
+### Features
+
+* **outlook-semantic-mcp:** un-19787 implement search powered by ms graph ([#492](https://github.com/Unique-AG/connectors/issues/492)) ([c7c630f](https://github.com/Unique-AG/connectors/commit/c7c630f5b5aede312ddfe0c227577a099f0f5aee))
+
+
+### Bug Fixes
+
+* **outlook-mcp,outlook-semantic-mcp:** reduce metrics cardinality by sanitizing endpoint IDs ([#497](https://github.com/Unique-AG/connectors/issues/497)) ([38ee132](https://github.com/Unique-AG/connectors/commit/38ee1327439d030fdccd42713bf63d76a9653e09))
+
 ## [0.3.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.3.0...outlook-semantic-mcp@0.3.1) (2026-04-24)
 
 
