@@ -143,7 +143,7 @@ export class SearchEmailsTool {
       }
     }
 
-    const results = await this.searchEmailsQuery.run(userProfileTypeId, input);
+    const { results, searchSummary } = await this.searchEmailsQuery.run(userProfileTypeId, input);
 
     if (!IS_MICROSOFT_GRAPH_BACKEND) {
       const stats = await this.getFullSyncStatsQuery.run(userProfileTypeId);
@@ -166,6 +166,6 @@ export class SearchEmailsTool {
       }
     }
 
-    return { success: true, results };
+    return { success: true, results, syncWarning: searchSummary };
   }
 }

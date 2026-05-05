@@ -271,26 +271,27 @@ export class SemanticSearchEmailsQuery {
       }
     }
 
+    let delegatedAccessToSearch = input.mailbox
+      ? delegatedAccesses.filter((item) => item.ownerUserEmail === input.mailbox)
+      : delegatedAccesses;
+    // Double checked here -> the query enforces them but we double check them here
+    delegatedAccessToSearch = delegatedAccessToSearch.filter((item) => {
+      return (
+        item.msGraphDirectoryIds.length > 0 &&
+        [item.ownerProviderUserId, item.ownerUserEmail, item.ownerUserId].every(isNonNullish)
+      );
+    });
+
     for (const {
       ownerUserEmail,
       ownerUserId,
       ownerProviderUserId,
       msGraphDirectoryIds,
-    } of delegatedAccesses) {
-      if (input.mailbox && input.mailbox !== ownerUserEmail) {
-        continue;
-      }
-
+    } of delegatedAccessToSearch) {
       const ownerRootScopeId = scopeExternalIdToScopeId.get(
         getRootScopeExternalIdForUser(ownerProviderUserId),
       );
-      if (
-        !msGraphDirectoryIds.length ||
-        isNullish(ownerProviderUserId) ||
-        isNullish(ownerUserEmail) ||
-        isNullish(ownerUserId) ||
-        isNullish(ownerRootScopeId)
-      ) {
+      if (isNullish(ownerRootScopeId)) {
         continue;
       }
 

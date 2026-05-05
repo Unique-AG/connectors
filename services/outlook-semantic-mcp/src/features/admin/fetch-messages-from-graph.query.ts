@@ -156,10 +156,10 @@ export class FetchMessagesFromGraphQuery {
       return;
     }
 
-    const messageIdsMap = await this.translateGraphIdsToImmutableIdsQuery.run(
-      userProfileId,
-      messages.map((message) => message.id).filter(isNonNullish),
-    );
+    const messageIdsMap = await this.translateGraphIdsToImmutableIdsQuery.run({
+      userProfileId: userProfileId,
+      ids: messages.map((message) => message.id).filter(isNonNullish),
+    });
     for (const message of messages) {
       const immutableId = messageIdsMap.get(message.id);
       if (immutableId) {

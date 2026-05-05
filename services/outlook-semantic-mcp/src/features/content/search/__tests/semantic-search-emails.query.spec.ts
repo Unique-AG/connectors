@@ -205,7 +205,12 @@ function createMockQuery(
   const profileMock = getUserProfileQuery as any;
   // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
   const sanitizeMock = sanitize as any;
-  const instance = new SemanticSearchEmailsQuery(getDelegtedAccessQuery, apiMock, profileMock, sanitizeMock);
+  const instance = new SemanticSearchEmailsQuery(
+    getDelegtedAccessQuery,
+    apiMock,
+    profileMock,
+    sanitizeMock,
+  );
 
   return { instance, contentSearch };
 }

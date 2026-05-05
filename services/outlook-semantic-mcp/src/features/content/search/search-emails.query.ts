@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as z from 'zod';
 import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { Nullish } from '~/utils/nullish';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
 import { SearchEmailsInputSchema } from './search-conditions.dto';
 import {
@@ -9,7 +10,6 @@ import {
   SearchEmailResult,
   SemanticSearchEmailsQuery,
 } from './semantic-search-emails.query';
-import { Nullish } from '~/utils/nullish';
 
 export interface SearchEmailsToolInput {
   uniqueSemanticSearchQueries?: z.infer<typeof SearchEmailsInputSchema>[];
@@ -19,7 +19,7 @@ export interface SearchEmailsToolInput {
 type BackendExecutor = (
   userProfileTypeId: UserProfileTypeID,
   input: SearchEmailsToolInput,
-) => Promise<SearchEmailResult[]>;
+) => Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }>;
 
 @Injectable()
 export class SearchEmailsQuery {
@@ -32,20 +32,20 @@ export class SearchEmailsQuery {
     [SearchBackend.Unique]: (
       userProfileTypeId: UserProfileTypeID,
       input: SearchEmailsToolInput,
-    ): Promise<SearchEmailResult[]> => {
+    ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> => {
       if (isMicrosoftGraphBackend() || !input.uniqueSemanticSearchQueries?.length) {
-        return Promise.resolve([]);
+        return Promise.resolve({ results: [], searchSummary: undefined });
       }
       return this.semanticSearchQuery
         .run(userProfileTypeId, input.uniqueSemanticSearchQueries)
-        .then(({ results }) => results);
+        .then(({ results, searchSummary }) => ({ results, searchSummary }));
     },
     [SearchBackend.MsGraph]: (
       userProfileTypeId: UserProfileTypeID,
       input: SearchEmailsToolInput,
-    ): Promise<SearchEmailResult[]> => {
+    ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> => {
       if (!input.msGraphKeywordSearchQueries) {
-        return Promise.resolve([]);
+        return Promise.resolve({ results: [], searchSummary: undefined });
       }
       return this.msGraphKqlQuery.run(userProfileTypeId, input.msGraphKeywordSearchQueries);
     },
@@ -54,13 +54,19 @@ export class SearchEmailsQuery {
   public async run(
     userProfileTypeId: UserProfileTypeID,
     input: SearchEmailsToolInput,
-  ): Promise<SearchEmailResult[]> {
-    const [semanticResults, graphResults] = await Promise.all([
+  ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
+    const [
+      { results: semanticResults, searchSummary: semanticSummary },
+      { results: graphResults, searchSummary: graphSummary },
+    ] = await Promise.all([
       this.executors[SearchBackend.Unique](userProfileTypeId, input),
       this.executors[SearchBackend.MsGraph](userProfileTypeId, input),
     ]);
 
-    return this.mergeResults(semanticResults, graphResults);
+    const summaries = [semanticSummary, graphSummary].filter((s): s is string => s !== undefined);
+    const searchSummary = summaries.length > 0 ? summaries.join('\n\n') : undefined;
+
+    return { results: this.mergeResults(semanticResults, graphResults), searchSummary };
   }
 
   private formatText({
