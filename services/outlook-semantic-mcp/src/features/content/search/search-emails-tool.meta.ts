@@ -97,7 +97,7 @@ export const META_MS_GRAPH = createMeta({
   By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
   After returning results, inform the user that they can narrow the search with more specific KQL terms if needed.
 
-  Build precise KQL queries using supported property filters: from:, to:, cc:, subject:, body:, received>=, received<=, hasAttachment:, category:.
+  Build precise KQL queries using supported property filters: from:, to:, cc:, subject:, body:, received>=, received<=, hasAttachment:, category:. Do NOT use folder: — it is not supported.
   Combine clauses with AND/OR for complex searches. You can run multiple KQL queries in parallel (up to 20) for broader coverage.`,
   toolFormatInformation: TOOL_FORMAT_INFORMATION,
 });

@@ -15,6 +15,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
+import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 
 const MAX_OUTPUT_RESULTS = 100;
 
@@ -240,7 +241,7 @@ export class MsGraphKqlSearchEmailsQuery {
           requests: batch.map((request) => ({
             id: request.requestId,
             method: 'GET',
-            url: `/users/${request.mailbox}/messages?$search=${encodeURIComponent(`"${request.kqlQuery}"`)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,bodyPreview&$top=${request.limit}`,
+            url: `/users/${request.mailbox}/messages?$search=${encodeURIComponent(`"${sanitizeKqlQuery(request.kqlQuery)}"`)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,bodyPreview&$top=${request.limit}`,
             headers: { Prefer: 'outlook.body-content-type="text"' },
           })),
         });

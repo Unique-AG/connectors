@@ -192,21 +192,36 @@ export const MsGraphKqlQuerySchema = z.object({
     .describe(
       'KQL (Keyword Query Language) query string for Microsoft Graph email search.\n' +
         'Supported property filters:\n' +
-        '  from:<email>              — sender address (exact or domain, e.g. from:alice@example.com)\n' +
-        '  to:<email>                — recipient in To field\n' +
-        '  cc:<email>                — recipient in CC field\n' +
-        '  subject:<words>           — words in the subject line (phrase: subject:"budget report")\n' +
-        '  body:<words>              — words in the message body\n' +
-        '  received>=YYYY-MM-DD      — received on or after date\n' +
-        '  received<=YYYY-MM-DD      — received on or before date\n' +
-        '  hasAttachment:true/false  — whether the email has attachments\n' +
-        '  category:"label"          — Outlook category label\n' +
-        'Free-text terms (no property prefix) perform a full-text search across subject and body.\n' +
-        'Combine clauses with AND / OR; use double quotes for phrases.\n' +
+        '  from:<email>                    — sender (SMTP address, display name, or domain)\n' +
+        '  to:<email>                      — To recipient (SMTP address, display name, or domain)\n' +
+        '  cc:<email>                      — CC recipient\n' +
+        '  bcc:<email>                     — BCC recipient\n' +
+        '  participants:<email>            — any of from/to/cc/bcc (broad people search across all address fields)\n' +
+        '  recipients:<email>              — any of to/cc/bcc\n' +
+        '  subject:<words>                 — words in subject line (phrase: subject:"budget report")\n' +
+        '  body:<words>                    — words in message body\n' +
+        '  attachment:<filename>           — attached file name (wildcards OK: attachment:report*)\n' +
+        '  received>=YYYY-MM-DD            — received on or after date\n' +
+        '  received<=YYYY-MM-DD            — received on or before date\n' +
+        '  sent>=YYYY-MM-DD                — sent on or after date\n' +
+        '  sent<=YYYY-MM-DD                — sent on or before date\n' +
+        '  hasAttachment:true/false        — whether the email has attachments\n' +
+        '  category:"label"                — Outlook category label\n' +
+        '  importance:low/medium/high      — email importance level\n' +
+        '  kind:email/meetings/voicemail   — message type; other values: contacts, docs, faxes, im, journals, notes, posts, rssfeeds, tasks\n' +
+        '  size>=<bytes>                   — message size in bytes (e.g. size>=1048576 for >1 MB); range: size:1..1048576\n' +
+        'Syntax rules:\n' +
+        '  - NO space between property name and value: from:alice@example.com NOT from: alice@example.com\n' +
+        '  - Boolean operators AND/OR/NOT must be UPPERCASE\n' +
+        '  - Suffix wildcards only: report* or budget*, NOT *report\n' +
+        '  - Phrases must be in double quotes: subject:"quarterly report"\n' +
+        '  - DO NOT use folder: — it is not supported and will cause a request error\n' +
+        'Free-text terms (no property prefix) search across subject, body, and from.\n' +
         'Examples:\n' +
         '  "from:alice@example.com subject:\\"Q2 budget\\" received>=2024-01-01"\n' +
         '  "project proposal hasAttachment:true received>=2024-03-01 received<=2024-03-31"\n' +
-        '  "from:hr@acme.com OR from:payroll@acme.com subject:salary"',
+        '  "from:hr@acme.com OR from:payroll@acme.com subject:salary"\n' +
+        '  "participants:alice@example.com kind:meetings received>=2024-01-01"',
     ),
   limit: z
     .number()
