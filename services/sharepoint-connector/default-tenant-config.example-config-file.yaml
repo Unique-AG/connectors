@@ -47,5 +47,13 @@ processing:
     - application/vnd.openxmlformats-officedocument.wordprocessingml.document
     - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
     - application/vnd.openxmlformats-officedocument.presentationml.presentation
+    - text/plain
+    - text/html
+    - text/csv
+  # Map of file extension suffix to canonical MIME type. Overrides the SharePoint-reported
+  # mimeType before the allow-list check (e.g. SharePoint reports `.csv` files as
+  # `application/vnd.ms-excel`). User-supplied values replace the default wholesale; include
+  # `.csv` in custom maps to retain the CSV fix.
+  # mimeTypeOverridesByExtension:
+  #   .csv: text/csv
   scanIntervalCron: "*/15 * * * *"
-
