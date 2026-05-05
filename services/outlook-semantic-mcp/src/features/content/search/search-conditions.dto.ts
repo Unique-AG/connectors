@@ -223,8 +223,8 @@ export const MsGraphKqlQuerySchema = z.object({
 export const MsGraphSearchParamsSchema = z
   .array(MsGraphKqlQuerySchema)
   .min(1)
-  .max(20)
-  .describe('List of KQL queries to execute in parallel. Maximum 20.');
+  .max(10)
+  .describe('List of KQL queries to execute in parallel. Maximum 10.');
 
 export const SearchEmailsMsGraphInputSchema = z.object({
   msGraphKeywordSearchQueries: MsGraphSearchParamsSchema,

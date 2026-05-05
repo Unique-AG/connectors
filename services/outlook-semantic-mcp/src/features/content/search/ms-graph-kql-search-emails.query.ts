@@ -311,7 +311,7 @@ export class MsGraphKqlSearchEmailsQuery {
     while (hasMoreItems) {
       hasMoreItems = false;
 
-      for (const [mailbox, index] of Object.entries(indicesMap)) {
+      for (const [mailbox, index] of Array.from(indicesMap)) {
         const itemsList = hitsByMailbox[mailbox];
         if (!itemsList) {
           indicesMap.delete(mailbox);
