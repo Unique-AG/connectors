@@ -1,5 +1,3 @@
-GetDelegtedAccessQuery;
-
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DrizzleModule } from '~/db/drizzle.module';

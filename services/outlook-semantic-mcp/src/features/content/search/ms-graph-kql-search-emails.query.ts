@@ -189,8 +189,7 @@ export class MsGraphKqlSearchEmailsQuery {
           ];
         }
 
-        // We are filtering user mailbox + all delegates. We support at most 25 delegated access queries
-        // This is a technical limit for a user in microsoft outlook
+        // Capped at 25 to keep the total sub-requests per input query within two $batch calls of 20.
         const delegatesToFilter = delegatedAccesses.slice(0, 25);
         return [
           {
