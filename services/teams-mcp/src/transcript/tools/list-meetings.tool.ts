@@ -45,6 +45,8 @@ const MeetingItemSchema = z.object({
   id: z.string().describe('Content ID — use this to reference the meeting in other tools'),
   title: z.string().describe('Meeting subject / title'),
   meetingDate: z.string().optional().describe('Meeting start date (ISO 8601)'),
+  startDatetime: z.string().optional().describe('Meeting start datetime (ISO 8601)'),
+  endDatetime: z.string().optional().describe('Meeting end datetime (ISO 8601)'),
   organizer: z.string().optional().describe('Name of the meeting organizer'),
   participants: z.array(z.string()).optional().describe('List of participant names'),
 });
@@ -131,14 +133,15 @@ export class ListMeetingsTool {
     );
 
     const meetings = result.contents.map((item) => {
-      const { meetingDate, organizer, participants } = parseTranscriptMetadata(
-        item.metadata as Record<string, unknown> | null,
-      );
+      const { meetingDate, startDatetime, endDatetime, organizer, participants } =
+        parseTranscriptMetadata(item.metadata as Record<string, unknown> | null);
 
       return {
         id: item.id,
         title: item.title ?? 'Untitled Meeting',
         meetingDate,
+        startDatetime,
+        endDatetime,
         organizer,
         participants,
       };

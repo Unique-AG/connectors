@@ -31,6 +31,8 @@ export class UniqueService {
       subject: string;
       startDateTime: Date;
       endDateTime: Date;
+      meetingStartDateTime: Date;
+      meetingEndDateTime: Date;
       contentCorrelationId: string;
       participants: { id?: string; name: string; email: string }[];
       owner: { id: string; name: string; email: string };
@@ -241,12 +243,16 @@ export class UniqueService {
 
   private buildContentMetadata(meeting: {
     startDateTime: Date;
+    meetingStartDateTime: Date;
+    meetingEndDateTime: Date;
     contentCorrelationId: string;
     owner: { name: string; email: string };
     participants: { name: string; email: string }[];
   }): Record<string, string> {
     const metadata: Record<string, string> = {
       date: meeting.startDateTime.toISOString(),
+      start_datetime: meeting.meetingStartDateTime.toISOString(),
+      end_datetime: meeting.meetingEndDateTime.toISOString(),
       content_correlation_id: meeting.contentCorrelationId,
       organizer_email: meeting.owner.email.toLowerCase(),
     };
