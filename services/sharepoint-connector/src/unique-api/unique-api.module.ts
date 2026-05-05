@@ -8,8 +8,7 @@ import {
 } from '../metrics';
 import { MetricsModule } from '../metrics/metrics.module';
 import { ProxyService } from '../proxy';
-import { BatchProcessorService } from '../shared/services/batch-processor.service';
-import { HttpClientService } from '../shared/services/http-client.service';
+import { SharedModule } from '../shared/shared.module';
 import { BottleneckFactory } from '../utils/bottleneck.factory';
 import { IngestionHttpClient } from './clients/ingestion-http.client';
 import {
@@ -25,7 +24,7 @@ import { UniqueScopesService } from './unique-scopes/unique-scopes.service';
 import { UniqueUsersService } from './unique-users/unique-users.service';
 
 @Module({
-  imports: [ConfigModule, MetricsModule],
+  imports: [ConfigModule, MetricsModule, SharedModule],
   providers: [
     UniqueAuthService,
     UniqueGroupsService,
@@ -33,9 +32,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
     UniqueFileIngestionService,
     UniqueFilesService,
     UniqueScopesService,
-    BatchProcessorService,
     BottleneckFactory,
-    HttpClientService,
     IngestionHttpClient,
     {
       provide: SCOPE_MANAGEMENT_CLIENT,

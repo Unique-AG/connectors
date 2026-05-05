@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { MimeTypeResolverService } from '../shared/services/mime-type-resolver.service';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
@@ -123,9 +124,6 @@ describe('ProcessingPipelineService', () => {
           if (key === 'processing.stepTimeoutSeconds') {
             return 30;
           }
-          if (key === 'processing.mimeTypeOverridesByExtension') {
-            return { '.csv': 'text/csv' };
-          }
           return undefined;
         }),
       }))
@@ -137,6 +135,10 @@ describe('ProcessingPipelineService', () => {
       .impl(() => mockSteps.uploadContent as unknown as UploadContentStep)
       .mock(IngestionFinalizationStep)
       .impl(() => mockSteps.ingestionFinalization as unknown as IngestionFinalizationStep)
+      .mock(MimeTypeResolverService)
+      .impl(() => ({
+        resolve: vi.fn(() => 'application/octet-stream'),
+      }))
       .mock(SPC_INGESTION_FILE_PROCESSED_TOTAL)
       .impl(() => ({
         add: vi.fn(),

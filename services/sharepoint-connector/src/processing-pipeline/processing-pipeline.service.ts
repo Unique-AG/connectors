@@ -7,6 +7,7 @@ import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { MimeTypeResolverService } from '../shared/services/mime-type-resolver.service';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { normalizeError, sanitizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
@@ -16,14 +17,12 @@ import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
 import type { IPipelineStep } from './steps/pipeline-step.interface';
 import { UploadContentStep } from './steps/upload-content.step';
 import type { PipelineResult, ProcessingContext } from './types/processing-context';
-import { resolveMimeType } from './utils/resolve-mime-type';
 
 @Injectable()
 export class ProcessingPipelineService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly pipelineSteps: IPipelineStep[];
   private readonly stepTimeoutMs: number;
-  private readonly mimeTypeOverridesByExtension: Record<string, string>;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -31,6 +30,7 @@ export class ProcessingPipelineService {
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly uploadContentStep: UploadContentStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
+    private readonly mimeTypeResolverService: MimeTypeResolverService,
     @Inject(SPC_INGESTION_FILE_PROCESSED_TOTAL)
     private readonly spcIngestionFileProcessedTotal: Counter,
   ) {
@@ -42,10 +42,6 @@ export class ProcessingPipelineService {
     ];
     this.stepTimeoutMs =
       this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
-    this.mimeTypeOverridesByExtension = this.configService.get(
-      'processing.mimeTypeOverridesByExtension',
-      { infer: true },
-    );
   }
 
   public async processItem(
@@ -134,10 +130,9 @@ export class ProcessingPipelineService {
     if (pipelineItem.itemType !== 'driveItem') {
       return DEFAULT_MIME_TYPE;
     }
-    return resolveMimeType(
+    return this.mimeTypeResolverService.resolve(
       pipelineItem.item.name,
       pipelineItem.item.file?.mimeType,
-      this.mimeTypeOverridesByExtension,
     );
   }
 

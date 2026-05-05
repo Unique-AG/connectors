@@ -1,8 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_MAX_FILE_SIZE_BYTES } from '../../constants/defaults.constants';
+import { DEFAULT_MAX_FILE_SIZE_BYTES, DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
+import { MimeTypeResolverService } from '../../shared/services/mime-type-resolver.service';
 import { FileFilterService } from './file-filter.service';
 import type { DriveItem } from './types/sharepoint.types';
 
@@ -97,6 +98,12 @@ describe('FileFilterService', () => {
           }
           return undefined;
         }),
+      }))
+      .mock(MimeTypeResolverService)
+      .impl(() => ({
+        resolve: vi.fn(
+          (_fileName: string, rawMimeType: string | undefined) => rawMimeType ?? DEFAULT_MIME_TYPE,
+        ),
       }))
       .compile();
 
