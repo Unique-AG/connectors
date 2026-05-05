@@ -46,6 +46,8 @@ export function registerBackendModule(): DynamicModule {
     ListCategoriesTool,
     CreateDraftEmailTool,
     LookupContactsTool,
+    SearchEmailsTool,
+    OpenEmailTool,
   ];
 
   const uniqueOnlyTools = isGraph
@@ -91,8 +93,6 @@ export function registerBackendModule(): DynamicModule {
       ...uniqueAndMicrosoftBackendCommonTools,
       ...uniqueOnlyTools,
       MailSubscriptionController,
-      SearchEmailsTool,
-      OpenEmailTool,
     ],
     controllers: [MailSubscriptionController],
   };
