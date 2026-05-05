@@ -160,8 +160,6 @@ export class TranscriptCreatedService {
         subject: meeting.subject ?? '',
         startDateTime: transcript.createdDateTime,
         endDateTime: transcript.endDateTime,
-        meetingStartDateTime: meeting.startDateTime,
-        meetingEndDateTime: meeting.endDateTime,
         contentCorrelationId: transcript.contentCorrelationId,
         owner: {
           id: meeting.participants.organizer.identity.user.id,
