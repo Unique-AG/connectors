@@ -160,3 +160,80 @@ tests:
       - equal:
           path: metadata.name
           value: sharepoint-connector-central-sales-demo-proxy-config
+
+  - it: "[UN-20317] processing config renders mimeTypeOverridesByExtension default"
+    template: tenant-config.yaml
+    set:
+      connectorConfig:
+        enabled: true
+        sharepoint:
+          tenantId: "test-tenant"
+          baseUrl: "https://test.sharepoint.com"
+          auth:
+            mode: certificate
+            clientId: "test-client"
+            privateKeyPath: /app/key.pem
+            thumbprintSha1: "aabbccdd"
+          sitesSource: config_file
+          sites:
+            - siteId: "00000000-0000-0000-0000-000000000000"
+              syncColumnName: Test
+              ingestionMode: flat
+              scopeId: scope_1
+              storeInternally: enabled
+              syncStatus: active
+              syncMode: content_only
+        unique:
+          authMode: cluster_local
+          ingestionServiceBaseUrl: "http://ingestion"
+          scopeManagementServiceBaseUrl: "http://scope-mgmt"
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "mimeTypeOverridesByExtension:"
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "\"\\.csv\": \"text/csv\""
+
+  - it: "[UN-20317] processing config renders custom mimeTypeOverridesByExtension"
+    template: tenant-config.yaml
+    set:
+      connectorConfig:
+        enabled: true
+        sharepoint:
+          tenantId: "test-tenant"
+          baseUrl: "https://test.sharepoint.com"
+          auth:
+            mode: certificate
+            clientId: "test-client"
+            privateKeyPath: /app/key.pem
+            thumbprintSha1: "aabbccdd"
+          sitesSource: config_file
+          sites:
+            - siteId: "00000000-0000-0000-0000-000000000000"
+              syncColumnName: Test
+              ingestionMode: flat
+              scopeId: scope_1
+              storeInternally: enabled
+              syncStatus: active
+              syncMode: content_only
+        unique:
+          authMode: cluster_local
+          ingestionServiceBaseUrl: "http://ingestion"
+          scopeManagementServiceBaseUrl: "http://scope-mgmt"
+        processing:
+          concurrency: 1
+          allowedMimeTypes:
+            - "application/pdf"
+          mimeTypeOverridesByExtension:
+            ".csv": "application/csv"
+            ".tar.gz": "application/gzip"
+    asserts:
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "\"\\.csv\": \"application/csv\""
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "\"\\.tar\\.gz\": \"application/gzip\""

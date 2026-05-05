@@ -550,6 +550,22 @@
               ],
               "description": "Maximum file size in bytes to ingest"
             },
+            "mimeTypeOverridesByExtension": {
+              "type": "object",
+              "description": "Map of file extension suffix to canonical MIME type. Overrides the SharePoint-reported mimeType. Keys must match one or more lowercase '.alphanumeric' segments (e.g. '.csv', '.tar.gz'). User-supplied values replace the default wholesale.",
+              "patternProperties": {
+                "^(\\.[a-z0-9]+)+$": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false,
+              "examples": [
+                {
+                  ".csv": "text/csv"
+                }
+              ]
+            },
             "scanIntervalCron": {
               "type": "string",
               "description": "Cron expression for the scheduled SharePoint scan interval",
