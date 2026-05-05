@@ -118,7 +118,8 @@ export function parseTranscriptMetadata(
 
   return {
     meetingDate: typeof metadata?.date === 'string' ? metadata.date : undefined,
-    startDatetime: typeof metadata?.start_datetime === 'string' ? metadata.start_datetime : undefined,
+    startDatetime:
+      typeof metadata?.start_datetime === 'string' ? metadata.start_datetime : undefined,
     endDatetime: typeof metadata?.end_datetime === 'string' ? metadata.end_datetime : undefined,
     organizer: typeof metadata?.organizer_name === 'string' ? metadata.organizer_name : undefined,
     participants: participants?.length ? participants : undefined,
