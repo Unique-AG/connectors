@@ -66,6 +66,7 @@ export const appConfig = registerConfig('app', ConfigSchema, {
     'SELF_URL',
     'MCP_DEBUG_MODE',
     'MCP_BACKEND',
+    'DIRECTORY_SYNC_CRON_SCHEDULE',
     // Delegated access
     'DELEGATED_ACCESS_SCAN',
     'DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE',

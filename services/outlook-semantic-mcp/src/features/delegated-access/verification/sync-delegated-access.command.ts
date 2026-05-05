@@ -78,14 +78,14 @@ export class SyncDelegatedAccessCommand {
     if (verificationResult.hasFullDelegatedAcces) {
       await this.db
         .delete(delegatedAccessDirectories)
-        .where(and(eq(delegatedAccessDirectories.pipelineId, pipelineId)));
+        .where(eq(delegatedAccessDirectories.pipelineId, pipelineId));
 
       await this.db
         .update(delegatedAccessPipelines)
         .set({
           hasFullDelegatedAccess: true,
         })
-        .where(and(eq(delegatedAccessDirectories.pipelineId, pipelineId)));
+        .where(eq(delegatedAccessPipelines.id, pipelineId));
       return;
     }
 

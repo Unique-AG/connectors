@@ -68,17 +68,19 @@ export class ListDirectoriesQuery {
       folders: ownTree,
     };
 
-    // Single query: join pipelines → allowed directory IDs → owner profiles → actual directories
-    const delegatedDirectoryRows = await this.db
-      .select({
-        ownerUserId: delegatedAccessPipelines.ownerUserId,
-        ownerEmail: userProfiles.email,
-        ownerDisplayName: userProfiles.displayName,
-        dirId: directories.id,
-        dirDisplayName: directories.displayName,
-        dirParentId: directories.parentId,
-        dirProviderDirectoryId: directories.providerDirectoryId,
-      })
+    const delegatedDirectoryRowsShape = {
+      ownerUserId: delegatedAccessPipelines.ownerUserId,
+      ownerEmail: userProfiles.email,
+      ownerDisplayName: userProfiles.displayName,
+      dirId: directories.id,
+      dirDisplayName: directories.displayName,
+      dirParentId: directories.parentId,
+      dirProviderDirectoryId: directories.providerDirectoryId,
+    };
+
+    // Directory-level delegated access: specific directories granted via delegatedAccessDirectories
+    const directoryLevelRows = await this.db
+      .select(delegatedDirectoryRowsShape)
       .from(delegatedAccessPipelines)
       .innerJoin(
         delegatedAccessDirectories,
@@ -93,7 +95,33 @@ export class ListDirectoriesQuery {
           eq(directories.ignoreForSync, false),
         ),
       )
-      .where(eq(delegatedAccessPipelines.delegateUserId, userProfileId));
+      .where(
+        and(
+          eq(delegatedAccessPipelines.delegateUserId, userProfileId),
+          eq(delegatedAccessPipelines.hasFullDelegatedAccess, false),
+        ),
+      );
+
+    // Full mailbox delegated access: all owner directories
+    const fullAccessRows = await this.db
+      .select(delegatedDirectoryRowsShape)
+      .from(delegatedAccessPipelines)
+      .innerJoin(userProfiles, eq(userProfiles.id, delegatedAccessPipelines.ownerUserId))
+      .innerJoin(
+        directories,
+        and(
+          eq(directories.userProfileId, delegatedAccessPipelines.ownerUserId),
+          eq(directories.ignoreForSync, false),
+        ),
+      )
+      .where(
+        and(
+          eq(delegatedAccessPipelines.delegateUserId, userProfileId),
+          eq(delegatedAccessPipelines.hasFullDelegatedAccess, true),
+        ),
+      );
+
+    const delegatedDirectoryRows = [...directoryLevelRows, ...fullAccessRows];
 
     if (delegatedDirectoryRows.length === 0) {
       return [ownMailbox];

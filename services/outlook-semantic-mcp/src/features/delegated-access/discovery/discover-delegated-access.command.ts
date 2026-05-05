@@ -338,17 +338,28 @@ export class DiscoverDelegatedAccessCommand {
       await client.api(`/users/${ownerEmail}/${apiEndpoint}`).top(1).select('id').get();
 
       const now = new Date();
+      const fieldsToUpsert =
+        apiEndpoint === 'messages'
+          ? {
+              lastDiscoveredAt: now,
+              hasFullDelegatedAccess: true,
+            }
+          : {
+              lastDiscoveredAt: now,
+              // if we did not check using the `messages` endpoint we do not flip hasFullDelegatedAccess to
+              // false because the sync-delegated-access.command.ts will flip that flag.
+            };
+
       await this.db
         .insert(delegatedAccessPipelines)
         .values({
+          ...fieldsToUpsert,
           delegateUserId,
           ownerUserId,
-          lastDiscoveredAt: now,
-          hasFullDelegatedAccess: apiEndpoint === 'messages',
         })
         .onConflictDoUpdate({
           target: [delegatedAccessPipelines.delegateUserId, delegatedAccessPipelines.ownerUserId],
-          set: { lastDiscoveredAt: now },
+          set: fieldsToUpsert,
         });
 
       this.logger.log({ delegateUserId, ownerUserId, msg: 'Delegated access discovered' });
