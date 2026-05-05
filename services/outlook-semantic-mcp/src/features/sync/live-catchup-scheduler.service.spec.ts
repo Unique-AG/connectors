@@ -44,7 +44,12 @@ function createMockDb({ liveCatchUpRows = [] as Array<{ subscriptionId: string }
 
 function createService({ amqp = createMockAmqp(), db = createMockDb() } = {}) {
   const schedulerRegistry = createMockSchedulerRegistry();
-  return new LiveCatchupSchedulerService(schedulerRegistry as any, amqp as any, {} as any, db as any);
+  return new LiveCatchupSchedulerService(
+    schedulerRegistry as any,
+    amqp as any,
+    {} as any,
+    db as any,
+  );
 }
 
 // ---------------------------------------------------------------------------

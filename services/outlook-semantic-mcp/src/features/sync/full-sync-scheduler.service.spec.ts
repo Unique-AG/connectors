@@ -40,7 +40,12 @@ function createMockDb({ rows = [] as Array<{ userProfileId: string }> } = {}) {
 
 function createService({ amqp = createMockAmqp(), db = createMockDb() } = {}) {
   const schedulerRegistry = createMockSchedulerRegistry();
-  return new FullSyncSchedulerService(schedulerRegistry as any, amqp as any, { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any, db as any);
+  return new FullSyncSchedulerService(
+    schedulerRegistry as any,
+    amqp as any,
+    { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
+    db as any,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +184,10 @@ describe('FullSyncRecoveryService', () => {
       const service = new FullSyncSchedulerService(
         schedulerRegistry as any,
         createMockAmqp() as any,
-        { mcpBackend: 'MicrosoftGraphAndUniqueApi', ingestionFullSyncRecoveryCron: '*/5 * * * *' } as any,
+        {
+          mcpBackend: 'MicrosoftGraphAndUniqueApi',
+          ingestionFullSyncRecoveryCron: '*/5 * * * *',
+        } as any,
         createMockDb() as any,
       );
 
