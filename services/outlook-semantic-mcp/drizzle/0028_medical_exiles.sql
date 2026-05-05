@@ -1,0 +1,1 @@
+ALTER TABLE "delegated_access_pipelines" ADD COLUMN "has_full_delegated_access" boolean DEFAULT false NOT NULL;
