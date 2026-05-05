@@ -191,7 +191,7 @@ export class MsGraphKqlSearchEmailsQuery {
 
         // We are filtering user mailbox + all delegates. We support at most 25 delegated access queries
         // This is a technical limit for a user in microsoft outlook
-        const delegatesToFilter = delegatedAccesses.slice(25);
+        const delegatesToFilter = delegatedAccesses.slice(0, 25);
         return [
           {
             requestId: getRequestId(),
@@ -237,14 +237,14 @@ export class MsGraphKqlSearchEmailsQuery {
     for (const batch of chunk(batchRequests, 20)) {
       let batchResponse: z.infer<typeof batchResponseSchema>;
       try {
-        const raw = await client.api('$batch').post(
-          batch.map((request) => ({
+        const raw = await client.api('$batch').post({
+          requests: batch.map((request) => ({
             id: request.requestId,
             method: 'GET',
             url: `/users/${request.mailbox}/messages?$search=${encodeURIComponent(`"${request.kqlQuery}"`)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,bodyPreview&$top=${request.limit}`,
             headers: { Prefer: 'outlook.body-content-type="text"' },
           })),
-        );
+        });
         batchResponse = batchResponseSchema.parse(raw);
       } catch {
         return {
