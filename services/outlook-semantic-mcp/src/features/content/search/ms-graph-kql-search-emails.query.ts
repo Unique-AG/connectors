@@ -109,17 +109,19 @@ export class MsGraphKqlSearchEmailsQuery {
       return { results: [], searchSummary: fetchResult.searchSummary };
     }
 
-    const idsTranslationMaps: Map<string, Map<string, string>> = new Map();
-    for (const [mailbox, hits] of Object.entries(
-      groupBy(fetchResult.hits, (item) => item.mailbox),
-    )) {
-      const translationMap = await this.translateGraphIdsToImmutableIdsQuery.run({
-        userProfileId: userProfile.id,
-        ids: hits.map(({ restId }) => restId),
-        ownerEmail: mailbox === userProfile.email ? undefined : mailbox,
-      });
-      idsTranslationMaps.set(mailbox, translationMap);
-    }
+    const hitsByMailbox = groupBy(fetchResult.hits, (item) => item.mailbox);
+    const idsTranslationMaps = new Map<string, Map<string, string>>(
+      await Promise.all(
+        Object.entries(hitsByMailbox).map(async ([mailbox, hits]) => {
+          const translationMap = await this.translateGraphIdsToImmutableIdsQuery.run({
+            userProfileId: userProfile.id,
+            ids: hits.map(({ restId }) => restId),
+            ownerEmail: mailbox === userProfile.email ? undefined : mailbox,
+          });
+          return [mailbox, translationMap] as const;
+        }),
+      ),
+    );
 
     const results: SearchEmailResult[] = [];
 

@@ -41,6 +41,16 @@ describe('sanitizeKqlQuery', () => {
       expect(sanitizeKqlQuery('from:anderson@example.com')).toBe('from:anderson@example.com');
       expect(sanitizeKqlQuery('subject:notable')).toBe('subject:notable');
     });
+
+    it('does not uppercase boolean keywords inside double-quoted phrases', () => {
+      expect(sanitizeKqlQuery('subject:"budget and planning"')).toBe(
+        'subject:"budget and planning"',
+      );
+      expect(sanitizeKqlQuery('body:"risk or return"')).toBe('body:"risk or return"');
+      expect(sanitizeKqlQuery('subject:"do not reply" AND from:alice@example.com')).toBe(
+        'subject:"do not reply" AND from:alice@example.com',
+      );
+    });
   });
 
   describe('date clamping', () => {

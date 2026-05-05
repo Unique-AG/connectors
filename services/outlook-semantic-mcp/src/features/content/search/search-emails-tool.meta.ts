@@ -25,6 +25,9 @@ const TOOL_FORMAT_INFORMATION = `## Email Display Rules
   2. **Deployment pipeline** was updated — the new CI/CD config requires all teams to re-trigger their staging builds. [open email](https://outlook.office.com/owa/?ItemID=AAkALgBB...&exvsurl=1&viewmodel=ReadMessageItem)
   ### Link rules (apply to ALL formats above)
   - NEVER show raw IDs (msGraphMessageId, uniqueContentId, folderId) to the user.
+  - NEVER construct or guess email URLs. When \`outlookWebLink\` is empty, show the subject as plain text only.
+  ### searchNotes
+  If the response includes a \`searchNotes\` field, display it to the user after the results — it contains context about the search run (e.g. folders excluded, mailboxes unavailable).
   ### Full listing example
   | Time | Sender | Subject |
   |------|--------|---------|
@@ -47,6 +50,7 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   - Attachment requirement ("with attachments", "PDFs from Alice") → \`hasAttachments\`
   - Folder mention ("in my Inbox", "from Sent Items") → \`directories\`
   - Category label ("tagged Important") → \`categories\`
+  - Company name, ticker, or person name that may appear **anywhere** in the email body (e.g. "emails mentioning UBS", "where Zach Greenwald is mentioned") → no structured filter applies here; rely on semantic \`search\` AND always add a KQL \`body:\` entry for exact-match recall (e.g. \`body:UBS\`, \`body:"Zach Greenwald"\`). Use \`participants:\` in KQL when the name may appear in any address field.
 
   When you are confident a signal maps to one of these filters, prefer expressing it in BOTH backends:
   1. As a \`conditions\` entry on every \`uniqueSemanticSearchQueries\` entry that targets the same intent. Semantic search honors structured filters and tends to produce sharper results when conditions are populated than when the same signal is encoded only in the natural-language \`search\` text. A common failure mode is to phrase the filter in \`search\` ("emails from alice@x.com about budget") and leave \`conditions\` empty — generally avoid that.
@@ -109,7 +113,8 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized — searching through them will not return results.
   For custom user-defined folders, call \`list_folders\` first to get the folder ID.
 
-  If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.`,
+  If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.
+  If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).`,
   toolFormatInformation: TOOL_FORMAT_INFORMATION,
 });
 
@@ -120,7 +125,9 @@ export const META_MS_GRAPH = createMeta({
   By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
   After returning results, inform the user that they can narrow the search with more specific KQL terms if needed.
 
-  Build precise KQL queries using supported property filters: from:, to:, cc:, subject:, body:, received>=, received<=, hasAttachment:, category:. Do NOT use folder: — it is not supported.
-  Combine clauses with AND/OR for complex searches. You can run multiple KQL queries in parallel (up to 20) for broader coverage.`,
+  Build precise KQL queries using supported property filters: from:, to:, cc:, subject:, body:, received>=, received<=, hasAttachment:, category:, participants:. Do NOT use folder: — it is not supported.
+  For entity/name mentions that may appear anywhere in the email (e.g. "emails mentioning UBS", "where Zach Greenwald appears"), always include a body: entry — e.g. body:UBS or body:"Zach Greenwald". Use participants: when the name may appear in any address field.
+  Combine clauses with AND/OR for complex searches. You can run multiple KQL queries in parallel (up to 10) for broader coverage.
+  If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).`,
   toolFormatInformation: TOOL_FORMAT_INFORMATION,
 });

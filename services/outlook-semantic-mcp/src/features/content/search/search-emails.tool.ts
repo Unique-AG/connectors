@@ -22,8 +22,8 @@ const SearchEmailsToolInputSchema = IS_MICROSOFT_GRAPH_BACKEND
   : SearchEmailsUnifiedInputSchema;
 
 const SearchEmailsToolDescription = IS_MICROSOFT_GRAPH_BACKEND
-  ? 'Search emails using Microsoft Graph KQL queries across your own and delegated mailboxes. Returns matched emails with an id per result.\n\nTo read the full body of a result, call `open_email_by_id` passing `msGraphMessageId` as `id` and `MsGraph` as `idType`.'
-  : 'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by a well-known folder (Inbox, Sent Items, Drafts, etc.) pass the name directly in `directories` — no need to call `list_folders`. For custom folders, call `list_folders` first to get the folder id. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` passing `uniqueContentId` (or `msGraphMessageId` if unavailable) as `id`, and `Unique` (or `MsGraph`) as `idType`. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete.';
+  ? 'Search emails using Microsoft Graph KQL queries across your own and delegated mailboxes. Returns matched emails with an id per result.\n\nTo read the full body of a result, call `open_email_by_id` passing `msGraphMessageId` as `id` and `MsGraph` as `idType`.\n\nIf the response includes `searchNotes`, display them to the user after results.'
+  : 'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by a well-known folder (Inbox, Sent Items, Drafts, etc.) pass the name directly in `directories` — no need to call `list_folders`. For custom folders, call `list_folders` first to get the folder id. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` passing `uniqueContentId` (or `msGraphMessageId` if unavailable) as `id`, and `Unique` (or `MsGraph`) as `idType`. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete. If the response includes `searchNotes`, display them to the user after results.';
 
 const SearchEmailResultSchema = z.object({
   uniqueContentId: z
@@ -44,7 +44,7 @@ const SearchEmailResultSchema = z.object({
       'ID of the folder containing this email. Internal identifier — do not display to the user.',
     ),
   title: z.string().describe('Subject line of the email.'),
-  from: z.string().describe('Sender of the email, in "Name <email>" or plain "email" format.'),
+  from: z.string().describe('Sender email address.'),
   receivedDateTime: z
     .string()
     .optional()
@@ -58,7 +58,7 @@ const SearchEmailResultSchema = z.object({
   outlookWebLink: z
     .string()
     .describe(
-      'Direct URL to open this email in Outlook on the web. Use as the primary link when non-empty; otherwise construct from `msGraphMessageId`.',
+      'Direct URL to open this email in Outlook on the web. When non-empty, use it as the link target. When empty (delegated mailbox results), do NOT construct a URL — show the subject as plain text instead.',
     ),
   sourceMailbox: z
     .string()
@@ -102,6 +102,12 @@ const SearchEmailsOutputSchema = z.object({
     .optional()
     .describe(
       'Present when email ingestion is still in progress or in an error state. Always display this to the user before showing results.',
+    ),
+  searchNotes: z
+    .string()
+    .optional()
+    .describe(
+      'Informational notes about the search run, e.g. unrecognized folders that were excluded or mailboxes that were partially unavailable. Display to the user after results when present.',
     ),
 });
 
@@ -153,6 +159,7 @@ export class SearchEmailsTool {
           success: true,
           syncWarning:
             'Search results may be inaccurate. Ingestion Statistics could not be fetched. Your inbox is in an unknown state try to use the tools `delete_inbox_data` and `reconnect_inbox` to get it into a proper state',
+          searchNotes: searchSummary,
           results,
         };
       }
@@ -161,11 +168,12 @@ export class SearchEmailsTool {
           success: true,
           syncWarning:
             'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox. The sync process synchronizes newest emails first.',
+          searchNotes: searchSummary,
           results,
         };
       }
     }
 
-    return { success: true, results, syncWarning: searchSummary };
+    return { success: true, results, searchNotes: searchSummary };
   }
 }

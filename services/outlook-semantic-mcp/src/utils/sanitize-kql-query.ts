@@ -26,8 +26,12 @@ export function sanitizeKqlQuery(kql: string): string {
       // Normalize Unicode smart/curly quotes to ASCII (LLMs sometimes emit these)
       .replace(/[‘’]/g, "'")
       .replace(/[“”]/g, '"')
-      // Uppercase boolean operators — KQL requires AND/OR/NOT in uppercase
-      .replace(/\b(and|or|not)\b/gi, (m) => m.toUpperCase())
+      // Uppercase boolean operators — KQL requires AND/OR/NOT in uppercase.
+      // The alternation skips content inside double-quoted phrases so that
+      // subject:"budget and planning" is not mangled into subject:"budget AND planning".
+      .replace(/"[^"]*"|\b(and|or|not)\b/gi, (match, group1: string | undefined) =>
+        group1 ? group1.toUpperCase() : match,
+      )
       // Clamp invalid dates in received>= / received<= / sent>= / sent<= filters
       .replace(
         /\b((?:received|sent)[<>]=?)(\d{4}-\d{2}-\d{2})\b/gi,
