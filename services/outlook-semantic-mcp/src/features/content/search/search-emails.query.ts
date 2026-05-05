@@ -9,10 +9,11 @@ import {
   SearchEmailResult,
   SemanticSearchEmailsQuery,
 } from './semantic-search-emails.query';
+import { Nullish } from '~/utils/nullish';
 
 export interface SearchEmailsToolInput {
   uniqueSemanticSearchQueries?: z.infer<typeof SearchEmailsInputSchema>[];
-  msGraphKeywordSearchQueries?: { kqlQuery: string; limit?: number }[];
+  msGraphKeywordSearchQueries?: { mailbox?: Nullish<string>; kqlQuery: string; limit?: number }[];
 }
 
 type BackendExecutor = (
