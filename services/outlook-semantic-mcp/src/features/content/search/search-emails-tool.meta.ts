@@ -62,7 +62,7 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   This combination is more reliable than relying on semantic relevance alone for listing or enumeration tasks.
 
   ## Complementing semantic search with KQL (msGraphKeywordSearchQueries)
-  ALWAYS include at least one entry in both \`uniqueSemanticSearchQueries\` and \`msGraphKeywordSearchQueries\` — the only exception is when the query is explicitly scoped to a delegated mailbox (KQL does not support delegated access). A single backend alone will miss results: semantic search may miss exact keyword hits; KQL will miss conceptual matches and attachment content.
+  ALWAYS include at least one entry in both \`uniqueSemanticSearchQueries\` and \`msGraphKeywordSearchQueries\`. A single backend alone will miss results: semantic search may miss exact keyword hits; KQL will miss conceptual matches and attachment content.
 
   The two backends cover different ground and their results are merged — semantic results are ranked first, then enriched with the KQL body excerpt when the same email was matched by both:
   - **Semantic** excels at: conceptual relevance, synonyms, natural-language intent, content inside attachments.

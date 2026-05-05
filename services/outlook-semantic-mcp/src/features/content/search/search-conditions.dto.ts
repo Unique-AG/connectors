@@ -191,7 +191,6 @@ export const MsGraphKqlQuerySchema = z.object({
     .nonempty()
     .describe(
       'KQL (Keyword Query Language) query string for Microsoft Graph email search.\n' +
-        "IMPORTANT: KQL search only filters the current user's own inbox — delegated-access mailboxes are NOT supported.\n" +
         'Supported property filters:\n' +
         '  from:<email>              — sender address (exact or domain, e.g. from:alice@example.com)\n' +
         '  to:<email>                — recipient in To field\n' +
@@ -248,20 +247,17 @@ export const SearchEmailsUnifiedInputSchema = z
           'Results from all searches are merged and deduplicated by email ID.',
       ),
     msGraphKeywordSearchQueries: MsGraphSearchParamsSchema.describe(
-      'REQUIRED unless the search is explicitly scoped to a delegated mailbox (KQL does not support delegated access). ' +
-        'KQL queries that address the SAME single user question as uniqueSemanticSearchQueries, expressed using keyword/lexical search. ' +
+      'KQL queries that address the SAME single user question as uniqueSemanticSearchQueries, expressed using keyword/lexical search. ' +
         'Use multiple entries to approach the same question from different angles (e.g. different keyword combinations, subject vs. body focus). ' +
-        "IMPORTANT: Microsoft Graph keyword search does NOT support delegated-access mailboxes — it only searches the current user's own mailbox. " +
         'Results from both backends are merged: semantic results are anchored first and enriched with the Graph body excerpt when the same email was matched by both. ' +
         'A single backend alone will miss results: semantic may miss exact keyword hits; KQL will miss conceptual matches and attachment content.',
     ),
   })
   .describe(
-    'IMPORTANT: ALWAYS populate both uniqueSemanticSearchQueries and msGraphKeywordSearchQueries — ' +
-      'the only exception is when the query is explicitly scoped to a delegated mailbox (KQL does not support delegated access). ' +
+    'IMPORTANT: ALWAYS populate both uniqueSemanticSearchQueries and msGraphKeywordSearchQueries. ' +
       'Both fields must address the SAME single user question, each using its own query language and approaching the question from different angles. ' +
       'Do NOT spread multiple unrelated user questions across the two fields. ' +
       'The two searches run in parallel and their results are merged to provide a broader and more reliable overview: ' +
-      'semantic search covers natural-language relevance, attachment content, and delegated-access mailboxes; ' +
-      'KQL covers lexical precision and full email-body excerpts (own mailbox only, no delegated access).',
+      'semantic search covers natural-language relevance and attachment content; ' +
+      'KQL covers lexical precision and full email-body excerpts.',
   );
