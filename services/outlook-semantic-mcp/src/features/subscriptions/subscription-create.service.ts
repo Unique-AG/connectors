@@ -198,11 +198,12 @@ export class SubscriptionCreateService {
 
     // We create the inbox configuration before we do the subscription because we do not want
     // to create a rance condition between webhook events and not having the subscription.
+    assert(this.config.mcpBackend === 'MicrosoftGraphAndUniqueApi');
     await this.db
       .insert(inboxConfigurations)
       .values({
         userProfileId,
-        filters: serializeMailFilters(this.config.defaultMailFilters),
+        filters: serializeMailFilters(this.config.ingestionDefaultMailFilters),
       })
       .onConflictDoNothing();
 

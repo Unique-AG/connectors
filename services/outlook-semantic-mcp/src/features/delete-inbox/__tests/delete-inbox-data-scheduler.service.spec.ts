@@ -11,7 +11,7 @@ const makeService = (deps: { db?: any; amqp?: any; schedulerRegistry?: any }) =>
   const amqp = deps.amqp ?? { publish: vi.fn().mockResolvedValue(true) };
   const db = deps.db ?? { select: vi.fn() };
 
-  const service = new DeleteInboxRecoveryService(schedulerRegistry, amqp, db);
+  const service = new DeleteInboxRecoveryService(schedulerRegistry, amqp, {} as any, db);
   // Prevent the real cron job from being registered during tests
   vi.spyOn(service as any, 'setupCronJob').mockImplementation(() => {});
   service.onModuleInit();
