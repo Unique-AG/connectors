@@ -6,6 +6,8 @@ import { RecordingCollection } from './transcript.dtos';
 export interface RecordingData {
   id: string;
   content: ReadableStream<Uint8Array<ArrayBuffer>>;
+  startDateTime: Date;
+  endDateTime: Date;
 }
 
 @Injectable()
@@ -74,7 +76,12 @@ export class TranscriptRecordingService {
         'Successfully fetched recording from MS Graph',
       );
 
-      return { id: recording.id, content: mp4Stream };
+      return {
+        id: recording.id,
+        content: mp4Stream,
+        startDateTime: recording.createdDateTime,
+        endDateTime: recording.endDateTime,
+      };
     } catch (error) {
       span?.addEvent('failed_to_retrieve_recording', {
         error: error instanceof Error ? error.message : String(error),
