@@ -29,6 +29,7 @@ export class UniqueService {
   public async ingestTranscript(
     meeting: {
       subject: string;
+      date: Date;
       startDateTime: Date;
       endDateTime: Date;
       contentCorrelationId: string;
@@ -46,7 +47,7 @@ export class UniqueService {
     const span = this.trace.getSpan();
     span?.setAttribute('transcript_id', transcript.id);
     span?.setAttribute('participant_count', meeting.participants.length);
-    span?.setAttribute('meeting_date', meeting.startDateTime.toISOString());
+    span?.setAttribute('meeting_date', meeting.date.toISOString());
     span?.setAttribute('owner_id', meeting.owner.id);
     if (recording) {
       span?.setAttribute('recording_id', recording.id);
@@ -57,7 +58,7 @@ export class UniqueService {
         transcriptId: transcript.id,
         recordingId: recording?.id,
         participantCount: meeting.participants.length,
-        meetingDate: meeting.startDateTime.toISOString(),
+        meetingDate: meeting.date.toISOString(),
       },
       'Beginning processing of meeting transcript for ingestion',
     );
@@ -91,10 +92,7 @@ export class UniqueService {
     );
 
     const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
-    const { subjectPath, datePath } = this.mapMeetingToRelativePaths(
-      meeting.subject,
-      meeting.startDateTime,
-    );
+    const { subjectPath, datePath } = this.mapMeetingToRelativePaths(meeting.subject, meeting.date);
 
     const parentScope = await this.scopeService.createScope(rootScopeId, subjectPath, false);
     span?.setAttribute('parent_scope_id', parentScope.id);
@@ -246,6 +244,7 @@ export class UniqueService {
 
   private buildContentMetadata(
     meeting: {
+      date: Date;
       startDateTime: Date;
       endDateTime: Date;
       contentCorrelationId: string;
@@ -257,7 +256,7 @@ export class UniqueService {
     const startDateTime = datetimeOverride?.startDateTime ?? meeting.startDateTime;
     const endDateTime = datetimeOverride?.endDateTime ?? meeting.endDateTime;
     const metadata: Record<string, string> = {
-      date: meeting.startDateTime.toISOString(),
+      date: meeting.date.toISOString(),
       start_datetime: startDateTime.toISOString(),
       end_datetime: endDateTime.toISOString(),
       content_correlation_id: meeting.contentCorrelationId,
