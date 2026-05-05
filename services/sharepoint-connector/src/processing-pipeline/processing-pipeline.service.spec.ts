@@ -123,6 +123,9 @@ describe('ProcessingPipelineService', () => {
           if (key === 'processing.stepTimeoutSeconds') {
             return 30;
           }
+          if (key === 'processing.mimeTypeOverridesByExtension') {
+            return { '.csv': 'text/csv' };
+          }
           return undefined;
         }),
       }))

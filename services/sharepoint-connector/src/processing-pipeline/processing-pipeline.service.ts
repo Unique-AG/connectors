@@ -16,12 +16,14 @@ import { IngestionFinalizationStep } from './steps/ingestion-finalization.step';
 import type { IPipelineStep } from './steps/pipeline-step.interface';
 import { UploadContentStep } from './steps/upload-content.step';
 import type { PipelineResult, ProcessingContext } from './types/processing-context';
+import { resolveMimeType } from './utils/resolve-mime-type';
 
 @Injectable()
 export class ProcessingPipelineService {
   private readonly logger = new Logger(this.constructor.name);
   private readonly pipelineSteps: IPipelineStep[];
   private readonly stepTimeoutMs: number;
+  private readonly mimeTypeOverridesByExtension: Record<string, string>;
 
   public constructor(
     private readonly configService: ConfigService<Config, true>,
@@ -40,6 +42,10 @@ export class ProcessingPipelineService {
     ];
     this.stepTimeoutMs =
       this.configService.get('processing.stepTimeoutSeconds', { infer: true }) * 1000;
+    this.mimeTypeOverridesByExtension = this.configService.get(
+      'processing.mimeTypeOverridesByExtension',
+      { infer: true },
+    );
   }
 
   public async processItem(
@@ -57,7 +63,7 @@ export class ProcessingPipelineService {
       pipelineItem,
       startTime,
       knowledgeBaseUrl: getItemUrl(pipelineItem),
-      mimeType: this.resolveMimeType(pipelineItem),
+      mimeType: this.resolveItemMimeType(pipelineItem),
       targetScopeId: scopeId,
       fileStatus,
     };
@@ -124,10 +130,15 @@ export class ProcessingPipelineService {
     return { success: true };
   }
 
-  private resolveMimeType(pipelineItem: SharepointContentItem): string {
-    const isDriveItem = pipelineItem.itemType === 'driveItem';
-    const mimeType = isDriveItem ? pipelineItem.item.file?.mimeType : undefined;
-    return mimeType ?? DEFAULT_MIME_TYPE;
+  private resolveItemMimeType(pipelineItem: SharepointContentItem): string {
+    if (pipelineItem.itemType !== 'driveItem') {
+      return DEFAULT_MIME_TYPE;
+    }
+    return resolveMimeType(
+      pipelineItem.item.name,
+      pipelineItem.item.file?.mimeType,
+      this.mimeTypeOverridesByExtension,
+    );
   }
 
   // Executes a pipeline step with a timeout. We use a custom Promise implementation instead of
