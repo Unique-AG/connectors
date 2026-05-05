@@ -141,8 +141,9 @@ describe('SyncDelegatedAccessCommand', () => {
   });
 
   it('upserts directory row when message fetch returns 200 for an accessible folder', async () => {
-    // folders list → one folder; messages fetch → success
+    // preliminary full-access check → 403 (not full access), then folder list, then per-folder messages
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] }) // mailFolders
       .mockResolvedValueOnce({ value: [] }); // messages (200, empty)
 
@@ -162,6 +163,7 @@ describe('SyncDelegatedAccessCommand', () => {
 
   it('deletes directory row on 403 response from message fetch', async () => {
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
       .mockRejectedValueOnce(makeGraphError(403));
 
@@ -176,6 +178,7 @@ describe('SyncDelegatedAccessCommand', () => {
 
   it('deletes directory row on 404 response from message fetch', async () => {
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
       .mockRejectedValueOnce(makeGraphError(404));
 
@@ -190,6 +193,7 @@ describe('SyncDelegatedAccessCommand', () => {
 
   it('skips folder on 429 — no upsert, throws transient error', async () => {
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
       .mockRejectedValueOnce(makeGraphError(429));
 
@@ -203,6 +207,7 @@ describe('SyncDelegatedAccessCommand', () => {
 
   it('skips folder on 5xx — no upsert, throws transient error', async () => {
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
       .mockRejectedValueOnce(makeGraphError(503));
 
@@ -216,6 +221,7 @@ describe('SyncDelegatedAccessCommand', () => {
 
   it('does NOT update lastVerifiedAt when a 429 transient error occurred on any folder', async () => {
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }, { id: FOLDER_ID_2 }] })
       .mockResolvedValueOnce({ value: [] }) // FOLDER_ID_1 succeeds
       .mockRejectedValueOnce(makeGraphError(429)); // FOLDER_ID_2 rate limited
@@ -225,11 +231,14 @@ describe('SyncDelegatedAccessCommand', () => {
 
     await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
 
-    expect(db.__update).not.toHaveBeenCalled();
+    expect(db.__updateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
+    );
   });
 
   it('does NOT update lastVerifiedAt when a 5xx transient error occurred on any folder', async () => {
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }, { id: FOLDER_ID_2 }] })
       .mockResolvedValueOnce({ value: [] }) // FOLDER_ID_1 succeeds
       .mockRejectedValueOnce(makeGraphError(500)); // FOLDER_ID_2 transient
@@ -239,11 +248,14 @@ describe('SyncDelegatedAccessCommand', () => {
 
     await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
 
-    expect(db.__update).not.toHaveBeenCalled();
+    expect(db.__updateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
+    );
   });
 
   it('deletes pipeline row when zero directory rows remain after processing all folders', async () => {
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
       .mockRejectedValueOnce(makeGraphError(403));
 
@@ -255,12 +267,15 @@ describe('SyncDelegatedAccessCommand', () => {
     // The last delete call should be for the pipeline row
     const deleteCalls = db.__delete.mock.calls;
     expect(deleteCalls.length).toBeGreaterThanOrEqual(1);
-    // pipeline delete is called (it receives delegatedAccessPipeline table reference)
-    expect(db.__update).not.toHaveBeenCalled();
+    // lastVerifiedAt is NOT updated — pipeline was deleted instead
+    expect(db.__updateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
+    );
   });
 
   it('does NOT delete pipeline row when dirCount is 0 but a transient 5xx error occurred', async () => {
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
       .mockRejectedValueOnce(makeGraphError(503));
 
@@ -271,11 +286,14 @@ describe('SyncDelegatedAccessCommand', () => {
 
     // Only the directory delete is called, not the pipeline delete
     expect(db.__delete).toHaveBeenCalledOnce();
-    expect(db.__update).not.toHaveBeenCalled();
+    expect(db.__updateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
+    );
   });
 
   it('does NOT delete pipeline row when at least one directory row exists, and updates lastVerifiedAt', async () => {
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
       .mockResolvedValueOnce({ value: [{ id: 'msg-1' }] });
 
@@ -284,7 +302,8 @@ describe('SyncDelegatedAccessCommand', () => {
 
     await command.run({ pipelineId: PIPELINE_ID });
 
-    expect(db.__update).toHaveBeenCalledOnce();
+    // update is called twice: once for hasFullDelegatedAccess:false, once for lastVerifiedAt
+    expect(db.__update).toHaveBeenCalledTimes(2);
     expect(db.__updateSet).toHaveBeenCalledWith(
       expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
     );
@@ -292,6 +311,7 @@ describe('SyncDelegatedAccessCommand', () => {
 
   it('processes multiple folders — upserts accessible ones, deletes inaccessible ones', async () => {
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({
         value: [{ id: FOLDER_ID_1 }, { id: FOLDER_ID_2 }, { id: FOLDER_ID_3 }],
       })
@@ -306,7 +326,8 @@ describe('SyncDelegatedAccessCommand', () => {
 
     expect(db.__insert).toHaveBeenCalledOnce(); // batch insert of FOLDER_ID_1 and FOLDER_ID_3
     expect(db.__delete).toHaveBeenCalledOnce(); // directories delete
-    expect(db.__update).toHaveBeenCalledOnce(); // lastVerifiedAt update
+    // update called twice: hasFullDelegatedAccess:false + lastVerifiedAt
+    expect(db.__update).toHaveBeenCalledTimes(2);
   });
 
   it('paginates folder list when @odata.nextLink is present', async () => {
@@ -314,6 +335,7 @@ describe('SyncDelegatedAccessCommand', () => {
       'https://graph.microsoft.com/v1.0/users/owner@example.com/mailFolders?$skiptoken=abc';
 
     graphApi.get
+      .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }], '@odata.nextLink': nextLinkUrl })
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_2 }] }) // next page (no nextLink)
       .mockResolvedValueOnce({ value: [] }) // FOLDER_ID_1 messages

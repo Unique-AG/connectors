@@ -159,22 +159,8 @@ function createMockQuery(
 ) {
   const { delegatedAccesses = [], searchResults = [[]], searchErrors = [] } = opts;
 
-  const selectChain: Record<string, ReturnType<typeof vi.fn>> = {
-    innerJoin: vi.fn(),
-    where: vi.fn().mockReturnValue({
-      groupBy: vi.fn().mockResolvedValue(delegatedAccesses),
-    }),
-  };
-  selectChain.innerJoin?.mockReturnValue(selectChain);
-
-  const db = {
-    selectDistinct: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue('subquery') }),
-    }),
-    select: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue(selectChain),
-    }),
-  };
+  // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
+  const getDelegtedAccessQuery = { run: vi.fn().mockResolvedValue(delegatedAccesses) } as any;
 
   let searchCallIndex = 0;
   const contentSearch = vi.fn().mockImplementation(() => {
@@ -209,8 +195,6 @@ function createMockQuery(
       ),
   };
 
-  // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
-  const dbMock = db as any;
   const apiObj = {
     content: { search: contentSearch },
     scopes: { getByExternalIds: scopesGetByExternalIds },
@@ -221,7 +205,7 @@ function createMockQuery(
   const profileMock = getUserProfileQuery as any;
   // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
   const sanitizeMock = sanitize as any;
-  const instance = new SemanticSearchEmailsQuery(dbMock, apiMock, profileMock, sanitizeMock);
+  const instance = new SemanticSearchEmailsQuery(getDelegtedAccessQuery, apiMock, profileMock, sanitizeMock);
 
   return { instance, contentSearch };
 }

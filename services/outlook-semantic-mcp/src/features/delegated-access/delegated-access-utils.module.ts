@@ -6,6 +6,7 @@ import { DrizzleModule } from '~/db/drizzle.module';
 import { GetDelegtedAccessQuery } from './queries/get-delegates-access.query';
 import { GetDirectoryDelegatedAccessQuery } from './queries/get-directory-delegated-access.query';
 import { GetFullDelegatedAccessQuery } from './queries/get-full-delegated-access.query';
+import { GetMailboxesWithFullDelegatedAccessQuery } from './queries/get-mailboxes-with-full-delegated-access.query';
 
 @Module({
   imports: [DrizzleModule, ConfigModule],
@@ -13,7 +14,8 @@ import { GetFullDelegatedAccessQuery } from './queries/get-full-delegated-access
     GetFullDelegatedAccessQuery,
     GetDirectoryDelegatedAccessQuery,
     GetDelegtedAccessQuery,
+    GetMailboxesWithFullDelegatedAccessQuery,
   ],
-  exports: [GetFullDelegatedAccessQuery, GetDelegtedAccessQuery],
+  exports: [GetFullDelegatedAccessQuery, GetDelegtedAccessQuery, GetMailboxesWithFullDelegatedAccessQuery],
 })
 export class DelegatedAccessUtilsModule {}
