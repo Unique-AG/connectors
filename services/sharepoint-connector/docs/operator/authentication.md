@@ -8,10 +8,12 @@ The SharePoint Connector authenticates with Microsoft services using Azure AD (M
 
 ## Authentication Methods
 
-| Method | Use Case | Recommended |
-|--------|----------|-------------|
-| Certificate | Production environments | Yes |
-| Client Secret | Development/testing only | No |
+
+| Method        | Use Case                 | Recommended |
+| ------------- | ------------------------ | ----------- |
+| Certificate   | Production environments  | Yes         |
+| Client Secret | Development/testing only | No          |
+
 
 **Certificate authentication** is the recommended method for production. It uses an X.509 certificate to obtain OAuth2 access tokens from Entra ID.
 **OIDC is currently not supported** for this connector. Client secret remains a fallback for non-production use and is discouraged for enterprise production deployments.
@@ -34,54 +36,59 @@ The connector requires a service user in Unique with the following permissions:
 4. Note the user ID for configuration
 
 For detailed instructions, see:
+
 - [How To Configure A Service User](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075)
 - [Understand Roles and Permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023168)
 
 ### 2. Create Azure AD Application Registration
 
+**Self-hosted only:** Complete this step when your organization hosts the connector and manages the Entra app registration yourself. If [Unique hosts the connector](../technical/architecture.md#single-tenant-unique-hosted) (see [Hosting models](../technical/architecture.md#hosting-models)), Unique manages the app registration—skip this step.
+
 #### Required Permissions
 
 **Microsoft Graph** (for content sync):
 
-| Permission | Type | Description |
-|------------|------|-------------|
-| `Sites.Selected` | Application | Fetch sites, folders, and content (if site-specific access) |
+
+| Permission                          | Type        | Description                                                        |
+| ----------------------------------- | ----------- | ------------------------------------------------------------------ |
+| `Sites.Selected`                    | Application | Fetch sites, folders, and content (if site-specific access)        |
 | `Lists.SelectedOperations.Selected` | Application | Fetch content from specific libraries (if library-specific access) |
+
 
 **Microsoft Graph** (for permission sync - optional):
 
-| Permission | Type | Description |
-|------------|------|-------------|
+
+| Permission             | Type        | Description        |
+| ---------------------- | ----------- | ------------------ |
 | `GroupMember.Read.All` | Application | Read group members |
-| `User.ReadBasic.All` | Application | Read user details |
+| `User.ReadBasic.All`   | Application | Read user details  |
+
 
 **SharePoint REST API** (for permission sync - optional):
 
-| Permission | Type | Description |
-|------------|------|-------------|
+
+| Permission       | Type        | Description                  |
+| ---------------- | ----------- | ---------------------------- |
 | `Sites.Selected` | Application | Read site groups and members |
+
 
 #### Registration Steps
 
 1. Go to [Azure Portal](https://portal.azure.com) → **Azure Active Directory** → **App registrations**
-
 2. Click **New registration**:
-   - Name: `Unique SharePoint Connector`
-   - Supported account types: **Accounts in this organizational directory only**
-   - Redirect URI: Leave empty
-
+  - Name: `Unique SharePoint Connector`
+  - Supported account types: **Accounts in this organizational directory only**
+  - Redirect URI: Leave empty
 3. Note the **Application (client) ID** and **Directory (tenant) ID**
-
 4. Go to **API permissions** → **Add a permission**:
-   - Select **Microsoft Graph** → **Application permissions**:
-     - Add `Sites.Selected` (for site-specific access)
-     - Add `Lists.SelectedOperations.Selected` (for library-specific access)
-   - If permission sync is enabled, also add:
-     - `GroupMember.Read.All`
-     - `User.ReadBasic.All`
-   - Select **SharePoint** → **Application permissions**:
-     - Add `Sites.Selected` (required for permission sync to read site groups)
-
+  - Select **Microsoft Graph** → **Application permissions**:
+    - Add `Sites.Selected` (for site-specific access)
+    - Add `Lists.SelectedOperations.Selected` (for library-specific access)
+  - If permission sync is enabled, also add:
+    - `GroupMember.Read.All`
+    - `User.ReadBasic.All`
+  - Select **SharePoint** → **Application permissions**:
+    - Add `Sites.Selected` (required for permission sync to read site groups)
 5. Click **Grant admin consent for [Your Organization]**
 
 ### 3. Create Azure AD Service Principal
@@ -97,6 +104,8 @@ https://login.microsoftonline.com/{tenant-id}/v2.0/adminconsent
   ?client_id={your-app-id}
   &scope=https://graph.microsoft.com/.default
 ```
+
+**Note:** Because this connector is a server-side application, the app registration typically has **no redirect/reply URL** configured. After granting consent, Microsoft may show an `AADSTS500113: No reply address is registered for the application` message that looks like a sign-in error. In this flow you can ignore it and verify success in Azure Portal → **Enterprise applications** → your app → **Permissions** (or **API permissions** in the app registration) where admin consent is marked as granted.
 
 **Option 2: Azure CLI**
 
@@ -332,6 +341,8 @@ flowchart LR
     Connector --> UniqueAPI
 ```
 
+
+
 ### Single-Tenant: Client-Hosted Connector
 
 Client hosts connector within their infrastructure, connecting to Unique Single Tenant:
@@ -373,6 +384,8 @@ sequenceDiagram
     Graph->>Connector: Site data
 ```
 
+
+
 ### Token Endpoint
 
 ```
@@ -411,11 +424,13 @@ When using permission sync, the app principal must be able to read site group me
 **Symptom:** `AADSTS700016: Application with identifier 'xxx' was not found`
 
 **Causes:**
+
 - App registration not found in the tenant
 - Service principal not created
 - Wrong tenant ID
 
 **Resolution:**
+
 1. Verify app registration exists
 2. Create service principal via admin consent
 3. Check tenant ID configuration
@@ -425,11 +440,13 @@ When using permission sync, the app principal must be able to read site group me
 **Symptom:** `AADSTS700027: Client assertion contains an invalid signature`
 
 **Causes:**
+
 - Wrong certificate uploaded to Azure
 - Certificate expired
 - Private key doesn't match certificate
 
 **Resolution:**
+
 1. Re-upload certificate to Azure AD
 2. Generate new certificate if expired
 3. Verify certificate and key match
@@ -439,9 +456,11 @@ When using permission sync, the app principal must be able to read site group me
 **Symptom:** `secretOrPrivateKey must be an asymmetric key when using RS256`
 
 **Cause:**
+
 - The connector received key material in an unsupported format (for example a plain secret string instead of file-based PEM/asymmetric key content).
 
 **Resolution:**
+
 1. Provide the private key to the connector as file content in supported PEM/asymmetric format.
 2. Ensure the key matches the uploaded certificate.
 3. If using KeyVault-backed configuration, make sure the secret value contains valid key file content rather than unrelated or transformed text.
@@ -451,15 +470,17 @@ When using permission sync, the app principal must be able to read site group me
 **Symptom:** `403 Forbidden` when accessing sites or libraries
 
 **Causes:**
+
 - `Sites.Selected` or `Lists.SelectedOperations.Selected` permission not granted for the site/library
 - Admin consent not completed
 - **Permission scope mismatch:** The app registration has `Sites.Selected` but the admin granted **library-level** access (via `-List` parameter). Library-level grants require `Lists.SelectedOperations.Selected` on the app registration — `Sites.Selected` alone does not cover them and will return 403.
 
 **Resolution:**
+
 1. Verify the app registration includes the correct permission for the type of grant issued:
-   - Site-level grants → `Sites.Selected`
-   - Library-level grants → `Lists.SelectedOperations.Selected`
-   - Mixed → both permissions (recommended default)
+  - Site-level grants → `Sites.Selected`
+  - Library-level grants → `Lists.SelectedOperations.Selected`
+  - Mixed → both permissions (recommended default)
 2. Grant site or library access via PowerShell
 3. Complete admin consent in Azure Portal
 
@@ -483,11 +504,14 @@ Mount the PEM file containing the additional CA certificates into the pod and po
 **Symptom:** `Site not found` or `404` errors
 
 **Causes:**
+
 - Incorrect site ID
 - Site deleted or renamed
 - No access to site
 
 **Resolution:**
+
 1. Verify site ID using Graph Explorer
 2. Re-grant site access if renamed
 3. Check site exists in SharePoint
+

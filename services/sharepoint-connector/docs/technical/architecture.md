@@ -257,9 +257,9 @@ Unique hosts the connector on behalf of the client:
 - Client provides:
   - SharePoint URL
   - Tenant ID
-  - Site configuration (one of):
-    - Site IDs and settings via YAML configuration, or
-    - SharePoint list location for dynamic configuration
+- Site configuration (one of):
+  - Site IDs and settings via YAML configuration, or
+  - SharePoint list location for dynamic configuration
 
 ## System Scalability and Resource Sizing
 
