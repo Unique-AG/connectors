@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { boolean, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
@@ -22,6 +22,7 @@ export const delegatedAccessPipelines = pgTable(
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
+    hasFullDelegatedAccess: boolean(`has_full_delegated_access`).notNull().default(false),
     lastDiscoveredAt: timestamp(`last_discovered_at`),
     lastVerifiedAt: timestamp(`last_verified_at`),
 

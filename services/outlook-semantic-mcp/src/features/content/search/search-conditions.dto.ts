@@ -178,6 +178,14 @@ export const SearchEmailsInputSchema = z.object({
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
 
 export const MsGraphKqlQuerySchema = z.object({
+  mailbox: z
+    .email()
+    .describe(
+      `Scope this entire search to one mailbox (exact email address match, no wildcards). ` +
+        `When omitted, all accessible mailboxes (own + delegated) are searched. ` +
+        `Use the \`list_folders\` tool to discover which mailboxes are available for the current user.`,
+    )
+    .optional(),
   kqlQuery: z
     .string()
     .nonempty()
@@ -231,24 +239,27 @@ export const SearchEmailsUnifiedInputSchema = z
       .max(10)
       .describe(
         'List of semantic searches to execute in parallel (at most 10). ALL entries must address the SAME single user question — do NOT pack unrelated questions into this array. ' +
-          'Use multiple entries only to approach the same question from different angles ' +
-          '(e.g. trying different phrasings, synonyms, or narrower vs. broader terms for the same intent). ' +
+          'A single phrasing often misses relevant emails — always compose 2–4 parallel entries that approach the question from different angles: ' +
+          '(1) different phrasings or synonyms (e.g. "project kick-off" vs "project launch"); ' +
+          '(2) narrower vs. broader scope — one with tight conditions, one with a broader search term and no conditions; ' +
+          '(3) different condition combinations (e.g. one entry scoped to "Inbox", another to "Sent Items") to capture both sides of a conversation; ' +
+          '(4) perspective shift (e.g. "emails I sent about the merger" vs "emails I received about the merger"). ' +
           'IMPORTANT: uniqueSemanticSearchQueries supports delegated-access mailboxes — use the mailbox field to scope searches to specific mailboxes including delegated ones. ' +
           'Results from all searches are merged and deduplicated by email ID.',
       ),
     msGraphKeywordSearchQueries: MsGraphSearchParamsSchema.describe(
-      'KQL queries that address the SAME single user question as uniqueSemanticSearchQueries, expressed using keyword/lexical search. ' +
+      'REQUIRED unless the search is explicitly scoped to a delegated mailbox (KQL does not support delegated access). ' +
+        'KQL queries that address the SAME single user question as uniqueSemanticSearchQueries, expressed using keyword/lexical search. ' +
         'Use multiple entries to approach the same question from different angles (e.g. different keyword combinations, subject vs. body focus). ' +
         "IMPORTANT: Microsoft Graph keyword search does NOT support delegated-access mailboxes — it only searches the current user's own mailbox. " +
-        'When provided, results from both backends are merged: semantic results are anchored first ' +
-        'and enriched with the Graph body excerpt when the same email was matched by both. ' +
-        'Always try to fill this alongside uniqueSemanticSearchQueries — the combined result gives a ' +
-        'more complete picture than either search alone.',
+        'Results from both backends are merged: semantic results are anchored first and enriched with the Graph body excerpt when the same email was matched by both. ' +
+        'A single backend alone will miss results: semantic may miss exact keyword hits; KQL will miss conceptual matches and attachment content.',
     ),
   })
   .describe(
-    'IMPORTANT: uniqueSemanticSearchQueries and msGraphKeywordSearchQueries must both address the SAME single user question — ' +
-      'each using its own query language and approaching the question from different angles. ' +
+    'IMPORTANT: ALWAYS populate both uniqueSemanticSearchQueries and msGraphKeywordSearchQueries — ' +
+      'the only exception is when the query is explicitly scoped to a delegated mailbox (KQL does not support delegated access). ' +
+      'Both fields must address the SAME single user question, each using its own query language and approaching the question from different angles. ' +
       'Do NOT spread multiple unrelated user questions across the two fields. ' +
       'The two searches run in parallel and their results are merged to provide a broader and more reliable overview: ' +
       'semantic search covers natural-language relevance, attachment content, and delegated-access mailboxes; ' +

@@ -5,6 +5,7 @@ import { CronJob } from 'cron';
 import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
 import z from 'zod';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
+import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { traceEvent } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
@@ -15,8 +16,6 @@ import {
 } from './live-catch-up/live-catch-up.command';
 import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 
-const RECOVERY_CRON_SCHEDULE = '*/5 * * * *';
-
 @Injectable()
 export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
@@ -25,6 +24,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -33,6 +33,10 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
   }
 
   public onModuleDestroy() {
+    if (this.config.mcpBackend !== 'MicrosoftGraphAndUniqueApi') {
+      return;
+    }
+
     this.logger.log({ msg: 'LiveCatchupSchedulerService is shutting down...' });
     this.isShuttingDown = true;
     try {
@@ -47,7 +51,11 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
   }
 
   private setupCronJob(): void {
-    const job = new CronJob(RECOVERY_CRON_SCHEDULE, () => {
+    if (this.config.mcpBackend !== 'MicrosoftGraphAndUniqueApi') {
+      return;
+    }
+
+    const job = new CronJob(this.config.ingestionLiveCatchupRecovery, () => {
       this.runRecoveryScan();
       this.runReadyLiveCatchupsWhichDidNotRunRecently();
     });

@@ -5,20 +5,12 @@ import {
   type UniqueApiClient,
   UniqueQLOperator,
 } from '@unique-ag/unique-api';
-import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNotNull, notInArray, sql } from 'drizzle-orm';
+import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, isNullish, map, pick, pipe, sortBy } from 'remeda';
 import * as z from 'zod';
-import {
-  DRIZZLE,
-  type DrizzleDatabase,
-  delegatedAccessDirectories,
-  delegatedAccessPipelines,
-  directories,
-  UserProfile,
-  userProfiles,
-} from '~/db';
+import { UserProfile } from '~/db';
+import { GetDelegtedAccessQuery } from '~/features/delegated-access/queries/get-delegates-access.query';
 import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { traceError } from '~/features/tracing.utils';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
@@ -82,7 +74,7 @@ type SearchJobInput = { isScoped: false } | ValidSearchJobInput;
 @Injectable()
 export class SemanticSearchEmailsQuery {
   public constructor(
-    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    private readonly getDelegtedAccessQuery: GetDelegtedAccessQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly sanitizeSearchConditionsForUserQuery: SanitizeSearchConditionsForUserQuery,
@@ -194,38 +186,7 @@ export class SemanticSearchEmailsQuery {
   private async loadAccessContext(
     userProfile: NonNullishProps<UserProfile, 'email'>,
   ): Promise<AccessContext> {
-    const directoriesIgnoredForSync = this.db
-      .selectDistinct({ microsoftDirectoryId: directories.providerDirectoryId })
-      .from(directories)
-      .where(eq(directories.ignoreForSync, true));
-
-    const delegatedAccesses = await this.db
-      .select({
-        ownerUserEmail: sql<string>`${userProfiles.email}`,
-        ownerUserId: delegatedAccessPipelines.ownerUserId,
-        ownerProviderUserId: sql<string>`${userProfiles.providerUserId}`,
-        msGraphDirectoryIds: sql<string[]>`array_agg(${delegatedAccessDirectories.directoryId})`,
-      })
-      .from(delegatedAccessPipelines)
-      .innerJoin(
-        delegatedAccessDirectories,
-        eq(delegatedAccessPipelines.id, delegatedAccessDirectories.pipelineId),
-      )
-      .innerJoin(userProfiles, eq(delegatedAccessPipelines.ownerUserId, userProfiles.id))
-      .where(
-        and(
-          isNotNull(userProfiles.providerUserId),
-          isNotNull(userProfiles.email),
-          eq(delegatedAccessPipelines.delegateUserId, userProfile.id),
-          notInArray(delegatedAccessDirectories.directoryId, directoriesIgnoredForSync),
-        ),
-      )
-      .groupBy(
-        userProfiles.providerUserId,
-        userProfiles.email,
-        delegatedAccessPipelines.ownerUserId,
-      );
-
+    const delegatedAccesses = await this.getDelegtedAccessQuery.run(userProfile.id);
     const scopes = await this.uniqueApi.scopes.getByExternalIds([
       getRootScopeExternalId(),
       getRootScopeExternalIdForUser(userProfile.providerUserId),

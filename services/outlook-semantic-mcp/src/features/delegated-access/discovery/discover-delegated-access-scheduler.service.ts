@@ -22,6 +22,9 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
   }
 
   public onModuleDestroy() {
+    if (this.config.delegatedAccessScan === 'disabled') {
+      return;
+    }
     this.logger.log({ msg: 'DiscoverDelegatedAccessSchedulerService is shutting down...' });
     this.isShuttingDown = true;
     try {
@@ -33,6 +36,9 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
   }
 
   private setupCronJob(): void {
+    if (this.config.delegatedAccessScan === 'disabled') {
+      return;
+    }
     const job = new CronJob(this.config.delegatedAccessDiscoveryCronSchedule, async () => {
       try {
         await this.triggerDiscovery();

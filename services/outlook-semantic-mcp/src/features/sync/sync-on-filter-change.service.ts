@@ -13,7 +13,10 @@ export class SyncOnFilterChangeService implements OnModuleInit {
   ) {}
 
   public async onModuleInit(): Promise<void> {
-    const defaultFilters = serializeMailFilters(this.config.defaultMailFilters);
+    if (this.config.mcpBackend !== 'MicrosoftGraphAndUniqueApi') {
+      return;
+    }
+    const defaultFilters = serializeMailFilters(this.config.ingestionDefaultMailFilters);
     this.logger.debug({ msg: `Update all inboxes to new inbox filters`, defaultFilters });
 
     const maxAttempts = 5;

@@ -33,6 +33,9 @@ export class LiveCatchUpListener {
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
   public async onLiveCatchUpEvent(@RabbitPayload() payload: unknown): Promise<void> {
+    if (this.config.mcpBackend !== 'MicrosoftGraphAndUniqueApi') {
+      return;
+    }
     const event = LiveCatchUpEventDto.parse(payload);
     this.logger.log({ msg: 'Live catch-up event received', type: event.type });
     switch (event.type) {
@@ -43,13 +46,14 @@ export class LiveCatchUpListener {
         );
         return await this.liveCatchUpCommand.run({
           ...event.payload,
-          liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
+          liveCatchupOverlappingWindow: this.config.ingestionLiveCatchupOverlappingWindowMinutes,
         });
       }
       case 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck': {
         return await this.liveCatchUpCommand.run({
           ...event.payload,
-          liveCatchupOverlappingWindow: this.config.liveCatchupRecheckOverlappingWindowMinutes,
+          liveCatchupOverlappingWindow:
+            this.config.ingestionLiveCatchupRecheckOverlappingWindowMinutes,
         });
       }
       default: {

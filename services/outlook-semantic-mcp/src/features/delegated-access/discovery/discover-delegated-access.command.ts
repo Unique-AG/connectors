@@ -4,6 +4,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, gt, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { last } from 'remeda';
+import { AppConfig, appConfig } from '~/config';
 import {
   DRIZZLE,
   DrizzleDatabase,
@@ -33,12 +34,18 @@ export class DiscoverDelegatedAccessCommand {
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly persistentCacheService: PersistentCacheService,
   ) {}
 
   @Span()
   public async run(): Promise<void> {
+    if (this.config.delegatedAccessScan === 'disabled') {
+      this.logger.log({
+        msg: `Skipped running delegated access discovery. Reason: delegated access is disabled`,
+      });
+    }
     const decision = await this.decide();
     if (decision.action === 'skip') {
       this.logger.log({
@@ -326,7 +333,9 @@ export class DiscoverDelegatedAccessCommand {
     }
 
     try {
-      await client.api(`/users/${ownerEmail}/mailFolders`).top(1).select('id').get();
+      const apiEndpoint =
+        this.config.delegatedAccessScan === 'fullAccessOnly' ? `messages` : 'mailFolders';
+      await client.api(`/users/${ownerEmail}/${apiEndpoint}`).top(1).select('id').get();
 
       const now = new Date();
       await this.db
@@ -335,6 +344,7 @@ export class DiscoverDelegatedAccessCommand {
           delegateUserId,
           ownerUserId,
           lastDiscoveredAt: now,
+          hasFullDelegatedAccess: apiEndpoint === 'messages',
         })
         .onConflictDoUpdate({
           target: [delegatedAccessPipelines.delegateUserId, delegatedAccessPipelines.ownerUserId],
