@@ -264,4 +264,50 @@ describe('FileFilterService', () => {
       expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
     });
   });
+
+  describe('mimeType override flow', () => {
+    beforeEach(async () => {
+      const { unit } = await TestBed.solitary(FileFilterService)
+        .mock(ConfigService)
+        .impl((stub) => ({
+          ...stub(),
+          get: vi.fn((key: string) => {
+            if (key === 'processing.allowedMimeTypes') {
+              return ['text/csv'];
+            }
+            if (key === 'processing.maxFileSizeToIngestBytes') {
+              return DEFAULT_MAX_FILE_SIZE_BYTES;
+            }
+            return undefined;
+          }),
+        }))
+        .mock(MimeTypeResolverService)
+        .impl(() => ({
+          resolve: vi.fn((fileName: string, rawMimeType: string | undefined) =>
+            fileName.toLowerCase().endsWith('.csv')
+              ? 'text/csv'
+              : (rawMimeType ?? DEFAULT_MIME_TYPE),
+          ),
+        }))
+        .compile();
+
+      service = unit;
+    });
+
+    it('accepts .csv file reported as application/vnd.ms-excel under text/csv allow-list', () => {
+      const item = mockDriveItem({
+        name: 'data.csv',
+        file: { mimeType: 'application/vnd.ms-excel', hashes: { quickXorHash: 'hash1' } },
+      });
+      expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
+    });
+
+    it('rejects .xls file reported as application/vnd.ms-excel under text/csv allow-list', () => {
+      const item = mockDriveItem({
+        name: 'legacy.xls',
+        file: { mimeType: 'application/vnd.ms-excel', hashes: { quickXorHash: 'hash1' } },
+      });
+      expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
+    });
+  });
 });
