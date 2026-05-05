@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { MsGraphKqlSearchEmailsQuery } from '../ms-graph-kql-search-emails.query';
 
@@ -94,7 +94,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const { results } = await instance.run(testUserId, [{ kqlQuery: 'subject:test' }]);
 
       expect(mockPost).toHaveBeenCalledOnce();
-      const { requests } = mockPost.mock.calls[0][0];
+      const requests = mockPost.mock.calls?.[0]?.[0]?.requests;
       expect(requests).toHaveLength(1);
       expect(requests[0].url).toContain(`/users/${OWN_EMAIL}/messages`);
       expect(results).toHaveLength(1);
@@ -113,7 +113,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
       const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }]);
 
-      const { requests } = mockPost.mock.calls[0][0];
+      const requests = mockPost.mock.calls?.[0]?.[0]?.requests;
       expect(requests).toHaveLength(3);
       const urls = requests.map((r: { url: string }) => r.url);
       expect(urls.some((u: string) => u.includes(OWN_EMAIL))).toBe(true);
@@ -129,7 +129,9 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
       await instance.run(testUserId, [{ kqlQuery: 'test' }]);
 
-      const totalRequests = mockPost.mock.calls.flatMap((call) => (call[0] as any).requests);
+      const totalRequests = mockPost.mock.calls.flatMap(
+        (call) => (call[0] as { requests: unknown[] }).requests,
+      );
       // own + 25 delegated = 26 (batch-chunked but total stays the same)
       expect(totalRequests).toHaveLength(26);
     });
@@ -147,7 +149,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         { kqlQuery: 'test', mailbox: OWN_EMAIL },
       ]);
 
-      const { requests } = mockPost.mock.calls[0][0];
+      const requests = mockPost.mock.calls?.[0]?.[0]?.requests;
       expect(requests).toHaveLength(1);
       expect(requests[0].url).toContain(`/users/${OWN_EMAIL}/messages`);
       expect(results[0]?.sourceMailbox).toBe(OWN_EMAIL);
@@ -164,7 +166,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         { kqlQuery: 'test', mailbox: DELEGATED_EMAIL },
       ]);
 
-      const { requests } = mockPost.mock.calls[0][0];
+      const requests = mockPost.mock.calls?.[0]?.[0]?.requests;
       expect(requests).toHaveLength(1);
       expect(requests[0].url).toContain(`/users/${DELEGATED_EMAIL}/messages`);
       expect(results[0]?.sourceMailbox).toBe(DELEGATED_EMAIL);
@@ -184,17 +186,19 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
   describe('403/404 self-healing', () => {
     it('marks delegated pipeline as no-full-access on 403 and excludes those results', async () => {
-      const mockPost = vi.fn().mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) => {
-        const responses = requests.map((req) => {
-          const isDelegated = req.url.includes(DELEGATED_EMAIL);
-          return {
-            id: req.id,
-            status: isDelegated ? 403 : 200,
-            body: isDelegated ? {} : { value: [makeMessage('own-1')] },
-          };
+      const mockPost = vi
+        .fn()
+        .mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) => {
+          const responses = requests.map((req) => {
+            const isDelegated = req.url.includes(DELEGATED_EMAIL);
+            return {
+              id: req.id,
+              status: isDelegated ? 403 : 200,
+              body: isDelegated ? {} : { value: [makeMessage('own-1')] },
+            };
+          });
+          return Promise.resolve({ responses });
         });
-        return Promise.resolve({ responses });
-      });
 
       const { instance, markPipelineNoFullAccessCommand } = createQuery({
         delegatedMailboxes: [DELEGATED_EMAIL],
@@ -212,14 +216,16 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     });
 
     it('marks delegated pipeline as no-full-access on 404', async () => {
-      const mockPost = vi.fn().mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) => {
-        const responses = requests.map((req) => ({
-          id: req.id,
-          status: req.url.includes(DELEGATED_EMAIL) ? 404 : 200,
-          body: req.url.includes(DELEGATED_EMAIL) ? {} : { value: [] },
-        }));
-        return Promise.resolve({ responses });
-      });
+      const mockPost = vi
+        .fn()
+        .mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) => {
+          const responses = requests.map((req) => ({
+            id: req.id,
+            status: req.url.includes(DELEGATED_EMAIL) ? 404 : 200,
+            body: req.url.includes(DELEGATED_EMAIL) ? {} : { value: [] },
+          }));
+          return Promise.resolve({ responses });
+        });
 
       const { instance, markPipelineNoFullAccessCommand } = createQuery({
         delegatedMailboxes: [DELEGATED_EMAIL],
@@ -235,18 +241,22 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     });
 
     it('does not mark pipeline for own mailbox 403', async () => {
-      const mockPost = vi.fn().mockResolvedValue({
+      const _mockPost = vi.fn().mockResolvedValue({
         responses: [{ id: 'req-0', status: 403, body: {} }],
       });
 
       // Use a single-request setup matching the requestId
-      const actualMockPost = vi.fn().mockImplementation(({ requests }: { requests: { id: string }[] }) =>
-        Promise.resolve({
-          responses: [{ id: requests[0]?.id, status: 403, body: {} }],
-        }),
-      );
+      const actualMockPost = vi
+        .fn()
+        .mockImplementation(({ requests }: { requests: { id: string }[] }) =>
+          Promise.resolve({
+            responses: [{ id: requests[0]?.id, status: 403, body: {} }],
+          }),
+        );
 
-      const { instance, markPipelineNoFullAccessCommand } = createQuery({ mockPost: actualMockPost });
+      const { instance, markPipelineNoFullAccessCommand } = createQuery({
+        mockPost: actualMockPost,
+      });
 
       const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }]);
 
@@ -368,14 +378,16 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
   describe('non-2xx response handling', () => {
     it('skips sub-responses with non-2xx status without error', async () => {
-      const mockPost = vi.fn().mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) => {
-        const responses = requests.map((req) => ({
-          id: req.id,
-          status: req.url.includes(OWN_EMAIL) ? 500 : 200,
-          body: { value: [] },
-        }));
-        return Promise.resolve({ responses });
-      });
+      const mockPost = vi
+        .fn()
+        .mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) => {
+          const responses = requests.map((req) => ({
+            id: req.id,
+            status: req.url.includes(OWN_EMAIL) ? 500 : 200,
+            body: { value: [] },
+          }));
+          return Promise.resolve({ responses });
+        });
       const { instance } = createQuery({ mockPost });
 
       const { results, searchSummary } = await instance.run(testUserId, [{ kqlQuery: 'test' }]);

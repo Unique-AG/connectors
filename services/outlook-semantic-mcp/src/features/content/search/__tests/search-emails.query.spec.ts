@@ -117,8 +117,14 @@ describe('SearchEmailsQuery', () => {
     // One graph-only result
     const graphOnly = makeGraphResult('email-graph-only');
 
-    semanticSearchQuery.run.mockResolvedValue({ results: semanticResults, searchSummary: undefined });
-    msGraphKqlQuery.run.mockResolvedValue({ results: [...graphMatches, graphOnly], searchSummary: undefined });
+    semanticSearchQuery.run.mockResolvedValue({
+      results: semanticResults,
+      searchSummary: undefined,
+    });
+    msGraphKqlQuery.run.mockResolvedValue({
+      results: [...graphMatches, graphOnly],
+      searchSummary: undefined,
+    });
 
     const result = await instance.run(testUserId, {
       uniqueSemanticSearchQueries: [{ search: 'test', conditions: [], limit: 25 }],
@@ -144,7 +150,10 @@ describe('SearchEmailsQuery', () => {
     );
     const graphOnly = makeGraphResult('email-graph-only');
 
-    semanticSearchQuery.run.mockResolvedValue({ results: semanticResults, searchSummary: undefined });
+    semanticSearchQuery.run.mockResolvedValue({
+      results: semanticResults,
+      searchSummary: undefined,
+    });
     msGraphKqlQuery.run.mockResolvedValue({ results: [graphOnly], searchSummary: undefined });
 
     const result = await instance.run(testUserId, {
@@ -166,7 +175,10 @@ describe('SearchEmailsQuery', () => {
     const semanticResult = makeUniqueResult('email-1', { text: 'Semantic content' });
     const graphResult = makeGraphResult('email-1', { text: 'Graph content' });
 
-    semanticSearchQuery.run.mockResolvedValue({ results: [semanticResult], searchSummary: undefined });
+    semanticSearchQuery.run.mockResolvedValue({
+      results: [semanticResult],
+      searchSummary: undefined,
+    });
     msGraphKqlQuery.run.mockResolvedValue({ results: [graphResult], searchSummary: undefined });
 
     const result = await instance.run(testUserId, {
@@ -182,7 +194,10 @@ describe('SearchEmailsQuery', () => {
   it('retains original text for semantic-only result', async () => {
     const semanticResult = makeUniqueResult('email-1', { text: 'Unique body' });
 
-    semanticSearchQuery.run.mockResolvedValue({ results: [semanticResult], searchSummary: undefined });
+    semanticSearchQuery.run.mockResolvedValue({
+      results: [semanticResult],
+      searchSummary: undefined,
+    });
     msGraphKqlQuery.run.mockResolvedValue({ results: [], searchSummary: undefined });
 
     const result = await instance.run(testUserId, {
@@ -211,7 +226,10 @@ describe('SearchEmailsQuery', () => {
     const semanticResult = makeUniqueResult('email-shared');
     const graphResult = makeGraphResult('email-shared');
 
-    semanticSearchQuery.run.mockResolvedValue({ results: [semanticResult], searchSummary: undefined });
+    semanticSearchQuery.run.mockResolvedValue({
+      results: [semanticResult],
+      searchSummary: undefined,
+    });
     msGraphKqlQuery.run.mockResolvedValue({ results: [graphResult], searchSummary: undefined });
 
     const result = await instance.run(testUserId, {

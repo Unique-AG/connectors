@@ -52,7 +52,7 @@ const granularDelegatedAccessScanConfig = z.object({
     .describe('Cron schedule for delegated access verification. Default: every 4 hours (6x/day).'),
 });
 
-export const delegatedAccessConfig = z.discriminatedUnion('delegatedAccessScanMode', [
+export const delegatedAccessConfig = z.discriminatedUnion('delegatedAccessScan', [
   disabledDelegatedAccessScan,
   onlyFullDelegatedAccessScanConfig,
   granularDelegatedAccessScanConfig,
