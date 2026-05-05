@@ -39,9 +39,24 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   icon: 'search',
   systemPrompt: `Searches ingested Outlook emails semantically. Use conditions to filter by sender, date, recipient, folder, attachments, or category. Returns matched passages from emails with metadata.
 
+  ## Step 1 — Reason about structured filters in the user's question (do this FIRST)
+  Before drafting any queries, read the user's question and try to identify signals that map cleanly to a structured filter:
+  - Specific sender, sender name, or sender domain (e.g. "from Alice", "emails from @acme.com") → \`fromSenders\`
+  - Specific recipient or recipient domain ("to Bob", "to anyone @client.com") → \`toRecipients\` / \`ccRecipients\`
+  - Date range or relative time ("last week", "since March", "in Q2 2024") → \`dateFrom\` / \`dateTo\`
+  - Attachment requirement ("with attachments", "PDFs from Alice") → \`hasAttachments\`
+  - Folder mention ("in my Inbox", "from Sent Items") → \`directories\`
+  - Category label ("tagged Important") → \`categories\`
+
+  When you are confident a signal maps to one of these filters, prefer expressing it in BOTH backends:
+  1. As a \`conditions\` entry on every \`uniqueSemanticSearchQueries\` entry that targets the same intent. Semantic search honors structured filters and tends to produce sharper results when conditions are populated than when the same signal is encoded only in the natural-language \`search\` text. A common failure mode is to phrase the filter in \`search\` ("emails from alice@x.com about budget") and leave \`conditions\` empty — generally avoid that.
+  2. As the matching KQL property filter on every relevant \`msGraphKeywordSearchQueries\` entry (e.g. \`from:\`, \`to:\`, \`received>=\`, \`hasAttachment:true\`, \`category:\`).
+
+  If a signal is ambiguous (e.g. an unspecific name, a vague time reference you can't confidently map to a date range), it is fine to omit the condition rather than guess wrong — but lean toward populating conditions whenever the user's intent is clear.
+
   ## Combining search + conditions + limit
   The \`search\` field and the \`conditions\` array work together — always try to use both:
-  - \`search\`: natural-language relevance query (e.g. "budget report from Alice").
+  - \`search\`: natural-language relevance query (e.g. "budget report"). Keep it focused on the topic, not the filters — the filters belong in \`conditions\`.
   - \`conditions\`: structured filters (sender, date range, folder, attachments, etc.) applied on top of the semantic search.
   - \`limit\`: increase toward 300 when the query is fuzzy or broad, or when you expect a large result set.
 
@@ -74,9 +89,17 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   3. Run multiple KQL queries in parallel for different angles: synonyms, subject-focus vs. body-focus, alternative keyword combinations.
 
   Example — user asks "Q2 budget report from Alice":
-  - Semantic: \`search: "Q2 budget report"\`, condition \`fromSenders: { value: "alice@example.com", operator: "equals" }\`
+  - Semantic entry 1: \`search: "Q2 budget report"\`, conditions: \`[{ fromSenders: { value: "alice@example.com", operator: "equals" } }]\`
+  - Semantic entry 2: \`search: "quarterly financial summary"\`, conditions: \`[{ fromSenders: { value: "alice@example.com", operator: "equals" } }]\`
   - KQL query 1: \`from:alice@example.com subject:"Q2 budget"\`
   - KQL query 2: \`from:alice@example.com body:"budget report" received>=2024-04-01 received<=2024-06-30\`
+
+  Example — user asks "emails from bob@example.com that mention 'sector rotation' in the subject":
+  - Semantic entry 1: \`search: "sector rotation"\`, conditions: \`[{ fromSenders: { value: "bob@example.com", operator: "equals" } }]\`
+  - Semantic entry 2: \`search: "sector allocation strategy"\`, conditions: \`[{ fromSenders: { value: "bob@example.com", operator: "equals" } }]\`
+  - KQL query 1: \`from:bob@example.com subject:"sector rotation"\`
+  - KQL query 2: \`from:bob@example.com subject:sector AND subject:rotation\`
+  Notice how \`fromSenders\` is populated on every semantic entry rather than encoded only in the \`search\` text — that is the preferred shape whenever the sender is clearly named.
 
   By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
   After returning results, inform the user that they can narrow the search to a specific folder if needed.

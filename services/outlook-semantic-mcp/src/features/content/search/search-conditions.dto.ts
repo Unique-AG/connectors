@@ -134,7 +134,7 @@ export const SearchConditionSchema = z
     message: `Invalid search condition, the following fields are supported for conditions 'dateFrom', 'dateTo', 'fromSenders', 'toRecipients', 'ccRecipients', 'directories', 'hasAttachments', 'categories'. Example of valid condition: { fromSenders: { value: "alice@example.com", operator: "equals" } }`,
   })
   .describe(
-    `Condition to narrow down the search, AND operator is applied between multiple conditions fields`,
+    `Structured filter applied on top of the semantic search. Lean toward populating this when the user clearly names a specific sender, recipient, date range, folder, attachment requirement, or category — populated conditions tend to produce sharper results than relying on the natural-language \`search\` text alone. If a signal is ambiguous, prefer omitting the condition over guessing. Fields within a single condition are AND-ed. Example: user says "from alice@x.com last month" → { fromSenders: { value: "alice@x.com", operator: "equals" }, dateFrom: { value: "2026-04-01T00:00:00Z", operator: "greaterThanOrEqual" } }.`,
   );
 
 export type SearchCondition = z.infer<typeof SearchConditionSchema>;
@@ -156,7 +156,7 @@ export const SearchEmailsInputSchema = z.object({
     .array(SearchConditionSchema)
     .optional()
     .describe(
-      `Conditions to narrow down the search, If we pass multiple conditions we apply OR operator between them.`,
+      `Structured filters applied on top of the semantic search. Prefer populating this when the user clearly names a specific sender, recipient, date, folder, attachment requirement, or category — these signals tend to produce sharper results when expressed structurally rather than only in the natural-language \`search\` text. Omit a condition rather than guess if the signal is ambiguous. Each entry in this array is OR-ed with the others; fields within a single entry are AND-ed. Example: user says "from alice@x.com" → [{ fromSenders: { value: "alice@x.com", operator: "equals" } }].`,
     ),
   limit: z
     .number()
@@ -255,9 +255,10 @@ export const SearchEmailsUnifiedInputSchema = z
         'List of semantic searches to execute in parallel (at most 10). ALL entries must address the SAME single user question — do NOT pack unrelated questions into this array. ' +
           'A single phrasing often misses relevant emails — always compose 2–4 parallel entries that approach the question from different angles: ' +
           '(1) different phrasings or synonyms (e.g. "project kick-off" vs "project launch"); ' +
-          '(2) narrower vs. broader scope — one with tight conditions, one with a broader search term and no conditions; ' +
-          '(3) different condition combinations (e.g. one entry scoped to "Inbox", another to "Sent Items") to capture both sides of a conversation; ' +
+          '(2) narrower vs. broader scope — one with tight conditions, one with a broader search term; ' +
+          '(3) different condition combinations (e.g. one entry scoped to folder "Inbox", another to "Sent Items" to capture both sides of a conversation); ' +
           '(4) perspective shift (e.g. "emails I sent about the merger" vs "emails I received about the merger"). ' +
+          'Reason about the user\'s question first: when they clearly name a specific sender, recipient, date range, folder, attachment requirement, or category, prefer expressing it via `conditions` on every entry that targets the same intent rather than encoding it only in the natural-language `search` text. If a signal is ambiguous, it is fine to omit the condition — but generally lean toward populating them when the intent is clear. Example: user asks "emails from alice@x.com about the budget" → every entry should include `conditions: [{ fromSenders: { value: "alice@x.com", operator: "equals" } }]`, with `search` carrying only the topic ("budget"). ' +
           'IMPORTANT: uniqueSemanticSearchQueries supports delegated-access mailboxes — use the mailbox field to scope searches to specific mailboxes including delegated ones. ' +
           'Results from all searches are merged and deduplicated by email ID.',
       ),
