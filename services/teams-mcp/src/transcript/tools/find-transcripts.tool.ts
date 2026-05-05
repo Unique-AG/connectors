@@ -50,8 +50,8 @@ const TranscriptChunkSchema = z.object({
   text: z.string().describe('The relevant passage'),
   url: z.string().optional().describe('External URL if applicable'),
   meetingDate: z.string().optional().describe('Date of the meeting'),
-  startDatetime: z.string().optional().describe('Meeting start datetime (ISO 8601)'),
-  endDatetime: z.string().optional().describe('Meeting end datetime (ISO 8601)'),
+  startDatetime: z.string().optional().describe('Transcript recording start datetime (ISO 8601)'),
+  endDatetime: z.string().optional().describe('Transcript recording end datetime (ISO 8601)'),
   organizer: z.string().optional().describe('Name of the meeting organizer'),
   participants: z.array(z.string()).optional().describe('List of participants'),
 });
