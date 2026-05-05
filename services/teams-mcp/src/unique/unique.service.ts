@@ -36,7 +36,12 @@ export class UniqueService {
       owner: { id: string; name: string; email: string };
     },
     transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
-    recording?: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
+    recording?: {
+      id: string;
+      content: ReadableStream<Uint8Array<ArrayBuffer>>;
+      startDateTime: Date;
+      endDateTime: Date;
+    },
   ): Promise<void> {
     const span = this.trace.getSpan();
     span?.setAttribute('transcript_id', transcript.id);
@@ -179,7 +184,7 @@ export class UniqueService {
             ingestionConfig: {
               uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
             },
-            metadata: this.buildContentMetadata(meeting),
+            metadata: this.buildContentMetadata(meeting, recording),
           },
         });
         await this.contentService.uploadToStorage(
@@ -239,17 +244,22 @@ export class UniqueService {
     return { subjectPath, datePath: formattedDate };
   }
 
-  private buildContentMetadata(meeting: {
-    startDateTime: Date;
-    endDateTime: Date;
-    contentCorrelationId: string;
-    owner: { name: string; email: string };
-    participants: { name: string; email: string }[];
-  }): Record<string, string> {
+  private buildContentMetadata(
+    meeting: {
+      startDateTime: Date;
+      endDateTime: Date;
+      contentCorrelationId: string;
+      owner: { name: string; email: string };
+      participants: { name: string; email: string }[];
+    },
+    datetimeOverride?: { startDateTime: Date; endDateTime: Date },
+  ): Record<string, string> {
+    const startDateTime = datetimeOverride?.startDateTime ?? meeting.startDateTime;
+    const endDateTime = datetimeOverride?.endDateTime ?? meeting.endDateTime;
     const metadata: Record<string, string> = {
       date: meeting.startDateTime.toISOString(),
-      start_datetime: meeting.startDateTime.toISOString(),
-      end_datetime: meeting.endDateTime.toISOString(),
+      start_datetime: startDateTime.toISOString(),
+      end_datetime: endDateTime.toISOString(),
       content_correlation_id: meeting.contentCorrelationId,
       organizer_email: meeting.owner.email.toLowerCase(),
     };
