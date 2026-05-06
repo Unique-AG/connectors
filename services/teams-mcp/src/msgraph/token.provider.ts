@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import { userProfiles } from '../drizzle/schema';
+import { MicrosoftReauthRequiredException } from '../utils/microsoft-reauth.exception';
 import { normalizeError } from '../utils/normalize-error';
 
 export class TokenProvider implements AuthenticationProvider {
@@ -93,16 +94,36 @@ export class TokenProvider implements AuthenticationProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
+        let parsedError: { error?: string; error_description?: string } = {};
+        try {
+          parsedError = JSON.parse(errorText);
+        } catch {
+          // not JSON
+        }
+
         this.logger.error(
           {
             status: response.status,
             errorText,
-            userProfileId: this.userProfileId,
+            userProfileId,
             tokenRefreshFailed: true,
             errorSource: 'microsoft_graph_api',
           },
           'Microsoft Graph API rejected token refresh request',
         );
+
+        if (parsedError.error === 'invalid_grant') {
+          // Permanently invalid — expired, revoked, device removed from tenant, CAP changed.
+          // Clear the dead tokens and surface a typed McpError so the tool handler
+          // propagates a JSON-RPC error instead of isError:true.
+          await this.drizzle
+            .update(userProfiles)
+            .set({ accessToken: null, refreshToken: null })
+            .where(eq(userProfiles.id, userProfileId));
+
+          throw new MicrosoftReauthRequiredException(parsedError.error_description);
+        }
+
         assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
@@ -125,7 +146,7 @@ export class TokenProvider implements AuthenticationProvider {
 
       this.logger.debug(
         {
-          userProfileId: this.userProfileId,
+          userProfileId,
           tokenRefreshSuccess: true,
           action: 'token_refresh_completed',
         },
@@ -133,9 +154,12 @@ export class TokenProvider implements AuthenticationProvider {
       );
       return tokenData.access_token;
     } catch (error) {
+      if (error instanceof MicrosoftReauthRequiredException) {
+        throw error;
+      }
       this.logger.error(
         {
-          userProfileId: this.userProfileId,
+          userProfileId,
           error: serializeError(normalizeError(error)),
           tokenRefreshFailed: true,
           errorSource: 'microsoft_graph_api',
