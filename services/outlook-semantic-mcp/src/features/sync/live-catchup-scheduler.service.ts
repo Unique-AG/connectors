@@ -7,7 +7,7 @@ import z from 'zod';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
-import { traceEvent } from '~/features/tracing.utils';
+import { NewTrace, traceEvent } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
 import {
   FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES,
@@ -64,6 +64,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     job.start();
   }
 
+  @NewTrace('cron.live-catchup-recovery')
   public async runRecoveryScan(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({
@@ -84,6 +85,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     }
   }
 
+  @NewTrace('cron.live-catchup-ready-recheck')
   public async runReadyLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({
