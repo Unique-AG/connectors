@@ -25,7 +25,7 @@ const OpenEmailByIdInputSchema = z.object({
     .email()
     .optional()
     .describe(
-      'The mailbox address this email belongs to. Pass the `sourceMailbox` value from the `search_emails` result. Required for delegated mailbox access; omit for the user\'s own mailbox.',
+      "The mailbox address this email belongs to. Pass the `sourceMailbox` value from the `search_emails` result. Required for delegated mailbox access; omit for the user's own mailbox.",
     ),
   parentFolderId: z
     .string()
