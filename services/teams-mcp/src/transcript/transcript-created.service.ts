@@ -158,6 +158,7 @@ export class TranscriptCreatedService {
     await this.unique.ingestTranscript(
       {
         subject: meeting.subject ?? '',
+        date: meeting.startDateTime,
         startDateTime: transcript.createdDateTime,
         endDateTime: transcript.endDateTime,
         contentCorrelationId: transcript.contentCorrelationId,

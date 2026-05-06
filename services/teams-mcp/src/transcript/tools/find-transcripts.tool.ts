@@ -50,6 +50,8 @@ const TranscriptChunkSchema = z.object({
   text: z.string().describe('The relevant passage'),
   url: z.string().optional().describe('External URL if applicable'),
   meetingDate: z.string().optional().describe('Date of the meeting'),
+  startDatetime: z.string().optional().describe('Transcript recording start datetime (ISO 8601)'),
+  endDatetime: z.string().optional().describe('Transcript recording end datetime (ISO 8601)'),
   organizer: z.string().optional().describe('Name of the meeting organizer'),
   participants: z.array(z.string()).optional().describe('List of participants'),
 });
@@ -135,9 +137,8 @@ export class FindTranscriptsTool {
     const result = await this.contentService.scopedSearch(searchRequest, scopeContext);
 
     const results = result.data.map((item) => {
-      const { meetingDate, organizer, participants } = parseTranscriptMetadata(
-        item.metadata as Record<string, unknown> | null,
-      );
+      const { meetingDate, startDatetime, endDatetime, organizer, participants } =
+        parseTranscriptMetadata(item.metadata as Record<string, unknown> | null);
 
       return {
         id: item.id,
@@ -147,6 +148,8 @@ export class FindTranscriptsTool {
         text: item.text,
         url: `unique://content/${item.id}`,
         meetingDate,
+        startDatetime,
+        endDatetime,
         organizer,
         participants,
       };

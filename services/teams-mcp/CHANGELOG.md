@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.8](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.7...teams-mcp@0.2.8) (2026-05-05)
+
+
+### Features
+
+* **teams-mcp:** add start_datetime and end_datetime to meeting metadata (UN-20156) ([#507](https://github.com/Unique-AG/connectors/issues/507)) ([b55038c](https://github.com/Unique-AG/connectors/commit/b55038c72ad659e337b6dc8e381ef269b7333979))
+
+
+### Bug Fixes
+
+* **deps:** upgrade nestjs-otel to v8 to resolve systeminformation CVEs ([#471](https://github.com/Unique-AG/connectors/issues/471)) ([ec584a9](https://github.com/Unique-AG/connectors/commit/ec584a95427b3a9989387c548d654c8b4fbbd775))
+* **teams-mcp:** set scoreThreshold 0 in find_transcripts to stop silent result filtering ([#465](https://github.com/Unique-AG/connectors/issues/465)) ([9d3eb35](https://github.com/Unique-AG/connectors/commit/9d3eb357c6e0bbe2604ad53e3da6ef7d428b639b))
+
 ## [0.2.7](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.6...teams-mcp@0.2.7) (2026-04-14)
 
 
