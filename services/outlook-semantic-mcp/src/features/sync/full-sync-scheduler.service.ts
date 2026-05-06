@@ -5,6 +5,7 @@ import { CronJob } from 'cron';
 import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
+import { NewTrace } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
 import {
   FAILED_HEARTBEAT_MINUTES,
@@ -57,6 +58,7 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
     job.start();
   }
 
+  @NewTrace('cron.full-sync-recovery')
   public async checkAndRetriggerStuckFullSyncs(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({ msg: 'Skipping full sync recovery scan due to shutdown' });
