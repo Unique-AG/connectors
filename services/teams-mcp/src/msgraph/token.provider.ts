@@ -155,6 +155,11 @@ export class TokenProvider implements AuthenticationProvider {
       );
       return tokenData.access_token;
     } catch (error) {
+      // MicrosoftReauthRequiredException (McpError) must propagate unwrapped so the
+      // middleware and tool handler can re-throw it as a JSON-RPC error response.
+      if (error instanceof MicrosoftReauthRequiredException) {
+        throw error;
+      }
       this.logger.error(
         {
           userProfileId: this.userProfileId,
