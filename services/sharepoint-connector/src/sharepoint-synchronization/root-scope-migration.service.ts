@@ -1,4 +1,4 @@
-import { ScopesService } from '@unique-ag/unique-api';
+import { ScopesService, toSafeBulkMoveError } from '@unique-ag/unique-api';
 import { Injectable, Logger } from '@nestjs/common';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import { sanitizeError } from '../utils/normalize-error';
@@ -85,12 +85,12 @@ export class RootScopeMigrationService {
       this.logger.log(`${logPrefix} Migration completed successfully`);
       return { status: 'migration_completed' };
     } catch (error) {
+      const safeError = toSafeBulkMoveError(error);
       this.logger.error({
         msg: `${logPrefix} Migration failed`,
-        error: sanitizeError(error),
+        error: sanitizeError(safeError),
       });
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return { status: 'migration_failed', error: errorMessage };
+      return { status: 'migration_failed', error: safeError.message };
     }
   }
 }

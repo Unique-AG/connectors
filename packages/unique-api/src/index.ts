@@ -44,6 +44,7 @@ export type {
   ScopeAccess,
   ScopeWithPath,
 } from './scopes/scopes.types';
+export { toSafeBulkMoveError } from './scopes/bulk-move-error';
 export { ScopesService } from './scopes/scopes.service';
 export type { GraphqlClient } from './scopes/scopes.service';
 export type {

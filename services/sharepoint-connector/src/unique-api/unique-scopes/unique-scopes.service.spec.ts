@@ -1,6 +1,6 @@
+import { toSafeBulkMoveError } from '@unique-ag/unique-api';
 import { ClientError, type GraphQLResponse } from 'graphql-request';
 import { describe, expect, it } from 'vitest';
-import { toSafeBulkMoveError } from './bulk-move-error';
 
 // Every message below is copied verbatim from the exception-throwing sites in
 // node-ingestion (see monorepo/next/services/node-ingestion/src/scope-operation/
