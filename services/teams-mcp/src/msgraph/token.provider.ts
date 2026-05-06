@@ -10,6 +10,7 @@ import { serializeError } from 'serialize-error-cjs';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import { userProfiles } from '../drizzle/schema';
 import { normalizeError } from '../utils/normalize-error';
+import { MicrosoftReauthRequiredException } from '../utils/microsoft-reauth.exception';
 
 export class TokenProvider implements AuthenticationProvider {
   private readonly logger = new Logger(TokenProvider.name);
@@ -103,6 +104,27 @@ export class TokenProvider implements AuthenticationProvider {
           },
           'Microsoft Graph API rejected token refresh request',
         );
+
+        let parsedError: { error?: string; error_description?: string } = {};
+        try {
+          parsedError = JSON.parse(errorText);
+        } catch {
+          // not JSON, fall through to generic error
+        }
+
+        if (parsedError.error === 'invalid_grant') {
+          // The refresh token is permanently invalid (expired, revoked, device removed,
+          // Conditional Access policy changed, etc.). Clear the dead tokens so subsequent
+          // requests don't keep retrying, then surface a typed McpError so the tool
+          // handler propagates a JSON-RPC error instead of an isError:true result.
+          await this.drizzle
+            .update(userProfiles)
+            .set({ accessToken: null, refreshToken: null })
+            .where(eq(userProfiles.id, userProfileId));
+
+          throw new MicrosoftReauthRequiredException(parsedError.error_description);
+        }
+
         assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
