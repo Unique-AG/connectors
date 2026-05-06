@@ -9,6 +9,8 @@ import { SearchCondition } from './search-conditions.dto';
 export class CleanupSearchConditionsForUserQuery {
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
+  // We check the search conditions and try fix directories to replace directory names to directory ids for
+  // Unique ql query.
   public async run(
     userProfileId: string,
     conditions: SearchCondition[] | undefined,

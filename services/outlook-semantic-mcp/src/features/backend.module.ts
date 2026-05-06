@@ -15,7 +15,7 @@ import { DeleteInboxModule } from './delete-inbox/delete-inbox.module';
 import { DeleteInboxDataTool } from './delete-inbox/delete-inbox-data.tool';
 import { InboxDeletingQueryModule } from './delete-inbox/inbox-deleting-query.module';
 import { DirectoriesSyncModule } from './directories-sync/directories-sync.module';
-import { ListFoldersTool } from './directories-sync/tools';
+import { ListMailboxesAndDirectoriesTool } from './directories-sync/tools';
 import { EmailManagementModule } from './email-management/email-management.module';
 import { CreateDraftEmailTool } from './email-management/tools/create-draft-email.tool';
 import { LookupContactsTool } from './email-management/tools/lookup-contacts.tool';
@@ -42,7 +42,7 @@ export function registerBackendModule(): DynamicModule {
   const isDebug = isDebugMode();
 
   const uniqueAndMicrosoftBackendCommonTools = [
-    ListFoldersTool,
+    ListMailboxesAndDirectoriesTool,
     ListCategoriesTool,
     CreateDraftEmailTool,
     LookupContactsTool,

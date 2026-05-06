@@ -170,63 +170,59 @@ export class MsGraphKqlSearchEmailsQuery {
     });
     const getRequestId = () => typeid(`batch_request`).toString();
 
-    const subRequestsByQuery = await Promise.all(
-      queries.map(async (query): Promise<GraphBatchRequest[]> => {
-        const limit = Math.min(50, query.limit ?? 25);
-        const { mailbox } = query;
+    return queries.flatMap((query): GraphBatchRequest[] => {
+      const limit = Math.min(50, query.limit ?? 25);
+      const { mailbox } = query;
 
-        if (mailbox) {
-          if (mailbox === userProfile.email) {
-            return [
-              {
-                requestId: getRequestId(),
-                mailbox: userProfile.email,
-                isDelegated: false,
-                kqlQuery: query.kqlQuery,
-                limit,
-              },
-            ];
-          }
-
-          const foundMailbox = delegatedAccesses.find((item) => mailbox === item);
-          if (!foundMailbox) {
-            return [];
-          }
-
+      if (mailbox) {
+        if (mailbox === userProfile.email) {
           return [
             {
               requestId: getRequestId(),
-              mailbox: foundMailbox,
-              isDelegated: true,
+              mailbox: userProfile.email,
+              isDelegated: false,
               kqlQuery: query.kqlQuery,
               limit,
             },
           ];
         }
 
-        // For safety to not expload the number of request we cap the delegated access search to 25. 25 Is not an arbitrary number
-        // Microsoft documents that a exchange user can have delegated access to at most 25 other inboxes.
-        const delegatesToFilter = delegatedAccesses.slice(0, 25);
+        const foundMailbox = delegatedAccesses.find((item) => mailbox === item);
+        if (!foundMailbox) {
+          return [];
+        }
+
         return [
           {
             requestId: getRequestId(),
-            mailbox: userProfile.email,
-            isDelegated: false,
-            kqlQuery: query.kqlQuery,
-            limit,
-          },
-          ...delegatesToFilter.map((ownerEmail) => ({
-            requestId: getRequestId(),
-            mailbox: ownerEmail,
+            mailbox: foundMailbox,
             isDelegated: true,
             kqlQuery: query.kqlQuery,
             limit,
-          })),
+          },
         ];
-      }),
-    );
+      }
 
-    return subRequestsByQuery.flat();
+      // For safety to not expload the number of request we cap the delegated access search to 25. 25 Is not an arbitrary number
+      // Microsoft documents that a exchange user can have delegated access to at most 25 other inboxes.
+      const delegatesToFilter = delegatedAccesses.slice(0, 25);
+      return [
+        {
+          requestId: getRequestId(),
+          mailbox: userProfile.email,
+          isDelegated: false,
+          kqlQuery: query.kqlQuery,
+          limit,
+        },
+        ...delegatesToFilter.map((ownerEmail) => ({
+          requestId: getRequestId(),
+          mailbox: ownerEmail,
+          isDelegated: true,
+          kqlQuery: query.kqlQuery,
+          limit,
+        })),
+      ];
+    });
   }
 
   private async fetchFromMicrosoft({

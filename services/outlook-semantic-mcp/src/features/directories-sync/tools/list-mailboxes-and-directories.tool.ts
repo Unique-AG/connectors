@@ -5,12 +5,12 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import {
-  ListDirectoriesQuery,
+  ListMailboxesAndDirectoriesQuery,
   type UserDirectory,
   type UserMailbox,
-} from '../list-directories.query';
+} from '../list-mailboxes-and-directories.query';
 import { SyncDirectoriesCommand } from '../sync-directories.command';
-import { META } from './list-folders-tool.meta';
+import { META } from './list-mailboxes-and-directories-tool.meta';
 
 const InputSchema = z.object({});
 
@@ -37,23 +37,23 @@ const OutputSchema = z.object({
 });
 
 @Injectable()
-export class ListFoldersTool {
+export class ListMailboxesAndDirectoriesTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
     private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
-    private readonly listDirectoriesQuery: ListDirectoriesQuery,
+    private readonly listDirectoriesQuery: ListMailboxesAndDirectoriesQuery,
   ) {}
 
   @Tool({
-    name: 'list_folders',
-    title: 'List Folders',
+    name: 'list_mailboxes_and_directories',
+    title: 'List Mailboxes and Directories',
     description:
-      "List all Outlook mail folders available for the user, grouped by mailbox. Returns the user's own mailbox and any delegated (shared) mailboxes they have access to. Each mailbox contains a hierarchical folder tree. Each folder has an id that can be passed to the `directories` filter in `search_emails`.",
+      "List all Outlook mailboxes with their folders/directories available for the user. Returns the user's own mailbox and any delegated (shared) mailboxes they have access to. Each mailbox contains a hierarchical folder tree. Each folder has an id that can be passed to the `directories` filter in `search_emails`.",
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {
-      title: 'List Folders',
+      title: 'List Mailboxes and Directories',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: true,
@@ -62,7 +62,7 @@ export class ListFoldersTool {
     _meta: META,
   })
   @Span()
-  public async listFolders(
+  public async list(
     _input: z.infer<typeof InputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
@@ -74,7 +74,7 @@ export class ListFoldersTool {
     const userProfileTypeIdString = userProfileTypeId.toString();
     this.logger.log({
       userProfileId: userProfileTypeIdString,
-      msg: 'Running directory sync before listing folders',
+      msg: 'Running directory sync before listing mailboxes and directories',
     });
     await this.syncDirectoriesCommand.run(userProfileTypeId);
     const mailboxes = await this.listDirectoriesQuery.run(userProfileTypeIdString);

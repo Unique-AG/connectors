@@ -33,7 +33,7 @@ export interface UserMailbox {
 }
 
 @Injectable()
-export class ListDirectoriesQuery {
+export class ListMailboxesAndDirectoriesQuery {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}

@@ -186,7 +186,7 @@ describe('FullSyncRecoveryService', () => {
         createMockAmqp() as any,
         {
           mcpBackend: 'MicrosoftGraphAndUniqueApi',
-          ingestionFullSyncRecoveryCron: '*/5 * * * *',
+          fullSyncRecoveryCron: '*/5 * * * *',
         } as any,
         createMockDb() as any,
       );

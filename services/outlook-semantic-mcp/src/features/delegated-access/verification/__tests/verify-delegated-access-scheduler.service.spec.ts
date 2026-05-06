@@ -18,7 +18,7 @@ function createMockAmqp() {
 }
 
 function createMockConfig() {
-  return { delegatedAccessVerificationCronSchedule: '0 */4 * * *' };
+  return { scan: 'granularAccess', verificationCronSchedule: '0 */4 * * *' };
 }
 
 function createService({ amqp = createMockAmqp() } = {}) {

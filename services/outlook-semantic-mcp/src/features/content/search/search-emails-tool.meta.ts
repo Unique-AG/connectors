@@ -108,10 +108,10 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
   After returning results, inform the user that they can narrow the search to a specific folder if needed.
 
-  To filter by folder, pass its name directly to the \`directories\` parameter — no need to call \`list_folders\` for well-known folders.
+  To filter by folder, pass its name directly to the \`directories\` parameter — no need to call \`list_mailboxes_and_directories\` for well-known folders.
   Use these exact names: "Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History".
   Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized — searching through them will not return results.
-  For custom user-defined folders, call \`list_folders\` first to get the folder ID.
+  For custom user-defined folders, call \`list_mailboxes_and_directories\` first to get the folder ID.
 
   If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.
   If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).`,

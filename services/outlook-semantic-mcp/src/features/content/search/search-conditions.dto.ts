@@ -98,10 +98,10 @@ export const SearchConditionSchema = z
         .array(z.string())
         .describe(
           `Folder ID(s) or system directory name(s) to filter by. ` +
-            `For well-known Outlook system folders pass the exact display name directly — no need to call \`list_folders\`: ` +
+            `For well-known Outlook system folders pass the exact display name directly — no need to call \`list_mailboxes_and_directories\`: ` +
             `"Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History". ` +
             `Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized and will not return results. ` +
-            `For custom user-defined folders, pass the folder ID obtained from \`list_folders\`. ` +
+            `For custom user-defined folders, pass the folder ID obtained from \`list_mailboxes_and_directories\`. ` +
             `Example IDs: ["${EXAMPLE_FOLDER_IDS.first}", "${EXAMPLE_FOLDER_IDS.second}"]. Recommended operators: in or notIn.`,
         ),
     ).optional(),
@@ -149,7 +149,7 @@ export const SearchEmailsInputSchema = z.object({
     .describe(
       `Scope this entire search to one mailbox (exact email address match, no wildcards). ` +
         `When omitted, all accessible mailboxes (own + delegated) are searched. ` +
-        `Use the \`list_folders\` tool to discover which mailboxes are available for the current user.`,
+        `Use the \`list_mailboxes_and_directories\` tool to discover which mailboxes are available for the current user.`,
     )
     .optional(),
   conditions: z
@@ -183,7 +183,7 @@ export const MsGraphKqlQuerySchema = z.object({
     .describe(
       `Scope this entire search to one mailbox (exact email address match, no wildcards). ` +
         `When omitted, all accessible mailboxes (own + delegated) are searched. ` +
-        `Use the \`list_folders\` tool to discover which mailboxes are available for the current user.`,
+        `Use the \`list_mailboxes_and_directories\` tool to discover which mailboxes are available for the current user.`,
     )
     .optional(),
   kqlQuery: z

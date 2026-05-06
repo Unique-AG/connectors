@@ -153,13 +153,11 @@ mcpConfig:
     # Env var: DELEGATED_ACCESS_SCAN
     delegatedAccessScan: disabled
     # -- Cron schedule for delegated access discovery runs.
-    # Required when delegatedAccessScan is not 'disabled'.
-    # Default: '0 */6 * * *' (every 6 hours). Env var: DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE
-    delegatedAccessDiscoveryCronSchedule: '0 */6 * * *'
+    # Required when delegatedAccessScan is not 'disabled'. Env var: DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE
+    # delegatedAccessDiscoveryCronSchedule: '0 */6 * * *'
     # -- Cron schedule for delegated access verification runs.
-    # Required when delegatedAccessScan is 'granularAccess'.
-    # Default: '0 */4 * * *' (every 4 hours). Env var: DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE
-    delegatedAccessVerificationCronSchedule: '0 */4 * * *'
+    # Required when delegatedAccessScan is 'granularAccess'. Env var: DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE
+    # delegatedAccessVerificationCronSchedule: '0 */4 * * *'
 
   # -- Optional log settings. To override:
   # logs:

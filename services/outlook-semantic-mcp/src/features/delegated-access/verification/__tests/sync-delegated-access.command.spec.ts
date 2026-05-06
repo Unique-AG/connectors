@@ -116,7 +116,7 @@ function createCommand({
   return new SyncDelegatedAccessCommand(
     createMockGraphClientFactory(graphApi) as any,
     db as any,
-    { delegatedAccessScan: 'granularAccess' } as any,
+    { scan: 'granularAccess' } as any,
   );
 }
 

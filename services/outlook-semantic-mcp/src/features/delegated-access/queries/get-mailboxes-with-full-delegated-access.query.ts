@@ -15,6 +15,8 @@ export class GetMailboxesWithFullDelegatedAccessQuery {
   public async run(input: GetMailboxesInput): Promise<string[]> {
     const { delegateUserId, mailbox } = input;
 
+    // This query is the same as GetFullDelegatedAccessQuery but it's more efficient because
+    // it returns just the mailboxes without the actual directories.
     const rows = await this.db
       .select({ email: userProfiles.email })
       .from(delegatedAccessAccounts)

@@ -16,6 +16,8 @@ export class GetFullDelegatedAccessQuery {
       return [];
     }
 
+    // This query is the same as GetMailboxesWithFullDelegatedAccessQuery but it also returns the directories
+    // to which a user has delegated accessf
     return await this.db
       .select({
         ownerUserEmail: sql<string>`${userProfiles.email}`,
