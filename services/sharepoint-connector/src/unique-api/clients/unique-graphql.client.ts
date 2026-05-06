@@ -1,3 +1,4 @@
+import { type GraphqlClient } from '@unique-ag/unique-api';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram } from '@opentelemetry/api';
@@ -23,7 +24,7 @@ export const SCOPE_MANAGEMENT_CLIENT = Symbol('SCOPE_MANAGEMENT_CLIENT');
 
 export type UniqueGraphqlClientTarget = 'ingestion' | 'scopeManagement';
 
-export class UniqueGraphqlClient {
+export class UniqueGraphqlClient implements GraphqlClient {
   private readonly logger = new Logger(this.constructor.name);
   private readonly graphQlClient: GraphQLClient;
   private readonly limiter: Bottleneck;
