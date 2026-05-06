@@ -254,8 +254,6 @@ export class ScopeManagementService {
               reason: f.failReason,
             })),
           });
-        } else {
-          this.logger.debug(`${logPrefix} Deleted stale scope ${scope.id}`);
         }
       } catch (error) {
         this.logger.warn({
