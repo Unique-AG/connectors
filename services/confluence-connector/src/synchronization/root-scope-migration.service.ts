@@ -1,4 +1,5 @@
 import type { UniqueApiClient } from '@unique-ag/unique-api';
+import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 
 export type MigrationResult =
@@ -35,6 +36,7 @@ export class RootScopeMigrationService {
       );
 
       const children = await this.uniqueApiClient.scopes.listChildren(oldRoot.id);
+      this.logger.log(`Found ${children.length} children to migrate to new root ${newRootScopeId}`);
 
       let failedCount = 0;
       let firstError: string | undefined;
@@ -57,12 +59,19 @@ export class RootScopeMigrationService {
         };
       }
 
+      this.logger.log(`Reparented ${children.length} children to new root ${newRootScopeId}`);
+
       const deleteResult = await this.uniqueApiClient.scopes.delete(oldRoot.id);
 
       if (deleteResult.failedFolders.length > 0) {
         this.logger.warn({
           msg: `Failed to delete old root scope ${oldRoot.id}`,
-          failedFolders: deleteResult.failedFolders,
+          failedFolders: deleteResult.failedFolders.map((f) => ({
+            id: f.id,
+            name: createSmeared(f.name),
+            path: smearPath(createSmeared(f.path)),
+            failReason: f.failReason,
+          })),
         });
         return { status: 'migration_failed', error: 'Failed to delete old root scope' };
       }
