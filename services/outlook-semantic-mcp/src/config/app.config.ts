@@ -32,7 +32,9 @@ const ConfigSchema = z
     directorySyncCronSchedule: z
       .string()
       .prefault('*/5 * * * *')
-      .describe('Cron schedule for delegated access discovery. Default: every 5 minutes'),
+      .describe(
+        'Cron schedule for syncing mail folder structure for all active subscriptions. Default: every 5 minutes.',
+      ),
   })
   .transform((c) => ({
     ...c,

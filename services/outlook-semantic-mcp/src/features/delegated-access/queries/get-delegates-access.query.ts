@@ -4,7 +4,7 @@ import { GetDirectoryDelegatedAccessQuery } from './get-directory-delegated-acce
 import { GetFullDelegatedAccessQuery } from './get-full-delegated-access.query';
 
 @Injectable()
-export class GetDelegtedAccessQuery {
+export class GetDelegatedAccessQuery {
   public constructor(
     private getDirectoryDelegatedAccessQuery: GetDirectoryDelegatedAccessQuery,
     private getFullDelegatedAccessQuery: GetFullDelegatedAccessQuery,

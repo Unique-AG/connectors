@@ -160,7 +160,7 @@ function createMockQuery(
   const { delegatedAccesses = [], searchResults = [[]], searchErrors = [] } = opts;
 
   // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
-  const getDelegtedAccessQuery = { run: vi.fn().mockResolvedValue(delegatedAccesses) } as any;
+  const getDelegatedAccessQuery = { run: vi.fn().mockResolvedValue(delegatedAccesses) } as any;
 
   let searchCallIndex = 0;
   const contentSearch = vi.fn().mockImplementation(() => {
@@ -206,7 +206,7 @@ function createMockQuery(
   // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
   const sanitizeMock = sanitize as any;
   const instance = new SemanticSearchEmailsQuery(
-    getDelegtedAccessQuery,
+    getDelegatedAccessQuery,
     apiMock,
     profileMock,
     sanitizeMock,

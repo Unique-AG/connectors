@@ -10,7 +10,7 @@ import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, isNullish, map, pick, pipe, sortBy } from 'remeda';
 import * as z from 'zod';
 import { UserProfile } from '~/db';
-import { GetDelegtedAccessQuery } from '~/features/delegated-access/queries/get-delegates-access.query';
+import { GetDelegatedAccessQuery } from '~/features/delegated-access/queries/get-delegates-access.query';
 import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { traceError } from '~/features/tracing.utils';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
@@ -83,7 +83,7 @@ type SearchJobInput = { isScoped: false } | ValidSearchJobInput;
 @Injectable()
 export class SemanticSearchEmailsQuery {
   public constructor(
-    private readonly getDelegtedAccessQuery: GetDelegtedAccessQuery,
+    private readonly getDelegatedAccessQuery: GetDelegatedAccessQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly cleanupSearchConditionsForUserQuery: CleanupSearchConditionsForUserQuery,
@@ -196,7 +196,7 @@ export class SemanticSearchEmailsQuery {
   private async loadAccessContext(
     userProfile: NonNullishProps<UserProfile, 'email'>,
   ): Promise<AccessContext> {
-    const delegatedAccesses = await this.getDelegtedAccessQuery.run(userProfile.id);
+    const delegatedAccesses = await this.getDelegatedAccessQuery.run(userProfile.id);
     const scopes = await this.uniqueApi.scopes.getByExternalIds([
       getRootScopeExternalId(),
       getRootScopeExternalIdForUser(userProfile.providerUserId),
