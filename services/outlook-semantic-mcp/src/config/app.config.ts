@@ -56,7 +56,19 @@ const commonSchema = z
     isDebuggingOn: c.logLevel === 'debug' || c.logLevel === 'trace',
   }));
 
-const ConfigSchema = commonSchema.and(delegatedAccessConfig).and(mcpBackendConfig);
+const ConfigSchema = commonSchema
+  .and(delegatedAccessConfig)
+  .and(mcpBackendConfig)
+  .superRefine((data, ctx) => {
+    if (data.mcpBackend === 'MicrosoftGraph' && data.delegatedAccessScan === 'granularAccess') {
+      ctx.addIssue({
+        code: 'custom',
+        message:
+          '`granularAccess` is not supported with the `MicrosoftGraph` backend; use `fullAccessOnly` or `disabled`',
+        path: ['delegatedAccessScan'],
+      });
+    }
+  });
 
 export const appConfig = registerConfig('app', ConfigSchema, {
   whitelistKeys: new Set([
