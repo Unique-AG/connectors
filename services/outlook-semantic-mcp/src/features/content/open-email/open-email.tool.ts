@@ -14,26 +14,35 @@ const OpenEmailByIdInputSchema = z.object({
   id: z
     .string()
     .describe(
-      'The email identifier from a `search_emails` result. Use `uniqueContentId` when it is available; otherwise use `msGraphMessageId`.',
+      'The email identifier. Use the `id` field from `openEmailParams` in a `search_emails` result.',
     ),
   idType: z
     .nativeEnum(SearchBackend)
     .describe(
-      'Indicates which identifier is being passed, derived from the `search_emails` result. Use `Unique` when passing `uniqueContentId`; use `MsGraph` when passing `msGraphMessageId`.',
+      'The backend type. Use the `idType` field from `openEmailParams` in a `search_emails` result.',
     ),
   mailbox: z
     .email()
     .optional()
     .describe(
-      "The mailbox address this email belongs to. Pass the `sourceMailbox` value from the `search_emails` result. Required for delegated mailbox access; omit for the user's own mailbox.",
+      'Delegated mailbox address. Use the `mailbox` field from `openEmailParams` in a `search_emails` result.',
     ),
   parentFolderId: z
     .string()
     .regex(/^[A-Za-z0-9_=-]+$/)
     .optional()
     .describe(
-      'The folder containing this email. Pass the `folderId` value from the `search_emails` result. Required when `mailbox` is provided.',
+      'The folder containing this email. Use the `parentFolderId` field from `openEmailParams` in a `search_emails` result.',
     ),
+  idIsImmutable: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether the id is an immutable ID. Use the `idIsImmutable` field from `openEmailParams` in a `search_emails` result.',
+    ),
+}).refine((val) => !val.mailbox || val.parentFolderId !== undefined, {
+  message: 'parentFolderId is required when mailbox is provided',
+  path: ['parentFolderId'],
 });
 
 export const EmailDataSchema = z.object({
@@ -61,7 +70,7 @@ export class OpenEmailTool {
     name: 'open_email_by_id',
     title: 'Open Email by ID',
     description:
-      'Retrieve the full body of an email. Both `id` and `idType` must come from a `search_emails` result: pass `uniqueContentId` as `id` and `Unique` as `idType` when `uniqueContentId` is available; otherwise pass `msGraphMessageId` as `id` and `MsGraph` as `idType`.',
+      'Retrieve the full body of an email. Pass the `openEmailParams` object from a `search_emails` result directly as the tool input.',
     parameters: OpenEmailByIdInputSchema,
     outputSchema: OpenEmailByIdOutputSchema,
     annotations: {
@@ -94,6 +103,7 @@ export class OpenEmailTool {
       input.idType,
       input.mailbox,
       input.parentFolderId,
+      input.idIsImmutable,
     );
     return { success: true, emailData };
   }

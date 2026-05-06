@@ -130,10 +130,12 @@ export class MsGraphKqlSearchEmailsQuery {
 
     for (const hit of fetchResult.hits) {
       const translationMap = idsTranslationMaps.get(hit.mailbox);
-      const translatedId = translationMap?.get(hit.restId) ?? hit.restId;
+      const translatedId = translationMap?.get(hit.restId);
+      const idIsImmutable = translatedId !== undefined;
+      const id = translatedId ?? hit.restId;
 
       results.push({
-        msGraphMessageId: translatedId,
+        msGraphMessageId: id,
         folderId: hit.parentFolderId,
         title: hit.subject,
         from: hit.from,
@@ -143,6 +145,13 @@ export class MsGraphKqlSearchEmailsQuery {
         text: hit.text,
         uniqueContentUrl: undefined,
         backend: SearchBackend.MsGraph,
+        openEmailParams: {
+          id,
+          idType: SearchBackend.MsGraph,
+          mailbox: hit.isDelegated ? hit.mailbox : undefined,
+          parentFolderId: hit.isDelegated ? hit.parentFolderId : undefined,
+          idIsImmutable,
+        },
       });
     }
 

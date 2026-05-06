@@ -29,6 +29,7 @@ function makeGraphResult(
     text: 'Graph body',
     uniqueContentUrl: undefined,
     backend: SearchBackend.MsGraph,
+    openEmailParams: { id: emailId, idType: SearchBackend.MsGraph, idIsImmutable: false },
     ...overrides,
   };
 }
@@ -49,6 +50,7 @@ function makeUniqueResult(
     text: 'Unique body',
     uniqueContentUrl: 'https://unique.example.com/doc/1',
     backend: SearchBackend.Unique,
+    openEmailParams: { id: `content-${emailId}`, idType: SearchBackend.Unique },
     ...overrides,
   };
 }

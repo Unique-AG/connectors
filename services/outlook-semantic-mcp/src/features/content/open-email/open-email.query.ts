@@ -54,9 +54,10 @@ export class OpenEmailQuery {
     idType: SearchBackend,
     mailbox?: string,
     folderId?: string,
+    idIsImmutable?: boolean,
   ): Promise<OpenEmailResult> {
     if (idType === SearchBackend.MsGraph) {
-      return this.readMessageFromMsGraph(userProfileId, id, mailbox, folderId);
+      return this.readMessageFromMsGraph(userProfileId, id, mailbox, folderId, idIsImmutable);
     }
     return this.readMessageFromUnique(id);
   }
@@ -66,16 +67,17 @@ export class OpenEmailQuery {
     messageId: string,
     mailbox?: string,
     folderId?: string,
+    idIsImmutable?: boolean,
   ): Promise<OpenEmailResult> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    // Read via folder path to support shared/delegated folder access; falls back to /me for own mailbox
     const messagePath =
       mailbox && folderId
         ? `/users/${mailbox}/mailFolders/${folderId}/messages/${messageId}`
         : `/me/messages/${messageId}`;
+    const immutableIdHeader = idIsImmutable ? ', IdType="ImmutableId"' : '';
     const raw = await client
       .api(messagePath)
-      .header('Prefer', 'IdType="ImmutableId", outlook.body-content-type="text"')
+      .header('Prefer', `outlook.body-content-type="text"${immutableIdHeader}`)
       .select(
         'id,subject,body,from,toRecipients,ccRecipients,receivedDateTime,parentFolderId,webLink,hasAttachments',
       )

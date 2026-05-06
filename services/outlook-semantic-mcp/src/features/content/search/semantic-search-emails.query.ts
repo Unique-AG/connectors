@@ -32,6 +32,14 @@ export enum SearchBackend {
   MsGraph = 'MsGraph',
 }
 
+export interface OpenEmailParams {
+  id: string;
+  idType: SearchBackend;
+  mailbox?: string;
+  parentFolderId?: string;
+  idIsImmutable?: boolean;
+}
+
 export interface SearchEmailResult {
   uniqueContentId?: string;
   msGraphMessageId?: string;
@@ -44,6 +52,7 @@ export interface SearchEmailResult {
   text: string;
   uniqueContentUrl: string | undefined;
   backend: SearchBackend;
+  openEmailParams: OpenEmailParams;
 }
 
 interface DelegatedAccess {
@@ -173,6 +182,7 @@ export class SemanticSearchEmailsQuery {
           receivedDateTime: metadata?.receivedDateTime ?? '',
           backend: SearchBackend.Unique,
           text: concatChunks(Array.from(item.chunks.values())),
+          openEmailParams: { id: item.content.id, idType: SearchBackend.Unique },
         };
       }),
     );

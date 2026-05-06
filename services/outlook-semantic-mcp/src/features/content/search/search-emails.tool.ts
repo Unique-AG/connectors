@@ -20,8 +20,8 @@ const SearchEmailsToolInputSchema = isMicrosoftGraphBackend()
   : SearchEmailsUnifiedInputSchema;
 
 const SearchEmailsToolDescription = isMicrosoftGraphBackend()
-  ? 'Search emails using Microsoft Graph KQL queries across your own and delegated mailboxes. Returns matched emails with an id per result.\n\nTo read the full body of a result, call `open_email_by_id` passing `msGraphMessageId` as `id` and `MsGraph` as `idType`.\n\nIf the response includes `searchNotes`, display them to the user after results.'
-  : 'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by a well-known folder (Inbox, Sent Items, Drafts, etc.) pass the name directly in `directories` — no need to call `list_folders`. For custom folders, call `list_folders` first to get the folder id. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` passing `uniqueContentId` (or `msGraphMessageId` if unavailable) as `id`, and `Unique` (or `MsGraph`) as `idType`. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete. If the response includes `searchNotes`, display them to the user after results.';
+  ? 'Search emails using Microsoft Graph KQL queries across your own and delegated mailboxes. Returns matched emails with an id per result.\n\nTo read the full body of a result, call `open_email_by_id` passing the `openEmailParams` object from the result directly as the tool input.\n\nIf the response includes `searchNotes`, display them to the user after results.'
+  : 'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by a well-known folder (Inbox, Sent Items, Drafts, etc.) pass the name directly in `directories` — no need to call `list_folders`. For custom folders, call `list_folders` first to get the folder id. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` passing the `openEmailParams` object from the result directly as the tool input. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete. If the response includes `searchNotes`, display them to the user after results.';
 
 const SearchEmailResultSchema = z.object({
   uniqueContentId: z
@@ -74,6 +74,17 @@ const SearchEmailResultSchema = z.object({
     .nativeEnum(SearchBackend)
     .describe(
       'Search backend that returned this result: "Unique" (semantic) or "MsGraph" (keyword). Determines which `idType` to use when calling `open_email_by_id`.',
+    ),
+  openEmailParams: z
+    .object({
+      id: z.string(),
+      idType: z.nativeEnum(SearchBackend),
+      mailbox: z.string().optional(),
+      parentFolderId: z.string().optional(),
+      idIsImmutable: z.boolean().optional(),
+    })
+    .describe(
+      'Pre-constructed input for `open_email_by_id`. Pass this object directly as the tool input without modification.',
     ),
 });
 
