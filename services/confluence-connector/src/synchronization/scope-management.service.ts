@@ -101,14 +101,14 @@ export class ScopeManagementService {
           externalId: expectedExternalId,
           msg: 'Claimed root scope ownership',
         });
-      } catch (error) {
+      } catch (err) {
         this.logger.error({
           scopeId: rootScope.id,
           externalId: expectedExternalId,
-          err: error,
+          err,
           msg: 'Failed to claim root scope ownership',
         });
-        throw error;
+        throw err;
       }
       return;
     }
@@ -194,13 +194,13 @@ export class ScopeManagementService {
           deletedFileCount,
           msg: 'Deleted orphaned space scope and its files',
         });
-      } catch (error) {
+      } catch (err) {
         this.metrics.recordOrphanedScopesCleaned(1, 'failure');
 
         this.logger.error({
           scopeId: scope.id,
           spaceKey: parsed.spaceKey,
-          err: error,
+          err,
           msg: 'Failed to clean up orphaned space scope',
         });
       }

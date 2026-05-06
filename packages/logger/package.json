@@ -6,17 +6,23 @@
   "types": "src/index.ts",
   "scripts": {
     "build": "tsc",
-    "test": "echo 'No test specified'",
+    "test": "vitest run",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
     "format": "biome format .",
     "format:fix": "biome format . --write",
     "check-types": "tsc --noEmit"
   },
+  "dependencies": {
+    "@unique-ag/utils": "workspace:*",
+    "remeda": "2.32.0",
+    "serialize-error-cjs": "0.2.0"
+  },
   "devDependencies": {
     "@types/node": "22.16.5",
     "pino-pretty": "13.1.1",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
   },
   "peerDependencies": {
     "@nestjs/common": "^11",

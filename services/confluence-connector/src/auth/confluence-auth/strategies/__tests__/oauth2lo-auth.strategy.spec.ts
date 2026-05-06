@@ -181,7 +181,7 @@ describe('OAuth2LoAuthStrategy', () => {
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
       const [loggedObj] = mockLogger.error.mock.calls[0]!;
       expect(loggedObj).toMatchObject({
-        err: expect.any(Error),
+        err: expect.objectContaining({ message: expect.any(String) }),
         msg: 'Failed to acquire Confluence cloud token via OAuth 2.0 2LO',
       });
     });

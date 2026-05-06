@@ -79,11 +79,11 @@ export class IngestionService {
         registrationResponse.readUrl,
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         pageId: page.id,
         title: page.title,
-        err: error,
+        err,
         msg: 'Failed to ingest page, skipping',
       });
       if (contentId) {
@@ -133,12 +133,12 @@ export class IngestionService {
         registrationResponse.readUrl,
       );
       await this.uniqueApiClient.ingestion.finalizeIngestion(finalizationRequest);
-    } catch (error) {
+    } catch (err) {
       stream?.destroy();
       this.logger.error({
         attachmentId: attachment.id,
         title: createSmeared(attachment.title),
-        err: error,
+        err,
         msg: 'Failed to ingest attachment, skipping',
       });
       if (contentId) {
@@ -161,11 +161,11 @@ export class IngestionService {
         contentId,
         msg: 'Deleted orphaned content after failed ingestion',
       });
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         ...logContext,
         contentId,
-        err: error,
+        err,
         msg: 'Failed to clean up orphaned content after failed ingestion',
       });
     }
@@ -203,8 +203,12 @@ export class IngestionService {
       });
 
       return deleted;
-    } catch (error) {
-      this.logger.error({ contentKeys, err: error, msg: 'Failed to delete content, skipping' });
+    } catch (err) {
+      this.logger.error({
+        contentKeys,
+        err,
+        msg: 'Failed to delete content, skipping',
+      });
       return 0;
     }
   }
