@@ -97,7 +97,10 @@ export class MsGraphKqlSearchEmailsQuery {
     if (!msGraphBatchRequest.length) {
       return {
         results: [],
-        searchSummary: `In order to get results we need at least 1 query to execute`,
+        searchSummary: [
+          `In order to get results we need at least 1 valid query to execute. `,
+          `Your queries do not match any inbox which you can access`,
+        ].join(''),
       };
     }
 
