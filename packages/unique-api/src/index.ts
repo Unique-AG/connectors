@@ -38,6 +38,7 @@ export type {
 } from './ingestion/ingestion.types';
 export { IngestionState } from './ingestion/ingestion.types';
 export type {
+  BulkMoveResult,
   DeleteFolderResult,
   Scope,
   ScopeAccess,

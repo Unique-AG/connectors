@@ -11,7 +11,7 @@ interface MockDeps {
   scopes: {
     getByExternalId: ReturnType<typeof vi.fn>;
     listChildren: ReturnType<typeof vi.fn>;
-    updateParent: ReturnType<typeof vi.fn>;
+    bulkMove: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
 }
@@ -20,7 +20,13 @@ function makeService(): MockDeps {
   const scopes = {
     getByExternalId: vi.fn(),
     listChildren: vi.fn(),
-    updateParent: vi.fn().mockResolvedValue(undefined),
+    bulkMove: vi.fn().mockResolvedValue({
+      scopeIds: [],
+      asyncMetadataRebuild: false,
+      jobId: null,
+      affectedFiles: null,
+      message: null,
+    }),
     delete: vi.fn().mockResolvedValue({ successFolders: [], failedFolders: [] }),
   };
 
@@ -46,7 +52,7 @@ describe('RootScopeMigrationService', () => {
 
       expect(result).toEqual({ status: 'no_migration_needed' });
       expect(scopes.listChildren).not.toHaveBeenCalled();
-      expect(scopes.updateParent).not.toHaveBeenCalled();
+      expect(scopes.bulkMove).not.toHaveBeenCalled();
       expect(scopes.delete).not.toHaveBeenCalled();
     });
 
@@ -83,14 +89,12 @@ describe('RootScopeMigrationService', () => {
       const result = await service.migrateIfNeeded(NEW_ROOT_ID, EXTERNAL_ID);
 
       expect(result).toEqual({ status: 'migration_completed' });
-      expect(scopes.updateParent).toHaveBeenCalledTimes(3);
-      expect(scopes.updateParent).toHaveBeenCalledWith('child-1', NEW_ROOT_ID);
-      expect(scopes.updateParent).toHaveBeenCalledWith('child-2', NEW_ROOT_ID);
-      expect(scopes.updateParent).toHaveBeenCalledWith('child-3', NEW_ROOT_ID);
+      expect(scopes.bulkMove).toHaveBeenCalledOnce();
+      expect(scopes.bulkMove).toHaveBeenCalledWith(['child-1', 'child-2', 'child-3'], NEW_ROOT_ID);
       expect(scopes.delete).toHaveBeenCalledWith(OLD_ROOT_ID);
     });
 
-    it('skips updateParent when no children and still deletes old root', async () => {
+    it('skips bulkMove when no children and still deletes old root', async () => {
       const { service, scopes } = makeService();
       scopes.getByExternalId.mockResolvedValue({
         id: OLD_ROOT_ID,
@@ -104,11 +108,11 @@ describe('RootScopeMigrationService', () => {
       const result = await service.migrateIfNeeded(NEW_ROOT_ID, EXTERNAL_ID);
 
       expect(result).toEqual({ status: 'migration_completed' });
-      expect(scopes.updateParent).not.toHaveBeenCalled();
+      expect(scopes.bulkMove).not.toHaveBeenCalled();
       expect(scopes.delete).toHaveBeenCalledWith(OLD_ROOT_ID);
     });
 
-    it('returns migration_failed with count when one of three updateParent calls rejects', async () => {
+    it('returns migration_failed when bulkMove throws', async () => {
       const { service, scopes } = makeService();
       scopes.getByExternalId.mockResolvedValue({
         id: OLD_ROOT_ID,
@@ -118,46 +122,14 @@ describe('RootScopeMigrationService', () => {
       });
       scopes.listChildren.mockResolvedValue([
         { id: 'child-1', name: 'Space1', parentId: OLD_ROOT_ID },
-        { id: 'child-2', name: 'Space2', parentId: OLD_ROOT_ID },
-        { id: 'child-3', name: 'Space3', parentId: OLD_ROOT_ID },
       ]);
-      scopes.updateParent
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValueOnce(new Error('reparent failed'))
-        .mockResolvedValueOnce(undefined);
+      scopes.bulkMove.mockRejectedValue(new Error('bulk move failed'));
 
       const result = await service.migrateIfNeeded(NEW_ROOT_ID, EXTERNAL_ID);
 
       expect(result).toEqual({
         status: 'migration_failed',
-        error: expect.stringContaining('1 of 3'),
-      });
-      expect(result).toEqual({
-        status: 'migration_failed',
-        error: expect.stringContaining('reparent failed'),
-      });
-      expect(scopes.delete).not.toHaveBeenCalled();
-    });
-
-    it('returns migration_failed with N of N when all children fail', async () => {
-      const { service, scopes } = makeService();
-      scopes.getByExternalId.mockResolvedValue({
-        id: OLD_ROOT_ID,
-        name: 'OldConfluence',
-        parentId: null,
-        externalId: EXTERNAL_ID,
-      });
-      scopes.listChildren.mockResolvedValue([
-        { id: 'child-1', name: 'Space1', parentId: OLD_ROOT_ID },
-        { id: 'child-2', name: 'Space2', parentId: OLD_ROOT_ID },
-      ]);
-      scopes.updateParent.mockRejectedValue(new Error('all broken'));
-
-      const result = await service.migrateIfNeeded(NEW_ROOT_ID, EXTERNAL_ID);
-
-      expect(result).toEqual({
-        status: 'migration_failed',
-        error: expect.stringContaining('2 of 2'),
+        error: 'bulk move failed',
       });
       expect(scopes.delete).not.toHaveBeenCalled();
     });
@@ -250,28 +222,6 @@ describe('RootScopeMigrationService', () => {
         status: 'migration_failed',
         error: 'string error',
       });
-    });
-
-    it('converts non-Error thrown from updateParent to string in error result', async () => {
-      const { service, scopes } = makeService();
-      scopes.getByExternalId.mockResolvedValue({
-        id: OLD_ROOT_ID,
-        name: 'OldConfluence',
-        parentId: null,
-        externalId: EXTERNAL_ID,
-      });
-      scopes.listChildren.mockResolvedValue([
-        { id: 'child-1', name: 'Space1', parentId: OLD_ROOT_ID },
-      ]);
-      scopes.updateParent.mockRejectedValue('string reparent error');
-
-      const result = await service.migrateIfNeeded(NEW_ROOT_ID, EXTERNAL_ID);
-
-      expect(result).toEqual({
-        status: 'migration_failed',
-        error: expect.stringContaining('string reparent error'),
-      });
-      expect(scopes.delete).not.toHaveBeenCalled();
     });
   });
 });

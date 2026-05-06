@@ -3,6 +3,9 @@ import { Logger } from '@nestjs/common';
 import { isNullish } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
+  BULK_MOVE_MUTATION,
+  type BulkMoveMutationInput,
+  type BulkMoveMutationResult,
   CREATE_SCOPE_ACCESSES_MUTATION,
   type CreateScopeAccessesMutationInput,
   type CreateScopeAccessesMutationResult,
@@ -22,7 +25,7 @@ import {
   type UpdateScopeMutationInput,
   type UpdateScopeMutationResult,
 } from './scopes.queries';
-import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
+import type { BulkMoveResult, DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
 import { UniqueApiScopesFacade } from './unique-scopes.facade';
 
 const BATCH_SIZE = 100;
@@ -169,6 +172,30 @@ export class ScopesService implements UniqueApiScopesFacade {
     } while (batchCount === BATCH_SIZE);
 
     return scopes;
+  }
+
+  public async bulkMove(scopeIds: string[], targetScopeId: string): Promise<BulkMoveResult> {
+    this.logger.debug(`Bulk-moving ${scopeIds.length} scopes to target ${targetScopeId}`);
+
+    const result = await this.scopeManagementClient.request<
+      BulkMoveMutationResult,
+      BulkMoveMutationInput
+    >(BULK_MOVE_MUTATION, {
+      input: { scopeIds, targetScopeId },
+    });
+
+    this.logger.debug({
+      msg: 'bulkMove response',
+      response: result.bulkMove,
+    });
+
+    return {
+      scopeIds: result.bulkMove.scopeIds,
+      asyncMetadataRebuild: result.bulkMove.asyncMetadataRebuild,
+      jobId: result.bulkMove.jobId ?? null,
+      affectedFiles: result.bulkMove.affectedFiles ?? null,
+      message: result.bulkMove.message ?? null,
+    };
   }
 
   public async createAccesses(

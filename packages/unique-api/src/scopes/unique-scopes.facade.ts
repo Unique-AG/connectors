@@ -1,4 +1,4 @@
-import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
+import type { BulkMoveResult, DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
 
 export interface UniqueApiScopesFacade {
   createFromPaths(
@@ -19,6 +19,7 @@ export interface UniqueApiScopesFacade {
     newParentId: string,
   ): Promise<{ id: string; parentId: string | null }>;
   listChildren(parentId: string): Promise<Scope[]>;
+  bulkMove(scopeIds: string[], targetScopeId: string): Promise<BulkMoveResult>;
   createAccesses(
     scopeId: string,
     accesses: ScopeAccess[],

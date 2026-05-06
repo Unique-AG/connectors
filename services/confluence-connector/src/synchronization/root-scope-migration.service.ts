@@ -38,25 +38,11 @@ export class RootScopeMigrationService {
       const children = await this.uniqueApiClient.scopes.listChildren(oldRoot.id);
       this.logger.log(`Found ${children.length} children to migrate to new root ${newRootScopeId}`);
 
-      let failedCount = 0;
-      let firstError: string | undefined;
-
-      for (const child of children) {
-        try {
-          await this.uniqueApiClient.scopes.updateParent(child.id, newRootScopeId);
-        } catch (err) {
-          failedCount++;
-          if (firstError === undefined) {
-            firstError = err instanceof Error ? err.message : String(err);
-          }
-        }
-      }
-
-      if (failedCount > 0) {
-        return {
-          status: 'migration_failed',
-          error: `Failed to reparent ${failedCount} of ${children.length} children: ${firstError}`,
-        };
+      if (children.length > 0) {
+        await this.uniqueApiClient.scopes.bulkMove(
+          children.map((c) => c.id),
+          newRootScopeId,
+        );
       }
 
       this.logger.log(`Reparented ${children.length} children to new root ${newRootScopeId}`);
