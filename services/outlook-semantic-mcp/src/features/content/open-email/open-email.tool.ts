@@ -22,13 +22,14 @@ const OpenEmailByIdInputSchema = z.object({
       'Indicates which identifier is being passed, derived from the `search_emails` result. Use `Unique` when passing `uniqueContentId`; use `MsGraph` when passing `msGraphMessageId`.',
     ),
   mailbox: z
-    .string()
+    .email()
     .optional()
     .describe(
       'The mailbox address this email belongs to. Pass the `sourceMailbox` value from the `search_emails` result. Required for delegated mailbox access; omit for the user\'s own mailbox.',
     ),
   parentFolderId: z
     .string()
+    .regex(/^[A-Za-z0-9_=-]+$/)
     .optional()
     .describe(
       'The folder containing this email. Pass the `folderId` value from the `search_emails` result. Required when `mailbox` is provided.',

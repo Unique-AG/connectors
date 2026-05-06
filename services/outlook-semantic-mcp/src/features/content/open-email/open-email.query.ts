@@ -75,8 +75,7 @@ export class OpenEmailQuery {
         : `/me/messages/${messageId}`;
     const raw = await client
       .api(messagePath)
-      .header('Prefer', 'IdType="ImmutableId"')
-      .header('Prefer', 'outlook.body-content-type="text"')
+      .header('Prefer', 'IdType="ImmutableId", outlook.body-content-type="text"')
       .select(
         'id,subject,body,from,toRecipients,ccRecipients,receivedDateTime,parentFolderId,webLink,hasAttachments',
       )
