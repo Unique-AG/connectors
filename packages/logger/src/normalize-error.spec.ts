@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeError } from '../normalize-error';
+import { normalizeError } from './normalize-error';
 
 describe('normalizeError', () => {
   it('returns Error instances unchanged', () => {
@@ -53,6 +53,7 @@ describe('normalizeError', () => {
 
     expect(result).toBeInstanceOf(Error);
     expect(result.message).toBe(JSON.stringify(obj));
+    expect(result.cause).toBe(obj);
   });
 
   it('converts number to Error', () => {
@@ -77,6 +78,7 @@ describe('normalizeError', () => {
 
     expect(result).toBeInstanceOf(Error);
     expect(result.message).toBe('[object Object]');
+    expect(result.cause).toBe(obj);
   });
 
   it('handles objects with custom toString', () => {
