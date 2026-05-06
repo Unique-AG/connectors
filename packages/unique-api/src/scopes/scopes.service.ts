@@ -192,14 +192,19 @@ export class ScopesService implements UniqueApiScopesFacade {
   public async bulkMove(scopeIds: string[], targetScopeId: string): Promise<BulkMoveResult> {
     this.logger.debug(`Bulk-moving ${scopeIds.length} scopes to target ${targetScopeId}`);
 
-    const result = await this.scopeManagementClient.request<
-      BulkMoveMutationResult,
-      BulkMoveMutationInput
-    >(
-      BULK_MOVE_MUTATION,
-      { input: { scopeIds, targetScopeId } },
-      { errorTransform: toSafeBulkMoveError },
-    );
+    let result: BulkMoveMutationResult;
+    try {
+      result = await this.scopeManagementClient.request<
+        BulkMoveMutationResult,
+        BulkMoveMutationInput
+      >(
+        BULK_MOVE_MUTATION,
+        { input: { scopeIds, targetScopeId } },
+        { errorTransform: toSafeBulkMoveError },
+      );
+    } catch (error) {
+      throw toSafeBulkMoveError(error);
+    }
 
     this.logger.debug({
       msg: 'bulkMove response',

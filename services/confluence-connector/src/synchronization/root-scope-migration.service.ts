@@ -1,4 +1,4 @@
-import { toSafeBulkMoveError, type UniqueApiClient } from '@unique-ag/unique-api';
+import type { UniqueApiClient } from '@unique-ag/unique-api';
 import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 
@@ -65,12 +65,14 @@ export class RootScopeMigrationService {
       this.logger.log(`Migration completed successfully, old root ${oldRoot.id} deleted`);
       return { status: 'migration_completed' };
     } catch (error) {
-      const safeError = toSafeBulkMoveError(error);
       this.logger.error({
         msg: 'Root scope migration failed',
-        err: safeError,
+        err: error,
       });
-      return { status: 'migration_failed', error: safeError.message };
+      return {
+        status: 'migration_failed',
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   }
 }
