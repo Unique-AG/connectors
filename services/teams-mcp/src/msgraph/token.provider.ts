@@ -104,7 +104,7 @@ export class TokenProvider implements AuthenticationProvider {
         this.logger.error(
           {
             status: response.status,
-            errorText: parsedError,
+            errorText,
             userProfileId,
             tokenRefreshFailed: true,
             errorSource: 'microsoft_graph_api',
