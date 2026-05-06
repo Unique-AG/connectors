@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.9](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.8...teams-mcp@0.2.9) (2026-05-06)
+
+
+### Bug Fixes
+
+* **teams-mcp:** propagate Microsoft invalid_grant as McpError for proper client re-auth signal ([#511](https://github.com/Unique-AG/connectors/issues/511)) ([d3c4cc2](https://github.com/Unique-AG/connectors/commit/d3c4cc283d8f176dfd5f5a2c7a8293307c0e4812))
+
 ## [0.2.8](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.7...teams-mcp@0.2.8) (2026-05-05)
 
 
