@@ -8,7 +8,7 @@ import {
   SearchBackend,
   SearchEmailResult,
 } from '~/features/content/search/semantic-search-emails.query';
-import { MarkPipelineNoFullAccessCommand } from '~/features/delegated-access/commands/mark-pipeline-no-full-access.command';
+import { MarkAccountsNoFullAccessCommand } from '~/features/delegated-access/commands/mark-accounts-no-full-access.command';
 import { GetMailboxesWithFullDelegatedAccessQuery } from '~/features/delegated-access/queries/get-mailboxes-with-full-delegated-access.query';
 import { TranslateGraphIdsToImmutableIdsQuery } from '~/features/graph-utils/translate-graph-ids-to-immutable-ids.query';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
@@ -80,15 +80,15 @@ export class MsGraphKqlSearchEmailsQuery {
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly translateGraphIdsToImmutableIdsQuery: TranslateGraphIdsToImmutableIdsQuery,
     private readonly getMailboxesWithFullDelegatedAccessQuery: GetMailboxesWithFullDelegatedAccessQuery,
-    private readonly markPipelineNoFullAccessCommand: MarkPipelineNoFullAccessCommand,
+    private readonly markAccountsNoFullAccessCommand: MarkAccountsNoFullAccessCommand,
   ) {}
 
   @Span()
   public async run(
-    userProfileTypeId: UserProfileTypeID,
+    userProfileId: UserProfileTypeID,
     queries: Array<QueryInput>,
   ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
-    const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
+    const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const msGraphBatchRequest: GraphBatchRequest[] = await this.translateQueriesToBatchRequests({
       userProfile,
       queries,
@@ -204,7 +204,8 @@ export class MsGraphKqlSearchEmailsQuery {
           ];
         }
 
-        // Capped at 25 to keep the total sub-requests per input query within two $batch calls of 20.
+        // For safety to not expload the number of request we cap the delegated access search to 25. 25 Is not an arbitrary number
+        // Microsoft documents that a exchange user can have delegated access to at most 25 other inboxes.
         const delegatesToFilter = delegatedAccesses.slice(0, 25);
         return [
           {
@@ -277,7 +278,7 @@ export class MsGraphKqlSearchEmailsQuery {
 
         if (originalRequest.isDelegated && (status === 403 || status === 404)) {
           mailboxesWhichLostAccess.add(originalRequest.mailbox);
-          this.markPipelineNoFullAccessCommand
+          this.markAccountsNoFullAccessCommand
             .run({ delegateUserId: userProfile.id, ownerEmail: originalRequest.mailbox })
             .catch(() => undefined);
           continue;

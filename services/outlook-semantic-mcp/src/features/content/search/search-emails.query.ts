@@ -17,7 +17,7 @@ export interface SearchEmailsToolInput {
 }
 
 type BackendExecutor = (
-  userProfileTypeId: UserProfileTypeID,
+  userProfileId: UserProfileTypeID,
   input: SearchEmailsToolInput,
 ) => Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }>;
 
@@ -30,37 +30,37 @@ export class SearchEmailsQuery {
 
   private readonly executors: Record<SearchBackend, BackendExecutor> = {
     [SearchBackend.Unique]: (
-      userProfileTypeId: UserProfileTypeID,
+      userProfileId: UserProfileTypeID,
       input: SearchEmailsToolInput,
     ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> => {
       if (isMicrosoftGraphBackend() || !input.uniqueSemanticSearchQueries?.length) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
       return this.semanticSearchQuery
-        .run(userProfileTypeId, input.uniqueSemanticSearchQueries)
+        .run(userProfileId, input.uniqueSemanticSearchQueries)
         .then(({ results, searchSummary }) => ({ results, searchSummary }));
     },
     [SearchBackend.MsGraph]: (
-      userProfileTypeId: UserProfileTypeID,
+      userProfileId: UserProfileTypeID,
       input: SearchEmailsToolInput,
     ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> => {
       if (!input.msGraphKeywordSearchQueries) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
-      return this.msGraphKqlQuery.run(userProfileTypeId, input.msGraphKeywordSearchQueries);
+      return this.msGraphKqlQuery.run(userProfileId, input.msGraphKeywordSearchQueries);
     },
   };
 
   public async run(
-    userProfileTypeId: UserProfileTypeID,
+    userProfileId: UserProfileTypeID,
     input: SearchEmailsToolInput,
   ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
     const [
       { results: semanticResults, searchSummary: semanticSummary },
       { results: graphResults, searchSummary: graphSummary },
     ] = await Promise.all([
-      this.executors[SearchBackend.Unique](userProfileTypeId, input),
-      this.executors[SearchBackend.MsGraph](userProfileTypeId, input),
+      this.executors[SearchBackend.Unique](userProfileId, input),
+      this.executors[SearchBackend.MsGraph](userProfileId, input),
     ]);
 
     const summaries = [semanticSummary, graphSummary].filter((s): s is string => s !== undefined);

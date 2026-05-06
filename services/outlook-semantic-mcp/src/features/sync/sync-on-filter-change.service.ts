@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { AppConfig, appConfig } from '~/config';
+import { IngestionConfig, ingestionConfig } from '~/config';
+import { McpBackendType } from '~/config/mcp-backend-type.config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 
@@ -9,14 +10,14 @@ export class SyncOnFilterChangeService implements OnModuleInit {
 
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(ingestionConfig.KEY) private readonly config: IngestionConfig,
   ) {}
 
   public async onModuleInit(): Promise<void> {
-    if (this.config.mcpBackend !== 'MicrosoftGraphAndUniqueApi') {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
       return;
     }
-    const defaultFilters = serializeMailFilters(this.config.ingestionDefaultMailFilters);
+    const defaultFilters = serializeMailFilters(this.config.defaultMailFilters);
     this.logger.debug({ msg: `Update all inboxes to new inbox filters`, defaultFilters });
 
     const maxAttempts = 5;

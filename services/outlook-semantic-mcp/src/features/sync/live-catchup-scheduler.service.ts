@@ -5,7 +5,8 @@ import { CronJob } from 'cron';
 import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
 import z from 'zod';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { AppConfig, appConfig } from '~/config';
+import { IngestionConfig, ingestionConfig } from '~/config';
+import { McpBackendType } from '~/config/mcp-backend-type.config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { NewTrace, traceEvent } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
@@ -24,7 +25,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(ingestionConfig.KEY) private readonly config: IngestionConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -33,7 +34,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
   }
 
   public onModuleDestroy() {
-    if (this.config.mcpBackend !== 'MicrosoftGraphAndUniqueApi') {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
       return;
     }
 
@@ -51,11 +52,11 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
   }
 
   private setupCronJob(): void {
-    if (this.config.mcpBackend !== 'MicrosoftGraphAndUniqueApi') {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
       return;
     }
 
-    const job = new CronJob(this.config.ingestionLiveCatchupRecovery, () => {
+    const job = new CronJob(this.config.liveCatchupRecovery, () => {
       this.runRecoveryScan();
       this.runReadyLiveCatchupsWhichDidNotRunRecently();
     });

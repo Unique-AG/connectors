@@ -6,8 +6,8 @@ import { isNullish, unique } from 'remeda';
 import {
   DRIZZLE,
   type DrizzleDatabase,
+  delegatedAccessAccounts,
   delegatedAccessDirectories,
-  delegatedAccessPipelines,
   directories,
   userProfiles,
 } from '~/db';
@@ -69,7 +69,7 @@ export class ListDirectoriesQuery {
     };
 
     const delegatedDirectoryRowsShape = {
-      ownerUserId: delegatedAccessPipelines.ownerUserId,
+      ownerUserId: delegatedAccessAccounts.ownerUserId,
       ownerEmail: userProfiles.email,
       ownerDisplayName: userProfiles.displayName,
       dirId: directories.id,
@@ -81,43 +81,43 @@ export class ListDirectoriesQuery {
     // Directory-level delegated access: specific directories granted via delegatedAccessDirectories
     const directoryLevelRows = await this.db
       .select(delegatedDirectoryRowsShape)
-      .from(delegatedAccessPipelines)
+      .from(delegatedAccessAccounts)
       .innerJoin(
         delegatedAccessDirectories,
-        eq(delegatedAccessDirectories.pipelineId, delegatedAccessPipelines.id),
+        eq(delegatedAccessDirectories.accountsId, delegatedAccessAccounts.id),
       )
-      .innerJoin(userProfiles, eq(userProfiles.id, delegatedAccessPipelines.ownerUserId))
+      .innerJoin(userProfiles, eq(userProfiles.id, delegatedAccessAccounts.ownerUserId))
       .innerJoin(
         directories,
         and(
-          eq(directories.userProfileId, delegatedAccessPipelines.ownerUserId),
+          eq(directories.userProfileId, delegatedAccessAccounts.ownerUserId),
           eq(directories.providerDirectoryId, delegatedAccessDirectories.directoryId),
           eq(directories.ignoreForSync, false),
         ),
       )
       .where(
         and(
-          eq(delegatedAccessPipelines.delegateUserId, userProfileId),
-          eq(delegatedAccessPipelines.hasFullDelegatedAccess, false),
+          eq(delegatedAccessAccounts.delegateUserId, userProfileId),
+          eq(delegatedAccessAccounts.hasFullDelegatedAccess, false),
         ),
       );
 
     // Full mailbox delegated access: all owner directories
     const fullAccessRows = await this.db
       .select(delegatedDirectoryRowsShape)
-      .from(delegatedAccessPipelines)
-      .innerJoin(userProfiles, eq(userProfiles.id, delegatedAccessPipelines.ownerUserId))
+      .from(delegatedAccessAccounts)
+      .innerJoin(userProfiles, eq(userProfiles.id, delegatedAccessAccounts.ownerUserId))
       .innerJoin(
         directories,
         and(
-          eq(directories.userProfileId, delegatedAccessPipelines.ownerUserId),
+          eq(directories.userProfileId, delegatedAccessAccounts.ownerUserId),
           eq(directories.ignoreForSync, false),
         ),
       )
       .where(
         and(
-          eq(delegatedAccessPipelines.delegateUserId, userProfileId),
-          eq(delegatedAccessPipelines.hasFullDelegatedAccess, true),
+          eq(delegatedAccessAccounts.delegateUserId, userProfileId),
+          eq(delegatedAccessAccounts.hasFullDelegatedAccess, true),
         ),
       );
 

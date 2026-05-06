@@ -6,8 +6,8 @@ import { DelegatedAccessUtilsModule } from '../delegated-access/delegated-access
 import { GraphUtilsModule } from '../graph-utils/graph-utils.module';
 import { FullSyncModule } from '../sync/full-sync';
 import { UserUtilsModule } from '../user-utils/user-utils.module';
+import { CleanupSearchConditionsForUserQuery } from './search/cleanup-search-conditions-for-user.query';
 import { MsGraphKqlSearchEmailsQuery } from './search/ms-graph-kql-search-emails.query';
-import { SanitizeSearchConditionsForUserQuery } from './search/sanitize-search-conditions-for-user.query';
 import { SearchEmailsQuery } from './search/search-emails.query';
 import { SemanticSearchEmailsQuery } from './search/semantic-search-emails.query';
 
@@ -15,7 +15,7 @@ const QUERIES = [
   SemanticSearchEmailsQuery,
   MsGraphKqlSearchEmailsQuery,
   SearchEmailsQuery,
-  SanitizeSearchConditionsForUserQuery,
+  CleanupSearchConditionsForUserQuery,
 ];
 
 @Module({

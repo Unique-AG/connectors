@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNotNull, notInArray, sql } from 'drizzle-orm';
-import { AppConfig, appConfig } from '~/config';
+import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
   DrizzleDatabase,
+  delegatedAccessAccounts,
   delegatedAccessDirectories,
-  delegatedAccessPipelines,
   directories,
   userProfiles,
 } from '~/db';
@@ -14,12 +14,12 @@ import { DelegatedAccessInfoDto } from './delegated-access-info.dto';
 @Injectable()
 export class GetDirectoryDelegatedAccessQuery {
   public constructor(
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
   public async run(userProfileId: string): Promise<DelegatedAccessInfoDto[]> {
-    if (this.config.delegatedAccessScan === 'disabled') {
+    if (this.config.scan === 'disabled') {
       return [];
     }
 
@@ -31,20 +31,20 @@ export class GetDirectoryDelegatedAccessQuery {
     return await this.db
       .select({
         ownerUserEmail: sql<string>`${userProfiles.email}`,
-        ownerUserId: delegatedAccessPipelines.ownerUserId,
+        ownerUserId: delegatedAccessAccounts.ownerUserId,
         ownerProviderUserId: sql<string>`${userProfiles.providerUserId}`,
         msGraphDirectoryIds: sql<string[]>`array_agg(${delegatedAccessDirectories.directoryId})`,
       })
-      .from(delegatedAccessPipelines)
+      .from(delegatedAccessAccounts)
       .innerJoin(
         delegatedAccessDirectories,
-        eq(delegatedAccessPipelines.id, delegatedAccessDirectories.pipelineId),
+        eq(delegatedAccessAccounts.id, delegatedAccessDirectories.accountsId),
       )
-      .innerJoin(userProfiles, eq(delegatedAccessPipelines.ownerUserId, userProfiles.id))
+      .innerJoin(userProfiles, eq(delegatedAccessAccounts.ownerUserId, userProfiles.id))
       .where(
         and(
-          eq(delegatedAccessPipelines.hasFullDelegatedAccess, false),
-          eq(delegatedAccessPipelines.delegateUserId, userProfileId),
+          eq(delegatedAccessAccounts.hasFullDelegatedAccess, false),
+          eq(delegatedAccessAccounts.delegateUserId, userProfileId),
           isNotNull(userProfiles.providerUserId),
           isNotNull(userProfiles.email),
           notInArray(delegatedAccessDirectories.directoryId, directoriesIgnoredForSync),
@@ -53,7 +53,7 @@ export class GetDirectoryDelegatedAccessQuery {
       .groupBy(
         userProfiles.providerUserId,
         userProfiles.email,
-        delegatedAccessPipelines.ownerUserId,
+        delegatedAccessAccounts.ownerUserId,
       );
   }
 }

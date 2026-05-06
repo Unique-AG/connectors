@@ -4,8 +4,8 @@ import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
 
-export const delegatedAccessPipelines = pgTable(
-  'delegated_access_pipelines',
+export const delegatedAccessAccounts = pgTable(
+  'delegated_access_accounts',
   {
     id: varchar()
       .primaryKey()
@@ -31,17 +31,17 @@ export const delegatedAccessPipelines = pgTable(
   (t) => [unique('unique_delegate_owner_pair').on(t.delegateUserId, t.ownerUserId)],
 );
 
-export const delegatedAccessPipelineRelations = relations(delegatedAccessPipelines, ({ one }) => ({
+export const delegatedAccessPipelineRelations = relations(delegatedAccessAccounts, ({ one }) => ({
   delegateUser: one(userProfiles, {
-    fields: [delegatedAccessPipelines.delegateUserId],
+    fields: [delegatedAccessAccounts.delegateUserId],
     references: [userProfiles.id],
     relationName: 'delegateUser',
   }),
   ownerUser: one(userProfiles, {
-    fields: [delegatedAccessPipelines.ownerUserId],
+    fields: [delegatedAccessAccounts.ownerUserId],
     references: [userProfiles.id],
     relationName: 'ownerUser',
   }),
 }));
 
-export type DelegatedAccessPipeline = typeof delegatedAccessPipelines.$inferSelect;
+export type DelegatedAccessPipeline = typeof delegatedAccessAccounts.$inferSelect;

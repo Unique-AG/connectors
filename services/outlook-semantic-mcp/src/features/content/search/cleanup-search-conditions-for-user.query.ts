@@ -6,7 +6,7 @@ import { findBestMatch } from '~/utils/find-best-match';
 import { SearchCondition } from './search-conditions.dto';
 
 @Injectable()
-export class SanitizeSearchConditionsForUserQuery {
+export class CleanupSearchConditionsForUserQuery {
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
   public async run(

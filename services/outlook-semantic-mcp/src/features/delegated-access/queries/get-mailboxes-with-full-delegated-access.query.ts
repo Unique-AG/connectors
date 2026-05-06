@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
 import { isNonNull } from 'remeda';
-import { DRIZZLE, DrizzleDatabase, delegatedAccessPipelines, userProfiles } from '~/db';
+import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts, userProfiles } from '~/db';
 
 interface GetMailboxesInput {
   delegateUserId: string;
@@ -17,12 +17,12 @@ export class GetMailboxesWithFullDelegatedAccessQuery {
 
     const rows = await this.db
       .select({ email: userProfiles.email })
-      .from(delegatedAccessPipelines)
-      .innerJoin(userProfiles, eq(delegatedAccessPipelines.ownerUserId, userProfiles.id))
+      .from(delegatedAccessAccounts)
+      .innerJoin(userProfiles, eq(delegatedAccessAccounts.ownerUserId, userProfiles.id))
       .where(
         and(
-          eq(delegatedAccessPipelines.delegateUserId, delegateUserId),
-          eq(delegatedAccessPipelines.hasFullDelegatedAccess, true),
+          eq(delegatedAccessAccounts.delegateUserId, delegateUserId),
+          eq(delegatedAccessAccounts.hasFullDelegatedAccess, true),
           ...(mailbox !== undefined ? [eq(userProfiles.email, mailbox)] : []),
         ),
       )

@@ -4,7 +4,8 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { AppConfig, appConfig } from '~/config';
+import { IngestionConfig, ingestionConfig } from '~/config';
+import { McpBackendType } from '~/config/mcp-backend-type.config';
 import {
   DRIZZLE,
   type DrizzleDatabase,
@@ -45,14 +46,14 @@ export class SubscriptionCreateService {
   public constructor(
     private readonly amqp: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(ingestionConfig.KEY) private readonly config: IngestionConfig,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly utils: MailSubscriptionUtilsService,
   ) {}
 
   @Span()
   public async subscribe(userProfileId: UserProfileTypeID): Promise<SubscribeResult> {
-    if (this.config.mcpBackend === 'MicrosoftGraph') {
+    if (this.config.mcpBackend === McpBackendType.MicrosoftGraph) {
       return { status: 'not_created', reason: 'Not required for backend "MicrosoftGraph"' };
     }
     traceAttrs({
@@ -208,7 +209,7 @@ export class SubscriptionCreateService {
       .insert(inboxConfigurations)
       .values({
         userProfileId,
-        filters: serializeMailFilters(this.config.ingestionDefaultMailFilters),
+        filters: serializeMailFilters(this.config.defaultMailFilters),
       })
       .onConflictDoNothing();
 

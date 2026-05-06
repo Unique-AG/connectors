@@ -4,11 +4,11 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, gt, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { last } from 'remeda';
-import { AppConfig, appConfig } from '~/config';
+import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
   DrizzleDatabase,
-  delegatedAccessPipelines,
+  delegatedAccessAccounts,
   subscriptions,
   userProfiles,
 } from '~/db';
@@ -34,14 +34,14 @@ export class DiscoverDelegatedAccessCommand {
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly persistentCacheService: PersistentCacheService,
   ) {}
 
   @Span()
   public async run(): Promise<void> {
-    if (this.config.delegatedAccessScan === 'disabled') {
+    if (this.config.scan === 'disabled') {
       this.logger.log({
         msg: `Skipped running delegated access discovery. Reason: delegated access is disabled`,
       });
@@ -334,8 +334,7 @@ export class DiscoverDelegatedAccessCommand {
     }
 
     try {
-      const apiEndpoint =
-        this.config.delegatedAccessScan === 'fullAccessOnly' ? `messages` : 'mailFolders';
+      const apiEndpoint = this.config.scan === 'fullAccessOnly' ? `messages` : 'mailFolders';
       await client.api(`/users/${ownerEmail}/${apiEndpoint}`).top(1).select('id').get();
 
       const now = new Date();
@@ -352,14 +351,14 @@ export class DiscoverDelegatedAccessCommand {
             };
 
       await this.db
-        .insert(delegatedAccessPipelines)
+        .insert(delegatedAccessAccounts)
         .values({
           ...fieldsToUpsert,
           delegateUserId,
           ownerUserId,
         })
         .onConflictDoUpdate({
-          target: [delegatedAccessPipelines.delegateUserId, delegatedAccessPipelines.ownerUserId],
+          target: [delegatedAccessAccounts.delegateUserId, delegatedAccessAccounts.ownerUserId],
           set: fieldsToUpsert,
         });
 
@@ -368,18 +367,18 @@ export class DiscoverDelegatedAccessCommand {
       if (error instanceof GraphError) {
         if (error.statusCode === 403 || error.statusCode === 404) {
           await this.db
-            .delete(delegatedAccessPipelines)
+            .delete(delegatedAccessAccounts)
             .where(
               and(
-                eq(delegatedAccessPipelines.delegateUserId, delegateUserId),
-                eq(delegatedAccessPipelines.ownerUserId, ownerUserId),
+                eq(delegatedAccessAccounts.delegateUserId, delegateUserId),
+                eq(delegatedAccessAccounts.ownerUserId, ownerUserId),
               ),
             );
           this.logger.log({
             delegateUserId,
             ownerUserId,
             statusCode: error.statusCode,
-            msg: 'Delegated access revoked, removed from pipeline',
+            msg: 'Delegated access revoked, removed from accounts',
           });
           return;
         }

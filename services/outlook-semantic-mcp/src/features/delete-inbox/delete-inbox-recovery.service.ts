@@ -4,7 +4,8 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { and, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { AppConfig, appConfig } from '~/config';
+import { IngestionConfig, ingestionConfig } from '~/config';
+import { McpBackendType } from '~/config/mcp-backend-type.config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 import { NewTrace } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
@@ -19,7 +20,7 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(ingestionConfig.KEY) private readonly config: IngestionConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -42,10 +43,10 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
   }
 
   private setupCronJob(): void {
-    if (this.config.mcpBackend !== 'MicrosoftGraphAndUniqueApi') {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
       return;
     }
-    const job = new CronJob(this.config.ingestionDeleteInboxRecoveryCron, async () => {
+    const job = new CronJob(this.config.deleteInboxRecoveryCron, async () => {
       try {
         await this.checkAndRetriggerStuckDeletions();
       } catch (err) {

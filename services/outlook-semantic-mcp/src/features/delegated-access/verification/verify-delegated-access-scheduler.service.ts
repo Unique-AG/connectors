@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { AppConfig, appConfig } from '~/config';
+import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import { NewTrace } from '~/features/tracing.utils';
 import { SyncDelegatedAccessEventDto } from './sync-delegated-access-event';
 
@@ -15,7 +15,7 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
   ) {}
 
   public onModuleInit() {
@@ -23,10 +23,7 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
   }
 
   public onModuleDestroy() {
-    if (
-      this.config.delegatedAccessScan === 'disabled' ||
-      this.config.delegatedAccessScan === 'fullAccessOnly'
-    ) {
+    if (this.config.scan === 'disabled' || this.config.scan === 'fullAccessOnly') {
       return;
     }
     this.logger.log({ msg: 'VerifyDelegatedAccessSchedulerService is shutting down...' });
@@ -39,15 +36,12 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
   }
 
   private setupCronJob(): void {
-    if (
-      this.config.delegatedAccessScan === 'disabled' ||
-      this.config.delegatedAccessScan === 'fullAccessOnly'
-    ) {
+    if (this.config.scan === 'disabled' || this.config.scan === 'fullAccessOnly') {
       return;
     }
-    const job = new CronJob(this.config.delegatedAccessVerificationCronSchedule, async () => {
+    const job = new CronJob(this.config.verificationCronSchedule, async () => {
       try {
-        await this.triggerVerificationForPipelineRows();
+        await this.triggerVerificationForAccounts();
       } catch (err) {
         this.logger.error({
           msg: 'An unexpected error occurred during delegated access verification scan',
@@ -61,7 +55,7 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
   }
 
   @NewTrace('cron.verify-delegated-access')
-  public async triggerVerificationForPipelineRows(): Promise<void> {
+  public async triggerVerificationForAccounts(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({ msg: 'Skipping verification scan due to shutdown' });
       return;

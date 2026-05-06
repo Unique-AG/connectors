@@ -42,8 +42,8 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
   ) {}
 
   @Span()
-  public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
-    const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
+  public async run(userProfileId: UserProfileTypeID): Promise<void> {
+    const userProfile = await this.getUserProfileQuery.run(userProfileId);
 
     traceEvent('Start system folders sync');
     const microsoftGraphDirectories = await this.fetchMicrosoftSystemFolders(userProfile.id);

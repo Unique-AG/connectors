@@ -1,4 +1,6 @@
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
+import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
 
 // Send as (‎0‎)
 // The Send as permission allows the delegate to send an email from this mailbox. Message will appear to have been sent from this mailbox owner.
@@ -7,16 +9,18 @@ import { z } from 'zod/v4';
 // Read and manage (Full Access) (‎0‎)
 // The Full Access permission allows a delegate to open this mailbox and behave as the mailbox owner.
 
-const delegatedAccessDiscoveryCronSchedule = z
+const discoveryCronSchedule = z
   .string()
-  .prefault('0 */6 * * *')
-  .describe('Cron schedule for delegated access discovery. Default: every 6 hours (4x/day).');
+  .prefault('0 */12 * * *')
+  .describe('Cron schedule for delegated access discovery. Default: every 12 hours (2x/day).');
 
 const disabledDelegatedAccessScan = z.object({
-  delegatedAccessScan: z.literal('disabled'),
+  mcpBackend: mcpBackendSchema,
+  scan: z.literal('disabled'),
 });
 
 const onlyFullDelegatedAccessScanConfig = z.object({
+  mcpBackend: mcpBackendSchema,
   // On microsoft exchange: https://admin.exchange.microsoft.com/#/mailboxes
   // You can set Read and manage (Full Access) on a mailbox - if a user has read and manage set up there
   // he get's full delegated access over that mailbox. This means that he can access the following endpoints as a
@@ -26,8 +30,8 @@ const onlyFullDelegatedAccessScanConfig = z.object({
   // /users/{{email}}/mailFolders/{{folderId}}/messages
   // When we configure the delegated access to be fullAccessOnly we will call /users/{{email}}/messages and assume
   // the user has full access to that inbox.
-  delegatedAccessScan: z.literal('fullAccessOnly'),
-  delegatedAccessDiscoveryCronSchedule,
+  scan: z.literal('fullAccessOnly'),
+  discoveryCronSchedule,
 });
 
 const granularDelegatedAccessScanConfig = z.object({
@@ -44,16 +48,30 @@ const granularDelegatedAccessScanConfig = z.object({
   // "Inbox" -> "RFQ" - the "RFQ" is a child of "Inbox" and she shares with Bob only the "RFQ" folder. When we call
   // /users/{{email}}/mailFolders => we can list both folders "Inbox" and "RFQ" but we can only read messages from the "RFQ"
   // folder.
-  delegatedAccessScan: z.literal('granularAccess'),
-  delegatedAccessDiscoveryCronSchedule,
-  delegatedAccessVerificationCronSchedule: z
+  scan: z.literal('granularAccess'),
+  mcpBackend: z
+    .literal(McpBackendType.MicrosoftGraphAndUniqueApi)
+    .describe(`Supported only for "MicrosoftGraphAndUniqueApi"`),
+  discoveryCronSchedule,
+  verificationCronSchedule: z
     .string()
     .prefault('0 */4 * * *')
     .describe('Cron schedule for delegated access verification. Default: every 4 hours (6x/day).'),
 });
 
-export const delegatedAccessConfig = z.discriminatedUnion('delegatedAccessScan', [
+export const DelegatedAccessConfigSchema = z.discriminatedUnion('scan', [
   disabledDelegatedAccessScan,
   onlyFullDelegatedAccessScanConfig,
   granularDelegatedAccessScanConfig,
 ]);
+
+export const delegatedAccessConfig = registerConfig(
+  'delegatedAccess',
+  DelegatedAccessConfigSchema,
+  {
+    whitelistKeys: new Set(['MCP_BACKEND']),
+  },
+);
+
+export type DelegatedAccessConfigNamespaced = NamespacedConfigType<typeof delegatedAccessConfig>;
+export type DelegatedAccessConfig = ConfigType<typeof delegatedAccessConfig>;

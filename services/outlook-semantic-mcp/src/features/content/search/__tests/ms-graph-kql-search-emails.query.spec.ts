@@ -48,7 +48,7 @@ function createQuery(opts: {
     run: vi.fn().mockResolvedValue(delegatedMailboxes),
   };
 
-  const markPipelineNoFullAccessCommand = {
+  const markAccountsNoFullAccessCommand = {
     run: vi.fn().mockResolvedValue(undefined),
   };
 
@@ -62,13 +62,13 @@ function createQuery(opts: {
     // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
     getMailboxesWithFullDelegatedAccessQuery as any,
     // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
-    markPipelineNoFullAccessCommand as any,
+    markAccountsNoFullAccessCommand as any,
   );
 
   return {
     instance,
     apiMock,
-    markPipelineNoFullAccessCommand,
+    markAccountsNoFullAccessCommand,
     translateGraphIdsToImmutableIdsQuery,
     getMailboxesWithFullDelegatedAccessQuery,
   };
@@ -185,7 +185,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
   });
 
   describe('403/404 self-healing', () => {
-    it('marks delegated pipeline as no-full-access on 403 and excludes those results', async () => {
+    it('marks delegated accounts as no-full-access on 403 and excludes those results', async () => {
       const mockPost = vi
         .fn()
         .mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) => {
@@ -200,14 +200,14 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           return Promise.resolve({ responses });
         });
 
-      const { instance, markPipelineNoFullAccessCommand } = createQuery({
+      const { instance, markAccountsNoFullAccessCommand } = createQuery({
         delegatedMailboxes: [DELEGATED_EMAIL],
         mockPost,
       });
 
       const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }]);
 
-      expect(markPipelineNoFullAccessCommand.run).toHaveBeenCalledWith({
+      expect(markAccountsNoFullAccessCommand.run).toHaveBeenCalledWith({
         delegateUserId: OWN_USER_ID,
         ownerEmail: DELEGATED_EMAIL,
       });
@@ -215,7 +215,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       expect(results[0]?.sourceMailbox).toBe(OWN_EMAIL);
     });
 
-    it('marks delegated pipeline as no-full-access on 404', async () => {
+    it('marks delegated accounts as no-full-access on 404', async () => {
       const mockPost = vi
         .fn()
         .mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) => {
@@ -227,20 +227,20 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           return Promise.resolve({ responses });
         });
 
-      const { instance, markPipelineNoFullAccessCommand } = createQuery({
+      const { instance, markAccountsNoFullAccessCommand } = createQuery({
         delegatedMailboxes: [DELEGATED_EMAIL],
         mockPost,
       });
 
       await instance.run(testUserId, [{ kqlQuery: 'test' }]);
 
-      expect(markPipelineNoFullAccessCommand.run).toHaveBeenCalledWith({
+      expect(markAccountsNoFullAccessCommand.run).toHaveBeenCalledWith({
         delegateUserId: OWN_USER_ID,
         ownerEmail: DELEGATED_EMAIL,
       });
     });
 
-    it('does not mark pipeline for own mailbox 403', async () => {
+    it('does not mark accounts for own mailbox 403', async () => {
       const _mockPost = vi.fn().mockResolvedValue({
         responses: [{ id: 'req-0', status: 403, body: {} }],
       });
@@ -254,13 +254,13 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           }),
         );
 
-      const { instance, markPipelineNoFullAccessCommand } = createQuery({
+      const { instance, markAccountsNoFullAccessCommand } = createQuery({
         mockPost: actualMockPost,
       });
 
       const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }]);
 
-      expect(markPipelineNoFullAccessCommand.run).not.toHaveBeenCalled();
+      expect(markAccountsNoFullAccessCommand.run).not.toHaveBeenCalled();
       expect(results).toHaveLength(0);
     });
   });

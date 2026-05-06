@@ -1,21 +1,27 @@
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { json } from '~/utils/zod';
+import { McpBackendType } from './mcp-backend-type.config';
 
-export const mcpIngestionConfig = z.object({
-  mcpBackend: z.literal(`MicrosoftGraphAndUniqueApi`),
-  ingestionDefaultMailFilters: json(inboxConfigurationMailFilters).describe(
+const noIngestionConfig = z.object({
+  mcpBackend: z.literal(McpBackendType.MicrosoftGraph),
+});
+
+export const withIngestionConfig = z.object({
+  mcpBackend: z.literal(McpBackendType.MicrosoftGraphAndUniqueApi),
+  defaultMailFilters: json(inboxConfigurationMailFilters).describe(
     'Default mail filters applied when syncing emails (e.g. {"retentionWindowInDays":95, "ignoredSenders": [], "ignoredContents": [] }). ',
   ),
-  ingestionFullSyncRecoveryCron: z
+  fullSyncRecoveryCron: z
     .string()
     .prefault('*/2 * * * *')
     .describe('Cron schedule for full sync recovery. Default every 2 minutes'),
-  ingestionLiveCatchupRecovery: z
+  liveCatchupRecovery: z
     .string()
     .prefault('*/5 * * * *')
     .describe('Cron schedule for full sync recovery. Default every 5 minutes'),
-  ingestionDeleteInboxRecoveryCron: z
+  deleteInboxRecoveryCron: z
     .string()
     .prefault('*/5 * * * *')
     .describe('Cron schedule for full sync recovery. Default every 5 minutes'),
@@ -30,14 +36,26 @@ export const mcpIngestionConfig = z.object({
   // 1.  60 seconds if you agree to lose some messages
   // 2. 2-3 minutes you will get almost all messages it's a very low chance to lose anything
   // 3.   5 minutes you are 99% you get everything if there are big outages you will probably lose some messages but the change is quite low
-  ingestionLiveCatchupRecheckOverlappingWindowMinutes: z.coerce
+  liveCatchupRecheckOverlappingWindowMinutes: z.coerce
     .number()
     .min(10)
     .prefault(10)
     .describe('How many minutes should each live catchup run overlap the previous one'),
-  ingestionLiveCatchupOverlappingWindowMinutes: z.coerce
+  liveCatchupOverlappingWindowMinutes: z.coerce
     .number()
     .min(2)
     .prefault(3)
     .describe('How many minutes should each live catchup run overlap the previous one'),
 });
+
+const IngestionConfigSchema = z.discriminatedUnion('mcpBackend', [
+  noIngestionConfig,
+  withIngestionConfig,
+]);
+
+export const ingestionConfig = registerConfig('ingestion', IngestionConfigSchema, {
+  whitelistKeys: new Set(['MCP_BACKEND']),
+});
+
+export type IngestionConfigNamespaced = NamespacedConfigType<typeof ingestionConfig>;
+export type IngestionConfig = ConfigType<typeof ingestionConfig>;

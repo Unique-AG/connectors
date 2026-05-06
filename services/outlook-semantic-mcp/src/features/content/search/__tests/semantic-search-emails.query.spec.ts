@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { SanitizeSearchConditionsForUserQuery } from '../sanitize-search-conditions-for-user.query';
+import { CleanupSearchConditionsForUserQuery } from '../cleanup-search-conditions-for-user.query';
 import { SearchConditionSchema, SearchEmailsInputSchema } from '../search-conditions.dto';
 import { SemanticSearchEmailsQuery } from '../semantic-search-emails.query';
 
@@ -60,7 +60,7 @@ describe('SearchEmailsInputSchema', () => {
 });
 
 // biome-ignore lint/suspicious/noExplicitAny: constructor args not needed for this private method
-const query = new SanitizeSearchConditionsForUserQuery(null as any);
+const query = new CleanupSearchConditionsForUserQuery(null as any);
 
 interface MockDirectory {
   providerDirectoryId: string;

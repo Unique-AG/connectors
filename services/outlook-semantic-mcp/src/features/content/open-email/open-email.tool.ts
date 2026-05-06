@@ -10,40 +10,42 @@ import { SearchBackend } from '../search/semantic-search-emails.query';
 import { OpenEmailQuery } from './open-email.query';
 import { META } from './open-email-tool.meta';
 
-const OpenEmailByIdInputSchema = z.object({
-  id: z
-    .string()
-    .describe(
-      'The email identifier. Use the `id` field from `openEmailParams` in a `search_emails` result.',
-    ),
-  idType: z
-    .nativeEnum(SearchBackend)
-    .describe(
-      'The backend type. Use the `idType` field from `openEmailParams` in a `search_emails` result.',
-    ),
-  mailbox: z
-    .email()
-    .optional()
-    .describe(
-      'Delegated mailbox address. Use the `mailbox` field from `openEmailParams` in a `search_emails` result.',
-    ),
-  parentFolderId: z
-    .string()
-    .regex(/^[A-Za-z0-9_=-]+$/)
-    .optional()
-    .describe(
-      'The folder containing this email. Use the `parentFolderId` field from `openEmailParams` in a `search_emails` result.',
-    ),
-  idIsImmutable: z
-    .boolean()
-    .optional()
-    .describe(
-      'Whether the id is an immutable ID. Use the `idIsImmutable` field from `openEmailParams` in a `search_emails` result.',
-    ),
-}).refine((val) => !val.mailbox || val.parentFolderId !== undefined, {
-  message: 'parentFolderId is required when mailbox is provided',
-  path: ['parentFolderId'],
-});
+const OpenEmailByIdInputSchema = z
+  .object({
+    id: z
+      .string()
+      .describe(
+        'The email identifier. Use the `id` field from `openEmailParams` in a `search_emails` result.',
+      ),
+    idType: z
+      .nativeEnum(SearchBackend)
+      .describe(
+        'The backend type. Use the `idType` field from `openEmailParams` in a `search_emails` result.',
+      ),
+    mailbox: z
+      .email()
+      .optional()
+      .describe(
+        'Delegated mailbox address. Use the `mailbox` field from `openEmailParams` in a `search_emails` result.',
+      ),
+    parentFolderId: z
+      .string()
+      .regex(/^[A-Za-z0-9_=-]+$/)
+      .optional()
+      .describe(
+        'The folder containing this email. Use the `parentFolderId` field from `openEmailParams` in a `search_emails` result.',
+      ),
+    idIsImmutable: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether the id is an immutable ID. Use the `idIsImmutable` field from `openEmailParams` in a `search_emails` result.',
+      ),
+  })
+  .refine((val) => !val.mailbox || val.parentFolderId !== undefined, {
+    message: 'parentFolderId is required when mailbox is provided',
+    path: ['parentFolderId'],
+  });
 
 export const EmailDataSchema = z.object({
   id: z.string(),

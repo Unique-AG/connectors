@@ -4,7 +4,7 @@ const DelegatedAccessVerificationCache = z.object({
   dataType: z.literal('DelegatedAccessVerification'),
   payload: z.object({
     state: z.enum(['running', 'failed', 'ready']),
-    lastProcessedPipelineId: z.string().nullish(),
+    lastProcessedAccountsId: z.string().nullish(),
     lastProgressRegisteredAt: z.number(),
   }),
 });

@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { AppConfig, appConfig } from '~/config';
+import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config/delegated-access.config';
 import { NewTrace } from '~/features/tracing.utils';
 import { DiscoverDelegatedAccessEventDto } from './discover-delegated-access-event.dto';
 
@@ -15,7 +15,7 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
   ) {}
 
   public onModuleInit() {
@@ -23,7 +23,7 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
   }
 
   public onModuleDestroy() {
-    if (this.config.delegatedAccessScan === 'disabled') {
+    if (this.config.scan === 'disabled') {
       return;
     }
     this.logger.log({ msg: 'DiscoverDelegatedAccessSchedulerService is shutting down...' });
@@ -37,10 +37,10 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
   }
 
   private setupCronJob(): void {
-    if (this.config.delegatedAccessScan === 'disabled') {
+    if (this.config.scan === 'disabled') {
       return;
     }
-    const job = new CronJob(this.config.delegatedAccessDiscoveryCronSchedule, async () => {
+    const job = new CronJob(this.config.discoveryCronSchedule, async () => {
       try {
         await this.triggerDiscovery();
       } catch (err) {

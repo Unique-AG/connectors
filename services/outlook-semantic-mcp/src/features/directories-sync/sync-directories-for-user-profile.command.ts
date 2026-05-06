@@ -43,14 +43,14 @@ export class SyncDirectoriesForUserProfileCommand {
   ) {}
 
   @Span()
-  public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
-    traceAttrs({ userProfileTypeId: userProfileTypeId.toString() });
+  public async run(userProfileId: UserProfileTypeID): Promise<void> {
+    traceAttrs({ userProfileId: userProfileId.toString() });
     this.logger.log({
-      userProfileId: userProfileTypeId.toString(),
+      userProfileId: userProfileId.toString(),
       msg: `Starting full directories sync for user profile`,
     });
 
-    const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
+    const userProfile = await this.getUserProfileQuery.run(userProfileId);
     traceAttrs({ userProfileId: userProfile.id });
     const userEmail = createSmeared(userProfile.email);
     this.logger.log({
@@ -89,7 +89,7 @@ export class SyncDirectoriesForUserProfileCommand {
         userEmail,
         msg: `No existing directories found, syncing system directories`,
       });
-      await this.syncSystemDirectoriesCommand.run(userProfileTypeId);
+      await this.syncSystemDirectoriesCommand.run(userProfileId);
     }
 
     const microsoftDirectories = await this.fetchAllDirectoriesFromOutlookQuery.run(userProfile.id);

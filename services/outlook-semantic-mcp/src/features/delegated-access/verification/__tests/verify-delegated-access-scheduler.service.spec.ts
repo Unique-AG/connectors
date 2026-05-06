@@ -39,12 +39,12 @@ describe('VerifyDelegatedAccessSchedulerService', () => {
     vi.clearAllMocks();
   });
 
-  describe('triggerVerificationForPipelineRows', () => {
+  describe('triggerVerificationForAccounts', () => {
     it('publishes a single sync event', async () => {
       const amqp = createMockAmqp();
       const service = createService({ amqp });
 
-      await service.triggerVerificationForPipelineRows();
+      await service.triggerVerificationForAccounts();
 
       expect(amqp.publish).toHaveBeenCalledOnce();
       expect(amqp.publish).toHaveBeenCalledWith(
@@ -63,7 +63,7 @@ describe('VerifyDelegatedAccessSchedulerService', () => {
 
       service.onModuleDestroy();
 
-      await service.triggerVerificationForPipelineRows();
+      await service.triggerVerificationForAccounts();
 
       expect(amqp.publish).not.toHaveBeenCalled();
     });
@@ -73,7 +73,7 @@ describe('VerifyDelegatedAccessSchedulerService', () => {
       amqp.publish.mockRejectedValue(new Error('AMQP error'));
       const service = createService({ amqp });
 
-      await expect(service.triggerVerificationForPipelineRows()).rejects.toThrow();
+      await expect(service.triggerVerificationForAccounts()).rejects.toThrow();
     });
   });
 

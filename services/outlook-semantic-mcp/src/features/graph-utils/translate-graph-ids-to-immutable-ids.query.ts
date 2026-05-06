@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { createSmeared } from '@unique-ag/utils';
+import { Injectable, Logger } from '@nestjs/common';
 import { filter, isNonNullish, pipe, unique } from 'remeda';
 import z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -11,6 +12,8 @@ type IdValue = string | null | undefined;
 
 @Injectable()
 export class TranslateGraphIdsToImmutableIdsQuery {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(private readonly graphClientFactory: GraphClientFactory) {}
 
   public async run({
@@ -45,7 +48,13 @@ export class TranslateGraphIdsToImmutableIdsQuery {
         });
       }
       return idsMap;
-    } catch {
+    } catch (err) {
+      this.logger.warn({
+        err,
+        msg: `Failed to translate exchange ids`,
+        userProfileId,
+        ...(ownerEmail ? { ownerEmail: createSmeared(ownerEmail) } : {}),
+      });
       return new Map<string, string>();
     }
   }

@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { DRIZZLE, DrizzleDatabase, delegatedAccessPipelines, userProfiles } from '~/db';
+import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts, userProfiles } from '~/db';
 
 @Injectable()
-export class MarkPipelineNoFullAccessCommand {
+export class MarkAccountsNoFullAccessCommand {
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
   public async run(input: { delegateUserId: string; ownerEmail: string }): Promise<void> {
@@ -19,12 +19,12 @@ export class MarkPipelineNoFullAccessCommand {
     }
 
     await this.db
-      .update(delegatedAccessPipelines)
+      .update(delegatedAccessAccounts)
       .set({ hasFullDelegatedAccess: false })
       .where(
         and(
-          eq(delegatedAccessPipelines.delegateUserId, delegateUserId),
-          eq(delegatedAccessPipelines.ownerUserId, ownerProfile.id),
+          eq(delegatedAccessAccounts.delegateUserId, delegateUserId),
+          eq(delegatedAccessAccounts.ownerUserId, ownerProfile.id),
         ),
       );
   }

@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, gt } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, delegatedAccessPipelines } from '~/db';
+import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts } from '~/db';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { Nullish } from '~/utils/nullish';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
@@ -12,7 +12,7 @@ const CACHE_KEY = `SyncDelegatedAccessForAllUsers`;
 const NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES = 10;
 
 type SyncDelegatedAccessForAllUsersDecision =
-  | { action: 'proceed'; lastProcessedPipelineId: Nullish<string> }
+  | { action: 'proceed'; lastProcessedAccountsId: Nullish<string> }
   | { action: 'skip'; reason: string };
 
 @Injectable()
@@ -35,7 +35,7 @@ export class SyncDelegatedAccessForAllUsersCommand {
 
     let finalState: 'ready' | 'failed';
     try {
-      await this.runSyncInBatches(decision.lastProcessedPipelineId);
+      await this.runSyncInBatches(decision.lastProcessedAccountsId);
       finalState = 'ready';
     } catch (error) {
       this.logger.error({ msg: `Failed to run delegated access sync`, err: error });
@@ -59,24 +59,24 @@ export class SyncDelegatedAccessForAllUsersCommand {
   }
 
   @Span()
-  private async runSyncInBatches(lastProcessedPipelineId: Nullish<string>): Promise<void> {
-    let batch = await this.fetchBatch({ lastProcessedPipelineId });
+  private async runSyncInBatches(lastProcessedAccountsId: Nullish<string>): Promise<void> {
+    let batch = await this.fetchBatch({ lastProcessedAccountsId });
 
     while (batch.length) {
       this.logger.log({
         msg: `Running delegated access sync for batch: ${batch.length}`,
-        pipelineIds: batch.map((item) => item.id).join(', '),
+        accountsIds: batch.map((item) => item.id).join(', '),
       });
-      for (const pipeline of batch) {
+      for (const accounts of batch) {
         await withRetryAttempts({
           fn: async () => {
-            await this.syncDelegatedAccessCommand.run({ pipelineId: pipeline.id });
+            await this.syncDelegatedAccessCommand.run({ accountsId: accounts.id });
             return { status: 'success' };
           },
           onError: rethrowRateLimitError,
           getResultFailure: (error) => ({ status: 'failed', error }),
         });
-        lastProcessedPipelineId = pipeline.id;
+        lastProcessedAccountsId = accounts.id;
         await this.persistentCacheService.setWith(
           CACHE_KEY,
           async ({ currentValue, update }): Promise<void> => {
@@ -86,7 +86,7 @@ export class SyncDelegatedAccessForAllUsersCommand {
               dataType: 'DelegatedAccessVerification',
               payload: {
                 ...currentValue.payload,
-                lastProcessedPipelineId: lastProcessedPipelineId,
+                lastProcessedAccountsId: lastProcessedAccountsId,
                 lastProgressRegisteredAt: Date.now(),
               },
             });
@@ -94,27 +94,27 @@ export class SyncDelegatedAccessForAllUsersCommand {
         );
       }
 
-      batch = await this.fetchBatch({ lastProcessedPipelineId });
+      batch = await this.fetchBatch({ lastProcessedAccountsId: lastProcessedAccountsId });
     }
   }
 
   @Span()
   private async fetchBatch({
-    lastProcessedPipelineId,
+    lastProcessedAccountsId,
   }: {
-    lastProcessedPipelineId: Nullish<string>;
+    lastProcessedAccountsId: Nullish<string>;
   }): Promise<{ id: string }[]> {
     return await this.db
-      .select({ id: delegatedAccessPipelines.id })
-      .from(delegatedAccessPipelines)
+      .select({ id: delegatedAccessAccounts.id })
+      .from(delegatedAccessAccounts)
       .where(
         and(
-          lastProcessedPipelineId
-            ? gt(delegatedAccessPipelines.id, lastProcessedPipelineId)
+          lastProcessedAccountsId
+            ? gt(delegatedAccessAccounts.id, lastProcessedAccountsId)
             : undefined,
         ),
       )
-      .orderBy(delegatedAccessPipelines.id)
+      .orderBy(delegatedAccessAccounts.id)
       .limit(50);
   }
 
@@ -128,12 +128,12 @@ export class SyncDelegatedAccessForAllUsersCommand {
             dataType: 'DelegatedAccessVerification',
             payload: {
               state: 'running',
-              lastProcessedPipelineId: null,
+              lastProcessedAccountsId: null,
               lastProgressRegisteredAt: Date.now(),
             },
           });
 
-          return { action: 'proceed', lastProcessedPipelineId: null };
+          return { action: 'proceed', lastProcessedAccountsId: null };
         }
 
         assert.ok(currentValue.dataType === 'DelegatedAccessVerification');
@@ -143,11 +143,11 @@ export class SyncDelegatedAccessForAllUsersCommand {
             dataType: 'DelegatedAccessVerification',
             payload: {
               state: 'running',
-              lastProcessedPipelineId: null,
+              lastProcessedAccountsId: null,
               lastProgressRegisteredAt: Date.now(),
             },
           });
-          return { action: 'proceed', lastProcessedPipelineId: null };
+          return { action: 'proceed', lastProcessedAccountsId: null };
         }
 
         if (currentValue.payload.state === 'failed') {
@@ -155,13 +155,13 @@ export class SyncDelegatedAccessForAllUsersCommand {
             dataType: 'DelegatedAccessVerification',
             payload: {
               state: 'running',
-              lastProcessedPipelineId: currentValue.payload.lastProcessedPipelineId,
+              lastProcessedAccountsId: currentValue.payload.lastProcessedAccountsId,
               lastProgressRegisteredAt: Date.now(),
             },
           });
           return {
             action: 'proceed',
-            lastProcessedPipelineId: currentValue.payload.lastProcessedPipelineId,
+            lastProcessedAccountsId: currentValue.payload.lastProcessedAccountsId,
           };
         }
 
@@ -175,13 +175,13 @@ export class SyncDelegatedAccessForAllUsersCommand {
             dataType: 'DelegatedAccessVerification',
             payload: {
               state: 'running',
-              lastProcessedPipelineId: currentValue.payload.lastProcessedPipelineId,
+              lastProcessedAccountsId: currentValue.payload.lastProcessedAccountsId,
               lastProgressRegisteredAt: Date.now(),
             },
           });
           return {
             action: 'proceed',
-            lastProcessedPipelineId: currentValue.payload.lastProcessedPipelineId,
+            lastProcessedAccountsId: currentValue.payload.lastProcessedAccountsId,
           };
         }
 

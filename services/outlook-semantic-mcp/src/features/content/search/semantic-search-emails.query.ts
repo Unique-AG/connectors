@@ -24,7 +24,7 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
 import { buildUniqueQlSearchFilter } from './build-unique-ql-search-filter.util';
-import { SanitizeSearchConditionsForUserQuery } from './sanitize-search-conditions-for-user.query';
+import { CleanupSearchConditionsForUserQuery } from './cleanup-search-conditions-for-user.query';
 import { SearchEmailsInputSchema } from './search-conditions.dto';
 
 export enum SearchBackend {
@@ -86,15 +86,15 @@ export class SemanticSearchEmailsQuery {
     private readonly getDelegtedAccessQuery: GetDelegtedAccessQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     private readonly getUserProfileQuery: GetUserProfileQuery,
-    private readonly sanitizeSearchConditionsForUserQuery: SanitizeSearchConditionsForUserQuery,
+    private readonly cleanupSearchConditionsForUserQuery: CleanupSearchConditionsForUserQuery,
   ) {}
 
   @Span()
   public async run(
-    userProfileTypeId: UserProfileTypeID,
+    userProfileId: UserProfileTypeID,
     inputs: z.infer<typeof SearchEmailsInputSchema>[],
   ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
-    const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
+    const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const context = await this.loadAccessContext(userProfile);
 
     const searchJobsInputs = await Promise.all(
@@ -350,7 +350,7 @@ export class SemanticSearchEmailsQuery {
     };
   }): Promise<{ filter: MetadataFilter; searchSummary: string | undefined }> {
     const { conditions: resolvedConditions, searchSummary } =
-      await this.sanitizeSearchConditionsForUserQuery.run(userProfileId, conditions);
+      await this.cleanupSearchConditionsForUserQuery.run(userProfileId, conditions);
 
     const uniqueQlMetadataFilter = buildUniqueQlSearchFilter(resolvedConditions);
     const scopedMetadataFilter: MetadataFilter = {

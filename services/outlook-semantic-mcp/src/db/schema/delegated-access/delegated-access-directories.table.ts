@@ -2,7 +2,7 @@ import { relations } from 'drizzle-orm';
 import { pgTable, text, unique, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
-import { delegatedAccessPipelines } from './delegated-access-pipelines.table';
+import { delegatedAccessAccounts } from './delegated-access-accounts.table';
 
 export const delegatedAccessDirectories = pgTable(
   'delegated_access_directories',
@@ -10,9 +10,9 @@ export const delegatedAccessDirectories = pgTable(
     id: varchar()
       .primaryKey()
       .$default(() => typeid('dad').toString()),
-    pipelineId: varchar(`pipeline_id`)
+    accountsId: varchar(`accounts_id`)
       .notNull()
-      .references(() => delegatedAccessPipelines.id, {
+      .references(() => delegatedAccessAccounts.id, {
         onDelete: 'cascade',
         onUpdate: 'cascade',
       }),
@@ -23,15 +23,15 @@ export const delegatedAccessDirectories = pgTable(
 
     ...timestamps,
   },
-  (t) => [unique('unique_pipeline_directory').on(t.pipelineId, t.directoryId)],
+  (t) => [unique('unique_accounts_directory').on(t.accountsId, t.directoryId)],
 );
 
 export const delegatedAccessDirectoriesRelations = relations(
   delegatedAccessDirectories,
   ({ one }) => ({
-    pipeline: one(delegatedAccessPipelines, {
-      fields: [delegatedAccessDirectories.pipelineId],
-      references: [delegatedAccessPipelines.id],
+    accounts: one(delegatedAccessAccounts, {
+      fields: [delegatedAccessDirectories.accountsId],
+      references: [delegatedAccessAccounts.id],
     }),
   }),
 );

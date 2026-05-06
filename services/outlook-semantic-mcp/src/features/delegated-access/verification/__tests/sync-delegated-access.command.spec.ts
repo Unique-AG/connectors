@@ -7,7 +7,7 @@ import { SyncDelegatedAccessCommand } from '../sync-delegated-access.command';
 // Constants
 // ---------------------------------------------------------------------------
 
-const PIPELINE_ID = 'dap_01jxk5r1s2fq9att23mp4z5ef1';
+const ACCOUNTS_ID = 'dap_01jxk5r1s2fq9att23mp4z5ef1';
 const DELEGATE_USER_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 const OWNER_USER_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef3';
 const OWNER_EMAIL = 'owner@example.com';
@@ -44,22 +44,22 @@ function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGrap
 }
 
 interface DbOptions {
-  pipeline?: { delegateUserId: string; ownerUserId: string } | null;
+  accounts?: { delegateUserId: string; ownerUserId: string } | null;
   ownerEmail?: string | null;
   directoryCount?: number;
 }
 
 function createMockDb({
-  pipeline = { delegateUserId: DELEGATE_USER_ID, ownerUserId: OWNER_USER_ID },
+  accounts = { delegateUserId: DELEGATE_USER_ID, ownerUserId: OWNER_USER_ID },
   ownerEmail = OWNER_EMAIL,
   directoryCount = 1,
 }: DbOptions = {}) {
   // select chain — returns different values depending on call order
-  // 1st call: pipeline lookup
+  // 1st call: accounts lookup
   // 2nd call: owner profile lookup
   // 3rd call: count directories
   const selectResults = [
-    pipeline ? [pipeline] : [],
+    accounts ? [accounts] : [],
     ownerEmail !== null && ownerEmail !== undefined ? [{ email: ownerEmail }] : [{ email: null }],
     [{ count: directoryCount }],
   ];
@@ -132,11 +132,11 @@ describe('SyncDelegatedAccessCommand', () => {
     vi.clearAllMocks();
   });
 
-  it('returns early without any DB writes when pipeline is not found', async () => {
-    const db = createMockDb({ pipeline: null });
+  it('returns early without any DB writes when accounts is not found', async () => {
+    const db = createMockDb({ accounts: null });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await command.run({ accountsId: ACCOUNTS_ID });
 
     expect(graphApi.get).not.toHaveBeenCalled();
     expect(db.__insert).not.toHaveBeenCalled();
@@ -154,12 +154,12 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await command.run({ accountsId: ACCOUNTS_ID });
 
     expect(db.__insert).toHaveBeenCalledOnce();
     expect(db.__insertValues).toHaveBeenCalledWith(
       expect.arrayContaining([
-        expect.objectContaining({ pipelineId: PIPELINE_ID, directoryId: FOLDER_ID_1 }),
+        expect.objectContaining({ accountsId: ACCOUNTS_ID, directoryId: FOLDER_ID_1 }),
       ]),
     );
     expect(db.__insertOnConflictDoNothing).toHaveBeenCalledOnce();
@@ -174,7 +174,7 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 0 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await command.run({ accountsId: ACCOUNTS_ID });
 
     expect(db.__delete).toHaveBeenCalledWith(expect.anything()); // directories delete
     expect(db.__insert).not.toHaveBeenCalled();
@@ -189,7 +189,7 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 0 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await command.run({ accountsId: ACCOUNTS_ID });
 
     expect(db.__delete).toHaveBeenCalledWith(expect.anything());
     expect(db.__insert).not.toHaveBeenCalled();
@@ -204,7 +204,7 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
+    await expect(command.run({ accountsId: ACCOUNTS_ID })).rejects.toThrow();
 
     expect(db.__insert).not.toHaveBeenCalled();
   });
@@ -218,7 +218,7 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
+    await expect(command.run({ accountsId: ACCOUNTS_ID })).rejects.toThrow();
 
     expect(db.__insert).not.toHaveBeenCalled();
   });
@@ -233,7 +233,7 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
+    await expect(command.run({ accountsId: ACCOUNTS_ID })).rejects.toThrow();
 
     expect(db.__updateSet).not.toHaveBeenCalledWith(
       expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
@@ -250,14 +250,14 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
+    await expect(command.run({ accountsId: ACCOUNTS_ID })).rejects.toThrow();
 
     expect(db.__updateSet).not.toHaveBeenCalledWith(
       expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
     );
   });
 
-  it('deletes pipeline row when zero directory rows remain after processing all folders', async () => {
+  it('deletes accounts row when zero directory rows remain after processing all folders', async () => {
     graphApi.get
       .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
@@ -266,18 +266,18 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 0 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await command.run({ accountsId: ACCOUNTS_ID });
 
-    // The last delete call should be for the pipeline row
+    // The last delete call should be for the accounts row
     const deleteCalls = db.__delete.mock.calls;
     expect(deleteCalls.length).toBeGreaterThanOrEqual(1);
-    // lastVerifiedAt is NOT updated — pipeline was deleted instead
+    // lastVerifiedAt is NOT updated — accounts was deleted instead
     expect(db.__updateSet).not.toHaveBeenCalledWith(
       expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
     );
   });
 
-  it('does NOT delete pipeline row when dirCount is 0 but a transient 5xx error occurred', async () => {
+  it('does NOT delete accounts row when dirCount is 0 but a transient 5xx error occurred', async () => {
     graphApi.get
       .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
@@ -286,16 +286,16 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 0 });
     const command = createCommand({ graphApi, db });
 
-    await expect(command.run({ pipelineId: PIPELINE_ID })).rejects.toThrow();
+    await expect(command.run({ accountsId: ACCOUNTS_ID })).rejects.toThrow();
 
-    // Only the directory delete is called, not the pipeline delete
+    // Only the directory delete is called, not the accounts delete
     expect(db.__delete).toHaveBeenCalledOnce();
     expect(db.__updateSet).not.toHaveBeenCalledWith(
       expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
     );
   });
 
-  it('does NOT delete pipeline row when at least one directory row exists, and updates lastVerifiedAt', async () => {
+  it('does NOT delete accounts row when at least one directory row exists, and updates lastVerifiedAt', async () => {
     graphApi.get
       .mockRejectedValueOnce(makeGraphError(403)) // preliminary /messages check
       .mockResolvedValueOnce({ value: [{ id: FOLDER_ID_1 }] })
@@ -304,7 +304,7 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await command.run({ accountsId: ACCOUNTS_ID });
 
     // update is called twice: once for hasFullDelegatedAccess:false, once for lastVerifiedAt
     expect(db.__update).toHaveBeenCalledTimes(2);
@@ -326,7 +326,7 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 2 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await command.run({ accountsId: ACCOUNTS_ID });
 
     expect(db.__insert).toHaveBeenCalledOnce(); // batch insert of FOLDER_ID_1 and FOLDER_ID_3
     expect(db.__delete).toHaveBeenCalledOnce(); // directories delete
@@ -348,7 +348,7 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 2 });
     const command = createCommand({ graphApi, db });
 
-    await command.run({ pipelineId: PIPELINE_ID });
+    await command.run({ accountsId: ACCOUNTS_ID });
 
     expect(db.__insert).toHaveBeenCalledOnce();
   });

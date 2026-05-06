@@ -4,12 +4,12 @@ import { and, count, eq, notInArray } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import { chunk } from 'remeda';
-import { AppConfig, appConfig } from '~/config';
+import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
   DrizzleDatabase,
+  delegatedAccessAccounts,
   delegatedAccessDirectories,
-  delegatedAccessPipelines,
   userProfiles,
 } from '~/db';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -35,33 +35,36 @@ export class SyncDelegatedAccessCommand {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
   ) {}
 
   @Span()
-  public async run(input: { pipelineId: string }): Promise<void> {
-    if (this.config.delegatedAccessScan !== 'granularAccess') {
+  public async run(input: { accountsId: string }): Promise<void> {
+    if (this.config.scan !== 'granularAccess') {
       this.logger.log({
         msg: `Skipped running delegated access verification. Reason: delegated access is not set to "granularAccess"`,
       });
       return;
     }
-    const { pipelineId } = input;
+    const { accountsId } = input;
 
-    const [pipeline] = await this.db
+    const [accounts] = await this.db
       .select({
-        delegateUserId: delegatedAccessPipelines.delegateUserId,
-        ownerUserId: delegatedAccessPipelines.ownerUserId,
+        delegateUserId: delegatedAccessAccounts.delegateUserId,
+        ownerUserId: delegatedAccessAccounts.ownerUserId,
       })
-      .from(delegatedAccessPipelines)
-      .where(eq(delegatedAccessPipelines.id, pipelineId));
+      .from(delegatedAccessAccounts)
+      .where(eq(delegatedAccessAccounts.id, accountsId));
 
-    if (!pipeline) {
-      this.logger.warn({ pipelineId, msg: 'Pipeline not found, skipping verification' });
+    if (!accounts) {
+      this.logger.warn({
+        accountsId,
+        msg: 'Accounts not found, skipping verification',
+      });
       return;
     }
 
-    const { delegateUserId, ownerUserId } = pipeline;
+    const { delegateUserId, ownerUserId } = accounts;
 
     const [ownerProfile] = await this.db
       .select({ email: userProfiles.email })
@@ -71,7 +74,7 @@ export class SyncDelegatedAccessCommand {
     const ownerEmail = ownerProfile?.email;
     if (!ownerEmail) {
       this.logger.warn({
-        pipelineId,
+        accountsId,
         ownerUserId,
         msg: 'Owner email not found, skipping verification',
       });
@@ -86,14 +89,14 @@ export class SyncDelegatedAccessCommand {
     if (verificationResult.hasFullDelegatedAcces) {
       await this.db
         .delete(delegatedAccessDirectories)
-        .where(eq(delegatedAccessDirectories.pipelineId, pipelineId));
+        .where(eq(delegatedAccessDirectories.accountsId, accountsId));
 
       await this.db
-        .update(delegatedAccessPipelines)
+        .update(delegatedAccessAccounts)
         .set({
           hasFullDelegatedAccess: true,
         })
-        .where(eq(delegatedAccessPipelines.id, pipelineId));
+        .where(eq(delegatedAccessAccounts.id, accountsId));
       return;
     }
 
@@ -108,7 +111,7 @@ export class SyncDelegatedAccessCommand {
       .delete(delegatedAccessDirectories)
       .where(
         and(
-          eq(delegatedAccessDirectories.pipelineId, pipelineId),
+          eq(delegatedAccessDirectories.accountsId, accountsId),
           accessibleFolderIds.length > 0
             ? notInArray(delegatedAccessDirectories.directoryId, accessibleFolderIds)
             : undefined,
@@ -120,7 +123,7 @@ export class SyncDelegatedAccessCommand {
         .insert(delegatedAccessDirectories)
         .values(
           accessibleFolderIds.map((directoryId) => ({
-            pipelineId,
+            accountsId,
             directoryId,
           })),
         )
@@ -130,28 +133,31 @@ export class SyncDelegatedAccessCommand {
     const [result] = await this.db
       .select({ count: count() })
       .from(delegatedAccessDirectories)
-      .where(eq(delegatedAccessDirectories.pipelineId, pipelineId));
+      .where(eq(delegatedAccessDirectories.accountsId, accountsId));
 
     await this.db
-      .update(delegatedAccessPipelines)
+      .update(delegatedAccessAccounts)
       .set({ hasFullDelegatedAccess: false })
-      .where(eq(delegatedAccessPipelines.id, pipelineId));
+      .where(eq(delegatedAccessAccounts.id, accountsId));
 
     const dirCount = result?.count ?? 0;
     if (dirCount === 0 && !foldersWithErrors.length) {
       await this.db
-        .delete(delegatedAccessPipelines)
-        .where(eq(delegatedAccessPipelines.id, pipelineId));
-      this.logger.log({ pipelineId, msg: 'No accessible directories, pipeline deleted' });
+        .delete(delegatedAccessAccounts)
+        .where(eq(delegatedAccessAccounts.id, accountsId));
+      this.logger.log({
+        accountsId,
+        msg: 'No accessible directories, accounts deleted',
+      });
       return;
     }
 
     if (!foldersWithErrors.length) {
       await this.db
-        .update(delegatedAccessPipelines)
+        .update(delegatedAccessAccounts)
         .set({ lastVerifiedAt: new Date() })
-        .where(eq(delegatedAccessPipelines.id, pipelineId));
-      this.logger.log({ pipelineId, dirCount, msg: 'Pipeline lastVerifiedAt updated' });
+        .where(eq(delegatedAccessAccounts.id, accountsId));
+      this.logger.log({ accountsId, dirCount, msg: 'Accounts lastVerifiedAt updated' });
       return;
     }
 

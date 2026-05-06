@@ -188,7 +188,7 @@ describe('DiscoverDelegatedAccessCommand', () => {
     expect(db.__delete).not.toHaveBeenCalled();
   });
 
-  it('deletes pipeline rows on 403 response', async () => {
+  it('deletes accounts rows on 403 response', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(403));
     const db = createMockDb();
     const command = createCommand({ graphApi, db });
@@ -203,7 +203,7 @@ describe('DiscoverDelegatedAccessCommand', () => {
     expect(db.__insert).not.toHaveBeenCalled();
   });
 
-  it('deletes pipeline rows on 404 response', async () => {
+  it('deletes accounts rows on 404 response', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(404));
     const db = createMockDb();
     const command = createCommand({ graphApi, db });
