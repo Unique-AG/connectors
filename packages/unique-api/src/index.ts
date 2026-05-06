@@ -37,6 +37,9 @@ export type {
   IngestionFinalizationRequest,
 } from './ingestion/ingestion.types';
 export { IngestionState } from './ingestion/ingestion.types';
+export { toSafeBulkMoveError } from './scopes/bulk-move-error';
+export type { GraphqlClient } from './scopes/scopes.service';
+export { ScopesService } from './scopes/scopes.service';
 export type {
   BulkMoveResult,
   DeleteFolderResult,
@@ -44,9 +47,6 @@ export type {
   ScopeAccess,
   ScopeWithPath,
 } from './scopes/scopes.types';
-export { toSafeBulkMoveError } from './scopes/bulk-move-error';
-export { ScopesService } from './scopes/scopes.service';
-export type { GraphqlClient } from './scopes/scopes.service';
 export type {
   UniqueAccessType,
   UniqueApiClientFactory,

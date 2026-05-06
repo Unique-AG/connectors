@@ -1,6 +1,7 @@
 import { processInBatches } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { isNullish } from 'remeda';
+import { toSafeBulkMoveError } from './bulk-move-error';
 import {
   BULK_MOVE_MUTATION,
   type BulkMoveMutationInput,
@@ -28,7 +29,11 @@ import type { BulkMoveResult, DeleteFolderResult, Scope, ScopeAccess } from './s
 import { UniqueApiScopesFacade } from './unique-scopes.facade';
 
 export interface GraphqlClient {
-  request<TResult, TVars extends object>(query: string, variables?: TVars): Promise<TResult>;
+  request<TResult, TVars extends object>(
+    query: string,
+    variables?: TVars,
+    options?: { errorTransform?: (error: unknown) => Error },
+  ): Promise<TResult>;
 }
 
 const BATCH_SIZE = 100;
@@ -190,9 +195,11 @@ export class ScopesService implements UniqueApiScopesFacade {
     const result = await this.scopeManagementClient.request<
       BulkMoveMutationResult,
       BulkMoveMutationInput
-    >(BULK_MOVE_MUTATION, {
-      input: { scopeIds, targetScopeId },
-    });
+    >(
+      BULK_MOVE_MUTATION,
+      { input: { scopeIds, targetScopeId } },
+      { errorTransform: toSafeBulkMoveError },
+    );
 
     this.logger.debug({
       msg: 'bulkMove response',
