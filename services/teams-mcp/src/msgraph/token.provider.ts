@@ -9,8 +9,8 @@ import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import { userProfiles } from '../drizzle/schema';
-import { normalizeError } from '../utils/normalize-error';
 import { MicrosoftReauthRequiredException } from '../utils/microsoft-reauth.exception';
+import { normalizeError } from '../utils/normalize-error';
 
 export class TokenProvider implements AuthenticationProvider {
   private readonly logger = new Logger(TokenProvider.name);
@@ -94,29 +94,28 @@ export class TokenProvider implements AuthenticationProvider {
 
       if (!response.ok) {
         const errorText = await response.text();
+        let parsedError: { error?: string; error_description?: string } = {};
+        try {
+          parsedError = JSON.parse(errorText);
+        } catch {
+          // not JSON
+        }
+
         this.logger.error(
           {
             status: response.status,
-            errorText,
-            userProfileId: this.userProfileId,
+            errorText: parsedError,
+            userProfileId,
             tokenRefreshFailed: true,
             errorSource: 'microsoft_graph_api',
           },
           'Microsoft Graph API rejected token refresh request',
         );
 
-        let parsedError: { error?: string; error_description?: string } = {};
-        try {
-          parsedError = JSON.parse(errorText);
-        } catch {
-          // not JSON, fall through to generic error
-        }
-
         if (parsedError.error === 'invalid_grant') {
-          // The refresh token is permanently invalid (expired, revoked, device removed,
-          // Conditional Access policy changed, etc.). Clear the dead tokens so subsequent
-          // requests don't keep retrying, then surface a typed McpError so the tool
-          // handler propagates a JSON-RPC error instead of an isError:true result.
+          // Permanently invalid — expired, revoked, device removed from tenant, CAP changed.
+          // Clear the dead tokens and surface a typed McpError so the tool handler
+          // propagates a JSON-RPC error instead of isError:true.
           await this.drizzle
             .update(userProfiles)
             .set({ accessToken: null, refreshToken: null })
@@ -147,7 +146,7 @@ export class TokenProvider implements AuthenticationProvider {
 
       this.logger.debug(
         {
-          userProfileId: this.userProfileId,
+          userProfileId,
           tokenRefreshSuccess: true,
           action: 'token_refresh_completed',
         },
@@ -155,14 +154,12 @@ export class TokenProvider implements AuthenticationProvider {
       );
       return tokenData.access_token;
     } catch (error) {
-      // MicrosoftReauthRequiredException (McpError) must propagate unwrapped so the
-      // middleware and tool handler can re-throw it as a JSON-RPC error response.
       if (error instanceof MicrosoftReauthRequiredException) {
         throw error;
       }
       this.logger.error(
         {
-          userProfileId: this.userProfileId,
+          userProfileId,
           error: serializeError(normalizeError(error)),
           tokenRefreshFailed: true,
           errorSource: 'microsoft_graph_api',

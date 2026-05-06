@@ -1,6 +1,6 @@
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
-import { Logger } from '@nestjs/common';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
+import { Logger } from '@nestjs/common';
 import { serializeError } from 'serialize-error-cjs';
 import { normalizeError } from '../utils/normalize-error';
 import { TokenProvider } from './token.provider';
@@ -134,8 +134,6 @@ export class TokenRefreshMiddleware implements Middleware {
         );
       }
     } catch (error) {
-      // McpErrors (e.g. MicrosoftReauthRequiredException) must propagate so the tool
-      // handler can re-throw them as a JSON-RPC error rather than isError:true.
       if (error instanceof McpError) {
         throw error;
       }

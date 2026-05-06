@@ -1,5 +1,4 @@
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
-import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 /**
  * Thrown when the Microsoft Graph refresh token is permanently invalid —
@@ -11,7 +10,7 @@ import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
  * signal that the user must re-authenticate rather than just a failed tool call.
  */
 export class MicrosoftReauthRequiredException extends McpError {
-  constructor(cause?: string) {
+  public constructor(cause?: string) {
     const message = cause
       ? `Microsoft re-authentication required: ${cause}`
       : 'Microsoft re-authentication required. Please reconnect your Microsoft account.';
