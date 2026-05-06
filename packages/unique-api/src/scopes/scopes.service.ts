@@ -1,7 +1,6 @@
 import { processInBatches } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { isNullish } from 'remeda';
-import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   BULK_MOVE_MUTATION,
   type BulkMoveMutationInput,
@@ -28,11 +27,15 @@ import {
 import type { BulkMoveResult, DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
 import { UniqueApiScopesFacade } from './unique-scopes.facade';
 
+export interface GraphqlClient {
+  request<TResult, TVars extends object>(query: string, variables?: TVars): Promise<TResult>;
+}
+
 const BATCH_SIZE = 100;
 
 export class ScopesService implements UniqueApiScopesFacade {
   public constructor(
-    private readonly scopeManagementClient: UniqueGraphqlClient,
+    private readonly scopeManagementClient: GraphqlClient,
     private readonly logger: Logger,
   ) {}
 

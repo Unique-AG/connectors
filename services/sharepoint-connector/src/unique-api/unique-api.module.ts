@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { type GraphqlClient, ScopesService } from '@unique-ag/unique-api';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { type Counter, type Histogram } from '@opentelemetry/api';
 import { Config } from '../config';
@@ -37,6 +38,16 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
     BottleneckFactory,
     HttpClientService,
     IngestionHttpClient,
+    {
+      provide: ScopesService,
+      useFactory: (ingestionClient: UniqueGraphqlClient) => {
+        return new ScopesService(
+          ingestionClient as unknown as GraphqlClient,
+          new Logger(ScopesService.name),
+        );
+      },
+      inject: [INGESTION_CLIENT],
+    },
     {
       provide: SCOPE_MANAGEMENT_CLIENT,
       useFactory: (
@@ -103,6 +114,7 @@ import { UniqueUsersService } from './unique-users/unique-users.service';
     UniqueUsersService,
     UniqueFileIngestionService,
     UniqueFilesService,
+    ScopesService,
     INGESTION_CLIENT,
     SCOPE_MANAGEMENT_CLIENT,
   ],

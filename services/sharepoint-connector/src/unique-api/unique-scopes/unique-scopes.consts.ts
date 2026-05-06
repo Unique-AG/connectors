@@ -222,35 +222,3 @@ export const DELETE_FOLDER_MUTATION = gql`
     }
   }
 `;
-
-export interface BulkMoveMutationInput {
-  input: {
-    scopeIds?: string[];
-    contentIds?: string[];
-    targetScopeId?: string | null;
-  };
-}
-
-export interface BulkMoveMutationResult {
-  bulkMove: {
-    scopeIds: string[];
-    asyncMetadataRebuild: boolean;
-    jobId?: string | null;
-    affectedFiles?: number | null;
-    message?: string | null;
-  };
-}
-
-export const BULK_MOVE_LOG_SAFE_KEYS: VariableLogPolicy = ['input.scopeIds', 'input.targetScopeId'];
-
-export const BULK_MOVE_MUTATION = gql`
-  mutation BulkMove($input: BulkMoveInput!) {
-    bulkMove(input: $input) {
-      scopeIds
-      asyncMetadataRebuild
-      jobId
-      affectedFiles
-      message
-    }
-  }
-`;

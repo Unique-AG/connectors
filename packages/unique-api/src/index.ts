@@ -44,6 +44,8 @@ export type {
   ScopeAccess,
   ScopeWithPath,
 } from './scopes/scopes.types';
+export { ScopesService } from './scopes/scopes.service';
+export type { GraphqlClient } from './scopes/scopes.service';
 export type {
   UniqueAccessType,
   UniqueApiClientFactory,

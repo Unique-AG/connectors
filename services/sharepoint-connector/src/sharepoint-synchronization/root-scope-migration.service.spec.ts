@@ -1,3 +1,4 @@
+import { ScopesService } from '@unique-ag/unique-api';
 import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
@@ -8,13 +9,13 @@ describe('RootScopeMigrationService', () => {
   let service: RootScopeMigrationService;
   let getScopeByExternalIdMock: ReturnType<typeof vi.fn>;
   let listChildrenScopesMock: ReturnType<typeof vi.fn>;
-  let bulkMoveScopesMock: ReturnType<typeof vi.fn>;
+  let bulkMoveMock: ReturnType<typeof vi.fn>;
   let deleteScopeMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     getScopeByExternalIdMock = vi.fn();
     listChildrenScopesMock = vi.fn();
-    bulkMoveScopesMock = vi.fn();
+    bulkMoveMock = vi.fn();
     deleteScopeMock = vi.fn();
 
     const { unit } = await TestBed.solitary(RootScopeMigrationService)
@@ -23,8 +24,12 @@ describe('RootScopeMigrationService', () => {
         ...stubFn(),
         getScopeByExternalId: getScopeByExternalIdMock,
         listChildrenScopes: listChildrenScopesMock,
-        bulkMoveScopes: bulkMoveScopesMock,
         deleteScope: deleteScopeMock,
+      }))
+      .mock<ScopesService>(ScopesService)
+      .impl((stubFn) => ({
+        ...stubFn(),
+        bulkMove: bulkMoveMock,
       }))
       .compile();
 
@@ -75,7 +80,7 @@ describe('RootScopeMigrationService', () => {
         listChildrenScopesMock.mockResolvedValue([
           { id: 'child-1', name: 'Folder1', parentId: 'old-root-123' },
         ]);
-        bulkMoveScopesMock.mockResolvedValue({
+        bulkMoveMock.mockResolvedValue({
           scopeIds: ['child-1'],
           asyncMetadataRebuild: false,
         });
@@ -92,7 +97,7 @@ describe('RootScopeMigrationService', () => {
         expect(result).toEqual({ status: 'migration_completed' });
         expect(getScopeByExternalIdMock).toHaveBeenNthCalledWith(1, 'spc:site:site-456');
         expect(getScopeByExternalIdMock).toHaveBeenNthCalledWith(2, 'spc:site-456/site');
-        expect(bulkMoveScopesMock).toHaveBeenCalledWith(['child-1'], 'new-root-123');
+        expect(bulkMoveMock).toHaveBeenCalledWith(['child-1'], 'new-root-123');
         expect(deleteScopeMock).toHaveBeenCalledWith('old-root-123');
       });
 
@@ -169,7 +174,7 @@ describe('RootScopeMigrationService', () => {
           { id: 'child-2', name: 'Folder2', parentId: 'old-root-123' },
           { id: 'child-3', name: 'Folder3', parentId: 'old-root-123' },
         ]);
-        bulkMoveScopesMock.mockResolvedValue({
+        bulkMoveMock.mockResolvedValue({
           scopeIds: ['child-1', 'child-2', 'child-3'],
           asyncMetadataRebuild: false,
         });
@@ -184,8 +189,8 @@ describe('RootScopeMigrationService', () => {
         );
 
         expect(result).toEqual({ status: 'migration_completed' });
-        expect(bulkMoveScopesMock).toHaveBeenCalledTimes(1);
-        expect(bulkMoveScopesMock).toHaveBeenCalledWith(
+        expect(bulkMoveMock).toHaveBeenCalledTimes(1);
+        expect(bulkMoveMock).toHaveBeenCalledWith(
           ['child-1', 'child-2', 'child-3'],
           'new-root-123',
         );
@@ -211,7 +216,7 @@ describe('RootScopeMigrationService', () => {
         );
 
         expect(result).toEqual({ status: 'migration_completed' });
-        expect(bulkMoveScopesMock).not.toHaveBeenCalled();
+        expect(bulkMoveMock).not.toHaveBeenCalled();
         expect(deleteScopeMock).toHaveBeenCalledWith('old-root-123');
       });
     });
@@ -228,7 +233,7 @@ describe('RootScopeMigrationService', () => {
           { id: 'child-1', name: 'Folder1', parentId: 'old-root-123' },
           { id: 'child-2', name: 'Folder2', parentId: 'old-root-123' },
         ]);
-        bulkMoveScopesMock.mockRejectedValue(new Error('bulkMove API error'));
+        bulkMoveMock.mockRejectedValue(new Error('bulkMove API error'));
 
         const result = await service.migrateIfNeeded(
           'new-root-123',
