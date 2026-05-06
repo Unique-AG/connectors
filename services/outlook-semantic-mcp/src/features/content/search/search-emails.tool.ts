@@ -15,13 +15,11 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { META_MS_GRAPH, META_UNIQUE_AND_MS_GRAPH } from './search-emails-tool.meta';
 import { SearchBackend } from './semantic-search-emails.query';
 
-const IS_MICROSOFT_GRAPH_BACKEND = isMicrosoftGraphBackend();
-
-const SearchEmailsToolInputSchema = IS_MICROSOFT_GRAPH_BACKEND
+const SearchEmailsToolInputSchema = isMicrosoftGraphBackend()
   ? SearchEmailsMsGraphInputSchema
   : SearchEmailsUnifiedInputSchema;
 
-const SearchEmailsToolDescription = IS_MICROSOFT_GRAPH_BACKEND
+const SearchEmailsToolDescription = isMicrosoftGraphBackend()
   ? 'Search emails using Microsoft Graph KQL queries across your own and delegated mailboxes. Returns matched emails with an id per result.\n\nTo read the full body of a result, call `open_email_by_id` passing `msGraphMessageId` as `id` and `MsGraph` as `idType`.\n\nIf the response includes `searchNotes`, display them to the user after results.'
   : 'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by a well-known folder (Inbox, Sent Items, Drafts, etc.) pass the name directly in `directories` — no need to call `list_folders`. For custom folders, call `list_folders` first to get the folder id. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` passing `uniqueContentId` (or `msGraphMessageId` if unavailable) as `id`, and `Unique` (or `MsGraph`) as `idType`. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete. If the response includes `searchNotes`, display them to the user after results.';
 
@@ -132,7 +130,7 @@ export class SearchEmailsTool {
       idempotentHint: true,
       openWorldHint: false,
     },
-    _meta: IS_MICROSOFT_GRAPH_BACKEND ? META_MS_GRAPH : META_UNIQUE_AND_MS_GRAPH,
+    _meta: isMicrosoftGraphBackend() ? META_MS_GRAPH : META_UNIQUE_AND_MS_GRAPH,
   })
   @Span()
   public async searchEmails(
@@ -142,7 +140,7 @@ export class SearchEmailsTool {
   ): Promise<z.infer<typeof SearchEmailsOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
 
-    if (!IS_MICROSOFT_GRAPH_BACKEND) {
+    if (!isMicrosoftGraphBackend()) {
       const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
       if (!subscriptionStatus.success) {
         return subscriptionStatus;
@@ -151,7 +149,7 @@ export class SearchEmailsTool {
 
     const { results, searchSummary } = await this.searchEmailsQuery.run(userProfileTypeId, input);
 
-    if (!IS_MICROSOFT_GRAPH_BACKEND) {
+    if (!isMicrosoftGraphBackend()) {
       const stats = await this.getFullSyncStatsQuery.run(userProfileTypeId);
 
       if (stats.state === 'error') {

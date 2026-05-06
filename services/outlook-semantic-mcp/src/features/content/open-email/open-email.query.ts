@@ -52,9 +52,11 @@ export class OpenEmailQuery {
     userProfileId: string,
     id: string,
     idType: SearchBackend,
+    mailbox?: string,
+    folderId?: string,
   ): Promise<OpenEmailResult> {
     if (idType === SearchBackend.MsGraph) {
-      return this.readMessageFromMsGraph(userProfileId, id);
+      return this.readMessageFromMsGraph(userProfileId, id, mailbox, folderId);
     }
     return this.readMessageFromUnique(id);
   }
@@ -62,10 +64,19 @@ export class OpenEmailQuery {
   private async readMessageFromMsGraph(
     userProfileId: string,
     messageId: string,
+    mailbox?: string,
+    folderId?: string,
   ): Promise<OpenEmailResult> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
+    // Read via folder path to support shared/delegated folder access; falls back to /me for own mailbox
+    const messagePath =
+      mailbox && folderId
+        ? `/users/${mailbox}/mailFolders/${folderId}/messages/${messageId}`
+        : `/me/messages/${messageId}`;
     const raw = await client
-      .api(`/me/messages/${messageId}`)
+      .api(messagePath)
+      .header('Prefer', 'IdType="ImmutableId"')
+      .header('Prefer', 'outlook.body-content-type="text"')
       .select(
         'id,subject,body,from,toRecipients,ccRecipients,receivedDateTime,parentFolderId,webLink,hasAttachments',
       )

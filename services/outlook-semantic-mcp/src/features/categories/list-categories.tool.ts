@@ -4,7 +4,6 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { GetSubscriptionStatusQuery } from '../subscriptions/get-subscription-status.query';
 import { ListCategoriesQuery, ListCategoriesQueryOutputSchema } from './list-categories.query';
 import { META } from './list-categories-tool.meta';
 
@@ -12,10 +11,7 @@ const InputSchema = z.object({});
 
 @Injectable()
 export class ListCategoriesTool {
-  public constructor(
-    private readonly listCategoriesQuery: ListCategoriesQuery,
-    private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
-  ) {}
+  public constructor(private readonly listCategoriesQuery: ListCategoriesQuery) {}
 
   @Tool({
     name: 'list_categories',
@@ -40,11 +36,6 @@ export class ListCategoriesTool {
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof ListCategoriesQueryOutputSchema>> {
     const userProfileId = extractUserProfileId(request);
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileId);
-
-    if (!subscriptionStatus.success) {
-      return subscriptionStatus;
-    }
     return this.listCategoriesQuery.run(userProfileId);
   }
 }

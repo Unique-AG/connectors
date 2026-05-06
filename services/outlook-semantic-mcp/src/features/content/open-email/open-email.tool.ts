@@ -10,8 +10,6 @@ import { SearchBackend } from '../search/semantic-search-emails.query';
 import { OpenEmailQuery } from './open-email.query';
 import { META } from './open-email-tool.meta';
 
-const IS_MICROSOFT_GRAPH_BACKEND = isMicrosoftGraphBackend();
-
 const OpenEmailByIdInputSchema = z.object({
   id: z
     .string()
@@ -22,6 +20,18 @@ const OpenEmailByIdInputSchema = z.object({
     .nativeEnum(SearchBackend)
     .describe(
       'Indicates which identifier is being passed, derived from the `search_emails` result. Use `Unique` when passing `uniqueContentId`; use `MsGraph` when passing `msGraphMessageId`.',
+    ),
+  mailbox: z
+    .string()
+    .optional()
+    .describe(
+      'The mailbox address this email belongs to. Pass the `sourceMailbox` value from the `search_emails` result. Required for delegated mailbox access; omit for the user\'s own mailbox.',
+    ),
+  parentFolderId: z
+    .string()
+    .optional()
+    .describe(
+      'The folder containing this email. Pass the `folderId` value from the `search_emails` result. Required when `mailbox` is provided.',
     ),
 });
 
@@ -70,7 +80,7 @@ export class OpenEmailTool {
   ): Promise<z.infer<typeof OpenEmailByIdOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
 
-    if (!IS_MICROSOFT_GRAPH_BACKEND) {
+    if (!isMicrosoftGraphBackend()) {
       const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
       if (!subscriptionStatus.success) {
         return subscriptionStatus;
@@ -81,6 +91,8 @@ export class OpenEmailTool {
       userProfileTypeId.toString(),
       input.id,
       input.idType,
+      input.mailbox,
+      input.parentFolderId,
     );
     return { success: true, emailData };
   }

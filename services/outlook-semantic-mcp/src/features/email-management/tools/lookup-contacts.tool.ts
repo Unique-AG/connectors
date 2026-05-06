@@ -4,7 +4,6 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { GetSubscriptionStatusQuery } from '../../subscriptions/get-subscription-status.query';
 import { LookupContactsQuery, LookupContactsResultSchema } from '../lookup-contacts.query';
 import { META } from './lookup-contacts-tool.meta';
 
@@ -17,10 +16,7 @@ const LookupContactsInputSchema = z.object({
 
 @Injectable()
 export class LookupContactsTool {
-  public constructor(
-    private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
-    private readonly lookupContactsQuery: LookupContactsQuery,
-  ) {}
+  public constructor(private readonly lookupContactsQuery: LookupContactsQuery) {}
 
   @Tool({
     name: 'lookup_contacts',
@@ -45,10 +41,6 @@ export class LookupContactsTool {
     request: McpAuthenticatedRequest,
   ) {
     const userProfileTypeId = extractUserProfileId(request);
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
-    if (!subscriptionStatus.success) {
-      return subscriptionStatus;
-    }
     return await this.lookupContactsQuery.run(userProfileTypeId, input.name);
   }
 }

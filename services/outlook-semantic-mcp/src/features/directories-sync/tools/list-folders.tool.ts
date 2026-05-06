@@ -3,7 +3,6 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import {
   ListDirectoriesQuery,
@@ -42,7 +41,6 @@ export class ListFoldersTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
     private readonly listDirectoriesQuery: ListDirectoriesQuery,
   ) {}
@@ -74,19 +72,11 @@ export class ListFoldersTool {
   > {
     const userProfileTypeId = extractUserProfileId(request);
     const userProfileTypeIdString = userProfileTypeId.toString();
-
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
-
-    if (!subscriptionStatus.success) {
-      return subscriptionStatus;
-    }
-
     this.logger.log({
       userProfileId: userProfileTypeIdString,
       msg: 'Running directory sync before listing folders',
     });
     await this.syncDirectoriesCommand.run(userProfileTypeId);
-
     const mailboxes = await this.listDirectoriesQuery.run(userProfileTypeIdString);
 
     return {
