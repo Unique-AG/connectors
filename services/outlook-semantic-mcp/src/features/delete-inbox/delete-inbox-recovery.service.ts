@@ -5,6 +5,7 @@ import { CronJob } from 'cron';
 import { and, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
+import { NewTrace } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
 import { DeleteInboxDataEventDto } from './delete-inbox-data-event.dto';
 import { STALE_DELETE_INBOX_CONFIGURATION_THRESHOLD_IN_MINUTES } from './execute-inbox-deletion.command';
@@ -53,6 +54,7 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
     job.start();
   }
 
+  @NewTrace('cron.delete-inbox-recovery')
   public async checkAndRetriggerStuckDeletions(): Promise<void> {
     if (this.isShuttingDown) {
       return;
