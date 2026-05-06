@@ -4,6 +4,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { AppConfig, appConfig } from '~/config';
+import { NewTrace } from '~/features/tracing.utils';
 import { SyncDelegatedAccessEventDto } from './sync-delegated-access-event';
 
 @Injectable()
@@ -59,6 +60,7 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
     job.start();
   }
 
+  @NewTrace('cron.verify-delegated-access')
   public async triggerVerificationForPipelineRows(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({ msg: 'Skipping verification scan due to shutdown' });

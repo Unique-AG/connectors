@@ -4,6 +4,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { AppConfig, appConfig } from '~/config';
+import { NewTrace } from '~/features/tracing.utils';
 import { DiscoverDelegatedAccessEventDto } from './discover-delegated-access-event.dto';
 
 @Injectable()
@@ -54,6 +55,7 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
     job.start();
   }
 
+  @NewTrace('cron.discover-delegated-access')
   public async triggerDiscovery(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({ msg: 'Skipping delegated access discovery scan due to shutdown' });

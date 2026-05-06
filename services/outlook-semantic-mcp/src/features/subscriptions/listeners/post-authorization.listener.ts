@@ -9,6 +9,7 @@ import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { UserAuthorizedEventDto } from '~/auth/dtos/user-authorized-event.dto';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
+import { NewTrace } from '~/features/tracing.utils';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
@@ -31,6 +32,7 @@ export class PostAuthorizationListener {
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @NewTrace('amqp.post-authorization')
   public async onUserAuthorized(@RabbitPayload() payload: unknown): Promise<void> {
     const event = UserAuthorizedEventDto.parse(payload);
     const { userProfileId } = event.payload;
