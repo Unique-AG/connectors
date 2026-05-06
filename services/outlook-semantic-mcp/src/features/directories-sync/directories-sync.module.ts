@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { MsGraphModule } from '../../msgraph/msgraph.module';
+import { InboxDeletingQueryModule } from '../delete-inbox/inbox-deleting-query.module';
 import { UserUtilsModule } from '../user-utils/user-utils.module';
 import { CreateRootScopeCommand } from './create-root-scope.command';
 import { DirectorySyncSchedulerService } from './directories-sync-scheduler.service';
@@ -29,7 +30,13 @@ const PUBLIC_COMMANDS = [
 ];
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule, UserUtilsModule, UniqueApiFeatureModule],
+  imports: [
+    DrizzleModule,
+    MsGraphModule,
+    UserUtilsModule,
+    UniqueApiFeatureModule,
+    InboxDeletingQueryModule,
+  ],
   providers: [...QUERIES, ...COMMANDS, ...PUBLIC_COMMANDS, DirectorySyncSchedulerService],
   exports: [...QUERIES, ...COMMANDS, ...PUBLIC_COMMANDS],
 })

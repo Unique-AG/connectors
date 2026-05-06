@@ -4,6 +4,7 @@ import { and, count, eq, notInArray } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import { chunk } from 'remeda';
+import { AppConfig, appConfig } from '~/config';
 import {
   DRIZZLE,
   DrizzleDatabase,
@@ -34,10 +35,17 @@ export class SyncDelegatedAccessCommand {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
   ) {}
 
   @Span()
   public async run(input: { pipelineId: string }): Promise<void> {
+    if (this.config.delegatedAccessScan !== 'granularAccess') {
+      this.logger.log({
+        msg: `Skipped running delegated access verification. Reason: delegated access is not set to "granularAccess"`,
+      });
+      return;
+    }
     const { pipelineId } = input;
 
     const [pipeline] = await this.db

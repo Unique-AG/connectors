@@ -24,17 +24,19 @@ import {
 } from './subscription.dtos';
 import { MailSubscriptionUtilsService } from './subscription-utils.service';
 
-export interface SubscribeResult {
-  status: 'created' | 'already_active' | 'expiring_soon';
-  subscription: {
-    id: string;
-    subscriptionId: string;
-    expiresAt: Date;
-    userProfileId: string;
-    createdAt: Date;
-    updatedAt: Date;
-  };
-}
+export type SubscribeResult =
+  | { status: 'not_created'; reason: 'Not required for backend "MicrosoftGraph"' }
+  | {
+      status: 'created' | 'already_active' | 'expiring_soon';
+      subscription: {
+        id: string;
+        subscriptionId: string;
+        expiresAt: Date;
+        userProfileId: string;
+        createdAt: Date;
+        updatedAt: Date;
+      };
+    };
 
 @Injectable()
 export class SubscriptionCreateService {
@@ -50,6 +52,9 @@ export class SubscriptionCreateService {
 
   @Span()
   public async subscribe(userProfileId: UserProfileTypeID): Promise<SubscribeResult> {
+    if (this.config.mcpBackend === 'MicrosoftGraph') {
+      return { status: 'not_created', reason: 'Not required for backend "MicrosoftGraph"' };
+    }
     traceAttrs({
       userProfileId: userProfileId.toString(),
       operation: 'create_subscription',
@@ -196,9 +201,9 @@ export class SubscriptionCreateService {
       providerUserId: userProfile.providerUserId,
     });
 
+    assert(this.config.mcpBackend === 'MicrosoftGraphAndUniqueApi');
     // We create the inbox configuration before we do the subscription because we do not want
     // to create a rance condition between webhook events and not having the subscription.
-    assert(this.config.mcpBackend === 'MicrosoftGraphAndUniqueApi');
     await this.db
       .insert(inboxConfigurations)
       .values({

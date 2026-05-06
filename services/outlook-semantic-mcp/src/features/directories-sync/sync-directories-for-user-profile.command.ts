@@ -17,6 +17,7 @@ import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { IsInboxDeletingQuery } from '../delete-inbox/is-inbox-deleting.query';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 import { CreateRootScopeCommand } from './create-root-scope.command';
 import { FetchAllDirectoriesFromOutlookQuery } from './fetch-all-directories-from-outlook.query';
@@ -38,6 +39,7 @@ export class SyncDirectoriesForUserProfileCommand {
     private readonly syncSystemDirectoriesCommand: SyncSystemDirectoriesForSubscriptionCommand,
     private readonly createRootScopeCommand: CreateRootScopeCommand,
     private readonly upsertDirectoryCommand: UpsertDirectoryCommand,
+    private readonly isInboxDeletingQuery: IsInboxDeletingQuery,
   ) {}
 
   @Span()
@@ -247,6 +249,14 @@ export class SyncDirectoriesForUserProfileCommand {
       this.logger.warn({
         userProfileId,
         msg: `Root scope not found, skipping unique file deletion`,
+      });
+      return;
+    }
+
+    if (await this.isInboxDeletingQuery.run(userProfileId)) {
+      this.logger.warn({
+        userProfileId,
+        msg: `Skip removing contents. Inbox is in full delete process`,
       });
       return;
     }

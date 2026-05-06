@@ -4,6 +4,7 @@ import {
   RabbitSubscribe,
 } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { pick } from 'remeda';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { UserAuthorizedEventDto } from '~/auth/dtos/user-authorized-event.dto';
@@ -49,7 +50,7 @@ export class PostAuthorizationListener {
       this.logger.log({
         msg: 'Subscription outcome after user authorization',
         userProfileId,
-        status: result.status,
+        ...pick(result, ['status', 'reason']),
       });
     } catch (error) {
       this.logger.error({

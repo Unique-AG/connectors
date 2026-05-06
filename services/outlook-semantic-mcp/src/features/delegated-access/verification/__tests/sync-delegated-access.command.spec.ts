@@ -113,7 +113,11 @@ function createCommand({
   graphApi?: ReturnType<typeof createMockGraphApi>;
   db?: ReturnType<typeof createMockDb>;
 } = {}): SyncDelegatedAccessCommand {
-  return new SyncDelegatedAccessCommand(createMockGraphClientFactory(graphApi) as any, db as any);
+  return new SyncDelegatedAccessCommand(
+    createMockGraphClientFactory(graphApi) as any,
+    db as any,
+    { delegatedAccessScan: 'granularAccess' } as any,
+  );
 }
 
 // ---------------------------------------------------------------------------

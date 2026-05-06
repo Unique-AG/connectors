@@ -45,6 +45,7 @@ export class DiscoverDelegatedAccessCommand {
       this.logger.log({
         msg: `Skipped running delegated access discovery. Reason: delegated access is disabled`,
       });
+      return;
     }
     const decision = await this.decide();
     if (decision.action === 'skip') {
