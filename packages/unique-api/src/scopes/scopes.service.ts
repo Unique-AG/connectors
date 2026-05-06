@@ -177,6 +177,13 @@ export class ScopesService implements UniqueApiScopesFacade {
     return scopes;
   }
 
+  /*
+   * Depending on the number of files it has to move, bulkMove can be a sync operation or an async operation.
+   * But it always returns *after the new parent was correctly set for scopes and files*.
+   * What it actually does asynchronously is the metadata update where it computes the new folderIdPath, for example
+   *  - folderIdpath: "uniquepathid://scope_o5jr5ig8k4iugk8lhd8nq42e/scope_xrqbd1pjg71xq7o6r762w01o"
+   * Recomputing the metadata is a slower process that's why for more files (default is 10) it'll be async
+   */
   public async bulkMove(scopeIds: string[], targetScopeId: string): Promise<BulkMoveResult> {
     this.logger.debug(`Bulk-moving ${scopeIds.length} scopes to target ${targetScopeId}`);
 
