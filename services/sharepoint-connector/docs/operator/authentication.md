@@ -42,7 +42,7 @@ For detailed instructions, see:
 
 ### 2. Create Azure AD Application Registration
 
-**Self-hosted only:** Complete this step when your organization hosts the connector and manages the Entra app registration yourself. If [Unique hosts the connector](../technical/architecture.md#single-tenant-unique-hosted) (see [Hosting models](../technical/architecture.md#hosting-models)), Unique manages the app registration—skip this step.
+**Self-hosted only:** Complete this step when your organization hosts the connector and manages the Entra app registration yourself. If [Unique hosts the connector](../technical/architecture.md#Single-Tenant:-Unique-Hosted) (see [Hosting models](../technical/architecture.md#Hosting-Models)), Unique manages the app registration—skip this step.
 
 #### Required Permissions
 
