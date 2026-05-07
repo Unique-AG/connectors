@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.0...outlook-semantic-mcp@0.4.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** update limits for next round of tests ([#520](https://github.com/Unique-AG/connectors/issues/520)) ([ff37af5](https://github.com/Unique-AG/connectors/commit/ff37af585ebd21942c9a93137f2b2bd108a0d0bc))
+
 ## [0.4.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.3.3...outlook-semantic-mcp@0.4.0) (2026-05-07)
 
 
