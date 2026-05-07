@@ -139,7 +139,7 @@ export class SearchEmailsTool {
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: true,
-      openWorldHint: false,
+      openWorldHint: true,
     },
     _meta: isMicrosoftGraphBackend() ? META_MS_GRAPH : META_UNIQUE_AND_MS_GRAPH,
   })
