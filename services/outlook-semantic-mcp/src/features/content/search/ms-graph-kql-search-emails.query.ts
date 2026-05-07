@@ -171,7 +171,7 @@ export class MsGraphKqlSearchEmailsQuery {
     const getRequestId = () => typeid(`batch_request`).toString();
 
     return queries.flatMap((query): GraphBatchRequest[] => {
-      const limit = Math.min(50, query.limit ?? 25);
+      const limit = query.limit ?? 100;
       const { mailbox } = query;
 
       if (mailbox) {
