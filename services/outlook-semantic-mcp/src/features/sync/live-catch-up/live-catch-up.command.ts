@@ -15,7 +15,7 @@ import {
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
-import { traceAttrs, traceEvent } from '~/features/tracing.utils';
+import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
@@ -53,11 +53,12 @@ export class LiveCatchUpCommand {
     });
   }
 
-  @Span()
+  @NewTrace('live-catchup')
   public async run(input: {
     liveCatchupOverlappingWindow: number;
     subscriptionId: string;
   }): Promise<void> {
+    traceAttrs({ subscriptionId: input.subscriptionId });
     await withRetryAttempts({
       fn: () => this.runLiveCatchup(input),
       onError: rethrowRateLimitError,
