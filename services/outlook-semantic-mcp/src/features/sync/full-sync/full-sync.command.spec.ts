@@ -5,6 +5,7 @@ import { FullSyncCommand, START_FULL_SYNC_LINK } from './full-sync.command';
 vi.mock('~/features/tracing.utils', () => ({
   traceAttrs: vi.fn(),
   traceEvent: vi.fn(),
+  NewTrace: () => () => ({}),
 }));
 
 // ---------------------------------------------------------------------------
