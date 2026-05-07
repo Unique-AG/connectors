@@ -17,6 +17,7 @@ export * from './delegated-access.config';
 export * from './encryption.config';
 export * from './ingestion.config';
 export * from './logs.config';
+export * from './mcp-backend-type.config';
 export * from './microsoft.config';
 export * from './unique.config';
 

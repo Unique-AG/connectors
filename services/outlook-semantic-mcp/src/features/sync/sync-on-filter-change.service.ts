@@ -1,6 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { IngestionConfig, ingestionConfig } from '~/config';
-import { McpBackendType } from '~/config/mcp-backend-type.config';
+import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 

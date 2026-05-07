@@ -4,8 +4,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { IngestionConfig, ingestionConfig } from '~/config';
-import { McpBackendType } from '~/config/mcp-backend-type.config';
+import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import {
   DRIZZLE,
   type DrizzleDatabase,
