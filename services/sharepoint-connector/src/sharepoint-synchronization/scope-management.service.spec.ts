@@ -10,8 +10,9 @@ import { ScopeExternalIdMigrationService } from '../scope-external-id-migration/
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
-import { Smeared } from '../utils/smeared';
+import { createSmeared, Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
+import { ResolveScopePathCommand } from './root-scope/resolve-scope-path.command';
 import { RootScopeMigrationService } from './root-scope-migration.service';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
@@ -168,6 +169,7 @@ describe('ScopeManagementService', () => {
     let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
     let rootMigrationMock: ReturnType<typeof vi.fn>;
     let externalIdMigrationMock: ReturnType<typeof vi.fn>;
+    let resolveScopePathMock: ReturnType<typeof vi.fn>;
 
     beforeEach(async () => {
       getScopeByIdMock = vi.fn();
@@ -176,6 +178,7 @@ describe('ScopeManagementService', () => {
       updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
       rootMigrationMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
       externalIdMigrationMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
+      resolveScopePathMock = vi.fn().mockResolvedValue(new Smeared('/Root/test1', false));
 
       const { unit } = await TestBed.solitary(ScopeManagementService)
         .mock<UniqueScopesService>(UniqueScopesService)
@@ -199,6 +202,11 @@ describe('ScopeManagementService', () => {
         .impl((stubFn) => ({
           ...stubFn(),
           migrateIfNeeded: externalIdMigrationMock,
+        }))
+        .mock<ResolveScopePathCommand>(ResolveScopePathCommand)
+        .impl((stubFn) => ({
+          ...stubFn(),
+          execute: resolveScopePathMock,
         }))
         .compile();
 
@@ -297,20 +305,14 @@ describe('ScopeManagementService', () => {
       expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
     });
 
-    it('grants permissions and resolves root path', async () => {
-      getScopeByIdMock
-        .mockResolvedValueOnce({
-          id: 'root-scope-123',
-          name: 'test1',
-          externalId: 'spc:site:site-123',
-          parentId: 'parent-1',
-        })
-        .mockResolvedValueOnce({
-          id: 'parent-1',
-          name: 'Root',
-          externalId: null,
-          parentId: null,
-        });
+    it('grants permissions and resolves root path via the path resolver', async () => {
+      const rootScope = {
+        id: 'root-scope-123',
+        name: 'test1',
+        externalId: 'spc:site:site-123',
+        parentId: 'parent-1',
+      };
+      getScopeByIdMock.mockResolvedValueOnce(rootScope);
 
       const result = await service.initializeRootScope(
         'root-scope-123',
@@ -326,8 +328,32 @@ describe('ScopeManagementService', () => {
         { type: 'READ', entityId: 'user-123', entityType: 'USER' },
         { type: 'WRITE', entityId: 'user-123', entityType: 'USER' },
       ]);
-      expect(createScopeAccessesMock).toHaveBeenCalledWith('parent-1', [
+      expect(resolveScopePathMock).toHaveBeenCalledWith(rootScope, 'user-123');
+    });
+
+    it('skips the path-walk when precomputedRootPath is provided', async () => {
+      const rootScope = {
+        id: 'root-scope-123',
+        name: 'test1',
+        externalId: 'spc:site-123/site',
+        parentId: 'parent-1',
+      };
+      getScopeByIdMock.mockResolvedValueOnce(rootScope);
+
+      const precomputedRootPath = createSmeared('/Configured/Parent/test1');
+      const result = await service.initializeRootScope(
+        'root-scope-123',
+        new Smeared('site-123', false),
+        IngestionMode.Flat,
+        { precomputedRootPath },
+      );
+
+      expect(result.rootPath).toBe(precomputedRootPath);
+      expect(resolveScopePathMock).not.toHaveBeenCalled();
+      expect(createScopeAccessesMock).toHaveBeenCalledWith('root-scope-123', [
+        { type: 'MANAGE', entityId: 'user-123', entityType: 'USER' },
         { type: 'READ', entityId: 'user-123', entityType: 'USER' },
+        { type: 'WRITE', entityId: 'user-123', entityType: 'USER' },
       ]);
     });
 

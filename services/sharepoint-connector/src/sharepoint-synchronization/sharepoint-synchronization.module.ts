@@ -8,6 +8,9 @@ import { ScopeExternalIdMigrationModule } from '../scope-external-id-migration/s
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ContentSyncService } from './content-sync.service';
 import { FileMoveProcessor } from './file-move-processor.service';
+import { CreateRootScopeCommand } from './root-scope/create-root-scope.command';
+import { FindRootScopeQuery } from './root-scope/find-root-scope.query';
+import { ResolveScopePathCommand } from './root-scope/resolve-scope-path.command';
 import { RootScopeMigrationService } from './root-scope-migration.service';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
@@ -26,7 +29,10 @@ import { SubsiteDiscoveryService } from './subsite-discovery.service';
   providers: [
     SharepointSynchronizationService,
     ContentSyncService,
+    CreateRootScopeCommand,
     FileMoveProcessor,
+    FindRootScopeQuery,
+    ResolveScopePathCommand,
     RootScopeMigrationService,
     ScopeManagementService,
     SubsiteDiscoveryService,

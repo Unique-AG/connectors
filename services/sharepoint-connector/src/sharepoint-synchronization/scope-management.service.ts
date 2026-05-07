@@ -23,11 +23,12 @@ import {
   buildStaleScopesPrefix,
   buildSubsiteExternalId,
   buildUnknownExternalId,
-  parseLegacyExternalId,
+  isOwnedBySite,
   toPendingDeleteExternalId,
 } from '../utils/scope-external-id';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
+import { ResolveScopePathCommand } from './root-scope/resolve-scope-path.command';
 import { RootScopeMigrationService } from './root-scope-migration.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -46,12 +47,14 @@ export class ScopeManagementService {
     private readonly uniqueUsersService: UniqueUsersService,
     private readonly rootScopeMigrationService: RootScopeMigrationService,
     private readonly scopeExternalIdMigrationService: ScopeExternalIdMigrationService,
+    private readonly resolveScopePathCommand: ResolveScopePathCommand,
   ) {}
 
   public async initializeRootScope(
     rootScopeId: string,
     siteId: Smeared,
     ingestionMode: IngestionMode,
+    options?: { precomputedRootPath?: Smeared },
   ): Promise<RootScopeInfo> {
     const userId = await this.uniqueUsersService.getCurrentUserId();
     assert.ok(userId, 'User ID must be available');
@@ -115,28 +118,12 @@ export class ScopeManagementService {
       }
     }
 
-    const pathSegments = [rootScope.name];
-    let currentScope: Scope = rootScope;
-
-    while (currentScope.parentId) {
-      // Grant READ permission first before accessing the parent scope. Otherwise we will not get it
-      // via `getScopeById` call.
-      await this.uniqueScopesService.createScopeAccesses(currentScope.parentId, [
-        { type: 'READ', entityId: userId, entityType: 'USER' },
-      ]);
-
-      const parent = await this.uniqueScopesService.getScopeById(currentScope.parentId);
-
-      assert.ok(
-        parent,
-        `Parent scope ${currentScope.parentId} not found for scope ${currentScope.id}`,
-      );
-
-      pathSegments.unshift(parent.name);
-      currentScope = parent;
-    }
-
-    const rootPath = createSmeared(`/${pathSegments.join('/')}`);
+    // The provisioner has already walked the parent's ancestors and granted READ on the new
+    // root's direct parent, so when a `precomputedRootPath` is provided we can skip the second
+    // walk entirely.
+    const rootPath =
+      options?.precomputedRootPath ??
+      (await this.resolveScopePathCommand.execute(rootScope, userId));
     this.logger.log(`Resolved root path: ${smearPath(rootPath)}`);
 
     return { serviceUserId: userId, rootPath, isInitialSync };
@@ -264,18 +251,11 @@ export class ScopeManagementService {
     }
   }
 
+  // A null externalId means the scope is freshly created and unclaimed — any site is allowed to
+  // claim it. Once claimed, the shared `isOwnedBySite` predicate decides ownership (legacy or
+  // new format both accepted).
   private isValidScopeOwnership(rootScope: Scope, siteId: Smeared): boolean {
-    if (!rootScope.externalId) {
-      return true;
-    }
-
-    // Accept both legacy (spc:site:{id}) and new (spc:{id}/site) formats during
-    // the transition period while existing scopes are being migrated.
-    const legacy = parseLegacyExternalId(rootScope.externalId);
-    if (legacy?.type === 'root' && legacy.siteId === siteId.value) {
-      return true;
-    }
-    return rootScope.externalId === buildRootExternalId(siteId.value).value;
+    return rootScope.externalId === null || isOwnedBySite(rootScope, siteId.value);
   }
 
   /**
