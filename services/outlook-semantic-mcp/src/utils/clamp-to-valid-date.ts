@@ -6,11 +6,11 @@ export function clampToValidDate(val: unknown): unknown {
   if (typeof val !== 'string') {
     return val;
   }
-  const match = val.match(/^(\d{4})-(\d{2})-(\d{2})(T.*)$/);
+  const match = val.match(/^(\d{4})-(\d{2})-(\d{2})(T.*)?$/);
   if (!match) {
     return val;
   }
-  const [, year, month, day, time] = match;
+  const [, year, month, day, time = ''] = match;
   const lastDay = new Date(Number(year), Number(month), 0).getDate();
   if (Number(day) <= lastDay) {
     return val;

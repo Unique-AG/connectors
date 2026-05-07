@@ -22,7 +22,7 @@
   - [What happens if I change the encryption key?](#What-happens-if-I-change-the-encryption-key)
   - [What happens if I change the webhook secret?](#What-happens-if-I-change-the-webhook-secret)
   - [What happens if I change the client secret?](#What-happens-if-I-change-the-client-secret)
-  - [What does DEFAULT_MAIL_FILTERS do?](#What-does-DEFAULT_MAIL_FILTERS-do)
+  - [What does INGESTION_DEFAULT_MAIL_FILTERS do?](#What-does-INGESTION_DEFAULT_MAIL_FILTERS-do)
 - [Sync](#Sync)
   - [What is the difference between full sync and live catch-up?](#What-is-the-difference-between-full-sync-and-live-catch-up)
   - [How do I check sync progress?](#How-do-I-check-sync-progress)
@@ -99,7 +99,7 @@ An additional 4 tools are available only when the server is running in debug mod
 
 ### Do I need to do anything after connecting?
 
-**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [DEFAULT_MAIL_FILTERS](./operator/configuration.md)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
+**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [INGESTION_DEFAULT_MAIL_FILTERS](./operator/configuration.md)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
 
 ## Authentication & Permissions
 
@@ -185,9 +185,9 @@ This must match exactly — including protocol, domain, and path — in both the
 
 **See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
 
-### What does `DEFAULT_MAIL_FILTERS` do?
+### What does `INGESTION_DEFAULT_MAIL_FILTERS` do?
 
-**Answer:** `DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `retentionWindowInDays` (positive integer — required, the application will not start without it; all ingested emails have an expired at date which is computed using receivedDateTime + retentionWindowInDays), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
+**Answer:** `INGESTION_DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `retentionWindowInDays` (positive integer — required, the application will not start without it; all ingested emails have an expired at date which is computed using receivedDateTime + retentionWindowInDays), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
 
 When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Configuration](./operator/configuration.md) for the full filter reference.
 

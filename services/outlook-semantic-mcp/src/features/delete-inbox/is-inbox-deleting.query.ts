@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import { isNonNullish } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 
 export const INBOX_DELETION_IN_PROGRESS_MESSAGE =
@@ -16,6 +17,6 @@ export class IsInboxDeletingQuery {
       .where(eq(inboxConfigurations.userProfileId, userProfileId))
       .then((rows) => rows[0]);
 
-    return row?.deletingInboxStartedAt != null;
+    return isNonNullish(row?.deletingInboxStartedAt);
   }
 }

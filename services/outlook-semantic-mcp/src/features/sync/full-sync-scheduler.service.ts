@@ -4,6 +4,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
+import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { NewTrace } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
@@ -14,8 +15,6 @@ import {
 } from './full-sync/full-sync.command';
 import { FullSyncEventDto } from './full-sync/full-sync-event.dto';
 
-const FULL_SYNC_RECOVERY_CRON_SCHEDULE = '*/2 * * * *';
-
 @Injectable()
 export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
@@ -24,6 +23,7 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
+    @Inject(ingestionConfig.KEY) private readonly config: IngestionConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -32,6 +32,9 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   public onModuleDestroy() {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
+      return;
+    }
     this.logger.log({ msg: 'FullSyncRecoveryService is shutting down...' });
     this.isShuttingDown = true;
     try {
@@ -43,7 +46,10 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private setupCronJob(): void {
-    const job = new CronJob(FULL_SYNC_RECOVERY_CRON_SCHEDULE, async () => {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
+      return;
+    }
+    const job = new CronJob(this.config.fullSyncRecoveryCron, async () => {
       try {
         await this.checkAndRetriggerStuckFullSyncs();
       } catch (err) {

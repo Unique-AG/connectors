@@ -7,7 +7,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, inArray } from 'drizzle-orm';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
-import { AppConfig, appConfig } from '~/config';
+import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { NewTrace } from '~/features/tracing.utils';
 import { greatestFrom } from '~/utils/greatest-from';
@@ -22,7 +22,7 @@ export class LiveCatchUpListener {
   public constructor(
     private readonly liveCatchUpCommand: LiveCatchUpCommand,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(ingestionConfig.KEY) private readonly config: IngestionConfig,
   ) {}
 
   @RabbitSubscribe({
@@ -35,6 +35,9 @@ export class LiveCatchUpListener {
   })
   @NewTrace('amqp.live-catch-up')
   public async onLiveCatchUpEvent(@RabbitPayload() payload: unknown): Promise<void> {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
+      return;
+    }
     const event = LiveCatchUpEventDto.parse(payload);
     this.logger.log({ msg: 'Live catch-up event received', type: event.type });
     switch (event.type) {

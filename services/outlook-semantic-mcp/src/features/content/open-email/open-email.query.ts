@@ -1,11 +1,12 @@
 import { type UniqueApiClient } from '@unique-ag/unique-api';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { filter, isNonNullish, map, pipe, sortBy } from 'remeda';
+import { filter, isNonNullish, map, pipe } from 'remeda';
 import * as z from 'zod';
 import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { concatChunks } from '~/utils/concat-chunks';
 import { Nullish } from '~/utils/nullish';
 import { SearchBackend } from '../search/semantic-search-emails.query';
 
@@ -51,9 +52,12 @@ export class OpenEmailQuery {
     userProfileId: string,
     id: string,
     idType: SearchBackend,
+    mailbox?: string,
+    folderId?: string,
+    idIsImmutable?: boolean,
   ): Promise<OpenEmailResult> {
     if (idType === SearchBackend.MsGraph) {
-      return this.readMessageFromMsGraph(userProfileId, id);
+      return this.readMessageFromMsGraph(userProfileId, id, mailbox, folderId, idIsImmutable);
     }
     return this.readMessageFromUnique(id);
   }
@@ -61,10 +65,19 @@ export class OpenEmailQuery {
   private async readMessageFromMsGraph(
     userProfileId: string,
     messageId: string,
+    mailbox?: string,
+    folderId?: string,
+    idIsImmutable?: boolean,
   ): Promise<OpenEmailResult> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
+    const messagePath =
+      mailbox && folderId
+        ? `/users/${mailbox}/mailFolders/${folderId}/messages/${messageId}`
+        : `/me/messages/${messageId}`;
+    const immutableIdHeader = idIsImmutable ? ', IdType="ImmutableId"' : '';
     const raw = await client
-      .api(`/me/messages/${messageId}`)
+      .api(messagePath)
+      .header('Prefer', `outlook.body-content-type="text"${immutableIdHeader}`)
       .select(
         'id,subject,body,from,toRecipients,ccRecipients,receivedDateTime,parentFolderId,webLink,hasAttachments',
       )
@@ -98,6 +111,7 @@ export class OpenEmailQuery {
   private async readMessageFromUnique(id: string): Promise<OpenEmailResult> {
     const emailData = await this.uniqueApi.content.getContentById({ contentId: id });
     const metadata = emailData.metadata as MessageMetadata | undefined;
+
     return {
       id: emailData.id,
       title: emailData.title ?? null,
@@ -109,11 +123,7 @@ export class OpenEmailQuery {
         webLink: metadata?.webLink,
         hasAttachments: metadata?.hasAttachments === 'true',
       },
-      text: pipe(
-        emailData.chunks ?? [],
-        sortBy((chunk) => chunk.order ?? 0),
-        map((chunk) => chunk.text),
-      ).join('\n'),
+      text: concatChunks(emailData.chunks ?? []),
     };
   }
 }

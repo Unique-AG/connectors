@@ -3,8 +3,10 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
+import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -42,6 +44,8 @@ export class FullSyncCommand {
     private readonly getScopeIngestionStatsQuery: GetScopeIngestionStatsQuery,
     private readonly updateByVersionCommand: UpdateInboxConfigByVersionCommand,
     private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
+    private readonly isInboxDeletingQuery: IsInboxDeletingQuery,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -58,6 +62,12 @@ export class FullSyncCommand {
   public async runFullSync(userProfileId: string): Promise<FullSyncResult> {
     traceAttrs({ userProfileId });
     this.logger.log({ userProfileId, msg: 'Full sync triggered' });
+    if (await this.isInboxDeletingQuery.run(userProfileId)) {
+      return { status: 'skipped', reason: 'Inbox is in deleting process' };
+    }
+    if (this.config.mcpBackend === 'MicrosoftGraph') {
+      return { status: 'skipped', reason: 'Not required for backend "MicrosoftGraph"' };
+    }
 
     const userProfile = await this.db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),

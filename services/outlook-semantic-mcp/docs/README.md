@@ -71,6 +71,12 @@ All permissions are delegated and require no admin consent. See [Permissions](./
 - List all mail folders and subfolders via `list_folders` to obtain folder IDs for use with `search_emails`
 - Retrieve email categories via `list_categories` to obtain category names for filtering searches
 
+**Delegated Mailbox Access (Optional)**
+
+- When `DELEGATED_ACCESS_SCAN` is enabled, the server automatically discovers users who have been granted Exchange mailbox delegation by other users
+- Delegates can search and access the inboxes of users who have granted them Full Access or folder-level delegation via Exchange admin
+- See [DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN) for configuration details
+
 **Subscription Management**
 
 - Check mailbox connection and webhook subscription status via `verify_inbox_connection` (returns: active, expiring_soon, expired, not_configured)
@@ -235,7 +241,7 @@ See [Architecture — Authentication](./technical/architecture.md#Authentication
 
 | Constraint | Details |
 |------------|---------|
-| **Delegated access scope** | Server syncs and searches only the signed-in user's own inbox (what Microsoft Graph `/me/messages` returns) |
+| **Delegated access scope** | By default, the server syncs and searches only the signed-in user's own inbox. When `DELEGATED_ACCESS_SCAN` is enabled, users can also search inboxes of other users who have granted them Exchange mailbox delegation (Full Access or folder-level) — see [Configuration](./operator/configuration.md#DELEGATED_ACCESS_SCAN) |
 | **Draft only, no direct send** | `create_draft_email` creates drafts; sending requires a separate action by the user or a future tool |
 | **Bulk deletion with immediate permanent removal** | The server processes emails in the Deleted Items folder and removes them from the Unique knowledge base. If the user permanently deletes emails from Deleted Items (e.g. via "Empty Folder") before the server finishes processing them, those emails are no longer visible to the server and will not be removed. They remain in the Unique knowledge base until the content expiration window removes them. |
 
@@ -249,7 +255,7 @@ See [Architecture — Authentication](./technical/architecture.md#Authentication
 ### Not Supported
 
 - **Application permissions**: The server uses delegated permissions only (acting on behalf of a signed-in user). It does not support application-level permissions, so it cannot run as a background daemon accessing mailboxes without user sign-in
-- **Shared mailboxes**: The server syncs and searches only the emails returned by the Microsoft Graph `/me/messages` API — i.e. the signed-in user's own mailbox. Emails in shared mailboxes or other users' inboxes are not included, even if the user has access to them
+- **Shared mailboxes**: Microsoft Exchange shared mailbox entities (dedicated mailboxes accessible to multiple members) are not supported. For user-to-user mailbox delegation (Full Access or folder-level access granted via Exchange admin), see `DELEGATED_ACCESS_SCAN` in [Configuration](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
 - **Calendar or task data**: Only mail and contacts are in scope
 - **Token introspection**: MCP tokens validated locally with short TTLs for performance
 

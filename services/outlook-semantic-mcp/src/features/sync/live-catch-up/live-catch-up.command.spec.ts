@@ -171,7 +171,9 @@ function createCommand({
     createMockGraphClientFactory(graphApi) as any,
     ingestEmailCommand as any,
     syncDirectories as any,
+    { run: vi.fn().mockResolvedValue(false) } as any,
     createMockUniqueApi() as any,
+    { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
     db as any,
     createMockMetricService() as any,
   );
