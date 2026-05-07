@@ -79,11 +79,12 @@ export class UniqueGraphqlClient {
   public async request<T, V extends Variables = Variables>(
     document: RequestDocument,
     variables?: V,
-    requestHeaders?: Record<string, string>,
+    options?: {
+      requestHeaders?: Record<string, string>;
+      errorTransform?: (error: unknown) => Error;
+    },
   ): Promise<T> {
-    return this.limiter.schedule(() =>
-      this.executeRequest<T, V>(document, variables, requestHeaders),
-    );
+    return this.limiter.schedule(() => this.executeRequest<T, V>(document, variables, options));
   }
 
   public async close(): Promise<void> {
@@ -93,7 +94,10 @@ export class UniqueGraphqlClient {
   private async executeRequest<T, V extends Variables = Variables>(
     document: RequestDocument,
     variables?: V,
-    requestHeaders?: Record<string, string>,
+    options?: {
+      requestHeaders?: Record<string, string>;
+      errorTransform?: (error: unknown) => Error;
+    },
   ): Promise<T> {
     const startTime = Date.now();
     const operationName = extractOperationName(document);
@@ -106,12 +110,12 @@ export class UniqueGraphqlClient {
     };
 
     try {
-      const options = {
+      const requestOptions = {
         document,
         variables,
-        requestHeaders,
+        requestHeaders: options?.requestHeaders,
       } as unknown as RequestOptions<V, T>;
-      const result = await this.graphQlClient.request<T, V>(options);
+      const result = await this.graphQlClient.request<T, V>(requestOptions);
 
       const durationMs = elapsedMilliseconds(startTime);
 
@@ -166,7 +170,11 @@ export class UniqueGraphqlClient {
         });
       }
 
-      this.logger.error({ msg: `Failed ${this.config.target} request (${operationName})`, error });
+      const loggableError = options?.errorTransform ? options.errorTransform(error) : error;
+      this.logger.error({
+        msg: `Failed ${this.config.target} request (${operationName})`,
+        error: loggableError,
+      });
 
       throw error;
     }

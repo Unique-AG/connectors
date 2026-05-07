@@ -37,6 +37,8 @@ export type {
   IngestionFinalizationRequest,
 } from './ingestion/ingestion.types';
 export { IngestionState } from './ingestion/ingestion.types';
+export { toSafeBulkMoveError } from './scopes/bulk-move-error';
+export { ScopesService } from './scopes/scopes.service';
 export type {
   BulkMoveResult,
   DeleteFolderResult,
