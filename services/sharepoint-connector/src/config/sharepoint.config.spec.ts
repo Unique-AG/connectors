@@ -439,6 +439,75 @@ describe('SharepointConfigSchema', () => {
     });
   });
 
+  describe('scopeId field', () => {
+    const buildConfigWithScopeId = (scopeId: unknown) => ({
+      ...validBaseConfig,
+      auth: clientSecretAuth,
+      sites: [
+        {
+          ...validBaseConfig.sites[0],
+          scopeId,
+        },
+      ],
+    });
+
+    const parseScopeId = (scopeId: unknown) => {
+      const result = SharepointConfigSchema.parse(buildConfigWithScopeId(scopeId));
+      if (result.sitesSource !== 'config_file') {
+        throw new Error('expected config_file source');
+      }
+      return result.sites[0]?.scopeId;
+    };
+
+    it('parses scope_<id> as fixed', () => {
+      expect(parseScopeId('scope_abc123')).toEqual({ type: 'fixed', scopeId: 'scope_abc123' });
+    });
+
+    it('parses in_parent:scope_<id> as auto', () => {
+      expect(parseScopeId('in_parent:scope_abc123')).toEqual({
+        type: 'auto',
+        parentScopeId: 'scope_abc123',
+      });
+    });
+
+    it('trims surrounding whitespace and parses as fixed', () => {
+      expect(parseScopeId('  scope_abc123  ')).toEqual({
+        type: 'fixed',
+        scopeId: 'scope_abc123',
+      });
+    });
+
+    it('rejects in_parent: with a space after the colon', () => {
+      expect(() =>
+        SharepointConfigSchema.parse(buildConfigWithScopeId('in_parent: scope_abc123')),
+      ).toThrow('Invalid scopeId');
+    });
+
+    it('rejects uppercase in scope id', () => {
+      expect(() => SharepointConfigSchema.parse(buildConfigWithScopeId('scope_ABC'))).toThrow(
+        'Invalid scopeId',
+      );
+    });
+
+    it('rejects unrelated strings', () => {
+      expect(() => SharepointConfigSchema.parse(buildConfigWithScopeId('not-a-scope'))).toThrow(
+        'Invalid scopeId',
+      );
+    });
+
+    it('rejects in_parent: with non-conforming inner value', () => {
+      expect(() =>
+        SharepointConfigSchema.parse(buildConfigWithScopeId('in_parent:not-a-scope')),
+      ).toThrow('Invalid scopeId');
+    });
+
+    it('rejects empty string', () => {
+      expect(() => SharepointConfigSchema.parse(buildConfigWithScopeId(''))).toThrow(
+        'Invalid scopeId',
+      );
+    });
+  });
+
   describe('invalid configurations', () => {
     it('rejects missing tenantId', () => {
       const config = {

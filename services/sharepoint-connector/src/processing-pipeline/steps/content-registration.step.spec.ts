@@ -46,6 +46,7 @@ describe('ContentRegistrationStep', () => {
       managedPath: 'sites',
       serviceUserId: 'user-1',
       rootPath: new Smeared('/Root', false),
+      rootScopeId: 'scope_test',
       isInitialSync: false,
       discoveredSubsites: [],
     },

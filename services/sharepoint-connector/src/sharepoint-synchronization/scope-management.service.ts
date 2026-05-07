@@ -452,7 +452,7 @@ export class ScopeManagementService {
     }
 
     const currentScopeIds = new Set(currentScopes.map((scope) => scope.id));
-    const configuredRootScopeId = context.siteConfig.scopeId;
+    const configuredRootScopeId = context.rootScopeId;
     const staleScopes = existingScopes.filter(
       (scope): scope is Scope & { externalId: string } =>
         isNonNullish(scope.externalId) &&
@@ -589,7 +589,7 @@ export class ScopeManagementService {
   ): string | undefined {
     if (!scopes || scopes.length === 0) {
       // Flat mode - return the configured scope ID
-      return context.siteConfig.scopeId;
+      return context.rootScopeId;
     }
 
     const scopePath = getUniqueParentPathFromItem(item, context.rootPath, context.siteName);

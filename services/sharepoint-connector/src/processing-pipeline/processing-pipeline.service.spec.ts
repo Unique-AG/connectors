@@ -149,6 +149,7 @@ describe('ProcessingPipelineService', () => {
     managedPath: 'sites',
     serviceUserId: 'test-user-id',
     rootPath: new Smeared('/Root', false),
+    rootScopeId: 'scope_test',
     isInitialSync: false,
     discoveredSubsites: [],
   };
@@ -179,10 +180,10 @@ describe('ProcessingPipelineService', () => {
 
   it('correctly handles targetScopeId in ProcessingContext by prioritizing target scope over root scope', async () => {
     const targetScopeId = 'specific-folder-scope-id';
-    const rootScopeIdFromConfig = mockSyncContext.siteConfig.scopeId;
+    const rootScopeIdFromContext = mockSyncContext.rootScopeId;
 
     // Ensure they are different for the test
-    expect(targetScopeId).not.toBe(rootScopeIdFromConfig);
+    expect(targetScopeId).not.toBe(rootScopeIdFromContext);
 
     await service.processItem(mockFile, targetScopeId, 'new', mockSyncContext);
 
@@ -190,12 +191,11 @@ describe('ProcessingPipelineService', () => {
     const context = executeCalls[0]?.[0];
 
     // The context.targetScopeId should be the targetScopeId passed to processItem,
-    // not the root scopeId from mockSyncContext.
+    // not the rootScopeId from mockSyncContext.
     expect(context?.targetScopeId).toBe(targetScopeId);
 
-    // We should still have access to the root scope via syncContext.config.scopeId
-    // which contains the SiteConfig (which is also the root scope)
-    expect(context?.syncContext.siteConfig.scopeId).toBe(mockSyncContext.siteConfig.scopeId);
+    // We should still have access to the root scope via syncContext.rootScopeId.
+    expect(context?.syncContext.rootScopeId).toBe(mockSyncContext.rootScopeId);
   });
 
   it('calls cleanup for each completed step', async () => {

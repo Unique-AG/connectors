@@ -113,8 +113,9 @@ describe('ScopeManagementService', () => {
     managedPath: 'sites',
     siteConfig: createMockSiteConfig({
       siteId: new Smeared('site-123', false),
-      scopeId: 'root-scope-123',
+      scopeId: { type: 'fixed', scopeId: 'scope_root123' },
     }),
+    rootScopeId: 'scope_root123',
     isInitialSync: false,
     discoveredSubsites: [],
   };
@@ -1053,7 +1054,7 @@ describe('ScopeManagementService', () => {
 
     it('never marks the configured root scope even when it is missing from current scopes', async () => {
       const rootScope: Scope = {
-        id: 'root-scope-123',
+        id: 'scope_root123',
         name: 'test1',
         parentId: null,
         externalId: 'spc:site-123/site',

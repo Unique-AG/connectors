@@ -4,7 +4,7 @@ import { type Histogram } from '@opentelemetry/api';
 import { entries, groupBy } from 'remeda';
 import { ConfigEmitEvent } from '../config/app.config';
 import { ConfigDiagnosticsService } from '../config/config-diagnostics.service';
-import type { SiteConfig } from '../config/sharepoint.schema';
+import { isAutoScope, isFixedScope, type SiteConfig } from '../config/sharepoint.schema';
 import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { FullSyncStep, SiteSyncStep } from '../constants/sync-step.enum';
@@ -165,9 +165,16 @@ export class SharepointSynchronizationService {
   }
 
   private deduplicateByScopeId(sites: SiteConfig[]): SiteConfig[] {
-    const groups = groupBy(sites, (site) => site.scopeId);
+    // `auto` rows have no determined scopeId yet at this time as they are resolved at sync time.
+    // We pass them through unchanged and rely on per-site checks.
+    const autoSites = sites.filter((site) => isAutoScope(site.scopeId));
+    const fixedSites = sites.flatMap((site) =>
+      isFixedScope(site.scopeId) ? [{ ...site, scopeId: site.scopeId }] : [],
+    );
 
-    return entries(groups).map(([scopeId, group]) => {
+    const groups = groupBy(fixedSites, (site) => site.scopeId.scopeId);
+
+    const dedupedFixed = entries(groups).map(([scopeId, group]) => {
       if (group.length > 1) {
         this.logDuplicateScopeId(scopeId, group);
       }
@@ -175,6 +182,8 @@ export class SharepointSynchronizationService {
       assert.ok(site, `No site configuration found for scopeId: ${scopeId}`);
       return site;
     });
+
+    return [...dedupedFixed, ...autoSites];
   }
 
   private logDuplicateScopeId(
@@ -194,28 +203,38 @@ export class SharepointSynchronizationService {
   private async processSingleSiteDeletion(siteConfig: SiteConfig): Promise<void> {
     const logPrefix = `[Site: ${siteConfig.siteId}]`;
 
+    if (isAutoScope(siteConfig.scopeId)) {
+      this.logger.error(
+        `${logPrefix} AUTO_DELETION_NOT_WIRED: skipping deletion for site with auto-resolved ` +
+          `scopeId (parent: ${siteConfig.scopeId.parentScopeId}). Auto-row deletion is wired in ` +
+          'a later commit (UN-20365 Task 6); operator must rerun once the full feature lands.',
+      );
+      return;
+    }
+
+    const rootScopeId = siteConfig.scopeId.scopeId;
     this.logger.log(
-      `${logPrefix} Processing deleted site - resetting root scope (ScopeId: ${siteConfig.scopeId})`,
+      `${logPrefix} Processing deleted site - resetting root scope (ScopeId: ${rootScopeId})`,
     );
 
     try {
-      const rootScope = await this.uniqueScopesService.getScopeById(siteConfig.scopeId);
+      const rootScope = await this.uniqueScopesService.getScopeById(rootScopeId);
 
       if (!rootScope) {
         this.logger.log(
-          `${logPrefix} Root scope ${siteConfig.scopeId} not found. Skipping deletion process.`,
+          `${logPrefix} Root scope ${rootScopeId} not found. Skipping deletion process.`,
         );
         return;
       }
 
       await this.uniqueFilesService.deleteFilesBySiteId(siteConfig.siteId);
-      await this.scopeManagementService.resetRootScope(siteConfig.scopeId);
+      await this.scopeManagementService.resetRootScope(rootScopeId);
 
       this.logger.log(`${logPrefix} Successfully reset root scope`);
     } catch (error) {
       this.logger.error({
         msg: `${logPrefix} Failed to reset root scope. Continuing with other sites`,
-        scopeId: siteConfig.scopeId,
+        scopeId: rootScopeId,
         error: sanitizeError(error),
       });
     }
@@ -247,10 +266,23 @@ export class SharepointSynchronizationService {
       return { failureStep: SiteSyncStep.SiteNameFetch };
     }
 
+    let rootScopeId: string;
+    if (isFixedScope(siteConfig.scopeId)) {
+      rootScopeId = siteConfig.scopeId.scopeId;
+    } else {
+      // Extension point: `resolveRootScopeId` for auto-resolved parent-scoped sites lands in a
+      // later task. Throwing here makes it impossible to silently drop an auto config.
+      this.logger.error({
+        msg: `${logPrefix} Auto-resolved scopeId is not yet implemented`,
+        parentScopeId: siteConfig.scopeId.parentScopeId,
+      });
+      return { failureStep: SiteSyncStep.RootScopeInit };
+    }
+
     let baseContext: RootScopeInfo;
     try {
       baseContext = await this.scopeManagementService.initializeRootScope(
-        siteConfig.scopeId,
+        rootScopeId,
         siteConfig.siteId,
         siteConfig.ingestionMode,
       );
@@ -269,6 +301,7 @@ export class SharepointSynchronizationService {
         managedPath,
         serviceUserId: baseContext.serviceUserId,
         rootPath: baseContext.rootPath,
+        rootScopeId,
         isInitialSync: baseContext.isInitialSync,
         discoveredSubsites: [],
       },

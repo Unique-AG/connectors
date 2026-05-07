@@ -93,6 +93,46 @@ export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 // Site Configuration
 // ==========================================
 
+export type ScopeIdConfig =
+  | { type: 'fixed'; scopeId: string }
+  | { type: 'auto'; parentScopeId: string };
+
+export function isFixedScope(
+  scopeId: ScopeIdConfig,
+): scopeId is { type: 'fixed'; scopeId: string } {
+  return scopeId.type === 'fixed';
+}
+
+export function isAutoScope(
+  scopeId: ScopeIdConfig,
+): scopeId is { type: 'auto'; parentScopeId: string } {
+  return scopeId.type === 'auto';
+}
+
+const SCOPE_ID_PATTERN = /^scope_[a-z0-9]+$/;
+const IN_PARENT_PREFIX = 'in_parent:';
+const SCOPE_ID_ERROR_MESSAGE = 'Invalid scopeId - expected `scope_<id>` or `in_parent:scope_<id>`';
+
+export const ScopeIdConfigSchema = z
+  .string()
+  .trim()
+  .transform((value, ctx): ScopeIdConfig => {
+    if (value.startsWith(IN_PARENT_PREFIX)) {
+      const parentScopeId = value.slice(IN_PARENT_PREFIX.length);
+      if (!SCOPE_ID_PATTERN.test(parentScopeId)) {
+        ctx.addIssue({ code: 'custom', message: SCOPE_ID_ERROR_MESSAGE });
+        return z.NEVER;
+      }
+      return { type: 'auto', parentScopeId };
+    }
+
+    if (!SCOPE_ID_PATTERN.test(value)) {
+      ctx.addIssue({ code: 'custom', message: SCOPE_ID_ERROR_MESSAGE });
+      return z.NEVER;
+    }
+    return { type: 'fixed', scopeId: value };
+  });
+
 const compoundSiteIdSchema = z.string().refine(
   (val) => {
     const parts = val.split(',');
@@ -121,12 +161,12 @@ export const SiteConfigSchema = z.object({
     .describe(
       'Ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy.',
     ),
-  scopeId: z
-    .string()
-    .trim()
-    .describe(
-      'Scope ID to be used as root for ingestion. For flat mode, all files are ingested in this scope. For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
-    ),
+  scopeId: ScopeIdConfigSchema.describe(
+    'Scope ID to be used as root for ingestion. Either `scope_<id>` for a fixed scope or ' +
+      '`in_parent:scope_<id>` to auto-create a child scope under the given parent. For flat mode, ' +
+      'all files are ingested in this scope. For recursive mode, this is the root scope where ' +
+      'SharePoint content hierarchy starts.',
+  ),
   maxFilesToIngest: z
     .union([z.undefined(), z.coerce.number().int().positive()])
     .describe(
