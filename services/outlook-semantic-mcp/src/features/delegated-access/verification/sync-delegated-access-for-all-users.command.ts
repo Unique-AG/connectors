@@ -8,8 +8,8 @@ import { Nullish } from '~/utils/nullish';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { SyncDelegatedAccessCommand } from './sync-delegated-access.command';
 
-const CACHE_KEY = `SyncDelegatedAccessForAllUsers`;
-const NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES = 10;
+export const SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY = `SyncDelegatedAccessForAllUsers`;
+export const SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_NO_PROGRESS_THRESHOLD_MINUTES = 10;
 
 type SyncDelegatedAccessForAllUsersDecision =
   | { action: 'proceed'; lastProcessedAccountsId: Nullish<string> }
@@ -42,7 +42,7 @@ export class SyncDelegatedAccessForAllUsersCommand {
       finalState = 'failed';
     }
     await this.persistentCacheService.setWith(
-      CACHE_KEY,
+      SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY,
       async ({ currentValue, update }): Promise<void> => {
         assert.ok(currentValue);
         assert.ok(currentValue.dataType === 'DelegatedAccessVerification');
@@ -78,7 +78,7 @@ export class SyncDelegatedAccessForAllUsersCommand {
         });
         lastProcessedAccountsId = accounts.id;
         await this.persistentCacheService.setWith(
-          CACHE_KEY,
+          SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY,
           async ({ currentValue, update }): Promise<void> => {
             assert.ok(currentValue);
             assert.ok(currentValue.dataType === 'DelegatedAccessVerification');
@@ -121,7 +121,7 @@ export class SyncDelegatedAccessForAllUsersCommand {
   @Span()
   public async decide(): Promise<SyncDelegatedAccessForAllUsersDecision> {
     return this.persistentCacheService.setWith(
-      CACHE_KEY,
+      SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY,
       async ({ currentValue, create, update }): Promise<SyncDelegatedAccessForAllUsersDecision> => {
         if (!currentValue) {
           await create({
@@ -167,7 +167,8 @@ export class SyncDelegatedAccessForAllUsersCommand {
 
         const currentTime = new Date();
         currentTime.setMinutes(
-          currentTime.getMinutes() - NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES,
+          currentTime.getMinutes() -
+            SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_NO_PROGRESS_THRESHOLD_MINUTES,
         );
 
         if (currentValue.payload.lastProgressRegisteredAt <= currentTime.getTime()) {

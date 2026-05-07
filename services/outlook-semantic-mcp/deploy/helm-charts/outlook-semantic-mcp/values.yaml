@@ -158,6 +158,9 @@ mcpConfig:
     # -- Cron schedule for delegated access verification runs.
     # Required when delegatedAccessScan is 'granularAccess'. Env var: DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE
     # delegatedAccessVerificationCronSchedule: '0 */4 * * *'
+    # -- Cron schedule for recovering stuck delegated access discovery and verification jobs.
+    # Active when delegatedAccessScan is not 'disabled'. Env var: DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE
+    # delegatedAccessRecoveryCronSchedule: '*/30 * * * *'
 
   # -- Optional log settings. To override:
   # logs:

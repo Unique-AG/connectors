@@ -8,5 +8,8 @@ DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE: {{ .app.delegatedAccessDiscoveryCronSc
 {{- if .app.delegatedAccessVerificationCronSchedule }}
 DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE: {{ .app.delegatedAccessVerificationCronSchedule | quote }}
 {{- end }}
+{{- if .app.delegatedAccessRecoveryCronSchedule }}
+DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE: {{ .app.delegatedAccessRecoveryCronSchedule | quote }}
+{{- end }}
 {{- end }}
 {{- end }}

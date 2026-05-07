@@ -14,6 +14,13 @@ const discoveryCronSchedule = z
   .prefault('0 */12 * * *')
   .describe('Cron schedule for delegated access discovery. Default: every 12 hours (2x/day).');
 
+const recoveryCronSchedule = z
+  .string()
+  .prefault('*/30 * * * *')
+  .describe(
+    'Cron schedule for recovering stuck delegated access discovery and verification jobs. Default: every 30 minutes.',
+  );
+
 const disabledDelegatedAccessScan = z.object({
   mcpBackend: mcpBackendSchema,
   scan: z.literal('disabled'),
@@ -32,6 +39,7 @@ const onlyFullDelegatedAccessScanConfig = z.object({
   // the user has full access to that inbox.
   scan: z.literal('fullAccessOnly'),
   discoveryCronSchedule,
+  recoveryCronSchedule,
 });
 
 const granularDelegatedAccessScanConfig = z.object({
@@ -57,6 +65,7 @@ const granularDelegatedAccessScanConfig = z.object({
     .string()
     .prefault('0 */4 * * *')
     .describe('Cron schedule for delegated access verification. Default: every 4 hours (6x/day).'),
+  recoveryCronSchedule,
 });
 
 export const DelegatedAccessConfigSchema = z.discriminatedUnion('scan', [

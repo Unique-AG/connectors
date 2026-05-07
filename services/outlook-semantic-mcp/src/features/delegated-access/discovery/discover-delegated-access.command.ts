@@ -17,8 +17,8 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { Nullish } from '~/utils/nullish';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 
-const CACHE_KEY = `DiscoverDelegatedAccess`;
-const NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES = 10;
+export const DISCOVER_DELEGATED_ACCESS_CACHE_KEY = `DiscoverDelegatedAccess`;
+export const DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES = 10;
 
 type DiscoverDelegatedAccessDecision =
   | {
@@ -67,7 +67,7 @@ export class DiscoverDelegatedAccessCommand {
       finalState = 'failed';
     }
     await this.persistentCacheService.setWith(
-      CACHE_KEY,
+      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
       async ({ currentValue, update }): Promise<void> => {
         assert.ok(currentValue);
         assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
@@ -156,7 +156,7 @@ export class DiscoverDelegatedAccessCommand {
 
       ownersLastFetchedId = last(ownersBatch)?.userProfileId;
       await this.persistentCacheService.setWith(
-        CACHE_KEY,
+        DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
         async ({ currentValue, update }): Promise<void> => {
           assert.ok(currentValue);
           assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
@@ -180,7 +180,7 @@ export class DiscoverDelegatedAccessCommand {
 
     // Inner loop complete for this delegate — clear the owner cursor
     await this.persistentCacheService.setWith(
-      CACHE_KEY,
+      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
       async ({ currentValue, update }): Promise<void> => {
         assert.ok(currentValue);
         assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
@@ -200,7 +200,7 @@ export class DiscoverDelegatedAccessCommand {
   @Span()
   public async decide(): Promise<DiscoverDelegatedAccessDecision> {
     return this.persistentCacheService.setWith(
-      CACHE_KEY,
+      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
       async ({ currentValue, create, update }): Promise<DiscoverDelegatedAccessDecision> => {
         if (!currentValue) {
           await create({
@@ -257,7 +257,7 @@ export class DiscoverDelegatedAccessCommand {
 
         const currentTime = new Date();
         currentTime.setMinutes(
-          currentTime.getMinutes() - NO_PROGRESS_REGISTERED_THRESHOLD_IN_MINUTES,
+          currentTime.getMinutes() - DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES,
         );
 
         if (currentValue.payload.lastProgressRegisteredAt <= currentTime.getTime()) {
