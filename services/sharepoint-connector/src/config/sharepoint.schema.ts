@@ -34,15 +34,6 @@ export const INHERITANCE_MODES_MAP: Record<PermissionsInheritanceMode, Inheritan
   none: { inheritScopes: false, inheritFiles: false },
 };
 
-export const PermissionsInheritanceModeSchema = z
-  .enum(['inherit_scopes_and_files', 'inherit_scopes', 'inherit_files', 'none'] as const)
-  .default('inherit_scopes_and_files')
-  .describe(
-    'Inheritance mode for generated scopes and ingested files. ' +
-      'Only used in content_only sync mode; ignored in content_and_permissions mode. ' +
-      'Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.',
-  );
-
 // ==========================================
 // Auth Configuration
 // ==========================================
@@ -93,6 +84,8 @@ export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 // Site Configuration
 // ==========================================
 
+const DEFAULT_SYNC_COLUMN_NAME = 'FinanceGPTKnowledge';
+
 const compoundSiteIdSchema = z.string().refine(
   (val) => {
     const parts = val.split(',');
@@ -104,59 +97,119 @@ const compoundSiteIdSchema = z.string().refine(
   { message: 'Invalid compound site ID format (expected: hostname,siteCollectionId,webId)' },
 );
 
+const siteIdField = z
+  .string()
+  .trim()
+  .pipe(z.union([z.uuidv4(), compoundSiteIdSchema]))
+  .transform((val) => createSmeared(val))
+  .describe('SharePoint site ID (UUID or compound format: hostname,siteCollectionId,webId)');
+
+const syncColumnNameField = z
+  .string()
+  .trim()
+  .describe('Name of the SharePoint column indicating sync flag');
+
+const ingestionModeField = z
+  .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
+  .describe(
+    'Ingestion mode: flat ingests all files to a single root scope, ' +
+      'recursive maintains the folder hierarchy.',
+  );
+
+const scopeIdField = z
+  .string()
+  .trim()
+  .describe(
+    'Scope ID to be used as root for ingestion. ' +
+      'For flat mode, all files are ingested in this scope. ' +
+      'For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
+  );
+
+const maxFilesToIngestField = z.coerce
+  .number()
+  .int()
+  .positive()
+  .optional()
+  .describe(
+    'Maximum number of files to ingest per site in a single sync run. ' +
+      'If the number of new + updated files exceeds this limit, the sync for that site will fail.',
+  );
+
+const storeInternallyField = z
+  .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+  .describe('Whether to store content internally in Unique or not.');
+
+const syncStatusField = z
+  .enum(['active', 'inactive', 'deleted'])
+  .describe(
+    'Sync status: active = sync this site, inactive = skip this site, deleted = skip this site',
+  );
+
+const syncModeField = z
+  .enum(['content_only', 'content_and_permissions'])
+  .describe(
+    'Mode of synchronization from SharePoint to Unique. ' +
+      'content_only: sync only the content, ' +
+      'content_and_permissions: sync both content and permissions',
+  );
+
+const permissionsInheritanceModeField = z
+  .enum(['inherit_scopes_and_files', 'inherit_scopes', 'inherit_files', 'none'] as const)
+  .describe(
+    'Inheritance mode for generated scopes and ingested files. ' +
+      'Only used in content_only sync mode; ignored in content_and_permissions mode. ' +
+      'Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.',
+  );
+
+const subsitesScanField = z
+  .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+  .describe('Whether to recursively discover and sync content from subsites.');
+
 export const SiteConfigSchema = z.object({
-  siteId: z
-    .string()
-    .trim()
-    .pipe(z.union([z.uuidv4(), compoundSiteIdSchema]))
-    .transform((val) => createSmeared(val))
-    .describe('SharePoint site ID (UUID or compound format: hostname,siteCollectionId,webId)'),
-  syncColumnName: z
-    .string()
-    .trim()
-    .prefault('FinanceGPTKnowledge')
-    .describe('Name of the SharePoint column indicating sync flag'),
-  ingestionMode: z
-    .enum([IngestionMode.Flat, IngestionMode.Recursive] as const)
-    .describe(
-      'Ingestion mode: flat ingests all files to a single root scope, recursive maintains the folder hierarchy.',
-    ),
-  scopeId: z
-    .string()
-    .trim()
-    .describe(
-      'Scope ID to be used as root for ingestion. For flat mode, all files are ingested in this scope. For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
-    ),
-  maxFilesToIngest: z
-    .union([z.undefined(), z.coerce.number().int().positive()])
-    .describe(
-      'Maximum number of files to ingest per site in a single sync run. If the number of new + updated files exceeds this limit, the sync for that site will fail.',
-    ),
-  storeInternally: z
-    .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
-    .default(EnabledDisabledMode.Enabled)
-    .describe('Whether to store content internally in Unique or not.'),
-  syncStatus: z
-    .enum(['active', 'inactive', 'deleted'])
-    .default('active')
-    .describe(
-      'Sync status: active = sync this site, inactive = skip this site, deleted = skip this site',
-    ),
-  syncMode: z
-    .enum(['content_only', 'content_and_permissions'])
-    .describe(
-      'Mode of synchronization from SharePoint to Unique. ' +
-        'content_only: sync only the content, ' +
-        'content_and_permissions: sync both content and permissions',
-    ),
-  permissionsInheritanceMode: PermissionsInheritanceModeSchema,
-  subsitesScan: z
-    .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
-    .default(EnabledDisabledMode.Disabled)
-    .describe('Whether to recursively discover and sync content from subsites.'),
+  siteId: siteIdField,
+  syncColumnName: syncColumnNameField.prefault(DEFAULT_SYNC_COLUMN_NAME),
+  ingestionMode: ingestionModeField,
+  scopeId: scopeIdField,
+  maxFilesToIngest: maxFilesToIngestField,
+  storeInternally: storeInternallyField.default(EnabledDisabledMode.Enabled),
+  syncStatus: syncStatusField.default('active'),
+  syncMode: syncModeField,
+  permissionsInheritanceMode: permissionsInheritanceModeField.default('inherit_scopes_and_files'),
+  subsitesScan: subsitesScanField.default(EnabledDisabledMode.Disabled),
 });
 
 export type SiteConfig = z.infer<typeof SiteConfigSchema>;
+
+export const SiteDefaultsSchema = z
+  .object({
+    syncColumnName: syncColumnNameField.prefault(DEFAULT_SYNC_COLUMN_NAME),
+    ingestionMode: ingestionModeField.optional(),
+    scopeId: scopeIdField.optional(),
+    maxFilesToIngest: maxFilesToIngestField,
+    storeInternally: storeInternallyField.default(EnabledDisabledMode.Enabled),
+    syncStatus: syncStatusField.default('active'),
+    syncMode: syncModeField.optional(),
+    permissionsInheritanceMode: permissionsInheritanceModeField.default('inherit_scopes_and_files'),
+    subsitesScan: subsitesScanField.default(EnabledDisabledMode.Disabled),
+  })
+  .prefault({});
+
+export type SiteDefaults = z.infer<typeof SiteDefaultsSchema>;
+
+export const PartialSiteConfigSchema = z.object({
+  siteId: siteIdField,
+  syncColumnName: syncColumnNameField.optional(),
+  ingestionMode: ingestionModeField.optional(),
+  scopeId: scopeIdField.optional(),
+  maxFilesToIngest: maxFilesToIngestField,
+  storeInternally: storeInternallyField.optional(),
+  syncStatus: syncStatusField.optional(),
+  syncMode: syncModeField.optional(),
+  permissionsInheritanceMode: permissionsInheritanceModeField.optional(),
+  subsitesScan: subsitesScanField.optional(),
+});
+
+export type PartialSiteConfig = z.infer<typeof PartialSiteConfigSchema>;
 
 export function getInheritanceSettings({
   syncMode,
@@ -202,6 +255,9 @@ const sharepointBaseConfig = z.object({
     "Your company's sharepoint URL",
     'Base URL must not end with a trailing slash',
   ),
+  siteDefaults: SiteDefaultsSchema.describe(
+    'Default values applied to every per-site config; per-site values override these when set.',
+  ),
 });
 
 export const SharepointConfigSchema = sharepointBaseConfig.and(
@@ -229,4 +285,5 @@ export type SharepointConfig = (
   };
   graphApiRateLimitPerMinuteThousands: number;
   baseUrl: string;
+  siteDefaults: SiteDefaults;
 };
