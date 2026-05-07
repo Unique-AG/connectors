@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.3.3...outlook-semantic-mcp@0.4.0) (2026-05-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **outlook-semantic-mcp,unique-api:** search_emails input schema replaced — single SearchEmailsInputSchema is now SearchEmailsUnifiedInputSchema requiring both uniqueSemanticSearchQueries and msGraphKeywordSearchQueries arrays. Output fields id and emailId replaced by uniqueContentId, msGraphMessageId, and backend; syncWarning no longer carries search context (moved to new searchNotes field).
+
+### Features
+
+* **outlook-semantic-mcp,unique-api:** un-19085 delegated access discovery ([#495](https://github.com/Unique-AG/connectors/issues/495)) ([209bff3](https://github.com/Unique-AG/connectors/commit/209bff3a129e85414a3df427f65e79830fde80d0))
+
 ## [0.3.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.3.2...outlook-semantic-mcp@0.3.3) (2026-05-06)
 
 
