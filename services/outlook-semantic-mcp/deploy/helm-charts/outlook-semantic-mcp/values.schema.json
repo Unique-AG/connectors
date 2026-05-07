@@ -204,6 +204,10 @@
             "delegatedAccessVerificationCronSchedule": {
               "type": "string",
               "description": "Cron schedule for delegated access verification. Required when delegatedAccessScan is granularAccess. Default: '0 */4 * * *' (every 4 hours)."
+            },
+            "delegatedAccessRecoveryCronSchedule": {
+              "type": "string",
+              "description": "Cron schedule for recovering stuck delegated access discovery and verification jobs. Active when delegatedAccessScan is not disabled. Default: '*/30 * * * *' (every 30 minutes)."
             }
           },
           "required": ["selfUrl"]
