@@ -161,16 +161,16 @@ export const SearchEmailsInputSchema = z.object({
   limit: z
     .number()
     .int()
-    .min(150)
-    .max(300)
+    .min(100)
+    .max(200)
     .optional()
-    .prefault(200)
+    .prefault(100)
     .describe(
       [
-        'Maximum number of results to return. Must be between 150 and 300.',
-        'If the search query is targeted (e.g. looking for a specific email or thread), pass 150 (the minimum).',
-        'If the query is fuzzy or broad (e.g. "overview of all emails from alice@example.com", "list emails from last week", "what happened last week"), pick a limit between 200 and 300.',
-        'When the expected result set is large, always use 300.',
+        'Maximum number of results to return. Must be between 100 and 200.',
+        'If the search query is targeted (e.g. looking for a specific email or thread), pass 100 (the minimum).',
+        'If the query is fuzzy or broad (e.g. "overview of all emails from alice@example.com", "list emails from last week", "what happened last week"), pick a limit between 100 and 200.',
+        'When the expected result set is large, always use 200.',
       ].join(' '),
     ),
 });
@@ -227,11 +227,11 @@ export const MsGraphKqlQuerySchema = z.object({
     .number()
     .int()
     .min(1)
-    .max(50)
+    .max(100)
     .optional()
-    .prefault(25)
+    .prefault(100)
     .describe(
-      'Maximum number of results to return for this query. Must be between 1 and 50. Default is 25. Use a higher value (up to 50) for broad or exploratory queries; the default is sufficient for targeted searches.',
+      'Maximum number of results to return for this query. Must be between 1 and 100. Default is 100. Use a lower value for targeted searches; the default is appropriate for broad or exploratory queries.',
     ),
 });
 

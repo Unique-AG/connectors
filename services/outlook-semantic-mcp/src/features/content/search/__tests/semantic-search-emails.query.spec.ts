@@ -329,7 +329,7 @@ describe('SemanticSearchEmailsQuery', () => {
       expect(results[0]?.text).toBe('from first search');
     });
 
-    it('caps merged results at 500', async () => {
+    it('caps merged results at 100', async () => {
       const items400 = Array.from({ length: 400 }, (_, i) => makeSearchItem(`a-${i}`));
       const items300 = Array.from({ length: 300 }, (_, i) => makeSearchItem(`b-${i}`));
 
@@ -342,7 +342,7 @@ describe('SemanticSearchEmailsQuery', () => {
         { search: 'query B', limit: 200 as const },
       ]);
 
-      expect(results).toHaveLength(500);
+      expect(results).toHaveLength(100);
     });
   });
 });

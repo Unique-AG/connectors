@@ -67,7 +67,10 @@ interface AccessContext {
   rootScopeForUserId: string;
   delegatedAccesses: DelegatedAccess[];
   scopeExternalIdToScopeId: Map<string, string>;
-  mapUniqueFolderPathToOwnerEmail: { uniqueFolderIdPath: string; ownerEmail: string }[];
+  mapUniqueFolderPathToOwnerEmail: {
+    uniqueFolderIdPath: string;
+    ownerEmail: string;
+  }[];
 }
 
 interface ValidSearchJobInput {
@@ -79,6 +82,8 @@ interface ValidSearchJobInput {
 }
 
 type SearchJobInput = { isScoped: false } | ValidSearchJobInput;
+
+const MAX_OUTPUT_RESULTS = 100;
 
 @Injectable()
 export class SemanticSearchEmailsQuery {
@@ -93,7 +98,10 @@ export class SemanticSearchEmailsQuery {
   public async run(
     userProfileId: UserProfileTypeID,
     inputs: z.infer<typeof SearchEmailsInputSchema>[],
-  ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
+  ): Promise<{
+    results: SearchEmailResult[];
+    searchSummary: string | undefined;
+  }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const context = await this.loadAccessContext(userProfile);
 
@@ -182,13 +190,16 @@ export class SemanticSearchEmailsQuery {
           receivedDateTime: metadata?.receivedDateTime ?? '',
           backend: SearchBackend.Unique,
           text: concatChunks(Array.from(item.chunks.values())),
-          openEmailParams: { id: item.content.id, idType: SearchBackend.Unique },
+          openEmailParams: {
+            id: item.content.id,
+            idType: SearchBackend.Unique,
+          },
         };
       }),
     );
 
     return {
-      results: results.slice(0, 500),
+      results: results.slice(0, MAX_OUTPUT_RESULTS),
       searchSummary: summaries.length > 0 ? summaries.join('\r\n') : undefined,
     };
   }
@@ -217,7 +228,10 @@ export class SemanticSearchEmailsQuery {
     );
     assert.ok(rootScopeForUserId, `Root scope not found for user: ${userProfile.providerUserId}`);
 
-    const mapUniqueFolderPathToOwnerEmail: { uniqueFolderIdPath: string; ownerEmail: string }[] = [
+    const mapUniqueFolderPathToOwnerEmail: {
+      uniqueFolderIdPath: string;
+      ownerEmail: string;
+    }[] = [
       {
         uniqueFolderIdPath: this.getUniqueFolderPath([rootScopeId, rootScopeForUserId]),
         ownerEmail: userProfile.email,

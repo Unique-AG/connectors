@@ -13,13 +13,22 @@ import {
 
 export interface SearchEmailsToolInput {
   uniqueSemanticSearchQueries?: z.infer<typeof SearchEmailsInputSchema>[];
-  msGraphKeywordSearchQueries?: { mailbox?: Nullish<string>; kqlQuery: string; limit?: number }[];
+  msGraphKeywordSearchQueries?: {
+    mailbox?: Nullish<string>;
+    kqlQuery: string;
+    limit?: number;
+  }[];
 }
 
 type BackendExecutor = (
   userProfileId: UserProfileTypeID,
   input: SearchEmailsToolInput,
-) => Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }>;
+) => Promise<{
+  results: SearchEmailResult[];
+  searchSummary: string | undefined;
+}>;
+
+const MAX_COMBINED_RESULTS = 200;
 
 @Injectable()
 export class SearchEmailsQuery {
@@ -32,7 +41,10 @@ export class SearchEmailsQuery {
     [SearchBackend.Unique]: (
       userProfileId: UserProfileTypeID,
       input: SearchEmailsToolInput,
-    ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> => {
+    ): Promise<{
+      results: SearchEmailResult[];
+      searchSummary: string | undefined;
+    }> => {
       if (isMicrosoftGraphBackend() || !input.uniqueSemanticSearchQueries?.length) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
@@ -43,7 +55,10 @@ export class SearchEmailsQuery {
     [SearchBackend.MsGraph]: (
       userProfileId: UserProfileTypeID,
       input: SearchEmailsToolInput,
-    ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> => {
+    ): Promise<{
+      results: SearchEmailResult[];
+      searchSummary: string | undefined;
+    }> => {
       if (!input.msGraphKeywordSearchQueries) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
@@ -54,7 +69,10 @@ export class SearchEmailsQuery {
   public async run(
     userProfileId: UserProfileTypeID,
     input: SearchEmailsToolInput,
-  ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
+  ): Promise<{
+    results: SearchEmailResult[];
+    searchSummary: string | undefined;
+  }> {
     const [
       { results: semanticResults, searchSummary: semanticSummary },
       { results: graphResults, searchSummary: graphSummary },
@@ -66,7 +84,10 @@ export class SearchEmailsQuery {
     const summaries = [semanticSummary, graphSummary].filter((s): s is string => s !== undefined);
     const searchSummary = summaries.length > 0 ? summaries.join('\n\n') : undefined;
 
-    return { results: this.mergeResults(semanticResults, graphResults), searchSummary };
+    return {
+      results: this.mergeResults(semanticResults, graphResults),
+      searchSummary,
+    };
   }
 
   private formatText({
@@ -115,29 +136,31 @@ export class SearchEmailsQuery {
         .map((item) => [item.msGraphMessageId, item]),
     );
 
-    const enriched: Array<{ result: SearchEmailResult; hadGraphMatch: boolean }> =
-      semanticResults.map((semanticResult) => {
-        const { msGraphMessageId } = semanticResult;
-        const graphResult = msGraphMessageId ? graphById.get(msGraphMessageId) : null;
+    const enriched: Array<{
+      result: SearchEmailResult;
+      hadGraphMatch: boolean;
+    }> = semanticResults.map((semanticResult) => {
+      const { msGraphMessageId } = semanticResult;
+      const graphResult = msGraphMessageId ? graphById.get(msGraphMessageId) : null;
 
-        if (!graphResult) {
-          return { result: semanticResult, hadGraphMatch: false };
-        }
+      if (!graphResult) {
+        return { result: semanticResult, hadGraphMatch: false };
+      }
 
-        if (msGraphMessageId) {
-          graphById.delete(msGraphMessageId);
-        }
-        return {
-          result: {
-            ...semanticResult,
-            text: this.formatText({
-              semanticText: semanticResult.text,
-              graphText: graphResult.text,
-            }),
-          },
-          hadGraphMatch: true,
-        };
-      });
+      if (msGraphMessageId) {
+        graphById.delete(msGraphMessageId);
+      }
+      return {
+        result: {
+          ...semanticResult,
+          text: this.formatText({
+            semanticText: semanticResult.text,
+            graphText: graphResult.text,
+          }),
+        },
+        hadGraphMatch: true,
+      };
+    });
 
     const topSemanticMatches = enriched.slice(0, 20).map((e) => e.result);
     const remainder = enriched.slice(20);
@@ -151,7 +174,7 @@ export class SearchEmailsQuery {
 
     return [...topSemanticMatches, ...commonRemainder, ...semanticOnly, ...remainingGraph].slice(
       0,
-      500,
+      MAX_COMBINED_RESULTS,
     );
   }
 }
