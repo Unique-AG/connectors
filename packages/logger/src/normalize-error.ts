@@ -22,9 +22,8 @@ export function normalizeError(error: unknown): Error {
   }
 
   try {
-    return new Error(JSON.stringify(error));
+    return new Error(JSON.stringify(error), { cause: error });
   } catch {
-    // Handle circular references or non-serializable objects
-    return new Error(String(error));
+    return new Error(String(error), { cause: error });
   }
 }

@@ -1,5 +1,5 @@
-import { normalizeError } from '@unique-ag/utils';
 import { serializeError } from 'serialize-error-cjs';
+import { normalizeError } from './normalize-error';
 
 interface GraphqlClientErrorLike extends Error {
   response: Record<string, unknown>;
