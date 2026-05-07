@@ -68,7 +68,7 @@ See [Tools Reference](./tools.md) for the full list and behavior details.
 
 After a user connects, the following pipelines keep the knowledge base in sync with the user's mailbox. See [Flows](./flows.md) for sequence diagrams.
 
-**Full Sync** — triggers automatically after connection; fetches historical emails in paginated batches (newest first); applies `DEFAULT_MAIL_FILTERS`; resumable via persisted Graph cursor; initializes the watermark that live catch-up depends on.
+**Full Sync** — triggers automatically after connection; fetches historical emails in paginated batches (newest first); applies `INGESTION_DEFAULT_MAIL_FILTERS`; resumable via persisted Graph cursor; initializes the watermark that live catch-up depends on.
 
 **Live Catch-Up** — webhook-driven; acknowledged immediately via RabbitMQ, processed async in the consumer; queries Graph for messages since the watermark; watermark defaults to `now()` on inbox creation so notifications are never buffered.
 

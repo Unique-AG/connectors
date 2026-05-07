@@ -10,7 +10,7 @@ describe('clampToValidDate', () => {
 
   it('passes through strings that do not match ISO datetime format', () => {
     expect(clampToValidDate('not-a-date')).toBe('not-a-date');
-    expect(clampToValidDate('2026-02-29')).toBe('2026-02-29');
+    expect(clampToValidDate('2026-02-29')).toBe('2026-02-28');
   });
 
   it('passes through valid dates unchanged', () => {

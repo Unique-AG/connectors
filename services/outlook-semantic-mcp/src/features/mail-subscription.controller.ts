@@ -21,7 +21,7 @@ import { partition, unique } from 'remeda';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
-import { traceAttrs, traceError, traceEvent } from '~/features/tracing.utils';
+import { NewTrace, traceAttrs, traceError, traceEvent } from '~/features/tracing.utils';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
 import {
   ChangeNotificationCollectionDto,
@@ -242,6 +242,7 @@ export class MailSubscriptionController {
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @NewTrace('amqp.lifecycle-notification')
   public async onLifecycleNotification(@RabbitPayload() payload: unknown) {
     const event = await LifecycleEventDto.parseAsync(payload);
     this.logger.log({ event, msg: 'Processing lifecycle event from message queue' });

@@ -112,6 +112,29 @@ export class ScopesService implements UniqueApiScopesFacade {
     return result.paginatedScope.nodes[0] ?? null;
   }
 
+  public async getByExternalIds(externalIds: string[]): Promise<Scope[]> {
+    let skip = 0;
+    const scopes: Scope[] = [];
+
+    let batchCount = 0;
+    do {
+      const batchResult = await this.scopeManagementClient.request<
+        PaginatedScopeQueryResult,
+        PaginatedScopeQueryInput
+      >(PAGINATED_SCOPE_QUERY, {
+        skip,
+        take: BATCH_SIZE,
+        where: {
+          externalId: { in: externalIds },
+        },
+      });
+      scopes.push(...batchResult.paginatedScope.nodes);
+      batchCount = batchResult.paginatedScope.nodes.length;
+      skip += BATCH_SIZE;
+    } while (batchCount === BATCH_SIZE);
+    return scopes;
+  }
+
   public async updateExternalId(
     scopeId: string,
     externalId: string | null,

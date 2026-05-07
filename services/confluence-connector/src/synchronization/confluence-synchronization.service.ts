@@ -114,9 +114,9 @@ export class ConfluenceSynchronizationService {
 
       this.logger.log({ msg: 'Sync work done' });
       return { status: 'success' };
-    } catch (error) {
+    } catch (err) {
       syncResult = 'failure';
-      this.logger.error({ err: error, msg: 'Sync failed' });
+      this.logger.error({ err, msg: 'Sync failed' });
       return { status: 'failure' };
     } finally {
       tenant.isScanning = false;

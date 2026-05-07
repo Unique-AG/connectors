@@ -168,7 +168,10 @@ describe('ConfluenceSynchronizationService', () => {
 
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
+        expect.objectContaining({
+          err: expect.objectContaining({ message: expect.any(String) }),
+          msg: 'Sync failed',
+        }),
       );
     });
 
@@ -227,7 +230,10 @@ describe('ConfluenceSynchronizationService', () => {
 
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.objectContaining({ err: expect.any(Error), msg: 'Sync failed' }),
+        expect.objectContaining({
+          err: expect.objectContaining({ message: 'diff failed' }),
+          msg: 'Sync failed',
+        }),
       );
       expect(mockContentFetcher.fetchPageContent).not.toHaveBeenCalled();
     });

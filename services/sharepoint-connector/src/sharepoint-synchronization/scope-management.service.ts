@@ -245,8 +245,16 @@ export class ScopeManagementService {
 
     for (const scope of sortedStaleScopes) {
       try {
-        await this.uniqueScopesService.deleteScope(scope.id);
-        this.logger.debug(`${logPrefix} Deleted stale scope ${scope.id}`);
+        const result = await this.uniqueScopesService.deleteScope(scope.id);
+        if (result.failedFolders.length > 0) {
+          this.logger.warn({
+            msg: `${logPrefix} Failed to delete stale scope ${scope.id}`,
+            failedFolders: result.failedFolders.map((f) => ({
+              id: f.id,
+              reason: f.failReason,
+            })),
+          });
+        }
       } catch (error) {
         this.logger.warn({
           msg: `${logPrefix} Failed to delete stale scope ${scope.id}`,

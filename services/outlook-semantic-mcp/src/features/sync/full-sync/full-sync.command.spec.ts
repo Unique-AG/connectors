@@ -129,6 +129,8 @@ function createCommand({
     statsQuery as any,
     updateByVersionCommand as any,
     syncDirectories as any,
+    { run: vi.fn().mockResolvedValue(false) } as any,
+    { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
     db as any,
   );
 }

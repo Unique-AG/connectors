@@ -1,1 +1,1 @@
-export * from './list-folders.tool';
+export * from './list-mailboxes-and-directories.tool';

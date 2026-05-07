@@ -2,14 +2,11 @@ import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
+import pLimit from 'p-limit';
 import { clone, sumBy, unique } from 'remeda';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '../../msgraph/graph-client.factory';
-import {
-  GraphOutlookDirectory,
-  graphOutlookDirectoriesResponse,
-  graphOutlookDirectory,
-} from './microsoft-graph.dtos';
+import { GraphOutlookDirectory, graphOutlookDirectoriesResponse } from './microsoft-graph.dtos';
 
 @Injectable()
 export class FetchAllDirectoriesFromOutlookQuery {
@@ -41,41 +38,22 @@ export class FetchAllDirectoriesFromOutlookQuery {
       msg: `Directories from microsoft before expansion`,
     });
 
-    const shouldExpandDirectory = (directory: GraphOutlookDirectory) =>
-      directory.childFolderCount > 0 &&
-      (!directory.childFolders || directory.childFolders.length !== directory.childFolderCount);
-
+    const limit = pLimit(10);
     const expandDirectoryRecursive = async (directory: GraphOutlookDirectory): Promise<void> => {
-      if (!shouldExpandDirectory(directory)) {
+      if (!directory.childFolderCount) {
         return;
       }
 
-      const expanded = await this.expandDirectory({
-        parentDirectoryId: directory.id,
-        client,
-      });
-      directory.childFolders = expanded.childFolders;
-      const promises =
-        directory.childFolders?.map((child) => {
-          if (shouldExpandDirectory(child)) {
-            return expandDirectoryRecursive(child);
-          }
-          return Promise.resolve();
-        }) ?? [];
-      await Promise.all(promises);
+      directory.childFolders = await limit(() =>
+        this.fetchChildDirectories({
+          parentDirectoryId: directory.id,
+          client,
+        }),
+      );
+      await Promise.all(directory.childFolders.map(expandDirectoryRecursive));
     };
 
-    const allPromisses: Promise<void>[] = [];
-    rootDirectories.forEach((rootDirectory) => {
-      // Roots are already expanded.
-      rootDirectory.childFolders?.forEach((subChild) => {
-        if (shouldExpandDirectory(subChild)) {
-          allPromisses.push(expandDirectoryRecursive(subChild));
-        }
-      });
-    });
-
-    await Promise.all(allPromisses);
+    await Promise.all(rootDirectories.map(expandDirectoryRecursive));
     this.logFullDirectoriesStructure({
       userProfileId,
       directories: rootDirectories,
@@ -112,7 +90,6 @@ export class FetchAllDirectoriesFromOutlookQuery {
       .api(apiUrl)
       .query({ includeHiddenFolders: 'true' })
       .top(500)
-      .expand('childFolders')
       .header(`Prefer`, `IdType="ImmutableId"`)
       .get();
     let parsedResult = graphOutlookDirectoriesResponse.parse(graphResponse);
@@ -175,20 +152,31 @@ export class FetchAllDirectoriesFromOutlookQuery {
     });
   }
 
-  private async expandDirectory({
+  private async fetchChildDirectories({
     parentDirectoryId,
     client,
   }: {
     parentDirectoryId: string;
     client: Client;
-  }): Promise<GraphOutlookDirectory> {
-    const response = await client
-      .api(`me/mailFolders/${parentDirectoryId}`)
+  }): Promise<GraphOutlookDirectory[]> {
+    let graphResponse = await client
+      .api(`me/mailFolders/${parentDirectoryId}/childFolders`)
       .query({ includeHiddenFolders: 'true' })
       .top(500)
-      .expand('childFolders')
       .header(`Prefer`, `IdType="ImmutableId"`)
       .get();
-    return graphOutlookDirectory.parseAsync(response);
+    let parsedResult = graphOutlookDirectoriesResponse.parse(graphResponse);
+    const output: GraphOutlookDirectory[] = [...parsedResult.value];
+
+    while (parsedResult['@odata.nextLink']) {
+      graphResponse = await client
+        .api(parsedResult['@odata.nextLink'])
+        .header(`Prefer`, `IdType="ImmutableId"`)
+        .get();
+      parsedResult = graphOutlookDirectoriesResponse.parse(graphResponse);
+      output.push(...parsedResult.value);
+    }
+
+    return output;
   }
 }

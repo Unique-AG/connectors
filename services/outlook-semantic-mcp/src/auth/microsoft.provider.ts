@@ -9,6 +9,7 @@ export const SCOPES = [
   'User.Read', // (delegated):
   'MailboxSettings.Read', // (delegated):
   'Mail.ReadWrite', // (delegated):
+  'Mail.ReadWrite.Shared', // (delegated):
   'People.Read', // (delegated):
 ];
 

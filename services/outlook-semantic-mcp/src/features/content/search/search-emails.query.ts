@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import * as z from 'zod';
+import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { Nullish } from '~/utils/nullish';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
-import { SearchEmailsInputSchema } from './semantic-search-conditions.dto';
+import { SearchEmailsInputSchema } from './search-conditions.dto';
 import {
   SearchBackend,
   SearchEmailResult,
@@ -9,14 +12,14 @@ import {
 } from './semantic-search-emails.query';
 
 export interface SearchEmailsToolInput {
-  semanticSearchParams?: z.infer<typeof SearchEmailsInputSchema>;
-  msGraphSearchParams?: { queries: Array<{ kqlQuery: string; limit?: number }> };
+  uniqueSemanticSearchQueries?: z.infer<typeof SearchEmailsInputSchema>[];
+  msGraphKeywordSearchQueries?: { mailbox?: Nullish<string>; kqlQuery: string; limit?: number }[];
 }
 
 type BackendExecutor = (
-  userProfileId: string,
+  userProfileId: UserProfileTypeID,
   input: SearchEmailsToolInput,
-) => Promise<SearchEmailResult[]>;
+) => Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }>;
 
 @Injectable()
 export class SearchEmailsQuery {
@@ -27,37 +30,43 @@ export class SearchEmailsQuery {
 
   private readonly executors: Record<SearchBackend, BackendExecutor> = {
     [SearchBackend.Unique]: (
-      userProfileId: string,
+      userProfileId: UserProfileTypeID,
       input: SearchEmailsToolInput,
-    ): Promise<SearchEmailResult[]> => {
-      if (!input.semanticSearchParams) {
-        return Promise.resolve([]);
+    ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> => {
+      if (isMicrosoftGraphBackend() || !input.uniqueSemanticSearchQueries?.length) {
+        return Promise.resolve({ results: [], searchSummary: undefined });
       }
       return this.semanticSearchQuery
-        .run(userProfileId, input.semanticSearchParams)
-        .then(({ results }) => results);
+        .run(userProfileId, input.uniqueSemanticSearchQueries)
+        .then(({ results, searchSummary }) => ({ results, searchSummary }));
     },
     [SearchBackend.MsGraph]: (
-      userProfileId: string,
+      userProfileId: UserProfileTypeID,
       input: SearchEmailsToolInput,
-    ): Promise<SearchEmailResult[]> => {
-      if (!input.msGraphSearchParams) {
-        return Promise.resolve([]);
+    ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> => {
+      if (!input.msGraphKeywordSearchQueries) {
+        return Promise.resolve({ results: [], searchSummary: undefined });
       }
-      return this.msGraphKqlQuery.run(userProfileId, input.msGraphSearchParams.queries);
+      return this.msGraphKqlQuery.run(userProfileId, input.msGraphKeywordSearchQueries);
     },
   };
 
   public async run(
-    userProfileId: string,
+    userProfileId: UserProfileTypeID,
     input: SearchEmailsToolInput,
-  ): Promise<SearchEmailResult[]> {
-    const [semanticResults, graphResults] = await Promise.all([
+  ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
+    const [
+      { results: semanticResults, searchSummary: semanticSummary },
+      { results: graphResults, searchSummary: graphSummary },
+    ] = await Promise.all([
       this.executors[SearchBackend.Unique](userProfileId, input),
       this.executors[SearchBackend.MsGraph](userProfileId, input),
     ]);
 
-    return this.mergeResults(semanticResults, graphResults);
+    const summaries = [semanticSummary, graphSummary].filter((s): s is string => s !== undefined);
+    const searchSummary = summaries.length > 0 ? summaries.join('\n\n') : undefined;
+
+    return { results: this.mergeResults(semanticResults, graphResults), searchSummary };
   }
 
   private formatText({
@@ -131,7 +140,7 @@ export class SearchEmailsQuery {
       });
 
     const topSemanticMatches = enriched.slice(0, 20).map((e) => e.result);
-    const remainder = enriched.slice(topSemanticMatches.length);
+    const remainder = enriched.slice(20);
     const commonRemainder = remainder.filter((e) => e.hadGraphMatch).map((e) => e.result);
     const semanticOnly = remainder.filter((e) => !e.hadGraphMatch).map((e) => e.result);
 

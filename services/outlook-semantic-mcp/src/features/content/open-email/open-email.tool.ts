@@ -10,20 +10,42 @@ import { SearchBackend } from '../search/semantic-search-emails.query';
 import { OpenEmailQuery } from './open-email.query';
 import { META } from './open-email-tool.meta';
 
-const IS_MICROSOFT_GRAPH_BACKEND = isMicrosoftGraphBackend();
-
-const OpenEmailByIdInputSchema = z.object({
-  id: z
-    .string()
-    .describe(
-      'The email identifier from a `search_emails` result. Use `uniqueContentId` when it is available; otherwise use `msGraphMessageId`.',
-    ),
-  idType: z
-    .nativeEnum(SearchBackend)
-    .describe(
-      'Indicates which identifier is being passed, derived from the `search_emails` result. Use `Unique` when passing `uniqueContentId`; use `MsGraph` when passing `msGraphMessageId`.',
-    ),
-});
+const OpenEmailByIdInputSchema = z
+  .object({
+    id: z
+      .string()
+      .describe(
+        'The email identifier. Use the `id` field from `openEmailParams` in a `search_emails` result.',
+      ),
+    idType: z
+      .nativeEnum(SearchBackend)
+      .describe(
+        'The backend type. Use the `idType` field from `openEmailParams` in a `search_emails` result.',
+      ),
+    mailbox: z
+      .email()
+      .optional()
+      .describe(
+        'Delegated mailbox address. Use the `mailbox` field from `openEmailParams` in a `search_emails` result.',
+      ),
+    parentFolderId: z
+      .string()
+      .regex(/^[A-Za-z0-9_=-]+$/)
+      .optional()
+      .describe(
+        'The folder containing this email. Use the `parentFolderId` field from `openEmailParams` in a `search_emails` result.',
+      ),
+    idIsImmutable: z
+      .boolean()
+      .optional()
+      .describe(
+        'Whether the id is an immutable ID. Use the `idIsImmutable` field from `openEmailParams` in a `search_emails` result.',
+      ),
+  })
+  .refine((val) => !val.mailbox || val.parentFolderId !== undefined, {
+    message: 'parentFolderId is required when mailbox is provided',
+    path: ['parentFolderId'],
+  });
 
 export const EmailDataSchema = z.object({
   id: z.string(),
@@ -50,7 +72,7 @@ export class OpenEmailTool {
     name: 'open_email_by_id',
     title: 'Open Email by ID',
     description:
-      'Retrieve the full body of an email. Both `id` and `idType` must come from a `search_emails` result: pass `uniqueContentId` as `id` and `Unique` as `idType` when `uniqueContentId` is available; otherwise pass `msGraphMessageId` as `id` and `MsGraph` as `idType`.',
+      'Retrieve the full body of an email. Pass the `openEmailParams` object from a `search_emails` result directly as the tool input.',
     parameters: OpenEmailByIdInputSchema,
     outputSchema: OpenEmailByIdOutputSchema,
     annotations: {
@@ -70,7 +92,7 @@ export class OpenEmailTool {
   ): Promise<z.infer<typeof OpenEmailByIdOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
 
-    if (!IS_MICROSOFT_GRAPH_BACKEND) {
+    if (!isMicrosoftGraphBackend()) {
       const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
       if (!subscriptionStatus.success) {
         return subscriptionStatus;
@@ -81,6 +103,9 @@ export class OpenEmailTool {
       userProfileTypeId.toString(),
       input.id,
       input.idType,
+      input.mailbox,
+      input.parentFolderId,
+      input.idIsImmutable,
     );
     return { success: true, emailData };
   }

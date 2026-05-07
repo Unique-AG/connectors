@@ -2,7 +2,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiveCatchupSchedulerService } from './live-catchup-scheduler.service';
 
-vi.mock('~/features/tracing.utils', () => ({ traceEvent: vi.fn() }));
+vi.mock('~/features/tracing.utils', () => ({
+  traceEvent: vi.fn(),
+  NewTrace: () => () => ({}),
+}));
 
 import { traceEvent } from '~/features/tracing.utils';
 
@@ -44,7 +47,12 @@ function createMockDb({ liveCatchUpRows = [] as Array<{ subscriptionId: string }
 
 function createService({ amqp = createMockAmqp(), db = createMockDb() } = {}) {
   const schedulerRegistry = createMockSchedulerRegistry();
-  return new LiveCatchupSchedulerService(schedulerRegistry as any, amqp as any, db as any);
+  return new LiveCatchupSchedulerService(
+    schedulerRegistry as any,
+    amqp as any,
+    {} as any,
+    db as any,
+  );
 }
 
 // ---------------------------------------------------------------------------

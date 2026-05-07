@@ -6,6 +6,7 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
+import { NewTrace } from '~/features/tracing.utils';
 import { DeleteInboxDataEventDto } from './delete-inbox-data-event.dto';
 import { ExecuteInboxDeletionCommand } from './execute-inbox-deletion.command';
 
@@ -23,6 +24,7 @@ export class DeleteInboxDataListener {
     queueOptions: { deadLetterExchange: DEAD_EXCHANGE.name },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @NewTrace('amqp.delete-inbox-data')
   public async onDeleteInboxData(@RabbitPayload() payload: unknown): Promise<void> {
     const event = DeleteInboxDataEventDto.parse(payload);
     const { userProfileId } = event.payload;

@@ -11,6 +11,7 @@ locals {
   graph_scopes = toset([
     "User.Read",
     "Mail.ReadWrite",
+    "Mail.ReadWrite.Shared",
     "MailboxSettings.Read",
     "People.Read"
   ])

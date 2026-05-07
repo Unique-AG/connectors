@@ -5,7 +5,6 @@ import { Span } from 'nestjs-otel';
 import { isString } from 'remeda';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { GetSubscriptionStatusQuery } from '../../subscriptions/get-subscription-status.query';
 import { CreateDraftEmailCommand } from '../create-draft-email.command';
 import { META } from './create-draft-email-tool.meta';
 
@@ -91,10 +90,7 @@ const CreateDraftEmailOutputSchema = z.object({
 
 @Injectable()
 export class CreateDraftEmailTool {
-  public constructor(
-    private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
-    private readonly createDraftEmailCommand: CreateDraftEmailCommand,
-  ) {}
+  public constructor(private readonly createDraftEmailCommand: CreateDraftEmailCommand) {}
 
   @Tool({
     name: 'draft_email',
@@ -119,10 +115,6 @@ export class CreateDraftEmailTool {
     request: McpAuthenticatedRequest,
   ) {
     const userProfileId = extractUserProfileId(request);
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileId);
-    if (!subscriptionStatus.success) {
-      return subscriptionStatus;
-    }
     const chatId = _context.mcpRequest.params._meta?.chatId;
     return this.createDraftEmailCommand.run(userProfileId, {
       ...input,

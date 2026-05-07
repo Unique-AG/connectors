@@ -181,7 +181,7 @@ describe('UniqueAuth', () => {
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           msg: 'Failed to acquire Unique API token from Zitadel',
-          error: expect.anything(),
+          err: expect.anything(),
         }),
       );
     });
@@ -222,7 +222,7 @@ describe('UniqueAuth', () => {
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           msg: 'Failed to acquire Unique API token from Zitadel',
-          error: expect.anything(),
+          err: expect.anything(),
         }),
       );
     });

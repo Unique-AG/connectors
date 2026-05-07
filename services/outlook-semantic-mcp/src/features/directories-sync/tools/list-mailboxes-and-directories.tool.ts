@@ -3,11 +3,14 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { ListDirectoriesQuery, type UserDirectory } from '../list-directories.query';
+import {
+  ListMailboxesAndDirectoriesQuery,
+  type UserDirectory,
+  type UserMailbox,
+} from '../list-mailboxes-and-directories.query';
 import { SyncDirectoriesCommand } from '../sync-directories.command';
-import { META } from './list-folders-tool.meta';
+import { META } from './list-mailboxes-and-directories-tool.meta';
 
 const InputSchema = z.object({});
 
@@ -19,32 +22,38 @@ const UserDirectorySchema: z.ZodType<UserDirectory> = z.lazy(() =>
   }),
 );
 
+const UserMailboxSchema: z.ZodType<UserMailbox> = z.object({
+  email: z.string().nullable(),
+  displayName: z.string().nullable(),
+  isOwn: z.boolean(),
+  folders: z.array(UserDirectorySchema),
+});
+
 const OutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   status: z.string().optional(),
-  folders: z.array(UserDirectorySchema).optional(),
+  mailboxes: z.array(UserMailboxSchema).optional(),
 });
 
 @Injectable()
-export class ListFoldersTool {
+export class ListMailboxesAndDirectoriesTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
-    private readonly listDirectoriesQuery: ListDirectoriesQuery,
+    private readonly listDirectoriesQuery: ListMailboxesAndDirectoriesQuery,
   ) {}
 
   @Tool({
-    name: 'list_folders',
-    title: 'List Folders',
+    name: 'list_mailboxes_and_directories',
+    title: 'List Mailboxes and Directories',
     description:
-      'List all Outlook mail folders available for the user. Returns a hierarchical tree of folders (e.g. Inbox, Sent, custom folders). Each folder has an id that can be passed to the `directories` filter in `search_emails`.',
+      "List all Outlook mailboxes with their folders/directories available for the user. Returns the user's own mailbox and any delegated (shared) mailboxes they have access to. Each mailbox contains a hierarchical folder tree. Each folder has an id that can be passed to the `directories` filter in `search_emails`.",
     parameters: InputSchema,
     outputSchema: OutputSchema,
     annotations: {
-      title: 'List Folders',
+      title: 'List Mailboxes and Directories',
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: true,
@@ -53,35 +62,27 @@ export class ListFoldersTool {
     _meta: META,
   })
   @Span()
-  public async listFolders(
+  public async list(
     _input: z.infer<typeof InputSchema>,
     _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<
     | { success: boolean; message: string }
-    | { success: boolean; message: string; folders: UserDirectory[] }
+    | { success: boolean; message: string; mailboxes: UserMailbox[] }
   > {
     const userProfileTypeId = extractUserProfileId(request);
     const userProfileTypeIdString = userProfileTypeId.toString();
-
-    const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
-
-    if (!subscriptionStatus.success) {
-      return subscriptionStatus;
-    }
-
     this.logger.log({
       userProfileId: userProfileTypeIdString,
-      msg: 'Running directory sync before listing folders',
+      msg: 'Running directory sync before listing mailboxes and directories',
     });
     await this.syncDirectoriesCommand.run(userProfileTypeId);
-
-    const folders = await this.listDirectoriesQuery.run(userProfileTypeIdString);
+    const mailboxes = await this.listDirectoriesQuery.run(userProfileTypeIdString);
 
     return {
       success: true,
       message: 'Directories available',
-      folders,
+      mailboxes,
     };
   }
 }

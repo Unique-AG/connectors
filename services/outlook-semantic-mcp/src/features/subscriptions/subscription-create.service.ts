@@ -4,7 +4,7 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { AppConfig, appConfig } from '~/config';
+import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import {
   DRIZZLE,
   type DrizzleDatabase,
@@ -24,17 +24,19 @@ import {
 } from './subscription.dtos';
 import { MailSubscriptionUtilsService } from './subscription-utils.service';
 
-export interface SubscribeResult {
-  status: 'created' | 'already_active' | 'expiring_soon';
-  subscription: {
-    id: string;
-    subscriptionId: string;
-    expiresAt: Date;
-    userProfileId: string;
-    createdAt: Date;
-    updatedAt: Date;
-  };
-}
+export type SubscribeResult =
+  | { status: 'not_created'; reason: 'Not required for backend "MicrosoftGraph"' }
+  | {
+      status: 'created' | 'already_active' | 'expiring_soon';
+      subscription: {
+        id: string;
+        subscriptionId: string;
+        expiresAt: Date;
+        userProfileId: string;
+        createdAt: Date;
+        updatedAt: Date;
+      };
+    };
 
 @Injectable()
 export class SubscriptionCreateService {
@@ -43,13 +45,16 @@ export class SubscriptionCreateService {
   public constructor(
     private readonly amqp: AmqpConnection,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(ingestionConfig.KEY) private readonly config: IngestionConfig,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly utils: MailSubscriptionUtilsService,
   ) {}
 
   @Span()
   public async subscribe(userProfileId: UserProfileTypeID): Promise<SubscribeResult> {
+    if (this.config.mcpBackend === McpBackendType.MicrosoftGraph) {
+      return { status: 'not_created', reason: 'Not required for backend "MicrosoftGraph"' };
+    }
     traceAttrs({
       userProfileId: userProfileId.toString(),
       operation: 'create_subscription',
@@ -196,6 +201,7 @@ export class SubscriptionCreateService {
       providerUserId: userProfile.providerUserId,
     });
 
+    assert(this.config.mcpBackend === 'MicrosoftGraphAndUniqueApi');
     // We create the inbox configuration before we do the subscription because we do not want
     // to create a rance condition between webhook events and not having the subscription.
     await this.db

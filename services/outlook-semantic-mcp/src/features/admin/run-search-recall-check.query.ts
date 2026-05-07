@@ -5,10 +5,11 @@ import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, map, pick, pipe } from 'remeda';
 import * as z from 'zod';
 import { DRIZZLE, DrizzleDatabase, directories } from '~/db';
-import { SearchEmailsInputSchema } from '~/features/content/search/semantic-search-conditions.dto';
+import { SearchEmailsInputSchema } from '~/features/content/search/search-conditions.dto';
 import { SemanticSearchEmailsQuery } from '~/features/content/search/semantic-search-emails.query';
 import { traceAttrs, traceError } from '~/features/tracing.utils';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import { FAILED_INGESTION_STATUSES } from '../sync/full-sync/get-scope-ingestion-stats.query';
 import { FetchMessagesFromGraphQuery } from './fetch-messages-from-graph.query';
@@ -103,7 +104,10 @@ export class RunSearchRecallCheckQuery {
         });
 
         const expectedMessageIds = notSkipped.map((e) => e.messageId);
-        const { results } = await this.searchEmailsQuery.run(userProfileId, checkCase.search);
+        const { results } = await this.searchEmailsQuery.run(
+          convertUserProfileIdToTypeId(userProfileId),
+          [checkCase.search],
+        );
         const returnedEmailIds = new Set(
           pipe(
             results,

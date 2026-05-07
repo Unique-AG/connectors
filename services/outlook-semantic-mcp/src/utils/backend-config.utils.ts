@@ -1,4 +1,4 @@
-import { mcpBackendSchema, mcpDebugModeSchema } from '~/config/app.config';
+import { mcpBackendSchema, mcpDebugModeSchema } from '~/config';
 
 export const isMicrosoftGraphBackend = (): boolean =>
   mcpBackendSchema.parse(process.env.MCP_BACKEND) === 'MicrosoftGraph';

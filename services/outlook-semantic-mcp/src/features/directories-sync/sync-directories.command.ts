@@ -26,14 +26,14 @@ export class SyncDirectoriesCommand {
   ) {}
 
   @Span()
-  public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
-    traceAttrs({ userProfileTypeId: userProfileTypeId.toString() });
+  public async run(userProfileId: UserProfileTypeID): Promise<void> {
+    traceAttrs({ userProfileId: userProfileId.toString() });
     this.logger.log({
-      userProfileId: userProfileTypeId.toString(),
+      userProfileId: userProfileId.toString(),
       msg: `Starting directories sync`,
     });
 
-    const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
+    const userProfile = await this.getUserProfileQuery.run(userProfileId);
     traceAttrs({ userProfileId: userProfile.id });
     const userEmail = createSmeared(userProfile.email);
     this.logger.log({
@@ -80,7 +80,7 @@ export class SyncDirectoriesCommand {
     if (shouldSyncDirectories || shouldForceDirectoriesSync) {
       traceEvent(`Run directories sync`);
       this.logger.log({ ...logContext, msg: `Run directories sync` });
-      await this.syncDirectoriesForUserProfileCommand.run(userProfileTypeId);
+      await this.syncDirectoriesForUserProfileCommand.run(userProfileId);
       traceEvent('directories sync completed');
       this.logger.log({ ...logContext, msg: `Directories sync completed` });
     } else {

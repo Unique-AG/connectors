@@ -35,6 +35,8 @@ import {
   microsoftConfig,
   uniqueConfig,
 } from './config';
+import { delegatedAccessConfig } from './config/delegated-access.config';
+import { ingestionConfig } from './config/ingestion.config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
 import { registerBackendModule } from './features/backend.module';
 import { ManifestController } from './manifest.controller';
@@ -56,6 +58,8 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         encryptionConfig,
         microsoftConfig,
         uniqueConfig,
+        delegatedAccessConfig,
+        ingestionConfig,
       ],
     }),
     ScheduleModule.forRoot(),

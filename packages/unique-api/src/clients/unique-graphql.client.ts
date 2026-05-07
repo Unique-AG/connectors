@@ -146,8 +146,8 @@ export class UniqueGraphqlClient {
       }
 
       return result;
-    } catch (error) {
-      const statusCode = getErrorCodeFromGraphqlRequest(error);
+    } catch (err) {
+      const statusCode = getErrorCodeFromGraphqlRequest(err);
       const statusCodeClass = getHttpStatusCodeClass(statusCode);
       const durationMs = elapsedMilliseconds(startTime);
 
@@ -170,13 +170,13 @@ export class UniqueGraphqlClient {
         });
       }
 
-      const loggableError = options?.errorTransform ? options.errorTransform(error) : error;
+      const loggableError = options?.errorTransform ? options.errorTransform(err) : err;
       this.logger.error({
         msg: `Failed ${this.config.target} request (${operationName})`,
         error: loggableError,
       });
 
-      throw error;
+      throw err;
     }
   }
 }

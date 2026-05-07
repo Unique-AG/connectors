@@ -10,6 +10,7 @@ export interface UniqueApiScopesFacade {
   ): Promise<Scope[]>;
   getById(id: string): Promise<Scope | null>;
   getByExternalId(externalId: string): Promise<Scope | null>;
+  getByExternalIds(externalIds: string[]): Promise<Scope[]>;
   updateExternalId(
     scopeId: string,
     externalId: string | null,

@@ -189,7 +189,7 @@ describe('ConfluenceContentFetcher', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({
         pageId: 'fail',
-        err: expect.any(Error),
+        err: expect.objectContaining({ message: 'request failed' }),
         msg: 'Failed to fetch page, possibly deleted in the meantime',
       }),
     );
