@@ -82,7 +82,7 @@ export class SitesConfigurationService {
   }
 
   // We need the mapping because in the API name stays the same, so after rename the old incorrect
-  // name will stil be visible in the name field, when the displayName will change.
+  // name will still be visible in the name field, when the displayName will change.
   private createDisplayNameToNameMap(columns: ListColumn[]): Record<string, string> {
     const map: Record<string, string> = {};
     for (const column of columns) {
