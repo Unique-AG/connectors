@@ -39,6 +39,7 @@ export interface ToolOptions {
  * @param {z.ZodObject} [options.outputSchema] - The output schema of the tool
  * @param {ToolAnnotations} [options.annotations] - The annotations of the tool
  * @param {SdkTool['_meta']} [options._meta] - The metadata of the tool
+ * @param {SdkTool['icons']} [options.icons] - The icons of the tool
  * @returns {MethodDecorator} - The decorator
  */
 export const Tool = (options: ToolOptions) => {
