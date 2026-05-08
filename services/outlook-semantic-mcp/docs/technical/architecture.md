@@ -72,7 +72,7 @@ After a user connects, the following pipelines keep the knowledge base in sync w
 
 **Live Catch-Up** — webhook-driven; acknowledged immediately via RabbitMQ, processed async in the consumer; queries Graph for messages since the watermark; watermark defaults to `now()` on inbox creation so notifications are never buffered.
 
-**Directory Sync** — runs on a 5-minute delta query schedule; keeps local folder tree in sync with Outlook; powers `list_mailboxes_and_directories` and folder-based search filtering; detects email deletion by tracking moves to excluded folders (e.g. Deleted Items).
+**Directory Sync** — runs on a 5-minute delta query schedule (configurable via `DIRECTORY_SYNC_CRON_SCHEDULE`); keeps local folder tree in sync with Outlook; powers `list_mailboxes_and_directories` and folder-based search filtering; detects email deletion by tracking moves to excluded folders (e.g. Deleted Items).
 
 **Subscription Management** — Graph webhook subscription created automatically on connect; renewed via Microsoft lifecycle notifications (`reauthorizationRequired`). If `subscriptionRemoved`, user calls `reconnect_inbox`; `verify_inbox_connection` reports status (`active`, `expiring_soon`, `expired`, `not_configured`).
 
@@ -86,7 +86,7 @@ consider 4× per day since discovery is the sole revocation mechanism). The
 confirms which individual folders within each delegated mailbox are still
 readable. Neither job triggers email ingestion — they write permission records
 that `search_emails` reads at query time to include the owner's scope alongside
-the delegate's own scope. A recovery scheduler automatically restarts either job
+the delegate's own scope. A recovery scheduler (configurable via `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE`) automatically restarts either job
 if it stalls. See [Delegated Access Discovery Flow](./flows.md#Delegated-Access-Discovery-Flow).
 
 ### Data Storage (PostgreSQL)

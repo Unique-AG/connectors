@@ -147,4 +147,4 @@ For the full security architecture, see [Security Documentation](../technical/se
 
 ## Scaling Considerations
 
-- **Directory sync** processes a maximum of 10 users per scheduled run (every 5 minutes). For large deployments with many connected users, account for the fact that folder sync updates are distributed across multiple runs.
+- **Directory sync** processes a maximum of 10 users per scheduled run (every 5 minutes, configurable via `DIRECTORY_SYNC_CRON_SCHEDULE`). For large deployments with many connected users, account for the fact that folder sync updates are distributed across multiple runs.

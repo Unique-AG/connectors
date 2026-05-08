@@ -5,7 +5,7 @@
 
 This runbook covers recovery procedures for the three stateful components the Outlook Semantic MCP Server depends on: the local PostgreSQL database, RabbitMQ, and the Unique Knowledge Base. Each component has a distinct failure mode and recovery path.
 
-Automatic recovery schedulers (a 2-minute full-sync retry and a live catch-up recovery scheduler that retriggers within 5 minutes on failure or after 4 hours of inactivity) handle transient failures. The scenarios below require explicit operator action because the automatic schedulers are insufficient for total data loss.
+Automatic recovery schedulers (a 2-minute full-sync retry, a live catch-up recovery scheduler that retriggers within 5 minutes on failure or after 30 minutes of inactivity, and an inbox-deletion recovery scheduler) handle transient failures. The scenarios below require explicit operator action because the automatic schedulers are insufficient for total data loss.
 
 Out of scope: partial database corruption, Microsoft Graph API outages, and automated recovery scripts.
 
@@ -50,7 +50,7 @@ The documentation does not provide fixed RTO targets because recovery time varie
 | Component | Recommendation | Rationale | Mode |
 |---|---|---|---|
 | **PostgreSQL** | Regular backups strongly recommended. Use your platform's backup solution (managed service snapshots, `pg_dump`, or WAL archiving). | Contains OAuth tokens, webhook subscriptions, and all sync state. Without a backup, all users must re-authenticate and full sync restarts from scratch. | Both modes — strongly recommended |
-| **RabbitMQ** | Backup not required. | Queues carry only transient sync trigger events. Live catch-up email ingestion happens inline (not via RabbitMQ), so RabbitMQ loss only affects trigger delivery, not per-email ingestion. The 2-minute full-sync recovery scheduler and the live catch-up recovery scheduler (5-minute retry on failure, 4-hour retry on inactivity) re-create any lost trigger events after reconnection. | Both modes — backup not required |
+| **RabbitMQ** | Backup not required. | Queues carry only transient sync trigger events. Live catch-up email ingestion happens inline (not via RabbitMQ), so RabbitMQ loss only affects trigger delivery, not per-email ingestion. The 2-minute full-sync recovery scheduler and the live catch-up recovery scheduler (5-minute retry on failure, 30-minute retry on inactivity; cron: `INGESTION_LIVE_CATCHUP_RECOVERY`, default `*/5 * * * *`) re-create any lost trigger events after reconnection. | Both modes — backup not required |
 | **Unique Knowledge Base** | Managed by the Unique platform. | Backup and restore are the responsibility of the Unique platform operator. | Both modes — managed by Unique platform |
 
 **Risk if no PostgreSQL backup exists:** every user must re-authenticate via OAuth and a full re-sync runs for each user. Existing emails in the Knowledge Base are not lost (re-ingestion is idempotent — only API call overhead, no duplicate data), but recovery time scales linearly with user count and mailbox size. For large deployments this can be significant, compounded by the shared Microsoft Graph API rate limit.
@@ -61,7 +61,7 @@ The documentation does not provide fixed RTO targets because recovery time varie
 
 Emails are sourced from Microsoft Graph, which retains the authoritative copy. In all three disaster scenarios, email content is not permanently lost — it can be re-fetched and re-ingested. The data loss window refers to the delay before the system catches up:
 
-- **Webhook notifications lost during an outage** are recovered by the live catch-up recovery scheduler — if no new activity occurs for 4 hours it retriggers live catch-up, which polls Microsoft Graph for any emails modified since the last known watermark.
+- **Webhook notifications lost during an outage** are recovered by the live catch-up recovery scheduler — if no new activity occurs for 30 minutes it retriggers live catch-up, which polls Microsoft Graph for any emails modified since the last known watermark.
 - **If a webhook subscription expires during an extended outage** (subscriptions renew daily), users must call `reconnect_inbox` to re-create it. Emails received during the gap are picked up by the subsequent full re-sync.
 - **Worst case:** emails received between the last successful live catch-up and service restoration are delayed, not lost. Full re-sync recovers all emails from Microsoft Graph that match the operator-configured [Mail Filters](./configuration.md#Mail-Filters) — emails outside the configured date window or matching exclusion rules are not synced.
 
@@ -71,7 +71,7 @@ Emails are sourced from Microsoft Graph, which retains the authoritative copy. I
 |---|---|
 | **Kubernetes operator** | All scenarios — restarts pods, updates secrets, runs migrations, enables debug mode. |
 | **Database / platform administrator** | Scenario 1 — restores or provisions PostgreSQL. Scenario 2 — restores or provisions RabbitMQ. |
-| **End users** | Scenario 1 — must call `reconnect_inbox` to re-authenticate (Mode A only — in Mode B, users re-authenticate via the standard OAuth flow without calling any tool). Scenario 2 — must call `reconnect_inbox` only if they are not receiving new emails after recovery (Mode A only). Scenario 3 — must call `restart_full_sync` (Mode A only — in Mode B, users re-authenticate via the standard OAuth flow without calling any tool). The operator cannot call tools on behalf of users. |
+| **End users** | Scenario 1 — must re-authenticate via the standard OAuth flow (reconnecting their MCP client). No tool call is required; OAuth completion automatically recreates the Graph webhook subscription and triggers a full sync (Mode A) or simply re-issues MCP tokens (Mode B). Scenario 2 — must call `reconnect_inbox` only if they are not receiving new emails after recovery (Mode A only). Scenario 3 — must call `restart_full_sync` (Mode A only — in Mode B, users re-authenticate via the standard OAuth flow without calling any tool). The operator cannot call tools on behalf of users. |
 
 No Microsoft tenant administrator action is required for recovery. Orphaned webhook subscriptions in Microsoft's systems expire automatically based on the expiration time set at creation (the service configures subscriptions to renew daily, so orphaned subscriptions typically expire within about 1 day; Microsoft allows up to 7 days for message subscriptions).
 
@@ -119,10 +119,7 @@ The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, a
    kubectl logs deploy/outlook-semantic-mcp -n outlook-semantic-mcp | grep -i migration
    ```
 
-4. Notify affected users that they must reconnect their inbox. Each user must:
-
-   - Open the MCP tool interface.
-   - Call `reconnect_inbox` (or follow the standard OAuth flow) to re-authenticate and re-create the Graph webhook subscription.
+4. Notify affected users that they must reconnect their inbox. Each user must reconnect their MCP client and complete the standard OAuth flow. The server publishes a `user-authorized` event on OAuth completion that automatically creates a new Graph webhook subscription and triggers a full sync — no tool call is needed (and `reconnect_inbox` cannot be called anyway, because the user has no MCP bearer token until OAuth completes).
 
 5. After reconnection, a full sync starts automatically. Users can monitor progress with `sync_progress`.
 
@@ -175,7 +172,7 @@ RabbitMQ carries in-flight sync trigger events between the service and its inter
 
 3. Once the pods reconnect, the automatic schedulers handle recovery without user action:
    - The 2-minute full-sync retry scheduler re-triggers any stalled full syncs.
-   - The live catch-up recovery scheduler retriggers any failed catch-ups within 5 minutes, and retriggers catch-ups that received no notifications within 4 hours.
+   - The live catch-up recovery scheduler retriggers any failed catch-ups within 5 minutes, and retriggers catch-ups that received no notifications within 30 minutes.
 
 4. If a user reports not receiving new emails after the service has recovered, they can call `reconnect_inbox` to re-create the webhook subscription. A full sync starts automatically after reconnection.
 

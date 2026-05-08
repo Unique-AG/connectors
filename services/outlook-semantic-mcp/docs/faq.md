@@ -470,7 +470,7 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 **Answer:** Check the following:
 
 1. **Active subscription** — verify via `verify_inbox_connection`. If the subscription is `expired` or `not_configured`, call `reconnect_inbox`.
-2. **Live catch-up state** — check `sync_progress` for `liveCatchUpState`. If `failed`, the recovery scheduler will reset it within 5 minutes.
+2. **Live catch-up state** — check `sync_progress` for `liveCatchUpState`. If `failed`, the recovery scheduler resets it automatically within 5 minutes — no user action is required. Operators can monitor pod logs if the issue persists.
 3. **Inbox filters** — the email may match an `ignoredSenders` or `ignoredContents` filter.
 
 **See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Flows](./technical/flows.md)
@@ -503,6 +503,8 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 **Answer:** `Mail.ReadWrite` serves dual purposes: it provides read access for email sync and search (full sync, live catch-up), and write access for the `create_draft_email` tool which creates email messages in the user's mailbox via `POST /me/messages`. Since `Mail.ReadWrite` already includes full read access, the narrower `Mail.Read` and `Mail.ReadBasic` scopes are not needed.
 
 Delete detection does not require write access — it works by observing `created` change notifications on ignored folders (such as Deleted Items), not by moving emails.
+
+In addition, `Mail.ReadWrite.Shared` is requested at OAuth time for delegated-access support. It is a no-op when `DELEGATED_ACCESS_SCAN=disabled` — no shared mailbox data is accessed — but it always appears on the Microsoft consent screen.
 
 **See also:** [Permissions](./technical/permissions.md) — [Tools — create_draft_email](./technical/tools.md#create_draft_email)
 
@@ -627,7 +629,7 @@ When the filters are updated and the service is redeployed, all user inbox confi
 
 Full sync relies on RabbitMQ for inter-batch orchestration — without RabbitMQ, in-progress full syncs complete their current batch but no new batches are triggered. See [Disaster Recovery — Scenario 2](./operator/disaster-recovery.md#Scenario-2:-RabbitMQ-Loss) for details.
 
-Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, eigher the first notification from MsGraph or the 4-hour catch-up cron re-triggers processing, which picks up missed messages by querying from the last watermark.
+Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, either the first notification from MsGraph or the 30-minute catch-up cron re-triggers processing, which picks up missed messages by querying from the last watermark.
 
 **Mode B (`MicrosoftGraph`):** The service loses its RabbitMQ connection and cannot function until it is restored; no email data is lost.
 
@@ -647,7 +649,7 @@ Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, eigh
 ### What do I do if a core infrastructure component fails?
 
 **Mode A (`MicrosoftGraphAndUniqueApi`):**
-- PostgreSQL loss — all stored OAuth tokens and sync state are gone; every user must re-authenticate via `reconnect_inbox`.
+- PostgreSQL loss — all stored OAuth tokens and sync state are gone; every user must re-authenticate via the standard OAuth flow in their MCP client. No tool call is needed — OAuth completion automatically recreates the subscription and triggers a full sync.
 - RabbitMQ loss — in-progress full syncs stall after the current batch; live catch-up trigger delivery is blocked but any in-progress run completes. No re-authentication needed. Live catch-up resumes automatically once RabbitMQ is restored.
 - Unique Knowledge Base loss — ingested email content must be re-ingested; each affected user must call `restart_full_sync` from their own MCP session (debug mode required).
 

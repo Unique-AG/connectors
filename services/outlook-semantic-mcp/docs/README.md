@@ -44,7 +44,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Permissions
 
-All permissions are delegated and require no admin consent. See [Permissions](./technical/permissions.md) for details.
+All permissions are delegated and require no admin consent. This includes `Mail.ReadWrite.Shared`, which is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`) and enables delegated mailbox access when configured. See [Permissions](./technical/permissions.md) for the full list and least-privilege justifications.
 
 ## Features
 

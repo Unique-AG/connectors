@@ -48,6 +48,7 @@ Set via `mcpConfig.app` in Helm values:
 | `DELEGATED_ACCESS_SCAN` | `mcpConfig.app.delegatedAccessScan` | `disabled` | Delegated access scanning mode — see [DELEGATED_ACCESS_SCAN](#DELEGATED_ACCESS_SCAN) |
 | `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` | `mcpConfig.app.delegatedAccessDiscoveryCronSchedule` | `0 */12 * * *` | Cron schedule for delegated access discovery runs. Required when `DELEGATED_ACCESS_SCAN` is not `disabled` |
 | `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` | `mcpConfig.app.delegatedAccessVerificationCronSchedule` | `0 */4 * * *` | Cron schedule for delegated access verification runs. Required when `DELEGATED_ACCESS_SCAN` is `granularAccess` |
+| `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE` | `mcpConfig.app.delegatedAccessRecoveryCronSchedule` | `*/30 * * * *` | Cron schedule for the delegated-access recovery scheduler. Restarts a discovery or verification job that has stalled (state `running` for > 10 minutes with no progress). Required when `DELEGATED_ACCESS_SCAN` is not `disabled` |
 
 ### Microsoft Configuration
 
@@ -122,6 +123,7 @@ Set via `server.env` in Helm values for plain config, or via `server.envVars` (w
 | `OTEL_METRICS_EXPORTER` | `prometheus` | OpenTelemetry metrics exporter |
 | `OTEL_EXPORTER_PROMETHEUS_HOST` | `0.0.0.0` | Host for the Prometheus metrics scrape endpoint |
 | `OTEL_EXPORTER_PROMETHEUS_PORT` | `51346` | Port for the Prometheus metrics scrape endpoint |
+| `DIRECTORY_SYNC_CRON_SCHEDULE` | `*/5 * * * *` | Cron schedule for directory (folder tree) delta sync. No dedicated `mcpConfig.app` Helm path exists — set via `server.env` |
 
 ## Helm Values Reference
 

@@ -108,7 +108,7 @@ sequenceDiagram
     Note over AMQP,DB: Subscription removed by Microsoft
     MSGraph->>OutlookMCP: POST /mail-subscription/lifecycle (subscriptionRemoved)
     OutlookMCP->>OutlookMCP: Validate clientState secret
-    OutlookMCP->>DB: Delete subscription and inbox_configurations records
+    OutlookMCP->>DB: Delete subscription record (inbox_configurations preserved)
 
     Note over AMQP,DB: Change notifications lost — Microsoft signals missed events
     MSGraph->>OutlookMCP: POST /mail-subscription/lifecycle (missed)
@@ -159,7 +159,7 @@ The server continuously syncs the user's Outlook folder structure from Microsoft
 
 **Key points:**
 
-- Directory sync runs on a 5-minute schedule using Graph delta queries, plus on-demand at the start of each full sync and live catch-up execution.
+- Directory sync runs on a 5-minute schedule (configurable via `DIRECTORY_SYNC_CRON_SCHEDULE`) using Graph delta queries, plus on-demand at the start of each full sync and live catch-up execution.
 - System folders such as Deleted Items, Junk Email, Recoverable Items Deletions, and Conversation History are excluded from sync (`ignoreForSync = true`). When an email is moved to an excluded folder, it is removed from the knowledge base.
 - The `list_mailboxes_and_directories` tool returns the folder tree synced here. The folder IDs it returns can be passed in the `conditions[].directories` field of `search_emails` to narrow results to a specific mailbox folder.
 
@@ -231,7 +231,7 @@ sequenceDiagram
 - Transient errors (429, 5xx) cause the pair to be skipped; the next scheduled run retries.
 - The verification job (`granularAccess` only) tests each folder individually, rebuilds `delegatedAccessDirectories` from confirmed-accessible folders, and deletes the account record if no folders remain accessible and no transient errors occurred.
 - In Mode B (`MicrosoftGraph`), only full-access delegations are searchable — honouring folder-level grants would require querying every accessible folder individually, which is not implemented due to API rate limits. Folder-level grants detected by verification have no effect on Mode B search results.
-- A recovery scheduler monitors both jobs. If either stalls (state `running` for > 10 minutes with no progress), it is automatically restarted.
+- A recovery scheduler (configurable via `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE`, default `*/30 * * * *`) monitors both jobs. If either stalls (state `running` for > 10 minutes with no progress), it is automatically restarted.
 
 ## Email Draft Creation Flow
 

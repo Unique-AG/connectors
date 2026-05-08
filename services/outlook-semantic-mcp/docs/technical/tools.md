@@ -20,7 +20,7 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | [`create_draft_email`](#create_draft_email) | Draft Creation | Yes | Both |
 | [`lookup_contacts`](#lookup_contacts) | Contact Lookup | No | Both |
 | [`list_categories`](#list_categories) | Mailbox Utilities | No | Both |
-| [`list_mailboxes_and_directories`](#list_mailboxes_and_directories) | Mailbox Utilities | Yes (refreshes folder cache) | Both |
+| [`list_mailboxes_and_directories`](#list_mailboxes_and_directories) | Mailbox Utilities | Yes | Both |
 | [`verify_inbox_connection`](#verify_inbox_connection) | Subscription Management | No | Mode A only |
 | [`reconnect_inbox`](#reconnect_inbox) | Subscription Management | Yes | Mode A only |
 | [`delete_inbox_data`](#delete_inbox_data) | Subscription Management | Yes | Mode A only |
@@ -576,6 +576,7 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
 - `state: "running"` means the full sync is actively fetching and uploading. Search results will be partial until `state: "finished"`.
 - `scheduledForIngestion` counts emails uploaded to Unique; `ingestionStats.finished` counts those confirmed processed by the knowledge base.
 - `failedToUploadForIngestion` emails were skipped after retries — check operator logs for details.
+- `syncStats.liveCatchUpState: "failed"` indicates the live catch-up pipeline stalled. Recovery is automatic — the `INGESTION_LIVE_CATCHUP_RECOVERY` scheduler resets it within 5 minutes. No user-callable tool exists for this outside `MCP_DEBUG_MODE`; users should wait and operators can monitor pod logs.
 
 ---
 
