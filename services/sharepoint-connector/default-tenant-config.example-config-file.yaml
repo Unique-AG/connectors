@@ -30,6 +30,17 @@ sharepoint:
       syncMode: content_only
       permissionsInheritanceMode: inherit_scopes_and_files
       subsitesScan: disabled
+    # Auto-resolves a per-site root under the configured parent scope
+    - siteId: 11111111-2222-3333-4444-555555555555
+      syncColumnName: SalesGPTKnowledge
+      ingestionMode: recursive
+      scopeId: in_parent:scope_bu4gokr0atzj0kfiucccccc
+      maxFilesToIngest: 1000
+      storeInternally: enabled
+      syncStatus: active
+      syncMode: content_only
+      permissionsInheritanceMode: inherit_scopes_and_files
+      subsitesScan: disabled
 unique:
   serviceAuthMode: cluster_local
   serviceExtraHeaders:
