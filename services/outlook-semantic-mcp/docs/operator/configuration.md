@@ -3,6 +3,19 @@
 
 # Outlook Semantic MCP - Configuration
 
+## Choose Your Deployment Mode
+
+Set `MCP_BACKEND` before configuring anything else — it determines which infrastructure components you need and which configuration sections apply.
+
+| Section | Mode A (`MicrosoftGraphAndUniqueApi`) | Mode B (`MicrosoftGraph`) |
+|---|---|---|
+| Required Secrets | All secrets | Same — `UNIQUE_ZITADEL_CLIENT_SECRET` only needed for `external` auth |
+| Ingestion Configuration (`mcpConfig.ingestion`) | Required | **Omit entirely** |
+| Unique API Configuration (`mcpConfig.unique`) | Required | Required |
+| RabbitMQ Configuration | Required | Required |
+
+See [MCP_BACKEND](#MCP_BACKEND) for the full description of what each mode enables.
+
 ## Environment Variables
 
 All configuration is done via environment variables, either directly or through Helm values.
@@ -11,15 +24,15 @@ All configuration is done via environment variables, either directly or through 
 
 These must be provided via Kubernetes secrets:
 
-| Variable | Format | Description |
-|----------|--------|-------------|
-| `DATABASE_URL` | `postgresql://user:pass@host:5432/db` | PostgreSQL connection string |
-| `AMQP_URL` | `amqp://user:pass@host:5672/vhost` | RabbitMQ connection string (or use individual `AMQP_*` fields) |
-| `MICROSOFT_CLIENT_SECRET` | String from Azure portal | Entra app client secret |
-| `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret — see [Generating Secrets](#Generating-Secrets) |
-| `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key — see [Generating Secrets](#Generating-Secrets) |
-| `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key — see [Generating Secrets](#Generating-Secrets) |
-| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret (required for `external` auth mode only) |
+| Variable | Format | Description | Required for |
+|----------|--------|-------------|-------------|
+| `DATABASE_URL` | `postgresql://user:pass@host:5432/db` | PostgreSQL connection string | Both modes |
+| `AMQP_URL` | `amqp://user:pass@host:5672/vhost` | RabbitMQ connection string (or use individual `AMQP_*` fields) | Both modes |
+| `MICROSOFT_CLIENT_SECRET` | String from Azure portal | Entra app client secret | Both modes |
+| `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret — see [Generating Secrets](#Generating-Secrets) | Both modes |
+| `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key — see [Generating Secrets](#Generating-Secrets) | Both modes |
+| `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key — see [Generating Secrets](#Generating-Secrets) | Both modes |
+| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret (required for `external` auth mode only) | Both modes (`external` service auth only) |
 
 ### Application Configuration
 
@@ -48,7 +61,10 @@ Set via `mcpConfig.microsoft` in Helm values:
 
 ### Ingestion Configuration
 
-Applies when `MCP_BACKEND` is `MicrosoftGraphAndUniqueApi`. Set via `mcpConfig.ingestion` in Helm values:
+!!! warning "Mode A (`MicrosoftGraphAndUniqueApi`) only"
+    This entire section applies only when `MCP_BACKEND` is `MicrosoftGraphAndUniqueApi`. If you are deploying in `MicrosoftGraph` mode, omit all `mcpConfig.ingestion` values from your Helm configuration.
+
+Set via `mcpConfig.ingestion` in Helm values:
 
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
@@ -109,7 +125,7 @@ Set via `server.env` in Helm values for plain config, or via `server.envVars` (w
 
 ## Helm Values Reference
 
-### Full Example
+### Mode A Minimal Values Example
 
 ```yaml
 server:
@@ -209,6 +225,63 @@ alerts:
       enabled: true
     uniqueApi:
       enabled: true
+```
+
+### Mode B Minimal Values Example
+
+```yaml
+server:
+  envVars:
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: DATABASE_URL
+    - name: AMQP_URL
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: AMQP_URL
+    - name: MICROSOFT_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: MICROSOFT_CLIENT_SECRET
+    - name: MICROSOFT_WEBHOOK_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: MICROSOFT_WEBHOOK_SECRET
+    - name: AUTH_HMAC_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: AUTH_HMAC_SECRET
+    - name: ENCRYPTION_KEY
+      valueFrom:
+        secretKeyRef:
+          name: outlook-semantic-mcp-secrets
+          key: ENCRYPTION_KEY
+
+mcpConfig:
+  enabled: true
+
+  app:
+    selfUrl: https://outlook.semantic.mcp.example.com
+    mcpBackend: MicrosoftGraph
+
+  microsoft:
+    clientId: "12345678-1234-1234-1234-123456789012"
+
+  unique:
+    serviceAuthMode: cluster_local
+    ingestionServiceBaseUrl: http://node-ingestion.unique:8091
+    scopeManagementServiceBaseUrl: http://node-scope-management.unique:8092
+    serviceExtraHeaders:
+      x-company-id: "<your-company-id>"
+      x-user-id: "<your-service-account-user-id>"
+
+  # No mcpConfig.ingestion section — omit entirely for MicrosoftGraph mode
 ```
 
 ### Service Auth Modes
@@ -376,6 +449,11 @@ The following secrets must be generated with a cryptographically secure random s
 The server listens on `PORT` (default `9542`). In Helm deployments, `server.ports.application` (default `51345`) overrides this value — the Helm chart injects the port via the deployment spec, so `PORT` typically does not need to be set explicitly.
 
 ### MCP_BACKEND
+
+| If you want... | Use |
+|---|---|
+| Semantic search against indexed email history + live KQL | `MicrosoftGraphAndUniqueApi` |
+| Live KQL search only, no email indexing | `MicrosoftGraph` |
 
 Selects the search and email-open backend at deploy time. Two values are accepted:
 

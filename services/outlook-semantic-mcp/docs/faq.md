@@ -65,7 +65,7 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 10 user-facing MCP tools that AI clients invoke on demand (plus 4 additional tools available only in debug mode), and once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background.
+**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 10 tools in `MicrosoftGraphAndUniqueApi` mode (plus 4 debug-mode tools), or 6 tools in `MicrosoftGraph` mode. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
 
 **What it does:**
 
@@ -80,6 +80,8 @@
 - 10 MCP tools available in their AI client immediately after connection (14 with debug mode enabled)
 - Search results that may be incomplete while the initial full sync is running (a `syncWarning` is returned by `search_emails`)
 
+The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `MicrosoftGraphAndUniqueApi` mode, it ingests emails into the Unique knowledge base and exposes 10 tools. In `MicrosoftGraph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 6 tools. See [Operator Configuration](./operator/configuration.md#MCP_BACKEND).
+
 **See also:** [Architecture](./technical/architecture.md) — [Tools](./technical/tools.md)
 
 ### What tools are available?
@@ -91,17 +93,21 @@
 | Email Search | `search_emails`, `open_email_by_id` |
 | Draft Creation | `create_draft_email` |
 | Contact Lookup | `lookup_contacts` |
-| Mailbox Utilities | `list_categories`, `list_folders` |
+| Mailbox Utilities | `list_categories`, `list_mailboxes_and_directories` |
 | Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data` |
 | Sync Monitoring | `sync_progress` |
 
 An additional 4 tools are available only when the server is running in debug mode (`MCP_DEBUG_MODE=enabled`): `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`. These are intended for development and troubleshooting and are not exposed in production deployments.
+
+In `MicrosoftGraph` mode, only the first 6 categories are available (Email Search, Draft Creation, Contact Lookup, Mailbox Utilities). Subscription Management and Sync Monitoring tools are not registered.
 
 **See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#Debug-Mode-Tools)
 
 ### Do I need to do anything after connecting?
 
 **Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [INGESTION_DEFAULT_MAIL_FILTERS](./operator/configuration.md)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
+
+**Mode B (`MicrosoftGraph`):** No. After granting consent, all 6 tools are available immediately. There is no ingestion pipeline — search results come from live Microsoft Graph queries.
 
 
 ## Data Privacy & Storage
@@ -112,17 +118,21 @@ An additional 4 tools are available only when the server is running in debug mod
 
 The MCP server's PostgreSQL database stores only encrypted OAuth tokens, opaque MCP bearer tokens, sync state, folder metadata, and subscription IDs — no email content. See [Data Classification and Flow](./technical/security.md#Data-Classification-and-Flow) for the full breakdown of what is stored where.
 
+In `MicrosoftGraph` mode, no email content is ever fetched into memory beyond what is needed to return a single search result — no ingestion occurs and nothing is sent to the Unique knowledge base.
+
 ### Where is my email content stored?
 
 **Answer:** Email content (subject, body, sender, recipients, and metadata) is stored in the **Unique knowledge base**, not in the MCP server itself. It is indexed there for semantic search and is accessible via the `search_emails` tool.
 
 The Unique knowledge base organizes each user's emails into a dedicated **root scope** (a top-level isolation boundary that logically separates one user's ingested data from another's within the Unique platform).
 
+In `MicrosoftGraph` mode, email content is not stored anywhere — it is queried live from Microsoft Graph per search request and never persisted.
+
 **See also:** [Knowledge Base Data Isolation](./technical/security.md#Knowledge-Base-Data-Isolation)
 
 ### Who can access my email data once it is ingested?
 
-**Answer:** Access to ingested email data operates at two levels:
+**Answer:** (Applies to Mode A — `MicrosoftGraphAndUniqueApi` — only) Access to ingested email data operates at two levels:
 
 **Via the MCP server (tool layer):** The `search_emails` tool only returns results from the authenticated user's own scope. One user's MCP session cannot query another user's emails.
 
@@ -153,11 +163,13 @@ Access to the email content itself requires access to the Unique knowledge base,
 - Removes the per-user root scopes from the Unique knowledge base, which also removes all ingested email content for that user
 - Clears the inbox configuration and folder sync data from PostgreSQL
 
+In Mode B (`MicrosoftGraph`), there is no inbox data to delete — `delete_inbox_data` is not available in this mode.
+
 **See also:** [Data Removal](./technical/security.md#Data-Removal)
 
 ### What email data is actually ingested into the knowledge base?
 
-**Answer:** The following fields from each email are ingested:
+**Answer:** (Mode A — `MicrosoftGraphAndUniqueApi` — only) The following fields from each email are ingested:
 
 - Subject
 - Body (plain text and/or HTML)
@@ -170,6 +182,8 @@ Access to the email content itself requires access to the Unique knowledge base,
 
 
 ## Supported Email Attachment Types
+
+> This section applies to Mode A (`MicrosoftGraphAndUniqueApi`) only. In `MicrosoftGraph` mode, attachments are not indexed.
 
 ### Documents
 - **PDF** (`.pdf`)
@@ -191,17 +205,15 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 
 ### How does `search_emails` search?
 
-**Answer:** `search_emails` performs semantic search against the Unique knowledge base — not a keyword search against a local index. It supports natural language queries and returns semantically relevant results even when exact words do not match.
+**Mode A (`MicrosoftGraphAndUniqueApi`):** `search_emails` runs two searches in parallel — semantic search against the Unique knowledge base and a KQL keyword search against Microsoft Graph — then merges and deduplicates the results. It supports natural-language queries and returns semantically relevant results even when exact keywords do not match. The input requires two arrays: `uniqueSemanticSearchQueries` (semantic, 1–10 entries) and `msGraphKeywordSearchQueries` (KQL, 1–10 entries), both addressing the same user question from different angles. A `limit` parameter on each entry (100–200 for semantic, 1–100 for KQL) controls the maximum per-query results. Search results may be incomplete while full sync is in progress — a `syncWarning` is returned in that case.
 
-Optional structured filters can be passed via the `conditions` array. Each condition is an object with fields like `directories`, `dateFrom`, `dateTo`, `fromSenders`, `toRecipients`, `ccRecipients`, `hasAttachments`, and `categories`. Each field uses a `{ value, operator }` wrapper. Multiple conditions in the array are OR-combined; fields within a single condition are AND-combined. A `limit` parameter (40–100) controls the maximum number of results.
-
-Search results may be incomplete while full sync is in progress. A `syncWarning` field is returned in that case.
+**Mode B (`MicrosoftGraph`):** `search_emails` calls the Microsoft Graph Search API directly using KQL queries only. Only `msGraphKeywordSearchQueries` is accepted. There is no semantic search and no Knowledge Base interaction. Folder filtering is not supported.
 
 **See also:** [Tools — search_emails](./technical/tools.md#search_emails)
 
 ### How do I filter search results to a specific folder?
 
-**Answer:** Use the `list_folders` tool to get the folder tree, then pass the folder ID in the `conditions` array using the `directories` field. Well-known system folders like "Inbox", "Sent Items", and "Drafts" can be used by name directly — no need to call `list_folders` for those.
+**Answer:** Use the `list_mailboxes_and_directories` tool to get the folder tree, then pass the folder ID in the `conditions` array using the `directories` field. Well-known system folders like "Inbox", "Sent Items", and "Drafts" can be used by name directly — no need to call `list_mailboxes_and_directories` for those.
 
 ```json
 // Search within a specific folder by name
@@ -214,18 +226,20 @@ Search results may be incomplete while full sync is in progress. A `syncWarning`
   ]
 }
 
-// Search within a custom folder by ID (from list_folders)
+// Search within a custom folder by ID (from list_mailboxes_and_directories)
 {
   "search": "project update",
   "conditions": [
     {
-      "directories": { "value": ["<folder-id-from-list_folders>"], "operator": "in" }
+      "directories": { "value": ["<folder-id-from-list_mailboxes_and_directories>"], "operator": "in" }
     }
   ]
 }
 ```
 
-**See also:** [Tools — list_folders](./technical/tools.md#list_folders) — [Tools — search_emails](./technical/tools.md#search_emails)
+**Mode B (`MicrosoftGraph`) limitation:** Folder filtering is not supported. The Microsoft Graph Search API does not expose a folder-scoped KQL predicate.
+
+**See also:** [Tools — list_mailboxes_and_directories](./technical/tools.md#list_mailboxes_and_directories) — [Tools — search_emails](./technical/tools.md#search_emails)
 
 ### Can I attach files when creating a draft email?
 
@@ -240,7 +254,7 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 ### What does `reconnect_inbox` do?
 
-**Answer:** `reconnect_inbox` creates a new Microsoft Graph subscription only if none exists or the existing one has expired. If the subscription is within 15 minutes of expiry, it returns `expiring_soon` without making changes (renewal is automatic). If the subscription is active with more than 15 minutes remaining, it returns `already_active`. Use it when:
+**Answer:** (Mode A — `MicrosoftGraphAndUniqueApi` — only) `reconnect_inbox` creates a new Microsoft Graph subscription only if none exists or the existing one has expired. If the subscription is within 15 minutes of expiry, it returns `expiring_soon` without making changes (renewal is automatic). If the subscription is active with more than 15 minutes remaining, it returns `already_active`. Use it when:
 
 - `verify_inbox_connection` reports the subscription as `expired` or `not_configured`
 - New emails stopped appearing in search results
@@ -250,10 +264,12 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 ### What does `delete_inbox_data` do?
 
-**Answer:** `delete_inbox_data` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Flows — Subscription Lifecycle](./technical/flows.md#Subscription-Creation-and-Renewal-Lifecycle) for details.
+**Answer:** (Mode A — `MicrosoftGraphAndUniqueApi` — only) `delete_inbox_data` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Flows — Subscription Lifecycle](./technical/flows.md#Subscription-Creation-and-Renewal-Lifecycle) for details.
 
 
 ## Sync
+
+> All questions in this section apply to **Mode A (`MicrosoftGraphAndUniqueApi`) only**. There is no sync pipeline in `MicrosoftGraph` mode.
 
 ### What is the difference between full sync and live catch-up?
 
@@ -429,6 +445,8 @@ This must match exactly — including protocol, domain, and path — in both the
 
 **Generate:** `openssl rand -hex 64` (128 characters)
 
+(Mode A only — in `MicrosoftGraph` mode, no webhook subscriptions are created.)
+
 **See also:** [Webhook Validation](./technical/security.md#Webhook-Validation) — [Configuration](./operator/configuration.md)
 
 ### What happens if I change the encryption key?
@@ -451,7 +469,7 @@ This must match exactly — including protocol, domain, and path — in both the
 
 ### What does `INGESTION_DEFAULT_MAIL_FILTERS` do?
 
-**Answer:** `INGESTION_DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `retentionWindowInDays` (positive integer — required, the application will not start without it; all ingested emails have an expired at date which is computed using receivedDateTime + retentionWindowInDays), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
+**Answer:** (Mode A — `MicrosoftGraphAndUniqueApi` — only) `INGESTION_DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `retentionWindowInDays` (positive integer — required, the application will not start without it; all ingested emails have an expired at date which is computed using receivedDateTime + retentionWindowInDays), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
 
 When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Configuration](./operator/configuration.md) for the full filter reference.
 
@@ -474,6 +492,8 @@ Full sync relies on RabbitMQ for inter-batch orchestration — without RabbitMQ,
 
 Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, eigher the first notification from MsGraph or the 4-hour catch-up cron re-triggers processing, which picks up missed messages by querying from the last watermark.
 
+**Mode B (`MicrosoftGraph`):** The service loses its RabbitMQ connection and cannot function until it is restored; no email data is lost.
+
 ### What happens if PostgreSQL is unavailable?
 
 **Answer:** All operations that require database access will fail: inbox lock acquisition (blocking live catch-up and full sync), token validation (blocking all tool calls), and sync state updates. The service will resume once PostgreSQL is restored.
@@ -489,12 +509,15 @@ Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, eigh
 
 ### What do I do if a core infrastructure component fails?
 
-**Answer:** Recovery depends on which component was lost:
+**Mode A (`MicrosoftGraphAndUniqueApi`):**
+- PostgreSQL loss — all stored OAuth tokens and sync state are gone; every user must re-authenticate via `reconnect_inbox`.
+- RabbitMQ loss — in-progress full syncs stall after the current batch; live catch-up trigger delivery is blocked but any in-progress run completes. No re-authentication needed. Live catch-up resumes automatically once RabbitMQ is restored.
+- Unique Knowledge Base loss — ingested email content must be re-ingested; each affected user must call `restart_full_sync` from their own MCP session (debug mode required).
 
-- **Local PostgreSQL DB loss** — all stored OAuth tokens and sync state are gone; every user must re-authenticate via `reconnect_inbox`.
-- **RabbitMQ loss** — in-progress full syncs stall after the current batch; live catch-up trigger delivery is blocked but any in-progress run completes. No re-authentication is needed. Live catch-up resumes automatically or when the first MsGraph notification arrives once RabbitMQ
-is restored.
-- **Unique Knowledge Base loss** — ingested email content must be re-ingested; each affected user must call `restart_full_sync` from their own MCP session (debug mode required). No re-authentication is needed.
+**Mode B (`MicrosoftGraph`):**
+- PostgreSQL loss — all stored OAuth tokens are gone; users must reconnect via the standard OAuth flow in their MCP client. No tool call is required. No sync data exists to recover.
+- RabbitMQ loss — the service cannot connect; no email data is lost. Recovery: restore RabbitMQ, restart pods. No user action required.
+- Unique Knowledge Base loss — no email data is stored there in Mode B, so search is unaffected. Restore the KB to restore full service connectivity. No user action required.
 
 **See also:** [Disaster Recovery Runbook](./operator/disaster-recovery.md)
 

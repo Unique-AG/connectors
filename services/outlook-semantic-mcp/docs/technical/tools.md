@@ -3,29 +3,32 @@
 
 # Outlook Semantic MCP - Tools
 
-The Outlook Semantic MCP Server exposes 10 MCP tools available to all users, plus 4 debug-mode tools only exposed when `MCP_DEBUG_MODE=enabled` is set on the server.
+The Outlook Semantic MCP Server exposes tools whose availability depends on the deployment mode (`MCP_BACKEND`) and debug settings.
+
+!!! warning "Mode A (`MicrosoftGraphAndUniqueApi`) only tools"
+    `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data`, and `sync_progress` are **only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi`**. They are not registered in `MicrosoftGraph` mode.
 
 !!! warning "Debug-Mode Tools"
-    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_DEBUG_MODE=enabled`** is configured. They are intended for operators diagnosing sync issues — they do not appear in the tool list for standard deployments. **Note:** Debug mode exposes these tools to **all** connected MCP users, not just operators. Do not leave enabled in production.
+    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi` AND `MCP_DEBUG_MODE=enabled`**. They do not appear for standard deployments or in `MicrosoftGraph` mode. **Note:** Debug mode exposes these tools to **all** connected MCP users, not just operators. Do not leave enabled in production.
 
 ## Tool Overview
 
-| Tool | Category | Mutating | Debug Only |
-|------|----------|----------|------------|
-| [`search_emails`](#search_emails) | Email Search | No | No |
-| [`open_email_by_id`](#open_email_by_id) | Email Search | No | No |
-| [`create_draft_email`](#create_draft_email) | Draft Creation | Yes | No |
-| [`lookup_contacts`](#lookup_contacts) | Contact Lookup | No | No |
-| [`list_categories`](#list_categories) | Mailbox Utilities | No | No |
-| [`list_folders`](#list_folders) | Mailbox Utilities | Yes (refreshes folder cache) | No |
-| [`verify_inbox_connection`](#verify_inbox_connection) | Subscription Management | No | No |
-| [`reconnect_inbox`](#reconnect_inbox) | Subscription Management | Yes | No |
-| [`delete_inbox_data`](#delete_inbox_data) | Subscription Management | Yes | No |
-| [`sync_progress`](#sync_progress) | Sync Monitoring | No | No |
-| [`run_full_sync`](#run_full_sync) | Full Sync Control (debug only) | Yes | **Yes** |
-| [`pause_full_sync`](#pause_full_sync) | Full Sync Control (debug only) | Yes | **Yes** |
-| [`resume_full_sync`](#resume_full_sync) | Full Sync Control (debug only) | Yes | **Yes** |
-| [`restart_full_sync`](#restart_full_sync) | Full Sync Control (debug only) | Yes | **Yes** |
+| Tool | Category | Mutating | Mode |
+|------|----------|----------|------|
+| [`search_emails`](#search_emails) | Email Search | No | Both |
+| [`open_email_by_id`](#open_email_by_id) | Email Search | No | Both |
+| [`create_draft_email`](#create_draft_email) | Draft Creation | Yes | Both |
+| [`lookup_contacts`](#lookup_contacts) | Contact Lookup | No | Both |
+| [`list_categories`](#list_categories) | Mailbox Utilities | No | Both |
+| [`list_mailboxes_and_directories`](#list_mailboxes_and_directories) | Mailbox Utilities | Yes (refreshes folder cache) | Both |
+| [`verify_inbox_connection`](#verify_inbox_connection) | Subscription Management | No | Mode A only |
+| [`reconnect_inbox`](#reconnect_inbox) | Subscription Management | Yes | Mode A only |
+| [`delete_inbox_data`](#delete_inbox_data) | Subscription Management | Yes | Mode A only |
+| [`sync_progress`](#sync_progress) | Sync Monitoring | No | Mode A only |
+| [`run_full_sync`](#run_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
+| [`pause_full_sync`](#pause_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
+| [`resume_full_sync`](#resume_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
+| [`restart_full_sync`](#restart_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 
 **Mutating** means the tool writes data to at least one of the following:
 
@@ -36,7 +39,7 @@ The Outlook Semantic MCP Server exposes 10 MCP tools available to all users, plu
 | Tool | What it mutates |
 |------|----------------|
 | `create_draft_email` | Creates a draft message in the user's Outlook mailbox via Microsoft Graph |
-| `list_folders` | Refreshes the folder cache in the internal database by re-fetching the folder tree from Microsoft Graph |
+| `list_mailboxes_and_directories` | Refreshes the folder cache in the internal database by re-fetching the folder tree from Microsoft Graph |
 | `reconnect_inbox` | Creates or renews the Microsoft Graph webhook subscription and writes the subscription record to the internal database |
 | `delete_inbox_data` | Cancels the Microsoft Graph webhook subscription and deletes the subscription record, folder cache, root scope, and all ingested email content from the Unique knowledge base |
 | `run_full_sync` | Triggers ingestion of all mailbox emails into the Unique knowledge base and updates sync state in the internal database |
@@ -50,82 +53,189 @@ The Outlook Semantic MCP Server exposes 10 MCP tools available to all users, plu
 
 ### `search_emails`
 
-Search emails semantically with optional structured filters. Results are returned from the Unique knowledge base — no live Microsoft Graph call is made per query. Use `sync_progress` if the response includes a `syncWarning`, as results may be incomplete.
+Search emails and return matched passages. The tool behaviour and input schema differ by deployment mode.
+
+**Available in:** Both modes
+
+---
+
+#### Mode A: `MicrosoftGraphAndUniqueApi`
+
+Runs two searches in parallel — semantic search against the Unique knowledge base and a KQL keyword search against Microsoft Graph — then merges and deduplicates the results. Both query arrays are required and must address the same user question.
 
 **Input parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `search` | string | Yes | Search query |
-| `limit` | number (40–100) | No | Maximum results to return. Default: 40 |
-| `conditions` | array | No | Filter conditions. Multiple condition objects are combined with OR; fields within a single condition are combined with AND. Each condition must have at least one field. |
+| `uniqueSemanticSearchQueries` | array (1–10) | Yes | Semantic searches. Compose 2–4 parallel entries that approach the question from different angles. |
+| `msGraphKeywordSearchQueries` | array (1–10) | Yes | KQL keyword searches addressing the same question. |
 
-Each object in `conditions` may include the following fields. All condition fields use an operator-wrapped format:
+Each entry in `uniqueSemanticSearchQueries`:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `search` | string | Yes | Natural-language search query |
+| `mailbox` | email | No | Scope to one mailbox. When omitted all accessible mailboxes are searched. |
+| `conditions` | array | No | Structured filters. Multiple condition objects are OR-combined; fields within one object are AND-combined. |
+| `limit` | integer (100–200) | No | Maximum results for this query. Default: 100. Use 200 for broad queries. |
+
+Each entry in `msGraphKeywordSearchQueries`:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `kqlQuery` | string | Yes | KQL query string. See [KQL reference](#KQL-reference) below. |
+| `mailbox` | email | No | Scope to one mailbox. |
+| `limit` | integer (1–100) | No | Maximum results for this query. Default: 100. |
+
+Each object in `conditions` (applies to `uniqueSemanticSearchQueries` entries only) may include:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `dateFrom` | `{ value: string, operator }` | ISO 8601 date — emails received on or after this date |
-| `dateTo` | `{ value: string, operator }` | ISO 8601 date — emails received on or before this date |
-| `fromSenders` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" \| "containsAny" }` | Filter by sender — accepts full email addresses or partial strings (e.g. `"@example.com"`). Prefer `containsAny` when matching a list of emails. |
-| `toRecipients` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" \| "containsAny" }` | Filter by To recipient — accepts full email addresses or partial strings. Prefer `containsAny` when matching a list of emails. |
-| `ccRecipients` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" \| "containsAny" }` | Filter by CC recipient — accepts full email addresses or partial strings. Prefer `containsAny` when matching a list of emails. |
-| `directories` | `{ value: string[], operator: "in" \| "notIn" }` | Folder IDs (from `list_folders`) or system names: `"Inbox"`, `"Sent Items"`, `"Drafts"`, `"Archive"`, `"Outbox"`, `"Clutter"`, `"Conversation History"` |
-| `hasAttachments` | `{ value: boolean, operator }` | Filter to emails with or without attachments |
-| `categories` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" \| "containsAny" }` | Category labels (from `list_categories`) |
+| `dateFrom` | `{ value: string, operator }` | ISO 8601 UTC — emails received on or after this date |
+| `dateTo` | `{ value: string, operator }` | ISO 8601 UTC — emails received on or before this date |
+| `fromSenders` | `{ value: string, operator }` or `{ value: string[], operator: "in" \| "notIn" \| "containsAny" }` | Filter by sender. Use `contains` for domain matching (e.g. `"google.com"`), `containsAny` for a list. |
+| `toRecipients` | `{ value: string, operator }` or array form | Filter by To recipient |
+| `ccRecipients` | `{ value: string, operator }` or array form | Filter by CC recipient |
+| `directories` | `{ value: string[], operator: "in" \| "notIn" }` | Folder IDs from `list_mailboxes_and_directories`, or well-known names: `"Inbox"`, `"Sent Items"`, `"Drafts"`, `"Archive"`, `"Outbox"`, `"Clutter"`, `"Conversation History"`. Note: `"Deleted Items"`, `"Junk Email"`, and `"Recoverable Items Deletions"` are not synchronized and return no results. |
+| `hasAttachments` | `{ value: "true" \| "false", operator }` | Filter by attachment presence. Value is a string, not a boolean. |
+| `categories` | `{ value: string, operator }` or array form | Category labels from `list_categories` |
 
 **Available operators:**
 
-- Singular operators: `equals`, `notEquals`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual`, `contains`, `notContains`, `isNull`, `isNotNull`, `isEmpty`, `isNotEmpty`
-- Array operators: `in`, `notIn`, `containsAny` (email fields only — expands to OR of `contains` filters)
+- Singular: `equals`, `notEquals`, `greaterThan`, `greaterThanOrEqual`, `lessThan`, `lessThanOrEqual`, `contains`, `notContains`, `isNull`, `isNotNull`, `isEmpty`, `isNotEmpty`
+- Array: `in`, `notIn`, `containsAny` (email fields only — expands to OR of `contains` filters)
 
-**Return shape:**
+**Example (Mode A):**
+
+```json
+{
+  "uniqueSemanticSearchQueries": [
+    {
+      "search": "quarterly report from Alice",
+      "conditions": [
+        {
+          "fromSenders": { "value": "alice@example.com", "operator": "equals" },
+          "dateFrom": { "value": "2024-01-01T00:00:00Z", "operator": "greaterThanOrEqual" }
+        }
+      ],
+      "limit": 100
+    },
+    {
+      "search": "Q1 budget summary",
+      "conditions": [
+        {
+          "fromSenders": { "value": "alice@example.com", "operator": "equals" }
+        }
+      ],
+      "limit": 100
+    }
+  ],
+  "msGraphKeywordSearchQueries": [
+    {
+      "kqlQuery": "from:alice@example.com subject:\"quarterly report\" received>=2024-01-01",
+      "limit": 100
+    }
+  ]
+}
+```
+
+---
+
+#### Mode B: `MicrosoftGraph`
+
+Calls the Microsoft Graph Search API directly with KQL queries. No semantic search is performed. Only `msGraphKeywordSearchQueries` is accepted.
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `msGraphKeywordSearchQueries` | array (1–10) | Yes | KQL keyword searches. |
+
+Each entry uses the same `kqlQuery`, `mailbox`, and `limit` fields as described in Mode A above.
+
+**Note:** Folder filtering via `directories` conditions is not supported in Mode B. The Microsoft Graph Search API does not expose a folder-scoped KQL predicate.
+
+**Example (Mode B):**
+
+```json
+{
+  "msGraphKeywordSearchQueries": [
+    {
+      "kqlQuery": "from:alice@example.com subject:\"quarterly report\" received>=2024-01-01",
+      "limit": 100
+    }
+  ]
+}
+```
+
+---
+
+#### KQL reference
+
+Supported KQL property filters for `kqlQuery`:
+
+| Filter | Example | Notes |
+|--------|---------|-------|
+| `from:<email>` | `from:alice@example.com` | Sender SMTP, display name, or domain |
+| `to:<email>` | `to:bob@example.com` | To recipient |
+| `cc:<email>` | `cc:alice@example.com` | CC recipient |
+| `participants:<email>` | `participants:alice@example.com` | Any of from/to/cc/bcc |
+| `subject:<words>` | `subject:"budget report"` | Words in subject |
+| `body:<words>` | `body:proposal` | Words in body |
+| `received>=YYYY-MM-DD` | `received>=2024-01-01` | Received on or after |
+| `received<=YYYY-MM-DD` | `received<=2024-03-31` | Received on or before |
+| `hasAttachment:true\|false` | `hasAttachment:true` | Has attachments |
+| `category:"label"` | `category:"Important"` | Outlook category |
+| `kind:email` | `kind:email` | Message type |
+
+Syntax rules:
+- No space between property and value: `from:alice@example.com` not `from: alice@example.com`
+- Boolean operators must be uppercase: `AND`, `OR`, `NOT`
+- Suffix wildcards only: `report*`, not `*report`
+- Phrases in double quotes: `subject:"quarterly report"`
+- Do NOT use `folder:` — it is not supported and causes a request error
+
+---
+
+#### Return shape (both modes)
 
 ```typescript
 {
   success: boolean;
-  status?: string;
-  message?: string;
-  syncWarning?: string;         // present if sync is incomplete
-  searchSummary?: string;
+  message?: string;           // error description when success is false
+  status?: string;            // informational subscription/backend status
+  syncWarning?: string;       // Mode A only — present when ingestion is incomplete or in error state. Always display to the user before showing results.
+  searchNotes?: string;       // informational notes about the search run (e.g. unrecognised folders excluded). Display to the user after results.
   results?: Array<{
-    id: string;                 // pass to open_email_by_id
-    emailId: string;
-    folderId: string;
-    title: string;
-    from: string;
-    receivedDateTime?: string | null;
-    text: string;               // matched passage
-    outlookWebLink?: string;
-    url?: string;
+    uniqueContentId?: string;     // Unique KB content ID. Present for semantic-backend results only.
+    msGraphMessageId?: string;    // Microsoft Graph message ID. Present for Graph-backend results; also present for semantic results when both backends matched the same email.
+    backend: "Unique" | "MsGraph"; // which backend returned this result
+    folderId: string;              // internal folder ID — do not display to users
+    title: string;                 // email subject
+    from: string;                  // sender email address
+    receivedDateTime?: string | null; // ISO 8601
+    text: string;                  // matched passage or excerpt — not the full body
+    outlookWebLink: string;        // direct URL to open in Outlook Web — use as link target when non-empty
+    sourceMailbox?: string | null; // mailbox this email belongs to
+    openEmailParams: {             // pass directly to open_email_by_id without modification
+      id: string;
+      idType: "Unique" | "MsGraph";
+      mailbox?: string;
+      parentFolderId?: string;
+      idIsImmutable?: boolean;
+    };
   }>;
 }
 ```
 
-**Example:**
-
-```json
-{
-  "search": "quarterly report from Alice",
-  "conditions": [
-    {
-      "fromSenders": { "value": "alice@example.com", "operator": "equals" },
-      "dateFrom": { "value": "2024-01-01T00:00:00Z", "operator": "greaterThanOrEqual" },
-      "dateTo": { "value": "2024-03-31T23:59:59Z", "operator": "lessThanOrEqual" },
-      "directories": { "value": ["Inbox"], "operator": "in" }
-    }
-  ],
-  "limit": 40
-}
-```
-
-This searches for emails from `alice@example.com` in Q1 2024 within the Inbox folder. System folder names like `"Inbox"`, `"Sent Items"`, `"Drafts"` can be used directly in `directories` — for custom folders, use the ID from `list_folders`.
-
 **Usage notes:**
 
-- Call `list_folders` first to obtain folder IDs for the `directories` filter (not needed for well-known system folders).
-- Call `list_categories` first to obtain valid category names for the `categories` filter.
-- Pass a result's `id` to `open_email_by_id` to retrieve the full email body.
-- If `syncWarning` is present, the full sync is still running — results are partial.
+- Pass the `openEmailParams` object from a result directly to `open_email_by_id` to retrieve the full email body.
+- If `syncWarning` is present (Mode A only), display it to the user and call `sync_progress` to check ingestion status — results may be incomplete.
+- If `searchNotes` is present, display it to the user after showing results.
+- Folder filtering via `conditions[].directories` is supported in Mode A only.
+- Well-known system folder names (`"Inbox"`, `"Sent Items"`, `"Drafts"`) can be used directly in `directories` — no need to call `list_mailboxes_and_directories` for those.
+- For custom folders, call `list_mailboxes_and_directories` first to obtain folder IDs.
 
 ---
 
@@ -137,7 +247,11 @@ Retrieve the full content of an email by its ID returned from `search_emails`.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | string | Yes | The content ID returned by `search_emails` |
+| `id` | string | Yes | Email identifier. Use `openEmailParams.id` from a `search_emails` result. |
+| `idType` | `"Unique"` \| `"MsGraph"` | Yes | Backend type. Use `openEmailParams.idType` from a `search_emails` result. |
+| `mailbox` | email | No | Use `openEmailParams.mailbox` when present. |
+| `parentFolderId` | string | No | Use `openEmailParams.parentFolderId` when present. Required when `mailbox` is provided. |
+| `idIsImmutable` | boolean | No | Use `openEmailParams.idIsImmutable` when present. |
 
 **Return shape:**
 
@@ -150,20 +264,15 @@ Retrieve the full content of an email by its ID returned from `search_emails`.
     id: string;
     title: string | null;
     metadata: unknown | null;
-    chunks?: Array<{
-      id: string;
-      startPage: number | null;
-      endPage: number | null;
-      order: number | null;
-      text: string;
-    }>;
+    text: string;              // full email body
   };
 }
 ```
 
 **Usage notes:**
 
-- Use this to read the full body of an email after finding it via `search_emails`. The `id` in `search_emails` results is the Unique content ID, not the Microsoft message ID.
+- Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually.
+- The `text` field in `emailData` contains the full email body. This is distinct from the `text` field in `search_emails` results, which contains only a matched passage or excerpt.
 
 ---
 
@@ -282,9 +391,11 @@ List all Outlook mail categories available for the user.
 
 ---
 
-### `list_folders`
+### `list_mailboxes_and_directories`
 
-List all Outlook mail folders in a hierarchical tree.
+List all Outlook mailboxes and their folder trees available to the user.
+
+**Available in:** Both modes
 
 **Input parameters:** None
 
@@ -295,10 +406,15 @@ List all Outlook mail folders in a hierarchical tree.
   success: boolean;
   message: string;
   status?: string;
-  folders?: Array<{
-    id: string;
-    displayName: string;
-    children: Array<...>;       // recursive, same shape
+  mailboxes?: Array<{
+    email: string | null;
+    displayName: string | null;
+    isOwn: boolean;            // true for the user's own primary mailbox
+    folders: Array<{
+      id: string;              // pass to directories filter in search_emails
+      displayName: string;
+      children: Array<...>;    // recursive — same shape
+    }>;
   }>;
 }
 ```
@@ -306,11 +422,16 @@ List all Outlook mail folders in a hierarchical tree.
 **Usage notes:**
 
 - Folder `id` values can be passed to the `directories` filter in `search_emails` to narrow results to a specific folder.
-- The folder tree is synced from Microsoft Graph and reflects the user's current mailbox structure.
+- In Mode A, the folder tree is synced from Microsoft Graph and reflects the user's current mailbox structure. Calling this tool triggers a fresh sync of the folder tree.
+- Folder filtering via `directories` is only effective in Mode A (`MicrosoftGraphAndUniqueApi`). In Mode B, the Microsoft Graph Search API does not support folder-scoped filtering — the `directories` condition is ignored.
+- Well-known system folder names (`"Inbox"`, `"Sent Items"`, `"Drafts"`, etc.) can be used directly in `search_emails` without calling this tool first.
 
 ---
 
 ## Subscription Management
+
+!!! note "Mode A (`MicrosoftGraphAndUniqueApi`) only"
+    `verify_inbox_connection`, `reconnect_inbox`, and `delete_inbox_data` are only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi`. These tools are not registered in `MicrosoftGraph` mode because no webhook subscriptions are created.
 
 ### `verify_inbox_connection`
 
@@ -399,6 +520,9 @@ Permanently delete all synced email data from Unique and cancel the Microsoft Gr
 
 ## Sync Monitoring
 
+!!! note "Mode A (`MicrosoftGraphAndUniqueApi`) only"
+    `sync_progress` is only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi`. There is no sync pipeline in `MicrosoftGraph` mode.
+
 ### `sync_progress`
 
 Check the current state of the full email sync and live catch-up pipeline. Call this after a `syncWarning` is returned by `search_emails`, or to monitor initial sync progress after connecting.
@@ -457,6 +581,9 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
 ## Debug-Mode Tools
 
 The following four tools are only available when `MCP_DEBUG_MODE=enabled` is set in the server configuration. They are intended for operators diagnosing sync issues, not for end users.
+
+!!! note "Mode A (`MicrosoftGraphAndUniqueApi`) only"
+    These tools are only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi` AND `MCP_DEBUG_MODE=enabled`.
 
 ### `run_full_sync`
 

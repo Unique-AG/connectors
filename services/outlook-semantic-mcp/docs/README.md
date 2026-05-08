@@ -54,7 +54,7 @@ All permissions are delegated and require no admin consent. See [Permissions](./
 
 - Unique semantic search across the user's mailbox via the `search_emails` tool
 - Open individual emails by message ID via `open_email_by_id`
-- Searches are executed against the Unique knowledge base, where emails are indexed during sync — no live Microsoft Graph API call is made per query
+- Search emails using the `search_emails` tool. In `MicrosoftGraphAndUniqueApi` mode, the tool runs semantic search against the Unique knowledge base and a live KQL query against Microsoft Graph in parallel, merging the results. In `MicrosoftGraph` mode, the tool queries Microsoft Graph directly using KQL — no knowledge base or ingestion is involved.
 
 **Draft Creation**
 
@@ -68,7 +68,7 @@ All permissions are delegated and require no admin consent. See [Permissions](./
 
 **Mailbox Utilities**
 
-- List all mail folders and subfolders via `list_folders` to obtain folder IDs for use with `search_emails`
+- List all accessible mailboxes and their folder trees via `list_mailboxes_and_directories` — folder IDs from this tool can be passed to `search_emails` filters
 - Retrieve email categories via `list_categories` to obtain category names for filtering searches
 
 **Delegated Mailbox Access (Optional)**
@@ -182,7 +182,7 @@ See [Flows](./technical/flows.md#Full-Sync:-Historical-Email-Ingestion) for the 
 
 ### Directory Sync
 
-The server continuously syncs the user's Outlook folder structure via Microsoft Graph delta queries. This enables folder-based search filtering (`list_folders` tool) and tracks email movement to handle deletions — when an email moves to an excluded folder (e.g. Deleted Items), it is removed from the knowledge base.
+The server continuously syncs the user's Outlook folder structure via Microsoft Graph delta queries. This enables folder-based search filtering (`list_mailboxes_and_directories` tool; folder filtering only applies in `MicrosoftGraphAndUniqueApi` mode) and tracks email movement to handle deletions — when an email moves to an excluded folder (e.g. Deleted Items), it is removed from the knowledge base.
 
 See [Directory Sync Flow](./technical/flows.md#Directory-Sync-Flow) for the detailed sequence diagram.
 
@@ -215,7 +215,7 @@ See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) 
    - Open specific messages with `open_email_by_id`
    - Compose drafts with `create_draft_email`
    - Look up contacts with `lookup_contacts`
-   - Use `list_folders` and `list_categories` to obtain folder IDs and category names for filtering searches
+   - Use `list_mailboxes_and_directories` and `list_categories` to obtain folder IDs and category names for filtering searches
 
 ## Limitations and Constraints
 

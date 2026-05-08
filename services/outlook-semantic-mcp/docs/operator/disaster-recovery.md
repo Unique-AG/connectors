@@ -9,11 +9,22 @@ Automatic recovery schedulers (a 2-minute full-sync retry and a live catch-up re
 
 Out of scope: partial database corruption, Microsoft Graph API outages, and automated recovery scripts.
 
+!!! note "Deployment Mode Scope"
+    The scenarios in this runbook differ by deployment mode:
+
+    | Scenario | `MicrosoftGraphAndUniqueApi` | `MicrosoftGraph` |
+    |---|---|---|
+    | [Scenario 1: PostgreSQL Loss](#Scenario-1:-Local-PostgreSQL-Database-Loss) | Applies | Applies (simplified — see below) |
+    | [Scenario 2: RabbitMQ Loss](#Scenario-2:-RabbitMQ-Loss) | Applies | Applies (simplified — see below) |
+    | [Scenario 3: Unique Knowledge Base Loss](#Scenario-3:-Unique-Knowledge-Base-Loss) | Applies | Infrastructure must be restored; no email data to re-ingest |
+
 ---
 
 ## Recovery Considerations
 
 ### Idempotent re-ingestion
+
+> This sub-section applies to **Mode A (`MicrosoftGraphAndUniqueApi`)** deployments only. In `MicrosoftGraph` mode there is no ingestion pipeline.
 
 For all recovery scenarios except Knowledge Base loss (Scenario 3), the system checks whether each email already exists in the Knowledge Base before re-ingesting it. If the file key matches and the metadata is unchanged, the email is skipped entirely. The only cost of a full re-sync in these cases is:
 
@@ -36,15 +47,17 @@ The documentation does not provide fixed RTO targets because recovery time varie
 
 ### Backup recommendations
 
-| Component | Recommendation | Rationale |
-|---|---|---|
-| **PostgreSQL** | Regular backups strongly recommended. Use your platform's backup solution (managed service snapshots, `pg_dump`, or WAL archiving). | Contains OAuth tokens, webhook subscriptions, and all sync state. Without a backup, all users must re-authenticate and full sync restarts from scratch. |
-| **RabbitMQ** | Backup not required. | Queues carry only transient sync trigger events. Live catch-up email ingestion happens inline (not via RabbitMQ), so RabbitMQ loss only affects trigger delivery, not per-email ingestion. The 2-minute full-sync recovery scheduler and the live catch-up recovery scheduler (5-minute retry on failure, 4-hour retry on inactivity) re-create any lost trigger events after reconnection. |
-| **Unique Knowledge Base** | Managed by the Unique platform. | Backup and restore are the responsibility of the Unique platform operator. |
+| Component | Recommendation | Rationale | Mode |
+|---|---|---|---|
+| **PostgreSQL** | Regular backups strongly recommended. Use your platform's backup solution (managed service snapshots, `pg_dump`, or WAL archiving). | Contains OAuth tokens, webhook subscriptions, and all sync state. Without a backup, all users must re-authenticate and full sync restarts from scratch. | Both modes — strongly recommended |
+| **RabbitMQ** | Backup not required. | Queues carry only transient sync trigger events. Live catch-up email ingestion happens inline (not via RabbitMQ), so RabbitMQ loss only affects trigger delivery, not per-email ingestion. The 2-minute full-sync recovery scheduler and the live catch-up recovery scheduler (5-minute retry on failure, 4-hour retry on inactivity) re-create any lost trigger events after reconnection. | Both modes — backup not required |
+| **Unique Knowledge Base** | Managed by the Unique platform. | Backup and restore are the responsibility of the Unique platform operator. | Both modes — managed by Unique platform |
 
 **Risk if no PostgreSQL backup exists:** every user must re-authenticate via OAuth and a full re-sync runs for each user. Existing emails in the Knowledge Base are not lost (re-ingestion is idempotent — only API call overhead, no duplicate data), but recovery time scales linearly with user count and mailbox size. For large deployments this can be significant, compounded by the shared Microsoft Graph API rate limit.
 
 ### Data loss window
+
+> This sub-section applies to **Mode A (`MicrosoftGraphAndUniqueApi`)** deployments only. In `MicrosoftGraph` mode there is no ingestion pipeline.
 
 Emails are sourced from Microsoft Graph, which retains the authoritative copy. In all three disaster scenarios, email content is not permanently lost — it can be re-fetched and re-ingested. The data loss window refers to the delay before the system catches up:
 
@@ -58,7 +71,7 @@ Emails are sourced from Microsoft Graph, which retains the authoritative copy. I
 |---|---|
 | **Kubernetes operator** | All scenarios — restarts pods, updates secrets, runs migrations, enables debug mode. |
 | **Database / platform administrator** | Scenario 1 — restores or provisions PostgreSQL. Scenario 2 — restores or provisions RabbitMQ. |
-| **End users** | Scenario 1 — must call `reconnect_inbox` to re-authenticate. Scenario 2 — must call `reconnect_inbox` only if they are not receiving new emails after recovery. Scenario 3 — must call `restart_full_sync`. The operator cannot call tools on behalf of users. |
+| **End users** | Scenario 1 — must call `reconnect_inbox` to re-authenticate (Mode A only — in Mode B, users re-authenticate via the standard OAuth flow without calling any tool). Scenario 2 — must call `reconnect_inbox` only if they are not receiving new emails after recovery (Mode A only). Scenario 3 — must call `restart_full_sync` (Mode A only — in Mode B, users re-authenticate via the standard OAuth flow without calling any tool). The operator cannot call tools on behalf of users. |
 
 No Microsoft tenant administrator action is required for recovery. Orphaned webhook subscriptions in Microsoft's systems expire automatically based on the expiration time set at creation (the service configures subscriptions to renew daily, so orphaned subscriptions typically expire within about 1 day; Microsoft allows up to 7 days for message subscriptions).
 
@@ -82,6 +95,8 @@ The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, a
 - Emails already ingested into the Unique Knowledge Base are **not** affected — they remain searchable.
 
 ### Recovery Steps
+
+#### Mode A (`MicrosoftGraphAndUniqueApi`) Recovery
 
 1. Restore or provision a new PostgreSQL instance and update `DATABASE_URL` in the Kubernetes secret if the connection string changed:
 
@@ -115,6 +130,18 @@ The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, a
 
 **See also:** [Authentication](./authentication.md), [Deployment](./deployment.md#Database-Migration), [Security — Encryption](../technical/security.md#Microsoft-Tokens-(Encrypted-at-Rest))
 
+#### Mode B (`MicrosoftGraph`) Recovery
+
+The recovery procedure is simpler in Mode B because there are no webhook subscriptions, sync state, or Knowledge Base scopes to restore.
+
+**Impact:** All users' OAuth tokens and MCP session tokens are lost. Users cannot call tools until they re-authenticate.
+
+**Recovery Steps:**
+
+1. Restore or provision a new PostgreSQL instance and update `DATABASE_URL` in the Kubernetes secret.
+2. Restart the service pods. Database migrations run automatically.
+3. Notify affected users that they must reconnect their MCP client via the standard OAuth flow. No tool call is needed — re-authentication issues new MCP tokens.
+
 ---
 
 ## Scenario 2: RabbitMQ Loss
@@ -136,6 +163,8 @@ RabbitMQ carries in-flight sync trigger events between the service and its inter
 
 ### Recovery Steps
 
+#### Mode A (`MicrosoftGraphAndUniqueApi`) Recovery
+
 1. Restore or provision a new RabbitMQ instance and update `AMQP_URL` in the Kubernetes secret if the connection string changed.
 
 2. Restart the service pods to reconnect to RabbitMQ:
@@ -151,6 +180,18 @@ RabbitMQ carries in-flight sync trigger events between the service and its inter
 4. If a user reports not receiving new emails after the service has recovered, they can call `reconnect_inbox` to re-create the webhook subscription. A full sync starts automatically after reconnection.
 
 **See also:** [`reconnect_inbox`](../technical/tools.md#reconnect_inbox), [`sync_progress`](../technical/tools.md#sync_progress)
+
+#### Mode B (`MicrosoftGraph`) Recovery
+
+In `MicrosoftGraph` mode, RabbitMQ is a required infrastructure component but is not used for email ingestion or sync. Service impact is limited to connectivity loss until RabbitMQ is restored.
+
+**Impact:** The service cannot connect to RabbitMQ. No email data is lost — there is no ingestion pipeline.
+
+**Recovery Steps:**
+
+1. Restore or provision a new RabbitMQ instance and update `AMQP_URL` in the Kubernetes secret if the connection string changed.
+2. Restart the service pods to reconnect.
+3. No user action is required.
 
 ---
 
@@ -173,6 +214,8 @@ The Unique Knowledge Base stores the actual ingested email content used for sema
 
 ### Recovery Steps
 
+#### Mode A (`MicrosoftGraphAndUniqueApi`) Recovery
+
 1. Restore or verify the Unique Knowledge Base is operational and reachable from the service. Confirm `UNIQUE_INGESTION_SERVICE_BASE_URL` and `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` are correct in the Helm values.
 
 2. Enable debug mode on the deployment if it is not already enabled, by setting `MCP_DEBUG_MODE=enabled` in `mcpConfig.app.mcpDebugMode` and restarting pods. This exposes debug tools including `restart_full_sync`, `run_full_sync`, `pause_full_sync`, and `resume_full_sync`. **Note:** Debug mode exposes these tools to all connected MCP users, not just operators — restrict MCP client access during recovery. See [Configuration](./configuration.md#Application-Configuration).
@@ -186,3 +229,7 @@ The Unique Knowledge Base stores the actual ingested email content used for sema
 6. Once all affected users have called `restart_full_sync`, disable debug mode by removing or unsetting `MCP_DEBUG_MODE` in the Helm values and redeploying (requires a pod restart). Debug mode should not remain enabled in production.
 
 **See also:** [`restart_full_sync`](../technical/tools.md#restart_full_sync), [`sync_progress`](../technical/tools.md#sync_progress), [Configuration](./configuration.md#Application-Configuration)
+
+#### Mode B (`MicrosoftGraph`) Impact
+
+In `MicrosoftGraph` mode, the Unique Knowledge Base is required infrastructure but no email content is stored there — search always queries Microsoft Graph directly. A Knowledge Base outage does not affect search results or any user-facing tool. No user action is required. Restore the Knowledge Base to restore the service's ability to connect to it.
