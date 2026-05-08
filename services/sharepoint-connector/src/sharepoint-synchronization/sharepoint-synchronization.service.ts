@@ -1,10 +1,8 @@
-import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { type Histogram } from '@opentelemetry/api';
-import { entries, groupBy } from 'remeda';
 import { ConfigEmitEvent } from '../config/app.config';
 import { ConfigDiagnosticsService } from '../config/config-diagnostics.service';
-import { isAutoScope, isFixedScope, type SiteConfig } from '../config/sharepoint.schema';
+import { isAutoScope, type SiteConfig } from '../config/sharepoint.schema';
 import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import { IngestionMode } from '../constants/ingestion.constants';
 import { FullSyncStep, SiteSyncStep } from '../constants/sync-step.enum';
@@ -21,11 +19,13 @@ import { UniqueFilesService } from '../unique-api/unique-files/unique-files.serv
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
-import type { ManagedPath } from '../utils/paths.util';
 import { type Smeared, smearPath } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
-import { RootScopeInfo, ScopeManagementService } from './scope-management.service';
+import { DeduplicateSitesQuery } from './deduplicate-sites.query';
+import { InitializeRootScopeCommand } from './root-scope/initialize-root-scope.command';
+import { RootScopeResolutionError } from './root-scope/root-scope-resolution.error';
+import { ScopeManagementService } from './scope-management.service';
 import { SharepointSyncContext } from './sharepoint-sync-context.interface';
 import { DiscoveredSubsite, SubsiteDiscoveryService } from './subsite-discovery.service';
 import type { FullSyncResult, SiteResultEntry, SiteSyncResult } from './sync-result.types';
@@ -50,6 +50,8 @@ export class SharepointSynchronizationService {
     private readonly uniqueScopesService: UniqueScopesService,
     private readonly configDiagnosticsService: ConfigDiagnosticsService,
     private readonly subsiteDiscoveryService: SubsiteDiscoveryService,
+    private readonly initializeRootScopeCommand: InitializeRootScopeCommand,
+    private readonly deduplicateSitesQuery: DeduplicateSitesQuery,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
   ) {}
@@ -82,7 +84,7 @@ export class SharepointSynchronizationService {
         return { fullResult, siteResults: [] };
       }
 
-      sites = this.deduplicateByScopeId(sites);
+      sites = this.deduplicateSitesQuery.execute(sites);
 
       const { active, deleted, inactive } = this.categorizeSites(sites);
 
@@ -164,42 +166,6 @@ export class SharepointSynchronizationService {
     };
   }
 
-  private deduplicateByScopeId(sites: SiteConfig[]): SiteConfig[] {
-    // `auto` rows have no determined scopeId yet at this time as they are resolved at sync time.
-    // We pass them through unchanged and rely on per-site checks.
-    const autoSites = sites.filter((site) => isAutoScope(site.scopeId));
-    const fixedSites = sites.flatMap((site) =>
-      isFixedScope(site.scopeId) ? [{ ...site, scopeId: site.scopeId }] : [],
-    );
-
-    const groups = groupBy(fixedSites, (site) => site.scopeId.scopeId);
-
-    const dedupedFixed = entries(groups).map(([scopeId, group]) => {
-      if (group.length > 1) {
-        this.logDuplicateScopeId(scopeId, group);
-      }
-      const site = group[0];
-      assert.ok(site, `No site configuration found for scopeId: ${scopeId}`);
-      return site;
-    });
-
-    return [...dedupedFixed, ...autoSites];
-  }
-
-  private logDuplicateScopeId(
-    scopeId: string,
-    sitesWithSameScopeId: ReadonlyArray<SiteConfig>,
-  ): void {
-    this.logger.error('DUPLICATE SCOPE ID DETECTED!');
-    this.logger.error(`ScopeId: ${scopeId} is configured for multiple sites:`);
-
-    for (const [index, site] of sitesWithSameScopeId.entries()) {
-      const status = index === 0 ? 'WILL SYNC - first occurrence' : 'SKIPPED - duplicate scopeId';
-      this.logger.error(`  - siteId: ${site.siteId} (${status})`);
-    }
-    this.logger.error('Only the first site will be synchronized.');
-  }
-
   private async processSingleSiteDeletion(siteConfig: SiteConfig): Promise<void> {
     const logPrefix = `[Site: ${siteConfig.siteId}]`;
 
@@ -246,18 +212,17 @@ export class SharepointSynchronizationService {
     }
   }
 
-  // IMPORTANT: getSiteInfo must run before initializeRootScope. The root scope init permanently
-  // stamps the scope's externalId with the configured siteId. If that siteId is wrong, the scope
-  // becomes locked to it and cannot be re-bound without manual intervention. Validating the site
-  // exists via the Graph API first ensures we never claim a scope with a bogus siteId.
+  // IMPORTANT: getSiteInfo must run before InitializeRootScopeCommand. The root scope init
+  // permanently stamps the scope's externalId with the configured siteId. If that siteId is wrong,
+  // the scope becomes locked to it and cannot be re-bound without manual intervention. Validating
+  // the site exists via the Graph API first ensures we never claim a scope with a bogus siteId.
   private async initializeSiteContext(
     siteConfig: SiteConfig,
     logPrefix: string,
   ): Promise<{ context: SharepointSyncContext } | { failureStep: SiteSyncStep }> {
-    let siteName: Smeared;
-    let managedPath: ManagedPath;
+    let siteInfo: Awaited<ReturnType<GraphApiService['getSiteInfo']>>;
     try {
-      ({ siteName, managedPath } = await this.graphApiService.getSiteInfo(siteConfig.siteId));
+      siteInfo = await this.graphApiService.getSiteInfo(siteConfig.siteId);
     } catch (error) {
       this.logger.error({
         msg: `${logPrefix} Failed to get site info`,
@@ -266,46 +231,34 @@ export class SharepointSynchronizationService {
       return { failureStep: SiteSyncStep.SiteNameFetch };
     }
 
-    let rootScopeId: string;
-    if (isFixedScope(siteConfig.scopeId)) {
-      rootScopeId = siteConfig.scopeId.scopeId;
-    } else {
-      // Extension point: `resolveRootScopeId` for auto-resolved parent-scoped sites lands in a
-      // later task. Throwing here makes it impossible to silently drop an auto config.
-      this.logger.error({
-        msg: `${logPrefix} Auto-resolved scopeId is not yet implemented`,
-        parentScopeId: siteConfig.scopeId.parentScopeId,
-      });
-      return { failureStep: SiteSyncStep.RootScopeInit };
-    }
-
-    let baseContext: RootScopeInfo;
     try {
-      baseContext = await this.scopeManagementService.initializeRootScope(
-        rootScopeId,
-        siteConfig.siteId,
-        siteConfig.ingestionMode,
-      );
+      const result = await this.initializeRootScopeCommand.execute(siteConfig, siteInfo.siteName);
+      return {
+        context: {
+          siteConfig,
+          siteName: siteInfo.siteName,
+          managedPath: siteInfo.managedPath,
+          serviceUserId: result.serviceUserId,
+          rootPath: result.rootPath,
+          rootScopeId: result.rootScopeId,
+          isInitialSync: result.isInitialSync,
+          discoveredSubsites: [],
+        },
+      };
     } catch (error) {
+      const failureStep =
+        error instanceof RootScopeResolutionError
+          ? SiteSyncStep.RootScopeResolution
+          : SiteSyncStep.RootScopeInit;
       this.logger.error({
-        msg: `${logPrefix} Failed to initialize root scope`,
+        msg:
+          failureStep === SiteSyncStep.RootScopeResolution
+            ? `${logPrefix} Failed to resolve auto root scope`
+            : `${logPrefix} Failed to initialize root scope`,
         error: sanitizeError(error),
       });
-      return { failureStep: SiteSyncStep.RootScopeInit };
+      return { failureStep };
     }
-
-    return {
-      context: {
-        siteConfig,
-        siteName,
-        managedPath,
-        serviceUserId: baseContext.serviceUserId,
-        rootPath: baseContext.rootPath,
-        rootScopeId,
-        isInitialSync: baseContext.isInitialSync,
-        discoveredSubsites: [],
-      },
-    };
   }
 
   private async syncSite(

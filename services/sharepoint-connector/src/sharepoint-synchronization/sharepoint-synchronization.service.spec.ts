@@ -1,6 +1,7 @@
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModerationStatus } from '../constants/moderation-status.constants';
+import { SiteSyncStep } from '../constants/sync-step.enum';
 import { SPC_SYNC_DURATION_SECONDS } from '../metrics';
 import { GraphApiService } from '../microsoft-apis/graph/graph-api.service';
 import { SitesConfigurationService } from '../microsoft-apis/graph/sites-configuration.service';
@@ -8,9 +9,12 @@ import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharep
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
-import { Smeared } from '../utils/smeared';
+import { createSmeared, Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
+import { DeduplicateSitesQuery } from './deduplicate-sites.query';
+import { InitializeRootScopeCommand } from './root-scope/initialize-root-scope.command';
+import { RootScopeResolutionError } from './root-scope/root-scope-resolution.error';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
 import { SubsiteDiscoveryService } from './subsite-discovery.service';
@@ -26,13 +30,21 @@ describe('SharepointSynchronizationService', () => {
     syncPermissionsForSite: ReturnType<typeof vi.fn>;
   };
   let mockScopeManagementService: {
-    initializeRootScope: ReturnType<typeof vi.fn>;
     batchCreateScopes: ReturnType<typeof vi.fn>;
     resetRootScope: ReturnType<typeof vi.fn>;
     deleteStaleScopes: ReturnType<typeof vi.fn>;
   };
   let mockSubsiteDiscoveryService: {
     discoverAllSubsites: ReturnType<typeof vi.fn>;
+  };
+  let mockInitializeRootScopeCommand: {
+    execute: ReturnType<typeof vi.fn>;
+  };
+  let mockDeduplicateSitesQuery: {
+    execute: ReturnType<typeof vi.fn>;
+  };
+  let mockUniqueScopesService: {
+    getScopeById: ReturnType<typeof vi.fn>;
   };
 
   const mockFile: SharepointContentItem = {
@@ -131,11 +143,6 @@ describe('SharepointSynchronizationService', () => {
     };
 
     mockScopeManagementService = {
-      initializeRootScope: vi.fn().mockResolvedValue({
-        serviceUserId: 'user-123',
-        rootPath: new Smeared('/test-root', false),
-        isInitialSync: false,
-      }),
       batchCreateScopes: vi.fn().mockResolvedValue([]),
       resetRootScope: vi.fn().mockResolvedValue(undefined),
       deleteStaleScopes: vi.fn().mockResolvedValue(undefined),
@@ -143,6 +150,30 @@ describe('SharepointSynchronizationService', () => {
 
     mockSubsiteDiscoveryService = {
       discoverAllSubsites: vi.fn().mockResolvedValue([]),
+    };
+
+    mockInitializeRootScopeCommand = {
+      execute: vi
+        .fn()
+        .mockImplementation(
+          async (siteConfig: { scopeId: { type: string; scopeId?: string } }) => ({
+            rootScopeId:
+              siteConfig.scopeId.type === 'fixed'
+                ? (siteConfig.scopeId.scopeId ?? 'fallback')
+                : 'auto-root',
+            serviceUserId: 'user-123',
+            rootPath: new Smeared('/test-root', false),
+            isInitialSync: false,
+          }),
+        ),
+    };
+
+    mockDeduplicateSitesQuery = {
+      execute: vi.fn().mockImplementation((sites: unknown[]) => sites),
+    };
+
+    mockUniqueScopesService = {
+      getScopeById: vi.fn().mockResolvedValue(null),
     };
 
     const mockHistogram = {
@@ -162,6 +193,12 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockScopeManagementService)
       .mock(SubsiteDiscoveryService)
       .impl(() => mockSubsiteDiscoveryService)
+      .mock(InitializeRootScopeCommand)
+      .impl(() => mockInitializeRootScopeCommand)
+      .mock(DeduplicateSitesQuery)
+      .impl(() => mockDeduplicateSitesQuery)
+      .mock(UniqueScopesService)
+      .impl(() => mockUniqueScopesService)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -307,6 +344,12 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockScopeManagementService)
       .mock(SubsiteDiscoveryService)
       .impl(() => mockSubsiteDiscoveryService)
+      .mock(InitializeRootScopeCommand)
+      .impl(() => mockInitializeRootScopeCommand)
+      .mock(DeduplicateSitesQuery)
+      .impl(() => mockDeduplicateSitesQuery)
+      .mock(UniqueScopesService)
+      .impl(() => mockUniqueScopesService)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -390,6 +433,12 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockScopeManagementService)
       .mock(SubsiteDiscoveryService)
       .impl(() => mockSubsiteDiscoveryService)
+      .mock(InitializeRootScopeCommand)
+      .impl(() => mockInitializeRootScopeCommand)
+      .mock(DeduplicateSitesQuery)
+      .impl(() => mockDeduplicateSitesQuery)
+      .mock(UniqueScopesService)
+      .impl(() => mockUniqueScopesService)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -1073,19 +1122,20 @@ describe('SharepointSynchronizationService', () => {
 
     expect(result.fullResult.status).toBe('success');
     expect(mockGraphApiService.getSiteInfo).toHaveBeenCalled();
-    expect(mockScopeManagementService.initializeRootScope).not.toHaveBeenCalled();
+    expect(mockInitializeRootScopeCommand.execute).not.toHaveBeenCalled();
     expect(mockContentSyncService.syncContentForSite).not.toHaveBeenCalled();
   });
 
-  it('calls getSiteInfo before initializeRootScope', async () => {
+  it('calls getSiteInfo before initializeRootScopeCommand', async () => {
     const callOrder: string[] = [];
     mockGraphApiService.getSiteInfo = vi.fn().mockImplementation(async () => {
       callOrder.push('getSiteInfo');
       return { siteName: new Smeared('test-site-name', false), managedPath: 'sites' };
     });
-    mockScopeManagementService.initializeRootScope = vi.fn().mockImplementation(async () => {
+    mockInitializeRootScopeCommand.execute = vi.fn().mockImplementation(async () => {
       callOrder.push('initializeRootScope');
       return {
+        rootScopeId: 'scope_test',
         serviceUserId: 'user-123',
         rootPath: new Smeared('/test-root', false),
         isInitialSync: false,
@@ -1097,87 +1147,61 @@ describe('SharepointSynchronizationService', () => {
     expect(callOrder).toEqual(['getSiteInfo', 'initializeRootScope']);
   });
 
-  it('ensures unique scopeIds and logs errors for duplicates', async () => {
+  it('delegates site list deduplication to DeduplicateSitesQuery', async () => {
     const site1 = createMockSiteConfig({
       siteId: new Smeared('site-1', false),
-      scopeId: { type: 'fixed', scopeId: 'scope_duplicate' },
+      scopeId: { type: 'fixed', scopeId: 'scope_a' },
     });
     const site2 = createMockSiteConfig({
       siteId: new Smeared('site-2', false),
-      scopeId: { type: 'fixed', scopeId: 'scope_duplicate' },
+      scopeId: { type: 'fixed', scopeId: 'scope_b' },
     });
-    const site3 = createMockSiteConfig({
-      siteId: new Smeared('site-3', false),
-      scopeId: { type: 'fixed', scopeId: 'scope_unique' },
-    });
-
     mockSitesConfigurationService.loadSitesConfiguration = vi
       .fn()
-      .mockResolvedValue([site1, site2, site3]);
-
-    // biome-ignore lint/suspicious/noExplicitAny: Access private logger to verify error logging
-    const loggerSpy = vi.spyOn((service as any).logger, 'error');
+      .mockResolvedValue([site1, site2]);
+    mockDeduplicateSitesQuery.execute = vi.fn().mockReturnValue([site1]);
 
     await service.synchronize();
 
-    // Should only sync site1 and site3
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(2);
+    expect(mockDeduplicateSitesQuery.execute).toHaveBeenCalledWith([site1, site2]);
+    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledTimes(1);
     expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
       expect.objectContaining({ value: site1.siteId.value }),
       expect.any(String),
     );
-    expect(mockGraphApiService.getAllSiteItems).toHaveBeenCalledWith(
-      expect.objectContaining({ value: site3.siteId.value }),
-      expect.any(String),
-    );
-    expect(mockGraphApiService.getAllSiteItems).not.toHaveBeenCalledWith(
-      expect.objectContaining({ value: site2.siteId.value }),
-      expect.any(String),
-    );
-
-    // Verify error logging
-    expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('DUPLICATE SCOPE ID DETECTED!'));
-    expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('scope_duplicate'));
   });
 
-  it('passes auto rows through deduplicateByScopeId alongside fixed rows', async () => {
-    const autoSite = createMockSiteConfig({
-      siteId: new Smeared('site-auto', false),
-      scopeId: { type: 'auto', parentScopeId: 'scope_X' },
-    });
-    const fixedSite = createMockSiteConfig({
-      siteId: new Smeared('site-fixed', false),
-      scopeId: { type: 'fixed', scopeId: 'scope_Y' },
-    });
-    mockSitesConfigurationService.loadSitesConfiguration = vi
-      .fn()
-      .mockResolvedValue([autoSite, fixedSite]);
+  it('maps RootScopeResolutionError from the command to RootScopeResolution failure step', async () => {
+    mockInitializeRootScopeCommand.execute = vi.fn().mockRejectedValue(
+      new RootScopeResolutionError('claim_failed', {
+        siteId: 'bd9c85ee-998f-4665-9c44-577cf5a08a66',
+        parentScopeId: 'scope_parent',
+        siteName: createSmeared('test-site-name'),
+        detail: 'claim failed',
+      }),
+    );
 
-    await service.synchronize();
+    const result = await service.synchronize();
 
-    expect(mockGraphApiService.getSiteInfo).toHaveBeenCalledTimes(2);
-    expect(mockGraphApiService.getSiteInfo).toHaveBeenCalledWith(autoSite.siteId);
-    expect(mockGraphApiService.getSiteInfo).toHaveBeenCalledWith(fixedSite.siteId);
+    const siteResult = result.siteResults[0]?.result;
+    expect(siteResult).toEqual({
+      status: 'failure',
+      step: SiteSyncStep.RootScopeResolution,
+    });
   });
 
-  it('does not collapse auto rows that share a parentScopeId', async () => {
-    const autoSiteA = createMockSiteConfig({
-      siteId: new Smeared('site-auto-a', false),
-      scopeId: { type: 'auto', parentScopeId: 'scope_P' },
-    });
-    const autoSiteB = createMockSiteConfig({
-      siteId: new Smeared('site-auto-b', false),
-      scopeId: { type: 'auto', parentScopeId: 'scope_P' },
-    });
-    mockSitesConfigurationService.loadSitesConfiguration = vi
+  it('maps generic errors from the command to RootScopeInit failure step', async () => {
+    mockInitializeRootScopeCommand.execute = vi
       .fn()
-      .mockResolvedValue([autoSiteA, autoSiteB]);
+      .mockRejectedValue(new Error('something else broke'));
 
-    await service.synchronize();
+    const result = await service.synchronize();
 
-    expect(mockGraphApiService.getSiteInfo).toHaveBeenCalledTimes(2);
-    expect(mockGraphApiService.getSiteInfo).toHaveBeenCalledWith(autoSiteA.siteId);
-    expect(mockGraphApiService.getSiteInfo).toHaveBeenCalledWith(autoSiteB.siteId);
+    const siteResult = result.siteResults[0]?.result;
+    expect(siteResult).toEqual({
+      status: 'failure',
+      step: SiteSyncStep.RootScopeInit,
+    });
   });
 
   it('does not run deletion side effects for deleted auto rows', async () => {
@@ -1210,6 +1234,10 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockScopeManagementService)
       .mock(SubsiteDiscoveryService)
       .impl(() => mockSubsiteDiscoveryService)
+      .mock(InitializeRootScopeCommand)
+      .impl(() => mockInitializeRootScopeCommand)
+      .mock(DeduplicateSitesQuery)
+      .impl(() => mockDeduplicateSitesQuery)
       .mock(UniqueFilesService)
       .impl(() => mockUniqueFilesService)
       .mock(UniqueScopesService)
