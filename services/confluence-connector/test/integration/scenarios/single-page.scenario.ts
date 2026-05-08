@@ -1,3 +1,4 @@
+import { aPage, aSpace } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 
 /**
@@ -6,16 +7,14 @@ import { defineScenario } from '../scenario/scenario.builder';
  */
 export const singlePageScenario = defineScenario({
   confluence: {
-    spaces: [{ id: 'space-1', key: 'SP', name: 'Space One' }],
+    spaces: [aSpace()],
     pages: [
-      {
+      aPage({
         id: 'p1',
-        spaceKey: 'SP',
         title: 'Page One',
         body: '<p>Hello, integration!</p>',
         labels: ['ai-ingest', 'engineering'],
-        versionWhen: '2026-05-01T10:00:00.000Z',
-      },
+      }),
     ],
   },
 });

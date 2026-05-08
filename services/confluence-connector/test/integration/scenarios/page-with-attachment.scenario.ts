@@ -1,3 +1,4 @@
+import { anAttachment, aPage, aSpace } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 
 const pdfBytes = Buffer.from('%PDF-1.4\n% fake pdf content for integration tests\n%%EOF\n');
@@ -8,25 +9,20 @@ const pdfBytes = Buffer.from('%PDF-1.4\n% fake pdf content for integration tests
  */
 export const pageWithAttachmentScenario = defineScenario({
   confluence: {
-    spaces: [{ id: 'space-1', key: 'SP', name: 'Space One' }],
+    spaces: [aSpace()],
     pages: [
-      {
+      aPage({
         id: 'p1',
-        spaceKey: 'SP',
         title: 'Page With Attachment',
         body: '<p>See attached.</p>',
-        labels: ['ai-ingest'],
-        versionWhen: '2026-05-01T10:00:00.000Z',
         attachments: [
-          {
+          anAttachment({
             id: 'att-1',
             title: 'report.pdf',
-            mediaType: 'application/pdf',
             bytes: pdfBytes,
-            versionWhen: '2026-05-01T10:00:00.000Z',
-          },
+          }),
         ],
-      },
+      }),
     ],
   },
 });

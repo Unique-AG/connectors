@@ -65,6 +65,14 @@ export interface ScenarioUniqueFile {
   mimeType: string;
   metadata?: Record<string, string>;
   body?: Buffer;
+  /**
+   * ISO timestamp the file was last updated in Unique.
+   * Compared against the page's `versionWhen` by `performFileDiff` to decide
+   * whether the file is up-to-date (no change), older (updated), or missing (new).
+   * Defaults to epoch zero so any real page wins by default — set this when you
+   * want to test "no-change" or "older Unique data" scenarios.
+   */
+  updatedAt?: string;
 }
 
 export interface ScenarioUnique {

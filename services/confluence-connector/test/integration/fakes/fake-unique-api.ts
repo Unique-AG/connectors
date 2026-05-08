@@ -27,6 +27,12 @@ interface StoredFile extends UniqueFile {
   updatedAt: string;
 }
 
+interface FailureMap {
+  registerContent: Map<string, Error>;
+  finalizeIngestion: Map<string, Error>;
+  performFileDiff?: Error;
+}
+
 /**
  * Stateful in-memory UniqueApiClient.
  *
@@ -50,6 +56,10 @@ export class FakeUniqueApi implements UniqueApiClient {
   private readonly scopesById = new Map<string, Scope>();
   private readonly filesById = new Map<string, StoredFile>();
   private readonly pendingUploads = new Map<string, PendingUpload>();
+  private readonly failures: FailureMap = {
+    registerContent: new Map(),
+    finalizeIngestion: new Map(),
+  };
 
   public constructor(private readonly initial: ScenarioUnique) {
     for (const scope of initial.scopes) {
@@ -68,7 +78,7 @@ export class FakeUniqueApi implements UniqueApiClient {
         ingestionState: IngestionState.Finished,
         metadata: file.metadata ?? null,
         body: file.body,
-        updatedAt: new Date(0).toISOString(),
+        updatedAt: file.updatedAt ?? new Date(0).toISOString(),
       });
     }
 
@@ -111,6 +121,26 @@ export class FakeUniqueApi implements UniqueApiClient {
 
   public listFiles(): StoredFile[] {
     return [...this.filesById.values()];
+  }
+
+  // ─── Failure-injection hooks ─────────────────────────────────────────────────
+
+  public failOnRegisterContent(key: string, error: Error): void {
+    this.failures.registerContent.set(key, error);
+  }
+
+  public failOnFinalizeIngestion(key: string, error: Error): void {
+    this.failures.finalizeIngestion.set(key, error);
+  }
+
+  public failOnPerformFileDiff(error: Error): void {
+    this.failures.performFileDiff = error;
+  }
+
+  public clearFailures(): void {
+    this.failures.registerContent.clear();
+    this.failures.finalizeIngestion.clear();
+    this.failures.performFileDiff = undefined;
   }
 
   private buildScopesFacade(): UniqueApiClient['scopes'] {
@@ -277,6 +307,10 @@ export class FakeUniqueApi implements UniqueApiClient {
   }
 
   private registerContent(request: ContentRegistrationRequest): IngestionApiResponse {
+    const failure = this.failures.registerContent.get(request.key);
+    if (failure) {
+      throw failure;
+    }
     const existing = [...this.filesById.values()].find((f) => f.key === request.key);
     const id = existing?.id ?? `content-${randomUUID()}`;
     const uploadToken = randomUUID();
@@ -316,6 +350,10 @@ export class FakeUniqueApi implements UniqueApiClient {
   }
 
   private finalizeIngestion(request: IngestionFinalizationRequest): { id: string } {
+    const failure = this.failures.finalizeIngestion.get(request.key);
+    if (failure) {
+      throw failure;
+    }
     const file = [...this.filesById.values()].find((f) => f.key === request.key);
     if (!file) {
       throw new Error(`Cannot finalize unknown key "${request.key}"`);
@@ -328,6 +366,9 @@ export class FakeUniqueApi implements UniqueApiClient {
   }
 
   private performFileDiff(fileList: FileDiffItem[], partialKey: string): FileDiffResponse {
+    if (this.failures.performFileDiff) {
+      throw this.failures.performFileDiff;
+    }
     const submitted = new Map(fileList.map((item) => [item.key, item]));
     const existing = [...this.filesById.values()].filter((f) => f.key.startsWith(`${partialKey}/`));
 
