@@ -6,6 +6,7 @@ import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 vi.mock('~/features/tracing.utils', () => ({
   traceAttrs: vi.fn(),
   traceEvent: vi.fn(),
+  NewTrace: () => () => ({}),
 }));
 
 // ---------------------------------------------------------------------------

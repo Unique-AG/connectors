@@ -28,8 +28,10 @@ export function traceError(error: unknown): void {
 }
 
 function startNewTrace<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const parentSpan = trace.getActiveSpan();
+  const links = parentSpan ? [{ context: parentSpan.spanContext() }] : [];
   return context.with(ROOT_CONTEXT, () =>
-    trace.getTracer('default').startActiveSpan(name, async (span) => {
+    trace.getTracer('default').startActiveSpan(name, { links }, async (span) => {
       try {
         return await fn();
       } catch (err) {

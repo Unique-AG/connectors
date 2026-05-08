@@ -13,6 +13,7 @@ import {
   userProfiles,
 } from '~/db';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
+import { NewTrace } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { Nullish } from '~/utils/nullish';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
@@ -39,7 +40,7 @@ export class DiscoverDelegatedAccessCommand {
     private readonly persistentCacheService: PersistentCacheService,
   ) {}
 
-  @Span()
+  @NewTrace('discover-delegated-access')
   public async run(): Promise<void> {
     if (this.config.scan === 'disabled') {
       this.logger.log({

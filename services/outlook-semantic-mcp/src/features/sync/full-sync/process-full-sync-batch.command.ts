@@ -14,7 +14,7 @@ import {
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
-import { traceAttrs, traceEvent } from '~/features/tracing.utils';
+import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
@@ -77,7 +77,7 @@ export class ProcessFullSyncBatchCommand {
     });
   }
 
-  @Span()
+  @NewTrace('process-full-sync-batch')
   public async run({
     userProfile,
     version,

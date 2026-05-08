@@ -1,7 +1,6 @@
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, notInArray } from 'drizzle-orm';
-import { Span } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import { chunk } from 'remeda';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
@@ -12,6 +11,7 @@ import {
   delegatedAccessDirectories,
   userProfiles,
 } from '~/db';
+import { NewTrace, traceAttrs } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { GenericRateLimitError } from '~/utils/is-rate-limit-error';
 
@@ -38,8 +38,9 @@ export class SyncDelegatedAccessCommand {
     @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
   ) {}
 
-  @Span()
+  @NewTrace('sync-delegated-access')
   public async run(input: { accountsId: string }): Promise<void> {
+    traceAttrs({ accountsId: input.accountsId });
     if (this.config.scan !== 'granularAccess') {
       this.logger.log({
         msg: `Skipped running delegated access verification. Reason: delegated access is not set to "granularAccess"`,

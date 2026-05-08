@@ -4,6 +4,7 @@ import { and, gt } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts } from '~/db';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
+import { NewTrace } from '~/features/tracing.utils';
 import { Nullish } from '~/utils/nullish';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { SyncDelegatedAccessCommand } from './sync-delegated-access.command';
@@ -25,7 +26,7 @@ export class SyncDelegatedAccessForAllUsersCommand {
     private syncDelegatedAccessCommand: SyncDelegatedAccessCommand,
   ) {}
 
-  @Span()
+  @NewTrace('sync-delegated-access-scan')
   public async run(): Promise<void> {
     const decision = await this.decide();
     if (decision.action === 'skip') {
