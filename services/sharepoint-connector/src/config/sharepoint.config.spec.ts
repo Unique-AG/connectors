@@ -405,7 +405,7 @@ describe('SharepointConfigSchema', () => {
   });
 
   describe('site configuration defaults', () => {
-    it('applies default values for optional fields', () => {
+    it('populates siteDefaults with schema-level defaults when the block is omitted', () => {
       const config = {
         ...validBaseConfig,
         auth: clientSecretAuth,
@@ -421,21 +421,15 @@ describe('SharepointConfigSchema', () => {
 
       const result = SharepointConfigSchema.parse(config);
 
-      // Handle discriminated union
-      if (result.sitesSource === 'config_file') {
-        expect(result.sites).toHaveLength(1);
-
-        // TypeScript doesn't understand that the schema guarantees at least one site
-        // biome-ignore lint/style/noNonNullAssertion: Schema validation ensures array has at least one element
-        const site = result.sites[0]!;
-
-        expect(site.syncColumnName).toBe('FinanceGPTKnowledge'); // default value
-        expect(site.storeInternally).toBe(EnabledDisabledMode.Enabled); // default value
-        expect(site.syncStatus).toBe('active'); // default value
-        expect(site.permissionsInheritanceMode).toBe('inherit_scopes_and_files'); // default value
-        expect(site.subsitesScan).toBe('disabled'); // default value
-        expect(site.maxFilesToIngest).toBeUndefined(); // optional field
-      }
+      expect(result.siteDefaults.syncColumnName).toBe('FinanceGPTKnowledge');
+      expect(result.siteDefaults.storeInternally).toBe(EnabledDisabledMode.Enabled);
+      expect(result.siteDefaults.syncStatus).toBe('active');
+      expect(result.siteDefaults.permissionsInheritanceMode).toBe('inherit_scopes_and_files');
+      expect(result.siteDefaults.subsitesScan).toBe('disabled');
+      expect(result.siteDefaults.maxFilesToIngest).toBeUndefined();
+      expect(result.siteDefaults.ingestionMode).toBeUndefined();
+      expect(result.siteDefaults.scopeId).toBeUndefined();
+      expect(result.siteDefaults.syncMode).toBeUndefined();
     });
   });
 

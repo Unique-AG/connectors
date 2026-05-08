@@ -226,7 +226,7 @@ export function getInheritanceSettings({
 const staticSitesConfig = z.object({
   sitesSource: z.literal('config_file').describe('Load sites configuration from static YAML array'),
   sites: z
-    .array(SiteConfigSchema)
+    .array(PartialSiteConfigSchema)
     .min(1, 'At least one site must be configured')
     .describe('Array of SharePoint sites to sync'),
 });

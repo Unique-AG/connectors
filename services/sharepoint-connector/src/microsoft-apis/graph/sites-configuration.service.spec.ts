@@ -29,6 +29,7 @@ describe('SitesConfigurationService', () => {
           if (key === 'sharepoint') {
             return {
               sitesSource: 'config_file',
+              siteDefaults: {},
               sites: [
                 {
                   siteId: new Smeared('12345678-1234-4234-8123-123456789abc', false),
@@ -117,7 +118,9 @@ describe('SitesConfigurationService', () => {
         listId: 'list-id-456',
       };
 
-      const result = await service.fetchSitesFromSharePointList(sharepointList);
+      // TODO(Task 10): rewrite this test through loadSitesConfiguration instead of reaching into a private method
+      // biome-ignore lint/suspicious/noExplicitAny: Test private method (will be replaced in Task 10)
+      const result = await (service as any).fetchSitesFromSharePointList(sharepointList);
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({

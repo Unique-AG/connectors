@@ -34,8 +34,8 @@ export function mergeSiteWithDefaults(
   siteDefaults: SiteDefaults,
   rowIdentifier: string,
 ): SiteConfig {
-  const merged = {
-    siteId: partialSite.siteId,
+  const result = SiteConfigSchema.safeParse({
+    siteId: partialSite.siteId.value,
     syncColumnName: coalesce(partialSite.syncColumnName, siteDefaults.syncColumnName),
     ingestionMode: coalesce(partialSite.ingestionMode, siteDefaults.ingestionMode),
     scopeId: coalesce(partialSite.scopeId, siteDefaults.scopeId),
@@ -48,9 +48,8 @@ export function mergeSiteWithDefaults(
       siteDefaults.permissionsInheritanceMode,
     ),
     subsitesScan: coalesce(partialSite.subsitesScan, siteDefaults.subsitesScan),
-  };
+  });
 
-  const result = SiteConfigSchema.safeParse(merged);
   if (result.success) {
     return result.data;
   }
@@ -77,10 +76,10 @@ function buildErrorMessage(rowIdentifier: string, error: z.ZodError): string {
     const verb = missingFields.length === 1 ? 'is' : 'are';
     const possessiveVerb = missingFields.length === 1 ? 'has' : 'have';
     return (
-      `Row ${rowIdentifier}: required field(s) ${fieldList} ${verb} not set per-site ` +
+      `${rowIdentifier}: required field(s) ${fieldList} ${verb} not set per-site ` +
       `and ${possessiveVerb} no deployment default`
     );
   }
 
-  return `Row ${rowIdentifier}: invalid configuration: ${z.prettifyError(error)}`;
+  return `${rowIdentifier}: invalid configuration: ${z.prettifyError(error)}`;
 }
