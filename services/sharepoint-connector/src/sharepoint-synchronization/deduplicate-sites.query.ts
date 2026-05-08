@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { entries, filter, first, forEach, groupBy, isNonNullish, last, map, pipe } from 'remeda';
+import { entries, filter, forEach, groupBy, isNonNullish, map, pipe } from 'remeda';
 import { isAutoScope, isFixedScope, type SiteConfig } from '../config/sharepoint.schema';
 
 @Injectable()
@@ -65,8 +65,7 @@ export class DeduplicateSitesQuery {
           this.logDuplicateSiteId(siteId, sites);
         }
       }),
-      map(last()), // get only the list of sites
-      map(first()), // get the first site from the group
+      map(([, sites]) => sites[0]), // get only the first site from the list of sites
       filter(isNonNullish), // If for whatever reason a group is empty, we filter it here
     );
   }
