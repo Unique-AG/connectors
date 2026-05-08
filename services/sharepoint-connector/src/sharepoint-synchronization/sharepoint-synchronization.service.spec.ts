@@ -13,6 +13,7 @@ import { createSmeared, Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
 import { ContentSyncService } from './content-sync.service';
 import { DeduplicateSitesQuery } from './deduplicate-sites.query';
+import { FindRootScopeQuery } from './root-scope/find-root-scope.query';
 import { InitializeRootScopeCommand } from './root-scope/initialize-root-scope.command';
 import { RootScopeResolutionError } from './root-scope/root-scope-resolution.error';
 import { ScopeManagementService } from './scope-management.service';
@@ -43,8 +44,15 @@ describe('SharepointSynchronizationService', () => {
   let mockDeduplicateSitesQuery: {
     execute: ReturnType<typeof vi.fn>;
   };
+  let mockFindRootScopeQuery: {
+    execute: ReturnType<typeof vi.fn>;
+  };
   let mockUniqueScopesService: {
     getScopeById: ReturnType<typeof vi.fn>;
+    deleteScope: ReturnType<typeof vi.fn>;
+  };
+  let mockUniqueFilesService: {
+    deleteFilesBySiteId: ReturnType<typeof vi.fn>;
   };
 
   const mockFile: SharepointContentItem = {
@@ -172,8 +180,17 @@ describe('SharepointSynchronizationService', () => {
       execute: vi.fn().mockImplementation((sites: unknown[]) => sites),
     };
 
+    mockFindRootScopeQuery = {
+      execute: vi.fn().mockResolvedValue(null),
+    };
+
     mockUniqueScopesService = {
       getScopeById: vi.fn().mockResolvedValue(null),
+      deleteScope: vi.fn().mockResolvedValue(undefined),
+    };
+
+    mockUniqueFilesService = {
+      deleteFilesBySiteId: vi.fn().mockResolvedValue(0),
     };
 
     const mockHistogram = {
@@ -195,10 +212,14 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockSubsiteDiscoveryService)
       .mock(InitializeRootScopeCommand)
       .impl(() => mockInitializeRootScopeCommand)
+      .mock(FindRootScopeQuery)
+      .impl(() => mockFindRootScopeQuery)
       .mock(DeduplicateSitesQuery)
       .impl(() => mockDeduplicateSitesQuery)
       .mock(UniqueScopesService)
       .impl(() => mockUniqueScopesService)
+      .mock(UniqueFilesService)
+      .impl(() => mockUniqueFilesService)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -346,10 +367,14 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockSubsiteDiscoveryService)
       .mock(InitializeRootScopeCommand)
       .impl(() => mockInitializeRootScopeCommand)
+      .mock(FindRootScopeQuery)
+      .impl(() => mockFindRootScopeQuery)
       .mock(DeduplicateSitesQuery)
       .impl(() => mockDeduplicateSitesQuery)
       .mock(UniqueScopesService)
       .impl(() => mockUniqueScopesService)
+      .mock(UniqueFilesService)
+      .impl(() => mockUniqueFilesService)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -435,10 +460,14 @@ describe('SharepointSynchronizationService', () => {
       .impl(() => mockSubsiteDiscoveryService)
       .mock(InitializeRootScopeCommand)
       .impl(() => mockInitializeRootScopeCommand)
+      .mock(FindRootScopeQuery)
+      .impl(() => mockFindRootScopeQuery)
       .mock(DeduplicateSitesQuery)
       .impl(() => mockDeduplicateSitesQuery)
       .mock(UniqueScopesService)
       .impl(() => mockUniqueScopesService)
+      .mock(UniqueFilesService)
+      .impl(() => mockUniqueFilesService)
       .mock(SPC_SYNC_DURATION_SECONDS)
       .impl(() => mockHistogram)
       .compile();
@@ -1204,52 +1233,136 @@ describe('SharepointSynchronizationService', () => {
     });
   });
 
-  it('does not run deletion side effects for deleted auto rows', async () => {
-    const mockHistogram = { record: vi.fn() };
-    const mockUniqueFilesService = {
-      deleteFilesBySiteId: vi.fn().mockResolvedValue(0),
-    };
-    const mockUniqueScopesService = {
-      getScopeById: vi.fn().mockResolvedValue(null),
-    };
-    const deletedAutoSite = createMockSiteConfig({
-      siteId: new Smeared('site-deleted-auto', false),
-      scopeId: { type: 'auto', parentScopeId: 'scope_P' },
-      syncStatus: 'deleted',
+  describe('processSiteDeletions', () => {
+    const FIXED_SCOPE_ID = 'scope_fixed_target';
+    const AUTO_PARENT_SCOPE_ID = 'scope_parent';
+
+    const fixedDeletedSite = (): ReturnType<typeof createMockSiteConfig> =>
+      createMockSiteConfig({
+        siteId: new Smeared('site-deleted-fixed', false),
+        scopeId: { type: 'fixed', scopeId: FIXED_SCOPE_ID },
+        syncStatus: 'deleted',
+      });
+
+    const autoDeletedSite = (): ReturnType<typeof createMockSiteConfig> =>
+      createMockSiteConfig({
+        siteId: new Smeared('site-deleted-auto', false),
+        scopeId: { type: 'auto', parentScopeId: AUTO_PARENT_SCOPE_ID },
+        syncStatus: 'deleted',
+      });
+
+    const claimedScope = (id: string) => ({
+      id,
+      name: 'claimed',
+      parentId: AUTO_PARENT_SCOPE_ID,
+      externalId: 'site::site-deleted-auto',
     });
 
-    const { unit } = await TestBed.solitary(SharepointSynchronizationService)
-      .mock(GraphApiService)
-      .impl(() => mockGraphApiService)
-      .mock(SitesConfigurationService)
-      .impl(() => ({
-        ...mockSitesConfigurationService,
-        loadSitesConfiguration: vi.fn().mockResolvedValue([deletedAutoSite]),
-      }))
-      .mock(ContentSyncService)
-      .impl(() => mockContentSyncService)
-      .mock(PermissionsSyncService)
-      .impl(() => mockPermissionsSyncService)
-      .mock(ScopeManagementService)
-      .impl(() => mockScopeManagementService)
-      .mock(SubsiteDiscoveryService)
-      .impl(() => mockSubsiteDiscoveryService)
-      .mock(InitializeRootScopeCommand)
-      .impl(() => mockInitializeRootScopeCommand)
-      .mock(DeduplicateSitesQuery)
-      .impl(() => mockDeduplicateSitesQuery)
-      .mock(UniqueFilesService)
-      .impl(() => mockUniqueFilesService)
-      .mock(UniqueScopesService)
-      .impl(() => mockUniqueScopesService)
-      .mock(SPC_SYNC_DURATION_SECONDS)
-      .impl(() => mockHistogram)
-      .compile();
+    it('skips deletion side effects for fixed rows when scope is not found', async () => {
+      mockSitesConfigurationService.loadSitesConfiguration = vi
+        .fn()
+        .mockResolvedValue([fixedDeletedSite()]);
+      mockUniqueScopesService.getScopeById = vi.fn().mockResolvedValue(null);
 
-    await unit.synchronize();
+      await service.synchronize();
 
-    expect(mockUniqueScopesService.getScopeById).not.toHaveBeenCalled();
-    expect(mockUniqueFilesService.deleteFilesBySiteId).not.toHaveBeenCalled();
-    expect(mockScopeManagementService.resetRootScope).not.toHaveBeenCalled();
+      expect(mockFindRootScopeQuery.execute).not.toHaveBeenCalled();
+      expect(mockUniqueScopesService.getScopeById).toHaveBeenCalledWith(FIXED_SCOPE_ID);
+      expect(mockUniqueFilesService.deleteFilesBySiteId).not.toHaveBeenCalled();
+      expect(mockScopeManagementService.resetRootScope).not.toHaveBeenCalled();
+      expect(mockUniqueScopesService.deleteScope).not.toHaveBeenCalled();
+    });
+
+    it('resets the root scope for fixed rows when scope is found, deleting files first', async () => {
+      const site = fixedDeletedSite();
+      mockSitesConfigurationService.loadSitesConfiguration = vi.fn().mockResolvedValue([site]);
+      mockUniqueScopesService.getScopeById = vi.fn().mockResolvedValue({
+        id: FIXED_SCOPE_ID,
+        name: 'fixed-scope',
+        parentId: null,
+        externalId: null,
+      });
+
+      await service.synchronize();
+
+      expect(mockFindRootScopeQuery.execute).not.toHaveBeenCalled();
+      expect(mockUniqueScopesService.getScopeById).toHaveBeenCalledWith(FIXED_SCOPE_ID);
+      expect(mockUniqueFilesService.deleteFilesBySiteId).toHaveBeenCalledWith(site.siteId);
+      expect(mockScopeManagementService.resetRootScope).toHaveBeenCalledWith(FIXED_SCOPE_ID);
+      expect(mockUniqueScopesService.deleteScope).not.toHaveBeenCalled();
+
+      const deleteFilesOrder =
+        mockUniqueFilesService.deleteFilesBySiteId.mock.invocationCallOrder[0] ??
+        Number.MAX_SAFE_INTEGER;
+      const resetOrder = mockScopeManagementService.resetRootScope.mock.invocationCallOrder[0] ?? 0;
+      expect(deleteFilesOrder).toBeLessThan(resetOrder);
+    });
+
+    it('skips deletion side effects for auto rows when scope is not found', async () => {
+      const site = autoDeletedSite();
+      mockSitesConfigurationService.loadSitesConfiguration = vi.fn().mockResolvedValue([site]);
+      mockFindRootScopeQuery.execute = vi.fn().mockResolvedValue(null);
+
+      await service.synchronize();
+
+      expect(mockFindRootScopeQuery.execute).toHaveBeenCalledTimes(1);
+      expect(mockFindRootScopeQuery.execute).toHaveBeenCalledWith(site);
+      expect(mockUniqueFilesService.deleteFilesBySiteId).not.toHaveBeenCalled();
+      expect(mockScopeManagementService.resetRootScope).not.toHaveBeenCalled();
+      expect(mockUniqueScopesService.deleteScope).not.toHaveBeenCalled();
+    });
+
+    it('deletes the auto-created root scope after resetting it', async () => {
+      const site = autoDeletedSite();
+      const found = claimedScope('scope_auto_root');
+      mockSitesConfigurationService.loadSitesConfiguration = vi.fn().mockResolvedValue([site]);
+      mockFindRootScopeQuery.execute = vi.fn().mockResolvedValueOnce(found);
+
+      await service.synchronize();
+
+      expect(mockFindRootScopeQuery.execute).toHaveBeenCalledWith(site);
+      expect(mockUniqueFilesService.deleteFilesBySiteId).toHaveBeenCalledWith(site.siteId);
+      expect(mockScopeManagementService.resetRootScope).toHaveBeenCalledWith(found.id);
+      expect(mockUniqueScopesService.deleteScope).toHaveBeenCalledWith(found.id, {
+        recursive: true,
+      });
+
+      const resetOrder =
+        mockScopeManagementService.resetRootScope.mock.invocationCallOrder[0] ??
+        Number.MAX_SAFE_INTEGER;
+      const deleteOrder = mockUniqueScopesService.deleteScope.mock.invocationCallOrder[0] ?? 0;
+      expect(resetOrder).toBeLessThan(deleteOrder);
+    });
+
+    it('continues with other sites when a deletion step fails', async () => {
+      const failingSite = createMockSiteConfig({
+        siteId: new Smeared('site-deleted-fails', false),
+        scopeId: { type: 'fixed', scopeId: 'scope_fails' },
+        syncStatus: 'deleted',
+      });
+      const survivingSite = createMockSiteConfig({
+        siteId: new Smeared('site-deleted-ok', false),
+        scopeId: { type: 'fixed', scopeId: 'scope_ok' },
+        syncStatus: 'deleted',
+      });
+      mockSitesConfigurationService.loadSitesConfiguration = vi
+        .fn()
+        .mockResolvedValue([failingSite, survivingSite]);
+      mockUniqueScopesService.getScopeById = vi.fn().mockResolvedValue({
+        id: 'whatever',
+        name: 'n',
+        parentId: null,
+        externalId: null,
+      });
+      mockScopeManagementService.resetRootScope = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('reset blew up'))
+        .mockResolvedValue(undefined);
+
+      await service.synchronize();
+
+      expect(mockScopeManagementService.resetRootScope).toHaveBeenCalledTimes(2);
+      expect(mockUniqueFilesService.deleteFilesBySiteId).toHaveBeenCalledTimes(2);
+    });
   });
 });

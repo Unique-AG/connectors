@@ -17,12 +17,13 @@ import { PermissionsSyncError } from '../permissions-sync/permissions-sync.error
 import { PermissionsSyncService } from '../permissions-sync/permissions-sync.service';
 import { UniqueFilesService } from '../unique-api/unique-files/unique-files.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
-import type { ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
+import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
 import { sanitizeError } from '../utils/normalize-error';
 import { type Smeared, smearPath } from '../utils/smeared';
 import { elapsedSeconds, elapsedSecondsLog } from '../utils/timing.util';
 import { ContentSyncService } from './content-sync.service';
 import { DeduplicateSitesQuery } from './deduplicate-sites.query';
+import { FindRootScopeQuery } from './root-scope/find-root-scope.query';
 import { InitializeRootScopeCommand } from './root-scope/initialize-root-scope.command';
 import { RootScopeResolutionError } from './root-scope/root-scope-resolution.error';
 import { ScopeManagementService } from './scope-management.service';
@@ -51,6 +52,7 @@ export class SharepointSynchronizationService {
     private readonly configDiagnosticsService: ConfigDiagnosticsService,
     private readonly subsiteDiscoveryService: SubsiteDiscoveryService,
     private readonly initializeRootScopeCommand: InitializeRootScopeCommand,
+    private readonly findRootScopeQuery: FindRootScopeQuery,
     private readonly deduplicateSitesQuery: DeduplicateSitesQuery,
     @Inject(SPC_SYNC_DURATION_SECONDS)
     private readonly spcSyncDurationSeconds: Histogram,
@@ -169,38 +171,39 @@ export class SharepointSynchronizationService {
   private async processSingleSiteDeletion(siteConfig: SiteConfig): Promise<void> {
     const logPrefix = `[Site: ${siteConfig.siteId}]`;
 
-    if (isAutoScope(siteConfig.scopeId)) {
-      this.logger.error(
-        `${logPrefix} AUTO_DELETION_NOT_WIRED: skipping deletion for site with auto-resolved ` +
-          `scopeId (parent: ${siteConfig.scopeId.parentScopeId}). Auto-row deletion is wired in ` +
-          'a later commit (UN-20365 Task 6); operator must rerun once the full feature lands.',
-      );
-      return;
-    }
+    this.logger.log(`${logPrefix} Processing deleted site - resolving root scope`);
 
-    const rootScopeId = siteConfig.scopeId.scopeId;
-    this.logger.log(
-      `${logPrefix} Processing deleted site - resetting root scope (ScopeId: ${rootScopeId})`,
-    );
-
+    let rootScopeId: string | undefined; // Kept here for error reporting
     try {
-      const rootScope = await this.uniqueScopesService.getScopeById(rootScopeId);
+      // Lookup-only resolution: never moves, never creates. For fixed it's a direct getScopeById;
+      // for auto, the finder consults externalId in new + legacy formats but skips the name-match
+      // fallback (omitted siteName option).
+      let rootScope: Scope | null;
+      if (isAutoScope(siteConfig.scopeId)) {
+        rootScope = await this.findRootScopeQuery.execute(siteConfig);
+      } else {
+        rootScope = await this.uniqueScopesService.getScopeById(siteConfig.scopeId.scopeId);
+      }
 
       if (!rootScope) {
-        this.logger.log(
-          `${logPrefix} Root scope ${rootScopeId} not found. Skipping deletion process.`,
-        );
+        this.logger.log(`${logPrefix} Root scope not found. Skipping deletion process.`);
         return;
       }
 
-      await this.uniqueFilesService.deleteFilesBySiteId(siteConfig.siteId);
-      await this.scopeManagementService.resetRootScope(rootScopeId);
+      rootScopeId = rootScope.id;
 
-      this.logger.log(`${logPrefix} Successfully reset root scope`);
+      await this.uniqueFilesService.deleteFilesBySiteId(siteConfig.siteId);
+      await this.scopeManagementService.resetRootScope(rootScope.id);
+
+      if (isAutoScope(siteConfig.scopeId)) {
+        await this.uniqueScopesService.deleteScope(rootScope.id, { recursive: true });
+      }
+
+      this.logger.log(`${logPrefix} Successfully processed site deletion`);
     } catch (error) {
       this.logger.error({
-        msg: `${logPrefix} Failed to reset root scope. Continuing with other sites`,
-        scopeId: rootScopeId,
+        msg: `${logPrefix} Failed to process site deletion. Continuing with other sites`,
+        rootScopeId,
         error: sanitizeError(error),
       });
     }
