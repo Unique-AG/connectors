@@ -3,60 +3,62 @@
 
 # Outlook Semantic MCP - FAQ
 
+
 ## Table of Contents
 
 - [General](#General)
-  - [What type of MCP server is this?](#What-type-of-MCP-server-is-this)
-  - [What tools are available?](#What-tools-are-available)
-  - [Do I need to do anything after connecting?](#Do-I-need-to-do-anything-after-connecting)
-- [Authentication & Permissions](#Authentication-&-Permissions)
-  - [Do any permissions require admin consent?](#Do-any-permissions-require-admin-consent)
-  - [Why does the server need Mail.ReadWrite if it mostly reads emails?](#Why-does-the-server-need-Mail.ReadWrite-if-it-mostly-reads-emails)
-  - [Why can't I use application permissions instead of delegated?](#Why-can't-I-use-application-permissions-instead-of-delegated)
-  - [Why do I need a client ID and client secret?](#Why-do-I-need-a-client-ID-and-client-secret)
-  - [What is the "login flicker" when users reconnect?](#What-is-the-"login-flicker"-when-users-reconnect)
-  - [What happens when a user's Microsoft refresh token expires?](#What-happens-when-a-user's-Microsoft-refresh-token-expires)
-- [Configuration](#Configuration)
-  - [What redirect URI should I configure in Entra ID?](#What-redirect-URI-should-I-configure-in-Entra-ID)
-  - [Why do I need a webhook secret?](#Why-do-I-need-a-webhook-secret)
-  - [What happens if I change the encryption key?](#What-happens-if-I-change-the-encryption-key)
-  - [What happens if I change the webhook secret?](#What-happens-if-I-change-the-webhook-secret)
-  - [What happens if I change the client secret?](#What-happens-if-I-change-the-client-secret)
-  - [What does INGESTION_DEFAULT_MAIL_FILTERS do?](#What-does-INGESTION_DEFAULT_MAIL_FILTERS-do)
-- [Sync](#Sync)
-  - [What is the difference between full sync and live catch-up?](#What-is-the-difference-between-full-sync-and-live-catch-up)
-  - [How do I check sync progress?](#How-do-I-check-sync-progress)
-  - [Why is my full sync stuck in waiting-for-ingestion?](#Why-is-my-full-sync-stuck-in-waiting-for-ingestion)
-  - [Why is my full sync stuck in running?](#Why-is-my-full-sync-stuck-in-running)
-  - [What happens if full sync is interrupted?](#What-happens-if-full-sync-is-interrupted-(restart,-crash))
-  - [Why are new emails not appearing in search results?](#Why-are-new-emails-not-appearing-in-search-results)
-  - [What happens to emails sent during full sync?](#What-happens-to-emails-sent-during-full-sync)
-  - [Why are deleted emails still appearing in search results?](#Why-are-deleted-emails-still-appearing-in-search-results)
-- [Tool Usage](#Tool-Usage)
-  - [How does search_emails search?](#How-does-search_emails-search)
-  - [How do I filter search results to a specific folder?](#How-do-I-filter-search-results-to-a-specific-folder)
-  - [Can I attach files when creating a draft email?](#Can-I-attach-files-when-creating-a-draft-email)
-  - [What does reconnect_inbox do?](#What-does-reconnect_inbox-do)
-  - [What does delete_inbox_data do?](#What-does-delete_inbox_data-do)
+  - [What type of MCP server is this?](#What-type-of-MCP-server-is-this?)
+  - [What tools are available?](#What-tools-are-available?)
+  - [Do I need to do anything after connecting?](#Do-I-need-to-do-anything-after-connecting?)
 - [Data Privacy & Storage](#Data-Privacy-&-Storage)
-  - [Does the MCP server store my emails?](#Does-the-MCP-server-store-my-emails)
-  - [Where is my email content stored?](#Where-is-my-email-content-stored)
-  - [Who can access my email data once it is ingested?](#Who-can-access-my-email-data-once-it-is-ingested)
-  - [Can an operator with database access read my emails?](#Can-an-operator-with-database-access-read-my-emails)
-  - [What happens to my email data when I disconnect?](#What-happens-to-my-email-data-when-I-disconnect)
-  - [What email data is actually ingested into the knowledge base?](#What-email-data-is-actually-ingested-into-the-knowledge-base)
+  - [Does the MCP server store my emails?](#Does-the-MCP-server-store-my-emails?)
+  - [Where is my email content stored?](#Where-is-my-email-content-stored?)
+  - [What email data is actually ingested into the knowledge base?](#What-email-data-is-actually-ingested-into-the-knowledge-base?)
+  - [Who can access my email data once it is ingested?](#Who-can-access-my-email-data-once-it-is-ingested?)
+  - [Can an operator with database access read my emails?](#Can-an-operator-with-database-access-read-my-emails?)
+  - [What happens to my email data when I disconnect?](#What-happens-to-my-email-data-when-I-disconnect?)
+- [Supported Email Attachment Types](#Supported-Email-Attachment-Types)
+- [Tool Usage](#Tool-Usage)
+  - [How does search_emails search?](#How-does-search_emails-search?)
+  - [How do I filter search results to a specific folder?](#How-do-I-filter-search-results-to-a-specific-folder?)
+  - [Can I attach files when creating a draft email?](#Can-I-attach-files-when-creating-a-draft-email?)
+  - [What does reconnect_inbox do?](#What-does-reconnect_inbox-do?)
+  - [What does delete_inbox_data do?](#What-does-delete_inbox_data-do?)
+- [Sync](#Sync)
+  - [What is the difference between full sync and live catch-up?](#What-is-the-difference-between-full-sync-and-live-catch-up?)
+  - [How do I check sync progress?](#How-do-I-check-sync-progress?)
+  - [Why is my full sync stuck in waiting-for-ingestion?](#Why-is-my-full-sync-stuck-in-waiting-for-ingestion?)
+  - [Why is my full sync stuck in running?](#Why-is-my-full-sync-stuck-in-running?)
+  - [What happens if full sync is interrupted?](#What-happens-if-full-sync-is-interrupted-(restart,-crash)?)
+  - [Why are new emails not appearing in search results?](#Why-are-new-emails-not-appearing-in-search-results?)
+  - [What happens to emails sent during full sync?](#What-happens-to-emails-sent-during-full-sync?)
+  - [Why are deleted emails still appearing in search results?](#Why-are-deleted-emails-still-appearing-in-search-results?)
+- [Authentication & Permissions](#Authentication-&-Permissions)
+  - [Do any permissions require admin consent?](#Do-any-permissions-require-admin-consent?)
+  - [Why does the server need Mail.ReadWrite if it mostly reads emails?](#Why-does-the-server-need-Mail.ReadWrite-if-it-mostly-reads-emails?)
+  - [Why can't I use application permissions instead of delegated?](#Why-can't-I-use-application-permissions-instead-of-delegated?)
+  - [Why do I need a client ID and client secret?](#Why-do-I-need-a-client-ID-and-client-secret?)
+  - [What is the "login flicker" when users reconnect?](#What-is-the-"login-flicker"-when-users-reconnect?)
+  - [What happens when a user's Microsoft refresh token expires?](#What-happens-when-a-user's-Microsoft-refresh-token-expires?)
 - [Security](#Security)
-  - [How are Microsoft tokens stored?](#How-are-Microsoft-tokens-stored)
-  - [How are MCP tokens stored?](#How-are-MCP-tokens-stored)
-  - [Why does the server use PKCE?](#Why-does-the-server-use-PKCE)
-  - [What happens if a refresh token is stolen?](#What-happens-if-a-refresh-token-is-stolen)
+  - [How are Microsoft tokens stored?](#How-are-Microsoft-tokens-stored?)
+  - [How are MCP tokens stored?](#How-are-MCP-tokens-stored?)
+  - [Why does the server use PKCE?](#Why-does-the-server-use-PKCE?)
+  - [What happens if a refresh token is stolen?](#What-happens-if-a-refresh-token-is-stolen?)
+- [Configuration](#Configuration)
+  - [What redirect URI should I configure in Entra ID?](#What-redirect-URI-should-I-configure-in-Entra-ID?)
+  - [Why do I need a webhook secret?](#Why-do-I-need-a-webhook-secret?)
+  - [What happens if I change the encryption key?](#What-happens-if-I-change-the-encryption-key?)
+  - [What happens if I change the webhook secret?](#What-happens-if-I-change-the-webhook-secret?)
+  - [What happens if I change the client secret?](#What-happens-if-I-change-the-client-secret?)
+  - [What does INGESTION_DEFAULT_MAIL_FILTERS do?](#What-does-INGESTION_DEFAULT_MAIL_FILTERS-do?)
 - [Deployment](#Deployment)
-  - [Why is RabbitMQ required?](#Why-is-RabbitMQ-required)
-  - [What happens if RabbitMQ is unavailable?](#What-happens-if-RabbitMQ-is-unavailable)
-  - [What happens if PostgreSQL is unavailable?](#What-happens-if-PostgreSQL-is-unavailable)
-  - [Can one deployment serve multiple Microsoft tenants?](#Can-one-deployment-serve-multiple-Microsoft-tenants)
+  - [Why is RabbitMQ required?](#Why-is-RabbitMQ-required?)
+  - [What happens if RabbitMQ is unavailable?](#What-happens-if-RabbitMQ-is-unavailable?)
+  - [What happens if PostgreSQL is unavailable?](#What-happens-if-PostgreSQL-is-unavailable?)
+  - [Can one deployment serve multiple Microsoft tenants?](#Can-one-deployment-serve-multiple-Microsoft-tenants?)
 - [Disaster Recovery](#Disaster-Recovery)
-  - [What do I do if a core infrastructure component fails?](#What-do-I-do-if-a-core-infrastructure-component-fails)
+  - [What do I do if a core infrastructure component fails?](#What-do-I-do-if-a-core-infrastructure-component-fails?)
 - [Related Documentation](#Related-Documentation)
 
 ## General
@@ -101,97 +103,155 @@ An additional 4 tools are available only when the server is running in debug mod
 
 **Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [INGESTION_DEFAULT_MAIL_FILTERS](./operator/configuration.md)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
 
-## Authentication & Permissions
 
-### Do any permissions require admin consent?
+## Data Privacy & Storage
 
-**Answer:** No. All permissions are delegated and do not require admin consent. Users can connect and grant consent themselves without IT involvement.
+### Does the MCP server store my emails?
 
-**See also:** [Permissions](./technical/permissions.md) for the full reference with least-privilege justification.
+**Answer:** No. The Outlook Semantic MCP Server stores **no email content** in its own database. Emails are fetched from Microsoft Graph into memory and forwarded directly to the Unique knowledge base for indexing. Nothing from the email body, subject, sender, or recipients is written to the MCP server's PostgreSQL database.
 
-### Why does the server need `Mail.ReadWrite` if it mostly reads emails?
+The MCP server's PostgreSQL database stores only encrypted OAuth tokens, opaque MCP bearer tokens, sync state, folder metadata, and subscription IDs — no email content. See [Data Classification and Flow](./technical/security.md#Data-Classification-and-Flow) for the full breakdown of what is stored where.
 
-**Answer:** `Mail.ReadWrite` serves dual purposes: it provides read access for email sync and search (full sync, live catch-up), and write access for the `create_draft_email` tool which creates email messages in the user's mailbox via `POST /me/messages`. Since `Mail.ReadWrite` already includes full read access, the narrower `Mail.Read` and `Mail.ReadBasic` scopes are not needed.
+### Where is my email content stored?
 
-Delete detection does not require write access — it works by observing `created` change notifications on ignored folders (such as Deleted Items), not by moving emails.
+**Answer:** Email content (subject, body, sender, recipients, and metadata) is stored in the **Unique knowledge base**, not in the MCP server itself. It is indexed there for semantic search and is accessible via the `search_emails` tool.
 
-**See also:** [Permissions](./technical/permissions.md) — [Tools — create_draft_email](./technical/tools.md#create_draft_email)
+The Unique knowledge base organizes each user's emails into a dedicated **root scope** (a top-level isolation boundary that logically separates one user's ingested data from another's within the Unique platform).
 
-### Why can't I use application permissions instead of delegated?
+**See also:** [Knowledge Base Data Isolation](./technical/security.md#Knowledge-Base-Data-Isolation)
 
-**Answer:** Application permissions would require tenant administrators to create Application Access Policies via PowerShell for each user. This defeats the self-service model where users connect their own accounts without IT involvement.
+### Who can access my email data once it is ingested?
 
-Delegated permissions also ensure the server can only access emails the signed-in user can access — not mailboxes of other users.
+**Answer:** Access to ingested email data operates at two levels:
 
-**See also:** [Why Delegated (Not Application) Permissions](./technical/permissions.md#Why-Delegated-(Not-Application)-Permissions)
+**Via the MCP server (tool layer):** The `search_emails` tool only returns results from the authenticated user's own scope. One user's MCP session cannot query another user's emails.
 
-### Why do I need a client ID and client secret?
+**Via the Unique platform (platform layer):** Email content stored in the Unique knowledge base is subject to Unique's own access control model. This includes:
 
-**Answer:** Microsoft Graph API uses OAuth 2.0. The `CLIENT_ID` identifies your app registration and the `CLIENT_SECRET` proves to Microsoft that your server is the legitimate application. Both are used server-side only — the client secret is never sent to AI clients.
+- The MCP server's service account, which has write access to the ingestion and scope management APIs used during sync
+- Unique platform administrators with API access — email scopes are not surfaced in the Unique Knowledge Base UI, but can be enumerated via the Unique API (e.g. `scopesByCompany`) or accessed directly via the database.
 
-**See also:** [Operator Configuration](./operator/configuration.md)
+Organizations with strict email privacy requirements should control who has API and database access to the Unique platform.
 
-### What is the "login flicker" when users reconnect?
+**See also:** [Knowledge Base Data Isolation](./technical/security.md#Knowledge-Base-Data-Isolation)
 
-**Answer:** When reconnecting, users may see a brief "flicker" — a rapid redirect sequence through Microsoft's login pages. This is **normal** Microsoft OAuth behavior. First-time connections show the full consent screen; subsequent reconnections are automatic.
+### Can an operator with database access read my emails?
 
-**See also:** [Authentication — User Reconnection Experience](./operator/authentication.md#User-Reconnection-Experience-(The-"Login-Flicker")) for details.
+**Answer:** No — not from the MCP server's PostgreSQL database. It contains no email content. An operator with direct database access would see only encrypted OAuth tokens, opaque random bearer tokens, sync state, and folder metadata.
 
-### What happens when a user's Microsoft refresh token expires?
+Decrypting the stored Microsoft tokens would require the `ENCRYPTION_KEY` value, which should be stored in a Kubernetes Secret and not accessible to most operators.
 
-**Answer:** The server can no longer refresh access tokens for that user. All Microsoft Graph operations fail until the user reconnects via the `reconnect_inbox` tool.
+Access to the email content itself requires access to the Unique knowledge base, which is governed separately by Unique platform policies.
 
-Refresh tokens expire after approximately 90 days of inactivity (Microsoft limit, not configurable) or when the user revokes consent.
+**See also:** [Data Classification and Flow](./technical/security.md#Data-Classification-and-Flow)
 
-**See also:** [Microsoft Token Refresh Flow](./technical/flows.md#Microsoft-Token-Refresh-Flow)
+### What happens to my email data when I disconnect?
 
-## Configuration
+**Answer:** Calling `delete_inbox_data`:
 
-### What redirect URI should I configure in Entra ID?
+- Deletes the Microsoft Graph subscription (stops future email sync)
+- Removes the per-user root scopes from the Unique knowledge base, which also removes all ingested email content for that user
+- Clears the inbox configuration and folder sync data from PostgreSQL
 
-**Answer:** The redirect URI must be:
+**See also:** [Data Removal](./technical/security.md#Data-Removal)
 
-```
-https://<your-domain>/auth/callback
-```
+### What email data is actually ingested into the knowledge base?
 
-This must match exactly — including protocol, domain, and path — in both the Entra ID app registration and the `SELF_URL` environment variable. The redirect URI is derived as `<SELF_URL>/auth/callback`.
+**Answer:** The following fields from each email are ingested:
 
-**See also:** [Configuration](./operator/configuration.md)
+- Subject
+- Body (plain text and/or HTML)
+- Sender (name and email address)
+- To, CC, and BCC recipients
+- Received date and time
+- Folder Id
+- Microsoft-assigned email ID and web link
+- Attachments (supported types listed below — note that supported types depend on the Unique knowledge base ingestion pipeline and may change independently of this service)
 
-### Why do I need a webhook secret?
 
-**Answer:** The `MICROSOFT_WEBHOOK_SECRET` validates that incoming webhook notifications actually come from Microsoft Graph. It is sent to Microsoft when creating subscriptions and returned in every notification payload. The server rejects any notification where the `clientState` does not match.
+## Supported Email Attachment Types
 
-**Generate:** `openssl rand -hex 64` (128 characters)
+### Documents
+- **PDF** (`.pdf`)
+- **Word** (`.doc`, `.docx`, `.dotx`)
+- **PowerPoint** (`.ppt`, `.pptx`)
+- **Excel** (`.xls`, `.xlsx`)
 
-**See also:** [Webhook Validation](./technical/security.md#Webhook-Validation) — [Configuration](./operator/configuration.md)
+### Text-based
+- **Plain text** (`.txt`)
+- **HTML** (`.html`, `.htm`)
+- **Markdown** (`.md`)
 
-### What happens if I change the encryption key?
-
-**Answer:** All stored Microsoft tokens become unreadable. All users must reconnect via `reconnect_inbox`. There is no zero-downtime rotation — plan for a maintenance window.
-
-**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
-
-### What happens if I change the webhook secret?
-
-**Answer:** All existing Microsoft Graph subscriptions will fail validation. Notifications will be rejected until subscriptions are recreated. All users must call `reconnect_inbox` after the change.
-
-**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
-
-### What happens if I change the client secret?
-
-**Answer:** Update the Kubernetes secret and restart the pods. Users do not need to reconnect — the server uses the new secret transparently. This supports zero-downtime rotation.
-
-**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
-
-### What does `INGESTION_DEFAULT_MAIL_FILTERS` do?
-
-**Answer:** `INGESTION_DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `retentionWindowInDays` (positive integer — required, the application will not start without it; all ingested emails have an expired at date which is computed using receivedDateTime + retentionWindowInDays), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
-
-When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Configuration](./operator/configuration.md) for the full filter reference.
+Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ignoredContents`) are never ingested.
 
 **See also:** [Configuration](./operator/configuration.md)
+
+
+## Tool Usage
+
+### How does `search_emails` search?
+
+**Answer:** `search_emails` performs semantic search against the Unique knowledge base — not a keyword search against a local index. It supports natural language queries and returns semantically relevant results even when exact words do not match.
+
+Optional structured filters can be passed via the `conditions` array. Each condition is an object with fields like `directories`, `dateFrom`, `dateTo`, `fromSenders`, `toRecipients`, `ccRecipients`, `hasAttachments`, and `categories`. Each field uses a `{ value, operator }` wrapper. Multiple conditions in the array are OR-combined; fields within a single condition are AND-combined. A `limit` parameter (40–100) controls the maximum number of results.
+
+Search results may be incomplete while full sync is in progress. A `syncWarning` field is returned in that case.
+
+**See also:** [Tools — search_emails](./technical/tools.md#search_emails)
+
+### How do I filter search results to a specific folder?
+
+**Answer:** Use the `list_folders` tool to get the folder tree, then pass the folder ID in the `conditions` array using the `directories` field. Well-known system folders like "Inbox", "Sent Items", and "Drafts" can be used by name directly — no need to call `list_folders` for those.
+
+```json
+// Search within a specific folder by name
+{
+  "search": "quarterly report",
+  "conditions": [
+    {
+      "directories": { "value": ["Inbox"], "operator": "in" }
+    }
+  ]
+}
+
+// Search within a custom folder by ID (from list_folders)
+{
+  "search": "project update",
+  "conditions": [
+    {
+      "directories": { "value": ["<folder-id-from-list_folders>"], "operator": "in" }
+    }
+  ]
+}
+```
+
+**See also:** [Tools — list_folders](./technical/tools.md#list_folders) — [Tools — search_emails](./technical/tools.md#search_emails)
+
+### Can I attach files when creating a draft email?
+
+**Answer:** Yes. The `create_draft_email` tool accepts attachments as an array of objects with `fileName` and `data` fields. The `data` field accepts:
+
+- A **base64-encoded data URI** (`data:[mediatype];base64,<data>`) — works in all deployment modes
+- A **Unique content URI** (`unique://content/{contentId}`) — only in cluster-local mode we expect the attachment to be in the chat or in knowledge base. In external mode this URI is unresolvable and the attachment will fail.
+
+If one or more attachments fail to upload, the draft is still created and the failed attachments are listed in the response.
+
+**See also:** [Tools — create_draft_email](./technical/tools.md#create_draft_email)
+
+### What does `reconnect_inbox` do?
+
+**Answer:** `reconnect_inbox` creates a new Microsoft Graph subscription only if none exists or the existing one has expired. If the subscription is within 15 minutes of expiry, it returns `expiring_soon` without making changes (renewal is automatic). If the subscription is active with more than 15 minutes remaining, it returns `already_active`. Use it when:
+
+- `verify_inbox_connection` reports the subscription as `expired` or `not_configured`
+- New emails stopped appearing in search results
+- The user's Microsoft refresh token has been renewed after a period of inactivity
+
+**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Tools — reconnect_inbox](./technical/tools.md#reconnect_inbox)
+
+### What does `delete_inbox_data` do?
+
+**Answer:** `delete_inbox_data` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Flows — Subscription Lifecycle](./technical/flows.md#Subscription-Creation-and-Renewal-Lifecycle) for details.
+
 
 ## Sync
 
@@ -276,151 +336,51 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 **See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Flows](./technical/flows.md) — [Limitations and Constraints](./README.md#Limitations-and-Constraints)
 
-## Tool Usage
 
-### How does `search_emails` search?
+## Authentication & Permissions
 
-**Answer:** `search_emails` performs semantic search against the Unique knowledge base — not a keyword search against a local index. It supports natural language queries and returns semantically relevant results even when exact words do not match.
+### Do any permissions require admin consent?
 
-Optional structured filters can be passed via the `conditions` array. Each condition is an object with fields like `directories`, `dateFrom`, `dateTo`, `fromSenders`, `toRecipients`, `ccRecipients`, `hasAttachments`, and `categories`. Each field uses a `{ value, operator }` wrapper. Multiple conditions in the array are OR-combined; fields within a single condition are AND-combined. A `limit` parameter (40–100) controls the maximum number of results.
+**Answer:** No. All permissions are delegated and do not require admin consent. Users can connect and grant consent themselves without IT involvement.
 
-Search results may be incomplete while full sync is in progress. A `syncWarning` field is returned in that case.
+**See also:** [Permissions](./technical/permissions.md) for the full reference with least-privilege justification.
 
-**See also:** [Tools — search_emails](./technical/tools.md#search_emails)
+### Why does the server need `Mail.ReadWrite` if it mostly reads emails?
 
-### How do I filter search results to a specific folder?
+**Answer:** `Mail.ReadWrite` serves dual purposes: it provides read access for email sync and search (full sync, live catch-up), and write access for the `create_draft_email` tool which creates email messages in the user's mailbox via `POST /me/messages`. Since `Mail.ReadWrite` already includes full read access, the narrower `Mail.Read` and `Mail.ReadBasic` scopes are not needed.
 
-**Answer:** Use the `list_folders` tool to get the folder tree, then pass the folder ID in the `conditions` array using the `directories` field. Well-known system folders like "Inbox", "Sent Items", and "Drafts" can be used by name directly — no need to call `list_folders` for those.
+Delete detection does not require write access — it works by observing `created` change notifications on ignored folders (such as Deleted Items), not by moving emails.
 
-```json
-// Search within a specific folder by name
-{
-  "search": "quarterly report",
-  "conditions": [
-    {
-      "directories": { "value": ["Inbox"], "operator": "in" }
-    }
-  ]
-}
+**See also:** [Permissions](./technical/permissions.md) — [Tools — create_draft_email](./technical/tools.md#create_draft_email)
 
-// Search within a custom folder by ID (from list_folders)
-{
-  "search": "project update",
-  "conditions": [
-    {
-      "directories": { "value": ["<folder-id-from-list_folders>"], "operator": "in" }
-    }
-  ]
-}
-```
+### Why can't I use application permissions instead of delegated?
 
-**See also:** [Tools — list_folders](./technical/tools.md#list_folders) — [Tools — search_emails](./technical/tools.md#search_emails)
+**Answer:** Application permissions would require tenant administrators to create Application Access Policies via PowerShell for each user. This defeats the self-service model where users connect their own accounts without IT involvement.
 
-### Can I attach files when creating a draft email?
+Delegated permissions also ensure the server can only access emails the signed-in user can access — not mailboxes of other users.
 
-**Answer:** Yes. The `create_draft_email` tool accepts attachments as an array of objects with `fileName` and `data` fields. The `data` field accepts:
+**See also:** [Why Delegated (Not Application) Permissions](./technical/permissions.md#Why-Delegated-(Not-Application)-Permissions)
 
-- A **base64-encoded data URI** (`data:[mediatype];base64,<data>`) — works in all deployment modes
-- A **Unique content URI** (`unique://content/{contentId}`) — only in cluster-local mode we expect the attachment to be in the chat or in knowledge base. In external mode this URI is unresolvable and the attachment will fail.
+### Why do I need a client ID and client secret?
 
-If one or more attachments fail to upload, the draft is still created and the failed attachments are listed in the response.
+**Answer:** Microsoft Graph API uses OAuth 2.0. The `CLIENT_ID` identifies your app registration and the `CLIENT_SECRET` proves to Microsoft that your server is the legitimate application. Both are used server-side only — the client secret is never sent to AI clients.
 
-**See also:** [Tools — create_draft_email](./technical/tools.md#create_draft_email)
+**See also:** [Operator Configuration](./operator/configuration.md)
 
-### What does `reconnect_inbox` do?
+### What is the "login flicker" when users reconnect?
 
-**Answer:** `reconnect_inbox` creates a new Microsoft Graph subscription only if none exists or the existing one has expired. If the subscription is within 15 minutes of expiry, it returns `expiring_soon` without making changes (renewal is automatic). If the subscription is active with more than 15 minutes remaining, it returns `already_active`. Use it when:
+**Answer:** When reconnecting, users may see a brief "flicker" — a rapid redirect sequence through Microsoft's login pages. This is **normal** Microsoft OAuth behavior. First-time connections show the full consent screen; subsequent reconnections are automatic.
 
-- `verify_inbox_connection` reports the subscription as `expired` or `not_configured`
-- New emails stopped appearing in search results
-- The user's Microsoft refresh token has been renewed after a period of inactivity
+**See also:** [Authentication — User Reconnection Experience](./operator/authentication.md#User-Reconnection-Experience-(The-"Login-Flicker")) for details.
 
-**See also:** [Architecture — Sync Pipeline](./technical/architecture.md#Sync-Pipeline) — [Tools — reconnect_inbox](./technical/tools.md#reconnect_inbox)
+### What happens when a user's Microsoft refresh token expires?
 
-### What does `delete_inbox_data` do?
+**Answer:** The server can no longer refresh access tokens for that user. All Microsoft Graph operations fail until the user reconnects via the `reconnect_inbox` tool.
 
-**Answer:** `delete_inbox_data` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Flows — Subscription Lifecycle](./technical/flows.md#Subscription-Creation-and-Renewal-Lifecycle) for details.
+Refresh tokens expire after approximately 90 days of inactivity (Microsoft limit, not configurable) or when the user revokes consent.
 
-## Data Privacy & Storage
+**See also:** [Microsoft Token Refresh Flow](./technical/flows.md#Microsoft-Token-Refresh-Flow)
 
-### Does the MCP server store my emails?
-
-**Answer:** No. The Outlook Semantic MCP Server stores **no email content** in its own database. Emails are fetched from Microsoft Graph into memory and forwarded directly to the Unique knowledge base for indexing. Nothing from the email body, subject, sender, or recipients is written to the MCP server's PostgreSQL database.
-
-The MCP server's PostgreSQL database stores only encrypted OAuth tokens, opaque MCP bearer tokens, sync state, folder metadata, and subscription IDs — no email content. See [Data Classification and Flow](./technical/security.md#Data-Classification-and-Flow) for the full breakdown of what is stored where.
-
-### Where is my email content stored?
-
-**Answer:** Email content (subject, body, sender, recipients, and metadata) is stored in the **Unique knowledge base**, not in the MCP server itself. It is indexed there for semantic search and is accessible via the `search_emails` tool.
-
-The Unique knowledge base organizes each user's emails into a dedicated **root scope** (a top-level isolation boundary that logically separates one user's ingested data from another's within the Unique platform).
-
-**See also:** [Knowledge Base Data Isolation](./technical/security.md#Knowledge-Base-Data-Isolation)
-
-### Who can access my email data once it is ingested?
-
-**Answer:** Access to ingested email data operates at two levels:
-
-**Via the MCP server (tool layer):** The `search_emails` tool only returns results from the authenticated user's own scope. One user's MCP session cannot query another user's emails.
-
-**Via the Unique platform (platform layer):** Email content stored in the Unique knowledge base is subject to Unique's own access control model. This includes:
-
-- The MCP server's service account, which has write access to the ingestion and scope management APIs used during sync
-- Unique platform administrators with API access — email scopes are not surfaced in the Unique Knowledge Base UI, but can be enumerated via the Unique API (e.g. `scopesByCompany`) or accessed directly via the database.
-
-Organizations with strict email privacy requirements should control who has API and database access to the Unique platform.
-
-**See also:** [Knowledge Base Data Isolation](./technical/security.md#Knowledge-Base-Data-Isolation)
-
-### Can an operator with database access read my emails?
-
-**Answer:** No — not from the MCP server's PostgreSQL database. It contains no email content. An operator with direct database access would see only encrypted OAuth tokens, opaque random bearer tokens, sync state, and folder metadata.
-
-Decrypting the stored Microsoft tokens would require the `ENCRYPTION_KEY` value, which should be stored in a Kubernetes Secret and not accessible to most operators.
-
-Access to the email content itself requires access to the Unique knowledge base, which is governed separately by Unique platform policies.
-
-**See also:** [Data Classification and Flow](./technical/security.md#Data-Classification-and-Flow)
-
-### What happens to my email data when I disconnect?
-
-**Answer:** Calling `delete_inbox_data`:
-
-- Deletes the Microsoft Graph subscription (stops future email sync)
-- Removes the per-user root scopes from the Unique knowledge base, which also removes all ingested email content for that user
-- Clears the inbox configuration and folder sync data from PostgreSQL
-
-**See also:** [Data Removal](./technical/security.md#Data-Removal)
-
-### What email data is actually ingested into the knowledge base?
-
-**Answer:** The following fields from each email are ingested:
-
-- Subject
-- Body (plain text and/or HTML)
-- Sender (name and email address)
-- To, CC, and BCC recipients
-- Received date and time
-- Folder Id
-- Microsoft-assigned email ID and web link
-- Attachments (supported types listed below — note that supported types depend on the Unique knowledge base ingestion pipeline and may change independently of this service)
-
-## Supported Email Attachment Types
-
-### Documents
-- **PDF** (`.pdf`)
-- **Word** (`.doc`, `.docx`, `.dotx`)
-- **PowerPoint** (`.ppt`, `.pptx`)
-- **Excel** (`.xls`, `.xlsx`)
-
-### Text-based
-- **Plain text** (`.txt`)
-- **HTML** (`.html`, `.htm`)
-- **Markdown** (`.md`)
-
-Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ignoredContents`) are never ingested.
-
-**See also:** [Configuration](./operator/configuration.md)
 
 ## Security
 
@@ -448,6 +408,56 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 
 **See also:** [Refresh Token Rotation](./technical/security.md#Refresh-Token-Rotation)
 
+
+## Configuration
+
+### What redirect URI should I configure in Entra ID?
+
+**Answer:** The redirect URI must be:
+
+```
+https://<your-domain>/auth/callback
+```
+
+This must match exactly — including protocol, domain, and path — in both the Entra ID app registration and the `SELF_URL` environment variable. The redirect URI is derived as `<SELF_URL>/auth/callback`.
+
+**See also:** [Configuration](./operator/configuration.md)
+
+### Why do I need a webhook secret?
+
+**Answer:** The `MICROSOFT_WEBHOOK_SECRET` validates that incoming webhook notifications actually come from Microsoft Graph. It is sent to Microsoft when creating subscriptions and returned in every notification payload. The server rejects any notification where the `clientState` does not match.
+
+**Generate:** `openssl rand -hex 64` (128 characters)
+
+**See also:** [Webhook Validation](./technical/security.md#Webhook-Validation) — [Configuration](./operator/configuration.md)
+
+### What happens if I change the encryption key?
+
+**Answer:** All stored Microsoft tokens become unreadable. All users must reconnect via `reconnect_inbox`. There is no zero-downtime rotation — plan for a maintenance window.
+
+**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
+
+### What happens if I change the webhook secret?
+
+**Answer:** All existing Microsoft Graph subscriptions will fail validation. Notifications will be rejected until subscriptions are recreated. All users must call `reconnect_inbox` after the change.
+
+**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
+
+### What happens if I change the client secret?
+
+**Answer:** Update the Kubernetes secret and restart the pods. Users do not need to reconnect — the server uses the new secret transparently. This supports zero-downtime rotation.
+
+**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
+
+### What does `INGESTION_DEFAULT_MAIL_FILTERS` do?
+
+**Answer:** `INGESTION_DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `retentionWindowInDays` (positive integer — required, the application will not start without it; all ingested emails have an expired at date which is computed using receivedDateTime + retentionWindowInDays), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
+
+When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Configuration](./operator/configuration.md) for the full filter reference.
+
+**See also:** [Configuration](./operator/configuration.md)
+
+
 ## Deployment
 
 ### Why is RabbitMQ required?
@@ -474,6 +484,7 @@ Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, eigh
 
 **See also:** [Architecture](./technical/architecture.md)
 
+
 ## Disaster Recovery
 
 ### What do I do if a core infrastructure component fails?
@@ -486,6 +497,7 @@ is restored.
 - **Unique Knowledge Base loss** — ingested email content must be re-ingested; each affected user must call `restart_full_sync` from their own MCP session (debug mode required). No re-authentication is needed.
 
 **See also:** [Disaster Recovery Runbook](./operator/disaster-recovery.md)
+
 
 ## Related Documentation
 
