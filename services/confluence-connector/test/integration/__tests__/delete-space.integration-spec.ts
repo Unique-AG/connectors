@@ -75,16 +75,13 @@ describe('delete space', () => {
     expect(state.files.map((file) => file.key)).toEqual(['tenant1/space-eng_ENG/eng-1']);
   });
 
-  // The HR space has been entirely deleted on the Confluence side (it does
-  // not even exist anymore — admin removed the space). The connector must
-  // treat this the same way as "space exists but has no labeled content":
-  // its scope and files in Unique are gone after the next sync.
-  //
-  // This is functionally equivalent to the previous test (the connector
-  // cannot distinguish "space deleted" from "space has no labeled pages" at
-  // sync time — both produce zero discovered pages for that space). The case
-  // is documented separately so that operators can find their exact scenario
-  // in the docs.
+  // The HR space has been entirely deleted on the Confluence side (admin
+  // removed the space). At sync time this is indistinguishable from "space
+  // exists but has no labeled content" — both produce zero discovered pages
+  // for that space — so this exercises the same `cleanupRemovedSpaces` code
+  // path as the previous test. It is kept as a separate test on purpose so
+  // both real-world operator scenarios (label removal vs space deletion)
+  // appear by name in the integration suite and the published docs.
   it('deletes a space scope and all its files when the space itself is gone from Confluence', async () => {
     const scenario = defineScenario({
       confluence: {
