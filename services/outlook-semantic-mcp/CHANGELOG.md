@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.1...outlook-semantic-mcp@0.4.2) (2026-05-08)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** un-20441 Make long running traces smaller ([#522](https://github.com/Unique-AG/connectors/issues/522)) ([84f39b8](https://github.com/Unique-AG/connectors/commit/84f39b85d6f22428d0be43a1f22346f7f1876901))
+
 ## [0.4.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.0...outlook-semantic-mcp@0.4.1) (2026-05-07)
 
 
