@@ -9,6 +9,7 @@ export interface PromptMetadata {
   description: string;
   parameters?: z.ZodObject;
   _meta?: SdkPrompt['_meta'];
+  icons?: SdkPrompt['icons'];
 }
 
 export interface PromptOptions {
@@ -17,6 +18,7 @@ export interface PromptOptions {
   description: string;
   parameters?: z.ZodObject;
   _meta?: SdkPrompt['_meta'];
+  icons?: SdkPrompt['icons'];
 }
 
 /**

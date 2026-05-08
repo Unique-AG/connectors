@@ -14,6 +14,7 @@ export interface ToolMetadata {
   outputSchema?: z.ZodObject;
   annotations?: SdkToolAnnotations;
   _meta?: SdkTool['_meta'];
+  icons?: SdkTool['icons'];
 }
 
 export interface ToolAnnotations extends SdkToolAnnotations {}
@@ -26,6 +27,7 @@ export interface ToolOptions {
   outputSchema?: z.ZodObject;
   annotations?: ToolAnnotations;
   _meta?: SdkTool['_meta'];
+  icons?: SdkTool['icons'];
 }
 
 /**
