@@ -81,6 +81,7 @@ Follow these steps to go from zero to a running deployment:
    2. Connect with an MCP client and complete the OAuth flow
    3. Call `verify_inbox_connection` to confirm the webhook subscription is `active`
    4. Send a test email to the connected account, wait a moment, then use `search_emails` to confirm it appears
+8. **(Optional) Enable delegated access** — If your organization uses Exchange mailbox delegation (Full Access or folder-level), set `delegatedAccessScan` to `fullAccessOnly` or `granularAccess` in your Helm values. Both users (delegate and owner) must connect their accounts for delegated search to work. See [Configuration — DELEGATED_ACCESS_SCAN](./configuration.md#DELEGATED_ACCESS_SCAN).
 
 ### Mode B: MicrosoftGraph
 
@@ -120,6 +121,7 @@ See [Deployment — Prerequisites](./deployment.md#Prerequisites) for the full i
    - [ ] Helm values configured ([Configuration Guide](./configuration.md)) *(Both modes)*
    - [ ] Helm chart deployed ([Deployment Guide](./deployment.md)) *(Both modes)*
    - [ ] Database migration — runs automatically via Helm hook; verify post-deploy *(Both modes)*
+   - [ ] `DELEGATED_ACCESS_SCAN` configured if using Exchange mailbox delegation *(Mode A optional)*
 
 4. **Verification**
 

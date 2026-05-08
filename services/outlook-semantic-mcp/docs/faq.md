@@ -17,6 +17,10 @@
   - [Who can access my email data once it is ingested?](#Who-can-access-my-email-data-once-it-is-ingested?)
   - [Can an operator with database access read my emails?](#Can-an-operator-with-database-access-read-my-emails?)
   - [What happens to my email data when I disconnect?](#What-happens-to-my-email-data-when-I-disconnect?)
+- [Shared Inbox & Delegated Access](#Shared-Inbox-&-Delegated-Access)
+  - [Who has access to a shared inbox?](#Who-has-access-to-a-shared-inbox?)
+  - [What happens with delegated access?](#What-happens-with-delegated-access?)
+  - [When shared inbox access is revoked, are previously ingested emails still accessible?](#When-shared-inbox-access-is-revoked,-are-previously-ingested-emails-still-accessible?)
 - [Supported Email Attachment Types](#Supported-Email-Attachment-Types)
 - [Tool Usage](#Tool-Usage)
   - [How does search_emails search?](#How-does-search_emails-search?)
@@ -134,7 +138,7 @@ In `MicrosoftGraph` mode, email content is not stored anywhere — it is queried
 
 **Answer:** (Applies to Mode A — `MicrosoftGraphAndUniqueApi` — only) Access to ingested email data operates at two levels:
 
-**Via the MCP server (tool layer):** The `search_emails` tool only returns results from the authenticated user's own scope. One user's MCP session cannot query another user's emails.
+**Via the MCP server (tool layer):** The `search_emails` tool returns results from the authenticated user's own email scope. When `DELEGATED_ACCESS_SCAN` is enabled and the user has been granted delegated access to another user's mailbox in Microsoft 365, `search_emails` also returns results from that owner's scope — but only while both users are connected and the access relationship is active. Outside of an explicitly configured delegated access relationship, one user's MCP session cannot access another user's emails.
 
 **Via the Unique platform (platform layer):** Email content stored in the Unique knowledge base is subject to Unique's own access control model. This includes:
 
@@ -179,6 +183,139 @@ In Mode B (`MicrosoftGraph`), there is no inbox data to delete — `delete_inbox
 - Folder Id
 - Microsoft-assigned email ID and web link
 - Attachments (supported types listed below — note that supported types depend on the Unique knowledge base ingestion pipeline and may change independently of this service)
+
+
+## Shared Inbox & Delegated Access
+
+> Ingestion never occurs in Mode B (`MicrosoftGraph`) regardless of
+> `DELEGATED_ACCESS_SCAN`. The discovery job runs in both modes when enabled.
+> In Mode B, only delegates with **full mailbox access** can search delegated
+> mailboxes — honouring folder-level delegations would require querying every
+> accessible folder individually, which is not implemented due to API rate
+> limits.
+
+### Who has access to a shared inbox?
+
+**Answer:** Any user whose Microsoft 365 account has been granted access to
+another user's mailbox — either Full Access (Read & Manage) or folder-level
+delegation configured via the Exchange admin center. The connector discovers
+these relationships automatically — no manual configuration is needed beyond
+enabling `DELEGATED_ACCESS_SCAN`.
+
+**Mode A (`MicrosoftGraphAndUniqueApi`):** A background discovery job
+periodically tests which other mailboxes each connected user can access via
+Microsoft Graph. When a delegation is detected, the owner's already-indexed
+emails become searchable by the delegate through `search_emails` — no additional
+ingestion occurs. **Both users must be connected** to the MCP connector: the
+owner's emails are only available if the owner has also connected their account
+and completed ingestion. Each user's emails remain in their own isolated scope in
+the Unique knowledge base.
+
+**Mode B (`MicrosoftGraph`):** The same background discovery job runs and
+records delegated mailbox relationships (`granularAccess` is not supported in
+Mode B — use `fullAccessOnly`). When `search_emails` is called, it queries each
+discovered delegated mailbox via a live Microsoft Graph KQL search alongside the
+user's own mailbox. Only delegates with **full mailbox access** can search
+delegated mailboxes in Mode B — honouring folder-level delegations would require
+querying every accessible folder individually, which is not implemented due to
+API rate limits. Microsoft Graph enforces permissions at query time — if the user no
+longer has access in Microsoft 365, that query returns no results. No ingestion
+occurs.
+
+**See also:** [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
+
+---
+
+### What happens with delegated access?
+
+**Answer:** When a user has been granted delegated or shared mailbox access in
+Microsoft 365, the connector's background jobs detect this and make the delegated
+mailbox searchable. There are two jobs:
+
+- **Discovery** (both `fullAccessOnly` and `granularAccess`) — periodically
+  checks which connected users have delegated access to another connected user's
+  mailbox and records the relationship. This is the only job that runs when
+  `DELEGATED_ACCESS_SCAN=fullAccessOnly`.
+- **Verification** (`granularAccess` only) — after discovery records a
+  delegation, the verification job runs more frequently and confirms exactly which
+  folders within the delegated mailbox are currently readable. It also detects
+  when folder-level access has been revoked.
+
+**Mode A (`MicrosoftGraphAndUniqueApi`):**
+
+- **Separate scopes, no new ingestion.** Each user's emails are stored in their
+  own isolated per-user scope in the Unique knowledge base. Discovery records the
+  access relationship — it does not trigger any ingestion. The delegate gains
+  search visibility into the owner's scope; nothing is copied or merged.
+- **Both users must be connected (both modes).** Discovery only considers
+  connected users — if the owner has not connected their MCP account there is
+  nothing to discover or search. In Mode A the owner must also have completed
+  the initial full sync for their emails to be visible to the delegate.
+- **Automatic detection.** New delegated access is picked up automatically on the
+  next discovery run — no user action is needed. In `granularAccess` mode,
+  folder-level access details are kept up to date by the verification job.
+- **Folder filtering.** Delegated mailboxes appear in
+  `list_mailboxes_and_directories` alongside the user's own mailbox (with
+  `isOwn: false`). Their folder IDs can be passed to the `directories` condition
+  in `search_emails` to narrow results to a specific folder.
+
+**Mode B (`MicrosoftGraph`):** Discovery runs and records delegated mailbox
+relationships. **Both users must be connected** to the MCP server — discovery
+only considers connected users, so if the owner has not connected their account
+there is nothing to discover or search. Each `search_emails` call queries the
+discovered delegated mailboxes via live Microsoft Graph KQL in addition to the
+user's own mailbox. **Only full mailbox access is supported in Mode B** —
+honouring folder-level delegations would require querying every accessible
+folder individually, which is not implemented due to API rate limits. Delegates
+who only have folder-level access to a mailbox cannot search it in Mode B. Folder filtering via `directories` is not supported in Mode B regardless
+of delegation.
+
+**See also:** [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
+
+---
+
+### When shared inbox access is revoked, are previously ingested emails still accessible?
+
+**Mode A (`MicrosoftGraphAndUniqueApi`):** No — but there is a detection delay
+whose length depends on which scan mode is configured.
+
+The connector runs up to two background jobs. Both can detect revocation:
+
+- **Discovery** (both modes) — tests whether the delegate can still access the
+  mailbox at all, and deletes the access record on 403/404. Scheduled via
+  `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` (default: every 12 hours; if you
+  are using `fullAccessOnly`, consider setting this to 4× per day since
+  discovery is the only revocation detection mechanism in that mode).
+- **Verification** (`granularAccess` only) — tests each folder individually and
+  deletes the access record when no folders remain accessible. Scheduled via
+  `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` (default: every 4 hours).
+
+In `granularAccess` mode, the verification job typically detects revocation
+first because it runs more frequently than discovery.
+
+Once a job detects revocation, the access record is removed and the owner's
+scope is excluded from the delegate's subsequent `search_emails` queries. During
+the window before detection, search results may still include emails from the
+revoked mailbox.
+
+The owner's emails are **not affected** — they remain in the owner's own
+per-user scope in the Unique knowledge base. Nothing is deleted or modified in
+either user's scope as a result of revocation.
+
+**Summary (Mode A):**
+
+| Scan mode | Access revoked — stale results visible until… |
+|-----------|------------------------------------------------|
+| `fullAccessOnly` | Next discovery run (default every 12 h — recommend configuring 4×/day) |
+| `granularAccess` | Next verification run (default every 4 h) |
+
+**Mode B (`MicrosoftGraph`):** Because `search_emails` queries Microsoft Graph
+live, revocation takes effect immediately at query time — Microsoft Graph rejects
+the call and no results are returned from the revoked mailbox. The access record
+is removed immediately after that failed query, so subsequent calls will no
+longer include the revoked mailbox.
+
+**See also:** [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
 
 
 ## Supported Email Attachment Types

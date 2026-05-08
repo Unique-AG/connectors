@@ -155,13 +155,83 @@ After a subscription is created, the server automatically begins ingesting the u
 
 ## Directory Sync Flow
 
-The server continuously syncs the user's Outlook folder structure from Microsoft Graph. This serves two purposes: enabling folder-based search filtering via the `list_folders` tool, and tracking email movement between folders to handle "deleted" emails without relying on delete notifications.
+The server continuously syncs the user's Outlook folder structure from Microsoft Graph. This serves two purposes: enabling folder-based search filtering via the `list_mailboxes_and_directories` tool, and tracking email movement between folders to handle "deleted" emails without relying on delete notifications.
 
 **Key points:**
 
 - Directory sync runs on a 5-minute schedule using Graph delta queries, plus on-demand at the start of each full sync and live catch-up execution.
 - System folders such as Deleted Items, Junk Email, Recoverable Items Deletions, and Conversation History are excluded from sync (`ignoreForSync = true`). When an email is moved to an excluded folder, it is removed from the knowledge base.
-- The `list_folders` tool returns the folder tree synced here. The folder IDs it returns can be passed in the `conditions[].directories` field of `search_emails` to narrow results to a specific mailbox folder.
+- The `list_mailboxes_and_directories` tool returns the folder tree synced here. The folder IDs it returns can be passed in the `conditions[].directories` field of `search_emails` to narrow results to a specific mailbox folder.
+
+## Delegated Access Discovery Flow
+
+When `DELEGATED_ACCESS_SCAN` is not `disabled`, two background jobs maintain
+delegated access state. The **discovery job** identifies which connected users
+have access to other connected users' mailboxes. The **verification job**
+(`granularAccess` mode only) runs more frequently and confirms which specific
+folders within each delegated mailbox are still readable.
+
+Neither job triggers email ingestion. They write permission records that
+`search_emails` reads at query time to include the owner's scope alongside the
+delegate's own scope.
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+sequenceDiagram
+    autonumber
+    participant Scheduler as Cron Scheduler
+    participant AMQP as RabbitMQ
+    participant Server as Outlook Semantic MCP Server
+    participant MSGraph as Microsoft Graph API
+    participant DB as PostgreSQL
+
+    Note over Scheduler,DB: Discovery — DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE (default every 12 h)
+    Scheduler->>AMQP: Publish delegated-access.discover event
+    AMQP->>Server: Consume event
+    loop For each delegate × owner pair (connected users)
+        alt fullAccessOnly mode
+            Server->>MSGraph: GET /users/{ownerEmail}/messages?$top=1
+        else granularAccess mode
+            Server->>MSGraph: GET /users/{ownerEmail}/mailFolders?$top=1
+        end
+        alt 200 — access confirmed
+            Server->>DB: UPSERT delegatedAccessAccounts
+        else 403 / 404 — access revoked
+            Server->>DB: DELETE delegatedAccessAccounts (cascade → delegatedAccessDirectories)
+        else 429 / 5xx — transient error
+            Server->>Server: Skip pair, retry on next run
+        end
+    end
+
+    Note over Scheduler,DB: Verification — granularAccess only, DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE (default every 4 h)
+    Scheduler->>AMQP: Publish delegated-access.sync event
+    AMQP->>Server: Consume event (one message per account)
+    loop For each delegatedAccessAccounts record
+        Server->>MSGraph: GET /users/{ownerEmail}/messages?$top=1
+        alt Full access confirmed (200)
+            Server->>DB: SET hasFullDelegatedAccess=true
+            Server->>DB: DELETE all delegatedAccessDirectories for account
+        else Folder-level access only
+            loop For each folder in mailbox
+                Server->>MSGraph: GET /users/{ownerEmail}/mailFolders/{id}/messages?$top=1
+            end
+            Server->>DB: UPSERT accessible folders in delegatedAccessDirectories
+            Server->>DB: DELETE inaccessible folders from delegatedAccessDirectories
+            alt No accessible folders and no transient errors
+                Server->>DB: DELETE delegatedAccessAccounts (cascade → delegatedAccessDirectories)
+            end
+        end
+    end
+```
+
+**Key points:**
+
+- Discovery iterates over all connected user pairs (delegate × owner). It probes one Graph endpoint per pair — `GET /users/{ownerEmail}/messages` in `fullAccessOnly` mode, `GET /users/{ownerEmail}/mailFolders` in `granularAccess` mode.
+- A 403 or 404 response immediately deletes the access record and all associated folder grants (cascading delete). The owner's scope is excluded from the delegate's next `search_emails` call.
+- Transient errors (429, 5xx) cause the pair to be skipped; the next scheduled run retries.
+- The verification job (`granularAccess` only) tests each folder individually, rebuilds `delegatedAccessDirectories` from confirmed-accessible folders, and deletes the account record if no folders remain accessible and no transient errors occurred.
+- In Mode B (`MicrosoftGraph`), only full-access delegations are searchable — honouring folder-level grants would require querying every accessible folder individually, which is not implemented due to API rate limits. Folder-level grants detected by verification have no effect on Mode B search results.
+- A recovery scheduler monitors both jobs. If either stalls (state `running` for > 10 minutes with no progress), it is automatically restarted.
 
 ## Email Draft Creation Flow
 

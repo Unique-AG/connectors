@@ -46,7 +46,7 @@ Set via `mcpConfig.app` in Helm values:
 | `MCP_BACKEND` | `mcpConfig.app.mcpBackend` | `MicrosoftGraphAndUniqueApi` | Selects the search backend — see [MCP_BACKEND](#MCP_BACKEND) |
 | `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
 | `DELEGATED_ACCESS_SCAN` | `mcpConfig.app.delegatedAccessScan` | `disabled` | Delegated access scanning mode — see [DELEGATED_ACCESS_SCAN](#DELEGATED_ACCESS_SCAN) |
-| `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` | `mcpConfig.app.delegatedAccessDiscoveryCronSchedule` | `0 */6 * * *` | Cron schedule for delegated access discovery runs. Required when `DELEGATED_ACCESS_SCAN` is not `disabled` |
+| `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` | `mcpConfig.app.delegatedAccessDiscoveryCronSchedule` | `0 */12 * * *` | Cron schedule for delegated access discovery runs. Required when `DELEGATED_ACCESS_SCAN` is not `disabled` |
 | `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` | `mcpConfig.app.delegatedAccessVerificationCronSchedule` | `0 */4 * * *` | Cron schedule for delegated access verification runs. Required when `DELEGATED_ACCESS_SCAN` is `granularAccess` |
 
 ### Microsoft Configuration
@@ -177,7 +177,7 @@ mcpConfig:
     mcpDebugMode: disabled
     mcpBackend: MicrosoftGraphAndUniqueApi
     delegatedAccessScan: disabled
-    # delegatedAccessDiscoveryCronSchedule: '0 */6 * * *'   # required when delegatedAccessScan != disabled
+    # delegatedAccessDiscoveryCronSchedule: '0 */12 * * *'  # required when delegatedAccessScan != disabled
     # delegatedAccessVerificationCronSchedule: '0 */4 * * *' # required when delegatedAccessScan == granularAccess
 
   microsoft:
@@ -479,6 +479,27 @@ Controls whether the service scans for delegated mailbox access granted between 
 | Users share individual folders (e.g., Inbox, RFQ) with others | `granularAccess` |
 
 `granularAccess` subsumes `fullAccessOnly` — if your org uses both types of delegation, use `granularAccess`.
+
+!!! warning "`granularAccess` requires Mode A — Mode B supports full access only"
+    `granularAccess` requires `MCP_BACKEND=MicrosoftGraphAndUniqueApi` and will
+    fail to start if configured with `MicrosoftGraph`. `fullAccessOnly` is
+    supported in both modes, but in Mode B only delegates with **full mailbox
+    access** can search delegated mailboxes — honouring folder-level delegations
+    would require querying every accessible folder individually, which is not
+    implemented due to API rate limits.
+
+> **Both users must be connected (both modes).** Discovery only considers
+> connected users — if the owner has not connected their account, there is
+> nothing to discover or search regardless of mode. In Mode A the owner must
+> also have completed the initial full sync for their emails to be available to
+> the delegate.
+
+> **`fullAccessOnly` — consider a more frequent discovery schedule.** When using
+> `fullAccessOnly`, discovery is the only revocation detection mechanism.
+> Consider setting `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` to run 4 times per
+> day (e.g. `0 */6 * * *`) to reduce the window during which a revoked delegate
+> can still search the owner's emails. In `granularAccess` mode this is less
+> critical because the verification job already runs every 4 hours.
 
 ### MCP_DEBUG_MODE
 

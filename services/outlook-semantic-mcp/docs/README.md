@@ -255,7 +255,6 @@ See [Architecture — Authentication](./technical/architecture.md#Authentication
 ### Not Supported
 
 - **Application permissions**: The server uses delegated permissions only (acting on behalf of a signed-in user). It does not support application-level permissions, so it cannot run as a background daemon accessing mailboxes without user sign-in
-- **Shared mailboxes**: Microsoft Exchange shared mailbox entities (dedicated mailboxes accessible to multiple members) are not supported. For user-to-user mailbox delegation (Full Access or folder-level access granted via Exchange admin), see `DELEGATED_ACCESS_SCAN` in [Configuration](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
 - **Calendar or task data**: Only mail and contacts are in scope
 - **Token introspection**: MCP tokens validated locally with short TTLs for performance
 

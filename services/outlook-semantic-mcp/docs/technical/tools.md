@@ -425,6 +425,7 @@ List all Outlook mailboxes and their folder trees available to the user.
 - In Mode A, the folder tree is synced from Microsoft Graph and reflects the user's current mailbox structure. Calling this tool triggers a fresh sync of the folder tree.
 - Folder filtering via `directories` is only effective in Mode A (`MicrosoftGraphAndUniqueApi`). In Mode B, the Microsoft Graph Search API does not support folder-scoped filtering — the `directories` condition is ignored.
 - Well-known system folder names (`"Inbox"`, `"Sent Items"`, `"Drafts"`, etc.) can be used directly in `search_emails` without calling this tool first.
+- When `DELEGATED_ACCESS_SCAN` is enabled, the `mailboxes` array includes delegated mailboxes alongside the user's own mailbox. The `isOwn` field is `true` for the user's primary mailbox and `false` for delegated ones. Folder IDs from delegated mailboxes can be passed to the `directories` condition in `search_emails` to narrow results to a specific folder in a delegated mailbox (folder filtering via `directories` is only effective in Mode A).
 
 ---
 
