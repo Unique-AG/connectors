@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import type { IngestionConfig } from '@unique-ag/unique-api';
 import type { FakeUniqueApi } from '../fakes/fake-unique-api';
 
 export interface UniqueScopeState {
@@ -17,6 +18,8 @@ export interface UniqueFileState {
   bodyHash: string | null;
   bodySize: number;
   bodyText: string | null;
+  /** Captured `ingestionConfig` (e.g. `jpgReadMode`) from the registerContent call. */
+  ingestionConfig: IngestionConfig | null;
 }
 
 export interface UniqueState {
@@ -58,6 +61,7 @@ export function getUniqueState(unique: FakeUniqueApi): UniqueState {
       bodyHash: file.body ? sha256(file.body) : null,
       bodySize: file.body?.byteLength ?? 0,
       bodyText: bodyTextOrNull(file.mimeType, file.body),
+      ingestionConfig: file.ingestionConfig,
     }))
     .sort((a, b) => a.key.localeCompare(b.key));
 

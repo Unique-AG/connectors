@@ -243,7 +243,7 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
     const raw: ConfluencePage = {
       id: page.id,
       title: page.title,
-      type: ContentType.PAGE,
+      type: page.type ?? ContentType.PAGE,
       space: { id: space.id, key: space.key, name: space.name },
       version: { when: page.versionWhen },
       _links: { webui: `/spaces/${page.spaceKey}/pages/${page.id}` },

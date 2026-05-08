@@ -8,7 +8,8 @@ import { FileDiffService } from '../../../src/synchronization/file-diff.service'
 import { IngestionService } from '../../../src/synchronization/ingestion.service';
 import { ScopeManagementService } from '../../../src/synchronization/scope-management.service';
 import type { TenantContext } from '../../../src/tenant';
-import { tenantStorage } from '../../../src/tenant';
+import { TenantDeleteService, tenantStorage } from '../../../src/tenant';
+import type { DeleteResult } from '../../../src/tenant/tenant-delete-result.types';
 import { FakeBlobStorage } from '../fakes/fake-blob-storage';
 import { FakeConfluenceApi } from '../fakes/fake-confluence-api';
 import { FakeUniqueApi } from '../fakes/fake-unique-api';
@@ -21,6 +22,11 @@ export interface ScenarioContext {
   readonly unique: FakeUniqueApi;
   readonly metrics: Metrics;
   runSync(): Promise<SyncResult>;
+  /**
+   * Run the tenant-deletion flow (used when a tenant's status flips to
+   * `deleted`). Wipes child scopes and content while preserving the root scope.
+   */
+  runDelete(): Promise<DeleteResult>;
   close(): Promise<void>;
 }
 
@@ -86,6 +92,13 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
     metrics,
   );
 
+  const deleteService = new TenantDeleteService(
+    scenario.tenant.name,
+    tenantConfig.ingestion.scopeId,
+    fakeUnique,
+    metrics,
+  );
+
   const tenant: TenantContext = {
     name: scenario.tenant.name,
     config: tenantConfig,
@@ -99,6 +112,7 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
     unique: fakeUnique,
     metrics,
     runSync: () => tenantStorage.run(tenant, () => syncService.synchronize()),
+    runDelete: () => tenantStorage.run(tenant, () => deleteService.deleteTenantContent()),
     close: () => blobStorage.close(),
   };
 }

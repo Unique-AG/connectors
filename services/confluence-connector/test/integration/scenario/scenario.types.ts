@@ -1,4 +1,5 @@
 import type { TenantConfig } from '../../../src/config';
+import type { ContentType } from '../../../src/confluence-api';
 
 export type InstanceDescriptor =
   | { type: 'cloud'; cloudId: string; baseUrl: string }
@@ -44,6 +45,13 @@ export interface ScenarioPage {
   parentId?: string;
   versionWhen: string;
   attachments?: ScenarioAttachment[];
+  /**
+   * Confluence content type. Defaults to `page`. Use `blogpost` to test blog
+   * post ingestion, or `database` / `whiteboard` / `embed` to test that the
+   * scanner skips these types (descendants are still discoverable via
+   * `parentId`, which is exercised by `content-types.integration-spec.ts`).
+   */
+  type?: ContentType;
 }
 
 export interface ScenarioConfluence {
@@ -73,6 +81,12 @@ export interface ScenarioUniqueFile {
    * want to test "no-change" or "older Unique data" scenarios.
    */
   updatedAt?: string;
+  /**
+   * Scope the file belongs to in Unique (`SCOPE` ownerId). Used by
+   * `files.getContentIdsByScope`, which the tenant-deletion flow relies on.
+   * Set this when seeding files for delete-tenant or scope-targeted tests.
+   */
+  scopeId?: string;
 }
 
 export interface ScenarioUnique {

@@ -5,6 +5,7 @@ import type {
   FileDiffItem,
   FileDiffResponse,
   IngestionApiResponse,
+  IngestionConfig,
   IngestionFinalizationRequest,
   Scope,
   ScopeAccess,
@@ -21,10 +22,12 @@ interface PendingUpload {
   key: string;
 }
 
-interface StoredFile extends UniqueFile {
+export interface StoredFile extends UniqueFile {
   mimeType: string;
   body?: Buffer;
   updatedAt: string;
+  /** Captured `ingestionConfig` from the most recent registerContent call (e.g. `jpgReadMode`). */
+  ingestionConfig: IngestionConfig | null;
 }
 
 interface FailureMap {
@@ -72,13 +75,14 @@ export class FakeUniqueApi implements UniqueApiClient {
         byteSize: file.byteSize,
         mimeType: file.mimeType,
         ownerType: 'SCOPE',
-        ownerId: 'unknown',
+        ownerId: file.scopeId ?? 'unknown',
         fileAccess: [],
         expiresAt: null,
         ingestionState: IngestionState.Finished,
         metadata: file.metadata ?? null,
         body: file.body,
         updatedAt: file.updatedAt ?? new Date(0).toISOString(),
+        ingestionConfig: null,
       });
     }
 
@@ -239,7 +243,8 @@ export class FakeUniqueApi implements UniqueApiClient {
       },
       addAccesses: async (_scopeId: string, _accesses: FileAccessInput[]) => 0,
       removeAccesses: async (_scopeId: string, _accesses: FileAccessInput[]) => 0,
-      getContentIdsByScope: notImplemented('files.getContentIdsByScope'),
+      getContentIdsByScope: async (scopeId: string) =>
+        [...this.filesById.values()].filter((f) => f.ownerId === scopeId).map((f) => f.id),
       getFileKeysByScopeId: notImplemented('files.getFileKeysByScopeId'),
       getIdsByScopeAndMetadataKey: notImplemented('files.getIdsByScopeAndMetadataKey'),
       getIdsByScope: notImplemented('files.getIdsByScope'),
@@ -330,6 +335,7 @@ export class FakeUniqueApi implements UniqueApiClient {
       metadata: stringifyMetadata(request.metadata),
       body: undefined,
       updatedAt: new Date().toISOString(),
+      ingestionConfig: request.ingestionConfig ?? null,
     };
     this.filesById.set(id, file);
     this.pendingUploads.set(uploadToken, { contentId: id, key: request.key });
