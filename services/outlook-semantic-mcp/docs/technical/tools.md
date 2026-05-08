@@ -264,7 +264,7 @@ Retrieve the full content of an email by its ID returned from `search_emails`.
     id: string;
     title: string | null;
     metadata: unknown | null;
-    text: string;              // full email body
+    text: string;              // full email body or the matched chunks depending on which search returned the results
   };
 }
 ```
