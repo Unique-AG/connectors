@@ -74,8 +74,7 @@ ingress:
 grafana:
   dashboard:
     # -- Enable Grafana dashboard ConfigMap creation.
-    # Disabled until a real kyckr-mcp dashboard is added to files/grafana-dashboard.json.
-    enabled: false
+    enabled: true
     # -- Grafana folder where the dashboard will be placed
     folder: mcp-servers
 
