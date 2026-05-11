@@ -16,25 +16,24 @@ export class DeduplicateSitesQuery {
     // We pass them through unchanged and rely on per-site checks.
     // Walk the input once preserving original order so that the subsequent
     // deduplicateBySiteId pass keeps first-occurrence-wins semantics across the operator's config.
-    const seenFixedScopeIds = new Set<string>();
-    const filteredScopeIds: Record<string, SiteConfig[]> = {};
+    const sitesGroupedByScopeId: Record<string, SiteConfig[]> = {};
     const deduplicatedSites = sites.flatMap((site) => {
       if (isAutoScope(site.scopeId)) {
         return [site];
       }
       const fixedScopeId = site.scopeId.scopeId;
-      if (seenFixedScopeIds.has(fixedScopeId)) {
-        filteredScopeIds[fixedScopeId] ??= [];
-        filteredScopeIds[fixedScopeId].push(site);
-        return [];
-      }
-      seenFixedScopeIds.add(fixedScopeId);
-      return [site];
+      const isDuplicate = isNonNullish(sitesGroupedByScopeId[fixedScopeId]);
+
+      sitesGroupedByScopeId[fixedScopeId] ??= [];
+      sitesGroupedByScopeId[fixedScopeId].push(site);
+
+      return isDuplicate ? [] : [site];
     });
 
     pipe(
-      filteredScopeIds,
+      sitesGroupedByScopeId,
       entries(),
+      filter(([, sites]) => sites.length > 1),
       forEach(([scopeId, sites]) => this.logDuplicateScopeId(scopeId, sites)),
     );
 

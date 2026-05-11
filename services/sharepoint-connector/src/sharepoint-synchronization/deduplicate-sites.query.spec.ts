@@ -50,6 +50,29 @@ describe('DeduplicateSitesQuery', () => {
         expect.stringContaining('DUPLICATE SCOPE ID DETECTED!'),
       );
       expect(loggerSpy).toHaveBeenCalledWith(expect.stringContaining('scope_duplicate'));
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining('siteId: site-1 (WILL SYNC - first occurrence)'),
+      );
+      expect(loggerSpy).toHaveBeenCalledWith(
+        expect.stringContaining('siteId: site-2 (SKIPPED - duplicate scopeId)'),
+      );
+    });
+
+    it('does not log a duplicate-scope error when every fixed scopeId is unique', () => {
+      const site1 = createMockSiteConfig({
+        siteId: new Smeared('site-1', false),
+        scopeId: { type: 'fixed', scopeId: 'scope_a' },
+      });
+      const site2 = createMockSiteConfig({
+        siteId: new Smeared('site-2', false),
+        scopeId: { type: 'fixed', scopeId: 'scope_b' },
+      });
+
+      query.execute([site1, site2]);
+
+      expect(loggerSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('DUPLICATE SCOPE ID DETECTED!'),
+      );
     });
 
     it('passes auto rows through alongside fixed rows', () => {
