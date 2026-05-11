@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MetricService } from 'nestjs-otel';
 import { KyckrConfig, kyckrConfig } from '~/config';
 import { KyckrHttpClient } from './kyckr-http.client';
+import { MetricsModule } from './metrics';
 import { CreateDocumentOrderQuery } from './tools/create-document-order/create-document-order.query';
 import { CreateDocumentOrderTool } from './tools/create-document-order/create-document-order.tool';
 import { GetEnhancedProfileQuery } from './tools/get-enhanced-profile/get-enhanced-profile.query';
@@ -37,6 +38,7 @@ const TOOLS = [
 ];
 
 @Module({
+  imports: [MetricsModule],
   providers: [
     {
       provide: KyckrHttpClient,

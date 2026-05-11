@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { type KyckrConfig, kyckrConfig } from '~/config';
 import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
+import { Metrics } from '../../metrics';
 import {
   KyckrActivitySchema,
   KyckrAddressSchema,
@@ -245,6 +246,7 @@ export class GetEnhancedProfileQuery {
 
   public constructor(
     private readonly kyckrClient: KyckrHttpClient,
+    private readonly metrics: Metrics,
     @Inject(kyckrConfig.KEY)
     private readonly config: KyckrConfig,
   ) {}
@@ -257,6 +259,8 @@ export class GetEnhancedProfileQuery {
         { customerReference: this.config.defaultCustomerReference },
       );
       const response = EnhancedProfileEnvelopeSchema.parse(raw);
+      this.metrics.recordToolCall('get_enhanced_profile', 'success');
+      this.metrics.recordCreditsConsumed('get_enhanced_profile', response.cost);
       return { success: true, ...response };
     } catch (err) {
       if (err instanceof KyckrApiError) {
@@ -269,6 +273,7 @@ export class GetEnhancedProfileQuery {
           },
           'get_enhanced_profile: Kyckr API rejected request',
         );
+        this.metrics.recordToolCall('get_enhanced_profile', 'error');
         return {
           success: false,
           statusCode: err.status,

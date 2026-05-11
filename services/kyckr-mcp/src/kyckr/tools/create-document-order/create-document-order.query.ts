@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { type KyckrConfig, kyckrConfig } from '~/config';
 import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
+import { Metrics } from '../../metrics';
 import {
   KyckrBaseResponseShape,
   KyckrIdSchema,
@@ -60,6 +61,7 @@ export class CreateDocumentOrderQuery {
 
   public constructor(
     private readonly kyckrClient: KyckrHttpClient,
+    private readonly metrics: Metrics,
     @Inject(kyckrConfig.KEY)
     private readonly config: KyckrConfig,
   ) {}
@@ -74,6 +76,8 @@ export class CreateDocumentOrderQuery {
         contactEmail: this.config.defaultContactEmail,
       });
       const response = CreateOrderEnvelopeSchema.parse(raw);
+      this.metrics.recordToolCall('create_document_order', 'success');
+      this.metrics.recordCreditsConsumed('create_document_order', response.cost);
       return { success: true, ...response };
     } catch (err) {
       if (err instanceof KyckrApiError) {
@@ -87,6 +91,7 @@ export class CreateDocumentOrderQuery {
           },
           'create_document_order: Kyckr API rejected request',
         );
+        this.metrics.recordToolCall('create_document_order', 'error');
         return {
           success: false,
           statusCode: err.status,

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
+import { Metrics } from '../../metrics';
 import {
   KyckrBaseResponseShape,
   KyckrOrdersPageSchema,
@@ -58,7 +59,10 @@ export type ListOrdersResult = z.infer<typeof ListOrdersOutputSchema>;
 export class ListOrdersQuery {
   private readonly logger = new Logger(ListOrdersQuery.name);
 
-  public constructor(private readonly kyckrClient: KyckrHttpClient) {}
+  public constructor(
+    private readonly kyckrClient: KyckrHttpClient,
+    private readonly metrics: Metrics,
+  ) {}
 
   @Span()
   public async run(input: ListOrdersInput): Promise<ListOrdersResult> {
@@ -69,6 +73,8 @@ export class ListOrdersQuery {
         isoCode: input.isoCode,
       });
       const response = ListOrdersEnvelopeSchema.parse(raw);
+      this.metrics.recordToolCall('list_orders', 'success');
+      this.metrics.recordCreditsConsumed('list_orders', response.cost);
       return { success: true, ...response };
     } catch (err) {
       if (err instanceof KyckrApiError) {
@@ -76,6 +82,7 @@ export class ListOrdersQuery {
           { status: err.status, correlationId: err.correlationId, msg: err.message },
           'list_orders: Kyckr API rejected request',
         );
+        this.metrics.recordToolCall('list_orders', 'error');
         return {
           success: false,
           statusCode: err.status,
