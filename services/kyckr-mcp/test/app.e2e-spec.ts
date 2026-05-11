@@ -50,4 +50,34 @@ describe('AppController (e2e)', () => {
   it('handles 404 for unknown routes', () => {
     return request(app.getHttpServer()).get('/unknown-route').expect(404);
   });
+
+  it('rejects /mcp requests without a Bearer token', () => {
+    return request(app.getHttpServer())
+      .post('/mcp')
+      .set('Accept', 'application/json, text/event-stream')
+      .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      .expect(403);
+  });
+
+  it('rejects /mcp requests with the wrong Bearer token', () => {
+    return request(app.getHttpServer())
+      .post('/mcp')
+      .set('Accept', 'application/json, text/event-stream')
+      .set('Authorization', 'Bearer wrong-token')
+      .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      .expect(403);
+  });
+
+  it('allows /mcp requests with the configured Bearer token', () => {
+    return request(app.getHttpServer())
+      .post('/mcp')
+      .set('Accept', 'application/json, text/event-stream')
+      .set('Authorization', 'Bearer test-mcp-access-token')
+      .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+      .expect((res) => {
+        if (res.status === 403) {
+          throw new Error('Guard rejected a request with the correct token');
+        }
+      });
+  });
 });

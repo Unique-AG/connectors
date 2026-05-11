@@ -137,7 +137,8 @@ export class KyckrHttpClient {
 
   private extractCorrelationId(body: unknown): string | undefined {
     if (body && typeof body === 'object' && 'correlationId' in body) {
-      return String((body as Record<string, unknown>).correlationId);
+      const value = (body as Record<string, unknown>).correlationId;
+      return typeof value === 'string' ? value : undefined;
     }
     return undefined;
   }
@@ -166,7 +167,7 @@ export class KyckrHttpClient {
     }
     const trimmed = raw.trim();
     if (trimmed) {
-      return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
+      return trimmed.length > 200 ? `${trimmed.slice(0, 200)}...` : trimmed;
     }
     return `HTTP ${status}`;
   }
