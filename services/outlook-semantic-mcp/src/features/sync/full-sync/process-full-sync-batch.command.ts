@@ -55,7 +55,7 @@ export class ProcessFullSyncBatchCommand {
   private readonly logger = new Logger(this.constructor.name);
 
   private readonly graphPageDuration: Histogram;
-  private readonly ingestionDuration: Histogram;
+  private readonly processEmailDuration: Histogram;
   private readonly messagesProcessed: Counter;
 
   public constructor(
@@ -66,13 +66,19 @@ export class ProcessFullSyncBatchCommand {
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     metricService: MetricService,
   ) {
-    this.graphPageDuration = metricService.getHistogram('full_sync_graph_page_duration_seconds', {
-      description: 'Duration of Graph API page fetch during full sync',
-    });
-    this.ingestionDuration = metricService.getHistogram('full_sync_ingestion_duration_seconds', {
-      description: 'Duration of single message ingestion during full sync (including retries)',
-    });
-    this.messagesProcessed = metricService.getCounter('full_sync_messages_processed_total', {
+    this.graphPageDuration = metricService.getHistogram(
+      'osm_full_sync_graph_page_duration_seconds',
+      {
+        description: 'Duration of Graph API page fetch during full sync',
+      },
+    );
+    this.processEmailDuration = metricService.getHistogram(
+      'osm_full_sync_process_email_duration_seconds',
+      {
+        description: 'Duration of single message ingestion during full sync (including retries)',
+      },
+    );
+    this.messagesProcessed = metricService.getCounter('osm_full_sync_messages_processed_total', {
       description: 'Total messages processed during full sync',
     });
   }
@@ -380,11 +386,20 @@ export class ProcessFullSyncBatchCommand {
   private async processMessage(
     input: ProcessEmailCommandInput,
   ): Promise<'ingested' | 'skipped' | 'failed'> {
-    const ingestionResult = await recordInHistogram({
-      histogram: this.ingestionDuration,
+    const processingResult = await recordInHistogram({
+      histogram: this.processEmailDuration,
       attributes: (result) => ({ outcome: result === 'failed' ? 'failure' : 'success' }),
       fn: () => this.processEmailCommand.run(input),
     });
+
+    if (processingResult === 'failed') {
+      this.logger.warn({
+        userProfileId: input.user.profileId,
+        messageId: input.graphMessage.id,
+        msg: 'Message ingestion failed after retries',
+      });
+    }
+    this.messagesProcessed.add(1, { outcome: processingResult });
 
     const mapToOurResult: Record<PossibleIngestionResults, 'ingested' | 'skipped' | 'failed'> = {
       ingested: `ingested`,
@@ -393,17 +408,6 @@ export class ProcessFullSyncBatchCommand {
       'content-updated': `ingested`,
       failed: `failed`,
     };
-
-    if (ingestionResult === 'failed') {
-      this.logger.warn({
-        userProfileId: input.user.profileId,
-        messageId: input.graphMessage.id,
-        msg: 'Message ingestion failed after retries',
-      });
-    }
-    const outcome = mapToOurResult[ingestionResult];
-    this.messagesProcessed.add(1, { outcome });
-
-    return outcome;
+    return mapToOurResult[processingResult];
   }
 }
