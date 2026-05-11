@@ -1,3 +1,4 @@
+import { Resource as SdkResource } from '@modelcontextprotocol/sdk/types.js';
 import { SetMetadata } from '@nestjs/common';
 import { MCP_RESOURCE_METADATA_KEY } from './constants';
 
@@ -7,6 +8,7 @@ export interface ResourceOptions {
   name?: string; // Human-readable name
   description?: string; // Optional description
   mimeType?: string; // Optional MIME type
+  icons?: SdkResource['icons'];
 }
 
 export interface ResourceMetadata {
@@ -14,6 +16,7 @@ export interface ResourceMetadata {
   name: string; // Human-readable name
   description?: string; // Optional description
   mimeType?: string; // Optional MIME type
+  icons?: SdkResource['icons'];
 }
 
 /**

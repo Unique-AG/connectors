@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Fork of @rekog-labs/MCP-Nest */
-import { ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
+import { Implementation, ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { CanActivate, ModuleMetadata, Type } from '@nestjs/common';
 
 export enum McpTransportType {
@@ -15,6 +15,7 @@ export interface McpOptions {
   version: string;
   capabilities?: ServerCapabilities;
   instructions?: string;
+  icons?: Implementation['icons'];
 
   transport?: McpTransportType | McpTransportType[];
   sseEndpoint?: string;
