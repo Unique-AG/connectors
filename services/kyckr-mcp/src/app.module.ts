@@ -12,8 +12,8 @@ import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
 import { type AppConfig, appConfig, kyckrConfig, logsConfig } from './config';
 import { KyckrModule } from './kyckr/kyckr.module';
-import { McpAccessTokenGuard } from './kyckr/mcp-access-token.guard';
 import { ManifestController } from './manifest.controller';
+import { McpAccessTokenGuard } from './mcp-access-token.guard';
 import { serverInstructions } from './server.instructions';
 
 @Module({

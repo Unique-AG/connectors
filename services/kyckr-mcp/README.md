@@ -34,16 +34,16 @@ The MCP endpoint is available at `http://localhost:9542/mcp`.
 
 ## Calling the `/mcp` endpoint
 
-When `KYCKR_MCP_ACCESS_TOKEN` is set, every request to `/mcp` must include it as a Bearer token in the `Authorization` header:
+When `MCP_ACCESS_TOKEN` is set, every request to `/mcp` must include it as a Bearer token in the `Authorization` header:
 
 ```bash
 curl -X POST http://localhost:9542/mcp \
-  -H "Authorization: Bearer $KYCKR_MCP_ACCESS_TOKEN" \
+  -H "Authorization: Bearer $MCP_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-If `KYCKR_MCP_ACCESS_TOKEN` is unset, the endpoint is open and no header is required (only intended for local development).
+If `MCP_ACCESS_TOKEN` is unset, the endpoint is open and no header is required (only intended for local development).
 
 ## Configuration
 
@@ -51,7 +51,7 @@ If `KYCKR_MCP_ACCESS_TOKEN` is unset, the endpoint is open and no header is requ
 |----------|----------|---------|-------------|
 | `KYCKR_API_KEY` | Yes | — | Kyckr API key (Bearer token) |
 | `KYCKR_API_BASE_URL` | No | `https://test-api.kyckr.com/v2` | Kyckr API base URL |
-| `KYCKR_MCP_ACCESS_TOKEN` | No | — | Shared secret to protect the `/mcp` endpoint |
+| `MCP_ACCESS_TOKEN` | No | — | Shared secret to protect the `/mcp` endpoint |
 | `KYCKR_DEFAULT_CUSTOMER_REFERENCE` | No | — | Default customer reference for usage reconciliation |
 | `KYCKR_DEFAULT_CONTACT_EMAIL` | No | — | Default contact email for document orders |
 | `PORT` | No | `9542` | HTTP port |
@@ -59,4 +59,4 @@ If `KYCKR_MCP_ACCESS_TOKEN` is unset, the endpoint is open and no header is requ
 
 ## Deployment
 
-See the Helm chart at `deploy/helm-charts/kyckr-mcp/`. Secrets (`KYCKR_API_KEY`, `KYCKR_MCP_ACCESS_TOKEN`) must be injected via `server.envVars` from a Kubernetes Secret.
+See the Helm chart at `deploy/helm-charts/kyckr-mcp/`. Secrets (`KYCKR_API_KEY`, `MCP_ACCESS_TOKEN`) must be injected via `server.envVars` from a Kubernetes Secret.

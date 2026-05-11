@@ -8,11 +8,6 @@ const ConfigSchema = z.object({
     .prefault('https://test-api.kyckr.com/v2')
     .describe('Base URL for the Kyckr REST API. Defaults to the test environment.'),
   apiKey: redacted(z.string()).describe('Kyckr API key sent as Bearer token.'),
-  mcpAccessToken: redacted(z.string())
-    .optional()
-    .describe(
-      'Optional shared secret to protect the MCP endpoint. When set, requests must supply it as a Bearer token in the Authorization header.',
-    ),
   defaultCustomerReference: z
     .string()
     .optional()

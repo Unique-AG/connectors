@@ -14,7 +14,7 @@ resource "azurerm_key_vault_secret" "manual_secret" {
 # @description Shared bearer token protecting the /mcp endpoint
 # @length 32 byte hex (64 hex chars)
 # @type random_bytes#hex
-# @env KYCKR_MCP_ACCESS_TOKEN
+# @env MCP_ACCESS_TOKEN
 # ---
 resource "random_bytes" "hex_mcp_access_token" {
   keepers = { version = var.secrets_to_create.hex_mcp_access_token.rotation_counter }

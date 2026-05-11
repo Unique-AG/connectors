@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MetricService } from 'nestjs-otel';
 import { request } from 'undici';
-import { KyckrConfig } from '../config';
+import { KyckrConfig } from '~/config';
 
 export class KyckrApiError extends Error {
   public constructor(

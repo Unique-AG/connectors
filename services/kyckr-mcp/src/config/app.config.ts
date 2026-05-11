@@ -1,6 +1,6 @@
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-import { enabledDisabledBoolean } from '~/utils/zod';
+import { enabledDisabledBoolean, redacted } from '~/utils/zod';
 
 const ConfigSchema = z
   .object({
@@ -20,6 +20,11 @@ const ConfigSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .prefault('info')
       .describe('The log level at which the services outputs (pino).'),
+    mcpAccessToken: redacted(z.string())
+      .optional()
+      .describe(
+        'Optional shared secret protecting the /mcp endpoint. When set, requests must supply it as a Bearer token in the Authorization header.',
+      ),
   })
   .transform((c) => ({
     ...c,
@@ -27,7 +32,7 @@ const ConfigSchema = z
   }));
 
 export const appConfig = registerConfig('app', ConfigSchema, {
-  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV']),
+  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'MCP_ACCESS_TOKEN']),
 });
 
 export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;

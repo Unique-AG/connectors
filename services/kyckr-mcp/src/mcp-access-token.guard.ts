@@ -1,14 +1,14 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, Logger } from '@nestjs/common';
 import type { Request } from 'express';
-import { type KyckrConfig, kyckrConfig } from '../config';
+import { type AppConfig, appConfig } from '~/config';
 
 @Injectable()
 export class McpAccessTokenGuard implements CanActivate {
   private readonly logger = new Logger(McpAccessTokenGuard.name);
 
   public constructor(
-    @Inject(kyckrConfig.KEY)
-    private readonly config: KyckrConfig,
+    @Inject(appConfig.KEY)
+    private readonly config: AppConfig,
   ) {}
 
   public canActivate(context: ExecutionContext): boolean {
