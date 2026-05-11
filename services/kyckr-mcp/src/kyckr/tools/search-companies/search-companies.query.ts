@@ -101,6 +101,10 @@ export class SearchCompaniesQuery {
 
   @Span()
   public async run(input: SearchCompaniesInput): Promise<SearchCompaniesResult> {
+    this.logger.debug(
+      { hasName: Boolean(input.name), companyNumber: input.companyNumber, isoCode: input.isoCode },
+      'search_companies: invoked',
+    );
     try {
       const raw = await this.kyckrClient.get<unknown>('/companies', {
         name: input.name,
@@ -110,6 +114,7 @@ export class SearchCompaniesQuery {
       const response = KyckrSearchEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('search_companies', 'success');
       this.metrics.recordCreditsConsumed('search_companies', response.cost);
+      this.logger.debug({ resultCount: response.data?.length ?? 0 }, 'search_companies: succeeded');
 
       return { success: true, ...response };
     } catch (err) {

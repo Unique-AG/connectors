@@ -66,6 +66,14 @@ export class ListOrdersQuery {
 
   @Span()
   public async run(input: ListOrdersInput): Promise<ListOrdersResult> {
+    this.logger.debug(
+      {
+        hasStartDate: Boolean(input.startDate),
+        hasEndDate: Boolean(input.endDate),
+        isoCode: input.isoCode,
+      },
+      'list_orders: invoked',
+    );
     try {
       const raw = await this.kyckrClient.get<unknown>('/orders', {
         startDate: input.startDate,
@@ -75,6 +83,13 @@ export class ListOrdersQuery {
       const response = ListOrdersEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('list_orders', 'success');
       this.metrics.recordCreditsConsumed('list_orders', response.cost);
+      this.logger.debug(
+        {
+          totalCount: response.data?.totalCount,
+          returned: response.data?.orders?.length ?? 0,
+        },
+        'list_orders: succeeded',
+      );
       return { success: true, ...response };
     } catch (err) {
       if (err instanceof KyckrApiError) {

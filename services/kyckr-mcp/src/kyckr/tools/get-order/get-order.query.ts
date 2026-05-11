@@ -14,7 +14,7 @@ export const GetOrderInputSchema = z.object({
     .union([z.string().trim().min(1), z.number().int()])
     .transform((v) => String(v))
     .describe(
-      'Order id returned by `create_document_order.data.orderId` or seen in `list_orders.data.orders[].orderId`. May be a string or a number — both accepted; pass the value as-is.',
+      'Order id returned by `create_document_order.data.orderId` or seen in `list_orders.data.orders[].orderId`. May be a string or a number - both accepted; pass the value as-is.',
     ),
 });
 
@@ -47,6 +47,7 @@ export class GetOrderQuery {
 
   @Span()
   public async run(input: GetOrderInput): Promise<GetOrderResult> {
+    this.logger.debug({ orderId: input.orderId }, 'get_order: invoked');
     try {
       const raw = await this.kyckrClient.get<unknown>(
         `/orders/${encodeURIComponent(input.orderId)}`,
@@ -54,6 +55,10 @@ export class GetOrderQuery {
       const response = GetOrderEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('get_order', 'success');
       this.metrics.recordCreditsConsumed('get_order', response.cost);
+      this.logger.debug(
+        { orderId: input.orderId, status: response.data?.status },
+        'get_order: succeeded',
+      );
       return { success: true, ...response };
     } catch (err) {
       if (err instanceof KyckrApiError) {

@@ -4,7 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger, LoggerErrorInterceptor } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { AppModule } from './app.module';
-import { type AppConfig, appConfig } from './config';
+import { type AppConfig, appConfig, type KyckrConfig, kyckrConfig } from './config';
 
 async function bootstrap() {
   const bufferLogs = process.env.APP_BUFFER_LOGS !== 'disabled';
@@ -21,12 +21,32 @@ async function bootstrap() {
   });
 
   const config = app.get<AppConfig>(appConfig.KEY);
-  await app.listen(config.port, () =>
+  const kyckr = app.get<KyckrConfig>(kyckrConfig.KEY);
+
+  if (!config.mcpAccessToken) {
+    logger.warn(
+      'MCP_ACCESS_TOKEN is not set - /mcp is unauthenticated. Do not run in production without a token.',
+      'Bootstrap',
+    );
+  }
+
+  await app.listen(config.port, () => {
     logger.log(
       `Kyckr MCP server successfully started and listening on http://localhost:${config.port}`,
       'Bootstrap',
-    ),
-  );
+    );
+    logger.log(
+      {
+        version: packageJson.version,
+        port: config.port,
+        kyckrApiBaseUrl: kyckr.apiBaseUrl,
+        mcpAccessTokenConfigured: Boolean(config.mcpAccessToken),
+        defaultCustomerReferenceConfigured: Boolean(kyckr.defaultCustomerReference),
+        defaultContactEmailConfigured: Boolean(kyckr.defaultContactEmail),
+      },
+      'Bootstrap',
+    );
+  });
 }
 
 initOpenTelemetry({

@@ -72,6 +72,10 @@ export class ListCompanyDocumentsQuery {
 
   @Span()
   public async run(input: ListCompanyDocumentsInput): Promise<ListCompanyDocumentsResult> {
+    this.logger.debug(
+      { kyckrId: input.kyckrId, hasContinuation: Boolean(input.continuationKey) },
+      'list_company_documents: invoked',
+    );
     try {
       const raw = await this.kyckrClient.get<unknown>(
         `/companies/${encodeURIComponent(input.kyckrId)}/documents`,
@@ -83,6 +87,14 @@ export class ListCompanyDocumentsQuery {
       const response = ListCompanyDocumentsEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('list_company_documents', 'success');
       this.metrics.recordCreditsConsumed('list_company_documents', response.cost);
+      this.logger.debug(
+        {
+          kyckrId: input.kyckrId,
+          documentCount: response.data?.length ?? 0,
+          hasMore: Boolean(response.continuationKey),
+        },
+        'list_company_documents: succeeded',
+      );
       return { success: true, ...response };
     } catch (err) {
       if (err instanceof KyckrApiError) {

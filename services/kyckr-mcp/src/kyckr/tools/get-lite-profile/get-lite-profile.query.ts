@@ -60,7 +60,7 @@ const LiteProfileDataSchema = z
     taxNumber: z
       .string()
       .optional()
-      .describe('Deprecated by Kyckr — prefer the matching entry in `otherIdentifiers`.'),
+      .describe('Deprecated by Kyckr - prefer the matching entry in `otherIdentifiers`.'),
     registrationAuthority: z
       .string()
       .optional()
@@ -108,7 +108,7 @@ const LiteProfileDataSchema = z
   })
   .loose()
   .describe(
-    'Lite company profile data — the canonical company identification fields. Use this when you need to confirm the company exists and obtain its identification, registered address, dates, and current status. Does not include directors, shareholders, or beneficial owners (use `get_enhanced_profile` for those).',
+    'Lite company profile data - the canonical company identification fields. Use this when you need to confirm the company exists and obtain its identification, registered address, dates, and current status. Does not include directors, shareholders, or beneficial owners (use `get_enhanced_profile` for those).',
   );
 
 const LiteProfileEnvelopeSchema = z
@@ -140,6 +140,7 @@ export class GetLiteProfileQuery {
 
   @Span()
   public async run(input: GetLiteProfileInput): Promise<GetLiteProfileResult> {
+    this.logger.debug({ kyckrId: input.kyckrId }, 'get_lite_profile: invoked');
     try {
       const raw = await this.kyckrClient.get<unknown>(
         `/companies/${encodeURIComponent(input.kyckrId)}/lite`,
@@ -150,6 +151,7 @@ export class GetLiteProfileQuery {
       const response = LiteProfileEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('get_lite_profile', 'success');
       this.metrics.recordCreditsConsumed('get_lite_profile', response.cost);
+      this.logger.debug({ kyckrId: input.kyckrId }, 'get_lite_profile: succeeded');
       return { success: true, ...response };
     } catch (err) {
       if (err instanceof KyckrApiError) {

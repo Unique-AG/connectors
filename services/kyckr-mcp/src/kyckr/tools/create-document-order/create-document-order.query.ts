@@ -68,6 +68,10 @@ export class CreateDocumentOrderQuery {
 
   @Span()
   public async run(input: CreateDocumentOrderInput): Promise<CreateDocumentOrderResult> {
+    this.logger.debug(
+      { kyckrId: input.kyckrId, productId: input.productId },
+      'create_document_order: invoked',
+    );
     try {
       const raw = await this.kyckrClient.post<unknown>('/orders', {
         kyckrId: input.kyckrId,
@@ -78,6 +82,15 @@ export class CreateDocumentOrderQuery {
       const response = CreateOrderEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('create_document_order', 'success');
       this.metrics.recordCreditsConsumed('create_document_order', response.cost);
+      this.logger.debug(
+        {
+          kyckrId: input.kyckrId,
+          productId: input.productId,
+          orderId: response.data?.orderId,
+          status: response.data?.status,
+        },
+        'create_document_order: succeeded',
+      );
       return { success: true, ...response };
     } catch (err) {
       if (err instanceof KyckrApiError) {

@@ -143,7 +143,7 @@ const EnhancedProfileDataSchema = z
       .loose()
       .optional()
       .describe(
-        'Total share capital summary. Fields: `totalValue` (amount), `quantity` (share count), `currency`, `type` (`Fixed` or `Variable`). May represent authorized or issued capital depending on what the registry reports — do not assume.',
+        'Total share capital summary. Fields: `totalValue` (amount), `quantity` (share count), `currency`, `type` (`Fixed` or `Variable`). May represent authorized or issued capital depending on what the registry reports - do not assume.',
       ),
     capital: z
       .array(z.object({}).loose())
@@ -253,6 +253,7 @@ export class GetEnhancedProfileQuery {
 
   @Span()
   public async run(input: GetEnhancedProfileInput): Promise<GetEnhancedProfileResult> {
+    this.logger.debug({ kyckrId: input.kyckrId }, 'get_enhanced_profile: invoked');
     try {
       const raw = await this.kyckrClient.get<unknown>(
         `/companies/${encodeURIComponent(input.kyckrId)}/enhanced`,
@@ -261,6 +262,7 @@ export class GetEnhancedProfileQuery {
       const response = EnhancedProfileEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('get_enhanced_profile', 'success');
       this.metrics.recordCreditsConsumed('get_enhanced_profile', response.cost);
+      this.logger.debug({ kyckrId: input.kyckrId }, 'get_enhanced_profile: succeeded');
       return { success: true, ...response };
     } catch (err) {
       if (err instanceof KyckrApiError) {
