@@ -1,150 +1,147 @@
 # Kyckr MCP Server
 
-A NestJS-based MCP server that exposes Kyckr company registry data as MCP tools for KYC/KYB workflows.
+A NestJS-based microservice that exposes Kyckr's v2 company-registry API as MCP tools for KYC/KYB workflows. It lets an AI agent search companies, fetch profiles, list registry documents, and place document orders.
 
-## Overview
+## Table of Contents
 
-The service wraps Kyckr's v2 REST API and exposes a set of MCP tools that let an AI agent look up company information, retrieve director and shareholder data, and order official registry documents.
+- [Quick Start](#quick-start)
+- [MCP Tools](#mcp-tools)
+- [Configuration](#configuration)
+- [Development](#development)
+- [Deployment](#deployment)
+- [Observability](#observability)
 
-See [`kyckr-mcp-docs/kyckr-mcp-implementation-scope.md`](kyckr-mcp-docs/kyckr-mcp-implementation-scope.md) for the full product context and tool specifications.
-
-## MCP Tools
-
-Status legend: shipped — implemented and verified end-to-end against the Kyckr test API. pending — planned, not yet implemented.
-
-| Tool | Kyckr endpoint | Cost | Status |
-|------|---------------|------|--------|
-| `search_companies` | `GET /companies` | Free | shipped |
-| `get_lite_profile` | `GET /companies/{kyckrId}/lite` | Credits | shipped |
-| `get_enhanced_profile` | `GET /companies/{kyckrId}/enhanced` | Credits | shipped |
-| `list_company_documents` | `GET /companies/{kyckrId}/documents` | Free | shipped |
-| `create_document_order` | `POST /orders` | Credits | shipped |
-| `get_order` | `GET /orders/{orderId}` | Free | shipped |
-| `list_orders` | `GET /orders` | Free | shipped |
-
-### Tool behavior conventions
-
-- **Errors are returned, not thrown.** Every tool returns `{ success: false, statusCode, message, correlationId }` on a Kyckr 4xx/5xx. The agent should always check `success` before reading `data`.
-- **Output schemas are loose.** Tools return Kyckr's response verbatim under `data` plus the upstream envelope fields (`correlationId`, `cost`, `timeStamp`, `details`). New fields added by Kyckr flow through to the client without requiring a release.
-- **Inputs are trimmed and normalized.** String inputs are `.trim()`-ed; `isoCode` is uppercased and validated against `^[A-Z]{2}$`.
-- **Annotations track cost.** Billed tools are marked `idempotentHint: false` so clients/agents do not retry or re-call them speculatively. Free tools are `idempotentHint: true`.
-
-## Local Development
-
-Copy `.env.example` to `.env` and fill in your Kyckr API key:
+## Quick Start
 
 ```bash
+# Install dependencies
+pnpm install
+
+# Copy environment template
 cp .env.example .env
 # Edit .env: set KYCKR_API_KEY
+
+# Start development server
 pnpm dev
 ```
 
-The MCP endpoint is available at `http://localhost:9542/mcp`.
+The MCP endpoint is then available at `http://localhost:9542/mcp`.
 
-## Calling the `/mcp` endpoint
+## MCP Tools
 
-When `MCP_ACCESS_TOKEN` is set, every request to `/mcp` must include it as a Bearer token in the `Authorization` header:
+| Tool | Kyckr endpoint | Cost |
+|------|----------------|------|
+| `search_companies` | `GET /companies` | Free |
+| `get_lite_profile` | `GET /companies/{kyckrId}/lite` | Credits |
+| `get_enhanced_profile` | `GET /companies/{kyckrId}/enhanced` | Credits |
+| `list_company_documents` | `GET /companies/{kyckrId}/documents` | Free |
+| `create_document_order` | `POST /orders` | Credits |
+| `get_order` | `GET /orders/{orderId}` | Free |
+| `list_orders` | `GET /orders` | Free |
+
+All tools return `{ success: false, statusCode, message, correlationId }` on Kyckr 4xx/5xx so the agent can branch on `success` instead of catching exceptions. Successful responses pass the Kyckr payload through under `data` unchanged.
+
+## Configuration
+
+Copy `.env.example` to `.env` and configure the following.
+
+### Required Variables
+
+| Variable | Description |
+|----------|-------------|
+| `KYCKR_API_KEY` | Kyckr API key, sent as `Bearer` to the Kyckr API |
+
+### Optional Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `KYCKR_API_BASE_URL` | `https://test-api.kyckr.com/v2` | Kyckr API base URL. Point at `https://api.kyckr.com/v2` for production. |
+| `KYCKR_DEFAULT_CUSTOMER_REFERENCE` | — | Default `customerReference` forwarded on profile and order calls for usage reconciliation. Overridable per call. |
+| `KYCKR_DEFAULT_CONTACT_EMAIL` | — | Default contact email used when placing document orders. Overridable per call. |
+| `MCP_ACCESS_TOKEN` | — | Shared secret protecting `/mcp`. When set, requests must include `Authorization: Bearer <token>`. When unset, the endpoint is open (dev only). |
+| `PORT` | `9542` | HTTP port. |
+| `LOG_LEVEL` | `info` | Pino log level (`fatal` / `error` / `warn` / `info` / `debug` / `trace` / `silent`). |
+| `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | Whether diagnostic data is concealed or exposed in logs. |
+
+### Generating Secrets
+
+```bash
+# Generate a 64-char hex secret (for MCP_ACCESS_TOKEN)
+openssl rand -hex 32
+```
+
+## Development
+
+### Prerequisites
+
+- Node.js 20+
+- pnpm
+- A Kyckr API key (test or production)
+
+### Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `pnpm dev` | Start development server |
+| `pnpm build` | Build for production |
+| `pnpm test` | Run unit tests |
+| `pnpm test:e2e` | Run end-to-end tests |
+| `pnpm test:coverage` | Run tests with coverage |
+| `pnpm check-types` | Type-check with `tsc --noEmit` |
+| `pnpm style` | Check code style |
+| `pnpm style:fix` | Fix code style issues |
+
+E2E tests inject dummy env vars in `test/setup.ts`. The repo-wide `.gitignore` excludes `.env.*`, so a real `.env.test` is not committed.
+
+### Calling `/mcp`
+
+When `MCP_ACCESS_TOKEN` is set, every request must include it as a Bearer token:
 
 ```bash
 curl -X POST http://localhost:9542/mcp \
   -H "Authorization: Bearer $MCP_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-If `MCP_ACCESS_TOKEN` is unset, the endpoint is open and no header is required (only intended for local development).
+## Deployment
 
-### Example: end-to-end Streamable HTTP session
+### Docker Compose (Production)
 
 ```bash
-TOKEN="my-demo-access-token"
-
-# 1) initialize — captures the mcp-session-id header
-curl -s -D /tmp/h -o /dev/null -X POST http://localhost:9542/mcp \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"demo","version":"0"}}}'
-SID=$(grep -i "mcp-session-id" /tmp/h | awk '{print $2}' | tr -d '\r\n')
-
-# 2) notifications/initialized — required handshake step
-curl -s -X POST http://localhost:9542/mcp \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" -H "mcp-session-id: $SID" \
-  -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
-
-# 3) tools/call: search_companies
-curl -s -X POST http://localhost:9542/mcp \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" -H "mcp-session-id: $SID" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_companies","arguments":{"name":"Kyckr","isoCode":"GB"}}}'
-
-# 4) tools/call: get_lite_profile (PAID — spends credits)
-curl -s -X POST http://localhost:9542/mcp \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" -H "mcp-session-id: $SID" \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_lite_profile","arguments":{"kyckrId":"GB|MTE2NTUyOTA"}}}'
+docker compose -f docker-compose.prod.yaml up -d
 ```
 
-## Configuration
+### Kubernetes (Helm)
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `KYCKR_API_KEY` | Yes | — | Kyckr API key (sent as Bearer to Kyckr) |
-| `KYCKR_API_BASE_URL` | No | `https://test-api.kyckr.com/v2` | Kyckr API base URL |
-| `KYCKR_DEFAULT_CUSTOMER_REFERENCE` | No | — | Default customer reference forwarded on profile / order calls for usage reconciliation. Can be overridden per tool call. |
-| `KYCKR_DEFAULT_CONTACT_EMAIL` | No | — | Default contact email for document orders. Can be overridden per tool call. |
-| `MCP_ACCESS_TOKEN` | No | — | Shared secret protecting the `/mcp` endpoint. When set, requests must include `Authorization: Bearer <token>`. When unset, the endpoint is open (dev only). |
-| `PORT` | No | `9542` | HTTP port |
-| `LOG_LEVEL` | No | `info` | Pino log level (`fatal` / `error` / `warn` / `info` / `debug` / `trace` / `silent`) |
-| `LOGS_DIAGNOSTICS_DATA_POLICY` | No | `conceal` | Whether diagnostic data is concealed or exposed in logs. |
-
-## Architecture
-
-```
-src/
-  config/                       app, kyckr, logs configs (zod-validated)
-  kyckr/
-    kyckr-http.client.ts        thin undici wrapper — bearer auth, metrics, error envelope
-    kyckr.module.ts             registers the http client and all tools
-    schemas/
-      kyckr.schemas.ts          shared Zod schemas for the Kyckr v2 wire shapes
-    tools/
-      search-companies/         search_companies tool (3 files: tool, query, meta)
-      get-lite-profile/         get_lite_profile tool
-  mcp-access-token.guard.ts     Bearer-token guard for /mcp when MCP_ACCESS_TOKEN is set
-  manifest.controller.ts        GET / — server manifest
-  server.instructions.ts        MCP server instructions returned during `initialize`
-  app.module.ts                 Nest root module wiring
-  main.ts                       bootstrap + OTel initialization
+```bash
+helm install kyckr-mcp ./deploy/helm-charts/kyckr-mcp \
+  --namespace kyckr-mcp \
+  --create-namespace \
+  -f values.yaml
 ```
 
-Each tool follows the same three-file pattern:
+Secrets (`KYCKR_API_KEY`, `MCP_ACCESS_TOKEN`) are wired through `server.envVars` from a Kubernetes Secret.
 
-- `*.tool.ts` — `@Tool({...})` decorator + thin handler delegating to the query.
-- `*.query.ts` — input/output Zod schemas + the call to `KyckrHttpClient` + error mapping.
-- `*-tool.meta.ts` — `createMeta({ icon, systemPrompt })` for client UI hints.
+### Terraform (Azure)
+
+Infrastructure modules in `deploy/terraform/`:
+- `kyckr-mcp-secrets`: Azure Key Vault entries for the API key and MCP access token.
 
 ## Observability
 
 The service emits:
 
-- `kyckr_api_requests_total` — counter labelled with `method`, `path` (normalized; ids replaced by `:id`), `status`.
-- `kyckr_api_request_duration_ms` — histogram labelled with `method`, `path`.
+- **Logging**: Structured JSON logs via Pino with correlation IDs.
+- **Metrics**: `kyckr_api_requests_total` (counter) and `kyckr_api_request_duration_ms` (histogram), labelled with `method`, `path` (normalized so registry ids become `:id`), and `status`.
+- **Tracing**: Distributed traces via `nestjs-otel` and the shared `@unique-ag/instrumentation` package.
+- **Dashboards**: Grafana dashboard shipped with the Helm chart.
 
-Traces are produced via `nestjs-otel` and the shared `@unique-ag/instrumentation` package. The standard OTel env vars (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_METRICS_EXPORTER`, …) apply.
+Configure with the standard OpenTelemetry environment variables:
 
-## Testing
-
-```bash
-pnpm test         # unit tests (vitest)
-pnpm test:e2e     # boots AppModule against in-process Nest
-pnpm check-types  # tsc --noEmit
-pnpm style        # biome check
+```env
+OTEL_SERVICE_NAME=kyckr-mcp
+OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
+OTEL_EXPORTER_PROMETHEUS_PORT=8081
 ```
-
-E2E tests inject dummy env vars in `test/setup.ts` (`.env.test` is gitignored repo-wide).
-
-## Deployment
-
-See the Helm chart at `deploy/helm-charts/kyckr-mcp/`. Secrets (`KYCKR_API_KEY`, `MCP_ACCESS_TOKEN`) are wired through `server.envVars` from a Kubernetes Secret. Terraform for the Azure Key Vault secret is at `deploy/terraform/azure/kyckr-mcp-secrets/`.
