@@ -39,6 +39,7 @@ const CreateOrderDataSchema = z
     "Created order summary. Most jurisdictions return `status: 'Pending'`; poll `get_order(orderId)` until `Success` or `Failed`.",
   );
 
+// The OpenAPI spec omits `data` for POST /orders, but the live API wraps orderId/status under `data` like every other endpoint.
 const CreateOrderEnvelopeSchema = z
   .object({
     ...KyckrBaseResponseShape,
