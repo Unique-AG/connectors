@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.2...outlook-semantic-mcp@0.4.3) (2026-05-11)
+
+
+### Bug Fixes
+
+* **deps,outlook-semantic-mcp:** argo sync ([#529](https://github.com/Unique-AG/connectors/issues/529)) ([8cb6650](https://github.com/Unique-AG/connectors/commit/8cb66500cb1a06e20ecc9dec8dfae097c7125f1f))
+
 ## [0.4.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.1...outlook-semantic-mcp@0.4.2) (2026-05-08)
 
 
