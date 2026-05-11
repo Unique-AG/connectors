@@ -94,7 +94,7 @@ export class FullSyncCommand {
   @Span()
   public async runFullSync(userProfileId: string): Promise<FullSyncResult> {
     traceAttrs({ userProfileId });
-    this.logger.log({ userProfileId, msg: 'Full sync triggered' });
+    this.logger.debug({ userProfileId, msg: 'Full sync triggered' });
     if (await this.isInboxDeletingQuery.run(userProfileId)) {
       return { status: 'skipped', reason: 'Inbox is in deleting process' };
     }
@@ -120,7 +120,7 @@ export class FullSyncCommand {
 
     if (lockResult.action === 'skip') {
       traceEvent('full sync skipped', { reason: lockResult.reason });
-      this.logger.log({
+      this.logger.debug({
         userProfileId: userProfile.id,
         reason: lockResult.reason,
         msg: 'Full sync skipped',
@@ -162,7 +162,7 @@ export class FullSyncCommand {
       switch (batchResult.outcome) {
         case 'version-mismatch':
         case 'missing-full-sync-next-link':
-          this.logger.log({
+          this.logger.warn({
             userProfileId: userProfile.id,
             version,
             msg: `Exiting: ${batchResult.outcome}`,
@@ -246,7 +246,7 @@ export class FullSyncCommand {
         return { action: 'skip' as const, reason: 'inbox-deletion-in-progress' };
       }
 
-      const decision = this.decideAction(row);
+      const decision = this.decideAction(row, userProfileId);
       if (decision.action === 'skip') {
         return decision;
       }
@@ -301,6 +301,7 @@ export class FullSyncCommand {
       | 'fullSyncLastRunAt'
       | 'fullSyncExpectedTotal'
     >,
+    userProfileId: string,
   ): { action: 'skip'; reason: string } | { action: 'proceed' } {
     switch (row.fullSyncState) {
       case 'ready':
@@ -314,7 +315,7 @@ export class FullSyncCommand {
         if (isWithinCooldown(row.fullSyncHeartbeatAt, RUNNING_HEARTBEAT_MINUTES)) {
           return { action: 'skip', reason: 'already-running' };
         }
-        this.logger.warn({ msg: 'Recovering stale running sync (heartbeat too old)' });
+        this.logger.warn({ userProfileId, msg: 'Recovering stale running sync (heartbeat too old)' });
         return { action: 'proceed' };
       case 'failed':
         if (isWithinCooldown(row.fullSyncHeartbeatAt, FAILED_HEARTBEAT_MINUTES)) {
@@ -348,7 +349,7 @@ export class FullSyncCommand {
         fullSyncHeartbeatAt: sql`NOW()`,
       });
 
-      this.logger.log({ userProfileId, expectedTotal: count, msg: 'Expected total fetched' });
+      this.logger.debug({ userProfileId, expectedTotal: count, msg: 'Expected total fetched' });
     } catch (error) {
       this.logger.warn({
         err: error,
@@ -375,13 +376,13 @@ export class FullSyncCommand {
     }
 
     if (!result.ok) {
-      this.logger.log({ userProfileId, version, msg: 'Ingestion is not reachable, waiting again' });
+      this.logger.warn({ userProfileId, version, msg: 'Ingestion is not reachable, waiting again' });
     } else {
-      this.logger.log({ userProfileId, version, msg: 'Scope still draining, waiting again' });
+      this.logger.debug({ userProfileId, version, msg: 'Scope still draining, waiting again' });
     }
     const isSaved = await this.transitionState(userProfileId, version, 'waiting-for-ingestion');
     if (!isSaved) {
-      this.logger.log({ userProfileId, version, msg: 'Skipping state transition failed' });
+      this.logger.warn({ userProfileId, version, msg: 'Version mismatch on ingestion wait transition' });
       return { status: 'skipped', reason: 'version-mismatch' };
     }
 
