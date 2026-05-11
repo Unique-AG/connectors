@@ -105,8 +105,23 @@ export class KyckrHttpClient {
     return url.toString();
   }
 
+  private static readonly ROUTE_PATTERNS: [RegExp, string][] = [
+    [/^\/companies\/[^/]+\/enhanced$/, '/companies/:kyckrId/enhanced'],
+    [/^\/companies\/[^/]+\/lite$/, '/companies/:kyckrId/lite'],
+    [/^\/companies\/[^/]+\/documents$/, '/companies/:kyckrId/documents'],
+    [/^\/companies$/, '/companies'],
+    [/^\/orders\/[^/]+$/, '/orders/:orderId'],
+    [/^\/orders$/, '/orders'],
+  ];
+
   private normalizePath(path: string): string {
-    return path.replace(/\/[A-Za-z0-9_-]{8,}/g, '/:id');
+    for (const [pattern, template] of KyckrHttpClient.ROUTE_PATTERNS) {
+      if (pattern.test(path)) {
+        return template;
+      }
+    }
+    this.logger.warn({ path }, 'Unknown Kyckr API path — metric label not normalized');
+    return path;
   }
 
   private tryParseJson(raw: string): unknown {
