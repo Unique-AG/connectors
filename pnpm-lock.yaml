@@ -709,9 +709,6 @@ importers:
       '@nestjs/platform-express':
         specifier: 11.1.18
         version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)
-      '@nestjs/swagger':
-        specifier: 11.2.6
-        version: 11.2.6(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)
       '@opentelemetry/api':
         specifier: 1.9.0
         version: 1.9.0
@@ -745,15 +742,9 @@ importers:
       nestjs-zod:
         specifier: 5.0.1
         version: 5.0.1(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.2.6(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.1.5)
-      p-limit:
-        specifier: 7.3.0
-        version: 7.3.0
       reflect-metadata:
         specifier: 0.2.2
         version: 0.2.2
-      remeda:
-        specifier: 2.32.0
-        version: 2.32.0
       rxjs:
         specifier: 7.8.2
         version: 7.8.2

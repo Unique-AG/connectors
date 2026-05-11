@@ -32,6 +32,19 @@ pnpm dev
 
 The MCP endpoint is available at `http://localhost:9542/mcp`.
 
+## Calling the `/mcp` endpoint
+
+When `KYCKR_MCP_ACCESS_TOKEN` is set, every request to `/mcp` must include it as a Bearer token in the `Authorization` header:
+
+```bash
+curl -X POST http://localhost:9542/mcp \
+  -H "Authorization: Bearer $KYCKR_MCP_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+If `KYCKR_MCP_ACCESS_TOKEN` is unset, the endpoint is open and no header is required (only intended for local development).
+
 ## Configuration
 
 | Variable | Required | Default | Description |

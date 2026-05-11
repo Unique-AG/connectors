@@ -3,7 +3,7 @@ import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
@@ -12,6 +12,7 @@ import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
 import { type AppConfig, appConfig, kyckrConfig, logsConfig } from './config';
 import { KyckrModule } from './kyckr/kyckr.module';
+import { McpAccessTokenGuard } from './kyckr/mcp-access-token.guard';
 import { ManifestController } from './manifest.controller';
 import { serverInstructions } from './server.instructions';
 
@@ -19,8 +20,7 @@ import { serverInstructions } from './server.instructions';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      ignoreEnvFile: true,
-      envFilePath: '.env.test',
+      envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
       load: [appConfig, kyckrConfig, logsConfig],
     }),
     LoggerModule.forRootAsync({
@@ -73,6 +73,7 @@ import { serverInstructions } from './server.instructions';
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },
     { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
+    { provide: APP_GUARD, useClass: McpAccessTokenGuard },
   ],
 })
 export class AppModule {}

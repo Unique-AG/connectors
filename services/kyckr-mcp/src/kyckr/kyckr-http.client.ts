@@ -65,11 +65,12 @@ export class KyckrHttpClient {
       });
 
       status = response.statusCode;
-      const responseBody = await response.body.json();
+      const rawBody = await response.body.text();
+      const responseBody = this.tryParseJson(rawBody);
 
       if (status >= 400) {
         const correlationId = this.extractCorrelationId(responseBody);
-        const message = this.extractErrorMessage(responseBody, status);
+        const message = this.extractErrorMessage(responseBody, status, rawBody);
         this.logger.error({ method, path, status, correlationId }, `Kyckr API error: ${message}`);
         throw new KyckrApiError(status, path, message, correlationId);
       }
@@ -105,7 +106,18 @@ export class KyckrHttpClient {
   }
 
   private normalizePath(path: string): string {
-    return path.replace(/\/[A-Za-z0-9|_-]{8,}/g, '/:id');
+    return path.replace(/\/[A-Za-z0-9_-]{8,}/g, '/:id');
+  }
+
+  private tryParseJson(raw: string): unknown {
+    if (!raw) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
   }
 
   private extractCorrelationId(body: unknown): string | undefined {
@@ -115,7 +127,7 @@ export class KyckrHttpClient {
     return undefined;
   }
 
-  private extractErrorMessage(body: unknown, status: number): string {
+  private extractErrorMessage(body: unknown, status: number, raw: string): string {
     if (body && typeof body === 'object') {
       const b = body as Record<string, unknown>;
       if (typeof b.message === 'string') {
@@ -127,6 +139,10 @@ export class KyckrHttpClient {
       if (typeof b.title === 'string') {
         return b.title;
       }
+    }
+    const trimmed = raw.trim();
+    if (trimmed) {
+      return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
     }
     return `HTTP ${status}`;
   }
