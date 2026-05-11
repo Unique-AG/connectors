@@ -41,7 +41,7 @@ variable "secrets_to_create" {
 
       Secret format requirements (from src/config/kyckr.config.ts):
       - MCP Access Token: 64-char hex (openssl rand -hex 32) -> length=32
-        Optional Bearer token protecting the /mcp endpoint. Set create=false to disable.
+        Required Bearer token protecting the /mcp endpoint.
     */
     hex_mcp_access_token = { create = true, name = "kyckr-mcp-access-token", content_type = "text/hex", rotation_counter = 0, expiration_date = "2099-12-31T23:59:59Z" }
   }

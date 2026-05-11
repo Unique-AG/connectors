@@ -20,11 +20,9 @@ const ConfigSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .prefault('info')
       .describe('The log level at which the services outputs (pino).'),
-    mcpAccessToken: redacted(z.string())
-      .optional()
-      .describe(
-        'Optional shared secret protecting the /mcp endpoint. When set, requests must supply it as a Bearer token in the Authorization header.',
-      ),
+    mcpAccessToken: redacted(z.string()).describe(
+      'Shared secret protecting the /mcp endpoint. Requests must supply it as a Bearer token in the Authorization header.',
+    ),
   })
   .transform((c) => ({
     ...c,

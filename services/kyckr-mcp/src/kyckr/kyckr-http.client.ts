@@ -120,7 +120,7 @@ export class KyckrHttpClient {
         return template;
       }
     }
-    this.logger.warn({ path }, 'Unknown Kyckr API path — metric label not normalized');
+    this.logger.warn({ path }, 'Unknown Kyckr API path - metric label not normalized');
     return path;
   }
 

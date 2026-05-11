@@ -13,7 +13,7 @@ export class GetOrderTool {
     name: 'get_order',
     title: 'Get Order',
     description:
-      'Retrieve a single Kyckr order by `orderId`. Free to call. Use to poll an order placed via `create_document_order` until `data.status` is `Success` (then use `data.links.document` / `data.links.data` to fetch the artifact) or `Failed`. Treat `statusCode: 410` as terminal — the order is no longer retrievable from Kyckr; do not retry.',
+      'Retrieve a single Kyckr order by `orderId`. Free to call. Use to poll an order placed via `create_document_order` until `data.status` is `Success` (then use `data.links.document` / `data.links.data` to fetch the artifact) or `Failed`. Treat `statusCode: 410` as terminal - the order is no longer retrievable from Kyckr; do not retry.',
     parameters: GetOrderInputSchema,
     outputSchema: GetOrderOutputSchema,
     annotations: {

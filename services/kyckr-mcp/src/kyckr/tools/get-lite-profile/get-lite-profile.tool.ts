@@ -17,7 +17,7 @@ export class GetLiteProfileTool {
     name: 'get_lite_profile',
     title: 'Get Lite Company Profile',
     description:
-      'Fetch a paid Lite company profile from Kyckr using a confirmed `kyckrId`. Use when basic verified registry details are needed: company name, registration number, registered address, registration/foundation dates, legal form, legal status, activities, and registration authority. Consumes credits. Does not return directors, shareholders, or beneficial owners — use `get_enhanced_profile` for ownership and representative data. For orderable filings (annual accounts, articles of association, etc.), see `list_company_documents`.',
+      'Fetch a paid Lite company profile from Kyckr using a confirmed `kyckrId`. Use when basic verified registry details are needed: company name, registration number, registered address, registration/foundation dates, legal form, legal status, activities, and registration authority. Consumes credits. Does not return directors, shareholders, or beneficial owners - use `get_enhanced_profile` for ownership and representative data. For orderable filings (annual accounts, articles of association, etc.), see `list_company_documents`.',
     parameters: GetLiteProfileInputSchema,
     outputSchema: GetLiteProfileOutputSchema,
     annotations: {

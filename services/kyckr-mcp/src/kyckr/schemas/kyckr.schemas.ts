@@ -60,7 +60,7 @@ export const McpEnvelopeShape = {
     .int()
     .optional()
     .describe(
-      'Upstream HTTP status returned by Kyckr when `success` is `false`. Common values: `400` (bad request — usually missing/invalid parameter), `401` (auth — server-side credential issue), `403` (entitlement — feature not on account), `404` (kyckrId / orderId not found), `405` (jurisdiction requires async ordering), `429` (rate-limited). Use this to decide whether to retry, surface to the user, or escalate.',
+      'Upstream HTTP status returned by Kyckr when `success` is `false`. Common values: `400` (bad request - usually missing/invalid parameter), `401` (auth - server-side credential issue), `403` (entitlement - feature not on account), `404` (kyckrId / orderId not found), `405` (jurisdiction requires async ordering), `429` (rate-limited). Use this to decide whether to retry, surface to the user, or escalate.',
     ),
   message: z
     .string()
@@ -208,7 +208,7 @@ export const KyckrIdentifierSchema = z
       .string()
       .optional()
       .describe(
-        'Kyckr standardized type code for the identifier. Encodes both the jurisdiction and the kind of ID — e.g. `IT_VAT_CD` (Italian VAT), `IT_TAX_CD` (Italian Codice Fiscale), `IT_REA_CD` (Italian REA trade register). Other jurisdictions follow the same `{ISO}_{KIND}_CD` pattern.',
+        'Kyckr standardized type code for the identifier. Encodes both the jurisdiction and the kind of ID - e.g. `IT_VAT_CD` (Italian VAT), `IT_TAX_CD` (Italian Codice Fiscale), `IT_REA_CD` (Italian REA trade register). Other jurisdictions follow the same `{ISO}_{KIND}_CD` pattern.',
       ),
   })
   .loose()
@@ -278,7 +278,7 @@ export const KyckrContactDetailsSchema = z
 export const KyckrOrderStatusSchema = z
   .enum(['Success', 'Pending', 'Failed'])
   .describe(
-    'Kyckr order status. `Success` means the document is ready — use `data.links.document` / `data.links.data` to fetch it. `Pending` means still processing — re-poll via `get_order` (when ordering, the `deliveryTimeMinutes` from `list_company_documents` is a reasonable initial wait). `Failed` means the order will not complete; surface to the user.',
+    'Kyckr order status. `Success` means the document is ready - use `data.links.document` / `data.links.data` to fetch it. `Pending` means still processing - re-poll via `get_order` (when ordering, the `deliveryTimeMinutes` from `list_company_documents` is a reasonable initial wait). `Failed` means the order will not complete; surface to the user.',
   );
 
 export const KyckrOrderDetailsSchema = z
@@ -316,7 +316,7 @@ export const KyckrOrderDetailsSchema = z
       })
       .loose()
       .optional()
-      .describe('What was ordered — the document or profile product details.'),
+      .describe('What was ordered - the document or profile product details.'),
     companyDetails: z
       .object({
         companyName: z.string().optional().describe('Company the order relates to.'),

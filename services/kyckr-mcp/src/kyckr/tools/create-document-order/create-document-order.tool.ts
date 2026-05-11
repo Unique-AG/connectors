@@ -17,7 +17,7 @@ export class CreateDocumentOrderTool {
     name: 'create_document_order',
     title: 'Order Document',
     description:
-      'Place a paid Kyckr order for an official registry document. The only write-side tool here: every successful call spends Kyckr credits and creates a real registry order. Required: `kyckrId` (from `search_companies`) and `productId` (from `list_company_documents`). Before calling, show the user the document `name` and `cost` from `list_company_documents` and obtain explicit confirmation. On success returns `data.orderId` and `data.status` — most jurisdictions return `status: "Pending"`, so poll `get_order(data.orderId)` until `Success` (download links populated) or `Failed`.',
+      'Place a paid Kyckr order for an official registry document. The only write-side tool here: every successful call spends Kyckr credits and creates a real registry order. Required: `kyckrId` (from `search_companies`) and `productId` (from `list_company_documents`). Before calling, show the user the document `name` and `cost` from `list_company_documents` and obtain explicit confirmation. On success returns `data.orderId` and `data.status` - most jurisdictions return `status: "Pending"`, so poll `get_order(data.orderId)` until `Success` (download links populated) or `Failed`.',
     parameters: CreateDocumentOrderInputSchema,
     outputSchema: CreateDocumentOrderOutputSchema,
     annotations: {

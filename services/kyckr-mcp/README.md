@@ -50,15 +50,15 @@ Copy `.env.example` to `.env` and configure the following.
 | Variable | Description |
 |----------|-------------|
 | `KYCKR_API_KEY` | Kyckr API key, sent as `Bearer` to the Kyckr API |
+| `MCP_ACCESS_TOKEN` | Shared secret protecting `/mcp`. Requests must include `Authorization: Bearer <token>`. |
 
 ### Optional Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `KYCKR_API_BASE_URL` | `https://test-api.kyckr.com/v2` | Kyckr API base URL. Point at `https://api.kyckr.com/v2` for production. |
-| `KYCKR_DEFAULT_CUSTOMER_REFERENCE` | — | Default `customerReference` forwarded on profile and order calls for usage reconciliation. Overridable per call. |
-| `KYCKR_DEFAULT_CONTACT_EMAIL` | — | Default contact email used when placing document orders. Overridable per call. |
-| `MCP_ACCESS_TOKEN` | — | Shared secret protecting `/mcp`. When set, requests must include `Authorization: Bearer <token>`. When unset, the endpoint is open (dev only). |
+| `KYCKR_DEFAULT_CUSTOMER_REFERENCE` | - | Default `customerReference` forwarded on profile and order calls for usage reconciliation. Overridable per call. |
+| `KYCKR_DEFAULT_CONTACT_EMAIL` | - | Default contact email used when placing document orders. Overridable per call. |
 | `PORT` | `9542` | HTTP port. |
 | `LOG_LEVEL` | `info` | Pino log level (`fatal` / `error` / `warn` / `info` / `debug` / `trace` / `silent`). |
 
@@ -94,7 +94,7 @@ E2E tests inject dummy env vars in `test/setup.ts`. The repo-wide `.gitignore` e
 
 ### Calling `/mcp`
 
-When `MCP_ACCESS_TOKEN` is set, every request must include it as a Bearer token:
+Every request to `/mcp` must include the `MCP_ACCESS_TOKEN` as a Bearer token:
 
 ```bash
 curl -X POST http://localhost:9542/mcp \

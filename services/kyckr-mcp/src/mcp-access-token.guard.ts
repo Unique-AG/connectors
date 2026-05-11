@@ -12,16 +12,12 @@ export class McpAccessTokenGuard implements CanActivate {
   ) {}
 
   public canActivate(context: ExecutionContext): boolean {
-    const expected = this.config.mcpAccessToken?.value;
-    if (!expected) {
-      return true;
-    }
-
     const request = context.switchToHttp().getRequest<Request>();
     if (!this.isMcpRoute(request.path)) {
       return true;
     }
 
+    const expected = this.config.mcpAccessToken.value;
     const header = request.headers.authorization;
     if (typeof header !== 'string' || !header.startsWith('Bearer ')) {
       this.logger.warn({ path: request.path }, 'Missing or malformed Authorization header on /mcp');
@@ -37,6 +33,7 @@ export class McpAccessTokenGuard implements CanActivate {
   }
 
   private isMcpRoute(path: string): boolean {
-    return path === '/mcp' || path.startsWith('/mcp/');
+    const lower = path.toLowerCase();
+    return lower === '/mcp' || lower.startsWith('/mcp/');
   }
 }
