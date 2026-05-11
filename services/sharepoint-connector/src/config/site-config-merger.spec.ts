@@ -87,7 +87,7 @@ describe('mergeSiteWithDefaults', () => {
       const partial = PartialSiteConfigSchema.parse({ siteId: SITE_UUID });
 
       expect(() => mergeSiteWithDefaults(partial, emptySiteDefaults, ROW_ID)).toThrow(
-        new RegExp(`^${ROW_ID.replace(/[[\]]/g, '\\$&')}: required field\\(s\\)`),
+        `${ROW_ID}: required field(s)`,
       );
       const error = (() => {
         try {
@@ -133,10 +133,10 @@ describe('mergeSiteWithDefaults', () => {
       } as unknown as PartialSiteConfig;
 
       expect(() => mergeSiteWithDefaults(partial, emptySiteDefaults, ROW_ID)).toThrow(
-        new RegExp(`^${ROW_ID.replace(/[[\]]/g, '\\$&')}: invalid configuration: `),
+        `${ROW_ID}: invalid configuration: `,
       );
       expect(() => mergeSiteWithDefaults(partial, emptySiteDefaults, ROW_ID)).not.toThrow(
-        /required field\(s\)/,
+        'required field(s)',
       );
     });
   });
