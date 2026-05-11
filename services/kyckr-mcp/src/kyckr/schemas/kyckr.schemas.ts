@@ -3,9 +3,20 @@ import * as z from 'zod';
 // Shared Zod schemas mirroring the Kyckr v2 API component schemas.
 // Schemas are intentionally `.loose()` so new Kyckr fields still reach the LLM.
 
+export const KyckrIdSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .describe(
+    'Kyckr company id returned by `search_companies` as the result `id`, e.g. "GB|MTE2NTUyOTA". Pass the exact value from search; do not construct or modify it.',
+  );
+
 export const KyckrCostSchema = z
   .object({
-    type: z.string().optional().describe('Cost dimension reported by Kyckr, typically "credit".'),
+    type: z
+      .string()
+      .optional()
+      .describe('Cost dimension, e.g. `"credit"`. Kyckr currently always reports credits.'),
     value: z
       .number()
       .optional()
@@ -55,7 +66,7 @@ export const McpEnvelopeShape = {
     .string()
     .optional()
     .describe(
-      'Human-readable error description when `success` is `false`. Sourced from Kyckr `data.detail` when present, then `data.title`, then the raw response body. Show to the user verbatim.',
+      'Human-readable error description when `success` is `false`, sourced from Kyckr. Surface to the user; rephrase if it sounds too low-level.',
     ),
   ...KyckrBaseResponseShape,
 } as const;
@@ -70,7 +81,7 @@ export const KyckrNormalizedDateSchema = z
       .string()
       .optional()
       .describe(
-        'Date in ISO 8601. Precision matches what the source provides: full date `YYYY-MM-DD`, or partial `YYYY-MM` / `YYYY` when only month or year is known. Prefer this over `original` for display and comparison.',
+        'Date in ISO 8601. Usually `YYYY-MM-DD`; some registries return `YYYY-MM` precision (most commonly UK director birthdates). Prefer this over `original` for display and comparison.',
       ),
   })
   .loose()
@@ -139,7 +150,12 @@ export const KyckrAddressSchema = z
       .optional()
       .describe('Administrative sub-region, e.g. a French commune or US county.'),
     region: z.string().optional().describe('Administrative region, e.g. a US state or UK county.'),
-    country: z.string().optional().describe('Country (registry-provided form).'),
+    country: z
+      .string()
+      .optional()
+      .describe(
+        'Country in the form the registry uses (unnormalized). For jurisdiction logic, prefer `isoCode`.',
+      ),
     isoCode: z
       .string()
       .optional()
@@ -192,7 +208,7 @@ export const KyckrIdentifierSchema = z
       .string()
       .optional()
       .describe(
-        'Kyckr standardized type code for the identifier. Examples: `IT_VAT_CD` (Italian VAT), `IT_TAX_CD` (Italian Codice Fiscale), `IT_REA_CD` (REA trade register).',
+        'Kyckr standardized type code for the identifier. Encodes both the jurisdiction and the kind of ID — e.g. `IT_VAT_CD` (Italian VAT), `IT_TAX_CD` (Italian Codice Fiscale), `IT_REA_CD` (Italian REA trade register). Other jurisdictions follow the same `{ISO}_{KIND}_CD` pattern.',
       ),
   })
   .loose()
@@ -247,4 +263,160 @@ export const KyckrRegistrationTypeDetailsSchema = z
   .loose()
   .describe(
     "Details of the company's original foundational registration when it is held in a different register than the one Kyckr is reporting from (cross-jurisdiction registration).",
+  );
+
+export const KyckrContactDetailsSchema = z
+  .object({
+    email: z.string().optional().describe('Primary email address for the company.'),
+    fax: z.string().optional().describe('Primary fax number.'),
+    telNumber: z.string().optional().describe('Primary phone number.'),
+    website: z.string().optional().describe('Primary website URL.'),
+  })
+  .loose()
+  .describe('Company contact details where the registry reports them.');
+
+export const KyckrOrderStatusSchema = z
+  .enum(['Success', 'Pending', 'Failed'])
+  .describe(
+    'Kyckr order status. `Success` means the document is ready — use `data.links.document` / `data.links.data` to fetch it. `Pending` means still processing — re-poll via `get_order` (when ordering, the `deliveryTimeMinutes` from `list_company_documents` is a reasonable initial wait). `Failed` means the order will not complete; surface to the user.',
+  );
+
+export const KyckrOrderDetailsSchema = z
+  .object({
+    orderId: z
+      .union([z.string(), z.number()])
+      .optional()
+      .describe(
+        'Kyckr order ID. May be a number or a string. Pass to `get_order` to refresh status or fetch download links.',
+      ),
+    orderDate: z.string().optional().describe('When the order was placed (ISO 8601 datetime).'),
+    customerReference: z
+      .string()
+      .optional()
+      .describe('Customer reference attached when the order was placed.'),
+    status: KyckrOrderStatusSchema.optional(),
+    cost: KyckrCostSchema.optional(),
+    user: z
+      .string()
+      .optional()
+      .describe(
+        'Reference to the Kyckr user that placed the order. Informational; usually not surfaced.',
+      ),
+    productDetails: z
+      .object({
+        productName: z.string().optional().describe('Human-readable name of the ordered product.'),
+        productId: z
+          .string()
+          .optional()
+          .describe('Same value as the `id` returned by `list_company_documents`.'),
+        productCategory: z
+          .string()
+          .optional()
+          .describe('Product category, e.g. "Financial Information".'),
+      })
+      .loose()
+      .optional()
+      .describe('What was ordered — the document or profile product details.'),
+    companyDetails: z
+      .object({
+        companyName: z.string().optional().describe('Company the order relates to.'),
+        companyNumber: z.string().optional().describe('Company registration number.'),
+        kyckrId: z.string().optional().describe('KyckrId of the company the order is against.'),
+      })
+      .loose()
+      .optional()
+      .describe('Which company the order was placed against.'),
+    links: z
+      .object({
+        document: z
+          .string()
+          .optional()
+          .describe(
+            'URL to download the document (typically PDF). Present once `status` is `Success`.',
+          ),
+        data: z
+          .string()
+          .optional()
+          .describe('URL to download the structured-data form of the document (JSON / XML).'),
+      })
+      .loose()
+      .optional()
+      .describe(
+        'Download links for the completed order. Empty / absent while `status` is `Pending`.',
+      ),
+  })
+  .loose()
+  .describe("An order Kyckr has placed against a registry on the caller's behalf.");
+
+export const KyckrOrdersPageSchema = z
+  .object({
+    accountId: z
+      .number()
+      .optional()
+      .describe('Kyckr account these orders were placed under. Informational.'),
+    pageNumber: z.number().int().optional().describe('Current page number (1-indexed).'),
+    pageSize: z.number().int().optional().describe('Page size used by Kyckr.'),
+    pageOffset: z.number().int().optional().describe('Offset into the result set.'),
+    totalCount: z
+      .number()
+      .int()
+      .optional()
+      .describe('Total matching orders across all pages, when reported.'),
+    orders: z.array(KyckrOrderDetailsSchema).optional().describe('Orders on this page.'),
+  })
+  .loose()
+  .describe(
+    'Paginated orders page. The orders themselves are under `orders`; the remaining fields are pagination metadata.',
+  );
+
+export const KyckrDocumentDescriptionSchema = z
+  .object({
+    id: z
+      .string()
+      .optional()
+      .describe(
+        'Product ID for the document. Pass to `create_document_order` as `productId` to order this specific document.',
+      ),
+    name: z
+      .string()
+      .optional()
+      .describe('Human-readable document name, e.g. "Form 15 - Annual Accounts 2021/22".'),
+    category: z
+      .string()
+      .optional()
+      .describe('Document category, e.g. "Annual Accounts", "Articles of Association".'),
+    documentDate: z
+      .string()
+      .optional()
+      .describe('Date associated with the document (typically the filing date) in ISO 8601.'),
+    deliveryTimeMinutes: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        'Target delivery time in minutes once the document is ordered. Use to set user expectations about when polling `get_order` is likely to succeed.',
+      ),
+    documentFormat: z
+      .array(z.enum(['application/pdf', 'application/json', 'application/zip', 'application/xml']))
+      .optional()
+      .describe('MIME types the ordered document will be returned in.'),
+    cost: KyckrCostSchema.optional().describe(
+      'Credit cost that ordering this document will incur. Show to the user before ordering.',
+    ),
+    documentDatapoints: z
+      .object({
+        companyDetails: z.boolean().optional(),
+        directors: z.boolean().optional(),
+        shareholders: z.boolean().optional(),
+        declaredBeneficialOwners: z.boolean().optional(),
+      })
+      .loose()
+      .optional()
+      .describe(
+        'Which datapoints the document covers. Use to pick the cheapest document that includes the data the user actually needs (e.g. skip a "directors-only" filing if shareholders are required).',
+      ),
+  })
+  .loose()
+  .describe(
+    'A document Kyckr can order from the registry. Use the `id` as `productId` when calling `create_document_order`.',
   );

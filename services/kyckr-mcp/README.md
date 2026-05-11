@@ -16,11 +16,11 @@ Status legend: shipped — implemented and verified end-to-end against the Kyckr
 |------|---------------|------|--------|
 | `search_companies` | `GET /companies` | Free | shipped |
 | `get_lite_profile` | `GET /companies/{kyckrId}/lite` | Credits | shipped |
-| `get_enhanced_profile` | `GET /companies/{kyckrId}/enhanced` | Credits | pending |
-| `list_company_documents` | `GET /companies/{kyckrId}/documents` | Free | pending |
-| `create_document_order` | `POST /orders` | Credits | pending |
-| `get_order` | `GET /orders/{orderId}` | Free | pending |
-| `list_orders` | `GET /orders` | Free | pending |
+| `get_enhanced_profile` | `GET /companies/{kyckrId}/enhanced` | Credits | shipped |
+| `list_company_documents` | `GET /companies/{kyckrId}/documents` | Free | shipped |
+| `create_document_order` | `POST /orders` | Credits | shipped |
+| `get_order` | `GET /orders/{orderId}` | Free | shipped |
+| `list_orders` | `GET /orders` | Free | shipped |
 
 ### Tool behavior conventions
 
