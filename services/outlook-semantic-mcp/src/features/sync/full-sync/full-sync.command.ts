@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { Counter, Histogram } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
-import { Span } from 'nestjs-otel';
+import { MetricService, Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
@@ -12,6 +13,7 @@ import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
+import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
@@ -38,6 +40,11 @@ export type FullSyncResult =
 export class FullSyncCommand {
   private readonly logger = new Logger(this.constructor.name);
 
+  private readonly fullSyncRunsCounter: Counter;
+  private readonly fullSyncRunDuration: Histogram;
+  private readonly directorySyncDuration: Histogram;
+  private readonly batchSyncDuration: Histogram;
+
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly processFullSyncBatchCommand: ProcessFullSyncBatchCommand,
@@ -47,15 +54,41 @@ export class FullSyncCommand {
     private readonly isInboxDeletingQuery: IsInboxDeletingQuery,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-  ) {}
+    metricService: MetricService,
+  ) {
+    this.fullSyncRunsCounter = metricService.getCounter('osm_full_sync_runs_total', {
+      description: 'Number of full sync run() invocations by outcome',
+    });
+    this.fullSyncRunDuration = metricService.getHistogram('osm_full_sync_run_duration_seconds', {
+      description: 'Wall-clock duration of a full sync run() call including retries',
+    });
+    this.directorySyncDuration = metricService.getHistogram(
+      'osm_full_sync_directory_sync_duration_seconds',
+      {
+        description: 'Duration of the directory sync step within a full sync',
+      },
+    );
+    this.batchSyncDuration = metricService.getHistogram('osm_full_sync_batch_duration_seconds', {
+      description: 'Duration of the batch processing step within a full sync',
+    });
+  }
 
   @Span()
   public async run(userProfileId: string): Promise<FullSyncResult> {
-    return await withRetryAttempts({
+    const runStart = Date.now();
+    const result = await withRetryAttempts<FullSyncResult>({
       fn: () => this.runFullSync(userProfileId),
       onError: rethrowRateLimitError,
       getResultFailure: (error) => ({ status: 'failed', error }),
     });
+    const durationSeconds = (Date.now() - runStart) / 1000;
+    const errorType =
+      result.status === 'failed'
+        ? isRateLimitError(result.error) ? 'throttling' : 'other'
+        : 'none';
+    this.fullSyncRunsCounter.add(1, { status: result.status, error_type: errorType });
+    this.fullSyncRunDuration.record(durationSeconds, { status: result.status });
+    return result;
   }
 
   @Span()
@@ -115,12 +148,16 @@ export class FullSyncCommand {
       if (lockResult.shouldFetchCount) {
         await this.fetchAndSaveExpectedTotal(userProfile.id, version, filters);
       }
+      const dirStart = Date.now();
       await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
+      this.directorySyncDuration.record((Date.now() - dirStart) / 1000);
 
+      const batchStart = Date.now();
       const batchResult = await this.processFullSyncBatchCommand.run({
         userProfile: { ...userProfile, email: userProfileEmail },
         version,
       });
+      this.batchSyncDuration.record((Date.now() - batchStart) / 1000, { outcome: batchResult.outcome });
 
       switch (batchResult.outcome) {
         case 'version-mismatch':
@@ -131,7 +168,6 @@ export class FullSyncCommand {
             msg: `Exiting: ${batchResult.outcome}`,
           });
           return { status: 'skipped', reason: 'version-mismatch' };
-
         case 'batch-uploaded': {
           const newStateSaved = await this.transitionState(
             userProfile.id,
@@ -153,7 +189,6 @@ export class FullSyncCommand {
           });
           return { status: 'waiting-for-ingestion' };
         }
-
         case 'completed': {
           const updated = await this.updateByVersionCommand.run(userProfile.id, version, {
             fullSyncState: 'ready',
@@ -173,7 +208,6 @@ export class FullSyncCommand {
           this.logger.log({ userProfileId: userProfile.id, version, msg: 'Full sync completed' });
           return { status: 'completed' };
         }
-
         default: {
           throw new Error(`Unhandled batch result: ${JSON.stringify(batchResult)}`);
         }

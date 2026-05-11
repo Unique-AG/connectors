@@ -133,6 +133,7 @@ function createCommand({
     { run: vi.fn().mockResolvedValue(false) } as any,
     { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
     db as any,
+    { getCounter: () => ({ add: vi.fn() }), getHistogram: () => ({ record: vi.fn() }) } as any,
   );
 }
 
