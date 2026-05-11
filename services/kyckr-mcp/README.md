@@ -61,7 +61,6 @@ Copy `.env.example` to `.env` and configure the following.
 | `MCP_ACCESS_TOKEN` | — | Shared secret protecting `/mcp`. When set, requests must include `Authorization: Bearer <token>`. When unset, the endpoint is open (dev only). |
 | `PORT` | `9542` | HTTP port. |
 | `LOG_LEVEL` | `info` | Pino log level (`fatal` / `error` / `warn` / `info` / `debug` / `trace` / `silent`). |
-| `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | Whether diagnostic data is concealed or exposed in logs. |
 
 ### Generating Secrets
 

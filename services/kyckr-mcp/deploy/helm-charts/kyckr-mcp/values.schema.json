@@ -170,18 +170,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "logs": {
-          "type": "object",
-          "description": "Log settings",
-          "properties": {
-            "diagnosticsDataPolicy": {
-              "type": "string",
-              "enum": ["conceal", "expose"],
-              "description": "Controls whether diagnostic data is concealed or exposed in logs"
-            }
-          },
-          "additionalProperties": false
         }
       },
       "additionalProperties": false

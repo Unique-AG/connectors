@@ -8,5 +8,4 @@ metadata:
 data:
   {{- include "chart.config.app" . | nindent 2 }}
   {{- include "chart.config.kyckr" . | nindent 2 }}
-  {{- include "chart.config.logs" . | nindent 2 }}
 {{- end }}

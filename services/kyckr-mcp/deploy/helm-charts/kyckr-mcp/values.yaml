@@ -104,7 +104,3 @@ mcpConfig:
     # defaultCustomerReference: ""
     # -- Optional. Default contact email for document orders.
     # defaultContactEmail: ""
-
-  # -- Optional log settings.
-  # logs:
-  #   diagnosticsDataPolicy: conceal

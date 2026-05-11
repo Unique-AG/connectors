@@ -10,7 +10,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
-import { type AppConfig, appConfig, kyckrConfig, logsConfig } from './config';
+import { type AppConfig, appConfig, kyckrConfig } from './config';
 import { KyckrModule } from './kyckr/kyckr.module';
 import { ManifestController } from './manifest.controller';
 import { McpAccessTokenGuard } from './mcp-access-token.guard';
@@ -21,7 +21,7 @@ import { serverInstructions } from './server.instructions';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
-      load: [appConfig, kyckrConfig, logsConfig],
+      load: [appConfig, kyckrConfig],
     }),
     LoggerModule.forRootAsync({
       inject: [appConfig.KEY],
