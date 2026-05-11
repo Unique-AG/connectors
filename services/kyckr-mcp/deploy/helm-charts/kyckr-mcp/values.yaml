@@ -1,0 +1,110 @@
+server:
+  deployment:
+    metadata:
+      annotations:
+        reloader.stakater.com/auto: "true"
+  env:
+    LOG_LEVEL: info
+    MAX_HEAP_MB: 512
+    NODE_ENV: production
+    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+    OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
+    OTEL_METRICS_EXPORTER: "prometheus"
+  # -- Environment variables from secrets.
+  # Example:
+  #   envVars:
+  #     - name: KYCKR_API_KEY
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: kyckr-mcp-secrets
+  #           key: KYCKR_API_KEY
+  #     - name: KYCKR_MCP_ACCESS_TOKEN
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: kyckr-mcp-secrets
+  #           key: KYCKR_MCP_ACCESS_TOKEN
+  envVars: []
+  # -- ConfigMap(s) to load environment variables from.
+  # Default assumes release name is "kyckr-mcp".
+  # Override with [<your-fullname>-config] if using a different release name or fullnameOverride.
+  extraEnvCM:
+    - kyckr-mcp-config
+  image:
+    repository: ghcr.io/unique-ag/connectors/services/kyckr-mcp
+    tag: 0.1.0 # x-release-please-version
+  ports:
+    application: 51345
+    metrics: 51346
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  routes:
+    paths:
+      default:
+        enabled: false
+
+# -- Ingress configuration
+# MCP servers need to be hosted on their own domain.
+ingress:
+  # -- Enable ingress resource creation
+  enabled: false
+  # -- Ingress class name (e.g., nginx, traefik)
+  ingressClassName: kong
+  # -- Additional labels for the ingress resource
+  additionalLabels: {}
+  # -- Annotations for the ingress resource
+  annotations:
+    konghq.com/plugins: unique-route-metrics
+  # -- Ingress hosts configuration
+  hosts: []
+    # - host: kyckr.mcp.example.com
+    #   paths:
+    #     - path: /
+    #       pathType: Prefix
+  # -- TLS configuration for the ingress
+  tls: []
+    # - secretName: kyckr-mcp-tls
+    #   hosts:
+    #     - kyckr.mcp.example.com
+
+# -- Grafana dashboard configuration
+grafana:
+  dashboard:
+    # -- Enable Grafana dashboard ConfigMap creation.
+    # Disabled until a real kyckr-mcp dashboard is added to files/grafana-dashboard.json.
+    enabled: false
+    # -- Grafana folder where the dashboard will be placed
+    folder: mcp-servers
+
+# -- Prometheus alerting rules configuration
+alerts:
+  # -- Enable PrometheusRule resource creation
+  enabled: false
+
+# -- Configuration for the deployed Kyckr MCP Server, mapped to environment variables.
+# Users who prefer setting all variables by hand can disable this and set extraEnvCM to [].
+mcpConfig:
+  # -- if disabled, server.extraEnvCM must be set to []
+  enabled: true
+
+  # -- Application configuration
+  app: {}
+    # -- Optional. Set to "disabled" to disable log buffering on startup.
+    # bufferLogs: enabled
+
+  # -- Kyckr API configuration.
+  # KYCKR_API_KEY and KYCKR_MCP_ACCESS_TOKEN must be provided via server.envVars (secrets).
+  kyckr: {}
+    # -- Kyckr REST API base URL. Defaults to the test environment in config.
+    # apiBaseUrl: https://test-api.kyckr.com/v2
+    # -- Optional. Default customer reference forwarded to Kyckr for usage reconciliation.
+    # defaultCustomerReference: ""
+    # -- Optional. Default contact email for document orders.
+    # defaultContactEmail: ""
+
+  # -- Optional log settings.
+  # logs:
+  #   diagnosticsDataPolicy: conceal

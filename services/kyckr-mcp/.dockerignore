@@ -1,0 +1,79 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+**/@generated
+
+# Development files
+*.log
+*.pid
+*.seed
+*.pid.lock
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*
+**/.env*
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*.swn
+.DS_Store
+
+# Testing
+coverage
+.nyc_output
+test
+**/*.spec.ts
+**/*.test.ts
+
+# Documentation
+README.md
+*.md
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Turbo
+.turbo
+**/.turbo
+
+# Build cache
+.cache
+.parcel-cache
+.next
+.nuxt
+.vuepress/dist
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
+.eslintcache
+
+# Lock files (except root)
+**/pnpm-lock.yaml
+!pnpm-lock.yaml
+
+# Source maps
+**/*.map
+
+# Temporary files
+tmp
+temp
+.tmp
+.temp
+**/tmp
+**/temp
