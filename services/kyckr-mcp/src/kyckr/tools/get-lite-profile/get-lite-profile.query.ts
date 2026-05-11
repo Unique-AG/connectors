@@ -9,6 +9,7 @@ import {
   KyckrAlternativeNameSchema,
   KyckrBaseResponseShape,
   KyckrIdentifierSchema,
+  KyckrIdSchema,
   KyckrNormalizedDateSchema,
   KyckrNormalizedLegalFormSchema,
   KyckrNormalizedStatusSchema,
@@ -18,13 +19,7 @@ import {
 } from '../../schemas/kyckr.schemas';
 
 export const GetLiteProfileInputSchema = z.object({
-  kyckrId: z
-    .string()
-    .trim()
-    .min(1)
-    .describe(
-      'Kyckr company id returned by `search_companies` as the result `id`, e.g. "GB|MTE2NTUyOTA". Pass the exact value from search; do not construct or modify it.',
-    ),
+  kyckrId: KyckrIdSchema,
 });
 
 export type GetLiteProfileInput = z.infer<typeof GetLiteProfileInputSchema>;
@@ -64,9 +59,7 @@ const LiteProfileDataSchema = z
     taxNumber: z
       .string()
       .optional()
-      .describe(
-        'DEPRECATED by Kyckr — prefer the corresponding entry in `otherIdentifiers`. Kept for compatibility with older clients.',
-      ),
+      .describe('Deprecated by Kyckr — prefer the matching entry in `otherIdentifiers`.'),
     registrationAuthority: z
       .string()
       .optional()

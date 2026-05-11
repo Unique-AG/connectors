@@ -17,9 +17,7 @@ const ConfigSchema = z.object({
   defaultContactEmail: z
     .string()
     .optional()
-    .describe(
-      'Optional contact email forwarded to Kyckr for document orders that need follow-up.',
-    ),
+    .describe('Optional contact email forwarded to Kyckr for document orders that need follow-up.'),
 });
 
 export const kyckrConfig = registerConfig('kyckr', ConfigSchema);

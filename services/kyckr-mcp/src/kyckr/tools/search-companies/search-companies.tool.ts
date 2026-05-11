@@ -17,7 +17,7 @@ export class SearchCompaniesTool {
     name: 'search_companies',
     title: 'Search Companies',
     description:
-      "Search the Kyckr company registry by name or registration number. Either `name` or `companyNumber` must be provided. Pass `isoCode` (ISO 3166 alpha-2, e.g. 'GB', 'AU') to search a specific jurisdiction directly. Without `isoCode`, Kyckr performs a global search over stored data - once you locate the right jurisdiction, repeat the search with that `isoCode` to confirm the entity is currently active. The returned `id` is the KyckrId required by every other Kyckr tool. This call does not consume credits.",
+      "Search the Kyckr company registry by name or registration number. Either `name` or `companyNumber` must be provided. Pass `isoCode` (ISO 3166 alpha-2, e.g. 'GB', 'AU') to search a specific jurisdiction directly. Without `isoCode`, Kyckr performs a global search over stored data — once you locate the right jurisdiction, repeat the search with that `isoCode` to confirm the entity is currently active. The returned `id` is the KyckrId required by every other Kyckr tool, and is also the starting point for `list_company_documents`. Free to call.",
     parameters: SearchCompaniesInputSchema,
     outputSchema: SearchCompaniesOutputSchema,
     annotations: {

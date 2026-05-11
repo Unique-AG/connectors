@@ -6,18 +6,13 @@ import { KyckrBaseResponseShape, McpEnvelopeShape } from '../../schemas/kyckr.sc
 
 export const SearchCompaniesInputSchema = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .min(1)
-      .optional()
-      .describe('Company name to search for. Whitespace is trimmed before sending to Kyckr.'),
+    name: z.string().trim().min(1).optional().describe('Company name to search for.'),
     companyNumber: z
       .string()
       .trim()
       .min(1)
       .optional()
-      .describe('Company registration number. Whitespace is trimmed before sending to Kyckr.'),
+      .describe('Company registration number to search for.'),
     isoCode: z
       .string()
       .trim()
@@ -25,7 +20,7 @@ export const SearchCompaniesInputSchema = z
       .regex(/^[A-Z]{2}$/, 'Must be a 2-letter ISO 3166 alpha-2 code, e.g. GB, IE, AU.')
       .optional()
       .describe(
-        'Jurisdiction ISO 3166 alpha-2 code (e.g. GB, AU). Normalized to uppercase. When set, the search is performed directly at the registry for that jurisdiction. When omitted, Kyckr performs a global search over stored data.',
+        'Optional ISO 3166 alpha-2 jurisdiction code, e.g. GB or AU. Use when the country is known.',
       ),
   })
   .refine((input) => Boolean(input.name) || Boolean(input.companyNumber), {
