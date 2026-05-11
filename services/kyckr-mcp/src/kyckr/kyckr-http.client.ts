@@ -129,15 +129,24 @@ export class KyckrHttpClient {
 
   private extractErrorMessage(body: unknown, status: number, raw: string): string {
     if (body && typeof body === 'object') {
-      const b = body as Record<string, unknown>;
-      if (typeof b.message === 'string') {
-        return b.message;
-      }
-      if (typeof b.detail === 'string') {
-        return b.detail;
-      }
-      if (typeof b.title === 'string') {
-        return b.title;
+      const envelope = body as Record<string, unknown>;
+      // Kyckr's ProblemDetails errors live under `data`, not at the top level.
+      const data =
+        typeof envelope.data === 'object' && envelope.data !== null
+          ? (envelope.data as Record<string, unknown>)
+          : undefined;
+
+      const message =
+        this.getStringField(data, 'detail') ??
+        this.getStringField(data, 'title') ??
+        this.getStringField(data, 'type') ??
+        this.getStringField(envelope, 'message') ??
+        this.getStringField(envelope, 'detail') ??
+        this.getStringField(envelope, 'title') ??
+        this.getStringField(envelope, 'details');
+
+      if (message) {
+        return message;
       }
     }
     const trimmed = raw.trim();
@@ -145,5 +154,13 @@ export class KyckrHttpClient {
       return trimmed.length > 200 ? `${trimmed.slice(0, 200)}…` : trimmed;
     }
     return `HTTP ${status}`;
+  }
+
+  private getStringField(
+    object: Record<string, unknown> | undefined,
+    key: string,
+  ): string | undefined {
+    const value = object?.[key];
+    return typeof value === 'string' ? value : undefined;
   }
 }
