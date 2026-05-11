@@ -12,13 +12,13 @@ const ConfigSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Default customer reference forwarded to Kyckr for usage reconciliation. Can be overridden per tool call.',
+      'Optional customer reference forwarded to Kyckr for usage reconciliation on paid calls.',
     ),
   defaultContactEmail: z
     .string()
     .optional()
     .describe(
-      'Default contact email forwarded to Kyckr document orders. Can be overridden per tool call.',
+      'Optional contact email forwarded to Kyckr for document orders that need follow-up.',
     ),
 });
 
