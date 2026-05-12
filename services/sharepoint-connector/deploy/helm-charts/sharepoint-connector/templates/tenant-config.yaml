@@ -110,6 +110,12 @@ data:
         {{- range .Values.connectorConfig.processing.allowedMimeTypes }}
         - {{ . | quote }}
         {{- end }}
+      {{- if .Values.connectorConfig.processing.mimeTypeOverridesByExtension }}
+      mimeTypeOverridesByExtension:
+        {{- range $suffix, $mime := .Values.connectorConfig.processing.mimeTypeOverridesByExtension }}
+        {{ $suffix | quote }}: {{ $mime | quote }}
+        {{- end }}
+      {{- end }}
       {{- if .Values.connectorConfig.processing.scanIntervalCron }}
       scanIntervalCron: {{ .Values.connectorConfig.processing.scanIntervalCron | quote }}
       {{- end }}

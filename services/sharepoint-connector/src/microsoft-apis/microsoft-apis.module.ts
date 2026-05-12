@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MetricsModule } from '../metrics/metrics.module';
+import { SharedModule } from '../shared/shared.module';
 import { BottleneckFactory } from '../utils/bottleneck.factory';
 import { MicrosoftAuthenticationService } from './auth/microsoft-authentication.service';
 import { FileFilterService } from './graph/file-filter.service';
@@ -12,7 +13,7 @@ import { SharepointRestClientService } from './sharepoint-rest/sharepoint-rest-c
 import { SharepointRestHttpService } from './sharepoint-rest/sharepoint-rest-http.service';
 
 @Module({
-  imports: [ConfigModule, MetricsModule],
+  imports: [ConfigModule, MetricsModule, SharedModule],
   providers: [
     MicrosoftAuthenticationService,
     GraphClientFactory,

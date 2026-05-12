@@ -1,8 +1,9 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_MAX_FILE_SIZE_BYTES } from '../../constants/defaults.constants';
+import { DEFAULT_MAX_FILE_SIZE_BYTES, DEFAULT_MIME_TYPE } from '../../constants/defaults.constants';
 import { ModerationStatus } from '../../constants/moderation-status.constants';
+import { MimeTypeResolverService } from '../../shared/services/mime-type-resolver.service';
 import { FileFilterService } from './file-filter.service';
 import type { DriveItem } from './types/sharepoint.types';
 
@@ -97,6 +98,12 @@ describe('FileFilterService', () => {
           }
           return undefined;
         }),
+      }))
+      .mock(MimeTypeResolverService)
+      .impl(() => ({
+        resolve: vi.fn(
+          (_fileName: string, rawMimeType: string | undefined) => rawMimeType ?? DEFAULT_MIME_TYPE,
+        ),
       }))
       .compile();
 
@@ -255,6 +262,52 @@ describe('FileFilterService', () => {
     it('returns true for file below maxFileSizeBytes limit', () => {
       const item = mockDriveItem({ size: 1048576 });
       expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
+    });
+  });
+
+  describe('mimeType override flow', () => {
+    beforeEach(async () => {
+      const { unit } = await TestBed.solitary(FileFilterService)
+        .mock(ConfigService)
+        .impl((stub) => ({
+          ...stub(),
+          get: vi.fn((key: string) => {
+            if (key === 'processing.allowedMimeTypes') {
+              return ['text/csv'];
+            }
+            if (key === 'processing.maxFileSizeToIngestBytes') {
+              return DEFAULT_MAX_FILE_SIZE_BYTES;
+            }
+            return undefined;
+          }),
+        }))
+        .mock(MimeTypeResolverService)
+        .impl(() => ({
+          resolve: vi.fn((fileName: string, rawMimeType: string | undefined) =>
+            fileName.toLowerCase().endsWith('.csv')
+              ? 'text/csv'
+              : (rawMimeType ?? DEFAULT_MIME_TYPE),
+          ),
+        }))
+        .compile();
+
+      service = unit;
+    });
+
+    it('accepts .csv file reported as application/vnd.ms-excel under text/csv allow-list', () => {
+      const item = mockDriveItem({
+        name: 'data.csv',
+        file: { mimeType: 'application/vnd.ms-excel', hashes: { quickXorHash: 'hash1' } },
+      });
+      expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(true);
+    });
+
+    it('rejects .xls file reported as application/vnd.ms-excel under text/csv allow-list', () => {
+      const item = mockDriveItem({
+        name: 'legacy.xls',
+        file: { mimeType: 'application/vnd.ms-excel', hashes: { quickXorHash: 'hash1' } },
+      });
+      expect(service.isFileValidForIngestion(item, 'FinanceGPTKnowledge')).toBe(false);
     });
   });
 });
