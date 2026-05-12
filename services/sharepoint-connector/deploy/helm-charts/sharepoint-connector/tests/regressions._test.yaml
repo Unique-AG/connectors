@@ -137,6 +137,100 @@ tests:
           path: metadata.name
           value: sharepoint-connector-central-sales-demo-tenant-config
 
+  - it: "[UN-20464] siteDefaults block renders alongside trimmed per-site rows"
+    template: tenant-config.yaml
+    set:
+      connectorConfig:
+        enabled: true
+        sharepoint:
+          tenantId: "12345678-1234-1234-1234-123456789012"
+          baseUrl: "https://acme.sharepoint.com"
+          auth:
+            mode: certificate
+            clientId: "00000000-0000-0000-0000-000000000000"
+            privateKeyPath: /app/key.pem
+            thumbprintSha1: "aabbccdd"
+          sitesSource: config_file
+          siteDefaults:
+            syncColumnName: FinanceGPTKnowledge
+            storeInternally: enabled
+            syncStatus: active
+            syncMode: content_only
+            permissionsInheritanceMode: inherit_scopes_and_files
+            subsitesScan: disabled
+          sites:
+            - siteId: "00000000-0000-0000-0000-000000000000"
+              ingestionMode: recursive
+              scopeId: scope_1
+              syncMode: content_and_permissions
+            - siteId: "00000000-0000-0000-0000-000000000001"
+              syncColumnName: HRKnowledge
+              ingestionMode: flat
+              scopeId: scope_2
+        unique:
+          authMode: cluster_local
+          ingestionServiceBaseUrl: "http://ingestion"
+          scopeManagementServiceBaseUrl: "http://scope-mgmt"
+        processing:
+          concurrency: 1
+          allowedMimeTypes:
+            - "application/pdf"
+    asserts:
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "siteDefaults:"
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "syncColumnName: FinanceGPTKnowledge"
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "subsitesScan: disabled"
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: 'syncMode: "content_and_permissions"'
+      - matchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: 'syncColumnName: "HRKnowledge"'
+      - notMatchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: 'syncStatus: "active"'
+
+  - it: "[UN-20464] siteDefaults block omitted when empty"
+    template: tenant-config.yaml
+    set:
+      connectorConfig:
+        enabled: true
+        sharepoint:
+          tenantId: "12345678-1234-1234-1234-123456789012"
+          baseUrl: "https://acme.sharepoint.com"
+          auth:
+            mode: certificate
+            clientId: "00000000-0000-0000-0000-000000000000"
+            privateKeyPath: /app/key.pem
+            thumbprintSha1: "aabbccdd"
+          sitesSource: config_file
+          siteDefaults: {}
+          sites:
+            - siteId: "00000000-0000-0000-0000-000000000000"
+              syncColumnName: FinanceGPTKnowledge
+              ingestionMode: recursive
+              scopeId: scope_1
+              storeInternally: enabled
+              syncStatus: active
+              syncMode: content_only
+        unique:
+          authMode: cluster_local
+          ingestionServiceBaseUrl: "http://ingestion"
+          scopeManagementServiceBaseUrl: "http://scope-mgmt"
+        processing:
+          concurrency: 1
+          allowedMimeTypes:
+            - "application/pdf"
+    asserts:
+      - notMatchRegex:
+          path: data["default-tenant-config.yaml"]
+          pattern: "siteDefaults:"
+
   - it: "[UN-18247] proxy-config ConfigMap name uses release name (default)"
     template: proxy-configmap.yaml
     set:

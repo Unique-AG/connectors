@@ -285,6 +285,61 @@
               },
               "additionalProperties": false
             },
+            "siteDefaults": {
+              "type": "object",
+              "description": "Deployment-level defaults applied to every site. Per-site values override these when set; empty/blank values fall through to these defaults. Any field except siteId may be defaulted here.",
+              "properties": {
+                "syncColumnName": {
+                  "type": "string",
+                  "description": "Default column name marking files for sync"
+                },
+                "ingestionMode": {
+                  "type": "string",
+                  "enum": ["flat", "recursive"],
+                  "description": "Default ingestion mode"
+                },
+                "scopeId": {
+                  "type": "string",
+                  "description": "Default root scope ID"
+                },
+                "maxFilesToIngest": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Default maximum number of files to ingest per site per run"
+                },
+                "storeInternally": {
+                  "type": "string",
+                  "enum": ["enabled", "disabled"],
+                  "description": "Default storeInternally setting"
+                },
+                "syncStatus": {
+                  "type": "string",
+                  "enum": ["active", "inactive", "deleted"],
+                  "description": "Default sync status"
+                },
+                "syncMode": {
+                  "type": "string",
+                  "enum": ["content_only", "content_and_permissions"],
+                  "description": "Default sync mode"
+                },
+                "permissionsInheritanceMode": {
+                  "type": "string",
+                  "enum": [
+                    "inherit_scopes_and_files",
+                    "inherit_scopes",
+                    "inherit_files",
+                    "none"
+                  ],
+                  "description": "Default permissions inheritance mode"
+                },
+                "subsitesScan": {
+                  "type": "string",
+                  "enum": ["enabled", "disabled"],
+                  "description": "Default subsitesScan setting"
+                }
+              },
+              "additionalProperties": false
+            },
             "sites": {
               "type": "array",
               "description": "Array of SharePoint sites to sync with their individual configurations. Only used when sitesSource is 'config_file'",
@@ -292,13 +347,7 @@
               "items": {
                 "type": "object",
                 "required": [
-                  "siteId",
-                  "syncColumnName",
-                  "ingestionMode",
-                  "scopeId",
-                  "storeInternally",
-                  "syncStatus",
-                  "syncMode"
+                  "siteId"
                 ],
                 "properties": {
                   "siteId": {
