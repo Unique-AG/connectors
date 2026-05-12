@@ -73,6 +73,7 @@ export class CreateDocumentOrderQuery {
       { kyckrId: input.kyckrId, productId: input.productId },
       'create_document_order: invoked',
     );
+    const start = Date.now();
     try {
       const raw = await this.kyckrClient.post<unknown>('/orders', {
         kyckrId: input.kyckrId,
@@ -83,6 +84,7 @@ export class CreateDocumentOrderQuery {
       const response = CreateOrderEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('create_document_order', 'success');
       this.metrics.recordCreditsConsumed('create_document_order', response.cost);
+      this.metrics.recordToolDuration('create_document_order', 'success', Date.now() - start);
       this.logger.debug(
         {
           kyckrId: input.kyckrId,
@@ -106,6 +108,7 @@ export class CreateDocumentOrderQuery {
           'create_document_order: Kyckr API rejected request',
         );
         this.metrics.recordToolCall('create_document_order', 'error');
+        this.metrics.recordToolDuration('create_document_order', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,

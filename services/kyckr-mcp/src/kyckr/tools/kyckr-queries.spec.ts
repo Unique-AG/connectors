@@ -23,6 +23,7 @@ const mockKyckrClient = {
 
 const mockMetrics = {
   recordToolCall: vi.fn(),
+  recordToolDuration: vi.fn(),
   recordCreditsConsumed: vi.fn(),
 };
 
@@ -110,6 +111,11 @@ describe('SearchCompaniesQuery', () => {
     expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('search_companies', {
       value: 0,
     });
+    expect(mockMetrics.recordToolDuration).toHaveBeenCalledWith(
+      'search_companies',
+      'success',
+      expect.any(Number),
+    );
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -125,6 +131,11 @@ describe('SearchCompaniesQuery', () => {
     });
     expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('search_companies', 'error');
     expect(mockMetrics.recordCreditsConsumed).not.toHaveBeenCalled();
+    expect(mockMetrics.recordToolDuration).toHaveBeenCalledWith(
+      'search_companies',
+      'error',
+      expect.any(Number),
+    );
   });
 
   it('rethrows unexpected errors', async () => {

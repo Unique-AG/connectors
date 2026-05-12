@@ -76,6 +76,7 @@ export class ListCompanyDocumentsQuery {
       { kyckrId: input.kyckrId, hasContinuation: Boolean(input.continuationKey) },
       'list_company_documents: invoked',
     );
+    const start = Date.now();
     try {
       const raw = await this.kyckrClient.get<unknown>(
         `/companies/${encodeURIComponent(input.kyckrId)}/documents`,
@@ -87,6 +88,7 @@ export class ListCompanyDocumentsQuery {
       const response = ListCompanyDocumentsEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('list_company_documents', 'success');
       this.metrics.recordCreditsConsumed('list_company_documents', response.cost);
+      this.metrics.recordToolDuration('list_company_documents', 'success', Date.now() - start);
       this.logger.debug(
         {
           kyckrId: input.kyckrId,
@@ -108,6 +110,7 @@ export class ListCompanyDocumentsQuery {
           'list_company_documents: Kyckr API rejected request',
         );
         this.metrics.recordToolCall('list_company_documents', 'error');
+        this.metrics.recordToolDuration('list_company_documents', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,

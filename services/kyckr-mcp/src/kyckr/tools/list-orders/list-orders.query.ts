@@ -74,6 +74,7 @@ export class ListOrdersQuery {
       },
       'list_orders: invoked',
     );
+    const start = Date.now();
     try {
       const raw = await this.kyckrClient.get<unknown>('/orders', {
         startDate: input.startDate,
@@ -83,6 +84,7 @@ export class ListOrdersQuery {
       const response = ListOrdersEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('list_orders', 'success');
       this.metrics.recordCreditsConsumed('list_orders', response.cost);
+      this.metrics.recordToolDuration('list_orders', 'success', Date.now() - start);
       this.logger.debug(
         {
           totalCount: response.data?.totalCount,
@@ -98,6 +100,7 @@ export class ListOrdersQuery {
           'list_orders: Kyckr API rejected request',
         );
         this.metrics.recordToolCall('list_orders', 'error');
+        this.metrics.recordToolDuration('list_orders', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,

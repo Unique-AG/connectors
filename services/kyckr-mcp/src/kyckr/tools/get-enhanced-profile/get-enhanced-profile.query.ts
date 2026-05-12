@@ -254,6 +254,7 @@ export class GetEnhancedProfileQuery {
   @Span()
   public async run(input: GetEnhancedProfileInput): Promise<GetEnhancedProfileResult> {
     this.logger.debug({ kyckrId: input.kyckrId }, 'get_enhanced_profile: invoked');
+    const start = Date.now();
     try {
       const raw = await this.kyckrClient.get<unknown>(
         `/companies/${encodeURIComponent(input.kyckrId)}/enhanced`,
@@ -262,6 +263,7 @@ export class GetEnhancedProfileQuery {
       const response = EnhancedProfileEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('get_enhanced_profile', 'success');
       this.metrics.recordCreditsConsumed('get_enhanced_profile', response.cost);
+      this.metrics.recordToolDuration('get_enhanced_profile', 'success', Date.now() - start);
       this.logger.debug({ kyckrId: input.kyckrId }, 'get_enhanced_profile: succeeded');
       return { success: true, ...response };
     } catch (err) {
@@ -276,6 +278,7 @@ export class GetEnhancedProfileQuery {
           'get_enhanced_profile: Kyckr API rejected request',
         );
         this.metrics.recordToolCall('get_enhanced_profile', 'error');
+        this.metrics.recordToolDuration('get_enhanced_profile', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,

@@ -105,6 +105,7 @@ export class SearchCompaniesQuery {
       { hasName: Boolean(input.name), companyNumber: input.companyNumber, isoCode: input.isoCode },
       'search_companies: invoked',
     );
+    const start = Date.now();
     try {
       const raw = await this.kyckrClient.get<unknown>('/companies', {
         name: input.name,
@@ -114,6 +115,7 @@ export class SearchCompaniesQuery {
       const response = KyckrSearchEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('search_companies', 'success');
       this.metrics.recordCreditsConsumed('search_companies', response.cost);
+      this.metrics.recordToolDuration('search_companies', 'success', Date.now() - start);
       this.logger.debug({ resultCount: response.data?.length ?? 0 }, 'search_companies: succeeded');
 
       return { success: true, ...response };
@@ -124,6 +126,7 @@ export class SearchCompaniesQuery {
           'search_companies: Kyckr API rejected request',
         );
         this.metrics.recordToolCall('search_companies', 'error');
+        this.metrics.recordToolDuration('search_companies', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,

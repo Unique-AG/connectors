@@ -48,6 +48,7 @@ export class GetOrderQuery {
   @Span()
   public async run(input: GetOrderInput): Promise<GetOrderResult> {
     this.logger.debug({ orderId: input.orderId }, 'get_order: invoked');
+    const start = Date.now();
     try {
       const raw = await this.kyckrClient.get<unknown>(
         `/orders/${encodeURIComponent(input.orderId)}`,
@@ -55,6 +56,7 @@ export class GetOrderQuery {
       const response = GetOrderEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('get_order', 'success');
       this.metrics.recordCreditsConsumed('get_order', response.cost);
+      this.metrics.recordToolDuration('get_order', 'success', Date.now() - start);
       this.logger.debug(
         { orderId: input.orderId, status: response.data?.status },
         'get_order: succeeded',
@@ -72,6 +74,7 @@ export class GetOrderQuery {
           'get_order: Kyckr API rejected request',
         );
         this.metrics.recordToolCall('get_order', 'error');
+        this.metrics.recordToolDuration('get_order', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,

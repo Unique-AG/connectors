@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Counter } from '@opentelemetry/api';
+import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 
 export const KYCKR_TOOL_NAMES = [
@@ -18,33 +18,19 @@ export type KyckrToolCallResult = 'success' | 'error';
 
 @Injectable()
 export class Metrics {
-  private readonly callCounters: Record<KyckrToolName, Counter>;
+  private readonly toolCalls: Counter;
+  private readonly toolCallDuration: Histogram;
   private readonly creditsConsumed: Counter;
 
   public constructor(metricService: MetricService) {
-    this.callCounters = {
-      search_companies: metricService.getCounter('kyckr_search_companies_calls_total', {
-        description: 'Number of `search_companies` MCP tool calls',
-      }),
-      get_lite_profile: metricService.getCounter('kyckr_lite_profile_fetches_total', {
-        description: 'Number of `get_lite_profile` MCP tool calls',
-      }),
-      get_enhanced_profile: metricService.getCounter('kyckr_enhanced_profile_fetches_total', {
-        description: 'Number of `get_enhanced_profile` MCP tool calls',
-      }),
-      list_company_documents: metricService.getCounter('kyckr_company_documents_list_calls_total', {
-        description: 'Number of `list_company_documents` MCP tool calls',
-      }),
-      create_document_order: metricService.getCounter('kyckr_document_orders_total', {
-        description: 'Number of `create_document_order` MCP tool calls',
-      }),
-      get_order: metricService.getCounter('kyckr_get_order_calls_total', {
-        description: 'Number of `get_order` MCP tool calls',
-      }),
-      list_orders: metricService.getCounter('kyckr_list_orders_calls_total', {
-        description: 'Number of `list_orders` MCP tool calls',
-      }),
-    };
+    this.toolCalls = metricService.getCounter('kyckr_tool_calls_total', {
+      description: 'Number of Kyckr MCP tool calls, labelled by tool and result',
+    });
+
+    this.toolCallDuration = metricService.getHistogram('kyckr_tool_call_duration_seconds', {
+      description: 'Duration of Kyckr MCP tool calls in seconds, labelled by tool and result',
+      unit: 's',
+    });
 
     this.creditsConsumed = metricService.getCounter('kyckr_credits_consumed_total', {
       description: 'Kyckr credits consumed, attributed to the MCP tool that triggered the call',
@@ -52,7 +38,15 @@ export class Metrics {
   }
 
   public recordToolCall(tool: KyckrToolName, result: KyckrToolCallResult): void {
-    this.callCounters[tool].add(1, { result });
+    this.toolCalls.add(1, { tool, result });
+  }
+
+  public recordToolDuration(
+    tool: KyckrToolName,
+    result: KyckrToolCallResult,
+    durationMs: number,
+  ): void {
+    this.toolCallDuration.record(durationMs / 1000, { tool, result });
   }
 
   public recordCreditsConsumed(tool: KyckrToolName, cost: { value?: number } | undefined): void {

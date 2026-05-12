@@ -141,6 +141,7 @@ export class GetLiteProfileQuery {
   @Span()
   public async run(input: GetLiteProfileInput): Promise<GetLiteProfileResult> {
     this.logger.debug({ kyckrId: input.kyckrId }, 'get_lite_profile: invoked');
+    const start = Date.now();
     try {
       const raw = await this.kyckrClient.get<unknown>(
         `/companies/${encodeURIComponent(input.kyckrId)}/lite`,
@@ -151,6 +152,7 @@ export class GetLiteProfileQuery {
       const response = LiteProfileEnvelopeSchema.parse(raw);
       this.metrics.recordToolCall('get_lite_profile', 'success');
       this.metrics.recordCreditsConsumed('get_lite_profile', response.cost);
+      this.metrics.recordToolDuration('get_lite_profile', 'success', Date.now() - start);
       this.logger.debug({ kyckrId: input.kyckrId }, 'get_lite_profile: succeeded');
       return { success: true, ...response };
     } catch (err) {
@@ -165,6 +167,7 @@ export class GetLiteProfileQuery {
           'get_lite_profile: Kyckr API rejected request',
         );
         this.metrics.recordToolCall('get_lite_profile', 'error');
+        this.metrics.recordToolDuration('get_lite_profile', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,

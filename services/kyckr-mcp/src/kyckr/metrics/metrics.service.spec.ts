@@ -2,19 +2,17 @@ import type { MetricService } from 'nestjs-otel';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Metrics } from './metrics.service';
 
-const mockCounters = {
-  kyckr_search_companies_calls_total: { add: vi.fn() },
-  kyckr_lite_profile_fetches_total: { add: vi.fn() },
-  kyckr_enhanced_profile_fetches_total: { add: vi.fn() },
-  kyckr_company_documents_list_calls_total: { add: vi.fn() },
-  kyckr_document_orders_total: { add: vi.fn() },
-  kyckr_get_order_calls_total: { add: vi.fn() },
-  kyckr_list_orders_calls_total: { add: vi.fn() },
+const mockMetrics = {
+  kyckr_tool_calls_total: { add: vi.fn() },
+  kyckr_tool_call_duration_seconds: { record: vi.fn() },
   kyckr_credits_consumed_total: { add: vi.fn() },
 };
 
-const mockMetricService: Pick<MetricService, 'getCounter'> = {
-  getCounter: vi.fn((name: keyof typeof mockCounters) => mockCounters[name]),
+const mockMetricService: Pick<MetricService, 'getCounter' | 'getHistogram'> = {
+  getCounter: vi.fn((name: 'kyckr_tool_calls_total' | 'kyckr_credits_consumed_total') => {
+    return mockMetrics[name];
+  }),
+  getHistogram: vi.fn(() => mockMetrics.kyckr_tool_call_duration_seconds),
 };
 
 describe('Metrics', () => {
@@ -25,14 +23,30 @@ describe('Metrics', () => {
     unit = new Metrics(mockMetricService as MetricService);
   });
 
-  it('records tool calls against the matching counter', () => {
+  it('records tool calls against a single counter labelled by tool and result', () => {
     unit.recordToolCall('search_companies', 'success');
     unit.recordToolCall('get_order', 'error');
 
-    expect(mockCounters.kyckr_search_companies_calls_total.add).toHaveBeenCalledWith(1, {
+    expect(mockMetrics.kyckr_tool_calls_total.add).toHaveBeenNthCalledWith(1, 1, {
+      tool: 'search_companies',
       result: 'success',
     });
-    expect(mockCounters.kyckr_get_order_calls_total.add).toHaveBeenCalledWith(1, {
+    expect(mockMetrics.kyckr_tool_calls_total.add).toHaveBeenNthCalledWith(2, 1, {
+      tool: 'get_order',
+      result: 'error',
+    });
+  });
+
+  it('records tool call duration as seconds with tool and result labels', () => {
+    unit.recordToolDuration('search_companies', 'success', 1500);
+    unit.recordToolDuration('get_order', 'error', 250);
+
+    expect(mockMetrics.kyckr_tool_call_duration_seconds.record).toHaveBeenNthCalledWith(1, 1.5, {
+      tool: 'search_companies',
+      result: 'success',
+    });
+    expect(mockMetrics.kyckr_tool_call_duration_seconds.record).toHaveBeenNthCalledWith(2, 0.25, {
+      tool: 'get_order',
       result: 'error',
     });
   });
@@ -40,7 +54,7 @@ describe('Metrics', () => {
   it('records positive credit consumption with the tool label', () => {
     unit.recordCreditsConsumed('get_lite_profile', { value: 3 });
 
-    expect(mockCounters.kyckr_credits_consumed_total.add).toHaveBeenCalledWith(3, {
+    expect(mockMetrics.kyckr_credits_consumed_total.add).toHaveBeenCalledWith(3, {
       tool: 'get_lite_profile',
     });
   });
@@ -49,6 +63,6 @@ describe('Metrics', () => {
     unit.recordCreditsConsumed('get_lite_profile', undefined);
     unit.recordCreditsConsumed('get_lite_profile', { value: 0 });
 
-    expect(mockCounters.kyckr_credits_consumed_total.add).not.toHaveBeenCalled();
+    expect(mockMetrics.kyckr_credits_consumed_total.add).not.toHaveBeenCalled();
   });
 });
