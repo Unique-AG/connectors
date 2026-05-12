@@ -71,16 +71,12 @@ export class KyckrHttpClient {
       if (status >= 400) {
         const correlationId = this.extractCorrelationId(responseBody);
         const message = this.extractErrorMessage(responseBody, status, rawBody);
-        this.logger.error({ method, path, status, correlationId }, `Kyckr API error: ${message}`);
         throw new KyckrApiError(status, path, message, correlationId);
       }
 
       return responseBody as T;
     } catch (err) {
-      if (err instanceof KyckrApiError) {
-        throw err;
-      }
-      this.logger.error({ method, path, err }, 'Kyckr API request failed');
+      this.logger.error({ method, path, status, err }, 'Kyckr API request failed');
       throw err;
     } finally {
       const duration = Date.now() - start;
