@@ -18,11 +18,11 @@ server:
   #         secretKeyRef:
   #           name: kyckr-mcp-secrets
   #           key: KYCKR_API_KEY
-  #     - name: MCP_ACCESS_TOKEN
+  #     - name: MCP_API_KEY
   #       valueFrom:
   #         secretKeyRef:
   #           name: kyckr-mcp-secrets
-  #           key: MCP_ACCESS_TOKEN
+  #           key: MCP_API_KEY
   envVars: []
   # -- ConfigMap(s) to load environment variables from.
   # Default assumes release name is "kyckr-mcp".
@@ -95,7 +95,7 @@ mcpConfig:
     # bufferLogs: enabled
 
   # -- Kyckr API configuration.
-  # KYCKR_API_KEY and MCP_ACCESS_TOKEN are required and must be provided via server.envVars (secrets).
+  # KYCKR_API_KEY and MCP_API_KEY are required and must be provided via server.envVars (secrets).
   kyckr: {}
     # -- Kyckr REST API base URL. Defaults to the test environment in config.
     # apiBaseUrl: https://test-api.kyckr.com/v2

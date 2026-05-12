@@ -1,9 +1,9 @@
 import { defaultLoggerOptions } from '@unique-ag/logger';
-import { McpModule } from '@unique-ag/mcp-server-module';
+import { McpModule, McpTransportType } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
@@ -13,8 +13,16 @@ import * as packageJson from '../package.json';
 import { type AppConfig, appConfig, kyckrConfig } from './config';
 import { KyckrModule } from './kyckr/kyckr.module';
 import { ManifestController } from './manifest.controller';
-import { McpAccessTokenGuard } from './mcp-access-token.guard';
 import { serverInstructions } from './server.instructions';
+
+// The MCP api-key lives in the URL path (Unique's connector validator rejects
+// URLs with query strings or fragments), so the McpModule is mounted at the
+// secret path. Requests to any other path return 404 from the Nest router.
+const mcpApiKey = process.env.MCP_API_KEY ?? '';
+
+// Shape produced by pino-std-serializers.reqSerializer (pino-http auto-wraps
+// custom serializers, so this is what the serializer below receives).
+type SerializedReq = { url?: string } & Record<string, unknown>;
 
 @Module({
   imports: [
@@ -30,6 +38,18 @@ import { serverInstructions } from './server.instructions';
         pinoHttp: {
           ...defaultLoggerOptions.pinoHttp,
           level: config.logLevel,
+          // The api-key lives in the URL path, so pino-http's default `req.url`
+          // logging would expose it on every request. Replace it before logging.
+          // pino-http auto-wraps custom serializers, so `req` here is already the
+          // output of `pino-std-serializers.reqSerializer`.
+          serializers: {
+            req: (req: SerializedReq) => {
+              if (mcpApiKey && typeof req.url === 'string') {
+                return { ...req, url: req.url.replace(mcpApiKey, '[Redacted]') };
+              }
+              return req;
+            },
+          },
           mixin: () => {
             const span = trace.getActiveSpan();
             if (!span?.isRecording()) {
@@ -60,12 +80,13 @@ import { serverInstructions } from './server.instructions';
       name: 'kyckr-mcp',
       version: packageJson.version,
       instructions: serverInstructions,
+      transport: McpTransportType.STREAMABLE_HTTP,
       streamableHttp: {
         enableJsonResponse: false,
         sessionIdGenerator: () => typeid('session').toString(),
         statelessMode: false,
       },
-      mcpEndpoint: 'mcp',
+      mcpEndpoint: `${mcpApiKey}/mcp`,
     }),
     KyckrModule,
   ],
@@ -73,7 +94,6 @@ import { serverInstructions } from './server.instructions';
   providers: [
     { provide: APP_PIPE, useClass: ZodValidationPipe },
     { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
-    { provide: APP_GUARD, useClass: McpAccessTokenGuard },
   ],
 })
 export class AppModule {}

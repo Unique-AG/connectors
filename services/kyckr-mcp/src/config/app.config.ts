@@ -20,8 +20,8 @@ const ConfigSchema = z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .prefault('info')
       .describe('The log level at which the services outputs (pino).'),
-    mcpAccessToken: redacted(z.string()).describe(
-      'Shared secret protecting the /mcp endpoint. Requests must supply it as a Bearer token in the Authorization header.',
+    mcpApiKey: redacted(z.string()).describe(
+      'Shared secret protecting the MCP endpoint. The service is mounted at `/<MCP_API_KEY>/mcp`, so the api-key is the URL-path prefix that clients must know to reach it.',
     ),
   })
   .transform((c) => ({
@@ -30,7 +30,7 @@ const ConfigSchema = z
   }));
 
 export const appConfig = registerConfig('app', ConfigSchema, {
-  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'MCP_ACCESS_TOKEN']),
+  whitelistKeys: new Set(['LOG_LEVEL', 'PORT', 'NODE_ENV', 'MCP_API_KEY']),
 });
 
 export type AppConfigNamespaced = NamespacedConfigType<typeof appConfig>;

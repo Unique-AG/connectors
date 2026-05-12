@@ -12,7 +12,7 @@ describe('ManifestController', () => {
       name: '@unique-ag/kyckr-mcp',
       type: 'mcp-server',
       endpoints: {
-        mcp: '/mcp',
+        mcp: '/<api-key>/mcp',
       },
       features: ['Kyckr company registry integration', 'KYC/KYB data retrieval'],
       documentation: {

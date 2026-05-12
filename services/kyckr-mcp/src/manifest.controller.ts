@@ -12,7 +12,7 @@ export class ManifestController {
       description: packageJson.description || 'Kyckr MCP Server - company registry data via MCP',
       type: 'mcp-server',
       endpoints: {
-        mcp: '/mcp',
+        mcp: '/<api-key>/mcp',
       },
       features: ['Kyckr company registry integration', 'KYC/KYB data retrieval'],
       documentation: {

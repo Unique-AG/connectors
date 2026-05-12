@@ -50,7 +50,7 @@ Copy `.env.example` to `.env` and configure the following.
 | Variable | Description |
 |----------|-------------|
 | `KYCKR_API_KEY` | Kyckr API key, sent as `Bearer` to the Kyckr API |
-| `MCP_ACCESS_TOKEN` | Shared secret protecting `/mcp`. Requests must include `Authorization: Bearer <token>`. |
+| `MCP_API_KEY` | Shared secret protecting the MCP endpoint. The service mounts at `/<MCP_API_KEY>/mcp`, so clients must use the api-key as the URL-path prefix. |
 
 ### Optional Variables
 
@@ -65,7 +65,7 @@ Copy `.env.example` to `.env` and configure the following.
 ### Generating Secrets
 
 ```bash
-# Generate a 64-char hex secret (for MCP_ACCESS_TOKEN)
+# Generate a 64-char hex secret (for MCP_API_KEY)
 openssl rand -hex 32
 ```
 
@@ -94,11 +94,10 @@ E2E tests inject dummy env vars in `test/setup.ts`. The repo-wide `.gitignore` e
 
 ### Calling `/mcp`
 
-Every request to `/mcp` must include the `MCP_ACCESS_TOKEN` as a Bearer token:
+The MCP endpoint is mounted at `/<MCP_API_KEY>/mcp`. Clients must use the api-key as the URL-path prefix:
 
 ```bash
-curl -X POST http://localhost:9542/mcp \
-  -H "Authorization: Bearer $MCP_ACCESS_TOKEN" \
+curl -X POST "http://localhost:9542/$MCP_API_KEY/mcp" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
@@ -121,7 +120,7 @@ helm install kyckr-mcp ./deploy/helm-charts/kyckr-mcp \
   -f values.yaml
 ```
 
-Secrets (`KYCKR_API_KEY`, `MCP_ACCESS_TOKEN`) are wired through `server.envVars` from a Kubernetes Secret.
+Secrets (`KYCKR_API_KEY`, `MCP_API_KEY`) are wired through `server.envVars` from a Kubernetes Secret.
 
 ### Terraform (Azure)
 

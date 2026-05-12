@@ -11,20 +11,20 @@ resource "azurerm_key_vault_secret" "manual_secret" {
 }
 
 # ---
-# @description Shared bearer token protecting the /mcp endpoint
+# @description Shared api-key protecting the /mcp endpoint (passed as the `api-key` query parameter)
 # @length 32 byte hex (64 hex chars)
 # @type random_bytes#hex
-# @env MCP_ACCESS_TOKEN
+# @env MCP_API_KEY
 # ---
-resource "random_bytes" "hex_mcp_access_token" {
-  keepers = { version = var.secrets_to_create.hex_mcp_access_token.rotation_counter }
-  length  = coalesce(var.secrets_to_create.hex_mcp_access_token.length, 32)
+resource "random_bytes" "hex_mcp_api_key" {
+  keepers = { version = var.secrets_to_create.hex_mcp_api_key.rotation_counter }
+  length  = coalesce(var.secrets_to_create.hex_mcp_api_key.length, 32)
 }
-resource "azurerm_key_vault_secret" "hex_mcp_access_token" {
-  count           = var.secrets_to_create.hex_mcp_access_token.create ? 1 : 0
-  name            = var.secrets_to_create.hex_mcp_access_token.name
-  value           = random_bytes.hex_mcp_access_token.hex
-  content_type    = var.secrets_to_create.hex_mcp_access_token.content_type
+resource "azurerm_key_vault_secret" "hex_mcp_api_key" {
+  count           = var.secrets_to_create.hex_mcp_api_key.create ? 1 : 0
+  name            = var.secrets_to_create.hex_mcp_api_key.name
+  value           = random_bytes.hex_mcp_api_key.hex
+  content_type    = var.secrets_to_create.hex_mcp_api_key.content_type
   key_vault_id    = coalesce(var.key_vault_sensitive_id, var.key_vault_id)
-  expiration_date = var.secrets_to_create.hex_mcp_access_token.expiration_date
+  expiration_date = var.secrets_to_create.hex_mcp_api_key.expiration_date
 }

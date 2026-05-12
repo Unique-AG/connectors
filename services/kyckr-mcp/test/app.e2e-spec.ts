@@ -29,7 +29,7 @@ describe('AppController (e2e)', () => {
           name: '@unique-ag/kyckr-mcp',
           type: 'mcp-server',
           endpoints: {
-            mcp: '/mcp',
+            mcp: '/<api-key>/mcp',
           },
           features: ['Kyckr company registry integration', 'KYC/KYB data retrieval'],
           documentation: {
@@ -51,32 +51,30 @@ describe('AppController (e2e)', () => {
     return request(app.getHttpServer()).get('/unknown-route').expect(404);
   });
 
-  it('rejects /mcp requests without a Bearer token', () => {
+  it('returns 404 for /mcp without the api-key path prefix', () => {
     return request(app.getHttpServer())
       .post('/mcp')
       .set('Accept', 'application/json, text/event-stream')
       .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
-      .expect(403);
+      .expect(404);
   });
 
-  it('rejects /mcp requests with the wrong Bearer token', () => {
+  it('returns 404 for a wrong api-key path prefix', () => {
     return request(app.getHttpServer())
-      .post('/mcp')
+      .post('/wrong-api-key/mcp')
       .set('Accept', 'application/json, text/event-stream')
-      .set('Authorization', 'Bearer wrong-token')
       .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
-      .expect(403);
+      .expect(404);
   });
 
-  it('allows /mcp requests with the configured Bearer token', () => {
+  it('serves /mcp under the configured api-key path prefix', () => {
     return request(app.getHttpServer())
-      .post('/mcp')
+      .post('/test-mcp-api-key/mcp')
       .set('Accept', 'application/json, text/event-stream')
-      .set('Authorization', 'Bearer test-mcp-access-token')
       .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
       .expect((res) => {
-        if (res.status === 403) {
-          throw new Error('Guard rejected a request with the correct token');
+        if (res.status === 404) {
+          throw new Error('McpModule did not register the route under the api-key prefix');
         }
       });
   });

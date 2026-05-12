@@ -18,4 +18,4 @@ Provide the following as Kubernetes Secrets via `server.envVars` in the Helm val
 | Secret key | Description |
 |------------|-------------|
 | `KYCKR_API_KEY` | Kyckr API key (Bearer token) |
-| `MCP_ACCESS_TOKEN` | Required shared secret protecting the `/mcp` endpoint |
+| `MCP_API_KEY` | Required shared secret protecting the MCP endpoint. The server mounts at `/<MCP_API_KEY>/mcp`; clients use the api-key as the URL-path prefix. |

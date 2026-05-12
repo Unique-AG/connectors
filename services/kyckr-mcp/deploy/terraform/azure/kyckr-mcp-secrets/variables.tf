@@ -39,10 +39,10 @@ variable "secrets_to_create" {
     /**
       Auto-generated secrets (hex output from random_bytes):
 
-      Secret format requirements (from src/config/kyckr.config.ts):
-      - MCP Access Token: 64-char hex (openssl rand -hex 32) -> length=32
-        Required Bearer token protecting the /mcp endpoint.
+      Secret format requirements (from src/config/app.config.ts):
+      - MCP API Key: 64-char hex (openssl rand -hex 32) -> length=32
+        Required shared secret protecting the /mcp endpoint, passed as the `api-key` query parameter.
     */
-    hex_mcp_access_token = { create = true, name = "kyckr-mcp-access-token", content_type = "text/hex", rotation_counter = 0, expiration_date = "2099-12-31T23:59:59Z" }
+    hex_mcp_api_key = { create = true, name = "kyckr-mcp-api-key", content_type = "text/hex", rotation_counter = 0, expiration_date = "2099-12-31T23:59:59Z" }
   }
 }
