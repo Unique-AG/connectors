@@ -103,7 +103,9 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
   if (spanProcessor) {
     sdkConfig.spanProcessor = spanProcessor;
   }
-  if (views.length) sdkConfig.views = views;
+  if (views.length) {
+    sdkConfig.views = views;
+  }
 
   const otelSDK = new NodeSDK(sdkConfig);
 

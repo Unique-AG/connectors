@@ -84,7 +84,9 @@ export class FullSyncCommand {
     const durationSeconds = (Date.now() - runStart) / 1000;
     const errorType =
       result.status === 'failed'
-        ? isRateLimitError(result.error) ? 'throttling' : 'other'
+        ? isRateLimitError(result.error)
+          ? 'throttling'
+          : 'other'
         : 'none';
     this.fullSyncRunsCounter.add(1, { status: result.status, error_type: errorType });
     this.fullSyncRunDuration.record(durationSeconds, { status: result.status });
@@ -157,7 +159,9 @@ export class FullSyncCommand {
         userProfile: { ...userProfile, email: userProfileEmail },
         version,
       });
-      this.batchSyncDuration.record((Date.now() - batchStart) / 1000, { outcome: batchResult.outcome });
+      this.batchSyncDuration.record((Date.now() - batchStart) / 1000, {
+        outcome: batchResult.outcome,
+      });
 
       switch (batchResult.outcome) {
         case 'version-mismatch':
@@ -315,7 +319,10 @@ export class FullSyncCommand {
         if (isWithinCooldown(row.fullSyncHeartbeatAt, RUNNING_HEARTBEAT_MINUTES)) {
           return { action: 'skip', reason: 'already-running' };
         }
-        this.logger.warn({ userProfileId, msg: 'Recovering stale running sync (heartbeat too old)' });
+        this.logger.warn({
+          userProfileId,
+          msg: 'Recovering stale running sync (heartbeat too old)',
+        });
         return { action: 'proceed' };
       case 'failed':
         if (isWithinCooldown(row.fullSyncHeartbeatAt, FAILED_HEARTBEAT_MINUTES)) {
@@ -376,13 +383,21 @@ export class FullSyncCommand {
     }
 
     if (!result.ok) {
-      this.logger.warn({ userProfileId, version, msg: 'Ingestion is not reachable, waiting again' });
+      this.logger.warn({
+        userProfileId,
+        version,
+        msg: 'Ingestion is not reachable, waiting again',
+      });
     } else {
       this.logger.debug({ userProfileId, version, msg: 'Scope still draining, waiting again' });
     }
     const isSaved = await this.transitionState(userProfileId, version, 'waiting-for-ingestion');
     if (!isSaved) {
-      this.logger.warn({ userProfileId, version, msg: 'Version mismatch on ingestion wait transition' });
+      this.logger.warn({
+        userProfileId,
+        version,
+        msg: 'Version mismatch on ingestion wait transition',
+      });
       return { status: 'skipped', reason: 'version-mismatch' };
     }
 
