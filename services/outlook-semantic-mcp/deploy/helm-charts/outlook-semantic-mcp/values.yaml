@@ -145,22 +145,36 @@ mcpConfig:
     # -- Search backend. MicrosoftGraphAndUniqueApi: dual backend, KB ingestion + semantic search (default).
     # MicrosoftGraph: direct Graph search, no ingestion, sync tools not registered.
     mcpBackend: MicrosoftGraphAndUniqueApi
-    # -- Delegated access scanning mode. Controls whether the service discovers shared mailbox access.
-    # Values: disabled | fullAccessOnly | granularAccess
+    # -- Optional. Cron schedule for syncing mail folder structure for all active subscriptions.
+    # Default: '*/5 * * * *'. Env var: DIRECTORY_SYNC_CRON_SCHEDULE
+    # directorySyncCronSchedule: '*/5 * * * *'
+    # -- Optional. Buffer logs during startup. Set to 'disabled' only for startup debugging.
+    # Default: 'enabled'. Env var: APP_BUFFER_LOGS
+    # bufferLogs: 'enabled'
+
+  # -- Delegated access configuration. Controls whether the service discovers shared mailbox access.
+  delegatedAccess:
+    # -- Scanning mode. Values: disabled | fullAccessOnly | granularAccess
     #   disabled       - delegated access scanning is off (default)
     #   fullAccessOnly - discovers Full Access (Read & Manage) delegation via /messages endpoint
     #   granularAccess - discovers folder-level delegation via /mailFolders endpoint + runs verification
     # Env var: DELEGATED_ACCESS_SCAN
-    delegatedAccessScan: disabled
+    scan: disabled
     # -- Cron schedule for delegated access discovery runs.
-    # Required when delegatedAccessScan is not 'disabled'. Env var: DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE
-    # delegatedAccessDiscoveryCronSchedule: '0 */12 * * *'
+    # Required when scan is not 'disabled'. Env var: DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE
+    # discoveryCronSchedule: '0 */12 * * *'
     # -- Cron schedule for delegated access verification runs.
-    # Required when delegatedAccessScan is 'granularAccess'. Env var: DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE
-    # delegatedAccessVerificationCronSchedule: '0 */4 * * *'
+    # Required when scan is 'granularAccess'. Env var: DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE
+    # verificationCronSchedule: '0 */4 * * *'
     # -- Cron schedule for recovering stuck delegated access discovery and verification jobs.
-    # Active when delegatedAccessScan is not 'disabled'. Env var: DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE
-    # delegatedAccessRecoveryCronSchedule: '*/30 * * * *'
+    # Active when scan is not 'disabled'. Env var: DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE
+    # recoveryCronSchedule: '*/30 * * * *'
+    # -- Optional. Hours after which a delegated access account is considered stale for health checks.
+    # Default: 24. Env var: DELEGATED_ACCESS_STALENESS_THRESHOLD_HOURS
+    # stalenessThresholdHours: 24
+    # -- Optional. Fraction (0–1) of eligible delegated users that may be stale before health is marked down.
+    # Default: 0.15. Env var: DELEGATED_ACCESS_FAILURE_THRESHOLD
+    # failureThreshold: 0.15
 
   # -- Optional log settings. To override:
   # logs:
@@ -194,6 +208,12 @@ mcpConfig:
     # -- Optional. Cron schedule for stuck inbox deletion recovery scans.
     # Default: '*/5 * * * *'. Env var: INGESTION_DELETE_INBOX_RECOVERY_CRON
     # deleteInboxRecoveryCron: "*/5 * * * *"
+    # -- Optional. Timeout in milliseconds for connectivity health checks (ping to Graph API).
+    # Default: 3000. Env var: INGESTION_CONNECTIVITY_TIMEOUT_MS
+    # connectivityTimeoutMs: 3000
+    # -- Optional. Fraction (0–1) of eligible users that may be failing fullSync or liveCatchup before health is marked down.
+    # Default: 0.15. Env var: INGESTION_SYNC_FAILURE_THRESHOLD
+    # syncFailureThreshold: 0.15
 
   # -- Microsoft Graph API configuration
   microsoft:

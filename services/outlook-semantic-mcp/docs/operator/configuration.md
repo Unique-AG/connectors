@@ -32,9 +32,20 @@ Set via `mcpConfig.app` in Helm values:
 | `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
 | `MCP_BACKEND` | `mcpConfig.app.mcpBackend` | `MicrosoftGraphAndUniqueApi` | Selects the search backend — see [MCP_BACKEND](#MCP_BACKEND) |
 | `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
-| `DELEGATED_ACCESS_SCAN` | `mcpConfig.app.delegatedAccessScan` | `disabled` | Delegated access scanning mode — see [DELEGATED_ACCESS_SCAN](#DELEGATED_ACCESS_SCAN) |
-| `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` | `mcpConfig.app.delegatedAccessDiscoveryCronSchedule` | `0 */6 * * *` | Cron schedule for delegated access discovery runs. Required when `DELEGATED_ACCESS_SCAN` is not `disabled` |
-| `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` | `mcpConfig.app.delegatedAccessVerificationCronSchedule` | `0 */4 * * *` | Cron schedule for delegated access verification runs. Required when `DELEGATED_ACCESS_SCAN` is `granularAccess` |
+| `DIRECTORY_SYNC_CRON_SCHEDULE` | `mcpConfig.app.directorySyncCronSchedule` | `*/5 * * * *` | Cron schedule for syncing mail folder structure for all active subscriptions |
+
+### Delegated Access Configuration
+
+Set via `mcpConfig.delegatedAccess` in Helm values:
+
+| Variable | Helm Path | Default | Description |
+|----------|-----------|---------|-------------|
+| `DELEGATED_ACCESS_SCAN` | `mcpConfig.delegatedAccess.scan` | `disabled` | Delegated access scanning mode — see [DELEGATED_ACCESS_SCAN](#DELEGATED_ACCESS_SCAN) |
+| `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` | `mcpConfig.delegatedAccess.discoveryCronSchedule` | `0 */12 * * *` | Cron schedule for delegated access discovery runs. Required when `DELEGATED_ACCESS_SCAN` is not `disabled` |
+| `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` | `mcpConfig.delegatedAccess.verificationCronSchedule` | `0 */4 * * *` | Cron schedule for delegated access verification runs. Required when `DELEGATED_ACCESS_SCAN` is `granularAccess` |
+| `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE` | `mcpConfig.delegatedAccess.recoveryCronSchedule` | `*/30 * * * *` | Cron schedule for recovering stuck delegated access discovery and verification jobs. Active when `DELEGATED_ACCESS_SCAN` is not `disabled` |
+| `DELEGATED_ACCESS_STALENESS_THRESHOLD_HOURS` | `mcpConfig.delegatedAccess.stalenessThresholdHours` | `24` | Hours after which a delegated access account is considered stale for the `/health` check |
+| `DELEGATED_ACCESS_FAILURE_THRESHOLD` | `mcpConfig.delegatedAccess.failureThreshold` | `0.15` | Fraction (0–1) of eligible delegated users that may be stale before the `/health` check reports down |
 
 ### Microsoft Configuration
 
@@ -58,6 +69,8 @@ Applies when `MCP_BACKEND` is `MicrosoftGraphAndUniqueApi`. Set via `mcpConfig.i
 | `INGESTION_FULL_SYNC_RECOVERY_CRON` | `mcpConfig.ingestion.fullSyncRecoveryCron` | `*/2 * * * *` | Cron schedule for stuck full-sync recovery scans |
 | `INGESTION_LIVE_CATCHUP_RECOVERY` | `mcpConfig.ingestion.liveCatchupRecovery` | `*/5 * * * *` | Cron schedule for stuck live catch-up recovery scans |
 | `INGESTION_DELETE_INBOX_RECOVERY_CRON` | `mcpConfig.ingestion.deleteInboxRecoveryCron` | `*/5 * * * *` | Cron schedule for stuck inbox deletion recovery scans |
+| `INGESTION_CONNECTIVITY_TIMEOUT_MS` | `mcpConfig.ingestion.connectivityTimeoutMs` | `3000` | Timeout in milliseconds for the Microsoft Graph connectivity check in `/health` |
+| `INGESTION_SYNC_FAILURE_THRESHOLD` | `mcpConfig.ingestion.syncFailureThreshold` | `0.15` | Fraction (0–1) of eligible users that may be failing fullSync or liveCatchup before the `/health` check reports down |
 
 ### Unique API Configuration
 
@@ -160,9 +173,11 @@ mcpConfig:
     selfUrl: https://outlook.semantic.mcp.example.com
     mcpDebugMode: disabled
     mcpBackend: MicrosoftGraphAndUniqueApi
-    delegatedAccessScan: disabled
-    # delegatedAccessDiscoveryCronSchedule: '0 */6 * * *'   # required when delegatedAccessScan != disabled
-    # delegatedAccessVerificationCronSchedule: '0 */4 * * *' # required when delegatedAccessScan == granularAccess
+
+  delegatedAccess:
+    scan: disabled
+    # discoveryCronSchedule: '0 */12 * * *'   # required when scan != disabled
+    # verificationCronSchedule: '0 */4 * * *'  # required when scan == granularAccess
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
@@ -386,7 +401,7 @@ Existing deployments that do not set this variable are unaffected — `Microsoft
 
 ### DELEGATED_ACCESS_SCAN
 
-Controls whether the service scans for delegated mailbox access granted between users at the Microsoft Exchange level. Three values are accepted:
+Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for delegated mailbox access granted between users at the Microsoft Exchange level. Three values are accepted:
 
 - **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. Users only see their own mailbox.
 - **`fullAccessOnly`** — discovers users who have been granted **Full Access (Read & Manage)** on a mailbox via Exchange admin. Uses the `/users/{email}/messages` endpoint to detect access. Requires `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE`.

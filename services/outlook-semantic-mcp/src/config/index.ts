@@ -4,7 +4,6 @@ import type { AuthConfigNamespaced } from './auth.config';
 import type { DatabaseConfigNamespaced } from './database.config';
 import { DelegatedAccessConfigNamespaced } from './delegated-access.config';
 import type { EncryptionConfigNamespaced } from './encryption.config';
-import type { HealthConfigNamespaced } from './health.config';
 import { IngestionConfigNamespaced } from './ingestion.config';
 import type { LogsConfigNamespaced } from './logs.config';
 import type { MicrosoftConfigNamespaced } from './microsoft.config';
@@ -16,7 +15,6 @@ export * from './auth.config';
 export * from './database.config';
 export * from './delegated-access.config';
 export * from './encryption.config';
-export * from './health.config';
 export * from './ingestion.config';
 export * from './logs.config';
 export * from './mcp-backend-type.config';
@@ -28,7 +26,6 @@ export type ConfigNamespaced = AMQPConfigNamespaced &
   AuthConfigNamespaced &
   DatabaseConfigNamespaced &
   EncryptionConfigNamespaced &
-  HealthConfigNamespaced &
   LogsConfigNamespaced &
   MicrosoftConfigNamespaced &
   UniqueConfigNamespaced &

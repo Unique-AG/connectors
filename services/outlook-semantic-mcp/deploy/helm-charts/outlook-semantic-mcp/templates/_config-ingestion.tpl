@@ -18,6 +18,12 @@ INGESTION_LIVE_CATCHUP_RECOVERY: {{ .ingestion.liveCatchupRecovery | quote }}
 {{- if .ingestion.deleteInboxRecoveryCron }}
 INGESTION_DELETE_INBOX_RECOVERY_CRON: {{ .ingestion.deleteInboxRecoveryCron | quote }}
 {{- end }}
+{{- if .ingestion.connectivityTimeoutMs }}
+INGESTION_CONNECTIVITY_TIMEOUT_MS: {{ .ingestion.connectivityTimeoutMs | quote }}
+{{- end }}
+{{- if .ingestion.syncFailureThreshold }}
+INGESTION_SYNC_FAILURE_THRESHOLD: {{ .ingestion.syncFailureThreshold | quote }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

@@ -30,7 +30,6 @@ import {
   databaseConfig,
   type EncryptionConfig,
   encryptionConfig,
-  healthConfig,
   logsConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
@@ -40,6 +39,7 @@ import { delegatedAccessConfig } from './config/delegated-access.config';
 import { ingestionConfig } from './config/ingestion.config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
 import { registerBackendModule } from './features/backend.module';
+import { HealthModule } from './health/health.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { buildServerInstructions } from './server.instructions';
@@ -57,7 +57,6 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         logsConfig,
         databaseConfig,
         encryptionConfig,
-        healthConfig,
         microsoftConfig,
         uniqueConfig,
         delegatedAccessConfig,
@@ -176,6 +175,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         loggerContext: 'UniqueApi',
       },
     }),
+    HealthModule,
     registerBackendModule(),
   ],
   controllers: [ManifestController],
