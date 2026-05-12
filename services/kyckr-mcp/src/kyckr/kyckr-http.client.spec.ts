@@ -1,18 +1,15 @@
 import type { Dispatcher } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KyckrConfig } from '~/config';
-import type { Metrics } from './metrics';
-
-type ApiMetricsRecorder = Pick<Metrics, 'recordApiRequest'>;
 
 vi.mock('undici', () => ({
   request: vi.fn(),
 }));
 
 import { request } from 'undici';
-import { KyckrApiError, KyckrHttpClient } from './kyckr-http.client';
+import { type ApiMetricsRecorder, KyckrApiError, KyckrHttpClient } from './kyckr-http.client';
 
-const mockMetrics: ApiMetricsRecorder = {
+const mockRecorder: ApiMetricsRecorder = {
   recordApiRequest: vi.fn(),
 };
 
@@ -39,7 +36,7 @@ describe('KyckrHttpClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    unit = new KyckrHttpClient(stubConfig as KyckrConfig, mockMetrics);
+    unit = new KyckrHttpClient(stubConfig as KyckrConfig, mockRecorder);
     internals = unit as unknown as KyckrHttpClientInternals;
   });
 
@@ -66,7 +63,7 @@ describe('KyckrHttpClient', () => {
           body: undefined,
         },
       );
-      expect(mockMetrics.recordApiRequest).toHaveBeenCalledWith({
+      expect(mockRecorder.recordApiRequest).toHaveBeenCalledWith({
         method: 'GET',
         path: '/companies',
         status: 200,
@@ -100,7 +97,7 @@ describe('KyckrHttpClient', () => {
         message: 'Order not found',
         correlationId: 'corr-404',
       } satisfies Partial<KyckrApiError>);
-      expect(mockMetrics.recordApiRequest).toHaveBeenCalledWith({
+      expect(mockRecorder.recordApiRequest).toHaveBeenCalledWith({
         method: 'GET',
         path: '/orders/:orderId',
         status: 404,
@@ -113,7 +110,7 @@ describe('KyckrHttpClient', () => {
       mockedRequest.mockRejectedValueOnce(error);
 
       await expect(unit.get('/companies')).rejects.toThrow('ECONNRESET');
-      expect(mockMetrics.recordApiRequest).toHaveBeenCalledWith({
+      expect(mockRecorder.recordApiRequest).toHaveBeenCalledWith({
         method: 'GET',
         path: '/companies',
         status: 0,

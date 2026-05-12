@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
+
+type MetricRegistrar = Pick<MetricService, 'getCounter' | 'getHistogram'>;
 
 export const KYCKR_TOOL_NAMES = [
   'search_companies',
@@ -24,7 +26,7 @@ export class Metrics {
   private readonly apiRequests: Counter;
   private readonly apiRequestDuration: Histogram;
 
-  public constructor(metricService: MetricService) {
+  public constructor(@Inject(MetricService) metricService: MetricRegistrar) {
     this.toolCalls = metricService.getCounter('kyckr_tool_calls_total', {
       description: 'Number of Kyckr MCP tool calls, labelled by tool and result',
     });
@@ -64,13 +66,17 @@ export class Metrics {
     }
   }
 
-  public recordApiRequest(params: {
+  public recordApiRequest({
+    method,
+    path,
+    status,
+    durationMs,
+  }: {
     method: string;
     path: string;
     status: number;
     durationMs: number;
   }): void {
-    const { method, path, status, durationMs } = params;
     this.apiRequests.add(1, { method, path, status: String(status) });
     this.apiRequestDuration.record(durationMs, { method, path });
   }

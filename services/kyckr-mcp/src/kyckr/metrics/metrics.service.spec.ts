@@ -2,6 +2,8 @@ import type { MetricService } from 'nestjs-otel';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Metrics } from './metrics.service';
 
+type MetricRegistrar = Pick<MetricService, 'getCounter' | 'getHistogram'>;
+
 const mockMetrics = {
   kyckr_tool_calls_total: { add: vi.fn() },
   kyckr_tool_call_duration_ms: { record: vi.fn() },
@@ -16,7 +18,7 @@ type CounterName =
   | 'kyckr_api_requests_total';
 type HistogramName = 'kyckr_tool_call_duration_ms' | 'kyckr_api_request_duration_ms';
 
-const mockMetricService: Pick<MetricService, 'getCounter' | 'getHistogram'> = {
+const mockMetricService: MetricRegistrar = {
   getCounter: vi.fn((name: CounterName) => mockMetrics[name]),
   getHistogram: vi.fn((name: HistogramName) => mockMetrics[name]),
 };
@@ -26,7 +28,7 @@ describe('Metrics', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    unit = new Metrics(mockMetricService as MetricService);
+    unit = new Metrics(mockMetricService);
   });
 
   it('records tool calls against a single counter labelled by tool and result', () => {

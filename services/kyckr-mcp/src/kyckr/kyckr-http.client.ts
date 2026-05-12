@@ -4,7 +4,7 @@ import { request } from 'undici';
 import { KyckrConfig } from '~/config';
 import type { Metrics } from './metrics';
 
-type ApiMetricsRecorder = Pick<Metrics, 'recordApiRequest'>;
+export type ApiMetricsRecorder = Pick<Metrics, 'recordApiRequest'>;
 
 export class KyckrApiError extends Error {
   public constructor(
