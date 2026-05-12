@@ -408,22 +408,26 @@ processing:
   maxFileSizeToIngestBytes: 209715200
   allowedMimeTypes:
     - application/pdf
-    - text/plain
-    - text/html
-    - application/x-asp
     - application/vnd.openxmlformats-officedocument.wordprocessingml.document
     - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
     - application/vnd.openxmlformats-officedocument.presentationml.presentation
+    - application/x-asp
+    - text/plain
+    - text/html
+    - text/csv
+  mimeTypeOverridesByExtension:
+    .csv: text/csv
   scanIntervalCron: "*/15 * * * *"
 ```
 
-| Option                     | Default                     | Description                                                                                                                              |
-| -------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `stepTimeoutSeconds`       | `30`                        | Time limit (in seconds) for a single file processing step before the file is skipped                                                     |
-| `concurrency`              | `1`                         | Number of files to ingest into Unique concurrently                                                                                       |
-| `maxFileSizeToIngestBytes` | `209715200` (200 MB)        | Maximum file size in bytes. Files larger than this are skipped with a warning in the logs                                                |
-| `allowedMimeTypes`         | (none — must be configured) | List of MIME types the connector will process. The Helm chart ships sensible defaults; see [Supported File Types](#Supported-File-Types) |
-| `scanIntervalCron`         | `*/15 * * * *`              | Cron expression for the scheduled sync interval                                                                                          |
+| Option                         | Default                     | Description                                                                                                                              |
+| ------------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `stepTimeoutSeconds`           | `30`                        | Time limit (in seconds) for a single file processing step before the file is skipped                                                     |
+| `concurrency`                  | `1`                         | Number of files to ingest into Unique concurrently                                                                                       |
+| `maxFileSizeToIngestBytes`     | `209715200` (200 MB)        | Maximum file size in bytes. Files larger than this are skipped with a warning in the logs                                                |
+| `allowedMimeTypes`             | (none — must be configured) | List of MIME types the connector will process. The Helm chart ships sensible defaults; see [Supported File Types](#Supported-File-Types) |
+| `mimeTypeOverridesByExtension` | `{ .csv: text/csv }`        | Map of file extension suffix to canonical MIME type. See [MIME Type Overrides by Extension](#MIME-Type-Overrides-by-Extension)           |
+| `scanIntervalCron`             | `*/15 * * * *`              | Cron expression for the scheduled sync interval                                                                                          |
 
 ## Supported File Types
 
@@ -438,8 +442,25 @@ Configure allowed types via the `allowedMimeTypes` processing option. There is n
 | `.txt`         | `text/plain`                                                                | Yes          |
 | `.html`        | `text/html`                                                                 | Yes          |
 | `.asp`/`.aspx` | `application/x-asp`                                                         | Yes          |
+| `.csv`         | `text/csv`                                                                  | Yes          |
 
 **Note:** `.aspx` SharePoint pages bypass the MIME type filter and are always eligible for ingestion regardless of `allowedMimeTypes`.
+
+## MIME Type Overrides by Extension
+
+SharePoint occasionally reports the wrong MIME type for a file (notably `.csv` files come back as `application/vnd.ms-excel`). This causes the ingestion service to reject the file even when the operator has whitelisted the correct type. The `mimeTypeOverridesByExtension` map rewrites the SharePoint-reported MIME type by file extension before the allow-list check runs, so both the filter and the registered content carry the canonical value.
+
+```yaml
+processing:
+  mimeTypeOverridesByExtension:
+    .csv: text/csv
+```
+
+**Defaults and merging:** The default value is `{ .csv: text/csv }`. A user-supplied value **replaces the default wholesale** — there is no merge. To keep the CSV fix while adding your own overrides, include `.csv: text/csv` explicitly in your map.
+
+**Suffix matching:** Keys are matched against the lowercased file name with `endsWith`. Both keys and file names are lowercased, so `.CSV` and `Foo.Csv` match a `.csv` key. Multi-segment suffixes are supported (e.g. `.tar.gz`); when multiple keys could match (e.g. `.tar.gz` and `.gz` are both configured), the **longest match wins** — so `archive.tar.gz` resolves via `.tar.gz`, not `.gz`.
+
+**Validation:** Keys must match `^(\.[a-z0-9]+)+$` after lowercase normalization (one or more `.alphanumeric` segments). Empty MIME values are rejected. Invalid configuration fails fast at startup.
 
 ## Scheduler Configuration
 

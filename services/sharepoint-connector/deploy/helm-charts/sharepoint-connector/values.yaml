@@ -302,6 +302,10 @@ connectorConfig:
       - application/vnd.ms-excel
       - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
       - application/vnd.openxmlformats-officedocument.presentationml.presentation
+      - text/csv
+    # -- map of file extension suffix to canonical MIME type, used to override the SharePoint-reported mimeType. User-supplied values replace the default wholesale; include `.csv` in custom maps to retain the CSV fix
+    mimeTypeOverridesByExtension:
+      .csv: text/csv
     maxFileSizeToIngestBytes: null
     # -- cron expression for the scheduled SharePoint scan interval default: every 15 minutes
     scanIntervalCron: "*/15 * * * *"

@@ -227,8 +227,11 @@ The sync column must be set on individual files (not folders).
 - Text (`.txt`)
 - HTML (`.html`)
 - ASP/ASPX (`.asp`, `.aspx`)
+- CSV (`.csv`)
 
 SharePoint pages (`.aspx`) bypass the MIME type filter and are always eligible regardless of configuration. Additional or fewer types can be configured via `allowedMimeTypes` in the [processing configuration](./operator/configuration.md#Processing-Configuration). Note: there is no schema-level default — `allowedMimeTypes` must be explicitly configured.
+
+**About CSV files:** SharePoint reports `.csv` files with the MIME type `application/vnd.ms-excel` (the legacy Excel type), which the ingestion service rejects. The connector ships a default `mimeTypeOverridesByExtension` mapping of `.csv` → `text/csv` that rewrites the reported MIME type before the allow-list check. If you previously added `application/vnd.ms-excel` to `allowedMimeTypes` as a workaround, you should now use `text/csv` instead — and remove `application/vnd.ms-excel` unless you actually want to ingest legacy `.xls` files. If you already configure `mimeTypeOverridesByExtension`, note that user-supplied maps replace the default wholesale; include `.csv: text/csv` explicitly in your map to retain the fix. See [MIME Type Overrides by Extension](./operator/configuration.md#MIME-Type-Overrides-by-Extension).
 
 ### What is the maximum file size?
 

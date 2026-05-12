@@ -179,6 +179,7 @@ describe('UploadContentStep', () => {
             return [
               'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
               'text/html',
+              'text/csv',
             ];
           }
           return undefined;
@@ -249,16 +250,10 @@ describe('UploadContentStep', () => {
         );
       });
 
-      it('throws when MIME type is not allowed', async () => {
+      it('throws when resolved MIME type is not allowed', async () => {
         const contextWithBadMimeType = {
           ...baseDriveItemContext,
-          pipelineItem: {
-            ...baseDriveItemContext.pipelineItem,
-            item: {
-              ...mockDriveItem,
-              file: { mimeType: 'application/x-executable' },
-            },
-          },
+          mimeType: 'application/x-executable',
         } as ProcessingContext;
 
         await expect(step.execute(contextWithBadMimeType)).rejects.toThrow(
@@ -266,20 +261,46 @@ describe('UploadContentStep', () => {
         );
       });
 
-      it('throws when MIME type is missing', async () => {
+      it('throws when resolved MIME type is missing', async () => {
         const contextWithNoMimeType = {
           ...baseDriveItemContext,
-          pipelineItem: {
-            ...baseDriveItemContext.pipelineItem,
-            item: {
-              ...mockDriveItem,
-              file: undefined,
-            },
-          },
+          mimeType: undefined,
         } as ProcessingContext;
 
         await expect(step.execute(contextWithNoMimeType)).rejects.toThrow(
           'MIME type is missing for this item',
+        );
+      });
+
+      it('uses the resolved MIME type even when raw SharePoint MIME type is not in allowedMimeTypes', async () => {
+        // SharePoint reports CSVs as application/vnd.ms-excel. The pipeline pre-resolves to
+        // text/csv via MimeTypeResolverService and the upload step must trust that resolution.
+        const contextWithRemappedMimeType = {
+          ...baseDriveItemContext,
+          mimeType: 'text/csv',
+          pipelineItem: {
+            ...baseDriveItemContext.pipelineItem,
+            item: {
+              ...mockDriveItem,
+              name: 'data.csv',
+              file: {
+                mimeType: 'application/vnd.ms-excel',
+                hashes: { quickXorHash: 'hash1' },
+              },
+            },
+          },
+        } as ProcessingContext;
+
+        const result = await step.execute(contextWithRemappedMimeType);
+
+        expect(result.uploadSucceeded).toBe(true);
+        expect(mockHttpClientService.request).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              'Content-Type': 'text/csv',
+            }),
+          }),
         );
       });
 
