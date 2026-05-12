@@ -186,8 +186,8 @@ describe('KyckrHttpClient', () => {
       expect(internals.normalizePath('/orders/abc-123-def')).toBe('/orders/:orderId');
     });
 
-    it('returns path unchanged for unknown routes', () => {
-      expect(internals.normalizePath('/unknown/route')).toBe('/unknown/route');
+    it('collapses unknown routes to [unknown] to bound metric cardinality', () => {
+      expect(internals.normalizePath('/unknown/route')).toBe('[unknown]');
     });
   });
 });

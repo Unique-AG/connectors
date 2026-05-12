@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MetricService } from 'nestjs-otel';
+import { isPlainObject, isString } from 'remeda';
 import { request } from 'undici';
 import { KyckrConfig } from '~/config';
 
@@ -69,7 +70,7 @@ export class KyckrHttpClient {
       const responseBody = this.tryParseJson(rawBody);
 
       if (status >= 400) {
-        const correlationId = this.extractCorrelationId(responseBody);
+        const correlationId = this.getStringField(responseBody, 'correlationId');
         const message = this.extractErrorMessage(responseBody, status, rawBody);
         throw new KyckrApiError(status, path, message, correlationId);
       }
@@ -131,31 +132,19 @@ export class KyckrHttpClient {
     }
   }
 
-  private extractCorrelationId(body: unknown): string | undefined {
-    if (body && typeof body === 'object' && 'correlationId' in body) {
-      const value = (body as Record<string, unknown>).correlationId;
-      return typeof value === 'string' ? value : undefined;
-    }
-    return undefined;
-  }
-
   private extractErrorMessage(body: unknown, status: number, raw: string): string {
-    if (body && typeof body === 'object') {
-      const envelope = body as Record<string, unknown>;
+    if (isPlainObject(body)) {
       // Kyckr's ProblemDetails errors live under `data`, not at the top level.
-      const data =
-        typeof envelope.data === 'object' && envelope.data !== null
-          ? (envelope.data as Record<string, unknown>)
-          : undefined;
+      const data = isPlainObject(body.data) ? body.data : undefined;
 
       const message =
         this.getStringField(data, 'detail') ??
         this.getStringField(data, 'title') ??
         this.getStringField(data, 'type') ??
-        this.getStringField(envelope, 'message') ??
-        this.getStringField(envelope, 'detail') ??
-        this.getStringField(envelope, 'title') ??
-        this.getStringField(envelope, 'details');
+        this.getStringField(body, 'message') ??
+        this.getStringField(body, 'detail') ??
+        this.getStringField(body, 'title') ??
+        this.getStringField(body, 'details');
 
       if (message) {
         return message;
@@ -168,11 +157,11 @@ export class KyckrHttpClient {
     return `HTTP ${status}`;
   }
 
-  private getStringField(
-    object: Record<string, unknown> | undefined,
-    key: string,
-  ): string | undefined {
-    const value = object?.[key];
-    return typeof value === 'string' ? value : undefined;
+  private getStringField(object: unknown, key: string): string | undefined {
+    if (isPlainObject(object)) {
+      const value = object[key];
+      return isString(value) ? value : undefined;
+    }
+    return undefined;
   }
 }

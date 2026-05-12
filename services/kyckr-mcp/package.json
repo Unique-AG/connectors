@@ -42,6 +42,7 @@
     "nestjs-pino": "4.6.1",
     "nestjs-zod": "5.0.1",
     "reflect-metadata": "0.2.2",
+    "remeda": "2.32.0",
     "rxjs": "7.8.2",
     "typeid-js": "1.2.0",
     "undici": "7.24.4",
