@@ -31,7 +31,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase({__name__=~\"kyckr_(search_companies_calls|lite_profile_fetches|enhanced_profile_fetches|company_documents_list_calls|document_orders|get_order_calls|list_orders_calls)_total\", job=~\"$job\"}[$__range]))) or vector(0)",
+          "expr": "round(sum(increase(kyckr_tool_calls_total{job=~\"$job\"}[$__range]))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -66,7 +66,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase({__name__=~\"kyckr_(search_companies_calls|lite_profile_fetches|enhanced_profile_fetches|company_documents_list_calls|document_orders|get_order_calls|list_orders_calls)_total\", job=~\"$job\", result=\"error\"}[$__range]))) or vector(0)",
+          "expr": "round(sum(increase(kyckr_tool_calls_total{job=~\"$job\", result=\"error\"}[$__range]))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -145,7 +145,7 @@
     },
     {
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
-      "description": "Tool calls per minute, broken down by tool. The metric name is the tool identifier (e.g. kyckr_search_companies_calls_total = search_companies).",
+      "description": "Tool calls per minute, broken down by tool.",
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -163,8 +163,8 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum by (__name__) (rate({__name__=~\"kyckr_(search_companies_calls|lite_profile_fetches|enhanced_profile_fetches|company_documents_list_calls|document_orders|get_order_calls|list_orders_calls)_total\", job=~\"$job\"}[1m])) * 60",
-          "legendFormat": "{{__name__}}",
+          "expr": "sum by (tool) (rate(kyckr_tool_calls_total{job=~\"$job\"}[1m])) * 60",
+          "legendFormat": "{{tool}}",
           "refId": "A"
         }
       ],
@@ -191,8 +191,8 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum by (__name__) (rate({__name__=~\"kyckr_(search_companies_calls|lite_profile_fetches|enhanced_profile_fetches|company_documents_list_calls|document_orders|get_order_calls|list_orders_calls)_total\", job=~\"$job\", result=\"error\"}[1m])) * 60",
-          "legendFormat": "{{__name__}}",
+          "expr": "sum by (tool) (rate(kyckr_tool_calls_total{job=~\"$job\", result=\"error\"}[1m])) * 60",
+          "legendFormat": "{{tool}}",
           "refId": "A"
         }
       ],
@@ -228,8 +228,48 @@
       "type": "timeseries"
     },
     {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "description": "Tool call duration percentiles (p50, p95, p99) per tool. Measured end-to-end from inside the query: includes Kyckr API latency and response parsing.",
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 8, "lineWidth": 2, "pointSize": 5 },
+          "unit": "s",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 25 },
+      "id": 24,
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.50, sum by (tool, le) (rate(kyckr_tool_call_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "p50 {{tool}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.95, sum by (tool, le) (rate(kyckr_tool_call_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "p95 {{tool}}",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.99, sum by (tool, le) (rate(kyckr_tool_call_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "p99 {{tool}}",
+          "refId": "C"
+        }
+      ],
+      "title": "Tool call duration per tool (p50, p95, p99)",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
       "id": 30,
       "title": "Kyckr API",
       "type": "row"
@@ -245,7 +285,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 26 },
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 35 },
       "id": 31,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -279,7 +319,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 26 },
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 35 },
       "id": 32,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -307,7 +347,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 35 },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 44 },
       "id": 33,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -338,7 +378,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 },
       "id": 40,
       "title": "MCP transport",
       "type": "row"
@@ -354,7 +394,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 45 },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 54 },
       "id": 41,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -373,7 +413,7 @@
     },
     {
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 54 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 63 },
       "id": 50,
       "title": "Node.js runtime",
       "type": "row"
@@ -389,7 +429,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 55 },
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 64 },
       "id": 51,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -429,7 +469,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 55 },
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 64 },
       "id": 52,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
@@ -457,7 +497,7 @@
           "min": 0
         }
       },
-      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 55 },
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 64 },
       "id": 53,
       "options": {
         "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
