@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MetricService } from 'nestjs-otel';
 import { isPlainObject, isString } from 'remeda';
 import { request } from 'undici';
 import { KyckrConfig } from '~/config';
+import type { Metrics } from './metrics';
+
+type ApiMetricsRecorder = Pick<Metrics, 'recordApiRequest'>;
 
 export class KyckrApiError extends Error {
   public constructor(
@@ -19,20 +21,11 @@ export class KyckrApiError extends Error {
 @Injectable()
 export class KyckrHttpClient {
   private readonly logger = new Logger(KyckrHttpClient.name);
-  private readonly requestCounter;
-  private readonly requestDuration;
 
   public constructor(
     private readonly config: KyckrConfig,
-    metricService: MetricService,
-  ) {
-    this.requestCounter = metricService.getCounter('kyckr_api_requests_total', {
-      description: 'Total Kyckr API requests',
-    });
-    this.requestDuration = metricService.getHistogram('kyckr_api_request_duration_ms', {
-      description: 'Kyckr API request duration in milliseconds',
-    });
-  }
+    private readonly metrics: ApiMetricsRecorder,
+  ) {}
 
   public async get<T>(path: string, params?: Record<string, string | undefined>): Promise<T> {
     return this.call<T>('GET', path, params);
@@ -80,13 +73,13 @@ export class KyckrHttpClient {
       this.logger.error({ method, path, status, err }, 'Kyckr API request failed');
       throw err;
     } finally {
-      const duration = Date.now() - start;
-      this.requestCounter.add(1, {
+      const durationMs = Date.now() - start;
+      this.metrics.recordApiRequest({
         method,
         path: this.normalizePath(path),
-        status: String(status),
+        status,
+        durationMs,
       });
-      this.requestDuration.record(duration, { method, path: this.normalizePath(path) });
     }
   }
 

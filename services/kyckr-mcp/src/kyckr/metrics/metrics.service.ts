@@ -21,6 +21,8 @@ export class Metrics {
   private readonly toolCalls: Counter;
   private readonly toolCallDuration: Histogram;
   private readonly creditsConsumed: Counter;
+  private readonly apiRequests: Counter;
+  private readonly apiRequestDuration: Histogram;
 
   public constructor(metricService: MetricService) {
     this.toolCalls = metricService.getCounter('kyckr_tool_calls_total', {
@@ -33,6 +35,14 @@ export class Metrics {
 
     this.creditsConsumed = metricService.getCounter('kyckr_credits_consumed_total', {
       description: 'Kyckr credits consumed, attributed to the MCP tool that triggered the call',
+    });
+
+    this.apiRequests = metricService.getCounter('kyckr_api_requests_total', {
+      description: 'Total Kyckr API requests, labelled by method, path, and status',
+    });
+
+    this.apiRequestDuration = metricService.getHistogram('kyckr_api_request_duration_ms', {
+      description: 'Kyckr API request duration in milliseconds, labelled by method and path',
     });
   }
 
@@ -52,5 +62,16 @@ export class Metrics {
     if (cost?.value && cost.value > 0) {
       this.creditsConsumed.add(cost.value, { tool });
     }
+  }
+
+  public recordApiRequest(params: {
+    method: string;
+    path: string;
+    status: number;
+    durationMs: number;
+  }): void {
+    const { method, path, status, durationMs } = params;
+    this.apiRequests.add(1, { method, path, status: String(status) });
+    this.apiRequestDuration.record(durationMs, { method, path });
   }
 }

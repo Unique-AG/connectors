@@ -1,7 +1,9 @@
-import type { MetricService } from 'nestjs-otel';
 import type { Dispatcher } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KyckrConfig } from '~/config';
+import type { Metrics } from './metrics';
+
+type ApiMetricsRecorder = Pick<Metrics, 'recordApiRequest'>;
 
 vi.mock('undici', () => ({
   request: vi.fn(),
@@ -10,11 +12,8 @@ vi.mock('undici', () => ({
 import { request } from 'undici';
 import { KyckrApiError, KyckrHttpClient } from './kyckr-http.client';
 
-const mockCounter = { add: vi.fn() };
-const mockHistogram = { record: vi.fn() };
-const mockMetricService: Pick<MetricService, 'getCounter' | 'getHistogram'> = {
-  getCounter: vi.fn().mockReturnValue(mockCounter),
-  getHistogram: vi.fn().mockReturnValue(mockHistogram),
+const mockMetrics: ApiMetricsRecorder = {
+  recordApiRequest: vi.fn(),
 };
 
 const stubConfig = { apiBaseUrl: 'https://api.example.com', apiKey: { value: 'key' } };
@@ -40,7 +39,7 @@ describe('KyckrHttpClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    unit = new KyckrHttpClient(stubConfig as KyckrConfig, mockMetricService as MetricService);
+    unit = new KyckrHttpClient(stubConfig as KyckrConfig, mockMetrics);
     internals = unit as unknown as KyckrHttpClientInternals;
   });
 
@@ -67,14 +66,11 @@ describe('KyckrHttpClient', () => {
           body: undefined,
         },
       );
-      expect(mockCounter.add).toHaveBeenCalledWith(1, {
+      expect(mockMetrics.recordApiRequest).toHaveBeenCalledWith({
         method: 'GET',
         path: '/companies',
-        status: '200',
-      });
-      expect(mockHistogram.record).toHaveBeenCalledWith(expect.any(Number), {
-        method: 'GET',
-        path: '/companies',
+        status: 200,
+        durationMs: expect.any(Number),
       });
     });
 
@@ -104,10 +100,11 @@ describe('KyckrHttpClient', () => {
         message: 'Order not found',
         correlationId: 'corr-404',
       } satisfies Partial<KyckrApiError>);
-      expect(mockCounter.add).toHaveBeenCalledWith(1, {
+      expect(mockMetrics.recordApiRequest).toHaveBeenCalledWith({
         method: 'GET',
         path: '/orders/:orderId',
-        status: '404',
+        status: 404,
+        durationMs: expect.any(Number),
       });
     });
 
@@ -116,10 +113,11 @@ describe('KyckrHttpClient', () => {
       mockedRequest.mockRejectedValueOnce(error);
 
       await expect(unit.get('/companies')).rejects.toThrow('ECONNRESET');
-      expect(mockCounter.add).toHaveBeenCalledWith(1, {
+      expect(mockMetrics.recordApiRequest).toHaveBeenCalledWith({
         method: 'GET',
         path: '/companies',
-        status: '0',
+        status: 0,
+        durationMs: expect.any(Number),
       });
     });
   });
