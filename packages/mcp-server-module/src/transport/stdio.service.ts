@@ -31,7 +31,11 @@ export class StdioService implements OnApplicationBootstrap {
 
     // Create MCP server with dynamic capabilities
     const mcpServer = new McpServer(
-      { name: this.options.name, version: this.options.version },
+      {
+        name: this.options.name,
+        version: this.options.version,
+        ...(this.options.icons && { icons: this.options.icons }),
+      },
       {
         capabilities,
         instructions: this.options.instructions || '',

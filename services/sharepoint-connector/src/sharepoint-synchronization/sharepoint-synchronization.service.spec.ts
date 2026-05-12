@@ -135,11 +135,6 @@ describe('SharepointSynchronizationService', () => {
           siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
         }),
       ]),
-      fetchSitesFromSharePointList: vi.fn().mockResolvedValue([
-        createMockSiteConfig({
-          siteId: new Smeared('bd9c85ee-998f-4665-9c44-577cf5a08a66', false),
-        }),
-      ]),
     };
 
     mockContentSyncService = {

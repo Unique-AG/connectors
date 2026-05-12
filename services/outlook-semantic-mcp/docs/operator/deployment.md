@@ -89,6 +89,8 @@ kubectl create secret generic outlook-semantic-mcp-zitadel-secret \
 
 ## Minimal Values Configuration
 
+### Mode A Minimal Values Example
+
 The following example uses `cluster_local` service auth mode. Each secret is referenced individually using `secretKeyRef`.
 
 ```yaml
@@ -140,19 +142,22 @@ mcpConfig:
       x-company-id: "<your-company-id>"
       x-user-id: "<your-service-account-user-id>"
 
-  # IMPORTANT: `retentionWindowInDays` is mandatory — the application will not start without it.
-  # Adjust it to control how far back the initial email sync goes. Setting a large value can
-  # cause very large initial syncs for users with large mailboxes, potentially taking hours
-  # and consuming significant Microsoft Graph API quota.
-  defaultMailFilters:
-    retentionWindowInDays: 95
-    ignoredContents: []
-    ignoredSenders: []
+  ingestion:
+    # IMPORTANT: `retentionWindowInDays` is mandatory — the application will not start without it.
+    # Adjust it to control how far back the initial email sync goes. Setting a large value can
+    # cause very large initial syncs for users with large mailboxes, potentially taking hours
+    # and consuming significant Microsoft Graph API quota.
+    defaultMailFilters:
+      retentionWindowInDays: 95
+      ignoredContents: []
+      ignoredSenders: []
 ```
 
 **PostgreSQL backups:** Strongly recommended. Without a backup, all users must re-authenticate and full sync restarts from scratch. See [Disaster Recovery — Backup Recommendations](./disaster-recovery.md#Backup-recommendations).
 
 **Note:** Ingress is disabled by default. Enable it and configure hosts/TLS in the `ingress` section of your `values.yaml`. The chart defaults to `ingressClassName: kong` but any ingress controller can be used. The application listens on port `51345` (set via `server.ports.application` in the Helm values; the default `9542` only applies outside Helm). MCP servers need to be hosted on their own domain because the OAuth redirect URI (`<SELF_URL>/auth/callback`) must resolve to this service — sharing a domain with other services would cause routing conflicts. Ensure your ingress allows large request bodies (for attachment uploads) and has appropriate timeouts for long-running OAuth flows.
+
+For Mode B, see [Mode B Minimal Values Example](./configuration.md#Mode-B-Minimal-Values-Example).
 
 ## Database Migration
 
@@ -238,15 +243,15 @@ If your cluster enforces network policies, the following traffic must be allowed
 
 ### Egress (what the service calls)
 
-| Destination | Port | Purpose |
-|-------------|------|---------|
-| DNS (kube-dns) | `53` (UDP/TCP) | Cluster DNS resolution |
-| PostgreSQL | `5432` (TCP) | Database access |
-| RabbitMQ | `5672` (TCP) | Message queue |
-| `node-ingestion` | `8091` (TCP) | Unique ingestion service |
-| `node-scope-management` | `8092` (TCP) | Unique scope management service |
-| `login.microsoftonline.com`, `graph.microsoft.com` | `443` (TCP) | Microsoft OAuth and Graph API |
-| `outlook.office.com`, `outlook.office365.com` | `443` (TCP) | Attachment upload sessions (Microsoft Graph) |
+| Destination | Port | Purpose | Mode |
+|-------------|------|---------|------|
+| DNS (kube-dns) | `53` (UDP/TCP) | Cluster DNS resolution | Both |
+| PostgreSQL | `5432` (TCP) | Database access | Both |
+| RabbitMQ | `5672` (TCP) | Message queue | Both |
+| `node-ingestion` | `8091` (TCP) | Unique ingestion service | Both |
+| `node-scope-management` | `8092` (TCP) | Unique scope management service | Both |
+| `login.microsoftonline.com`, `graph.microsoft.com` | `443` (TCP) | Microsoft OAuth and Graph API | Both |
+| `outlook.office.com`, `outlook.office365.com` | `443` (TCP) | Attachment upload sessions (Microsoft Graph) | Both |
 
 The [`backend-service`](https://github.com/Unique-AG/helm-charts/tree/main/charts/backend-service) Helm chart supports Cilium network policies via the `server.networkPolicy` values. See the chart documentation for configuration details.
 

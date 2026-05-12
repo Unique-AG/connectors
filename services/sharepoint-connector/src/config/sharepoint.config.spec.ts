@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import { IngestionMode } from '../constants/ingestion.constants';
-import { SharepointConfigSchema } from './sharepoint.schema';
+import {
+  PartialSiteConfigSchema,
+  parsedScopeIdField,
+  SharepointConfigSchema,
+  SiteDefaultsSchema,
+} from './sharepoint.schema';
 
 describe('SharepointConfigSchema', () => {
   const validBaseConfig = {
@@ -405,7 +410,7 @@ describe('SharepointConfigSchema', () => {
   });
 
   describe('site configuration defaults', () => {
-    it('applies default values for optional fields', () => {
+    it('populates siteDefaults with schema-level defaults when the block is omitted', () => {
       const config = {
         ...validBaseConfig,
         auth: clientSecretAuth,
@@ -421,90 +426,85 @@ describe('SharepointConfigSchema', () => {
 
       const result = SharepointConfigSchema.parse(config);
 
-      // Handle discriminated union
-      if (result.sitesSource === 'config_file') {
-        expect(result.sites).toHaveLength(1);
+      expect(result.siteDefaults.syncColumnName).toBe('FinanceGPTKnowledge');
+      expect(result.siteDefaults.storeInternally).toBe(EnabledDisabledMode.Enabled);
+      expect(result.siteDefaults.syncStatus).toBe('active');
+      expect(result.siteDefaults.permissionsInheritanceMode).toBe('inherit_scopes_and_files');
+      expect(result.siteDefaults.subsitesScan).toBe(EnabledDisabledMode.Disabled);
+      expect(result.siteDefaults.maxFilesToIngest).toBeUndefined();
+      expect(result.siteDefaults.ingestionMode).toBeUndefined();
+      expect(result.siteDefaults.scopeId).toBeUndefined();
+      expect(result.siteDefaults.syncMode).toBeUndefined();
+    });
 
-        // TypeScript doesn't understand that the schema guarantees at least one site
-        // biome-ignore lint/style/noNonNullAssertion: Schema validation ensures array has at least one element
-        const site = result.sites[0]!;
+    it('applies a partial siteDefaults override and keeps schema-level defaults for the rest', () => {
+      const config = {
+        ...validBaseConfig,
+        auth: clientSecretAuth,
+        siteDefaults: { syncMode: 'content_only' as const },
+      };
 
-        expect(site.syncColumnName).toBe('FinanceGPTKnowledge'); // default value
-        expect(site.storeInternally).toBe(EnabledDisabledMode.Enabled); // default value
-        expect(site.syncStatus).toBe('active'); // default value
-        expect(site.permissionsInheritanceMode).toBe('inherit_scopes_and_files'); // default value
-        expect(site.subsitesScan).toBe('disabled'); // default value
-        expect(site.maxFilesToIngest).toBeUndefined(); // optional field
-      }
+      const result = SharepointConfigSchema.parse(config);
+
+      expect(result.siteDefaults.syncMode).toBe('content_only');
+      expect(result.siteDefaults.syncColumnName).toBe('FinanceGPTKnowledge');
+      expect(result.siteDefaults.storeInternally).toBe(EnabledDisabledMode.Enabled);
+      expect(result.siteDefaults.syncStatus).toBe('active');
+      expect(result.siteDefaults.permissionsInheritanceMode).toBe('inherit_scopes_and_files');
+      expect(result.siteDefaults.subsitesScan).toBe(EnabledDisabledMode.Disabled);
+    });
+
+    it('rejects siteDefaults blocks that contain invalid values', () => {
+      const config = {
+        ...validBaseConfig,
+        auth: clientSecretAuth,
+        siteDefaults: { ingestionMode: 'invalid' },
+      };
+
+      expect(() => SharepointConfigSchema.parse(config)).toThrow();
     });
   });
 
-  describe('scopeId field', () => {
-    const buildConfigWithScopeId = (scopeId: unknown) => ({
-      ...validBaseConfig,
-      auth: clientSecretAuth,
-      sites: [
-        {
-          ...validBaseConfig.sites[0],
-          scopeId,
-        },
-      ],
-    });
-
-    const parseScopeId = (scopeId: unknown) => {
-      const result = SharepointConfigSchema.parse(buildConfigWithScopeId(scopeId));
-      if (result.sitesSource !== 'config_file') {
-        throw new Error('expected config_file source');
-      }
-      return result.sites[0]?.scopeId;
-    };
-
+  describe('scopeId field (via ScopeIdConfigSchema)', () => {
     it('parses scope_<id> as fixed', () => {
-      expect(parseScopeId('scope_abc123')).toEqual({ type: 'fixed', scopeId: 'scope_abc123' });
+      expect(parsedScopeIdField.parse('scope_abc123')).toEqual({
+        type: 'fixed',
+        scopeId: 'scope_abc123',
+      });
     });
 
     it('parses in_parent:scope_<id> as auto', () => {
-      expect(parseScopeId('in_parent:scope_abc123')).toEqual({
+      expect(parsedScopeIdField.parse('in_parent:scope_abc123')).toEqual({
         type: 'auto',
         parentScopeId: 'scope_abc123',
       });
     });
 
     it('trims surrounding whitespace and parses as fixed', () => {
-      expect(parseScopeId('  scope_abc123  ')).toEqual({
+      expect(parsedScopeIdField.parse('  scope_abc123  ')).toEqual({
         type: 'fixed',
         scopeId: 'scope_abc123',
       });
     });
 
     it('rejects in_parent: with a space after the colon', () => {
-      expect(() =>
-        SharepointConfigSchema.parse(buildConfigWithScopeId('in_parent: scope_abc123')),
-      ).toThrow('Invalid scopeId');
+      expect(() => parsedScopeIdField.parse('in_parent: scope_abc123')).toThrow('Invalid scopeId');
     });
 
     it('rejects uppercase in scope id', () => {
-      expect(() => SharepointConfigSchema.parse(buildConfigWithScopeId('scope_ABC'))).toThrow(
-        'Invalid scopeId',
-      );
+      expect(() => parsedScopeIdField.parse('scope_ABC')).toThrow('Invalid scopeId');
     });
 
     it('rejects unrelated strings', () => {
-      expect(() => SharepointConfigSchema.parse(buildConfigWithScopeId('not-a-scope'))).toThrow(
-        'Invalid scopeId',
-      );
+      expect(() => parsedScopeIdField.parse('not-a-scope')).toThrow('Invalid scopeId');
     });
 
     it('rejects in_parent: with non-conforming inner value', () => {
-      expect(() =>
-        SharepointConfigSchema.parse(buildConfigWithScopeId('in_parent:not-a-scope')),
-      ).toThrow('Invalid scopeId');
+      expect(() => parsedScopeIdField.parse('in_parent:not-a-scope')).toThrow('Invalid scopeId');
     });
 
     it('rejects empty string', () => {
-      expect(() => SharepointConfigSchema.parse(buildConfigWithScopeId(''))).toThrow(
-        'Invalid scopeId',
-      );
+      expect(() => parsedScopeIdField.parse('')).toThrow('Invalid scopeId');
     });
   });
 
@@ -620,5 +620,113 @@ describe('SharepointConfigSchema', () => {
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
     });
+  });
+});
+
+describe('SiteDefaultsSchema', () => {
+  it('parses an empty object and populates the five schema-level defaults', () => {
+    const result = SiteDefaultsSchema.parse({});
+
+    expect(result.syncColumnName).toBe('FinanceGPTKnowledge');
+    expect(result.storeInternally).toBe(EnabledDisabledMode.Enabled);
+    expect(result.syncStatus).toBe('active');
+    expect(result.permissionsInheritanceMode).toBe('inherit_scopes_and_files');
+    expect(result.subsitesScan).toBe(EnabledDisabledMode.Disabled);
+    expect(result.ingestionMode).toBeUndefined();
+    expect(result.scopeId).toBeUndefined();
+    expect(result.syncMode).toBeUndefined();
+    expect(result.maxFilesToIngest).toBeUndefined();
+  });
+
+  it('honors a partial override and leaves other defaults untouched', () => {
+    const result = SiteDefaultsSchema.parse({ syncMode: 'content_and_permissions' });
+
+    expect(result.syncMode).toBe('content_and_permissions');
+    expect(result.syncColumnName).toBe('FinanceGPTKnowledge');
+    expect(result.storeInternally).toBe(EnabledDisabledMode.Enabled);
+    expect(result.syncStatus).toBe('active');
+    expect(result.permissionsInheritanceMode).toBe('inherit_scopes_and_files');
+    expect(result.subsitesScan).toBe(EnabledDisabledMode.Disabled);
+  });
+
+  it('rejects an invalid ingestionMode', () => {
+    expect(() => SiteDefaultsSchema.parse({ ingestionMode: 'bogus' })).toThrow();
+  });
+
+  it('rejects an invalid storeInternally value', () => {
+    expect(() => SiteDefaultsSchema.parse({ storeInternally: 'lol' })).toThrow();
+  });
+
+  it('rejects a negative maxFilesToIngest', () => {
+    expect(() => SiteDefaultsSchema.parse({ maxFilesToIngest: -1 })).toThrow();
+  });
+
+  it('rejects a zero maxFilesToIngest', () => {
+    expect(() => SiteDefaultsSchema.parse({ maxFilesToIngest: 0 })).toThrow();
+  });
+});
+
+describe('PartialSiteConfigSchema', () => {
+  const validUuid = '87654321-4321-4321-8321-cba987654321';
+
+  it('accepts a row with only siteId set', () => {
+    const result = PartialSiteConfigSchema.parse({ siteId: validUuid });
+
+    expect(result.siteId.value).toBe(validUuid);
+    expect(result.syncColumnName).toBeUndefined();
+    expect(result.ingestionMode).toBeUndefined();
+    expect(result.scopeId).toBeUndefined();
+    expect(result.maxFilesToIngest).toBeUndefined();
+    expect(result.storeInternally).toBeUndefined();
+    expect(result.syncStatus).toBeUndefined();
+    expect(result.syncMode).toBeUndefined();
+    expect(result.permissionsInheritanceMode).toBeUndefined();
+    expect(result.subsitesScan).toBeUndefined();
+  });
+
+  it('rejects a row with a malformed siteId', () => {
+    expect(() => PartialSiteConfigSchema.parse({ siteId: 'not-a-uuid' })).toThrow();
+  });
+
+  it('accepts a row with a valid compound siteId', () => {
+    const compoundId =
+      'dogfoodindustries.sharepoint.com,af2b5be6-a37d-4992-ab8f-988b0134007e,86088ee2-974c-49b8-9689-ba6e04b1807c';
+    const result = PartialSiteConfigSchema.parse({ siteId: compoundId });
+
+    expect(result.siteId.value).toBe(compoundId);
+  });
+
+  it('parses provided fields correctly without applying any defaults', () => {
+    const result = PartialSiteConfigSchema.parse({
+      siteId: validUuid,
+      ingestionMode: IngestionMode.Flat,
+      scopeId: 'scope_partial',
+      maxFilesToIngest: 25,
+      storeInternally: EnabledDisabledMode.Disabled,
+      syncStatus: 'inactive' as const,
+      syncMode: 'content_only' as const,
+      permissionsInheritanceMode: 'none' as const,
+      subsitesScan: EnabledDisabledMode.Enabled,
+    });
+
+    expect(result.ingestionMode).toBe(IngestionMode.Flat);
+    expect(result.scopeId).toBe('scope_partial');
+    expect(result.maxFilesToIngest).toBe(25);
+    expect(result.storeInternally).toBe(EnabledDisabledMode.Disabled);
+    expect(result.syncStatus).toBe('inactive');
+    expect(result.syncMode).toBe('content_only');
+    expect(result.permissionsInheritanceMode).toBe('none');
+    expect(result.subsitesScan).toBe(EnabledDisabledMode.Enabled);
+    expect(result.syncColumnName).toBeUndefined();
+  });
+
+  it('rejects an invalid ingestionMode', () => {
+    expect(() =>
+      PartialSiteConfigSchema.parse({ siteId: validUuid, ingestionMode: 'bogus' }),
+    ).toThrow();
+  });
+
+  it('requires siteId', () => {
+    expect(() => PartialSiteConfigSchema.parse({ scopeId: 'scope_partial' })).toThrow();
   });
 });

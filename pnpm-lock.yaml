@@ -950,6 +950,9 @@ importers:
       cron:
         specifier: 4.3.5
         version: 4.3.5
+      drizzle-kit:
+        specifier: 0.31.4
+        version: 0.31.4
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.2))
@@ -1065,9 +1068,6 @@ importers:
       '@vitest/coverage-istanbul':
         specifier: 3.2.4
         version: 3.2.4(vitest@3.2.4(@types/node@22.16.5)(jiti@2.6.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))
-      drizzle-kit:
-        specifier: 0.31.4
-        version: 0.31.4
       globals:
         specifier: 16.3.0
         version: 16.3.0

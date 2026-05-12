@@ -9,12 +9,23 @@ sharepoint:
     thumbprintSha1: your-sha1-thumbprint-here
   baseUrl: https://yourcompany.sharepoint.com
   graphApiRateLimitPerMinuteThousands: 6
+  # Deployment-level defaults applied to every list row; per-row values
+  # always win when set. Any field except siteId may be defaulted here, so
+  # rows can leave columns blank and inherit the values below.
+  siteDefaults:
+    syncColumnName: FinanceGPTKnowledge
+    storeInternally: enabled
+    syncStatus: active
+    syncMode: content_only
+    permissionsInheritanceMode: inherit_scopes_and_files
+    subsitesScan: disabled
   # Sites configuration from SharePoint list
   sitesSource: sharepoint_list
   sharepointList:
     siteId: your-config-site-id-here
     listId: your-config-list-guid-here
-  # Required SharePoint list columns:
+  # SharePoint list columns (only siteId is mandatory per row; everything
+  # else falls back to siteDefaults above when blank):
   # - siteId (Single line text) - SharePoint site ID
   # - syncColumnName (Single line text) - Column that marks files for sync
   # - ingestionMode (Choice: flat, recursive)
@@ -23,6 +34,8 @@ sharepoint:
   # - storeInternally (Choice: enabled, disabled)
   # - syncStatus (Choice: active, inactive, deleted)
   # - syncMode (Choice: content_only, content_and_permissions)
+  # - permissionsInheritanceMode (Choice: inherit_scopes_and_files, inherit_scopes, inherit_files, none)
+  # - subsitesScan (Choice: enabled, disabled)
 unique:
   serviceAuthMode: cluster_local
   serviceExtraHeaders:
