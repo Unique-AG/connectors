@@ -153,7 +153,10 @@ function createMockSyncDirectoriesCommand() {
 }
 
 function createMockMetricService() {
-  return { getCounter: vi.fn().mockReturnValue({ add: vi.fn() }) };
+  return {
+    getCounter: vi.fn().mockReturnValue({ add: vi.fn() }),
+    getHistogram: vi.fn().mockReturnValue({ record: vi.fn() }),
+  };
 }
 
 function createCommand({
