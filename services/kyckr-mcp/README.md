@@ -111,21 +111,19 @@ curl -X POST "http://localhost:9542/$MCP_API_KEY/mcp" \
 docker compose -f docker-compose.prod.yaml up -d
 ```
 
-### Kubernetes (Helm)
+### Azure Lab (Demo)
+
+Demo deployment to the Unique [LAB](https://unique-ch.atlassian.net/wiki/spaces/DX/pages/1873739786/Labs) subscription as an App Service Web App. Demo only — no SLA, no client data, no production go-lives.
 
 ```bash
-helm install kyckr-mcp ./deploy/helm-charts/kyckr-mcp \
-  --namespace kyckr-mcp \
-  --create-namespace \
-  -f values.yaml
+cp services/kyckr-mcp/deploy/.env.deploy.example services/kyckr-mcp/deploy/.env.deploy
+# Fill in KYCKR_API_KEY and MCP_API_KEY (generate: openssl rand -hex 32)
+
+az login                                  # pick the LAB subscription
+./services/kyckr-mcp/deploy/deploy.sh
 ```
 
-Secrets (`KYCKR_API_KEY`, `MCP_API_KEY`) are wired through `server.envVars` from a Kubernetes Secret.
-
-### Terraform (Azure)
-
-Infrastructure modules in `deploy/terraform/`:
-- `kyckr-mcp-secrets`: Azure Key Vault entries for the API key and MCP access token.
+The script provisions ACR (Basic) + B1 App Service Plan + Web App + Key Vault in `rg-lab-demo-001-kyckr-mcp` (swedencentral). Secrets (`KYCKR_API_KEY`, `MCP_API_KEY`) are stored in `kv-kyckr-mcp-lab` and pulled by the Web App via system-assigned managed identity, referenced from app settings as `@Microsoft.KeyVault(...)`. The script prints the MCP URL: `https://kyckr-mcp-app.azurewebsites.net/<MCP_API_KEY>/mcp`. Tail logs with `az webapp log tail -n kyckr-mcp-app -g rg-lab-demo-001-kyckr-mcp`.
 
 ## Observability
 
