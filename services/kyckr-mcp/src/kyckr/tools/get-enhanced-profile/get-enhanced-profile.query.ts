@@ -261,8 +261,7 @@ export class GetEnhancedProfileQuery {
         { customerReference: this.config.defaultCustomerReference },
       );
       const response = EnhancedProfileEnvelopeSchema.parse(raw);
-      this.metrics.recordToolCall('get_enhanced_profile', 'success');
-      this.metrics.recordCreditsConsumed('get_enhanced_profile', response.cost);
+      this.metrics.recordCreditsConsumed('get_enhanced_profile', response.cost?.value ?? 0);
       this.metrics.recordToolDuration('get_enhanced_profile', 'success', Date.now() - start);
       this.logger.debug({ kyckrId: input.kyckrId }, 'get_enhanced_profile: succeeded');
       return { success: true, ...response };
@@ -277,7 +276,6 @@ export class GetEnhancedProfileQuery {
           },
           'get_enhanced_profile: Kyckr API rejected request',
         );
-        this.metrics.recordToolCall('get_enhanced_profile', 'error');
         this.metrics.recordToolDuration('get_enhanced_profile', 'error', Date.now() - start);
         return {
           success: false,

@@ -2,9 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { isPlainObject, isString } from 'remeda';
 import { request } from 'undici';
 import { KyckrConfig } from '~/config';
-import type { Metrics } from './metrics';
-
-export type ApiMetricsRecorder = Pick<Metrics, 'recordApiRequest'>;
+import { Metrics } from './metrics';
 
 export class KyckrApiError extends Error {
   public constructor(
@@ -24,7 +22,7 @@ export class KyckrHttpClient {
 
   public constructor(
     private readonly config: KyckrConfig,
-    private readonly metrics: ApiMetricsRecorder,
+    private readonly metrics: Metrics,
   ) {}
 
   public async get<T>(path: string, params?: Record<string, string | undefined>): Promise<T> {

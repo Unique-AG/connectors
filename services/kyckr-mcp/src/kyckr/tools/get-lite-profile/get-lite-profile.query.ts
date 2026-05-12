@@ -150,8 +150,7 @@ export class GetLiteProfileQuery {
         },
       );
       const response = LiteProfileEnvelopeSchema.parse(raw);
-      this.metrics.recordToolCall('get_lite_profile', 'success');
-      this.metrics.recordCreditsConsumed('get_lite_profile', response.cost);
+      this.metrics.recordCreditsConsumed('get_lite_profile', response.cost?.value ?? 0);
       this.metrics.recordToolDuration('get_lite_profile', 'success', Date.now() - start);
       this.logger.debug({ kyckrId: input.kyckrId }, 'get_lite_profile: succeeded');
       return { success: true, ...response };
@@ -166,7 +165,6 @@ export class GetLiteProfileQuery {
           },
           'get_lite_profile: Kyckr API rejected request',
         );
-        this.metrics.recordToolCall('get_lite_profile', 'error');
         this.metrics.recordToolDuration('get_lite_profile', 'error', Date.now() - start);
         return {
           success: false,

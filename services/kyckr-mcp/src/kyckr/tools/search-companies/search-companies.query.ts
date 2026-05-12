@@ -113,8 +113,7 @@ export class SearchCompaniesQuery {
         isoCode: input.isoCode,
       });
       const response = KyckrSearchEnvelopeSchema.parse(raw);
-      this.metrics.recordToolCall('search_companies', 'success');
-      this.metrics.recordCreditsConsumed('search_companies', response.cost);
+      this.metrics.recordCreditsConsumed('search_companies', response.cost?.value ?? 0);
       this.metrics.recordToolDuration('search_companies', 'success', Date.now() - start);
       this.logger.debug({ resultCount: response.data?.length ?? 0 }, 'search_companies: succeeded');
 
@@ -125,7 +124,6 @@ export class SearchCompaniesQuery {
           { status: err.status, correlationId: err.correlationId, msg: err.message },
           'search_companies: Kyckr API rejected request',
         );
-        this.metrics.recordToolCall('search_companies', 'error');
         this.metrics.recordToolDuration('search_companies', 'error', Date.now() - start);
         return {
           success: false,

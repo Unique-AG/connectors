@@ -82,8 +82,7 @@ export class ListOrdersQuery {
         isoCode: input.isoCode,
       });
       const response = ListOrdersEnvelopeSchema.parse(raw);
-      this.metrics.recordToolCall('list_orders', 'success');
-      this.metrics.recordCreditsConsumed('list_orders', response.cost);
+      this.metrics.recordCreditsConsumed('list_orders', response.cost?.value ?? 0);
       this.metrics.recordToolDuration('list_orders', 'success', Date.now() - start);
       this.logger.debug(
         {
@@ -99,7 +98,6 @@ export class ListOrdersQuery {
           { status: err.status, correlationId: err.correlationId, msg: err.message },
           'list_orders: Kyckr API rejected request',
         );
-        this.metrics.recordToolCall('list_orders', 'error');
         this.metrics.recordToolDuration('list_orders', 'error', Date.now() - start);
         return {
           success: false,

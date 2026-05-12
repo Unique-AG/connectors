@@ -1,8 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
-
-type MetricRegistrar = Pick<MetricService, 'getCounter' | 'getHistogram'>;
 
 export const KYCKR_TOOL_NAMES = [
   'search_companies',
@@ -20,17 +18,12 @@ export type KyckrToolCallResult = 'success' | 'error';
 
 @Injectable()
 export class Metrics {
-  private readonly toolCalls: Counter;
   private readonly toolCallDuration: Histogram;
   private readonly creditsConsumed: Counter;
   private readonly apiRequests: Counter;
   private readonly apiRequestDuration: Histogram;
 
-  public constructor(@Inject(MetricService) metricService: MetricRegistrar) {
-    this.toolCalls = metricService.getCounter('kyckr_tool_calls_total', {
-      description: 'Number of Kyckr MCP tool calls, labelled by tool and result',
-    });
-
+  public constructor(metricService: MetricService) {
     this.toolCallDuration = metricService.getHistogram('kyckr_tool_call_duration_ms', {
       description: 'Duration of Kyckr MCP tool calls in milliseconds, labelled by tool and result',
     });
@@ -48,10 +41,6 @@ export class Metrics {
     });
   }
 
-  public recordToolCall(tool: KyckrToolName, result: KyckrToolCallResult): void {
-    this.toolCalls.add(1, { tool, result });
-  }
-
   public recordToolDuration(
     tool: KyckrToolName,
     result: KyckrToolCallResult,
@@ -60,10 +49,8 @@ export class Metrics {
     this.toolCallDuration.record(durationMs, { tool, result });
   }
 
-  public recordCreditsConsumed(tool: KyckrToolName, cost: { value?: number } | undefined): void {
-    if (cost?.value && cost.value > 0) {
-      this.creditsConsumed.add(cost.value, { tool });
-    }
+  public recordCreditsConsumed(tool: KyckrToolName, credits: number): void {
+    this.creditsConsumed.add(credits, { tool });
   }
 
   public recordApiRequest({

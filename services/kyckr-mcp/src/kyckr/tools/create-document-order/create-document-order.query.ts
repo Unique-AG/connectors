@@ -82,8 +82,7 @@ export class CreateDocumentOrderQuery {
         contactEmail: this.config.defaultContactEmail,
       });
       const response = CreateOrderEnvelopeSchema.parse(raw);
-      this.metrics.recordToolCall('create_document_order', 'success');
-      this.metrics.recordCreditsConsumed('create_document_order', response.cost);
+      this.metrics.recordCreditsConsumed('create_document_order', response.cost?.value ?? 0);
       this.metrics.recordToolDuration('create_document_order', 'success', Date.now() - start);
       this.logger.debug(
         {
@@ -107,7 +106,6 @@ export class CreateDocumentOrderQuery {
           },
           'create_document_order: Kyckr API rejected request',
         );
-        this.metrics.recordToolCall('create_document_order', 'error');
         this.metrics.recordToolDuration('create_document_order', 'error', Date.now() - start);
         return {
           success: false,

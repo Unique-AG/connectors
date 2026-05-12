@@ -86,8 +86,7 @@ export class ListCompanyDocumentsQuery {
         },
       );
       const response = ListCompanyDocumentsEnvelopeSchema.parse(raw);
-      this.metrics.recordToolCall('list_company_documents', 'success');
-      this.metrics.recordCreditsConsumed('list_company_documents', response.cost);
+      this.metrics.recordCreditsConsumed('list_company_documents', response.cost?.value ?? 0);
       this.metrics.recordToolDuration('list_company_documents', 'success', Date.now() - start);
       this.logger.debug(
         {
@@ -109,7 +108,6 @@ export class ListCompanyDocumentsQuery {
           },
           'list_company_documents: Kyckr API rejected request',
         );
-        this.metrics.recordToolCall('list_company_documents', 'error');
         this.metrics.recordToolDuration('list_company_documents', 'error', Date.now() - start);
         return {
           success: false,

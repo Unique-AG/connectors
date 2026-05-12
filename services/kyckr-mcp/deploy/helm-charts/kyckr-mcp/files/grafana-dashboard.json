@@ -31,7 +31,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(kyckr_tool_calls_total{job=~\"$job\"}[$__range]))) or vector(0)",
+          "expr": "round(sum(increase(kyckr_tool_call_duration_ms_count{job=~\"$job\"}[$__range]))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -66,7 +66,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "round(sum(increase(kyckr_tool_calls_total{job=~\"$job\", result=\"error\"}[$__range]))) or vector(0)",
+          "expr": "round(sum(increase(kyckr_tool_call_duration_ms_count{job=~\"$job\", result=\"error\"}[$__range]))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -163,7 +163,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum by (tool) (rate(kyckr_tool_calls_total{job=~\"$job\"}[1m])) * 60",
+          "expr": "sum by (tool) (rate(kyckr_tool_call_duration_ms_count{job=~\"$job\"}[1m])) * 60",
           "legendFormat": "{{tool}}",
           "refId": "A"
         }
@@ -191,7 +191,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum by (tool) (rate(kyckr_tool_calls_total{job=~\"$job\", result=\"error\"}[1m])) * 60",
+          "expr": "sum by (tool) (rate(kyckr_tool_call_duration_ms_count{job=~\"$job\", result=\"error\"}[1m])) * 60",
           "legendFormat": "{{tool}}",
           "refId": "A"
         }

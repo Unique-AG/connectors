@@ -54,8 +54,7 @@ export class GetOrderQuery {
         `/orders/${encodeURIComponent(input.orderId)}`,
       );
       const response = GetOrderEnvelopeSchema.parse(raw);
-      this.metrics.recordToolCall('get_order', 'success');
-      this.metrics.recordCreditsConsumed('get_order', response.cost);
+      this.metrics.recordCreditsConsumed('get_order', response.cost?.value ?? 0);
       this.metrics.recordToolDuration('get_order', 'success', Date.now() - start);
       this.logger.debug(
         { orderId: input.orderId, status: response.data?.status },
@@ -73,7 +72,6 @@ export class GetOrderQuery {
           },
           'get_order: Kyckr API rejected request',
         );
-        this.metrics.recordToolCall('get_order', 'error');
         this.metrics.recordToolDuration('get_order', 'error', Date.now() - start);
         return {
           success: false,

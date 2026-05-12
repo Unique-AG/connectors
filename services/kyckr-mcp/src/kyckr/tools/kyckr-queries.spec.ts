@@ -22,7 +22,6 @@ const mockKyckrClient = {
 };
 
 const mockMetrics = {
-  recordToolCall: vi.fn(),
   recordToolDuration: vi.fn(),
   recordCreditsConsumed: vi.fn(),
 };
@@ -107,10 +106,7 @@ describe('SearchCompaniesQuery', () => {
       isoCode: 'GB',
     });
     expect(result).toEqual({ success: true, ...response });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('search_companies', 'success');
-    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('search_companies', {
-      value: 0,
-    });
+    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('search_companies', 0);
     expect(mockMetrics.recordToolDuration).toHaveBeenCalledWith(
       'search_companies',
       'success',
@@ -129,7 +125,6 @@ describe('SearchCompaniesQuery', () => {
       message: 'No matching companies',
       correlationId: 'corr-search-fail',
     });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('search_companies', 'error');
     expect(mockMetrics.recordCreditsConsumed).not.toHaveBeenCalled();
     expect(mockMetrics.recordToolDuration).toHaveBeenCalledWith(
       'search_companies',
@@ -172,10 +167,7 @@ describe('GetLiteProfileQuery', () => {
       customerReference: 'customer-ref-123',
     });
     expect(result).toEqual({ success: true, ...response });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('get_lite_profile', 'success');
-    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('get_lite_profile', {
-      value: 2,
-    });
+    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('get_lite_profile', 2);
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -189,7 +181,6 @@ describe('GetLiteProfileQuery', () => {
       message: 'Profile unavailable',
       correlationId: 'corr-lite-fail',
     });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('get_lite_profile', 'error');
     expect(mockMetrics.recordCreditsConsumed).not.toHaveBeenCalled();
   });
 
@@ -230,10 +221,7 @@ describe('GetEnhancedProfileQuery', () => {
       customerReference: 'customer-ref-123',
     });
     expect(result).toEqual({ success: true, ...response });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('get_enhanced_profile', 'success');
-    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('get_enhanced_profile', {
-      value: 5,
-    });
+    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('get_enhanced_profile', 5);
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -252,7 +240,6 @@ describe('GetEnhancedProfileQuery', () => {
       message: 'Enhanced profile requires ordering',
       correlationId: 'corr-enhanced-fail',
     });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('get_enhanced_profile', 'error');
     expect(mockMetrics.recordCreditsConsumed).not.toHaveBeenCalled();
   });
 
@@ -299,10 +286,7 @@ describe('ListCompanyDocumentsQuery', () => {
       continuationKey: 'current-page-token',
     });
     expect(result).toEqual({ success: true, ...response });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('list_company_documents', 'success');
-    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('list_company_documents', {
-      value: 1,
-    });
+    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('list_company_documents', 1);
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -321,7 +305,6 @@ describe('ListCompanyDocumentsQuery', () => {
       message: 'Company not found',
       correlationId: 'corr-docs-fail',
     });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('list_company_documents', 'error');
     expect(mockMetrics.recordCreditsConsumed).not.toHaveBeenCalled();
   });
 
@@ -365,10 +348,7 @@ describe('CreateDocumentOrderQuery', () => {
       contactEmail: 'ops@example.com',
     });
     expect(result).toEqual({ success: true, ...response });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('create_document_order', 'success');
-    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('create_document_order', {
-      value: 3,
-    });
+    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('create_document_order', 3);
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -382,7 +362,6 @@ describe('CreateDocumentOrderQuery', () => {
       message: 'Product id is invalid',
       correlationId: 'corr-order-create-fail',
     });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('create_document_order', 'error');
     expect(mockMetrics.recordCreditsConsumed).not.toHaveBeenCalled();
   });
 
@@ -425,8 +404,7 @@ describe('GetOrderQuery', () => {
 
     expect(mockKyckrClient.get).toHaveBeenCalledWith('/orders/ORD-1');
     expect(result).toEqual({ success: true, ...response });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('get_order', 'success');
-    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('get_order', { value: 0 });
+    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('get_order', 0);
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -440,7 +418,6 @@ describe('GetOrderQuery', () => {
       message: 'Order not found',
       correlationId: 'corr-order-fail',
     });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('get_order', 'error');
     expect(mockMetrics.recordCreditsConsumed).not.toHaveBeenCalled();
   });
 
@@ -488,8 +465,7 @@ describe('ListOrdersQuery', () => {
       isoCode: 'GB',
     });
     expect(result).toEqual({ success: true, ...response });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('list_orders', 'success');
-    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('list_orders', { value: 0 });
+    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('list_orders', 0);
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -503,7 +479,6 @@ describe('ListOrdersQuery', () => {
       message: 'Too many requests',
       correlationId: 'corr-orders-fail',
     });
-    expect(mockMetrics.recordToolCall).toHaveBeenCalledWith('list_orders', 'error');
     expect(mockMetrics.recordCreditsConsumed).not.toHaveBeenCalled();
   });
 

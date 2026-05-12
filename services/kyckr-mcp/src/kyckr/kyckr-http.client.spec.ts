@@ -1,15 +1,16 @@
 import type { Dispatcher } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { KyckrConfig } from '~/config';
+import type { Metrics } from './metrics';
 
 vi.mock('undici', () => ({
   request: vi.fn(),
 }));
 
 import { request } from 'undici';
-import { type ApiMetricsRecorder, KyckrApiError, KyckrHttpClient } from './kyckr-http.client';
+import { KyckrApiError, KyckrHttpClient } from './kyckr-http.client';
 
-const mockRecorder: ApiMetricsRecorder = {
+const mockRecorder = {
   recordApiRequest: vi.fn(),
 };
 
@@ -36,7 +37,7 @@ describe('KyckrHttpClient', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    unit = new KyckrHttpClient(stubConfig as KyckrConfig, mockRecorder);
+    unit = new KyckrHttpClient(stubConfig as KyckrConfig, mockRecorder as unknown as Metrics);
     internals = unit as unknown as KyckrHttpClientInternals;
   });
 
