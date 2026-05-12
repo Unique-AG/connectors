@@ -7,6 +7,7 @@ import { UniqueApiFeatureModuleOptions } from '../config/unique-api-feature-modu
 import { ContentService } from '../content/content.service';
 import { FilesService } from '../files/files.service';
 import { GroupsService } from '../groups/groups.service';
+import { UniqueApiHealth } from '../health/unique-api-health.service';
 import { FileIngestionService } from '../ingestion/ingestion.service';
 import { ScopesService } from '../scopes/scopes.service';
 import type { UniqueApiClient } from '../types';
@@ -31,6 +32,13 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       config.dispatcher ?? new Agent().compose([interceptors.retry(), interceptors.redirect()]);
 
     const auth = new UniqueAuth(config.auth, this.metrics, this.logger, dispatcher);
+
+    const health = new UniqueApiHealth(
+      auth,
+      config.ingestion.baseUrl,
+      config.scopeManagement.baseUrl,
+      config.healthCheckTimeoutMs,
+    );
 
     const scopeManagementGraphQlClient = new UniqueGraphqlClient(
       auth,
@@ -99,6 +107,7 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
 
     return {
       auth,
+      health,
       scopes,
       files,
       users,

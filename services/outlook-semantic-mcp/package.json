@@ -33,6 +33,7 @@
     "@modelcontextprotocol/sdk": "1.27.1",
     "@nestjs/cache-manager": "3.0.1",
     "@nestjs/common": "11.1.18",
+    "@nestjs/terminus": "11.1.1",
     "@nestjs/config": "4.0.3",
     "@nestjs/core": "11.1.18",
     "@nestjs/event-emitter": "3.0.1",

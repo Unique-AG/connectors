@@ -1,11 +1,11 @@
+import { Inject, Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import {
   getUniqueApiClientToken,
   UniqueApiFeatureModuleInputOptions,
   UniqueApiModule,
 } from '@unique-ag/unique-api';
-import { Inject, Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { UniqueConfigNamespaced } from '../config';
+import { HealthConfigNamespaced, UniqueConfigNamespaced } from '../config';
 import { UploadFileForIngestionCommand } from './upload-file-for-ingestion.command';
 
 const OUTLOOK_SEMANTIC_MCP_TOKEN_NAME = 'outlook-semantic-mcp';
@@ -17,7 +17,7 @@ const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANT
   imports: [ConfigModule],
   inject: [ConfigService],
   useFactory: (
-    configService: ConfigService<UniqueConfigNamespaced, true>,
+    configService: ConfigService<UniqueConfigNamespaced & HealthConfigNamespaced, true>,
   ): UniqueApiFeatureModuleInputOptions => {
     const uniqueConfig = configService.get('unique', { infer: true });
     return {
@@ -27,6 +27,7 @@ const UNIQUE_API_FEATURE_MODULE = UniqueApiModule.forFeatureAsync(OUTLOOK_SEMANT
           : uniqueConfig,
       ingestion: { baseUrl: uniqueConfig.ingestionServiceBaseUrl },
       scopeManagement: { baseUrl: uniqueConfig.scopeManagementServiceBaseUrl },
+      healthCheckTimeoutMs: configService.get('health.connectivityTimeoutMs', { infer: true }),
     };
   },
 });
