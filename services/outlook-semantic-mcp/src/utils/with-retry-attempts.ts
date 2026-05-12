@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { getRetryAfterMs } from './get-retry-after-ms';
 import { isRateLimitError } from './is-rate-limit-error';
 import { sleep } from './sleep';
 
@@ -31,7 +32,7 @@ export const withRetryAttempts = async <T, Err = T>({
       await onError?.(error, attempt >= maxAttempts);
 
       if (attempt < maxAttempts) {
-        await sleep(backOffMs * 2 ** (attempt - 1));
+        await sleep(getRetryAfterMs(error) ?? backOffMs * 2 ** (attempt - 1));
       } else {
         return getResultFailure(error);
       }
