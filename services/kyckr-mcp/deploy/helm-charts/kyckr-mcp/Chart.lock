@@ -1,6 +1,6 @@
 dependencies:
 - name: backend-service
   repository: oci://ghcr.io/unique-ag/helm-charts
-  version: 10.1.2
-digest: sha256:ad15ad4f094c76402751222de75272ec0dfb502c3334352b425b32a765430183
-generated: "2026-03-02T14:25:52.723578+02:00"
+  version: 10.5.0
+digest: sha256:fec9eb6df45676291b418c4f0dcf5f6f5017ff4a56457114954d2e2af5f5b3fb
+generated: "2026-05-12T17:05:46.114336+03:00"
