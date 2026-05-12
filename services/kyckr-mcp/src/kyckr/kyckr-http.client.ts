@@ -117,7 +117,7 @@ export class KyckrHttpClient {
       }
     }
     this.logger.warn({ path }, 'Unknown Kyckr API path - metric label not normalized');
-    return path;
+    return '[unknown]';
   }
 
   private tryParseJson(raw: string): unknown {
