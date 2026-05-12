@@ -17,9 +17,7 @@ import { ManifestController } from './manifest.controller';
 import { createRedactRequestSerializer } from './redact-request-serializer';
 import { serverInstructions } from './server.instructions';
 
-// The MCP api-key lives in the URL path (Unique's connector validator rejects
-// URLs with query strings or fragments), so the McpModule is mounted at the
-// secret path. Requests to any other path return 404 from the Nest router.
+// MCP is mounted at `/<api-key>/mcp` (URL path, since Unique's connector validator rejects query/fragment); other paths 404.
 const mcpApiKey = process.env.MCP_API_KEY;
 // zod throws after route is mounted if the env var is not set
 assert.ok(mcpApiKey, 'MCP_API_KEY env var is required');

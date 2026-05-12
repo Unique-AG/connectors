@@ -9,5 +9,5 @@ metadata:
   annotations:
     grafana_folder: {{ .Values.grafana.dashboard.folder | quote }}
 data:
-  dashboard.json: {{ .Files.Get "files/grafana-dashboard.json" | quote }}
+  kyckr-mcp.json: {{ .Files.Get "files/kyckr-mcp.json" | quote }}
 {{- end }}
