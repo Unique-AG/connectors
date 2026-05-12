@@ -72,6 +72,14 @@ initOpenTelemetry({
         options: { boundaries: [0.1, 0.5, 1, 2, 5, 10, 30] },
       },
     },
+    {
+      instrumentType: InstrumentType.HISTOGRAM,
+      instrumentName: 'osm_live_catchup_batch_duration_seconds',
+      aggregation: {
+        type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
+        options: { boundaries: [1, 5, 10, 30, 60, 120, 300] },
+      },
+    },
   ],
 });
 void runWithInstrumentation(bootstrap, 'outlook-semantic-mcp');

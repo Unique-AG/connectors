@@ -93,11 +93,9 @@ export class ProcessFullSyncBatchCommand {
   }): Promise<BatchResult> {
     traceAttrs({ userProfileId: userProfile.id, version });
 
-    this.logger.log({ userProfileId: userProfile.id, version, msg: 'Starting batch processing' });
-
     const config = await this.findConfigByVersion.run(userProfile.id, version);
     if (isNullish(config)) {
-      this.logger.log({
+      this.logger.warn({
         userProfileId: userProfile.id,
         version,
         msg: 'Version mismatch on config load',
@@ -105,7 +103,7 @@ export class ProcessFullSyncBatchCommand {
       return { outcome: 'version-mismatch' };
     }
     if (!config.fullSyncNextLink) {
-      this.logger.log({ userProfileId: userProfile.id, version, msg: 'Missing fullSyncNextLink' });
+      this.logger.warn({ userProfileId: userProfile.id, version, msg: 'Missing fullSyncNextLink' });
       return { outcome: 'missing-full-sync-next-link' };
     }
 
@@ -182,16 +180,16 @@ export class ProcessFullSyncBatchCommand {
 
       iterationInfo.pageSize = page.length;
       if (page.length === 0) {
-        this.logger.log({ ...iterationInfo, msg: 'Empty page, ending' });
+        this.logger.log({
+          userProfileId: iterationInfo.userProfileId,
+          version: iterationInfo.version,
+          pageNumber: iterationInfo.pageNumber,
+          msg: 'Empty page, ending sync',
+        });
         break;
       }
 
       const messages = page.slice(iterationInfo.batchIndex);
-
-      this.logger.log({
-        ...iterationInfo,
-        msg: 'Graph API page fetched',
-      });
 
       const fileKeys = messages.map((item) =>
         getUniqueKeyForMessage({ userEmail: userProfile.email, messageId: item.id }),
@@ -256,6 +254,17 @@ export class ProcessFullSyncBatchCommand {
         }
       }
 
+      this.logger.log({
+        userProfileId: iterationInfo.userProfileId,
+        version: iterationInfo.version,
+        pageNumber: iterationInfo.pageNumber,
+        pageSize: iterationInfo.pageSize,
+        uploaded: iterationInfo.uploaded,
+        skipped: iterationInfo.skipped,
+        failed: iterationInfo.failed,
+        msg: 'Page processed',
+      });
+
       iterationInfo.batchIndex = 0;
       iterationInfo.nextLink = nextPageLink ?? null;
 
@@ -278,11 +287,29 @@ export class ProcessFullSyncBatchCommand {
         iterationInfo.uploaded + iterationInfo.failed >= MAX_MESSAGES_PROCESSED_PAGE_LIMIT
       ) {
         traceEvent('batch-uploaded');
+        this.logger.log({
+          userProfileId: iterationInfo.userProfileId,
+          version: iterationInfo.version,
+          uploaded: iterationInfo.uploaded,
+          skipped: iterationInfo.skipped,
+          failed: iterationInfo.failed,
+          pageNumber: iterationInfo.pageNumber,
+          msg: 'Batch yielded, more pages remain',
+        });
         return { outcome: 'batch-uploaded' };
       }
     }
 
     traceEvent('completed');
+    this.logger.log({
+      userProfileId: iterationInfo.userProfileId,
+      version: iterationInfo.version,
+      uploaded: iterationInfo.uploaded,
+      skipped: iterationInfo.skipped,
+      failed: iterationInfo.failed,
+      pageNumber: iterationInfo.pageNumber,
+      msg: 'Full sync batch completed',
+    });
     return { outcome: 'completed' };
   }
 

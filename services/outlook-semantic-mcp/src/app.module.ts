@@ -41,7 +41,7 @@ import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
 import { registerBackendModule } from './features/backend.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
-import { serverInstructions } from './server.instructions';
+import { buildServerInstructions } from './server.instructions';
 import { GraphErrorFilter } from './utils/graph-error.filter';
 
 @Module({
@@ -158,7 +158,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     McpModule.forRoot({
       name: 'outlook-semantic-mcp',
       version: packageJson.version,
-      instructions: serverInstructions,
+      instructions: buildServerInstructions(),
       streamableHttp: {
         enableJsonResponse: false,
         sessionIdGenerator: () => typeid('session').toString(),
