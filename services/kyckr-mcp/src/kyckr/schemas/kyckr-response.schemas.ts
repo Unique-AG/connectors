@@ -1,6 +1,6 @@
 import * as z from 'zod';
 
-// Shared Zod schemas mirroring the Kyckr v2 API component schemas.
+// Shared Zod response schemas mirroring the Kyckr v2 API component schemas.
 // Schemas are intentionally `.loose()` so new Kyckr fields still reach the LLM.
 
 export const KyckrIdSchema = z

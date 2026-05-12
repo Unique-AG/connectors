@@ -3,7 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
 import { Metrics } from '../../metrics';
-import { KyckrBaseResponseShape, McpEnvelopeShape } from '../../schemas/kyckr.schemas';
+import { KyckrBaseResponseShape, McpEnvelopeShape } from '../../schemas/kyckr-response.schemas';
 
 export const SearchCompaniesInputSchema = z
   .object({

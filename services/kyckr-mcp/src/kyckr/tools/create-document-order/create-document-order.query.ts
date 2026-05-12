@@ -9,7 +9,7 @@ import {
   KyckrIdSchema,
   KyckrOrderStatusSchema,
   McpEnvelopeShape,
-} from '../../schemas/kyckr.schemas';
+} from '../../schemas/kyckr-response.schemas';
 
 export const CreateDocumentOrderInputSchema = z.object({
   kyckrId: KyckrIdSchema,

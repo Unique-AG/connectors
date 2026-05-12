@@ -7,7 +7,7 @@ import {
   KyckrBaseResponseShape,
   KyckrOrderDetailsSchema,
   McpEnvelopeShape,
-} from '../../schemas/kyckr.schemas';
+} from '../../schemas/kyckr-response.schemas';
 
 export const GetOrderInputSchema = z.object({
   orderId: z

@@ -9,7 +9,7 @@ import {
   KyckrDocumentDescriptionSchema,
   KyckrIdSchema,
   McpEnvelopeShape,
-} from '../../schemas/kyckr.schemas';
+} from '../../schemas/kyckr-response.schemas';
 
 export const ListCompanyDocumentsInputSchema = z.object({
   kyckrId: KyckrIdSchema,

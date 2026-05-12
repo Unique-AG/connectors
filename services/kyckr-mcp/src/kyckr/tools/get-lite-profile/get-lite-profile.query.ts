@@ -17,7 +17,7 @@ import {
   KyckrPreviousNameSchema,
   KyckrRegistrationTypeDetailsSchema,
   McpEnvelopeShape,
-} from '../../schemas/kyckr.schemas';
+} from '../../schemas/kyckr-response.schemas';
 
 export const GetLiteProfileInputSchema = z.object({
   kyckrId: KyckrIdSchema,
