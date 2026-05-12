@@ -1,3 +1,4 @@
+import { elapsedMilliseconds } from '@unique-ag/utils';
 import { Injectable } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
@@ -44,9 +45,9 @@ export class Metrics {
   public recordToolDuration(
     tool: KyckrToolName,
     result: KyckrToolCallResult,
-    durationMs: number,
+    startTime: Date | number,
   ): void {
-    this.toolCallDuration.record(durationMs, { tool, result });
+    this.toolCallDuration.record(elapsedMilliseconds(startTime), { tool, result });
   }
 
   public recordCreditsConsumed(tool: KyckrToolName, credits: number): void {

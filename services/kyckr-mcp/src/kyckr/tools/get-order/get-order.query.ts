@@ -82,7 +82,7 @@ export class GetOrderQuery {
       }
       throw err;
     } finally {
-      this.metrics.recordToolDuration('get_order', result, Date.now() - start);
+      this.metrics.recordToolDuration('get_order', result, start);
     }
   }
 }

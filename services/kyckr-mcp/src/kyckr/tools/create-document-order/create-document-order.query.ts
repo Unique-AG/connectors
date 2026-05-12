@@ -116,7 +116,7 @@ export class CreateDocumentOrderQuery {
       }
       throw err;
     } finally {
-      this.metrics.recordToolDuration('create_document_order', result, Date.now() - start);
+      this.metrics.recordToolDuration('create_document_order', result, start);
     }
   }
 }

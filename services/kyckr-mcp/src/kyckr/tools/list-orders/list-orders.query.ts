@@ -108,7 +108,7 @@ export class ListOrdersQuery {
       }
       throw err;
     } finally {
-      this.metrics.recordToolDuration('list_orders', result, Date.now() - start);
+      this.metrics.recordToolDuration('list_orders', result, start);
     }
   }
 }

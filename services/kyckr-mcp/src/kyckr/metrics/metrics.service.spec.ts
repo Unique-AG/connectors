@@ -26,17 +26,27 @@ describe('Metrics', () => {
   });
 
   it('records tool call duration in milliseconds with tool and result labels', () => {
-    unit.recordToolDuration('search_companies', 'success', 1500);
-    unit.recordToolDuration('get_order', 'error', 250);
+    vi.useFakeTimers();
+    try {
+      const firstStart = Date.now();
+      vi.advanceTimersByTime(1500);
+      unit.recordToolDuration('search_companies', 'success', firstStart);
 
-    expect(mockMetrics.kyckr_tool_call_duration_ms.record).toHaveBeenNthCalledWith(1, 1500, {
-      tool: 'search_companies',
-      result: 'success',
-    });
-    expect(mockMetrics.kyckr_tool_call_duration_ms.record).toHaveBeenNthCalledWith(2, 250, {
-      tool: 'get_order',
-      result: 'error',
-    });
+      const secondStart = Date.now();
+      vi.advanceTimersByTime(250);
+      unit.recordToolDuration('get_order', 'error', secondStart);
+
+      expect(mockMetrics.kyckr_tool_call_duration_ms.record).toHaveBeenNthCalledWith(1, 1500, {
+        tool: 'search_companies',
+        result: 'success',
+      });
+      expect(mockMetrics.kyckr_tool_call_duration_ms.record).toHaveBeenNthCalledWith(2, 250, {
+        tool: 'get_order',
+        result: 'error',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('records credit consumption with the tool label', () => {

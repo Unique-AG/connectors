@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { defaultLoggerOptions } from '@unique-ag/logger';
 import { McpModule, McpTransportType } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
@@ -13,16 +14,15 @@ import * as packageJson from '../package.json';
 import { type AppConfig, appConfig, kyckrConfig } from './config';
 import { KyckrModule } from './kyckr/kyckr.module';
 import { ManifestController } from './manifest.controller';
+import { createRedactRequestSerializer } from './redact-request-serializer';
 import { serverInstructions } from './server.instructions';
 
 // The MCP api-key lives in the URL path (Unique's connector validator rejects
 // URLs with query strings or fragments), so the McpModule is mounted at the
 // secret path. Requests to any other path return 404 from the Nest router.
-const mcpApiKey = process.env.MCP_API_KEY ?? '';
-
-// Shape produced by pino-std-serializers.reqSerializer (pino-http auto-wraps
-// custom serializers, so this is what the serializer below receives).
-type SerializedReq = { url?: string } & Record<string, unknown>;
+const mcpApiKey = process.env.MCP_API_KEY;
+// zod throws after route is mounted if the env var is not set
+assert.ok(mcpApiKey, 'MCP_API_KEY env var is required');
 
 @Module({
   imports: [
@@ -39,16 +39,9 @@ type SerializedReq = { url?: string } & Record<string, unknown>;
           ...defaultLoggerOptions.pinoHttp,
           level: config.logLevel,
           // The api-key lives in the URL path, so pino-http's default `req.url`
-          // logging would expose it on every request. Replace it before logging.
-          // pino-http auto-wraps custom serializers, so `req` here is already the
-          // output of `pino-std-serializers.reqSerializer`.
+          // logging would expose it on every request.
           serializers: {
-            req: (req: SerializedReq) => {
-              if (mcpApiKey && typeof req.url === 'string') {
-                return { ...req, url: req.url.replace(mcpApiKey, '[Redacted]') };
-              }
-              return req;
-            },
+            req: createRedactRequestSerializer(mcpApiKey),
           },
           mixin: () => {
             const span = trace.getActiveSpan();

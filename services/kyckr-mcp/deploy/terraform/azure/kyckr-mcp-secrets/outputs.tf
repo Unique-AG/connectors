@@ -7,13 +7,3 @@ output "manual_secrets" {
     }
   ]
 }
-
-output "sensitive_secrets" {
-  description = "List of sensitive (auto-generated) secrets with name and resource ID."
-  value = [
-    for s in azurerm_key_vault_secret.hex_mcp_api_key : {
-      name = s.name
-      id   = s.id
-    }
-  ]
-}

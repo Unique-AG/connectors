@@ -11,18 +11,19 @@ server:
     OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
     OTEL_METRICS_EXPORTER: "prometheus"
   # -- Environment variables from secrets.
+  # The Azure Key Vault projects each KV secret into the K8s Secret using its KV name as the key.
   # Example:
   #   envVars:
   #     - name: KYCKR_API_KEY
   #       valueFrom:
   #         secretKeyRef:
   #           name: kyckr-mcp-secrets
-  #           key: KYCKR_API_KEY
+  #           key: manual-kyckr-api-key
   #     - name: MCP_API_KEY
   #       valueFrom:
   #         secretKeyRef:
   #           name: kyckr-mcp-secrets
-  #           key: MCP_API_KEY
+  #           key: manual-kyckr-mcp-key
   envVars: []
   # -- ConfigMap(s) to load environment variables from.
   # Default assumes release name is "kyckr-mcp".

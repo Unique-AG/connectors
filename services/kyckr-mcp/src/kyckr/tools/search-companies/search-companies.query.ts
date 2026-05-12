@@ -134,7 +134,7 @@ export class SearchCompaniesQuery {
       }
       throw err;
     } finally {
-      this.metrics.recordToolDuration('search_companies', result, Date.now() - start);
+      this.metrics.recordToolDuration('search_companies', result, start);
     }
   }
 }

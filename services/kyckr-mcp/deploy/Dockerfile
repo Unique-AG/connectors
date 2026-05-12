@@ -94,7 +94,7 @@ COPY --from=builder --chown=nestjs:nodejs /app/out/package.json ./package.json
 
 # Run as non-root for security
 USER nestjs
-EXPOSE 3000
+EXPOSE 9542
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["sh", "-c", "node --enable-source-maps --max-old-space-size=${MAX_HEAP_MB:-850} dist/main.js"]

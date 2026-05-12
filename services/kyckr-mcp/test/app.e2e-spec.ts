@@ -69,7 +69,7 @@ describe('AppController (e2e)', () => {
 
   it('serves /mcp under the configured api-key path prefix', () => {
     return request(app.getHttpServer())
-      .post('/test-mcp-api-key/mcp')
+      .post('/test-kyckr-mcp-key/mcp')
       .set('Accept', 'application/json, text/event-stream')
       .send({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
       .expect((res) => {

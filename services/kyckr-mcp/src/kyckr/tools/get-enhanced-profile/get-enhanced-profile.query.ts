@@ -286,7 +286,7 @@ export class GetEnhancedProfileQuery {
       }
       throw err;
     } finally {
-      this.metrics.recordToolDuration('get_enhanced_profile', result, Date.now() - start);
+      this.metrics.recordToolDuration('get_enhanced_profile', result, start);
     }
   }
 }

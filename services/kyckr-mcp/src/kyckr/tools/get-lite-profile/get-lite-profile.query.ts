@@ -175,7 +175,7 @@ export class GetLiteProfileQuery {
       }
       throw err;
     } finally {
-      this.metrics.recordToolDuration('get_lite_profile', result, Date.now() - start);
+      this.metrics.recordToolDuration('get_lite_profile', result, start);
     }
   }
 }

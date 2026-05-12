@@ -118,7 +118,7 @@ export class ListCompanyDocumentsQuery {
       }
       throw err;
     } finally {
-      this.metrics.recordToolDuration('list_company_documents', result, Date.now() - start);
+      this.metrics.recordToolDuration('list_company_documents', result, start);
     }
   }
 }
