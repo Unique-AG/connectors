@@ -193,11 +193,7 @@ export class SharepointSynchronizationService {
       rootScopeId = rootScope.id;
 
       await this.uniqueFilesService.deleteFilesBySiteId(siteConfig.siteId);
-      await this.scopeManagementService.resetRootScope(rootScope.id);
-
-      if (isAutoScope(siteConfig.scopeId)) {
-        await this.uniqueScopesService.deleteScope(rootScope.id, { recursive: true });
-      }
+      await this.scopeManagementService.resetRootScope(rootScope.id, siteConfig.scopeId.type);
 
       this.logger.log(`${logPrefix} Successfully processed site deletion`);
     } catch (error) {

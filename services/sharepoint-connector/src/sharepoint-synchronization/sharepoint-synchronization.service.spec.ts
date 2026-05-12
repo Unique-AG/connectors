@@ -1283,7 +1283,10 @@ describe('SharepointSynchronizationService', () => {
       expect(mockFindRootScopeQuery.execute).not.toHaveBeenCalled();
       expect(mockUniqueScopesService.getScopeById).toHaveBeenCalledWith(FIXED_SCOPE_ID);
       expect(mockUniqueFilesService.deleteFilesBySiteId).toHaveBeenCalledWith(site.siteId);
-      expect(mockScopeManagementService.resetRootScope).toHaveBeenCalledWith(FIXED_SCOPE_ID);
+      expect(mockScopeManagementService.resetRootScope).toHaveBeenCalledWith(
+        FIXED_SCOPE_ID,
+        'fixed',
+      );
       expect(mockUniqueScopesService.deleteScope).not.toHaveBeenCalled();
 
       const deleteFilesOrder =
@@ -1307,7 +1310,7 @@ describe('SharepointSynchronizationService', () => {
       expect(mockUniqueScopesService.deleteScope).not.toHaveBeenCalled();
     });
 
-    it('deletes the auto-created root scope after resetting it', async () => {
+    it('delegates root-scope deletion for auto rows to resetRootScope in auto mode', async () => {
       const site = autoDeletedSite();
       const found = claimedScope('scope_auto_root');
       mockSitesConfigurationService.loadSitesConfiguration = vi.fn().mockResolvedValue([site]);
@@ -1317,16 +1320,8 @@ describe('SharepointSynchronizationService', () => {
 
       expect(mockFindRootScopeQuery.execute).toHaveBeenCalledWith(site);
       expect(mockUniqueFilesService.deleteFilesBySiteId).toHaveBeenCalledWith(site.siteId);
-      expect(mockScopeManagementService.resetRootScope).toHaveBeenCalledWith(found.id);
-      expect(mockUniqueScopesService.deleteScope).toHaveBeenCalledWith(found.id, {
-        recursive: true,
-      });
-
-      const resetOrder =
-        mockScopeManagementService.resetRootScope.mock.invocationCallOrder[0] ??
-        Number.MAX_SAFE_INTEGER;
-      const deleteOrder = mockUniqueScopesService.deleteScope.mock.invocationCallOrder[0] ?? 0;
-      expect(resetOrder).toBeLessThan(deleteOrder);
+      expect(mockScopeManagementService.resetRootScope).toHaveBeenCalledWith(found.id, 'auto');
+      expect(mockUniqueScopesService.deleteScope).not.toHaveBeenCalled();
     });
 
     it('continues with other sites when a deletion step fails', async () => {

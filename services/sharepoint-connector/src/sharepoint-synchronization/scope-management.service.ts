@@ -31,9 +31,18 @@ export class ScopeManagementService {
 
   public constructor(private readonly uniqueScopesService: UniqueScopesService) {}
 
-  public async resetRootScope(scopeId: string): Promise<void> {
+  // Finalises a root scope at the end of a site's lifecycle. The two modes differ in what happens
+  // to the scope itself after its children are gone:
+  //   - `fixed`: the scope was provided by the operator and must survive — we clear its externalId
+  //     so it is no longer claimed by this site and can be reused or manually retargeted.
+  //   - `auto`: the scope was provisioned by the connector and is destroyed here. We deliberately
+  //     do NOT clear externalId before the deletion: if `deleteScope` fails partway, an intact
+  //     externalId keeps the scope discoverable by `FindRootScopeQuery` so the next sync can
+  //     retry. Clearing externalId first would orphan an empty scope that nothing can find again.
+  public async resetRootScope(scopeId: string, mode: 'fixed' | 'auto'): Promise<void> {
     const logPrefix = `[RootScopeId: ${scopeId}]`;
-    this.logger.log(`${logPrefix} Resetting root scope (deleting children, clearing externalId)`);
+    const finalAction = mode === 'fixed' ? 'clearing externalId' : 'deleting root scope';
+    this.logger.log(`${logPrefix} Resetting root scope (deleting children, ${finalAction})`);
 
     try {
       const children = await this.uniqueScopesService.listChildrenScopes(scopeId);
@@ -65,8 +74,13 @@ export class ScopeManagementService {
         );
       }
 
-      await this.uniqueScopesService.updateScopeExternalId(scopeId, null);
-      this.logger.log(`${logPrefix} Cleared externalId on root scope`);
+      if (mode === 'fixed') {
+        await this.uniqueScopesService.updateScopeExternalId(scopeId, null);
+        this.logger.log(`${logPrefix} Cleared externalId on root scope`);
+      } else {
+        await this.uniqueScopesService.deleteScope(scopeId, { recursive: true });
+        this.logger.log(`${logPrefix} Deleted root scope`);
+      }
     } catch (error) {
       this.logger.error({
         msg: `${logPrefix} Failed to reset root scope`,
