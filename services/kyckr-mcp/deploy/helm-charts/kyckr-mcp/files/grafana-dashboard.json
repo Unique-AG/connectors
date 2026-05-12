@@ -234,7 +234,7 @@
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": { "drawStyle": "line", "fillOpacity": 8, "lineWidth": 2, "pointSize": 5 },
-          "unit": "s",
+          "unit": "ms",
           "min": 0
         }
       },
@@ -247,19 +247,19 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.50, sum by (tool, le) (rate(kyckr_tool_call_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (tool, le) (rate(kyckr_tool_call_duration_ms_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "p50 {{tool}}",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.95, sum by (tool, le) (rate(kyckr_tool_call_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (tool, le) (rate(kyckr_tool_call_duration_ms_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "p95 {{tool}}",
           "refId": "B"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "histogram_quantile(0.99, sum by (tool, le) (rate(kyckr_tool_call_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (tool, le) (rate(kyckr_tool_call_duration_ms_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "p99 {{tool}}",
           "refId": "C"
         }

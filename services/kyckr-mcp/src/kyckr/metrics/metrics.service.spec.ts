@@ -4,7 +4,7 @@ import { Metrics } from './metrics.service';
 
 const mockMetrics = {
   kyckr_tool_calls_total: { add: vi.fn() },
-  kyckr_tool_call_duration_seconds: { record: vi.fn() },
+  kyckr_tool_call_duration_ms: { record: vi.fn() },
   kyckr_credits_consumed_total: { add: vi.fn() },
 };
 
@@ -12,7 +12,7 @@ const mockMetricService: Pick<MetricService, 'getCounter' | 'getHistogram'> = {
   getCounter: vi.fn((name: 'kyckr_tool_calls_total' | 'kyckr_credits_consumed_total') => {
     return mockMetrics[name];
   }),
-  getHistogram: vi.fn(() => mockMetrics.kyckr_tool_call_duration_seconds),
+  getHistogram: vi.fn(() => mockMetrics.kyckr_tool_call_duration_ms),
 };
 
 describe('Metrics', () => {
@@ -37,15 +37,15 @@ describe('Metrics', () => {
     });
   });
 
-  it('records tool call duration as seconds with tool and result labels', () => {
+  it('records tool call duration in milliseconds with tool and result labels', () => {
     unit.recordToolDuration('search_companies', 'success', 1500);
     unit.recordToolDuration('get_order', 'error', 250);
 
-    expect(mockMetrics.kyckr_tool_call_duration_seconds.record).toHaveBeenNthCalledWith(1, 1.5, {
+    expect(mockMetrics.kyckr_tool_call_duration_ms.record).toHaveBeenNthCalledWith(1, 1500, {
       tool: 'search_companies',
       result: 'success',
     });
-    expect(mockMetrics.kyckr_tool_call_duration_seconds.record).toHaveBeenNthCalledWith(2, 0.25, {
+    expect(mockMetrics.kyckr_tool_call_duration_ms.record).toHaveBeenNthCalledWith(2, 250, {
       tool: 'get_order',
       result: 'error',
     });

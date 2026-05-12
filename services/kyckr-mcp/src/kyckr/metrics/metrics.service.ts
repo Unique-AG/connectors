@@ -27,9 +27,8 @@ export class Metrics {
       description: 'Number of Kyckr MCP tool calls, labelled by tool and result',
     });
 
-    this.toolCallDuration = metricService.getHistogram('kyckr_tool_call_duration_seconds', {
-      description: 'Duration of Kyckr MCP tool calls in seconds, labelled by tool and result',
-      unit: 's',
+    this.toolCallDuration = metricService.getHistogram('kyckr_tool_call_duration_ms', {
+      description: 'Duration of Kyckr MCP tool calls in milliseconds, labelled by tool and result',
     });
 
     this.creditsConsumed = metricService.getCounter('kyckr_credits_consumed_total', {
@@ -46,7 +45,7 @@ export class Metrics {
     result: KyckrToolCallResult,
     durationMs: number,
   ): void {
-    this.toolCallDuration.record(durationMs / 1000, { tool, result });
+    this.toolCallDuration.record(durationMs, { tool, result });
   }
 
   public recordCreditsConsumed(tool: KyckrToolName, cost: { value?: number } | undefined): void {
