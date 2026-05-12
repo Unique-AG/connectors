@@ -3,7 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { type KyckrConfig, kyckrConfig } from '~/config';
 import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
-import { Metrics } from '../../metrics';
+import { type KyckrToolCallResult, Metrics } from '../../metrics';
 import {
   KyckrBaseResponseShape,
   KyckrIdSchema,
@@ -74,6 +74,7 @@ export class CreateDocumentOrderQuery {
       'create_document_order: invoked',
     );
     const start = Date.now();
+    let result: KyckrToolCallResult = 'success';
     try {
       const raw = await this.kyckrClient.post<unknown>('/orders', {
         kyckrId: input.kyckrId,
@@ -83,7 +84,6 @@ export class CreateDocumentOrderQuery {
       });
       const response = CreateOrderEnvelopeSchema.parse(raw);
       this.metrics.recordCreditsConsumed('create_document_order', response.cost?.value ?? 0);
-      this.metrics.recordToolDuration('create_document_order', 'success', Date.now() - start);
       this.logger.debug(
         {
           kyckrId: input.kyckrId,
@@ -95,6 +95,7 @@ export class CreateDocumentOrderQuery {
       );
       return { success: true, ...response };
     } catch (err) {
+      result = 'error';
       if (err instanceof KyckrApiError) {
         this.logger.warn(
           {
@@ -106,7 +107,6 @@ export class CreateDocumentOrderQuery {
           },
           'create_document_order: Kyckr API rejected request',
         );
-        this.metrics.recordToolDuration('create_document_order', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,
@@ -115,6 +115,8 @@ export class CreateDocumentOrderQuery {
         };
       }
       throw err;
+    } finally {
+      this.metrics.recordToolDuration('create_document_order', result, Date.now() - start);
     }
   }
 }

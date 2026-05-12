@@ -133,11 +133,16 @@ describe('SearchCompaniesQuery', () => {
     );
   });
 
-  it('rethrows unexpected errors', async () => {
+  it('rethrows unexpected errors and still records duration as error', async () => {
     const error = new Error('network failure');
     mockKyckrClient.get.mockRejectedValueOnce(error);
 
     await expect(unit.run({ name: 'Acme Ltd' })).rejects.toThrow('network failure');
+    expect(mockMetrics.recordToolDuration).toHaveBeenCalledWith(
+      'search_companies',
+      'error',
+      expect.any(Number),
+    );
   });
 });
 

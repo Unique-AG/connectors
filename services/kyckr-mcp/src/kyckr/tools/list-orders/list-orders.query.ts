@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
-import { Metrics } from '../../metrics';
+import { type KyckrToolCallResult, Metrics } from '../../metrics';
 import {
   KyckrBaseResponseShape,
   KyckrOrdersPageSchema,
@@ -75,6 +75,7 @@ export class ListOrdersQuery {
       'list_orders: invoked',
     );
     const start = Date.now();
+    let result: KyckrToolCallResult = 'success';
     try {
       const raw = await this.kyckrClient.get<unknown>('/orders', {
         startDate: input.startDate,
@@ -83,7 +84,6 @@ export class ListOrdersQuery {
       });
       const response = ListOrdersEnvelopeSchema.parse(raw);
       this.metrics.recordCreditsConsumed('list_orders', response.cost?.value ?? 0);
-      this.metrics.recordToolDuration('list_orders', 'success', Date.now() - start);
       this.logger.debug(
         {
           totalCount: response.data?.totalCount,
@@ -93,12 +93,12 @@ export class ListOrdersQuery {
       );
       return { success: true, ...response };
     } catch (err) {
+      result = 'error';
       if (err instanceof KyckrApiError) {
         this.logger.warn(
           { status: err.status, correlationId: err.correlationId, msg: err.message },
           'list_orders: Kyckr API rejected request',
         );
-        this.metrics.recordToolDuration('list_orders', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,
@@ -107,6 +107,8 @@ export class ListOrdersQuery {
         };
       }
       throw err;
+    } finally {
+      this.metrics.recordToolDuration('list_orders', result, Date.now() - start);
     }
   }
 }

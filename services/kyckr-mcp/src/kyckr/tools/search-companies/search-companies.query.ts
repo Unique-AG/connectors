@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
-import { Metrics } from '../../metrics';
+import { type KyckrToolCallResult, Metrics } from '../../metrics';
 import { KyckrBaseResponseShape, McpEnvelopeShape } from '../../schemas/kyckr-response.schemas';
 
 export const SearchCompaniesInputSchema = z
@@ -106,6 +106,7 @@ export class SearchCompaniesQuery {
       'search_companies: invoked',
     );
     const start = Date.now();
+    let result: KyckrToolCallResult = 'success';
     try {
       const raw = await this.kyckrClient.get<unknown>('/companies', {
         name: input.name,
@@ -114,17 +115,16 @@ export class SearchCompaniesQuery {
       });
       const response = KyckrSearchEnvelopeSchema.parse(raw);
       this.metrics.recordCreditsConsumed('search_companies', response.cost?.value ?? 0);
-      this.metrics.recordToolDuration('search_companies', 'success', Date.now() - start);
       this.logger.debug({ resultCount: response.data?.length ?? 0 }, 'search_companies: succeeded');
 
       return { success: true, ...response };
     } catch (err) {
+      result = 'error';
       if (err instanceof KyckrApiError) {
         this.logger.warn(
           { status: err.status, correlationId: err.correlationId, msg: err.message },
           'search_companies: Kyckr API rejected request',
         );
-        this.metrics.recordToolDuration('search_companies', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,
@@ -133,6 +133,8 @@ export class SearchCompaniesQuery {
         };
       }
       throw err;
+    } finally {
+      this.metrics.recordToolDuration('search_companies', result, Date.now() - start);
     }
   }
 }

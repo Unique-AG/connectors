@@ -10,7 +10,7 @@ vi.mock('undici', () => ({
 import { request } from 'undici';
 import { KyckrApiError, KyckrHttpClient } from './kyckr-http.client';
 
-const mockRecorder = {
+const mockRecorder: Pick<Metrics, 'recordApiRequest'> = {
   recordApiRequest: vi.fn(),
 };
 

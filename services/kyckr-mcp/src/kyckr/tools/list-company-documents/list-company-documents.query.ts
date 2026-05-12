@@ -3,7 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { type KyckrConfig, kyckrConfig } from '~/config';
 import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
-import { Metrics } from '../../metrics';
+import { type KyckrToolCallResult, Metrics } from '../../metrics';
 import {
   KyckrBaseResponseShape,
   KyckrDocumentDescriptionSchema,
@@ -77,6 +77,7 @@ export class ListCompanyDocumentsQuery {
       'list_company_documents: invoked',
     );
     const start = Date.now();
+    let result: KyckrToolCallResult = 'success';
     try {
       const raw = await this.kyckrClient.get<unknown>(
         `/companies/${encodeURIComponent(input.kyckrId)}/documents`,
@@ -87,7 +88,6 @@ export class ListCompanyDocumentsQuery {
       );
       const response = ListCompanyDocumentsEnvelopeSchema.parse(raw);
       this.metrics.recordCreditsConsumed('list_company_documents', response.cost?.value ?? 0);
-      this.metrics.recordToolDuration('list_company_documents', 'success', Date.now() - start);
       this.logger.debug(
         {
           kyckrId: input.kyckrId,
@@ -98,6 +98,7 @@ export class ListCompanyDocumentsQuery {
       );
       return { success: true, ...response };
     } catch (err) {
+      result = 'error';
       if (err instanceof KyckrApiError) {
         this.logger.warn(
           {
@@ -108,7 +109,6 @@ export class ListCompanyDocumentsQuery {
           },
           'list_company_documents: Kyckr API rejected request',
         );
-        this.metrics.recordToolDuration('list_company_documents', 'error', Date.now() - start);
         return {
           success: false,
           statusCode: err.status,
@@ -117,6 +117,8 @@ export class ListCompanyDocumentsQuery {
         };
       }
       throw err;
+    } finally {
+      this.metrics.recordToolDuration('list_company_documents', result, Date.now() - start);
     }
   }
 }
