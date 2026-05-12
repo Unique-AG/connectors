@@ -1,13 +1,21 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { sql } from 'drizzle-orm';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpProcessesHealthIndicator } from './mcp-processes-health.indicator';
 
 const MOCK_SUBQUERY = sql`SELECT user_profile_id FROM inbox_configurations`;
 
-const INGESTION_UNIQUEAPI = { mcpBackend: 'MicrosoftGraphAndUniqueApi', syncFailureThreshold: 0.15 } as any;
+const INGESTION_UNIQUEAPI = {
+  mcpBackend: 'MicrosoftGraphAndUniqueApi',
+  syncFailureThreshold: 0.15,
+} as any;
 const INGESTION_GRAPH = { mcpBackend: 'MicrosoftGraph', connectivityTimeoutMs: 3000 } as any;
-const DELEGATED_ENABLED = { scan: 'fullAccessOnly', stalenessThresholdHours: 24, failureThreshold: 0.15 } as any;
+const DELEGATED_ENABLED = {
+  scan: 'fullAccessOnly',
+  stalenessThresholdHours: 24,
+  failureThreshold: 0.15,
+} as any;
 const DELEGATED_DISABLED = { scan: 'disabled' } as any;
 
 function createHealthIndicatorService() {
@@ -42,7 +50,12 @@ function createIndicator(
   delegatedAccessCfg: any,
   healthIndicatorService = createHealthIndicatorService(),
 ) {
-  return new McpProcessesHealthIndicator(db, ingestionCfg, delegatedAccessCfg, healthIndicatorService as any);
+  return new McpProcessesHealthIndicator(
+    db,
+    ingestionCfg,
+    delegatedAccessCfg,
+    healthIndicatorService as any,
+  );
 }
 
 describe('McpProcessesHealthIndicator', () => {

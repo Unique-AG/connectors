@@ -24,7 +24,9 @@ export const withIngestionConfig = z.object({
     .min(0)
     .max(1)
     .prefault(0.15)
-    .describe('Fraction of eligible users that may be failing before fullSync or liveCatchup is marked down.'),
+    .describe(
+      'Fraction of eligible users that may be failing before fullSync or liveCatchup is marked down.',
+    ),
   defaultMailFilters: json(inboxConfigurationMailFilters).describe(
     'Default mail filters applied when syncing emails (e.g. {"retentionWindowInDays":95, "ignoredSenders": [], "ignoredContents": [] }). ',
   ),

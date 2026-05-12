@@ -33,7 +33,9 @@ const delegatedAccessFailureThreshold = z.coerce
   .min(0)
   .max(1)
   .prefault(0.15)
-  .describe('Fraction of eligible delegated users that may be stale before the check is marked down.');
+  .describe(
+    'Fraction of eligible delegated users that may be stale before the check is marked down.',
+  );
 
 const disabledDelegatedAccessScan = z.object({
   mcpBackend: mcpBackendSchema,

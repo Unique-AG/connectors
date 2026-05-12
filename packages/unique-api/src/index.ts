@@ -1,5 +1,4 @@
 export type { UniqueApiFeatureModuleInputOptions } from './config/unique-api-feature-module-options';
-export { UniqueApiHealth } from './health/unique-api-health.service';
 export type { UniqueApiRootModuleInputOptions } from './config/unique-api-root-module-options';
 export type { Content } from './content/content.dto';
 export { ContentSchema } from './content/content.dto';
@@ -26,6 +25,7 @@ export type {
   UniqueFile,
 } from './files/files.types';
 export type { Group, GroupWithMembers } from './groups/groups.types';
+export { UniqueApiHealth } from './health/unique-api-health.service';
 export type { IngestionConfig } from './ingestion/ingestion.queries';
 export type {
   AuthorMetadata,

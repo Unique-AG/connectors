@@ -1,10 +1,10 @@
-import { Inject, Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import {
   getUniqueApiClientToken,
   UniqueApiFeatureModuleInputOptions,
   UniqueApiModule,
 } from '@unique-ag/unique-api';
+import { Inject, Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { IngestionConfigNamespaced, UniqueConfigNamespaced } from '../config';
 import { UploadFileForIngestionCommand } from './upload-file-for-ingestion.command';
 

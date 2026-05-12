@@ -1,6 +1,6 @@
+import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Injectable } from '@nestjs/common';
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 
 @Injectable()

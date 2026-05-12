@@ -3,10 +3,10 @@ import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus'
 import { and, count, countDistinct, eq, gt, inArray, sql } from 'drizzle-orm';
 import {
   DelegatedAccessConfig,
-  IngestionConfig,
-  McpBackendType,
   delegatedAccessConfig,
+  IngestionConfig,
   ingestionConfig,
+  McpBackendType,
 } from '~/config';
 import {
   DRIZZLE,
@@ -52,7 +52,12 @@ export class McpProcessesHealthIndicator {
     const failing = Number(row?.failing ?? 0);
     const ratio = eligible > 0 ? failing / eligible : 0;
 
-    const details = { threshold: syncFailureThreshold, eligibleUsers: eligible, failingUsers: failing, ratio };
+    const details = {
+      threshold: syncFailureThreshold,
+      eligibleUsers: eligible,
+      failingUsers: failing,
+      ratio,
+    };
     return ratio > syncFailureThreshold ? indicator.down(details) : indicator.up(details);
   }
 
@@ -79,7 +84,12 @@ export class McpProcessesHealthIndicator {
     const failing = Number(row?.failing ?? 0);
     const ratio = eligible > 0 ? failing / eligible : 0;
 
-    const details = { threshold: syncFailureThreshold, eligibleUsers: eligible, failingUsers: failing, ratio };
+    const details = {
+      threshold: syncFailureThreshold,
+      eligibleUsers: eligible,
+      failingUsers: failing,
+      ratio,
+    };
     return ratio > syncFailureThreshold ? indicator.down(details) : indicator.up(details);
   }
 
@@ -107,7 +117,12 @@ export class McpProcessesHealthIndicator {
     const stale = Number(row?.stale ?? 0);
     const ratio = total > 0 ? stale / total : 0;
 
-    const details = { threshold: failureThreshold, eligibleUsers: total, failingUsers: stale, ratio };
+    const details = {
+      threshold: failureThreshold,
+      eligibleUsers: total,
+      failingUsers: stale,
+      ratio,
+    };
     return ratio > failureThreshold ? indicator.down(details) : indicator.up(details);
   }
 

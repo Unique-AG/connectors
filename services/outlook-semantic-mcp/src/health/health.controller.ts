@@ -1,3 +1,4 @@
+import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Controller, Get, Inject } from '@nestjs/common';
 import {
   HealthCheck,
@@ -5,14 +6,13 @@ import {
   HealthIndicatorResult,
   HealthIndicatorService,
 } from '@nestjs/terminus';
-import { UniqueApiClient } from '@unique-ag/unique-api';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
+import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { AmqpHealthIndicator } from './amqp-health.indicator';
 import { ConnectivityHealthIndicator } from './connectivity-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { McpProcessesHealthIndicator } from './mcp-processes-health.indicator';
-import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 
 @Controller('health')
 export class HealthController {
