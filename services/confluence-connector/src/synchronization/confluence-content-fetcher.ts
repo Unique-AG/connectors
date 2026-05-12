@@ -15,11 +15,11 @@ export class ConfluenceContentFetcher {
     let fullPage: ConfluencePage | null;
     try {
       fullPage = await this.apiClient.getPageById(page.id);
-    } catch (error) {
+    } catch (err) {
       this.logger.error({
         pageId: page.id,
         title: page.title,
-        err: error,
+        err,
         msg: 'Failed to fetch page, possibly deleted in the meantime',
       });
       return null;

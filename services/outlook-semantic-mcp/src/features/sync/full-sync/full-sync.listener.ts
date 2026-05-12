@@ -6,6 +6,7 @@ import {
 import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
+import { NewTrace } from '~/features/tracing.utils';
 import { FullSyncCommand } from './full-sync.command';
 import { FullSyncEventDto } from './full-sync-event.dto';
 
@@ -23,6 +24,7 @@ export class FullSyncListener {
     queueOptions: { deadLetterExchange: DEAD_EXCHANGE.name },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @NewTrace('amqp.full-sync')
   public async onFullSyncEvent(@RabbitPayload() payload: unknown): Promise<void> {
     const event = FullSyncEventDto.parse(payload);
     this.logger.log({ msg: 'Full sync event received', type: event.type });

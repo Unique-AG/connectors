@@ -244,11 +244,11 @@ export class FilesService implements UniqueFilesFacade {
           },
         );
         successCount += batch.length;
-      } catch (error) {
-        const statusCode = getErrorCodeFromGraphqlRequest(error);
+      } catch (err) {
+        const statusCode = getErrorCodeFromGraphqlRequest(err);
 
         if (statusCode !== 400) {
-          throw error;
+          throw err;
         }
 
         this.logger.warn({
@@ -273,7 +273,7 @@ export class FilesService implements UniqueFilesFacade {
               msg: `${logPrefix} Failed to add single file access`,
               scopeId,
               permission,
-              error: singleError,
+              err: singleError,
             });
           }
         }
@@ -302,11 +302,11 @@ export class FilesService implements UniqueFilesFacade {
           fileAccesses: batch,
         });
         successCount += batch.length;
-      } catch (error) {
-        const statusCode = getErrorCodeFromGraphqlRequest(error);
+      } catch (err) {
+        const statusCode = getErrorCodeFromGraphqlRequest(err);
 
         if (statusCode !== 400) {
-          throw error;
+          throw err;
         }
 
         this.logger.warn({
@@ -331,7 +331,7 @@ export class FilesService implements UniqueFilesFacade {
               msg: `${logPrefix} Failed to remove single file access`,
               scopeId,
               permission,
-              error: singleError,
+              err: singleError,
             });
           }
         }

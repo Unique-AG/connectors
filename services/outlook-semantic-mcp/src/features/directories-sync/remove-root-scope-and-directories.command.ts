@@ -14,11 +14,11 @@ export class RemoveRootScopeAndDirectoriesCommand {
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
   ) {}
 
-  public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
+  public async run(userProfileId: UserProfileTypeID): Promise<void> {
     const userProfile = await this.db.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, userProfileTypeId.toString()),
+      where: eq(userProfiles.id, userProfileId.toString()),
     });
-    assert.ok(userProfile, `User profile not found for: ${userProfileTypeId.toString()}`);
+    assert.ok(userProfile, `User profile not found for: ${userProfileId.toString()}`);
 
     await this.db
       .delete(directoriesSync)

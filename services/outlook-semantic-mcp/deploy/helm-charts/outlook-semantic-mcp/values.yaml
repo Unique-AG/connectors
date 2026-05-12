@@ -32,7 +32,7 @@ server:
     - outlook-semantic-mcp-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/outlook-semantic-mcp
-    tag: 0.3.2 # x-release-please-version
+    tag: 0.4.3 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
@@ -145,20 +145,55 @@ mcpConfig:
     # -- Search backend. MicrosoftGraphAndUniqueApi: dual backend, KB ingestion + semantic search (default).
     # MicrosoftGraph: direct Graph search, no ingestion, sync tools not registered.
     mcpBackend: MicrosoftGraphAndUniqueApi
-    # -- Optional. Overlapping window in minutes for standard live catch-up sync runs. Office 365
-    # uses eventual consistency, so messages can appear with a delayed updatedAt timestamp after
-    # the actual event. Re-querying an overlapping window ensures late-arriving messages are not
-    # missed. Minimum: 2. To override set env var directly: LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES=5
-    liveCatchupOverlappingWindowMinutes: 5
-    # -- Optional. Overlapping window in minutes for live catch-up ready-recheck runs. Uses a larger
-    # window than the standard run to account for higher latency during recheck scenarios.
-    # Minimum: 10. To override set env var directly: LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES=10
-    liveCatchupRecheckOverlappingWindowMinutes: 10
+    # -- Delegated access scanning mode. Controls whether the service discovers shared mailbox access.
+    # Values: disabled | fullAccessOnly | granularAccess
+    #   disabled       - delegated access scanning is off (default)
+    #   fullAccessOnly - discovers Full Access (Read & Manage) delegation via /messages endpoint
+    #   granularAccess - discovers folder-level delegation via /mailFolders endpoint + runs verification
+    # Env var: DELEGATED_ACCESS_SCAN
+    delegatedAccessScan: disabled
+    # -- Cron schedule for delegated access discovery runs.
+    # Required when delegatedAccessScan is not 'disabled'. Env var: DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE
+    # delegatedAccessDiscoveryCronSchedule: '0 */12 * * *'
+    # -- Cron schedule for delegated access verification runs.
+    # Required when delegatedAccessScan is 'granularAccess'. Env var: DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE
+    # delegatedAccessVerificationCronSchedule: '0 */4 * * *'
+    # -- Cron schedule for recovering stuck delegated access discovery and verification jobs.
+    # Active when delegatedAccessScan is not 'disabled'. Env var: DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE
+    # delegatedAccessRecoveryCronSchedule: '*/30 * * * *'
 
   # -- Optional log settings. To override:
   # logs:
   #   diagnosticsDataPolicy: conceal
   # Or set env var directly: LOGS_DIAGNOSTICS_DATA_POLICY=conceal
+
+  # -- Ingestion backend configuration.
+  # Required when mcpBackend is 'MicrosoftGraphAndUniqueApi'. Omit entirely for 'MicrosoftGraph'.
+  ingestion:
+    # -- Required. Default mail filters applied when creating a new inbox configuration.
+    # retentionWindowInDays: limits sync to emails received within the last N days (rolling).
+    # Env var: INGESTION_DEFAULT_MAIL_FILTERS (JSON string)
+    defaultMailFilters:
+      retentionWindowInDays: 95
+      ignoredContents: []
+      ignoredSenders: []
+    # -- Optional. Overlapping window (minutes) for standard live catch-up sync runs.
+    # Office 365 uses eventual consistency — messages can appear with a delayed updatedAt after
+    # the actual event. Re-querying an overlapping window avoids missing late-arriving messages.
+    # Minimum: 2. Default: 3. Env var: INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES
+    # liveCatchupOverlappingWindowMinutes: 3
+    # -- Optional. Overlapping window (minutes) for live catch-up ready-recheck runs.
+    # Minimum: 10. Default: 10. Env var: INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES
+    # liveCatchupRecheckOverlappingWindowMinutes: 10
+    # -- Optional. Cron schedule for stuck full-sync recovery scans.
+    # Default: '*/2 * * * *'. Env var: INGESTION_FULL_SYNC_RECOVERY_CRON
+    # fullSyncRecoveryCron: "*/2 * * * *"
+    # -- Optional. Cron schedule for stuck live catch-up recovery scans.
+    # Default: '*/5 * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECOVERY
+    # liveCatchupRecovery: "*/5 * * * *"
+    # -- Optional. Cron schedule for stuck inbox deletion recovery scans.
+    # Default: '*/5 * * * *'. Env var: INGESTION_DELETE_INBOX_RECOVERY_CRON
+    # deleteInboxRecoveryCron: "*/5 * * * *"
 
   # -- Microsoft Graph API configuration
   microsoft:
@@ -205,12 +240,6 @@ mcpConfig:
         clientId: unset_default_value
         oauthTokenUrl: unset_default_value
         projectId: unset_default_value
-
-  # -- Default mail filters applied when syncing emails
-  defaultMailFilters:
-    retentionWindowInDays: 95
-    ignoredContents: []
-    ignoredSenders: []
 
   # -- Authentication configuration for the MCP server
   # Optional. Access and refresh token expiration times. To override:

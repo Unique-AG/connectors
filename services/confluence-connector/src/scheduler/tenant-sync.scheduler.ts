@@ -31,8 +31,8 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
         this.logger.log({ msg: `Stopping cron job: ${name}` });
         job.stop();
       }
-    } catch (error) {
-      this.logger.error({ err: error, msg: 'Error stopping cron jobs' });
+    } catch (err) {
+      this.logger.error({ err, msg: 'Error stopping cron jobs' });
     }
   }
 
@@ -107,7 +107,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
           result,
         });
       });
-    } catch (error) {
+    } catch (err) {
       // Reaching here means synchronize() itself threw before producing a SyncResult.
       this.syncStatusStore.record({
         timestamp: new Date(),
@@ -116,7 +116,7 @@ export class TenantSyncScheduler implements OnModuleInit, OnModuleDestroy {
       });
       this.logger.error({
         tenantName: tenant.name,
-        err: error,
+        err,
         msg: 'Unexpected error in tenant job',
       });
     }

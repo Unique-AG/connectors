@@ -3,11 +3,10 @@ import { createSmeared } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes } from '@opentelemetry/api';
 import { and, eq, inArray } from 'drizzle-orm';
-import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish } from 'remeda';
 import { DirectoriesSync, directories, directoriesSync } from '~/db';
 import { DRIZZLE, DrizzleDatabase } from '~/db/drizzle.module';
-import { traceAttrs, traceEvent } from '~/features/tracing.utils';
+import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
@@ -25,15 +24,15 @@ export class SyncDirectoriesCommand {
     private readonly syncDirectoriesForUserProfileCommand: SyncDirectoriesForUserProfileCommand,
   ) {}
 
-  @Span()
-  public async run(userProfileTypeId: UserProfileTypeID): Promise<void> {
-    traceAttrs({ userProfileTypeId: userProfileTypeId.toString() });
+  @NewTrace('sync-directories')
+  public async run(userProfileId: UserProfileTypeID): Promise<void> {
+    traceAttrs({ userProfileId: userProfileId.toString() });
     this.logger.log({
-      userProfileId: userProfileTypeId.toString(),
+      userProfileId: userProfileId.toString(),
       msg: `Starting directories sync`,
     });
 
-    const userProfile = await this.getUserProfileQuery.run(userProfileTypeId);
+    const userProfile = await this.getUserProfileQuery.run(userProfileId);
     traceAttrs({ userProfileId: userProfile.id });
     const userEmail = createSmeared(userProfile.email);
     this.logger.log({
@@ -80,7 +79,7 @@ export class SyncDirectoriesCommand {
     if (shouldSyncDirectories || shouldForceDirectoriesSync) {
       traceEvent(`Run directories sync`);
       this.logger.log({ ...logContext, msg: `Run directories sync` });
-      await this.syncDirectoriesForUserProfileCommand.run(userProfileTypeId);
+      await this.syncDirectoriesForUserProfileCommand.run(userProfileId);
       traceEvent('directories sync completed');
       this.logger.log({ ...logContext, msg: `Directories sync completed` });
     } else {

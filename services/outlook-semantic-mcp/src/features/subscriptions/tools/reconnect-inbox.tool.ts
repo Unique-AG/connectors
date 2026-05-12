@@ -67,6 +67,9 @@ export class ReconnectInboxTool {
     this.logger.log({ userProfileId, msg: 'Reconnecting inbox subscription for user' });
 
     const result = await this.subscriptionCreate.subscribe(userProfileTypeid);
+    if (result.status === 'not_created') {
+      return { success: false, message: result.reason, subscription: null };
+    }
     const { status, subscription } = result;
 
     const expiresAt = new Date(subscription.expiresAt);

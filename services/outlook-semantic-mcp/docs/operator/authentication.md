@@ -74,6 +74,7 @@ module "outlook_semantic_mcp_app" {
    |------------|------|---------------|
    | `User.Read` | Delegated | No |
    | `Mail.ReadWrite` | Delegated | No |
+   | `Mail.ReadWrite.Shared` | Delegated | No |
    | `MailboxSettings.Read` | Delegated | No |
    | `People.Read` | Delegated | No |
    | `offline_access` | Delegated | No |
@@ -93,7 +94,7 @@ module "outlook_semantic_mcp_app" {
 
 ## Required Permissions
 
-All permissions are delegated and do not require admin consent.
+All permissions are delegated and do not require admin consent. `Mail.ReadWrite.Shared` is always included in the OAuth consent screen (even when `DELEGATED_ACCESS_SCAN=disabled`) because it is requested unconditionally at OAuth time.
 
 For the complete permissions reference with justifications for each permission, see [Permissions](../technical/permissions.md).
 
@@ -203,12 +204,12 @@ Use this when one MCP server deployment serves users from multiple Microsoft 365
 
 The service requires four secrets for authentication and data protection. All must be stored in Kubernetes Secrets (not ConfigMaps).
 
-| Secret | Format | Generation | Purpose |
-|--------|--------|------------|---------|
+| Variable | Format | Generation | Purpose |
+|----------|--------|------------|---------|
 | `MICROSOFT_CLIENT_SECRET` | Azure-generated string | Created in Entra ID app registration | Authenticates the server to Microsoft Entra ID during OAuth flows |
 | `MICROSOFT_WEBHOOK_SECRET` | 128-char hex string | `openssl rand -hex 64` | Validates that incoming webhook notifications come from Microsoft Graph |
-| `ENCRYPTION_KEY` | 64-char hex string | `openssl rand -hex 32` | Encrypts Microsoft OAuth tokens (access + refresh) at rest in PostgreSQL using AES-256-GCM |
 | `AUTH_HMAC_SECRET` | 64-char hex string | `openssl rand -hex 32` | Signs OAuth session state during the MCP client authentication flow (HMAC-SHA256) |
+| `ENCRYPTION_KEY` | 64-char hex string | `openssl rand -hex 32` | Encrypts Microsoft OAuth tokens (access + refresh) at rest in PostgreSQL using AES-256-GCM |
 
 ### `MICROSOFT_CLIENT_SECRET`
 
@@ -241,14 +242,14 @@ Passed to Microsoft as the `clientState` field when creating Graph subscriptions
 
 - **Live catch-up stops** — all incoming email notifications are rejected until subscriptions are recreated.
 - **Full sync is unaffected** — it pulls directly from Microsoft Graph and does not use webhooks.
-- **Emails received during the gap will not be ingested into the Knowledge Base** until subscriptions are recreated. Once a user calls `reconnect_inbox` and the next live catch-up runs (triggered by a new notification or the 4-hour inactivity scheduler), it queries from the last watermark and picks up any emails missed during the gap.
+- **Emails received during the gap will not be ingested into the Knowledge Base** until subscriptions are recreated. Once a user calls `reconnect_inbox` and the next live catch-up runs (triggered by a new notification or the 30-minute inactivity scheduler), it queries from the last watermark and picks up any emails missed during the gap.
 
 **How to rotate:**
 
 1. Generate a new secret: `openssl rand -hex 64`
 2. Update the Kubernetes secret and redeploy the service
 3. All users must call `reconnect_inbox` to recreate their subscriptions with the new secret
-4. Emails arriving during the gap will not be ingested until `reconnect_inbox` is called. After that, live catch-up picks them up automatically on the next notification or the 4-hour inactivity scheduler (it queries from the last watermark)
+4. Emails arriving during the gap will not be ingested until `reconnect_inbox` is called. After that, live catch-up picks them up automatically on the next notification or the 30-minute inactivity scheduler (it queries from the last watermark)
 
 Plan this as a maintenance window — there is no zero-downtime rotation path.
 

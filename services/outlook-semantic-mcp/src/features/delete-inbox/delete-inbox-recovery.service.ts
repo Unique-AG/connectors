@@ -4,12 +4,12 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { and, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
+import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
+import { NewTrace } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
 import { DeleteInboxDataEventDto } from './delete-inbox-data-event.dto';
 import { STALE_DELETE_INBOX_CONFIGURATION_THRESHOLD_IN_MINUTES } from './execute-inbox-deletion.command';
-
-const DELETE_INBOX_DATA_RECOVERY_CRON_SCHEDULE = '*/5 * * * *';
 
 @Injectable()
 export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy {
@@ -19,6 +19,7 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
+    @Inject(ingestionConfig.KEY) private readonly config: IngestionConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -27,6 +28,9 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
   }
 
   public onModuleDestroy() {
+    if (this.config.mcpBackend !== 'MicrosoftGraphAndUniqueApi') {
+      return;
+    }
     this.logger.log({ msg: 'DeleteInboxRecoveryService is shutting down...' });
     this.isShuttingDown = true;
     try {
@@ -38,7 +42,10 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
   }
 
   private setupCronJob(): void {
-    const job = new CronJob(DELETE_INBOX_DATA_RECOVERY_CRON_SCHEDULE, async () => {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
+      return;
+    }
+    const job = new CronJob(this.config.deleteInboxRecoveryCron, async () => {
       try {
         await this.checkAndRetriggerStuckDeletions();
       } catch (err) {
@@ -53,6 +60,7 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
     job.start();
   }
 
+  @NewTrace('cron.delete-inbox-recovery')
   public async checkAndRetriggerStuckDeletions(): Promise<void> {
     if (this.isShuttingDown) {
       return;

@@ -1,6 +1,8 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
+import { AppConfig, appConfig } from '~/config';
+import { NewTrace } from '~/features/tracing.utils';
 import { SyncDirectoriesForSubscriptionsCommand } from './sync-directories-for-subscriptions.command';
 
 @Injectable()
@@ -11,6 +13,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private syncDirectoriesForSubscriptionsCommand: SyncDirectoriesForSubscriptionsCommand,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
   ) {}
 
   public onModuleInit() {
@@ -26,7 +29,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
   }
 
   private setupScheduledScan(): void {
-    const job = new CronJob(`*/5 * * * *`, () => {
+    const job = new CronJob(this.config.directorySyncCronSchedule, () => {
       this.runScheduledScan();
     });
 
@@ -34,6 +37,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
     job.start();
   }
 
+  @NewTrace('cron.directory-sync')
   public async runScheduledScan(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({ msg: 'Skipping scheduled scan due to shutdown' });

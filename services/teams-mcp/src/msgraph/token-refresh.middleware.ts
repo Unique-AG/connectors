@@ -1,4 +1,5 @@
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
+import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
 import { serializeError } from 'serialize-error-cjs';
 import { normalizeError } from '../utils/normalize-error';
@@ -133,6 +134,10 @@ export class TokenRefreshMiddleware implements Middleware {
         );
       }
     } catch (error) {
+      if (error instanceof McpError) {
+        throw error;
+      }
+
       this.logger.error(
         {
           error: serializeError(normalizeError(error)),

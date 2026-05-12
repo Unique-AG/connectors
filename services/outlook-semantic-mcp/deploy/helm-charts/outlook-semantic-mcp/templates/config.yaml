@@ -7,6 +7,8 @@ metadata:
     {{- include "chart.labels" . | nindent 4 }}
 data:
   {{- include "chart.config.app" . | nindent 2 }}
+  {{- include "chart.config.delegatedAccess" . | nindent 2 }}
+  {{- include "chart.config.ingestion" . | nindent 2 }}
   {{- include "chart.config.auth" . | nindent 2 }}
   {{- include "chart.config.logs" . | nindent 2 }}
   {{- include "chart.config.microsoft" . | nindent 2 }}

@@ -27,6 +27,11 @@ data:
       {{- if .Values.connectorConfig.sharepoint.apiRateLimitPerMinuteThousands }}
       graphApiRateLimitPerMinuteThousands: {{ .Values.connectorConfig.sharepoint.apiRateLimitPerMinuteThousands }}
       {{- end }}
+      {{- with .Values.connectorConfig.sharepoint.siteDefaults }}
+      # Deployment-level defaults; per-site values override these when set.
+      siteDefaults:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       # Sites Configuration
       sitesSource: {{ .Values.connectorConfig.sharepoint.sitesSource | quote }}
       {{- if eq .Values.connectorConfig.sharepoint.sitesSource "sharepoint_list" }}
@@ -39,15 +44,27 @@ data:
       sites:
         {{- range .Values.connectorConfig.sharepoint.sites }}
         - siteId: {{ .siteId | quote }}
+          {{- if .syncColumnName }}
           syncColumnName: {{ .syncColumnName | quote }}
+          {{- end }}
+          {{- if .ingestionMode }}
           ingestionMode: {{ .ingestionMode | quote }}
+          {{- end }}
+          {{- if .scopeId }}
           scopeId: {{ .scopeId | quote }}
+          {{- end }}
           {{- if .maxFilesToIngest }}
           maxFilesToIngest: {{ .maxFilesToIngest }}
           {{- end }}
+          {{- if .storeInternally }}
           storeInternally: {{ .storeInternally | quote }}
+          {{- end }}
+          {{- if .syncStatus }}
           syncStatus: {{ .syncStatus | quote }}
+          {{- end }}
+          {{- if .syncMode }}
           syncMode: {{ .syncMode | quote }}
+          {{- end }}
           {{- if .permissionsInheritanceMode }}
           permissionsInheritanceMode: {{ .permissionsInheritanceMode | quote }}
           {{- end }}

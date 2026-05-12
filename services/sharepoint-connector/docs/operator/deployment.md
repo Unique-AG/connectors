@@ -188,9 +188,10 @@ Further compatibilities (Data Center, On Premise, or other variants) are on the 
 
 ### Unique Platform Compatibility
 
-| Connector Version | Minimum Unique Version |
-| ----------------- | ---------------------- |
-| 2.x               | TBD                    |
+| Connector Version | Minimum Unique Version                                                   |
+| ----------------- | ------------------------------------------------------------------------ |
+| < 2.6.0           | `node-ingestion` and `node-scope-management` - 2026.10.13                |
+| >= 2.6.0          | `node-ingestion` - `2026.10.14` (patch line) or `2026.18.0`+ (main line) |
 
 ## Upgrading
 

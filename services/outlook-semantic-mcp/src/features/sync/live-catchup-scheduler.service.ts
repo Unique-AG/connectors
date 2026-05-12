@@ -5,8 +5,9 @@ import { CronJob } from 'cron';
 import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
 import z from 'zod';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
+import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
-import { traceEvent } from '~/features/tracing.utils';
+import { NewTrace, traceEvent } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
 import {
   FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES,
@@ -14,8 +15,6 @@ import {
   RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES,
 } from './live-catch-up/live-catch-up.command';
 import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
-
-const RECOVERY_CRON_SCHEDULE = '*/5 * * * *';
 
 @Injectable()
 export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -25,6 +24,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly amqp: AmqpConnection,
+    @Inject(ingestionConfig.KEY) private readonly config: IngestionConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
   ) {}
 
@@ -33,6 +33,10 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
   }
 
   public onModuleDestroy() {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
+      return;
+    }
+
     this.logger.log({ msg: 'LiveCatchupSchedulerService is shutting down...' });
     this.isShuttingDown = true;
     try {
@@ -47,7 +51,11 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
   }
 
   private setupCronJob(): void {
-    const job = new CronJob(RECOVERY_CRON_SCHEDULE, () => {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
+      return;
+    }
+
+    const job = new CronJob(this.config.liveCatchupRecovery, () => {
       this.runRecoveryScan();
       this.runReadyLiveCatchupsWhichDidNotRunRecently();
     });
@@ -56,6 +64,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     job.start();
   }
 
+  @NewTrace('cron.live-catchup-recovery')
   public async runRecoveryScan(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({
@@ -76,6 +85,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     }
   }
 
+  @NewTrace('cron.live-catchup-ready-recheck')
   public async runReadyLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({

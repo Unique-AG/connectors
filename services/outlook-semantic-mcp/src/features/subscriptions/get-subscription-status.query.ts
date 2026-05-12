@@ -26,10 +26,10 @@ export class GetSubscriptionStatusQuery {
 
   public constructor(@Inject(DRIZZLE) private readonly db: DrizzleDatabase) {}
 
-  public async run(userProfileTypeID: UserProfileTypeID): Promise<CheckSubscriptionQueryOutput> {
-    const subscriptionStatus = await this.getSubscriptionStatus(userProfileTypeID);
+  public async run(userProfileId: UserProfileTypeID): Promise<CheckSubscriptionQueryOutput> {
+    const subscriptionStatus = await this.getSubscriptionStatus(userProfileId);
     this.logger.debug({
-      userProfileId: userProfileTypeID.toString(),
+      userProfileId: userProfileId.toString(),
       msg: subscriptionStatus.message,
       status: subscriptionStatus.success,
     });
@@ -37,12 +37,12 @@ export class GetSubscriptionStatusQuery {
   }
 
   private async getSubscriptionStatus(
-    userProfileTypeID: UserProfileTypeID,
+    userProfileId: UserProfileTypeID,
   ): Promise<CheckSubscriptionQueryOutput> {
     const subscription = await this.db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.internalType, 'mail_monitoring'),
-        eq(subscriptions.userProfileId, userProfileTypeID.toString()),
+        eq(subscriptions.userProfileId, userProfileId.toString()),
       ),
     });
     if (!subscription) {

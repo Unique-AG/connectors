@@ -6,14 +6,16 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes, Counter } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
 import { MetricService, Span } from 'nestjs-otel';
+import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions, userProfiles } from '~/db';
 import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
-import { traceAttrs, traceEvent } from '~/features/tracing.utils';
+import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
@@ -40,7 +42,9 @@ export class LiveCatchUpCommand {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly processEmailCommand: ProcessEmailCommand,
     private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
+    private readonly isInboxDeletingQuery: IsInboxDeletingQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     metricService: MetricService,
   ) {
@@ -49,11 +53,12 @@ export class LiveCatchUpCommand {
     });
   }
 
-  @Span()
+  @NewTrace('live-catchup')
   public async run(input: {
     liveCatchupOverlappingWindow: number;
     subscriptionId: string;
   }): Promise<void> {
+    traceAttrs({ subscriptionId: input.subscriptionId });
     await withRetryAttempts({
       fn: () => this.runLiveCatchup(input),
       onError: rethrowRateLimitError,
@@ -74,6 +79,9 @@ export class LiveCatchUpCommand {
       subscriptionId,
       msg: 'Live catch-up triggered',
     });
+    if (this.config.mcpBackend === 'MicrosoftGraph') {
+      return;
+    }
 
     const userProfile = await this.db
       .select({
@@ -86,6 +94,9 @@ export class LiveCatchUpCommand {
       .where(eq(subscriptions.subscriptionId, subscriptionId))
       .then((rows) => rows[0]);
     if (!userProfile) {
+      return;
+    }
+    if (await this.isInboxDeletingQuery.run(userProfile.userProfileId)) {
       return;
     }
 

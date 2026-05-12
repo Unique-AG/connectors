@@ -22,7 +22,7 @@ Subscriptions are renewed via Microsoft Graph lifecycle notifications:
 - The server responds by PATCHing the subscription with a new `expirationDateTime`
 - Subscriptions renew to the next configured UTC expiration hour (set by `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC`)
 
-If a `subscriptionRemoved` notification arrives (Microsoft removed the subscription), the subscription and inbox_configurations records are deleted. The user must reconnect via `reconnect_inbox`.
+If a `subscriptionRemoved` notification arrives (Microsoft removed the subscription), only the subscription record is deleted; the `inbox_configurations` record is preserved (it is cleared when `reconnect_inbox` creates a new subscription). The user must reconnect via `reconnect_inbox`.
 
 ## Subscription Status
 
@@ -63,7 +63,7 @@ Microsoft Graph sends lifecycle notifications when a subscription's state change
 | Condition | What Happens | User Action Required? |
 |-----------|-------------|----------------------|
 | `reauthorizationRequired` lifecycle event | Server automatically PATCHes the subscription with a new expiration time | No |
-| `subscriptionRemoved` lifecycle event | Subscription and `inbox_configurations` records are deleted — live catch-up and full sync stop | Yes — user must call `reconnect_inbox` |
+| `subscriptionRemoved` lifecycle event | Subscription record is deleted; `inbox_configurations` record is preserved until the next `reconnect_inbox` — live catch-up and full sync stop | Yes — user must call `reconnect_inbox` |
 | `missed` lifecycle event | Server triggers a live catch-up run to recover missed emails from the watermark | No |
 | Subscription expired (missed renewal) | `verify_inbox_connection` reports `expired`; no notifications are received | Yes — user must call `reconnect_inbox` |
 | No subscription exists | `verify_inbox_connection` reports `not_configured` | Yes — user must call `reconnect_inbox` |

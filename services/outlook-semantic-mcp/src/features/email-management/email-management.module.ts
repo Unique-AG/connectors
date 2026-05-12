@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { SubscriptionModule } from '~/features/subscriptions/subscription.module';
-import { SubscriptionUtilsModule } from '~/features/user-utils/subscription-utils.module';
+import { UserUtilsModule } from '~/features/user-utils/user-utils.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
@@ -18,7 +18,7 @@ const COMMANDS = [
 const QUERIES = [LookupContactsQuery];
 
 @Module({
-  imports: [MsGraphModule, SubscriptionModule, SubscriptionUtilsModule, UniqueApiFeatureModule],
+  imports: [MsGraphModule, SubscriptionModule, UserUtilsModule, UniqueApiFeatureModule],
   providers: [...COMMANDS, ...QUERIES],
   exports: [...COMMANDS, ...QUERIES],
 })

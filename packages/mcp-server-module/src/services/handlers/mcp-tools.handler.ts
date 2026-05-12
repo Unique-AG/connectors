@@ -82,6 +82,9 @@ export class McpToolsHandler extends McpHandlerBase {
         if (tool.metadata._meta) {
           toolSchema._meta = tool.metadata._meta;
         }
+        if (tool.metadata.icons) {
+          toolSchema.icons = tool.metadata.icons;
+        }
         if (tool.metadata.outputSchema) {
           toolSchema.outputSchema = z.toJSONSchema(
             tool.metadata.outputSchema,
