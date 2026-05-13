@@ -7,7 +7,7 @@ export const createMockSiteConfig = (overrides?: Partial<SiteConfig>): SiteConfi
   siteId: createSmeared('site-id'),
   syncColumnName: 'TestColumn',
   ingestionMode: IngestionMode.Flat,
-  scopeId: 'scope-id',
+  scopeId: { type: 'fixed', scopeId: 'scope_test' },
   maxFilesToIngest: 1000,
   storeInternally: EnabledDisabledMode.Enabled,
   syncStatus: 'active',

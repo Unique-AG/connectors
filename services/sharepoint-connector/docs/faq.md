@@ -171,7 +171,7 @@ It is recommended to create a new column with desired name and deleting the old 
 **Answer:** The connector includes safeguards to prevent accidental data loss:
 
 - **Full-deletion protection**: If the file diff would delete all files stored in Unique for a site, the sync cycle for that site is aborted. This prevents accidental full deletion due to misconfiguration or transient issues. To intentionally remove all content for a site, set the site's `syncStatus` to `deleted` in the configuration.
-- **Duplicate scope ID detection**: If multiple configured sites share the same `scopeId`, the connector logs a warning and deduplicates to prevent conflicts.
+- **Duplicate scope ID detection**: The connector runs two dedup passes: by `scopeId` (skipped for `in_parent:` rows since multiple sites can legitimately share the same parent) and by `siteId` (a SharePoint site can only be configured once, regardless of variant). First-occurrence wins; later duplicates are logged and skipped.
 - **Scope ownership validation**: Each root scope is tagged with the site that owns it. If a scope was already claimed by a different site, the sync for that site fails immediately, preventing two sites from accidentally writing into the same scope.
 
 ### What happens when a file is deleted from SharePoint?
@@ -186,6 +186,17 @@ Both are treated as deletions in Unique.
 ### What happens if I change a site's `scopeId`?
 
 **Answer:** The connector detects that the root scope has changed and automatically migrates all child scopes from the old root to the new root. After migration the old root scope is deleted. If migration fails for any child scope, the error is logged and the sync continues.
+
+The same migration path covers transitions between the two `scopeId` variants:
+
+- `scope_<X>` → `scope_<Y>` — existing behaviour, no change.
+- `scope_<X>` → `in_parent:scope_<P>` — the existing scope is reused (claim by externalId still hits) and moved under `<P>` if it isn't already there.
+- `in_parent:scope_<P>` → `scope_<Y>` — the existing root-scope-migration logic moves children to `<Y>` and deletes the auto-created scope.
+- `in_parent:scope_<X>` → `in_parent:scope_<Y>` — the existing scope is moved under `<Y>` (same global externalId lookup).
+
+### When should I use `in_parent:` instead of a fixed scope ID?
+
+**Answer:** Use `in_parent:scope_<parentId>` when you want the connector to find-or-create a per-site root scope under a shared parent automatically, instead of pre-creating one scope per site. It's useful when many sites need to be onboarded quickly and you don't want operators to materialise a scope before each ingestion request. The auto-created scope is named after the SharePoint site's URL slug. Removing the site (via `syncStatus: deleted`) removes the auto-created scope; the parent stays operator-managed and is never claimed by the connector.
 
 ### What happens if I unflag a document?
 
@@ -216,8 +227,11 @@ The sync column must be set on individual files (not folders).
 - Text (`.txt`)
 - HTML (`.html`)
 - ASP/ASPX (`.asp`, `.aspx`)
+- CSV (`.csv`)
 
 SharePoint pages (`.aspx`) bypass the MIME type filter and are always eligible regardless of configuration. Additional or fewer types can be configured via `allowedMimeTypes` in the [processing configuration](./operator/configuration.md#Processing-Configuration). Note: there is no schema-level default — `allowedMimeTypes` must be explicitly configured.
+
+**About CSV files:** SharePoint reports `.csv` files with the MIME type `application/vnd.ms-excel` (the legacy Excel type), which the ingestion service rejects. The connector ships a default `mimeTypeOverridesByExtension` mapping of `.csv` → `text/csv` that rewrites the reported MIME type before the allow-list check. If you previously added `application/vnd.ms-excel` to `allowedMimeTypes` as a workaround, you should now use `text/csv` instead — and remove `application/vnd.ms-excel` unless you actually want to ingest legacy `.xls` files. If you already configure `mimeTypeOverridesByExtension`, note that user-supplied maps replace the default wholesale; include `.csv: text/csv` explicitly in your map to retain the fix. See [MIME Type Overrides by Extension](./operator/configuration.md#MIME-Type-Overrides-by-Extension).
 
 ### What is the maximum file size?
 

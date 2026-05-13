@@ -204,7 +204,7 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 | `siteId`                     | Single line text | SharePoint site ID (UUID or compound format: `hostname,siteCollectionId,webId` for subsites) |
 | `syncColumnName`             | Single line text | Column that marks files for sync                                                             |
 | `ingestionMode`              | Choice           | `flat` or `recursive`                                                                        |
-| `uniqueScopeId`              | Single line text | Unique scope ID                                                                              |
+| `uniqueScopeId`              | Single line text | Unique scope ID. Either `scope_<id>` (existing root) or `in_parent:scope_<parentId>` (auto-resolve under parent). |
 | `maxFilesToIngest`           | Number           | Maximum new + updated files per sync cycle; sync fails for the site if exceeded              |
 | `storeInternally`            | Choice           | `enabled` or `disabled`                                                                      |
 | `syncStatus`                 | Choice           | `active`, `inactive`, or `deleted`                                                           |
@@ -223,18 +223,24 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 
 **Important:** The connector is a singleton — each SharePoint site must be configured in at most one connector process per Unique instance. Configuring the same site in multiple processes leads to conflicting state and unexpected behavior of the connector.
 
-| Option                       | Values                                    | Default                      | Description                                                                         |
-| ---------------------------- | ----------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
-| `siteId`                     | UUID or compound ID                       | — (required)                 | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId` |
-| `syncColumnName`             | String                                    | `FinanceGPTKnowledge`        | Display name or internal name of the sync flag column (display name takes priority) |
-| `ingestionMode`              | `flat`, `recursive`                       | — (required)                 | Flat ingests all to one scope; recursive maintains hierarchy                        |
-| `scopeId`                    | String                                    | — (required)                 | Root scope ID in Unique                                                             |
-| `maxFilesToIngest`           | Number                                    | — (unlimited)                | Maximum new + updated files per sync cycle; sync fails for the site if exceeded     |
-| `storeInternally`            | `enabled`, `disabled`                     | `enabled`                    | Whether to store content in Unique                                                  |
-| `syncStatus`                 | `active`, `inactive`, `deleted`           | `active`                     | Control sync behavior                                                               |
-| `syncMode`                   | `content_only`, `content_and_permissions` | — (required)                 | What to sync                                                                        |
-| `permissionsInheritanceMode` | See below                                 | `inherit_scopes_and_files`   | Inheritance settings for content_only mode                                          |
-| `subsitesScan`               | `enabled`, `disabled`                     | `disabled`                   | Recursively discover and sync content from subsites                                 |
+| Option                       | Values                                          | Default                    | Description                                                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------- | ----------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `siteId`                     | UUID or compound ID                             | — (required)               | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId`                                                                                                                                                                                                                                                                                        |
+| `syncColumnName`             | String                                          | `FinanceGPTKnowledge`      | Display name or internal name of the sync flag column (display name takes priority)                                                                                                                                                                                                                                                                                        |
+| `ingestionMode`              | `flat`, `recursive`                             | — (required)               | Flat ingests all to one scope; recursive maintains hierarchy                                                                                                                                                                                                                                                                                                               |
+| `scopeId`                    | `scope_<id>` or `in_parent:scope_<parentId>`    | — (required)               | Where to mount this site's content. `scope_<id>` uses an existing scope as the site root (operator must have created it). `in_parent:scope_<parentId>` finds-or-creates a child scope under the given parent automatically — useful when many sites share a single parent and the operator doesn't want to pre-create a scope per site.                                    |
+| `maxFilesToIngest`           | Number                                          | — (unlimited)              | Maximum new + updated files per sync cycle; sync fails for the site if exceeded                                                                                                                                                                                                                                                                                            |
+| `storeInternally`            | `enabled`, `disabled`                           | `enabled`                  | Whether to store content in Unique                                                                                                                                                                                                                                                                                                                                         |
+| `syncStatus`                 | `active`, `inactive`, `deleted`                 | `active`                   | Control sync behavior                                                                                                                                                                                                                                                                                                                                                      |
+| `syncMode`                   | `content_only`, `content_and_permissions`       | — (required)               | What to sync                                                                                                                                                                                                                                                                                                                                                               |
+| `permissionsInheritanceMode` | See below                                       | `inherit_scopes_and_files` | Inheritance settings for content_only mode                                                                                                                                                                                                                                                                                                                                 |
+| `subsitesScan`               | `enabled`, `disabled`                           | `disabled`                 | Recursively discover and sync content from subsites                                                                                                                                                                                                                                                                                                                        |
+
+### Choosing between fixed scope and `in_parent:` auto-resolve
+
+**Fixed (`scope_<id>`)** — each site needs its own scope, pre-created by the operator before the site is configured. Best when scopes are managed centrally and named or permissioned individually, since the operator stays in full control of the scope's identity, ACLs, and lifecycle.
+
+**Auto (`in_parent:scope_<parentId>`)** — the connector finds-or-creates a child scope under the parent on every sync, named after the SharePoint site's URL slug. Multiple sites can legitimately share the same parent — the connector intentionally does not dedup by parent. Removing a site (via `syncStatus: deleted`) removes the auto-created scope; removing the parent itself stays the operator's responsibility, since the parent's externalId is never written by the connector. If a sibling scope under the parent already has the same site name and isn't claimed by us, the connector aborts the sync with a typed error rather than guessing — the four codes are `unclaimed_name_match` (orphan with no externalId), `foreign_name_match` (claimed by a different site), `ambiguous_name_match` (multiple siblings share the name), and `claim_failed` (creation succeeded but the externalId update didn't — the connector rolls back the create).
 
 ### Permissions Inheritance Modes
 
@@ -402,22 +408,26 @@ processing:
   maxFileSizeToIngestBytes: 209715200
   allowedMimeTypes:
     - application/pdf
-    - text/plain
-    - text/html
-    - application/x-asp
     - application/vnd.openxmlformats-officedocument.wordprocessingml.document
     - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
     - application/vnd.openxmlformats-officedocument.presentationml.presentation
+    - application/x-asp
+    - text/plain
+    - text/html
+    - text/csv
+  mimeTypeOverridesByExtension:
+    .csv: text/csv
   scanIntervalCron: "*/15 * * * *"
 ```
 
-| Option                     | Default                     | Description                                                                                                                              |
-| -------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `stepTimeoutSeconds`       | `30`                        | Time limit (in seconds) for a single file processing step before the file is skipped                                                     |
-| `concurrency`              | `1`                         | Number of files to ingest into Unique concurrently                                                                                       |
-| `maxFileSizeToIngestBytes` | `209715200` (200 MB)        | Maximum file size in bytes. Files larger than this are skipped with a warning in the logs                                                |
-| `allowedMimeTypes`         | (none — must be configured) | List of MIME types the connector will process. The Helm chart ships sensible defaults; see [Supported File Types](#Supported-File-Types) |
-| `scanIntervalCron`         | `*/15 * * * *`              | Cron expression for the scheduled sync interval                                                                                          |
+| Option                         | Default                     | Description                                                                                                                              |
+| ------------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `stepTimeoutSeconds`           | `30`                        | Time limit (in seconds) for a single file processing step before the file is skipped                                                     |
+| `concurrency`                  | `1`                         | Number of files to ingest into Unique concurrently                                                                                       |
+| `maxFileSizeToIngestBytes`     | `209715200` (200 MB)        | Maximum file size in bytes. Files larger than this are skipped with a warning in the logs                                                |
+| `allowedMimeTypes`             | (none — must be configured) | List of MIME types the connector will process. The Helm chart ships sensible defaults; see [Supported File Types](#Supported-File-Types) |
+| `mimeTypeOverridesByExtension` | `{ .csv: text/csv }`        | Map of file extension suffix to canonical MIME type. See [MIME Type Overrides by Extension](#MIME-Type-Overrides-by-Extension)           |
+| `scanIntervalCron`             | `*/15 * * * *`              | Cron expression for the scheduled sync interval                                                                                          |
 
 ## Supported File Types
 
@@ -432,8 +442,25 @@ Configure allowed types via the `allowedMimeTypes` processing option. There is n
 | `.txt`         | `text/plain`                                                                | Yes          |
 | `.html`        | `text/html`                                                                 | Yes          |
 | `.asp`/`.aspx` | `application/x-asp`                                                         | Yes          |
+| `.csv`         | `text/csv`                                                                  | Yes          |
 
 **Note:** `.aspx` SharePoint pages bypass the MIME type filter and are always eligible for ingestion regardless of `allowedMimeTypes`.
+
+## MIME Type Overrides by Extension
+
+SharePoint occasionally reports the wrong MIME type for a file (notably `.csv` files come back as `application/vnd.ms-excel`). This causes the ingestion service to reject the file even when the operator has whitelisted the correct type. The `mimeTypeOverridesByExtension` map rewrites the SharePoint-reported MIME type by file extension before the allow-list check runs, so both the filter and the registered content carry the canonical value.
+
+```yaml
+processing:
+  mimeTypeOverridesByExtension:
+    .csv: text/csv
+```
+
+**Defaults and merging:** The default value is `{ .csv: text/csv }`. A user-supplied value **replaces the default wholesale** — there is no merge. To keep the CSV fix while adding your own overrides, include `.csv: text/csv` explicitly in your map.
+
+**Suffix matching:** Keys are matched against the lowercased file name with `endsWith`. Both keys and file names are lowercased, so `.CSV` and `Foo.Csv` match a `.csv` key. Multi-segment suffixes are supported (e.g. `.tar.gz`); when multiple keys could match (e.g. `.tar.gz` and `.gz` are both configured), the **longest match wins** — so `archive.tar.gz` resolves via `.tar.gz`, not `.gz`.
+
+**Validation:** Keys must match `^(\.[a-z0-9]+)+$` after lowercase normalization (one or more `.alphanumeric` segments). Empty MIME values are rejected. Invalid configuration fails fast at startup.
 
 ## Scheduler Configuration
 

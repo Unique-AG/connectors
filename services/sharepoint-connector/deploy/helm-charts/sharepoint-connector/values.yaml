@@ -192,6 +192,23 @@ connectorConfig:
       thumbprintSha256: ""
     # -- Rate limiting for Graph API requests per minute (in thousands)
     apiRateLimitPerMinuteThousands: 780
+    # -- Deployment-level defaults applied to every site (config_file rows or
+    # sharepoint_list rows). Per-site values always win when set; empty/blank
+    # values fall through to these defaults. Any field except siteId may be
+    # defaulted here. Leave as `{}` to keep today's behaviour where every
+    # field is supplied per-site.
+    # Example:
+    # siteDefaults:
+    #   syncColumnName: FinanceGPTKnowledge
+    #   ingestionMode: recursive
+    #   scopeId: scope_default
+    #   maxFilesToIngest: 1000
+    #   storeInternally: enabled
+    #   syncStatus: active
+    #   syncMode: content_only
+    #   permissionsInheritanceMode: inherit_scopes_and_files
+    #   subsitesScan: disabled
+    siteDefaults: {}
     # -- Sites source configuration
     # Determines how sites are configured: from static YAML (config_file) or dynamically from SharePoint list (sharepoint_list)
     # possible values: config_file, sharepoint_list
@@ -285,6 +302,10 @@ connectorConfig:
       - application/vnd.ms-excel
       - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
       - application/vnd.openxmlformats-officedocument.presentationml.presentation
+      - text/csv
+    # -- map of file extension suffix to canonical MIME type, used to override the SharePoint-reported mimeType. User-supplied values replace the default wholesale; include `.csv` in custom maps to retain the CSV fix
+    mimeTypeOverridesByExtension:
+      .csv: text/csv
     maxFileSizeToIngestBytes: null
     # -- cron expression for the scheduled SharePoint scan interval default: every 15 minutes
     scanIntervalCron: "*/15 * * * *"

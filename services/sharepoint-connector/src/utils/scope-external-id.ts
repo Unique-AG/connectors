@@ -190,6 +190,21 @@ export function toPendingDeleteExternalId(activeExternalId: string): Smeared {
   return createSmeared(activeExternalId.replace(EXTERNAL_ID_PREFIX, PENDING_DELETE_PREFIX));
 }
 
+// Single source of truth for "is this scope owned by this site?". Accepts both legacy
+// (`spc:site:{id}`) and new (`spc:{id}/site`) externalId formats so the predicate keeps working
+// during the migration period. Returns false when `externalId` is null — callers that want to
+// treat unclaimed scopes as ownable must layer that semantic on top.
+export function isOwnedBySite(scope: { externalId: string | null }, siteId: string): boolean {
+  if (!scope.externalId) {
+    return false;
+  }
+  if (scope.externalId === buildRootExternalId(siteId).value) {
+    return true;
+  }
+  const legacy = parseLegacyExternalId(scope.externalId);
+  return legacy?.type === 'root' && legacy.siteId === siteId;
+}
+
 // --- Migration helper (legacy -> new) ---
 
 export function migrateLegacyExternalId(rootSiteId: string, legacyExternalId: Smeared): Smeared {
