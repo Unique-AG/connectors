@@ -10,7 +10,6 @@ import {
   McpEnvelopeShape,
 } from '../../schemas/kyckr-response.schemas';
 import { appendDetail, fetchOrder, stripLinks } from '../_shared/fetch-order';
-import type { McpToolResult } from '../_shared/mcp-tool-result';
 
 export const GetOrderInputSchema = z.object({
   orderId: z
@@ -37,8 +36,7 @@ export const GetOrderOutputSchema = z
   })
   .loose();
 
-export type GetOrderStructured = z.infer<typeof GetOrderOutputSchema>;
-export type GetOrderResult = McpToolResult<GetOrderStructured>;
+export type GetOrderResult = z.infer<typeof GetOrderOutputSchema>;
 
 @Injectable()
 export class GetOrderQuery {
@@ -79,32 +77,12 @@ export class GetOrderQuery {
       const detail = fetched.kind === 'absent' ? fetched.detail : undefined;
       const documentJson = fetched.kind === 'json' ? fetched.documentJson : undefined;
 
-      const structured: GetOrderStructured = {
+      return {
         success: true,
         ...response,
         details: appendDetail(response.details, detail),
         data: { ...dataWithoutLinks, documentJson },
       };
-
-      if (fetched.kind === 'pdf') {
-        GetOrderOutputSchema.parse(structured);
-        return {
-          structuredContent: structured,
-          content: [
-            { type: 'text', text: JSON.stringify(structured, null, 2) },
-            {
-              type: 'resource',
-              resource: {
-                uri: `kyckr-order://${input.orderId}/document.pdf`,
-                mimeType: 'application/pdf',
-                blob: fetched.pdfBase64,
-              },
-            },
-          ],
-        };
-      }
-
-      return structured;
     } catch (err) {
       result = 'error';
       if (err instanceof KyckrApiError) {

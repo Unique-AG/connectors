@@ -1,0 +1,2479 @@
+openapi: 3.0.3
+info:
+  title: Kyckr Companies V2 API
+  version: '2.0'
+  contact:
+    url: 'https://www.kyckr.com'
+  description: |
+    Kyckr Companies V2 API
+
+    ## Changelog
+
+    | Date       | Change Description | Notes |
+    |------------|-------------------|-------|
+    | 2026-04 | Profile extensions and address geocoding:<br>- New `extend` query parameter (comma-separated string) on GET Enhanced Profile for per-account profile extensions.<br>- `geocoding` is the first available extension type, providing parsed and geocoded address information via the `additionalInformation` response object.<br>- New schemas: AdditionalInformation, AddressAdditionalInformation, InformationSource.<br>- `Address` now has an `identifier` field, consistent per address, linking to the `additionalInformation.addressInformation` geocoding data.<br>- Supports extensible extension types: future types (e.g. firmographics, activity codes) to follow.<br>- Unrecognised or unauthorised values are silently ignored. | Opt-in feature. Per-account entitlements. Additional cost per extension type. |
+    | 2026-03 | Added otherIdentifiers array to CorporationDetails schema, enabling typed identifiers (ACN, ABN, ARBN, ARSN, ARFN, foreign registration numbers) on corporate representatives and shareholders. | Driven by AU ASIC mapping where corporate officers and shareholders carry multiple identifier types. Reuses existing Identifier schema. |
+    | 2026-02 | Shareholding percentage range support:<br>- Shareholding.percentage is now nullable. When the registry provides a range (e.g. unknown shareholding amount), percentage is null and percentageIsRange, percentageRange, percentageLowerLimit, percentageUpperLimit convey the range. | Supports jurisdictions such as EE where ownership may be reported as a range (e.g. "0-100%"). |
+    | 2026-02 | Enhanced Profile – company relationships and registration type:<br>- Added companyRelationships array for future relational extract data (subsidiaries; company evolution – merged, demerged, acquired). Parent/ultimate parent/immediate parent remain in roles and corporate representatives; branch/establishments are covered by a separate establishments model.<br>- Added registrationType and registrationTypeDetails to Enhanced Profile for capturing foreign registered body and details at the source registry when available. | Company relationships support subsidiary and evolution history; registration type fields support jurisdiction-specific registration classification. |
+    | 2026-02 | Enhanced Profile – POST /companies/{kyckrId}/enhanced to request enhanced profile (same resource as GET; POST creates an order, no timeout). GET returns 405 for async-only jurisdictions; use POST instead. | Coming soon |
+    | 2026-02 | Added otherIdentifiers array with type codes to Search results (V2 API has a single search endpoint; identifiers appear in that search result) | Enables jurisdiction-specific identifier types in Search results |
+    | 2025-10 | Field consistency improvements across profiles:<br>- Created reusable AlternativeNames and PreviousNames schema components<br>- Standardized previousNames structure with proper schema references<br>- Added registrationDate to LiteProfile schema<br>- Added lastAnnualAccountDate to LiteProfile schema<br>- Added registeredAgentName and registeredAgentAddress to BasicProfile schema<br>- Aligns LiteProfile date fields with V1 and EnhancedProfile<br>- Aligns BasicProfile/EnhancedProfile with V1 for registered agent information<br>- Improves schema reusability and consistency across V2 API |
+    | 2025-07 | Additional properties added<br/>Corrected 'Get Order' API response documentation |  - Future SearchResults previous names <br/>- Future Enhanced Profile properties: UBO kind, last annual account date, description of voting rights from the registry.  |
+    | 2025-03 | Capital and Shareholding simplification<br>Deprecated tradingName in favor of alias<br>New OtherIdentifiers with jurisdiction-specific type codes | Deprecated fields flagged<br><br>OtherIdentifiers will evolve with additional type codes per jurisdiction |
+    | 2025-02   | - New field - Enhanced Profile - capital[].shareholdings[].beneficiallyHeld<br>- Added "Other" category in corporations/individuals arrays for ambiguous entity types | - Future AU update<br>- Handles cases where registry source data cannot definitively identify entity type |
+    | 2025-02    | Documentation corrections - Enhanced Profile - ultimateBeneficialOwners field descriptions | |
+    | 2025-01    | Documentation corrections - Enhanced Profile - ultimateBeneficialOwners | |
+    | 2024-11    | Preview feature UBO Verify | Subject to change - limited Beta trial only |
+  license:
+    name: Kyckr API License
+    url: 'https://www.kyckr.com/legal'
+  termsOfService: 'https://www.kyckr.com/legal'
+servers:
+  - url: 'https://api.kyckr.com/v2'
+    description: Production
+  - url: 'https://test-api.kyckr.com/v2'
+    description: Testing
+tags:
+  - name: Companies
+  - name: Orders
+  - name: PREVIEW UBO Verify
+    description: Endpoints for analyzing company ownership structure and ultimate beneficial owners
+paths:
+  /companies:
+    get:
+      summary: Search for companies
+      operationId: get-companies
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SearchResult'
+              examples:
+                Single Search Result (GB):
+                  value:
+                    correlationId: 8df02c1f6a2b4c2980992bf24daad522
+                    customerReference: ''
+                    timeStamp: '2023-04-06T07:23:36.9353291Z'
+                    details: Success
+                    data:
+                      - id: GB|MTE2NTUyOTA
+                        companyName: KYCKR UK LIMITED
+                        companyNumber: '11655290'
+                        address: 'Kemp House, 160 City Road, London, United Kingdom, EC1V 2NX'
+                        status: active
+                        type: ltd
+                        startDate: '2018-11-01'
+                Multiple Search Results (AU):
+                  value:
+                    correlationId: a7d84f0116a047e5bddb6ad6b9d28568
+                    customerReference: ''
+                    timeStamp: '2023-04-06T07:24:52.5152243Z'
+                    details: Success
+                    data:
+                      - id: AU|MTE1ODM5NTg4X1dJU0UgVEVDSCBQVFkgTElNSVRFRHxBdXN0cmFsaWFuIFNlY3VyaXRpZXMgYW5kIEludmVzdG1lbnRzIENvbW1pc3Npb24
+                        companyName: WISE TECH PTY LIMITED
+                        companyNumber: 115839588_WISE TECH PTY LIMITED
+                        status: DRGD
+                        type: APTY
+                      - id: AU|MTM2ODg4NDM4X1dJU0VURUNIIFBUWSBMVER8QXVzdHJhbGlhbiBTZWN1cml0aWVzIGFuZCBJbnZlc3RtZW50cyBDb21taXNzaW9u
+                        companyName: WISETECH PTY LTD
+                        companyNumber: 136888438_WISETECH PTY LTD
+                        status: DRGD
+                        type: APTY
+                      - id: AU|MTU2MjEwODU2X1dJU0VURUNIIFBUWSBMVER8QXVzdHJhbGlhbiBTZWN1cml0aWVzIGFuZCBJbnZlc3RtZW50cyBDb21taXNzaW9u
+                        companyName: WISETECH PTY LTD
+                        companyNumber: 156210856_WISETECH PTY LTD
+                        address: 'BURSWOOD, WA, 6100'
+                        status: REGD
+                        type: APTY
+                      - id: AU|NjMyNTg3NzQzX1dJU0VURUNIIEFDQURFTVkgUFRZIExURHxBdXN0cmFsaWFuIFNlY3VyaXRpZXMgYW5kIEludmVzdG1lbnRzIENvbW1pc3Npb24
+                        companyName: WISETECH ACADEMY PTY LTD
+                        companyNumber: 632587743_WISETECH ACADEMY PTY LTD
+                        address: 'ALEXANDRIA, NSW, 2015'
+                        status: REGD
+                        type: APTY
+                      - id: AU|MDg3NDM3NTcyX1dJU0VURUNIIENPTlNVTFRJTkcgUFRZIExURHxBdXN0cmFsaWFuIFNlY3VyaXRpZXMgYW5kIEludmVzdG1lbnRzIENvbW1pc3Npb24
+                        companyName: WISETECH CONSULTING PTY LTD
+                        companyNumber: 087437572_WISETECH CONSULTING PTY LTD
+                        status: DRGD
+                        type: APTY
+                Multiple Search Results (GB):
+                  value:
+                    correlationId: b88d0458a4ec40989bf291f0d8a64977
+                    customerReference: ''
+                    timeStamp: '2023-04-06T07:26:15.076971Z'
+                    details: Success
+                    data:
+                      - id: GB|MDY2OTQ4MTA
+                        companyName: FLOWERS LTD
+                        companyNumber: '06694810'
+                        address: '337  Moorside Road, Swinton, Manchster, M27 9PN'
+                        status: dissolved
+                        type: ltd
+                      - id: GB|U0M3NDgwMDk
+                        companyName: ALL THINGS FLORAL LTD
+                        companyNumber: SC748009
+                        address: 'The Melting Pot, 15 Calton Road, Edinburgh, Scotland, EH8 8DL'
+                        status: active
+                        type: ltd
+                        startDate: '2022-10-21'
+                      - id: GB|MDY4Njk1MTM
+                        companyName: BY...SP LTD
+                        companyNumber: '06869513'
+                        address: '5 The Broadway, Broadstairs, CT10 2AD'
+                        status: active
+                        type: ltd
+                        startDate: '2009-04-03'
+                      - id: GB|MTM1MDQzNzE
+                        companyName: FLOWERS ABBEYGAIL DESIGNS LIMITED
+                        companyNumber: '13504371'
+                        address: '93 Garron Lane, South Ockendon, England, RM15 5JQ'
+                        status: dissolved
+                        type: ltd
+                      - id: GB|MTI4ODQ4MzI
+                        companyName: FLOWERS ACADEMIA LIMITED
+                        companyNumber: '12884832'
+                        address: '4 Floor, Fairgate House, 78 New Oxford Street, London, United Kingdom, WC1A 1HB'
+                        status: active
+                        type: ltd
+                        startDate: '2020-09-16'
+        '404':
+          $ref: '#/components/responses/404Response'
+        '400':
+          $ref: '#/components/responses/400Response'
+        '401':
+          $ref: '#/components/responses/401Response'
+        '403':
+          $ref: '#/components/responses/403Response'
+        '429':
+          $ref: '#/components/responses/429Response'
+      parameters:
+        - $ref: '#/components/parameters/isoCode'
+        - schema:
+            type: string
+          in: query
+          name: name
+          description: Company Name
+          example: Kyckr
+        - schema:
+            type: string
+          in: query
+          name: companyNumber
+          description: Company Registration Number
+          example: '11655290'
+      description: |-
+        Search companies using company name or registration number. You must provide one of `name` or `companyNumber`.
+
+        With an `isoCode`, a search will be performed directly at the registry for that jurisdiction.
+
+        Without an `isoCode`, Kyckr will perform a global search across all jurisdictions. It is important to remember that the Global Search uses stored data. Once you have found the correct jurisdiction, you should then use Kyckr's search by Name or Number API with the specific jurisdiction to confirm that the entity is still active on the register.
+      tags:
+        - Companies
+  '/companies/{kyckrId}/lite':
+    parameters:
+      - $ref: '#/components/parameters/kyckrId'
+    get:
+      summary: Lite Profile
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LiteProfile'
+              examples:
+                Lite Profile (GB):
+                  value:
+                    correlationId: 455cd440f5ea4b7d940ab38e6ab4c1e1
+                    customerReference: ''
+                    timeStamp: '2023-04-05T10:27:24.363606Z'
+                    details: Success
+                    data:
+                      activity:
+                        - code: '63120'
+                          description: Web portals
+                          type: Primary
+                      address:
+                        fullAddress: 'Kemp House, 160 City Road, London, United Kingdom, EC1V 2NX'
+                        buildingName: Kemp House
+                        streetName: 160 City Road
+                        city: London
+                        postcode: EC1V 2NX
+                        country: United Kingdom
+                      companyNumber: '11655290'
+                      companyName: KYCKR UK LIMITED
+                      foundationDate:
+                        original: '2018-11-01'
+                      legalForm:
+                        original: ltd
+                      legalStatus:
+                        original: active
+                      registrationAuthority: 'Companies House, United Kingdom'
+        '400':
+          $ref: '#/components/responses/400Response'
+        '401':
+          $ref: '#/components/responses/401Response'
+        '403':
+          $ref: '#/components/responses/403Response'
+        '404':
+          $ref: '#/components/responses/404Response'
+        '429':
+          $ref: '#/components/responses/429Response'
+      operationId: get-companies-kyckrId
+      description: "Basic company details are verified by ordering a Lite Profile. The Lite Profile includes (where present at the registry):\r\n\r\n- Company Name\r\n- Company Number\r\n- Registered Address\r\n- Registration or Foundation Date\r\n- Registration Status\r\n- Legal Form\r\n- Company Activity\r\n- Registration Authority"
+      tags:
+        - Companies
+      parameters:
+        - $ref: '#/components/parameters/customerReference'
+  '/companies/{kyckrId}/enhanced':
+    parameters:
+      - $ref: '#/components/parameters/kyckrId'
+    get:
+      summary: Enhanced Profile
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EnhancedProfile'
+              examples:
+                Example 1:
+                  value:
+                    orderId: 12345
+                    correlationId: string
+                    customerReference: string
+                    timeStamp: '2019-08-24T14:15:22Z'
+                    details: string
+                    cost:
+                      type: credit
+                      value: 1
+                    links:
+                      self: ../dictionary
+                    data:
+                      activities:
+                        - code: string
+                          description: string
+                          classificationScheme: NACE
+                          type: Primary
+                      activityDeclarations:
+                        - declaration: string
+                          declarationDescription: string
+                          language: string
+                      addresses:
+                        - type: string
+                          fullAddress: string
+                          rawAddressLines:
+                            - string
+                          buildingName: string
+                          streetNumber: string
+                          streetName: string
+                          city: string
+                          postcode: string
+                          municipality: string
+                          region: string
+                          country: string
+                          secondaryPostalCode: string
+                      capital:
+                        - type: string
+                          description: string
+                          classCode: string
+                          classDescription: string
+                          quantity: 0
+                          unitNominalValue: 0
+                          totalNominalValue: 0
+                          currency: string
+                          shareholdings:
+                            - percentage: string
+                              count: 0
+                              totalNominalValue: 0
+                              shareholders:
+                                corporations:
+                                  - type: Corporation
+                                    idNumber: string
+                                    name: string
+                                    address:
+                                      type: string
+                                      fullAddress: string
+                                      rawAddressLines:
+                                        - string
+                                      buildingName: string
+                                      streetNumber: string
+                                      streetName: string
+                                      city: string
+                                      postcode: string
+                                      municipality: string
+                                      region: string
+                                      country: string
+                                      secondaryPostalCode: string
+                                    registrationNumber: string
+                                    registrationDate:
+                                      original: string
+                                      normalized: '2019-08-24'
+                                    registrationAuthority: string
+                                    registeredAddress:
+                                      type: string
+                                      fullAddress: string
+                                      rawAddressLines:
+                                        - string
+                                      buildingName: string
+                                      streetNumber: string
+                                      streetName: string
+                                      city: string
+                                      postcode: string
+                                      municipality: string
+                                      region: string
+                                      country: string
+                                      secondaryPostalCode: string
+                                individuals:
+                                  - type: Person
+                                    idNumber: string
+                                    name: string
+                                    address:
+                                      type: string
+                                      fullAddress: string
+                                      rawAddressLines:
+                                        - string
+                                      buildingName: string
+                                      streetNumber: string
+                                      streetName: string
+                                      city: string
+                                      postcode: string
+                                      municipality: string
+                                      region: string
+                                      country: string
+                                      secondaryPostalCode: string
+                                    birthdate:
+                                      original: string
+                                      normalized: '2019-08-24'
+                                    nationality: string
+                                    placeOfBirth:
+                                      type: string
+                                      fullAddress: string
+                                      rawAddressLines:
+                                        - string
+                                      buildingName: string
+                                      streetNumber: string
+                                      streetName: string
+                                      city: string
+                                      postcode: string
+                                      municipality: string
+                                      region: string
+                                      country: string
+                                      secondaryPostalCode: string
+                                    placeOfResidence:
+                                      type: string
+                                      fullAddress: string
+                                      rawAddressLines:
+                                        - string
+                                      buildingName: string
+                                      streetNumber: string
+                                      streetName: string
+                                      city: string
+                                      postcode: string
+                                      municipality: string
+                                      region: string
+                                      country: string
+                                      secondaryPostalCode: string
+                      representatives:
+                        corporations:
+                          - type: Corporation
+                            idNumber: string
+                            name: string
+                            address:
+                              type: string
+                              fullAddress: string
+                              rawAddressLines:
+                                - string
+                              buildingName: string
+                              streetNumber: string
+                              streetName: string
+                              city: string
+                              postcode: string
+                              municipality: string
+                              region: string
+                              country: string
+                              secondaryPostalCode: string
+                            registrationNumber: string
+                            registrationDate:
+                              original: string
+                              normalized: '2019-08-24'
+                            registrationAuthority: string
+                            registeredAddress:
+                              type: string
+                              fullAddress: string
+                              rawAddressLines:
+                                - string
+                              buildingName: string
+                              streetNumber: string
+                              streetName: string
+                              city: string
+                              postcode: string
+                              municipality: string
+                              region: string
+                              country: string
+                              secondaryPostalCode: string
+                            role:
+                              original: string
+                              normalized: string
+                            startDate:
+                              original: string
+                              normalized: '2019-08-24'
+                            endDate:
+                              original: string
+                              normalized: '2019-08-24'
+                            isActive: true
+                            directorships:
+                              - companyNumber: string
+                                companyName: string
+                                role: string
+                                startDate:
+                                  original: string
+                                  normalized: '2019-08-24'
+                                endDate:
+                                  original: string
+                                  normalized: '2019-08-24'
+                                isActive: true
+                            powers:
+                              - string
+                        individuals:
+                          - type: Person
+                            idNumber: string
+                            name: string
+                            address:
+                              type: string
+                              fullAddress: string
+                              rawAddressLines:
+                                - string
+                              buildingName: string
+                              streetNumber: string
+                              streetName: string
+                              city: string
+                              postcode: string
+                              municipality: string
+                              region: string
+                              country: string
+                              secondaryPostalCode: string
+                            birthdate:
+                              original: string
+                              normalized: '2019-08-24'
+                            nationality: string
+                            placeOfBirth:
+                              type: string
+                              fullAddress: string
+                              rawAddressLines:
+                                - string
+                              buildingName: string
+                              streetNumber: string
+                              streetName: string
+                              city: string
+                              postcode: string
+                              municipality: string
+                              region: string
+                              country: string
+                              secondaryPostalCode: string
+                            placeOfResidence:
+                              type: string
+                              fullAddress: string
+                              rawAddressLines:
+                                - string
+                              buildingName: string
+                              streetNumber: string
+                              streetName: string
+                              city: string
+                              postcode: string
+                              municipality: string
+                              region: string
+                              country: string
+                              secondaryPostalCode: string
+                            role:
+                              original: string
+                              normalized: string
+                            startDate:
+                              original: string
+                              normalized: '2019-08-24'
+                            endDate:
+                              original: string
+                              normalized: '2019-08-24'
+                            isActive: true
+                            directorships:
+                              - companyNumber: string
+                                companyName: string
+                                role: string
+                                startDate:
+                                  original: string
+                                  normalized: '2019-08-24'
+                                endDate:
+                                  original: string
+                                  normalized: '2019-08-24'
+                                isActive: true
+                            powers:
+                              - string
+                      ultimateBeneficialOwners:
+                        individuals:
+                          - natureOfControl:
+                              - string
+                            type: Person
+                            idNumber: string
+                            name: string
+                            address:
+                              type: string
+                              fullAddress: string
+                              rawAddressLines:
+                                - string
+                              buildingName: string
+                              streetNumber: string
+                              streetName: string
+                              city: string
+                              postcode: string
+                              municipality: string
+                              region: string
+                              country: string
+                              secondaryPostalCode: string
+                            birthdate:
+                              original: string
+                              normalized: '2019-08-24'
+                            nationality: string
+                            placeOfBirth:
+                              type: string
+                              fullAddress: string
+                              rawAddressLines:
+                                - string
+                              buildingName: string
+                              streetNumber: string
+                              streetName: string
+                              city: string
+                              postcode: string
+                              municipality: string
+                              region: string
+                              country: string
+                              secondaryPostalCode: string
+                            placeOfResidence:
+                              type: string
+                              fullAddress: string
+                              rawAddressLines:
+                                - string
+                              buildingName: string
+                              streetNumber: string
+                              streetName: string
+                              city: string
+                              postcode: string
+                              municipality: string
+                              region: string
+                              country: string
+                              secondaryPostalCode: string
+                      contactDetails:
+                        email: string
+                        fax: string
+                        telNumber: string
+                        website: string
+                      identifiers:
+                        primaryRegistrationNumber: string
+                        taxNumber: string
+                        secondaryRegistrationNumber: string
+                        otherIdentifiers:
+                          - type: array
+                            description: Additional identifiers with their standardized type codes
+                            items:
+                              $ref: '#/components/schemas/Identifier'
+                      companyName: string
+                      tradingName: string
+                      englishName: string
+                      aliases:
+                        - name: string
+                          type: string
+                      previousNames:
+                        - name: string
+                          startDate:
+                            original: string
+                            normalized: '2019-08-24'
+                          endDate:
+                            original: string
+                            normalized: '2019-08-24'
+                      registrationAuthority: string
+                      lastUpdated: '2019-08-24T14:15:22Z'
+                      foundationDate:
+                        original: string
+                        normalized: '2019-08-24'
+                      registrationDate:
+                        original: string
+                        normalized: '2019-08-24'
+                      incorporationDate:
+                        original: string
+                        normalized: '2019-08-24'
+                      dissolutionDate:
+                        original: string
+                        normalized: '2019-08-24'
+                      status:
+                        original: string
+                        normalized: Active
+                      legalForm:
+                        original: string
+                        normalized: string
+        '400':
+          $ref: '#/components/responses/400Response'
+        '401':
+          $ref: '#/components/responses/401Response'
+        '403':
+          $ref: '#/components/responses/403Response'
+        '404':
+          $ref: '#/components/responses/404Response'
+        '405':
+          $ref: '#/components/responses/405Response'
+        '429':
+          $ref: '#/components/responses/429Response'
+      operationId: get-companies-kyckrId-enhanced
+      description: "A company profile, including information about directors and shareholders, is retrieved using the Enhanced Profile API. This profile contains all information from the Lite Profile and adds details of associated persons or entities filed at the company registry. The profile includes (where filed in structured form at the registry):\r\n\r\n- Registration Information (Lite Profile + expanded details where available)\r\n- Share capital structure\r\n- Company Officials (incl. Directors) – including function, date of birth and address.\r\n- Shareholders (Beneficial owners) – including share count, share percentage and ID information.\r\n- Ultimate Beneficial Owners – where filed in structured form."
+      parameters:
+        - schema:
+            type: boolean
+            default: false
+          in: query
+          name: showDirectorships
+          description: 'Where supported (currently GB/UK only), includes additional directorship information for each director, showing other companies where the director holds positions. When set to true, the directorships array will be populated for each representative.'
+        - $ref: '#/components/parameters/customerReference'
+        - schema:
+            type: string
+            example: "geocoding"
+          in: query
+          name: extend
+          description: |-
+            Comma-separated list of profile extension types to include in the response. Extension data is returned in the `additionalInformation` object on the EnhancedProfile. Each extension type may be subject to per-account entitlements and additional cost. Unrecognised or unauthorised values are silently ignored. Additional extension types will be added as they become available. This parameter and its extension types are currently in beta trial and subject to change.
+
+            Available extension types:
+            - `geocoding` — Populates `additionalInformation.addressInformation` with parsed and geocoded address variants for all addresses in the profile. Each entry in `addressInformation.addresses[]` is linked to its source address via the `Address.identifier` field. Contact your account manager to enable.
+      tags:
+        - Companies
+    post:
+      summary: Request Enhanced Profile
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Location of created resource
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          - Success
+                          - Pending
+                          - Failed
+                      orderId:
+                        type: string
+                      customerReference:
+                        type: string
+        '400':
+          $ref: '#/components/responses/400Response'
+        '401':
+          $ref: '#/components/responses/401Response'
+        '403':
+          $ref: '#/components/responses/403Response'
+        '404':
+          $ref: '#/components/responses/404Response'
+        '429':
+          $ref: '#/components/responses/429Response'
+      operationId: post-companies-kyckrId-enhanced
+      description: |
+        🚧 COMING SOON
+
+        Creates a request for an enhanced company profile. The same resource as GET enhanced: POST creates an order and returns immediately with an order identifier; the enhanced profile can be retrieved when ready using the Orders API. The resulting profile is the same as that returned by GET when the jurisdiction supports synchronous enhanced profile.
+
+        Use POST for jurisdictions where enhanced profile is only available asynchronously (GET returns 405 for those jurisdictions). POST guarantees order processing without timeouts.
+
+        Profile content (where filed in structured form at the registry):
+        - Registration Information (Lite Profile + expanded details where available)
+        - Share capital structure
+        - Company Officials (incl. Directors) – including function, date of birth and address.
+        - Shareholders (Beneficial owners) – including share count, share percentage and ID information.
+        - Ultimate Beneficial Owners – where filed in structured form.
+
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customerReference:
+                  type: string
+                  description: Optional client reference
+                contactEmail:
+                  type: string
+                  format: email
+                  description: An email address that can be contacted in case of issues with the order
+      tags:
+        - Companies
+  '/companies/{kyckrId}/documents':
+    parameters:
+      - $ref: '#/components/parameters/kyckrId'
+      - $ref: '#/components/parameters/customerReference'
+    get:
+      summary: Documents
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DocumentDescription'
+                      continuationKey:
+                        type: string
+                        description: When present, pass this value as the continuationKey query parameter on the next request to retrieve the next page of documents. When absent, there are no more pages.
+                        nullable: true
+        '400':
+          $ref: '#/components/responses/400Response'
+        '401':
+          $ref: '#/components/responses/401Response'
+        '403':
+          $ref: '#/components/responses/403Response'
+        '404':
+          $ref: '#/components/responses/404Response'
+        '429':
+          $ref: '#/components/responses/429Response'
+      operationId: get-companies-kyckrId-documents
+      description: 'Retrieve a list of available documents for a company.  After finding a document of interest, use the Create Order API to order a copy of the document.'
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: continuationKey
+          description: Opaque token returned in the previous response. When provided, the API returns the next page of documents (e.g. next 100 filings). When the previous response had no continuationKey, there are no more pages.
+      tags:
+        - Companies
+  /orders:
+    get:
+      summary: Get List of Orders
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/OrderDetails'
+        '400':
+          $ref: '#/components/responses/400Response'
+        '401':
+          $ref: '#/components/responses/401Response'
+        '403':
+          $ref: '#/components/responses/403Response'
+        '429':
+          $ref: '#/components/responses/429Response'
+      operationId: get-order
+      description: List all orders
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: startDate
+          description: Earliest date to fetch orders for in ISO-8601
+        - schema:
+            type: string
+          in: query
+          name: endDate
+          description: Latest date to fetch orders for in ISO-8601
+        - $ref: '#/components/parameters/isoCode'
+      tags:
+        - Orders
+    parameters: []
+    post:
+      summary: Create Order
+      tags:
+        - Orders
+      operationId: post-orders
+      responses:
+        '201':
+          description: Created
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Location of created resource
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          - Success
+                          - Pending
+                          - Failed
+                      orderId:
+                        type: string
+                      customerReference:
+                        type: string
+        '400':
+          $ref: '#/components/responses/400Response'
+        '401':
+          $ref: '#/components/responses/401Response'
+        '403':
+          $ref: '#/components/responses/403Response'
+        '429':
+          $ref: '#/components/responses/429Response'
+      description: Create an Order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kyckrId:
+                  type: string
+                productId:
+                  type: string
+                customerReference:
+                  type: string
+                contactEmail:
+                  type: string
+                  format: email
+                  description: An email address that can be contacted in case of issues with the order
+  '/orders/{orderId}':
+    parameters:
+      - schema:
+          type: string
+        name: orderId
+        in: path
+        required: true
+    get:
+      summary: Get Single Order
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrderDetails'
+        '400':
+          $ref: '#/components/responses/400Response'
+        '401':
+          $ref: '#/components/responses/401Response'
+        '403':
+          $ref: '#/components/responses/403Response'
+        '404':
+          $ref: '#/components/responses/404Response'
+        '410':
+          $ref: '#/components/responses/ErrorResponse'
+      operationId: get-orders-orderId
+      description: Retrieve a single order and retrieval details
+      tags:
+        - Orders
+components:
+  schemas:
+    Identifier:
+      title: Identifier
+      type: object
+      description: A standardized identifier with its type code
+      properties:
+        value:
+          type: string
+          description: The identifier value
+          example: NA0091712
+        type:
+          type: string
+          description: The standardized type code for this identifier
+          example: IT_REA_CD
+      x-examples:
+        REA Trade Register Number:
+          value: NA0091712
+          type: IT_REA_CD
+        European VAT number:
+          value: IT12345678912
+          type: IT_VAT_CD
+        Tax ID (Codice Fiscale):
+          value: 12345678901
+          type: IT_TAX_CD
+    SearchResult:
+      title: Search Result
+      type: object
+      description: Single search result
+      properties:
+        id:
+          type: string
+          description: The KyckrId of the company representing a unique identifier for ordering profiles and documents.
+        companyName:
+          type: string
+          description: The name of the company.
+        englishName:
+          type: string
+          description: "In some jurisdictions, an englishName is additionally provided for the company name.\r\n"
+        companyNumber:
+          type: string
+          description: An identifier representing the company.
+        address:
+          type: string
+          description: The address of the company
+        status:
+          type: string
+          description: 'The status of the company, for example whether or not the company is currently active.'
+        type:
+          type: string
+          description: 'The type of company, e.g. "LTD".   Allowed values will vary by jurisdiction.'
+        startDate:
+          type: string
+          format: date
+          description: The start date of the company.
+        links:
+          type: object
+          properties:
+            self:
+              type: string
+              format: uri-reference
+        registrationAuthority:
+          type: string
+          description: The Registration Authority Code is a unique identifier provided by some registries to specify the registration authority responsible for maintaining the company's records.
+        otherIdentifiers:
+          type: array
+          description: Additional identifiers with their standardized type codes
+          items:
+            $ref: '#/components/schemas/Identifier'  
+        registrationType:
+          type: string
+          description: 'If present, indicates that the original foundational legal entity registration  is at another register (the source register).'
+        registrationTypeDetails:
+          type: object
+          description: Additional details in relation to the registration type, if registrationType is set.
+          properties:
+            originalCode:
+              type: string
+              description: Non standard code for the source registry.
+            originalDescription:
+              type: string
+              description: Description text for the source registry.
+            normalizedCode:
+              type: string
+              description: ISO code for the country, province or state of the source registry.
+            normalizedDescription:
+              type: string
+              description: Country and state description of the foreign registry.
+        isPreviousName:
+          type: boolean
+          description: 'Returns whether the search result corresponds to a previous name of the company. Only relevant for name searches.'
+    ProblemDetails:
+      title: Problem Details
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        errors:
+          type: array
+          items:
+            type: string
+    LiteProfile:
+      title: Lite Profile
+      type: object
+      properties:
+        activity:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+        address:
+          $ref: '#/components/schemas/Address'
+        companyNumber:
+          type: string
+          description: Company registration number issued by the registrationAuthority
+        registrationAuthority:
+          type: string
+          description: Name of registration authority
+        registrationAuthorityCode:
+          type: string
+          description: The registration authority code for the company
+        registrationType:
+          type: string
+          description: 'If present, indicates that the original foundational legal entity registration  is at another register (the source register).'
+        registrationTypeDetails:
+          type: object
+          description: Additional details in relation to the registration type, if registrationType is set.
+          properties:
+            originalCode:
+              type: string
+              description: Non standard code for the source registry.
+            originalDescription:
+              type: string
+              description: Description text for the source registry.
+            normalizedCode:
+              type: string
+              description: ISO code for the country, province or state of the source registry.
+            normalizedDescription:
+              type: string
+              description: Country and state description of the foreign registry.
+        companyName:
+          type: string
+          description: Company name as at registry
+        englishName:
+          type: string
+          description: 'Company name in english, if available'
+        aliases:
+          type: array
+          description: Alternative company names
+          items:
+            $ref: '#/components/schemas/AlternativeNames'
+        previousNames:
+          type: array
+          description: Previous company names
+          items:
+            $ref: '#/components/schemas/PreviousNames'
+        otherIdentifiers:
+          type: array
+          description: Additional identifiers with their standardized type codes
+          items:
+            $ref: '#/components/schemas/Identifier'
+        taxNumber:
+          type: string
+          deprecated: true
+          description: 'Deprecated, use otherIdentifiers instead'
+        foundationDate:
+          $ref: '#/components/schemas/NormalizedDate'
+        registrationDate:
+          $ref: '#/components/schemas/NormalizedDate'
+        lastAnnualAccountDate:
+          $ref: '#/components/schemas/NormalizedDate'
+        legalForm:
+          $ref: '#/components/schemas/NormalizedLegalForm'
+        legalStatus:
+          $ref: '#/components/schemas/NormalizedStatus'
+        stateOfIncorporation:
+          type: string
+          description: State of incorporation (US Only)
+        updatedDate:
+          $ref: '#/components/schemas/NormalizedDate'
+    Activity:
+      title: Activity
+      type: object
+      description: Description of a company's economic activity according to internationally defined schemas
+      properties:
+        code:
+          type: string
+          description: Activity code
+        description:
+          type: string
+          description: Description of activity
+        classificationScheme:
+          type: string
+          enum:
+            - NACE
+            - SIC
+            - SIC07
+            - NAICS
+          description: 'Classification scheme, for example NAICS or NACErev2'
+        type:
+          type: string
+          enum:
+            - Primary
+            - Secondary
+          description: Primary or secondary activity
+    ActivityDeclaration:
+      title: ActivityDeclaration
+      type: object
+      description: Full text declaration of the company's business purpose as stated in the registry
+      properties:
+        declaration:
+          type: string
+          description: The full text of the activity declaration from the registry (e.g., the company's stated business purpose from articles of incorporation)
+        declarationDescription:
+          type: string
+          description: The section heading or label from the registry document indicating where this declaration appears (e.g., "Objet social", "Business Purpose")
+        language:
+          type: string
+          description: Language code of the declaration text (e.g., 'fr', 'en')
+    Address:
+      description: Standardised shared model for addresses
+      type: object
+      title: Address
+      properties:
+        identifier:
+          type: string
+          nullable: true
+          description: 'Stable identifier for this address instance within the profile. Use to cross-reference into the additionalInformation.addressInformation array.'
+          example: 'IE-Wo0Fri41lHuGoElhaChY3-iXz6Gx6h2rHdw7LqC4Tok'
+        type:
+          type: string
+          minLength: 1
+          description: 'Type of address, for example "Head Office" or "Registered Address"'
+        fullAddress:
+          type: string
+          minLength: 1
+          description: The full address as a single string
+        rawAddressLines:
+          type: array
+          description: An array of address lines as retrieved from the registry
+          items:
+            type: string
+        buildingName:
+          type: string
+          description: 'Name of building, e.g. "The Chrysler Building"'
+        streetNumber:
+          type: string
+          description: 'Number portion of street address, e.g. "18", "21A"'
+        streetName:
+          type: string
+          description: Street name
+        city:
+          type: string
+          minLength: 1
+          description: City or town
+        postcode:
+          type: string
+          minLength: 1
+          description: Primary postal code
+        municipality:
+          type: string
+          description: 'Administrative sub-region, for example a French commune or US county'
+        region:
+          type: string
+          minLength: 1
+          description: Administrative region for example a US state or UK county
+        country:
+          type: string
+          minLength: 1
+          description: Country
+        isoCode:
+          type: string
+          description: Jurisdiction code in ISO 3166 alpha-2
+          example: GB
+        secondaryPostalCode:
+          type: string
+          description: 'A secondary postal code, for example a CEDEX'
+    NormalizedDate:
+      title: Normalized Date
+      type: object
+      description: ''
+      properties:
+        original:
+          type: string
+          description: Date as formatted at registry source
+        normalized:
+          type: string
+          format: date
+          description: Date in ISO-8601 format. The precision matches what is available at the registry source. Supports both full dates (YYYY-MM-DD) and partial dates (YYYY-MM) when only month and year are available.
+    NormalizedLegalForm:
+      title: Normalized Legal Form
+      type: object
+      properties:
+        original:
+          type: string
+          description: Legal form as described at source
+        normalized:
+          type: string
+          description: Legal form mapped to controlled dictionary
+    NormalizedStatus:
+      title: Normalized Status
+      type: object
+      properties:
+        original:
+          type: string
+          description: Legal status as described at source
+        normalized:
+          type: string
+          description: Legal status mapped to controlled dictionary
+          enum:
+            - Active
+            - Inactive
+            - Distressed
+            - Other
+    Capital:
+      title: Capital
+      type: object
+      description: Description of a company's capital allocations
+      properties:
+        type:
+          type: string
+          description: Deprecated. Use classCode instead.
+          deprecated: true
+        description:
+          type: string
+          description: Deprecated. Use classDescription instead.
+          deprecated: true
+        classCode:
+          type: string
+          description: Class code of capital instrument
+        classDescription:
+          type: string
+          description: Description of capital class
+        quantity:
+          type: number
+          description: Number of shares in class/category (when available)
+        unitNominalValue:
+          type: number
+          description: Nominal value of each unit (i.e. each share)
+        totalNominalValue:
+          type: number
+          description: Total nominal value of shares in class/category
+        currency:
+          type: string
+          description: Currency of recorded capital
+        votingRights:
+          type: string
+          description: A text description of voting rights from the registry
+        shareholdings:
+          type: array
+          description: Array of shareholdings for the class
+          items:
+            $ref: '#/components/schemas/Shareholding'
+    LegalEntity:
+      title: Legal Entity
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - Person
+            - Corporation
+            - Other
+          description: Type of legal entity. 'Other' is used when the source data does not specify a person or organisation.
+        idNumber:
+          type: string
+          description: Identification number assigned to representative
+        name:
+          type: string
+          description: Full Name
+        address:
+          $ref: '#/components/schemas/Address'
+    PersonDetails:
+      title: Person Details
+      description: A natural person as opposed to a legal person/corporation
+      allOf:
+        - $ref: '#/components/schemas/LegalEntity'
+        - title: Individual Details
+          type: object
+          required:
+            - type
+          properties:
+            birthdate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    Director's date of birth. The precision of this field matches what is available at the registry source.
+                    For UK companies, dates are normalized to ISO 8601 format (YYYY-MM) when only month and year are available.
+                    The normalized field will reflect the precision available at the registry and will not introduce additional precision.
+            nationality:
+              type: string
+              description: Nationality
+            placeOfBirth:
+              $ref: '#/components/schemas/Address'
+            placeOfResidence:
+              $ref: '#/components/schemas/Address'
+            type:
+              type: string
+              enum:
+                - Person
+    ShareholderPersonDetails:
+      title: Shareholder Person Details
+      description: A simplified person schema specifically for shareholders with minimal fields
+      allOf:
+        - $ref: '#/components/schemas/LegalEntity'
+        - type: object
+          properties:
+            type:
+              type: string
+              description: Person type shareholder
+              enum:
+                - Person
+    CorporationDetails:
+      title: Corporation Details
+      description: Any type of incorporated entity
+      allOf:
+        - $ref: '#/components/schemas/LegalEntity'
+        - title: Registration Details
+          type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Corporation type shareholder
+              enum:
+                - Corporation
+            registrationNumber:
+              type: string
+              description: Company registration number in home registry
+            registrationDate:
+              $ref: '#/components/schemas/NormalizedDate'
+            registrationAuthority:
+              type: string
+              description: Registration Authority
+            registeredAddress:
+              $ref: '#/components/schemas/Address'
+            otherIdentifiers:
+              type: array
+              description: Additional identifiers with their standardized type codes for this corporate entity
+              items:
+                $ref: '#/components/schemas/Identifier'
+    Directorship:
+      title: Directorship
+      type: object
+      description: Description of a single position held as a director at a different company
+      properties:
+        companyNumber:
+          type: string
+          description: Number or ID of company where directorship held
+        companyName:
+          type: string
+          description: Name of company where directorship held
+        role:
+          type: string
+          description: Position/Role when in post
+        startDate:
+          $ref: '#/components/schemas/NormalizedDate'
+        endDate:
+          $ref: '#/components/schemas/NormalizedDate'
+        isActive:
+          type: boolean
+          description: True if directorship is current/active
+    IndividualRepresentative:
+      title: IndividualRepresentative
+      description: 'Description of a single representative of a company, for example a director, senior management team member, or legal representative'
+      allOf:
+        - $ref: '#/components/schemas/PersonDetails'
+        - title: Representative Details
+          type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Person type representative
+              enum:
+                - Person
+            role:
+              type: object
+              properties:
+                original:
+                  type: string
+                  description: Officer's role as described at source
+                normalized:
+                  type: string
+                  description: Officer's role mapped to controlled dictionary
+            startDate:
+              $ref: '#/components/schemas/NormalizedDate'
+            endDate:
+              $ref: '#/components/schemas/NormalizedDate'
+            isActive:
+              type: boolean
+              description: True if officer is currently in post
+            directorships:
+              type: array
+              description: List of directors roles at other companies
+              items:
+                $ref: '#/components/schemas/Directorship'
+            powers:
+              type: array
+              description: List of descriptions of officer's powers as described at source
+              items:
+                type: string
+    CorporationRepresentative:
+      title: CorporationRepresentative
+      description: 'Description of a single representative of a company, for example a director, senior management team member, or legal representative'
+      allOf:
+        - $ref: '#/components/schemas/CorporationDetails'
+        - type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Corporation type representative
+              enum:
+                - Corporation
+            natureOfControl:
+              type: array
+              description: Nature of control of representative
+              items:
+                type: string
+                description: Nature of control
+            startDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the corporation became a beneficial owner.
+                    May not be available in all jurisdictions as some only record notification dates.
+            notifiedDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the beneficial ownership was officially notified to the registry.
+                    This is often the only date available in beneficial ownership registers,
+                    representing when the ownership was declared rather than when it began.
+            endDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the corporation ceased to be a beneficial owner.
+                    Only present for historical records.
+            role:
+              type: object
+              properties:
+                original:
+                  type: string
+                  description: Officer's role as described at source
+                normalized:
+                  type: string
+                  description: Officer's role mapped to controlled dictionary
+            isActive:
+              type: boolean
+              description: True if officer is currently in post
+            directorships:
+              type: array
+              description: List of directors roles at other companies
+              items:
+                $ref: '#/components/schemas/Directorship'
+            powers:
+              type: array
+              description: List of descriptions of officer's powers as described at source
+              items:
+                description: Description of officer's power as described at source
+                type: string
+    OtherRepresentative:
+      title: OtherRepresentative
+      description: Description of a single representative of a company that cannot be definitively mapped to Individual or Corporation
+      allOf:
+        - $ref: '#/components/schemas/LegalEntity'
+        - title: Representative Details
+          type: object
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Type of representative
+              enum:
+                - Other
+            role:
+              type: object
+              properties:
+                original:
+                  type: string
+                  description: Officer's role as described at source
+                normalized:
+                  type: string
+                  description: Officer's role mapped to controlled dictionary
+            startDate:
+              $ref: '#/components/schemas/NormalizedDate'
+            endDate:
+              $ref: '#/components/schemas/NormalizedDate'
+            isActive:
+              type: boolean
+              description: True if officer is currently in post
+            directorships:
+              type: array
+              description: List of directors roles at other companies
+              items:
+                $ref: '#/components/schemas/Directorship'
+            powers:
+              type: array
+              description: List of descriptions of officer's powers as described at source
+              items:
+                type: string
+                description: Description of officer's power as described at source
+    Shareholding:
+      title: Shareholding
+      type: object
+      properties:
+        percentage:
+          type: string
+          nullable: true
+          description: |
+            Percentage of class/category that this shareholding represents.
+            Null when ownership is expressed as a range (use percentageIsRange, percentageRange, percentageLowerLimit, percentageUpperLimit instead).
+        percentageIsRange:
+          type: boolean
+          description: When true, the holding is expressed as a range and percentage is null. Use percentageRange, percentageLowerLimit and percentageUpperLimit for the range.
+          example: true
+        percentageRange:
+          type: string
+          nullable: true
+          description: Human-readable percentage range when the registry provides a range rather than a single value (e.g. "0-100%"). Present when percentageIsRange is true.
+          example: "0-100%"
+        percentageLowerLimit:
+          type: string
+          nullable: true
+          description: Lower bound of the percentage range as a numeric string (e.g. "0"). Present when percentageIsRange is true.
+          example: "0"
+        percentageUpperLimit:
+          type: string
+          nullable: true
+          description: Upper bound of the percentage range as a numeric string (e.g. "100"). Present when percentageIsRange is true.
+          example: "100"
+        count:
+          type: number
+          description: Number of shares held in class/category (when available)
+        totalNominalValue:
+          type: number
+          description: Total nominal value of shares in class/category
+        currency:
+          type: string
+          deprecated: true
+        beneficiallyHeld:
+          type: boolean
+          description: In some jurisdictions a share holding may not be beneficially held for the indicated shareholders and needs to be investigated.
+        shareholders:
+          type: object
+          description: 'If multiple entries, the indicated shareholders have a joint holding of this shareholding with an unknown split.'
+          properties:
+            corporations:
+              type: array
+              description: |
+                Array of shareholders that are corporations, or unknown legal entities
+                depending on available data from the registry.
+              items:
+                anyOf:
+                  - $ref: '#/components/schemas/CorporationDetails'
+                  - $ref: '#/components/schemas/LegalEntity'
+                discriminator:
+                  propertyName: type
+                  mapping:
+                    Corporation: '#/components/schemas/CorporationDetails'
+                    LegalEntity: '#/components/schemas/LegalEntity'
+            individuals:
+              type: array
+              description: |
+                Array of shareholders that are individuals, or unknown legal entities
+                depending on available data from the registry.
+              items:
+                anyOf:
+                  - $ref: '#/components/schemas/ShareholderPersonDetails'
+                  - $ref: '#/components/schemas/LegalEntity'
+                discriminator:
+                  propertyName: type
+                  mapping:
+                    Person: '#/components/schemas/ShareholderPersonDetails'
+                    LegalEntity: '#/components/schemas/LegalEntity'
+    PreviousNames:
+      title: Previous Names
+      type: object
+      properties:
+        name:
+          type: string
+          description: Previous company name
+        startDate:
+          $ref: '#/components/schemas/NormalizedDate'
+        endDate:
+          $ref: '#/components/schemas/NormalizedDate'
+    AlternativeNames:
+      title: Alternative Names (Business Name, Trading Name, Doing Business As)
+      type: object
+      properties:
+        name:
+          type: string
+          description: Alternative company names
+        type:
+          type: string
+          description: 'Type of name, e.g. Trading Name, Business Name'
+    CompanyRelationship:
+      title: Company Relationship
+      type: object
+      description: |
+        Information about a relationship between companies, for future incorporation of relational
+        extract data. Covers subsidiaries and company evolution history (merged, demerged, acquired).
+        Parent, ultimate parent and immediate parent are represented in roles/corporate representatives
+        (e.g. Australian data model). Branch/establishment relationships are covered by a separate
+        establishments data model.
+      properties:
+        relationship:
+          type: string
+          enum:
+            - Subsidiary
+            - Merged
+            - Demerged
+            - Acquired
+            - Other
+          description: Type of relationship (subsidiaries; or evolution history – merged, demerged, acquired)
+        company:
+          type: object
+          description: Details of the related company
+          properties:
+            kyckrId:
+              type: string
+              description: Kyckr ID of the related company
+            companyName:
+              type: string
+              description: Name of the related company
+            companyNumber:
+              type: string
+              description: Registration number of the related company
+        effectiveDate:
+          type: string
+          format: date
+          description: Date when the relationship became effective
+        description:
+          type: string
+          description: Additional description or details about the relationship
+    BasicProfile:
+      title: Company Profile
+      type: object
+      description: Basic company information
+      properties:
+        identifiers:
+          type: object
+          properties:
+            primaryRegistrationNumber:
+              type: string
+              description: Primary corporate registration number
+            taxNumber:
+              type: string
+              deprecated: true
+              description: 'Deprecated, use otherIdentifiers instead'
+            secondaryRegistrationNumber:
+              type: string
+              deprecated: true
+              description: 'Deprecated, use otherIdentifiers instead'
+            otherIdentifiers:
+              type: array
+              description: Additional identifiers with their standardized type codes
+              items:
+                $ref: '#/components/schemas/Identifier'
+        companyName:
+          type: string
+          description: Company name in original language
+        tradingName:
+          deprecated: true
+          type: string
+          description: Deprecated. Use aliases instead.
+        englishName:
+          type: string
+          description: 'Company name in English, if available'
+        aliases:
+          type: array
+          description: Alternative company names
+          items:
+            $ref: '#/components/schemas/AlternativeNames'
+        previousNames:
+          type: array
+          description: Previous company names
+          items:
+            $ref: '#/components/schemas/PreviousNames'
+        registrationAuthority:
+          description: 'Name of authority where the company is registered, e.g. KVK, Companies House'
+          type: string
+        lastUpdated:
+          description: Date that the information in the profile was last updated
+          type: string
+          format: date-time
+        lastAnnualAccountDate:
+          description: Date of filing for the last annual accounts
+          allOf:
+            - $ref: '#/components/schemas/NormalizedDate'
+        foundationDate:
+          description: Date of foundation
+          allOf:
+            - $ref: '#/components/schemas/NormalizedDate'
+        registrationDate:
+          description: Date of registration
+          allOf:
+            - $ref: '#/components/schemas/NormalizedDate'
+        incorporationDate:
+          description: Date of incorporation
+          allOf:
+            - $ref: '#/components/schemas/NormalizedDate'
+        dissolutionDate:
+          description: Date of dissolution
+          allOf:
+            - $ref: '#/components/schemas/NormalizedDate'
+        status:
+          $ref: '#/components/schemas/NormalizedStatus'
+        legalForm:
+          $ref: '#/components/schemas/NormalizedLegalForm'
+        incorporationJurisdiction:
+          type: object
+          properties:
+            original:
+              type: string
+              description: Jurisdiction of incorporation
+        registeredAgentName:
+          type: string
+          description: Name of registered agent
+        registeredAgentAddress:
+          type: string
+          description: Address of registered agent
+    ContactDetails:
+      title: Contact Details
+      type: object
+      properties:
+        email:
+          type: string
+          description: Primary email address for company
+        fax:
+          type: string
+          description: Primary fax number for company
+        telNumber:
+          type: string
+          description: Primary phone number for company
+        website:
+          type: string
+          description: Primary website address for company
+    EnhancedProfile:
+      allOf:
+        - type: object
+          properties:
+            activities:
+              type: array
+              description: Industry classifications for the company
+              items:
+                $ref: '#/components/schemas/Activity'
+            activityDeclarations:
+              type: array
+              description: Full text declarations of the company's business purpose as stated in the registry
+              items:
+                $ref: '#/components/schemas/ActivityDeclaration'
+            addresses:
+              type: array
+              description: Addresses for the company
+              items:
+                $ref: '#/components/schemas/Address'
+            totalCapital:
+              type: object
+              description: |
+                Total share capital summary as reported by the registry. This value represents what the registry 
+                provides and may be authorized capital, issued capital, or nominal capital - the specific type 
+                is often not explicitly stated by registries. This summary is commonly available even when 
+                detailed share class breakdowns in the `capital` array are not provided.
+                
+                When the `capital` array is populated with share classes, the sum of `capital[].totalNominalValue` 
+                may represent the issued capital. The sum of shareholdings across all capital classes can also 
+                represent the issued capital, though this may not always equal `totalCapital.totalValue` if 
+                the registry reports authorized capital instead.
+              properties:
+                totalValue:
+                  type: number
+                  description: |
+                    Total share capital amount as reported by the registry. This may represent authorized capital, 
+                    issued capital, or nominal capital depending on what the registry provides. The specific 
+                    type is typically not distinguished in registry data.
+                quantity:
+                  type: number
+                  description: |
+                    Total number of shares as reported by the registry. This represents the aggregate number 
+                    of shares across all share classes when available from the registry.
+                currency:
+                  type: string
+                  description: |
+                    Currency of the capital amount. If multiple currencies exist in the `capital` array, 
+                    this represents the primary currency or the currency used for the total calculation 
+                    as reported by the registry.
+                type:
+                  type: string
+                  enum:
+                    - Fixed
+                    - Variable
+                  description: Type of capital structure (fixed or variable) as reported by the registry
+            capital:
+              type: array
+              description: Array of share capital classes for the company. Each class represents a different type of share with its own details including state, code, title, number of shares, and amounts.
+              items:
+                $ref: '#/components/schemas/Capital'
+            representatives:
+              type: object
+              properties:
+                corporations:
+                  type: array
+                  description: Array of representatives that are corporations, or unknown legal entities depending on available data from the registry.
+                  items:
+                    anyOf:
+                      - $ref: '#/components/schemas/CorporationRepresentative'
+                      - $ref: '#/components/schemas/OtherRepresentative'
+                    discriminator:
+                      propertyName: type
+                      mapping:
+                        CorporationRepresentative: '#/components/schemas/CorporationRepresentative'
+                        OtherRepresentative: '#/components/schemas/OtherRepresentative'
+                individuals:
+                  type: array
+                  description: Array of representatives that are individuals, or unknown legal entities depending on available data from the registry.
+                  items:
+                    anyOf:
+                      - $ref: '#/components/schemas/IndividualRepresentative'
+                      - $ref: '#/components/schemas/OtherRepresentative'
+                    discriminator:
+                      propertyName: type
+                      mapping:
+                        IndividualRepresentative: '#/components/schemas/IndividualRepresentative'
+                        OtherRepresentative: '#/components/schemas/OtherRepresentative'
+            ultimateBeneficialOwners:
+              description: |
+                Information about Ultimate Beneficial Owners (UBOs) sourced from official beneficial ownership registers 
+                when integrated into company registers where available (e.g., UK's Persons of Significant Control register).
+              type: object
+              properties:
+                individuals:
+                  type: array
+                  description: Array of individuals identified as Ultimate Beneficial Owners
+                  items:
+                    anyOf:
+                      - $ref: '#/components/schemas/IndividualUBO'
+                      - $ref: '#/components/schemas/OtherUBO'
+                    discriminator:
+                      propertyName: type
+                      mapping:
+                        IndividualUBO: '#/components/schemas/IndividualUBO'
+                        OtherUBO: '#/components/schemas/OtherUBO'
+                corporations:
+                  type: array
+                  description: Array of corporations identified as Ultimate Beneficial Owners
+                  items:
+                    anyOf:
+                      - $ref: '#/components/schemas/CorporationUBO'
+                      - $ref: '#/components/schemas/OtherUBO'
+                    discriminator:
+                      propertyName: type
+                      mapping:
+                        CorporationUBO: '#/components/schemas/CorporationUBO'
+                        OtherUBO: '#/components/schemas/OtherUBO'
+            contactDetails:
+              $ref: '#/components/schemas/ContactDetails'
+            companyRelationships:
+              type: array
+              description: Array of relationships between this company and other companies
+              items:
+                $ref: '#/components/schemas/CompanyRelationship'
+            links:
+              type: object
+              properties:
+                document:
+                  type: string
+                  format: uri-reference
+                  example: /orders/12345/download
+                data:
+                  type: string
+                  format: uri
+            registrationType:
+              type: string
+              description: 'If present, indicates that the original foundational legal entity registration  is at another register (the source register).'
+            registrationTypeDetails:
+              type: object
+              description: Additional details in relation to the registration type, if registrationType is set.
+              properties:
+                originalCode:
+                  type: string
+                  description: Non standard code for the source registry.
+                originalDescription:
+                  type: string
+                  description: Description text for the source registry.
+                normalizedCode:
+                  type: string
+                  description: ISO code for the country, province or state of the source registry.
+                normalizedDescription:
+                  type: string
+                  description: Country and state description of the foreign registry.
+            additionalInformation:
+              $ref: '#/components/schemas/AdditionalInformation'
+        - $ref: '#/components/schemas/BasicProfile'
+    Cost:
+      type: object
+      description: Cost of an item
+      properties:
+        type:
+          type: string
+          enum:
+            - credit
+            - lite
+          example: credit
+        value:
+          type: number
+          example: 3
+    DocumentDescription:
+      title: DocumentDescription
+      type: object
+      properties:
+        id:
+          type: string
+          description: Product ID
+        cost:
+          $ref: '#/components/schemas/Cost'
+        name:
+          type: string
+          description: Name of document
+          example: Form 15 - Annual Accounts 2021/22
+        documentDate:
+          description: 'The date associated with the document, usually the filing date'
+          type: string
+          format: date
+        category:
+          type: string
+          description: Type of document
+          example: Annual Accounts
+        deliveryTimeMinutes:
+          type: integer
+          description: Target delivery time in minutes
+          example: 15
+        documentFormat:
+          type: array
+          description: A list of mime-types for files that will be returned for an order
+          example:
+            - application/pdf
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - application/pdf
+              - application/json
+              - application/zip
+              - application/xml
+        documentDatapoints:
+          type: object
+          properties:
+            companyDetails:
+              type: boolean
+            directors:
+              type: boolean
+            shareholders:
+              type: boolean
+            declaredBeneficialOwners:
+              type: boolean
+    OrderDetails:
+      title: OrderDetails
+      type: object
+      properties:
+        orderId:
+          type: string
+          example: '12345'
+        orderDate:
+          type: string
+          example: '2023-01-01T00:00:00Z'
+          format: date-time
+        customerReference:
+          type: string
+          description: Optional reference supplied by user
+        status:
+          type: string
+          enum:
+            - Success
+            - Pending
+            - Failed
+          description: Status of order
+        cost:
+          $ref: '#/components/schemas/Cost'
+        user:
+          type: string
+          format: uri-reference
+          example: /users/12345
+          description: URL reference to user who placed order
+        productDetails:
+          type: object
+          properties:
+            productName:
+              type: string
+              example: Annual Accounts 2021-22
+              description: The name of the ordered product
+            productId:
+              type: string
+              description: The unique identifier of the ordered product
+              example: ROWOFF_SVRBX0VDUF8wMQ==_RXh0ZW5kZWQgUHJvZmlsZQ==
+            productCategory:
+              type: string
+              description: The category of the ordered product
+              example: Financial Information
+        companyDetails:
+          type: object
+          description: The name of the company referred to in the order
+          properties:
+            companyName:
+              type: string
+              example: Kyckr Limited
+              description: The number of the company referred to in the order
+            companyNumber:
+              type: string
+              example: R123456
+              description: The number of the company referred to in the order
+            kyckrID:
+              type: string
+              example: IE|UjEyMzQ1Ng==
+              description: The Kyckr ID of the company referred to in the order
+        links:
+          type: object
+          properties:
+            data:
+              type: string
+              format: uri-reference
+              example: /orders/12345/download?format=json
+              description: URL reference to structured data format
+            document:
+              type: string
+              format: uri-reference
+              example: /orders/12345/download?format=pdf
+              description: URL reference to document format
+    BaseResponse:
+      title: BaseResponse
+      type: object
+      properties:
+        orderId:
+          type: number
+          example: 12345
+          description: The related orderId.
+        correlationId:
+          type: string
+          description: "The related correlationId to this request, for support purposes. \r\n"
+        customerReference:
+          type: string
+          description: 'A customer provided reference, which appears in the order list.'
+        timeStamp:
+          type: string
+          format: date-time
+          description: The UTC time at which the request occurred.
+        details:
+          type: string
+          description: 'The response status details for the current request.  '
+        cost:
+          $ref: '#/components/schemas/Cost'
+        links:
+          type: object
+          properties:
+            self:
+              type: string
+              format: uri-reference
+              example: /orders/12345
+      description: ''
+    CorporationUBO:
+      title: CorporationUBO
+      description: Details of a corporate entity identified as an Ultimate Beneficial Owner from official beneficial ownership registers
+      allOf:
+        - $ref: '#/components/schemas/CorporationDetails'
+        - type: object
+          description: Details of a corporate entity identified as an Ultimate Beneficial Owner from official beneficial ownership registers
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Corporation type
+              enum:
+                - Corporation
+            natureOfControl:
+              type: array
+              description: Nature of control 
+              items:
+                type: string
+                description: Nature of control
+            startDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the corporation became a beneficial owner.
+                    May not be available in all jurisdictions as some only record notification dates.
+            notifiedDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the beneficial ownership was officially notified to the registry.
+                    This is often the only date available in beneficial ownership registers,
+                    representing when the ownership was declared rather than when it began.
+            endDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the corporation ceased to be a beneficial owner.
+                    Only present for historical records.
+            kind:
+              type: string
+              description: '[FUTURE] The kind of corporation UBO'
+    IndividualUBO:
+      title: IndividualUBO
+      description: Details of an individual identified as an Ultimate Beneficial Owner from official beneficial ownership registers
+      allOf:
+        - $ref: '#/components/schemas/PersonDetails'
+        - type: object
+          description: Details of an individual identified as an Ultimate Beneficial Owner from official beneficial ownership registers
+          required:
+            - type
+          properties:
+            type:
+              type: string
+              description: Person type UBO
+              enum:
+                - Person
+            natureOfControl:
+              type: array
+              description: List of nature of control of UBO
+              items:
+                type: string
+                description: Nature of control
+            startDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the individual became a beneficial owner.
+                    May not be available in all jurisdictions as some only record notification dates.
+            notifiedDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the beneficial ownership was officially notified to the registry.
+                    This is often the only date available in beneficial ownership registers,
+                    representing when the ownership was declared rather than when it began.
+            endDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the individual ceased to be a beneficial owner.
+            kind:
+              type: string
+              description: '[FUTURE] The kind of individual UBO'
+    OtherUBO:
+      title: OtherUBO
+      allOf:
+        - $ref: '#/components/schemas/LegalEntity'
+        - type: object
+          required:
+            - type
+          description: Details of an individual identified as an Ultimate Beneficial Owner from official beneficial ownership registers
+          properties:
+            type:
+              type: string
+              description: Type of UBO
+              enum:
+                - Other
+            natureOfControl:
+              type: array
+              description: List of nature of control of UBO
+              items:
+                type: string
+                description: Nature of control
+            startDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the individual became a beneficial owner.
+                    May not be available in all jurisdictions as some only record notification dates.
+            notifiedDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the beneficial ownership was officially notified to the registry.
+                    This is often the only date available in beneficial ownership registers,
+                    representing when the ownership was declared rather than when it began.
+            endDate:
+              allOf:
+                - $ref: '#/components/schemas/NormalizedDate'
+                - description: |
+                    The date when the individual ceased to be a beneficial owner.
+    AdditionalInformation:
+      type: object
+      title: AdditionalInformation
+      description: Additional enriched information for the profile. Only populated when an extension type is requested via the `extend` query parameter.
+      properties:
+        addressInformation:
+          $ref: '#/components/schemas/AddressAdditionalInformation'
+    AddressAdditionalInformation:
+      type: object
+      title: AddressAdditionalInformation
+      description: Parsed and geocoded address variants for all addresses in the profile. Populated when the `geocoding` extension type is requested via the `extend` query parameter.
+      properties:
+        addresses:
+          type: array
+          description: Array of address groups, one per unique source address. Each group contains parsed and/or geocoded variants and references to the entities in the profile that use this address.
+          items:
+            $ref: '#/components/schemas/AddressGroup'
+    AddressGroup:
+      type: object
+      title: AddressGroup
+      description: Groups address variants and source references for a single source address instance.
+      properties:
+        identifier:
+          type: string
+          description: 'Matches the `identifier` on the source Address object. Use to correlate address groups with their corresponding addresses in the profile.'
+          example: 'IE-Wo0Fri41lHuGoElhaChY3-iXz6Gx6h2rHdw7LqC4Tok'
+        variants:
+          type: array
+          description: Address representations derived from this source address. May include parsed variants (structured decomposition of the raw address) and geocoded variants (resolved via Google Maps, indicated by "Geocoded (Exact Match)" or "Geocoded (Partial Match)" type). Multiple parsed variants may exist where different parsers produce different results. Parsed and geocoded variants indicated by the 'Type' property
+          items:
+            $ref: '#/components/schemas/Address'
+        sources:
+          type: array
+          description: References to the entities in the profile that use this address.
+          items:
+            $ref: '#/components/schemas/InformationSource'
+    InformationSource:
+      type: object
+      title: InformationSource
+      description: Reference to the entity in the profile that is the source of this address.
+      properties:
+        entityName:
+          type: string
+          description: Display name of the entity (company name or person name).
+          example: Bob Smith
+        entityType:
+          type: string
+          description: 'Type of entity (e.g. "Company", "Individual Representative").'
+          example: Individual Representative
+        context:
+          type: string
+          description: 'The address type context (e.g. "Registered Address", "Service Address").'
+          example: Service Address
+        path:
+          type: string
+          description: JSON path to the source address within the profile response.
+          example: 'EnhancedProfile.Representatives.Individuals[0].Address'
+  responses:
+    400Response:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/BaseResponse'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            Missing Parameter:
+              value:
+                orderId: 12345
+                correlationId: string
+                customerReference: string
+                timeStamp: '2019-08-24T14:15:22Z'
+                details: string
+                cost:
+                  type: credit
+                  value: 0
+                links:
+                  self: ../dictionary
+                data:
+                  type: 'https://httpstatuses.com/400'
+                  title: Missing Parameter
+                  detail: The `isoCode` parameter is required
+                  errors: []
+    401Response:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/BaseResponse'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            Unauthorized:
+              value:
+                orderId: 12345
+                correlationId: string
+                customerReference: string
+                timeStamp: '2019-08-24T14:15:22Z'
+                details: string
+                cost:
+                  type: credit
+                  value: 0
+                links:
+                  self: ../dictionary
+                data:
+                  type: 'https://httpstatuses.com/401'
+                  title: Unauthorized
+                  detail: Please authorize before making requests
+                  errors: []
+    403Response:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/BaseResponse'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            Forbidden:
+              value:
+                orderId: 12345
+                correlationId: string
+                customerReference: string
+                timeStamp: '2019-08-24T14:15:22Z'
+                details: string
+                cost:
+                  type: credit
+                  value: 0
+                links:
+                  self: ../dictionary
+                data:
+                  type: 'https://httpstatuses.com/403'
+                  title: Forbidden
+                  detail: This feature is not available on this account
+                  errors: []
+    404Response:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/BaseResponse'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            Not Found:
+              value:
+                orderId: 12345
+                correlationId: string
+                customerReference: string
+                timeStamp: '2019-08-24T14:15:22Z'
+                details: string
+                cost:
+                  type: credit
+                  value: 0
+                links:
+                  self: ../dictionary
+                data:
+                  type: 'https://httpstatuses.com/404'
+                  title: Not Found
+                  detail: This resource could not be found
+                  errors: []
+    405Response:
+      description: Method Not Allowed. Returned when the jurisdiction supports enhanced profile only asynchronously; use POST on this resource to request an enhanced profile instead.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/BaseResponse'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            Async only jurisdiction:
+              value:
+                orderId: 0
+                correlationId: string
+                customerReference: string
+                timeStamp: '2019-08-24T14:15:22Z'
+                details: string
+                cost:
+                  type: credit
+                  value: 0
+                links:
+                  self: ../dictionary
+                data:
+                  type: 'https://httpstatuses.com/405'
+                  title: Method Not Allowed
+                  detail: Synchronous enhanced profile is not available for this jurisdiction. Use POST to request an enhanced profile.
+                  errors: []
+    429Response:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/BaseResponse'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProblemDetails'
+          examples:
+            Rate limit exceeded:
+              value:
+                orderId: 12345
+                correlationId: string
+                customerReference: string
+                timeStamp: '2019-08-24T14:15:22Z'
+                details: string
+                cost:
+                  type: credit
+                  value: 0
+                links:
+                  self: ../dictionary
+                data:
+                  type: 'https://httpstatuses.com/429'
+                  title: Too Many Requests
+                  detail: This service only allows 50 requests within a 10 minute period
+                  errors: []
+    ErrorResponse:
+      description: Error
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/BaseResponse'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProblemDetails'
+      headers:
+        Location:
+          schema:
+            type: string
+          description: 'URL of '
+  securitySchemes:
+    AuthHeader:
+      type: http
+      scheme: bearer
+  parameters:
+    kyckrId:
+      name: kyckrId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: 'Kyckr company reference, a shared format, usable across our V2 APIs'
+      example: GB|MTE2NTUyOTA
+    isoCode:
+      name: isoCode
+      in: query
+      schema:
+        type: string
+      description: Jurisdiction code in ISO 3166 alpha-2
+      example: GB
+    customerReference:
+      name: customerReference
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Optional reference supplied by customer for tracking purposes
+security:
+  - AuthHeader: []

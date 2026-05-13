@@ -13,8 +13,9 @@ export const serverInstructions = `
 
 ### Document polling and presentation
 - After \`create_document_order\`, inspect \`data.status\`. On \`Success\` the document body is delivered with the same call. On \`Pending\`, poll \`get_order\` until \`data.status\` is \`Success\` or \`Failed\`.
-- Render \`data.documentJson\` to the user as a structured, readable summary - it IS the document. When the response also attaches a PDF resource block, the registry has no JSON projection; summarise the PDF content directly.
-- Never surface raw download URLs or order-internal links to the user. Speak only about document contents.
+- Render \`data.documentJson\` to the user as a structured, readable summary - it IS the document.
+- When \`data.documentJson\` is absent at \`Success\`, \`details\` carries the message that the document is PDF-only and PDF delivery is not yet supported (coming soon). Relay that message to the user.
+- Never surface raw download URLs or order-internal links.
 - Use \`list_orders\` to reconcile recently created orders when a specific orderId is not in context.
 
 ### Customer reference

@@ -13,12 +13,7 @@ const BASE_URL = process.env.KYCKR_MCP_URL ?? 'http://localhost:9542';
 const API_KEY = process.env.MCP_API_KEY ?? 'my-demo-api-key';
 const ENDPOINT = `${BASE_URL}/${API_KEY}/mcp`;
 
-type ContentBlock = {
-  type: string;
-  text?: string;
-  resource?: { uri?: string; mimeType?: string; blob?: string };
-};
-type ToolCallPayload = { content: ContentBlock[]; structuredContent?: unknown };
+type ToolCallPayload = { content: unknown[]; structuredContent?: unknown };
 
 function logHeading(title: string) {
   console.log(`\n=== ${title} ===`);
@@ -33,20 +28,6 @@ function structured<T = unknown>(result: ToolCallPayload): T {
     throw new Error(`No structuredContent on tool result:\n${pretty(result)}`);
   }
   return result.structuredContent as T;
-}
-
-function pdfResourceSummary(result: ToolCallPayload):
-  | { uri: string; mimeType: string; blobLength: number }
-  | undefined {
-  const block = result.content.find(
-    (c) => c.type === 'resource' && c.resource?.mimeType === 'application/pdf',
-  );
-  if (!block?.resource?.blob) return undefined;
-  return {
-    uri: block.resource.uri ?? '(no uri)',
-    mimeType: block.resource.mimeType ?? '(no mime)',
-    blobLength: block.resource.blob.length,
-  };
 }
 
 function linksField(structuredData: { data?: unknown } | undefined): unknown {
@@ -96,7 +77,6 @@ async function main() {
       documentJsonTopLevelKeys: fetched.data?.documentJson
         ? Object.keys(fetched.data.documentJson as Record<string, unknown>)
         : undefined,
-      pdfResource: pdfResourceSummary(raw as ToolCallPayload),
       linksExposed: linksField(fetched),
       detail: fetched.details,
     });
@@ -146,7 +126,6 @@ async function main() {
   }>(createdRaw);
   console.log(pretty(created));
   console.log({
-    pdfResource: pdfResourceSummary(createdRaw),
     linksExposed: linksField(created),
   });
 
@@ -168,7 +147,6 @@ async function main() {
   logHeading('5. get_order (poll)');
   const maxAttempts = 3;
   let lastFetched: { data?: { status?: string; documentJson?: unknown }; details?: string } | undefined;
-  let lastRaw: ToolCallPayload | undefined;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     console.log(`\n--- attempt ${attempt}/${maxAttempts} ---`);
     const raw = (await client.callTool({
@@ -182,7 +160,6 @@ async function main() {
     }>(raw);
     console.log(pretty(fetched));
     lastFetched = fetched;
-    lastRaw = raw;
     const status = fetched.data?.status;
     if (status === 'Success' || status === 'Failed') {
       break;
@@ -199,7 +176,6 @@ async function main() {
     initialStatus,
     finalStatus: lastFetched?.data?.status,
     hasDocumentJson: lastFetched?.data?.documentJson !== undefined,
-    pdfResource: lastRaw ? pdfResourceSummary(lastRaw) : undefined,
     linksExposed: linksField(lastFetched),
     detail: lastFetched?.details,
   });
