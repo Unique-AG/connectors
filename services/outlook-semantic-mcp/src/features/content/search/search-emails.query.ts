@@ -10,6 +10,7 @@ import {
   SearchEmailResult,
   SemanticSearchEmailsQuery,
 } from './semantic-search-emails.query';
+import { SEARCH_CONFIG } from './search.config';
 
 export interface SearchEmailsToolInput {
   uniqueSemanticSearchQueries?: z.infer<typeof SearchEmailsInputSchema>[];
@@ -28,8 +29,6 @@ type BackendExecutor = (
   searchSummary: string | undefined;
 }>;
 
-const MAX_COMBINED_RESULTS = 200;
-
 @Injectable()
 export class SearchEmailsQuery {
   public constructor(
@@ -45,11 +44,19 @@ export class SearchEmailsQuery {
       results: SearchEmailResult[];
       searchSummary: string | undefined;
     }> => {
-      if (isMicrosoftGraphBackend() || !input.uniqueSemanticSearchQueries?.length) {
+      if (
+        isMicrosoftGraphBackend() ||
+        !input.uniqueSemanticSearchQueries?.length ||
+        SEARCH_CONFIG.semanticSearch.maxEmailsLimit <= 0
+      ) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
       return this.semanticSearchQuery
-        .run(userProfileId, input.uniqueSemanticSearchQueries)
+        .run(
+          userProfileId,
+          input.uniqueSemanticSearchQueries,
+          SEARCH_CONFIG.semanticSearch.maxEmailsLimit,
+        )
         .then(({ results, searchSummary }) => ({ results, searchSummary }));
     },
     [SearchBackend.MsGraph]: (
@@ -62,7 +69,11 @@ export class SearchEmailsQuery {
       if (!input.msGraphKeywordSearchQueries) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
-      return this.msGraphKqlQuery.run(userProfileId, input.msGraphKeywordSearchQueries);
+      return this.msGraphKqlQuery.run(
+        userProfileId,
+        input.msGraphKeywordSearchQueries,
+        SEARCH_CONFIG.msGraph.maxEmailsLimit,
+      );
     },
   };
 
@@ -174,7 +185,7 @@ export class SearchEmailsQuery {
 
     return [...topSemanticMatches, ...commonRemainder, ...semanticOnly, ...remainingGraph].slice(
       0,
-      MAX_COMBINED_RESULTS,
+      SEARCH_CONFIG.maxOutputEmails,
     );
   }
 }

@@ -17,8 +17,6 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 
-const MAX_OUTPUT_RESULTS = 100;
-
 const batchResponseSchema = z.object({
   responses: z.array(
     z.object({
@@ -87,6 +85,7 @@ export class MsGraphKqlSearchEmailsQuery {
   public async run(
     userProfileId: UserProfileTypeID,
     queries: Array<QueryInput>,
+    maxOutputEmails: number,
   ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const msGraphBatchRequest: GraphBatchRequest[] = await this.translateQueriesToBatchRequests({
@@ -107,6 +106,7 @@ export class MsGraphKqlSearchEmailsQuery {
     const fetchResult = await this.fetchFromMicrosoft({
       userProfile,
       batchRequests: msGraphBatchRequest,
+      maxOutputEmails,
     });
     if (!fetchResult.success) {
       return { results: [], searchSummary: fetchResult.searchSummary };
@@ -153,9 +153,13 @@ export class MsGraphKqlSearchEmailsQuery {
           idIsImmutable,
         },
       });
+
+      if (results.length >= maxOutputEmails) {
+        break;
+      }
     }
 
-    return { results, searchSummary: undefined };
+    return { results: results, searchSummary: undefined };
   }
 
   private async translateQueriesToBatchRequests({
@@ -228,9 +232,11 @@ export class MsGraphKqlSearchEmailsQuery {
   private async fetchFromMicrosoft({
     userProfile,
     batchRequests,
+    maxOutputEmails,
   }: {
     userProfile: NonNullishProps<UserProfile, 'email'>;
     batchRequests: GraphBatchRequest[];
+    maxOutputEmails: number;
   }): Promise<
     | {
         success: false;
@@ -311,10 +317,10 @@ export class MsGraphKqlSearchEmailsQuery {
       groupBy((item) => item.mailbox),
     );
 
-    return { success: true, hits: this.mergeResults(results) };
+    return { success: true, hits: this.mergeResults(results, maxOutputEmails) };
   }
 
-  private mergeResults(hitsByMailbox: Record<string, Hit[]>): Hit[] {
+  private mergeResults(hitsByMailbox: Record<string, Hit[]>, maxOutputEmails: number): Hit[] {
     const allResults: Hit[] = [];
     const indicesMap = new Map(Object.keys(hitsByMailbox).map((mailbox) => [mailbox, 0]));
     let hasMoreItems = true;
@@ -336,7 +342,7 @@ export class MsGraphKqlSearchEmailsQuery {
 
         if (!allResults.some((result) => result.restId === item.restId)) {
           allResults.push(item);
-          if (allResults.length >= MAX_OUTPUT_RESULTS) {
+          if (allResults.length >= maxOutputEmails) {
             return allResults;
           }
         }

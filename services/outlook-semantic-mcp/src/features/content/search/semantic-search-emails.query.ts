@@ -83,8 +83,6 @@ interface ValidSearchJobInput {
 
 type SearchJobInput = { isScoped: false } | ValidSearchJobInput;
 
-const MAX_OUTPUT_RESULTS = 100;
-
 @Injectable()
 export class SemanticSearchEmailsQuery {
   public constructor(
@@ -98,10 +96,12 @@ export class SemanticSearchEmailsQuery {
   public async run(
     userProfileId: UserProfileTypeID,
     inputs: z.infer<typeof SearchEmailsInputSchema>[],
+    maxOutputEmails: number,
   ): Promise<{
     results: SearchEmailResult[];
     searchSummary: string | undefined;
   }> {
+    assert.ok(maxOutputEmails > 0, `maxOutputEmails: ${maxOutputEmails} cannot be <= 0`);
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const context = await this.loadAccessContext(userProfile);
 
@@ -199,7 +199,7 @@ export class SemanticSearchEmailsQuery {
     );
 
     return {
-      results: results.slice(0, MAX_OUTPUT_RESULTS),
+      results: results.slice(0, maxOutputEmails),
       searchSummary: summaries.length > 0 ? summaries.join('\r\n') : undefined,
     };
   }

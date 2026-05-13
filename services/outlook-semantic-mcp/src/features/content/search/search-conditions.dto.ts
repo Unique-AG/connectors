@@ -1,6 +1,7 @@
 import { UniqueQLOperator } from '@unique-ag/unique-api';
 import { z } from 'zod';
 import { clampToValidDate } from '~/utils/clamp-to-valid-date';
+import { SEARCH_CONFIG } from './search.config';
 
 export const CONTAINS_ANY_OPERATOR = 'containsAny' as const;
 
@@ -161,18 +162,11 @@ export const SearchEmailsInputSchema = z.object({
   limit: z
     .number()
     .int()
-    .min(100)
-    .max(200)
+    .min(SEARCH_CONFIG.semanticSearch.subQueryChunksLimits.min)
+    .max(SEARCH_CONFIG.semanticSearch.subQueryChunksLimits.max)
     .optional()
-    .prefault(100)
-    .describe(
-      [
-        'Maximum number of results to return. Must be between 100 and 200.',
-        'If the search query is targeted (e.g. looking for a specific email or thread), pass 100 (the minimum).',
-        'If the query is fuzzy or broad (e.g. "overview of all emails from alice@example.com", "list emails from last week", "what happened last week"), pick a limit between 100 and 200.',
-        'When the expected result set is large, always use 200.',
-      ].join(' '),
-    ),
+    .prefault(SEARCH_CONFIG.semanticSearch.subQueryChunksLimits.default)
+    .describe(SEARCH_CONFIG.semanticSearch.subQueryChunksLimits.description),
 });
 
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;
@@ -226,13 +220,11 @@ export const MsGraphKqlQuerySchema = z.object({
   limit: z
     .number()
     .int()
-    .min(1)
-    .max(100)
+    .min(SEARCH_CONFIG.msGraph.subQueryLimits.min)
+    .max(SEARCH_CONFIG.msGraph.subQueryLimits.max)
     .optional()
-    .prefault(100)
-    .describe(
-      'Maximum number of results to return for this query. Must be between 1 and 100. Default is 100. Use a lower value for targeted searches; the default is appropriate for broad or exploratory queries.',
-    ),
+    .prefault(SEARCH_CONFIG.msGraph.subQueryLimits.default)
+    .describe(SEARCH_CONFIG.msGraph.subQueryLimits.description),
 });
 
 export const MsGraphSearchParamsSchema = z
