@@ -38,13 +38,19 @@ export class StreamUniqueAttachmentCommand {
     if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
       return {
         status: 'failed',
-        reason: { fileName: fileName.value, reason: 'App is not running in cluster local' },
+        reason: {
+          fileName: fileName.value,
+          reason: 'App is not running in cluster local',
+        },
       };
     }
     if (!uniqueIdentity) {
       return {
         status: 'failed',
-        reason: { fileName: fileName.value, reason: 'Could not resolve unique identity' },
+        reason: {
+          fileName: fileName.value,
+          reason: 'Could not resolve unique identity',
+        },
       };
     }
 
@@ -59,14 +65,25 @@ export class StreamUniqueAttachmentCommand {
 
     const response = await fetch(contentUrl, {
       headers: {
+        // We impersonate the unique user because the mcp user might not have access to the content
         'x-user-id': uniqueIdentity.userId,
         'x-company-id': uniqueIdentity.companyId,
-        'x-service-id': 'outlook-semantic-mcp',
+        // We do not pass the x-service-id because the content download endpoint is allowing only ingestion worker and we do not want
+        // allow outlook mcp integration there. This means that we have to explicitly pass the user roles because do in cluster
+        // communication, and this is the minimum required role which is needed by the impersonated user to be able to download the
+        // file.
+        'x-user-roles': 'chat.chat.basic',
       },
     });
 
     if (!response.ok) {
       const text = await response.text();
+      this.logger.warn({
+        msg: `Download content failed`,
+        contentId,
+        chatId,
+        error: text,
+      });
       return {
         status: 'failed',
         reason: {
