@@ -102,6 +102,27 @@
         }
       ]
     },
+    "services/kyckr-mcp": {
+      "prerelease": true,
+      "prerelease-type": "alpha",
+      "versioning": "prerelease",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/kyckr-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/kyckr-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/kyckr-mcp/values.yaml"
+        }
+      ]
+    },
     "services/confluence-connector": {
       "prerelease": true,
       "prerelease-type": "alpha",
