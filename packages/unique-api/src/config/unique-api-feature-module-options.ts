@@ -41,9 +41,8 @@ export const uniqueApiFeatureModuleOptionsSchema = z.object({
     .number()
     .int()
     .positive()
-    .optional()
-    .nullish()
-    .prefault(DEFAULT_HEALTH_CHECK_TIMEOUT_MS),
+    .prefault(DEFAULT_HEALTH_CHECK_TIMEOUT_MS)
+    .optional(),
 });
 
 export type UniqueApiFeatureModuleOptions = z.infer<typeof uniqueApiFeatureModuleOptionsSchema>;
