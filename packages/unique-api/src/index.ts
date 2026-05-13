@@ -25,6 +25,8 @@ export type {
   UniqueFile,
 } from './files/files.types';
 export type { Group, GroupWithMembers } from './groups/groups.types';
+export type { PingResult } from './health/ping-result';
+export { extractErrorCode } from './health/ping-result';
 export { UniqueApiHealth } from './health/unique-api-health.service';
 export type { IngestionConfig } from './ingestion/ingestion.queries';
 export type {

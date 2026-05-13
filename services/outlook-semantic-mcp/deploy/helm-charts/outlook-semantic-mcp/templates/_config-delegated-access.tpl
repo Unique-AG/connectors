@@ -12,10 +12,10 @@ DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE: {{ .verificationCronSchedule | quot
 {{- if .recoveryCronSchedule }}
 DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE: {{ .recoveryCronSchedule | quote }}
 {{- end }}
-{{- if .stalenessThresholdHours }}
+{{- if (hasKey . "stalenessThresholdHours") }}
 DELEGATED_ACCESS_STALENESS_THRESHOLD_HOURS: {{ .stalenessThresholdHours | quote }}
 {{- end }}
-{{- if .failureThreshold }}
+{{- if (hasKey . "failureThreshold") }}
 DELEGATED_ACCESS_FAILURE_THRESHOLD: {{ .failureThreshold | quote }}
 {{- end }}
 {{- end }}

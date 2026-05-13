@@ -1,8 +1,8 @@
+import { extractErrorCode, type PingResult } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
 import { fetch as undiciFetch } from 'undici';
 import { IngestionConfig, ingestionConfig } from '~/config';
-import { extractErrorCode, type PingResult } from './ping-result';
 
 const GRAPH_URL = 'https://graph.microsoft.com/v1.0/';
 
@@ -34,6 +34,8 @@ export class ConnectivityHealthIndicator {
         signal: AbortSignal.timeout(this.timeoutMs),
       });
       await response.body?.cancel();
+      // Any HTTP response (including 401 from unauthenticated requests) is treated as
+      // reachable — we're testing network path, not authentication.
       return { reachable: true };
     } catch (error) {
       return { reachable: false, errorCode: extractErrorCode(error) };

@@ -11,6 +11,9 @@ const MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS = `
 
 ### Inbox Connection
 - If the inbox is not connected, suggest the user run \`reconnect_inbox\` before attempting any other operations.
+
+### Search Results and Incomplete Ingestion
+- When \`search_emails\` returns a \`syncWarning\` field, relay that warning message to the user so they know results may not reflect all emails.
 `;
 
 export function buildServerInstructions(): string {
