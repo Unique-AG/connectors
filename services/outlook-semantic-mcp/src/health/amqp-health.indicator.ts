@@ -18,13 +18,19 @@ export class AmqpHealthIndicator {
       if (!this.amqpConnection.connected || !this.amqpConnection.channel) {
         return indicator.down({ message: 'AMQP not connected' });
       }
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(
+      let timeoutHandle: ReturnType<typeof setTimeout>;
+      const timeout = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(
           () => reject(new Error('AMQP checkExchange timed out')),
           CHECK_EXCHANGE_TIMEOUT_MS,
-        ),
-      );
-      await Promise.race([this.amqpConnection.channel.checkExchange(MAIN_EXCHANGE.name), timeout]);
+        );
+      });
+      await Promise.race([
+        this.amqpConnection.channel
+          .checkExchange(MAIN_EXCHANGE.name)
+          .finally(() => clearTimeout(timeoutHandle)),
+        timeout,
+      ]);
       return indicator.up();
     } catch (error) {
       return indicator.down({ message: error instanceof Error ? error.message : String(error) });
