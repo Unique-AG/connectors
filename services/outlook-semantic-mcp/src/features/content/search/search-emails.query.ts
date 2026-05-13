@@ -4,13 +4,13 @@ import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
+import { SEARCH_CONFIG } from './search.config';
 import { SearchEmailsInputSchema } from './search-conditions.dto';
 import {
   SearchBackend,
   SearchEmailResult,
   SemanticSearchEmailsQuery,
 } from './semantic-search-emails.query';
-import { SEARCH_CONFIG } from './search.config';
 
 export interface SearchEmailsToolInput {
   uniqueSemanticSearchQueries?: z.infer<typeof SearchEmailsInputSchema>[];
