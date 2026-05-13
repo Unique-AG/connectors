@@ -3,6 +3,7 @@ import { isNonNullish } from 'remeda';
 import { errors } from 'undici';
 import { GenericRateLimitError } from './is-rate-limit-error';
 
+// Extracts the Retry-After delay (ms) from Graph, undici, and GenericRateLimitError (including batched-cause arrays); returns the maximum found, or null.
 export const getRetryAfterMs = (error: unknown): number | null => {
   if (error instanceof GraphError) {
     const retryAfter = error.headers?.get('Retry-After');
