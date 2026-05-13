@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.3...outlook-semantic-mcp@0.4.4) (2026-05-13)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** update headers for downloading attachments ([#538](https://github.com/Unique-AG/connectors/issues/538)) ([f821c50](https://github.com/Unique-AG/connectors/commit/f821c508e47e4e28733340aa88eb2d9757f7916c))
+
 ## [0.4.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.2...outlook-semantic-mcp@0.4.3) (2026-05-11)
 
 
