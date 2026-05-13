@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { KyckrOrderDocumentSchema } from './kyckr-order-document.schemas';
 
 // Shared Zod response schemas mirroring the Kyckr v2 API component schemas.
 // Schemas are intentionally `.loose()` so new Kyckr fields still reach the LLM.
@@ -278,8 +279,10 @@ export const KyckrContactDetailsSchema = z
 export const KyckrOrderStatusSchema = z
   .enum(['Success', 'Pending', 'Failed'])
   .describe(
-    'Kyckr order status. `Success` means the document is ready - use `data.links.document` / `data.links.data` to fetch it. `Pending` means still processing - re-poll via `get_order` (when ordering, the `deliveryTimeMinutes` from `list_company_documents` is a reasonable initial wait). `Failed` means the order will not complete; surface to the user.',
+    'Kyckr order status. `Success` means the document is ready - the structured JSON view is automatically inlined under `data.documentJson` by `create_document_order` / `get_order`, and when no JSON projection exists the official PDF is attached to the response as an embedded resource block. `Pending` means still processing - re-poll via `get_order` (when ordering, the `deliveryTimeMinutes` from `list_company_documents` is a reasonable initial wait). `Failed` means the order will not complete; surface to the user.',
   );
+
+export type KyckrOrderStatus = z.infer<typeof KyckrOrderStatusSchema>;
 
 export const KyckrOrderDetailsSchema = z
   .object({
@@ -344,9 +347,18 @@ export const KyckrOrderDetailsSchema = z
       .describe(
         'Download links for the completed order. Empty / absent while `status` is `Pending`.',
       ),
+    documentJson: KyckrOrderDocumentSchema.optional().describe(
+      'Parsed structured view of the ordered document, inlined automatically by `create_document_order` / `get_order` once `status` is `Success`. Field names are PascalCase (Kyckr download-endpoint convention). The JSON view is attempted for every `Success` order; many filings nominally listed as PDF still have a JSON projection. Absent while `status` is `Pending` / `Failed`, and absent when the registry has no JSON projection for the filing - in that case the tool response attaches the official PDF as an embedded resource block.',
+    ),
   })
   .loose()
   .describe("An order Kyckr has placed against a registry on the caller's behalf.");
+
+export const KyckrOrderDetailsAgentSchema = KyckrOrderDetailsSchema.omit({ links: true })
+  .loose()
+  .describe(
+    "An order Kyckr has placed against a registry on the caller's behalf, projected for agent consumption (raw download URLs are stripped: the document content itself is delivered via `data.documentJson` or as an embedded PDF resource block on the tool response).",
+  );
 
 export const KyckrOrdersPageSchema = z
   .object({

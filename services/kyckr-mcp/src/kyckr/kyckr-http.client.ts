@@ -33,6 +33,51 @@ export class KyckrHttpClient {
     return this.call<T>('POST', path, undefined, body);
   }
 
+  public async getBinary(
+    path: string,
+    params?: Record<string, string | undefined>,
+  ): Promise<Buffer> {
+    const url = this.buildUrl(path, params);
+    const start = Date.now();
+
+    this.logger.debug({ method: 'GET', path, binary: true }, 'Kyckr API call');
+
+    let status = 0;
+    try {
+      const response = await request(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey.value}`,
+          Accept: 'application/pdf, application/octet-stream, */*',
+        },
+      });
+
+      status = response.statusCode;
+
+      if (status >= 400) {
+        const rawBody = await response.body.text();
+        const responseBody = this.tryParseJson(rawBody);
+        const correlationId = this.getStringField(responseBody, 'correlationId');
+        const message = this.extractErrorMessage(responseBody, status, rawBody);
+        throw new KyckrApiError(status, path, message, correlationId);
+      }
+
+      const arrayBuffer = await response.body.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    } catch (err) {
+      this.logger.error({ method: 'GET', path, status, err }, 'Kyckr API binary request failed');
+      throw err;
+    } finally {
+      const durationMs = Date.now() - start;
+      this.metrics.recordApiRequest({
+        method: 'GET',
+        path: this.normalizePath(path),
+        status,
+        durationMs,
+      });
+    }
+  }
+
   private async call<T>(
     method: string,
     path: string,
@@ -98,6 +143,7 @@ export class KyckrHttpClient {
     [/^\/companies\/[^/]+\/lite$/, '/companies/:kyckrId/lite'],
     [/^\/companies\/[^/]+\/documents$/, '/companies/:kyckrId/documents'],
     [/^\/companies$/, '/companies'],
+    [/^\/orders\/[^/]+\/download$/, '/orders/:orderId/download'],
     [/^\/orders\/[^/]+$/, '/orders/:orderId'],
     [/^\/orders$/, '/orders'],
   ];

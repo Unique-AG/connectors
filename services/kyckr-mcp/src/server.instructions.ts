@@ -9,10 +9,12 @@ export const serverInstructions = `
 ### Credit usage
 - \`search_companies\` is free. Profile and document calls may spend Kyckr credits.
 - Do not call paid endpoints speculatively. Confirm the company identity with search before ordering profiles or documents.
-- \`create_document_order\` explicitly spends credits. Always confirm intent before calling it.
+- Once the user has named or chosen a specific filing from \`list_company_documents\`, call \`create_document_order\` directly; do not stage a separate confirmation step (the cost is already known from \`list_company_documents\`).
 
-### Document polling
-- Kyckr has no webhooks. After \`create_document_order\`, poll with \`get_order\` until the order reaches a terminal state.
+### Document polling and presentation
+- After \`create_document_order\`, inspect \`data.status\`. On \`Success\` the document body is delivered with the same call. On \`Pending\`, poll \`get_order\` until \`data.status\` is \`Success\` or \`Failed\`.
+- Render \`data.documentJson\` to the user as a structured, readable summary - it IS the document. When the response also attaches a PDF resource block, the registry has no JSON projection; summarise the PDF content directly.
+- Never surface raw download URLs or order-internal links to the user. Speak only about document contents.
 - Use \`list_orders\` to reconcile recently created orders when a specific orderId is not in context.
 
 ### Customer reference

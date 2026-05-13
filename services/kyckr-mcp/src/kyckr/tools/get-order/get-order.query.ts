@@ -5,9 +5,12 @@ import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
 import { type KyckrToolCallResult, Metrics } from '../../metrics';
 import {
   KyckrBaseResponseShape,
+  KyckrOrderDetailsAgentSchema,
   KyckrOrderDetailsSchema,
   McpEnvelopeShape,
 } from '../../schemas/kyckr-response.schemas';
+import { appendDetail, fetchOrder, stripLinks } from '../_shared/fetch-order';
+import type { McpToolResult } from '../_shared/mcp-tool-result';
 
 export const GetOrderInputSchema = z.object({
   orderId: z
@@ -30,11 +33,12 @@ const GetOrderEnvelopeSchema = z
 export const GetOrderOutputSchema = z
   .object({
     ...McpEnvelopeShape,
-    data: KyckrOrderDetailsSchema.optional(),
+    data: KyckrOrderDetailsAgentSchema.optional(),
   })
   .loose();
 
-export type GetOrderResult = z.infer<typeof GetOrderOutputSchema>;
+export type GetOrderStructured = z.infer<typeof GetOrderOutputSchema>;
+export type GetOrderResult = McpToolResult<GetOrderStructured>;
 
 @Injectable()
 export class GetOrderQuery {
@@ -60,7 +64,47 @@ export class GetOrderQuery {
         { orderId: input.orderId, status: response.data?.status },
         'get_order: succeeded',
       );
-      return { success: true, ...response };
+
+      const dataWithoutLinks = stripLinks(response.data);
+
+      if (response.data?.status !== 'Success') {
+        return {
+          success: true,
+          ...response,
+          data: dataWithoutLinks,
+        };
+      }
+
+      const fetched = await fetchOrder(this.kyckrClient, input.orderId, response.data.status);
+      const detail = fetched.kind === 'absent' ? fetched.detail : undefined;
+      const documentJson = fetched.kind === 'json' ? fetched.documentJson : undefined;
+
+      const structured: GetOrderStructured = {
+        success: true,
+        ...response,
+        details: appendDetail(response.details, detail),
+        data: { ...dataWithoutLinks, documentJson },
+      };
+
+      if (fetched.kind === 'pdf') {
+        GetOrderOutputSchema.parse(structured);
+        return {
+          structuredContent: structured,
+          content: [
+            { type: 'text', text: JSON.stringify(structured, null, 2) },
+            {
+              type: 'resource',
+              resource: {
+                uri: `kyckr-order://${input.orderId}/document.pdf`,
+                mimeType: 'application/pdf',
+                blob: fetched.pdfBase64,
+              },
+            },
+          ],
+        };
+      }
+
+      return structured;
     } catch (err) {
       result = 'error';
       if (err instanceof KyckrApiError) {
