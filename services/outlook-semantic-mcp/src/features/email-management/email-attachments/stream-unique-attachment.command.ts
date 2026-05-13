@@ -82,7 +82,7 @@ export class StreamUniqueAttachmentCommand {
         msg: `Download content failed`,
         contentId,
         chatId,
-        error: text,
+        status: response.status,
       });
       return {
         status: 'failed',
