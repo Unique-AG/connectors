@@ -231,7 +231,7 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[]],
       });
 
-      await instance.run(testUserId, [baseInput]);
+      await instance.run(testUserId, [baseInput], 100);
 
       expect(contentSearch).toHaveBeenCalledOnce();
       const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
@@ -244,7 +244,7 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[]],
       });
 
-      await instance.run(testUserId, [{ ...baseInput, mailbox: OWN_EMAIL }]);
+      await instance.run(testUserId, [{ ...baseInput, mailbox: OWN_EMAIL }], 100);
 
       expect(contentSearch).toHaveBeenCalledOnce();
       const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
@@ -258,7 +258,7 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[]],
       });
 
-      await instance.run(testUserId, [{ ...baseInput, mailbox: DELEGATED_EMAIL }]);
+      await instance.run(testUserId, [{ ...baseInput, mailbox: DELEGATED_EMAIL }], 100);
 
       expect(contentSearch).toHaveBeenCalledOnce();
       const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
@@ -271,9 +271,11 @@ describe('SemanticSearchEmailsQuery', () => {
         delegatedAccesses: [delegatedAccess],
       });
 
-      const { results } = await instance.run(testUserId, [
-        { ...baseInput, mailbox: 'unknown@example.com' },
-      ]);
+      const { results } = await instance.run(
+        testUserId,
+        [{ ...baseInput, mailbox: 'unknown@example.com' }],
+        100,
+      );
 
       expect(contentSearch).not.toHaveBeenCalled();
       expect(results).toEqual([]);
@@ -286,10 +288,14 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[makeSearchItem('a')], [makeSearchItem('b')]],
       });
 
-      const { results } = await instance.run(testUserId, [
-        { search: 'query A', limit: 200 as const },
-        { search: 'query B', limit: 200 as const },
-      ]);
+      const { results } = await instance.run(
+        testUserId,
+        [
+          { search: 'query A', limit: 200 as const },
+          { search: 'query B', limit: 200 as const },
+        ],
+        100,
+      );
 
       expect(contentSearch).toHaveBeenCalledTimes(2);
       expect(results).toHaveLength(2);
@@ -301,10 +307,14 @@ describe('SemanticSearchEmailsQuery', () => {
         searchErrors: [new Error('search failed'), null],
       });
 
-      const { results } = await instance.run(testUserId, [
-        { search: 'failing query', limit: 200 as const },
-        { search: 'succeeding query', limit: 200 as const },
-      ]);
+      const { results } = await instance.run(
+        testUserId,
+        [
+          { search: 'failing query', limit: 200 as const },
+          { search: 'succeeding query', limit: 200 as const },
+        ],
+        100,
+      );
 
       expect(contentSearch).toHaveBeenCalledTimes(2);
       expect(results).toHaveLength(1);
@@ -320,10 +330,14 @@ describe('SemanticSearchEmailsQuery', () => {
         ],
       });
 
-      const { results } = await instance.run(testUserId, [
-        { search: 'query A', limit: 200 as const },
-        { search: 'query B', limit: 200 as const },
-      ]);
+      const { results } = await instance.run(
+        testUserId,
+        [
+          { search: 'query A', limit: 200 as const },
+          { search: 'query B', limit: 200 as const },
+        ],
+        100,
+      );
 
       expect(results).toHaveLength(1);
       expect(results[0]?.text).toBe('from first search');
@@ -337,10 +351,14 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [items400, items300],
       });
 
-      const { results } = await instance.run(testUserId, [
-        { search: 'query A', limit: 200 as const },
-        { search: 'query B', limit: 200 as const },
-      ]);
+      const { results } = await instance.run(
+        testUserId,
+        [
+          { search: 'query A', limit: 200 as const },
+          { search: 'query B', limit: 200 as const },
+        ],
+        100,
+      );
 
       expect(results).toHaveLength(100);
     });

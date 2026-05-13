@@ -46,16 +46,18 @@ export class LiveCatchUpListener {
           event.payload.subscriptionId,
           event.payload.notificationReceivedAt,
         );
-        return await this.liveCatchUpCommand.run({
+        await this.liveCatchUpCommand.run({
           ...event.payload,
           liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
         });
+        return;
       }
       case 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck': {
-        return await this.liveCatchUpCommand.run({
+        await this.liveCatchUpCommand.run({
           ...event.payload,
           liveCatchupOverlappingWindow: this.config.liveCatchupRecheckOverlappingWindowMinutes,
         });
+        return;
       }
       default: {
         this.logger.error({ msg: `Unsuported live catchup event type: ${JSON.stringify(event)}` });

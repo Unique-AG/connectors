@@ -11,9 +11,9 @@ import { traceAttrs, traceError } from '~/features/tracing.utils';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
+import { SEARCH_CONFIG } from '../content/search/search.config';
 import { FAILED_INGESTION_STATUSES } from '../sync/full-sync/get-scope-ingestion-stats.query';
 import { FetchMessagesFromGraphQuery } from './fetch-messages-from-graph.query';
-import { SEARCH_CONFIG } from '../content/search/search.config';
 
 export interface SearchRecallCheckCase {
   id: string;
