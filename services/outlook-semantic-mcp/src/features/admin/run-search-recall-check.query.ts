@@ -13,6 +13,7 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { Nullish } from '~/utils/nullish';
 import { FAILED_INGESTION_STATUSES } from '../sync/full-sync/get-scope-ingestion-stats.query';
 import { FetchMessagesFromGraphQuery } from './fetch-messages-from-graph.query';
+import { SEARCH_CONFIG } from '../content/search/search.config';
 
 export interface SearchRecallCheckCase {
   id: string;
@@ -107,6 +108,7 @@ export class RunSearchRecallCheckQuery {
         const { results } = await this.searchEmailsQuery.run(
           convertUserProfileIdToTypeId(userProfileId),
           [checkCase.search],
+          SEARCH_CONFIG.maxOutputEmails,
         );
         const returnedEmailIds = new Set(
           pipe(
