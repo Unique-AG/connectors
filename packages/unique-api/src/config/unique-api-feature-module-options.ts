@@ -35,7 +35,7 @@ export const uniqueApiFeatureModuleOptionsSchema = z.object({
       tenantKey: z.string().optional(),
     })
     .prefault({}),
-  healthCheckTimeoutMs: z.number().int().positive().prefault(3000),
+  healthCheckTimeoutMs: z.number().int().positive().optional().prefault(3000),
 });
 
 export type UniqueApiFeatureModuleOptions = z.infer<typeof uniqueApiFeatureModuleOptionsSchema>;
