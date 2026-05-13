@@ -99,7 +99,6 @@ export class TenantRegistry implements OnModuleInit {
         clientName: 'confluence-connector',
         tenantKey: tenantName,
       },
-      healthCheckTimeoutMs: 3000,
     });
   }
 

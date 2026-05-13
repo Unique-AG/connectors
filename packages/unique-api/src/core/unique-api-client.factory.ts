@@ -3,7 +3,10 @@ import { Agent, interceptors } from 'undici';
 import { UniqueAuth } from '../auth/unique-auth';
 import { UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import { UniqueHttpClient } from '../clients/unique-http.client';
-import { UniqueApiFeatureModuleOptions } from '../config/unique-api-feature-module-options';
+import {
+  DEFAULT_HEALTH_CHECK_TIMEOUT_MS,
+  UniqueApiFeatureModuleOptions,
+} from '../config/unique-api-feature-module-options';
 import { ContentService } from '../content/content.service';
 import { FilesService } from '../files/files.service';
 import { GroupsService } from '../groups/groups.service';
@@ -37,7 +40,7 @@ export class UniqueApiClientFactoryImpl implements UniqueApiClientFactory {
       auth,
       config.ingestion.baseUrl,
       config.scopeManagement.baseUrl,
-      config.healthCheckTimeoutMs,
+      config.healthCheckTimeoutMs ?? DEFAULT_HEALTH_CHECK_TIMEOUT_MS,
     );
 
     const scopeManagementGraphQlClient = new UniqueGraphqlClient(
