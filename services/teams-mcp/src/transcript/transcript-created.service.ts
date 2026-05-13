@@ -158,7 +158,10 @@ export class TranscriptCreatedService {
     await this.unique.ingestTranscript(
       {
         subject: meeting.subject ?? '',
-        date: meeting.startDateTime,
+        // onlineMeetings/{id}.startDateTime returns the master/scheduled time, which
+        // collapses every occurrence of a recurring meeting into one YYYY-MM-DD folder.
+        // Use the transcript time so each occurrence gets its own folder.
+        date: transcript.createdDateTime,
         startDateTime: transcript.createdDateTime,
         endDateTime: transcript.endDateTime,
         contentCorrelationId: transcript.contentCorrelationId,
