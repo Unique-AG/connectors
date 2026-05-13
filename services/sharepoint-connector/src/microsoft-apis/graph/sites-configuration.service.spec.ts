@@ -88,7 +88,7 @@ describe('SitesConfigurationService', () => {
         expect(site).toMatchObject({
           syncColumnName: 'TestColumn',
           ingestionMode: 'recursive',
-          scopeId: 'scope_test',
+          scopeId: { type: 'fixed', scopeId: 'scope_test' },
           maxFilesToIngest: 100,
           storeInternally: 'enabled',
           syncStatus: 'active',
@@ -104,14 +104,14 @@ describe('SitesConfigurationService', () => {
           siteDefaults: SiteDefaultsSchema.parse({
             syncColumnName: 'DefaultColumn',
             ingestionMode: 'flat',
-            scopeId: 'default_scope',
+            scopeId: 'scope_default',
             syncMode: 'content_only',
             subsitesScan: 'enabled',
           }),
           sites: [
             PartialSiteConfigSchema.parse({
               siteId: SITE_UUID,
-              scopeId: 'override_scope',
+              scopeId: 'scope_override',
             }),
           ],
         });
@@ -122,7 +122,7 @@ describe('SitesConfigurationService', () => {
         expect(result[0]).toMatchObject({
           syncColumnName: 'DefaultColumn',
           ingestionMode: 'flat',
-          scopeId: 'override_scope',
+          scopeId: { type: 'fixed', scopeId: 'scope_override' },
           syncMode: 'content_only',
           subsitesScan: 'enabled',
           // schema-level defaults from SiteDefaultsSchema.parse({...}) propagate too
@@ -152,7 +152,7 @@ describe('SitesConfigurationService', () => {
         expect(result[0]).toMatchObject({
           syncColumnName: 'FinanceGPTKnowledge',
           ingestionMode: 'recursive',
-          scopeId: 'scope_required',
+          scopeId: { type: 'fixed', scopeId: 'scope_required' },
           syncMode: 'content_and_permissions',
           storeInternally: 'enabled',
           syncStatus: 'active',
@@ -228,7 +228,7 @@ describe('SitesConfigurationService', () => {
         expect(site).toMatchObject({
           syncColumnName: 'TestColumn',
           ingestionMode: 'recursive',
-          scopeId: 'scope_test',
+          scopeId: { type: 'fixed', scopeId: 'scope_test' },
           maxFilesToIngest: 100,
           storeInternally: 'enabled',
           syncStatus: 'active',
@@ -249,7 +249,7 @@ describe('SitesConfigurationService', () => {
           siteDefaults: SiteDefaultsSchema.parse({
             syncColumnName: 'DefaultColumn',
             ingestionMode: 'flat',
-            scopeId: 'default_scope',
+            scopeId: 'scope_default',
             syncMode: 'content_only',
             subsitesScan: 'enabled',
           }),
@@ -265,7 +265,7 @@ describe('SitesConfigurationService', () => {
             id: '1',
             fields: {
               internal_siteId: SITE_UUID,
-              internal_uniqueScopeId: 'override_scope',
+              internal_uniqueScopeId: 'scope_override',
               // sharepoint sets unset numeric cells to 0; transformer maps that to undefined
               internal_maxFilesToIngest: 0,
             },
@@ -281,7 +281,7 @@ describe('SitesConfigurationService', () => {
         expect(site).toMatchObject({
           syncColumnName: 'DefaultColumn',
           ingestionMode: 'flat',
-          scopeId: 'override_scope',
+          scopeId: { type: 'fixed', scopeId: 'scope_override' },
           syncMode: 'content_only',
           subsitesScan: 'enabled',
           storeInternally: 'enabled',

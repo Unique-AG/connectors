@@ -29,7 +29,7 @@ sharepoint:
   # - siteId (Single line text) - SharePoint site ID
   # - syncColumnName (Single line text) - Column that marks files for sync
   # - ingestionMode (Choice: flat, recursive)
-  # - uniqueScopeId (Single line text) - Unique scope ID
+  # - uniqueScopeId (Single line text) - Unique scope ID; either `scope_<id>` or `in_parent:scope_<parentId>`
   # - maxFilesToIngest (Number, optional)
   # - storeInternally (Choice: enabled, disabled)
   # - syncStatus (Choice: active, inactive, deleted)

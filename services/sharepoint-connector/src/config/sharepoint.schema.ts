@@ -86,6 +86,22 @@ export type AuthConfig = z.infer<typeof AuthConfigSchema>;
 
 const DEFAULT_SYNC_COLUMN_NAME = 'FinanceGPTKnowledge';
 
+export type ScopeIdConfig =
+  | { type: 'fixed'; scopeId: string }
+  | { type: 'auto'; parentScopeId: string };
+
+export function isFixedScope(
+  scopeId: ScopeIdConfig,
+): scopeId is { type: 'fixed'; scopeId: string } {
+  return scopeId.type === 'fixed';
+}
+
+export function isAutoScope(
+  scopeId: ScopeIdConfig,
+): scopeId is { type: 'auto'; parentScopeId: string } {
+  return scopeId.type === 'auto';
+}
+
 const compoundSiteIdSchema = z.string().refine(
   (val) => {
     const parts = val.split(',');
@@ -116,13 +132,45 @@ const ingestionModeField = z
       'recursive maintains the folder hierarchy.',
   );
 
-const scopeIdField = z
+const rawScopeIdField = z
   .string()
   .trim()
   .describe(
-    'Scope ID to be used as root for ingestion. ' +
-      'For flat mode, all files are ingested in this scope. ' +
-      'For recursive mode, this is the root scope where SharePoint content hierarchy starts.',
+    'Scope ID to be used as root for ingestion. Either `scope_<id>` for a fixed scope or ' +
+      '`in_parent:scope_<id>` to auto-create a child scope under the given parent. For flat ' +
+      'mode, all files are ingested in this scope. For recursive mode, this is the root scope ' +
+      'where SharePoint content hierarchy starts.',
+  );
+
+const SCOPE_ID_PATTERN = /^scope_[a-z0-9]+$/;
+const IN_PARENT_PREFIX = 'in_parent:';
+const SCOPE_ID_ERROR_MESSAGE = 'Invalid scopeId - expected `scope_<id>` or `in_parent:scope_<id>`';
+
+export const parsedScopeIdField = z
+  .string()
+  .trim()
+  .transform((value, ctx): ScopeIdConfig => {
+    if (value.startsWith(IN_PARENT_PREFIX)) {
+      const parentScopeId = value.slice(IN_PARENT_PREFIX.length);
+      if (!SCOPE_ID_PATTERN.test(parentScopeId)) {
+        ctx.addIssue({ code: 'custom', message: SCOPE_ID_ERROR_MESSAGE });
+        return z.NEVER;
+      }
+      return { type: 'auto', parentScopeId };
+    }
+
+    if (!SCOPE_ID_PATTERN.test(value)) {
+      ctx.addIssue({ code: 'custom', message: SCOPE_ID_ERROR_MESSAGE });
+      return z.NEVER;
+    }
+    return { type: 'fixed', scopeId: value };
+  })
+  .describe(
+    'Validated and parsed scope ID. Accepts `scope_<id>` (a pre-created scope used as-is) or ' +
+      '`in_parent:scope_<id>` (the connector auto-resolves or creates a per-site child under the ' +
+      'given parent scope). Surrounding whitespace is trimmed; both the fixed scope and the ' +
+      'parent of an `in_parent:` value must match /^scope_[a-z0-9]+$/. Output is a discriminated ' +
+      'union: `{ type: "fixed", scopeId }` or `{ type: "auto", parentScopeId }`.',
   );
 
 const maxFilesToIngestField = z.coerce
@@ -167,15 +215,15 @@ const subsitesScanField = z
 
 export const SiteConfigSchema = z.object({
   siteId: siteIdField,
-  syncColumnName: syncColumnNameField.prefault(DEFAULT_SYNC_COLUMN_NAME),
+  syncColumnName: syncColumnNameField,
   ingestionMode: ingestionModeField,
-  scopeId: scopeIdField,
+  scopeId: parsedScopeIdField,
   maxFilesToIngest: maxFilesToIngestField,
-  storeInternally: storeInternallyField.default(EnabledDisabledMode.Enabled),
+  storeInternally: storeInternallyField,
   syncStatus: syncStatusField.default('active'),
   syncMode: syncModeField,
-  permissionsInheritanceMode: permissionsInheritanceModeField.default('inherit_scopes_and_files'),
-  subsitesScan: subsitesScanField.default(EnabledDisabledMode.Disabled),
+  permissionsInheritanceMode: permissionsInheritanceModeField,
+  subsitesScan: subsitesScanField,
 });
 
 export type SiteConfig = z.infer<typeof SiteConfigSchema>;
@@ -184,7 +232,7 @@ export const SiteDefaultsSchema = z
   .object({
     syncColumnName: syncColumnNameField.prefault(DEFAULT_SYNC_COLUMN_NAME),
     ingestionMode: ingestionModeField.optional(),
-    scopeId: scopeIdField.optional(),
+    scopeId: rawScopeIdField.optional(),
     maxFilesToIngest: maxFilesToIngestField,
     storeInternally: storeInternallyField.default(EnabledDisabledMode.Enabled),
     syncStatus: syncStatusField.default('active'),
@@ -200,7 +248,7 @@ export const PartialSiteConfigSchema = z.object({
   siteId: siteIdField,
   syncColumnName: syncColumnNameField.optional(),
   ingestionMode: ingestionModeField.optional(),
-  scopeId: scopeIdField.optional(),
+  scopeId: rawScopeIdField.optional(),
   maxFilesToIngest: maxFilesToIngestField,
   storeInternally: storeInternallyField.optional(),
   syncStatus: syncStatusField.optional(),

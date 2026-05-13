@@ -30,6 +30,12 @@ sharepoint:
       syncColumnName: HRKnowledge
       ingestionMode: flat
       scopeId: scope_bu4gokr0atzj0kfiubbbbbb
+    # Auto-resolves a per-site root under the configured parent scope
+    - siteId: 11111111-2222-3333-4444-555555555555
+      syncColumnName: SalesGPTKnowledge
+      ingestionMode: recursive
+      scopeId: in_parent:scope_bu4gokr0atzj0kfiucccccc
+      maxFilesToIngest: 1000
 unique:
   serviceAuthMode: cluster_local
   serviceExtraHeaders:

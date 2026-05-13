@@ -3,6 +3,7 @@ import { EnabledDisabledMode } from '../constants/enabled-disabled-mode.enum';
 import { IngestionMode } from '../constants/ingestion.constants';
 import {
   PartialSiteConfigSchema,
+  parsedScopeIdField,
   SharepointConfigSchema,
   SiteDefaultsSchema,
 } from './sharepoint.schema';
@@ -461,6 +462,49 @@ describe('SharepointConfigSchema', () => {
       };
 
       expect(() => SharepointConfigSchema.parse(config)).toThrow();
+    });
+  });
+
+  describe('scopeId field (via ScopeIdConfigSchema)', () => {
+    it('parses scope_<id> as fixed', () => {
+      expect(parsedScopeIdField.parse('scope_abc123')).toEqual({
+        type: 'fixed',
+        scopeId: 'scope_abc123',
+      });
+    });
+
+    it('parses in_parent:scope_<id> as auto', () => {
+      expect(parsedScopeIdField.parse('in_parent:scope_abc123')).toEqual({
+        type: 'auto',
+        parentScopeId: 'scope_abc123',
+      });
+    });
+
+    it('trims surrounding whitespace and parses as fixed', () => {
+      expect(parsedScopeIdField.parse('  scope_abc123  ')).toEqual({
+        type: 'fixed',
+        scopeId: 'scope_abc123',
+      });
+    });
+
+    it('rejects in_parent: with a space after the colon', () => {
+      expect(() => parsedScopeIdField.parse('in_parent: scope_abc123')).toThrow('Invalid scopeId');
+    });
+
+    it('rejects uppercase in scope id', () => {
+      expect(() => parsedScopeIdField.parse('scope_ABC')).toThrow('Invalid scopeId');
+    });
+
+    it('rejects unrelated strings', () => {
+      expect(() => parsedScopeIdField.parse('not-a-scope')).toThrow('Invalid scopeId');
+    });
+
+    it('rejects in_parent: with non-conforming inner value', () => {
+      expect(() => parsedScopeIdField.parse('in_parent:not-a-scope')).toThrow('Invalid scopeId');
+    });
+
+    it('rejects empty string', () => {
+      expect(() => parsedScopeIdField.parse('')).toThrow('Invalid scopeId');
     });
   });
 

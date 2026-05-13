@@ -105,6 +105,7 @@ describe('ItemProcessingOrchestratorService', () => {
     managedPath: 'sites',
     serviceUserId: 'test-user-id',
     rootPath: new Smeared('/Root', false),
+    rootScopeId: 'scope_test',
     isInitialSync: false,
     discoveredSubsites: [],
   };

@@ -15,7 +15,7 @@ const ROW_ID = 'row[2]';
 const fullSiteDefaults = SiteDefaultsSchema.parse({
   syncColumnName: 'FinanceGPTKnowledge',
   ingestionMode: IngestionMode.Recursive,
-  scopeId: 'default-scope',
+  scopeId: 'scope_default',
   storeInternally: EnabledDisabledMode.Enabled,
   syncStatus: 'active',
   syncMode: 'content_only',
@@ -128,7 +128,7 @@ describe('mergeSiteWithDefaults', () => {
       const partial = {
         siteId: createSmeared(SITE_UUID),
         ingestionMode: 'bogus',
-        scopeId: 'scope-1',
+        scopeId: 'scope_1',
         syncMode: 'content_only',
       } as unknown as PartialSiteConfig;
 
@@ -147,7 +147,7 @@ describe('mergeSiteWithDefaults', () => {
         siteId: SITE_UUID,
         syncColumnName: 'CustomCol',
         ingestionMode: IngestionMode.Recursive,
-        scopeId: 'scope-per-site',
+        scopeId: 'scope_persite',
         maxFilesToIngest: 500,
         storeInternally: EnabledDisabledMode.Disabled,
         syncStatus: 'inactive',
@@ -160,7 +160,7 @@ describe('mergeSiteWithDefaults', () => {
 
       expect(result.syncColumnName).toBe('CustomCol');
       expect(result.ingestionMode).toBe(IngestionMode.Recursive);
-      expect(result.scopeId).toBe('scope-per-site');
+      expect(result.scopeId).toEqual({ type: 'fixed', scopeId: 'scope_persite' });
       expect(result.maxFilesToIngest).toBe(500);
       expect(result.storeInternally).toBe(EnabledDisabledMode.Disabled);
       expect(result.syncStatus).toBe('inactive');
