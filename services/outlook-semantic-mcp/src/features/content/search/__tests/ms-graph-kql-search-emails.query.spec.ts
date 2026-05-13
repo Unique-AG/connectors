@@ -145,9 +145,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         mockPost,
       });
 
-      const { results } = await instance.run(testUserId, [
-        { kqlQuery: 'test', mailbox: OWN_EMAIL },
-      ], 100);
+      const { results } = await instance.run(
+        testUserId,
+        [{ kqlQuery: 'test', mailbox: OWN_EMAIL }],
+        100,
+      );
 
       const requests = mockPost.mock.calls?.[0]?.[0]?.requests;
       expect(requests).toHaveLength(1);
@@ -162,9 +164,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         mockPost,
       });
 
-      const { results } = await instance.run(testUserId, [
-        { kqlQuery: 'test', mailbox: DELEGATED_EMAIL },
-      ], 100);
+      const { results } = await instance.run(
+        testUserId,
+        [{ kqlQuery: 'test', mailbox: DELEGATED_EMAIL }],
+        100,
+      );
 
       const requests = mockPost.mock.calls?.[0]?.[0]?.requests;
       expect(requests).toHaveLength(1);
@@ -175,9 +179,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     it('returns empty results with searchSummary when mailbox not in accessible set', async () => {
       const { instance } = createQuery({ delegatedMailboxes: [DELEGATED_EMAIL] });
 
-      const { results, searchSummary } = await instance.run(testUserId, [
-        { kqlQuery: 'test', mailbox: 'unknown@example.com' },
-      ], 100);
+      const { results, searchSummary } = await instance.run(
+        testUserId,
+        [{ kqlQuery: 'test', mailbox: 'unknown@example.com' }],
+        100,
+      );
 
       expect(results).toHaveLength(0);
       expect(searchSummary).toBeDefined();
@@ -270,7 +276,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const mockPost = vi.fn().mockRejectedValue(new Error('network error'));
       const { instance } = createQuery({ mockPost });
 
-      const { results, searchSummary } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results, searchSummary } = await instance.run(
+        testUserId,
+        [{ kqlQuery: 'test' }],
+        100,
+      );
 
       expect(results).toHaveLength(0);
       expect(searchSummary).toBeDefined();
@@ -368,9 +378,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         mockPost,
       });
 
-      const { results } = await instance.run(testUserId, [
-        { kqlQuery: 'test', mailbox: DELEGATED_EMAIL },
-      ], 100);
+      const { results } = await instance.run(
+        testUserId,
+        [{ kqlQuery: 'test', mailbox: DELEGATED_EMAIL }],
+        100,
+      );
 
       expect(results[0]?.outlookWebLink).toBe('');
     });
@@ -390,7 +402,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         });
       const { instance } = createQuery({ mockPost });
 
-      const { results, searchSummary } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results, searchSummary } = await instance.run(
+        testUserId,
+        [{ kqlQuery: 'test' }],
+        100,
+      );
 
       expect(results).toHaveLength(0);
       expect(searchSummary).toBeUndefined();
