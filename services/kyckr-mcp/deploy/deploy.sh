@@ -68,18 +68,78 @@ else
   echo "ACR ${ACR} already exists, reusing."
 fi
 
-# === BUILD IMAGE IN ACR FROM MONOREPO ROOT ===
-# Build context must be the monorepo root so workspace deps (pnpm-workspace.yaml,
-# pnpm-lock.yaml, packages/*) are available to the multi-stage build.
-echo "Building image in ACR (this can take 5-10 min for first build)..."
+# === BUILD AND PUSH IMAGE LOCALLY ===
+# az acr build is currently blocked in this lab subscription ("failed to
+# download context" 3s into the build agent). Until that is fixed, we build
+# locally with --platform linux/amd64 and push to ACR.
+#
+# Once `az acr build` works in this lab again, this whole section can be
+# replaced with:
+#   (cd "${REPO_ROOT}" && az acr build --registry "${ACR}" \
+#      --image "${IMAGE}" --file "${DOCKERFILE}" .)
+
+# Pre-flight: docker daemon must be running.
+if ! docker info >/dev/null 2>&1; then
+  echo "ERROR: Docker is not running. Start Docker Desktop and re-run." >&2
+  exit 1
+fi
+
+# Auto-stash the packages/utils/package.json `prepare: tsc` edit if present.
+# That hook runs during `pnpm install` in the deps stage and fails because
+# tsconfig.json is not yet in scope, breaking every monorepo Dockerfile build.
+# We restore the stash via a trap so the user's working tree is untouched.
+STASH_DONE=false
+if git -C "${REPO_ROOT}" diff -- packages/utils/package.json 2>/dev/null \
+     | grep -qE '^\+\s*"prepare":\s*"tsc"'; then
+  STASH_MSG="kyckr-deploy-auto-stash-$$"
+  echo "Auto-stashing packages/utils/package.json (contains build-breaking prepare:tsc)..."
+  if git -C "${REPO_ROOT}" stash push -m "${STASH_MSG}" -- packages/utils/package.json >/dev/null; then
+    STASH_DONE=true
+    trap '
+      if [[ "${STASH_DONE}" == "true" ]]; then
+        REF=$(git -C "'"${REPO_ROOT}"'" stash list | grep -F "'"${STASH_MSG}"'" | head -1 | cut -d: -f1)
+        if [[ -n "$REF" ]]; then
+          echo "Restoring packages/utils/package.json from stash $REF..."
+          git -C "'"${REPO_ROOT}"'" stash pop "$REF" >/dev/null || \
+            echo "WARN: could not auto-restore stash $REF. Run: git stash list" >&2
+        fi
+      fi
+    ' EXIT
+  else
+    echo "ERROR: failed to stash packages/utils/package.json." >&2
+    exit 1
+  fi
+fi
+
+# Log into ACR (uses the active az session, no password prompt).
+echo "Logging into ACR ${ACR}..."
+az acr login -n "${ACR}" >/dev/null
+
+# Build for linux/amd64 (App Service runs amd64; Apple Silicon needs the flag).
+echo "Building image for linux/amd64 (5-15 min, faster with Docker Desktop Rosetta)..."
 (
   cd "${REPO_ROOT}"
-  az acr build \
-    --registry "${ACR}" \
-    --image "${IMAGE}" \
-    --file "${DOCKERFILE}" \
+  DOCKER_BUILDKIT=1 docker build \
+    --platform linux/amd64 \
+    -t "${ACR}.azurecr.io/${IMAGE}" \
+    -f "${DOCKERFILE}" \
     .
 )
+
+# Verify architecture before pushing — pushing an arm64 image leaves App
+# Service stuck in a crash loop with "no matching manifest for linux/amd64".
+ARCH="$(docker inspect "${ACR}.azurecr.io/${IMAGE}" --format '{{.Architecture}}/{{.Os}}')"
+if [[ "${ARCH}" != "amd64/linux" ]]; then
+  echo "ERROR: Built image is ${ARCH}, expected amd64/linux." >&2
+  echo "       App Service requires amd64. Check --platform flag above." >&2
+  exit 1
+fi
+echo "Image architecture verified: ${ARCH}"
+
+# Push.
+echo "Pushing image to ACR..."
+docker push "${ACR}.azurecr.io/${IMAGE}" >/dev/null
+echo "Image pushed."
 
 # === CREATE APP SERVICE PLAN (B1 Linux, ~$13/mo) ===
 if ! az appservice plan show -n "${APP}-plan" -g "${RG}" >/dev/null 2>&1; then
