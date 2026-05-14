@@ -20,6 +20,7 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { greatestFrom } from '~/utils/greatest-from';
+import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { recordInHistogram } from '~/utils/record-in-histogram';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
@@ -34,14 +35,14 @@ export const RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES = 20;
 export const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
 export const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 30;
 
-type LiveCatchupStatus = 'skipped' | 'completed' | 'failed';
+type LiveCatchupResult = { status: 'completed' | 'skipped' } | { status: 'failed'; err: unknown };
 
 @Injectable()
 export class LiveCatchUpCommand {
   private readonly logger = new Logger(this.constructor.name);
   private readonly messagesProcessed: Counter<Attributes>;
-  private readonly liveCatchupRunsCounter: Counter;
   private readonly liveCatchupRunDuration: Histogram;
+  private readonly liveCatchupRoundDuration: Histogram;
   private readonly directorySyncDuration: Histogram;
   private readonly batchSyncDuration: Histogram;
 
@@ -58,13 +59,16 @@ export class LiveCatchUpCommand {
     this.messagesProcessed = metricService.getCounter('osm_live_catchup_messages_total', {
       description: 'Total messages processed during live catch-up',
     });
-    this.liveCatchupRunsCounter = metricService.getCounter('osm_live_catchup_runs_total', {
-      description: 'Number of live catch-up run() invocations by status',
-    });
     this.liveCatchupRunDuration = metricService.getHistogram(
       'osm_live_catchup_run_duration_seconds',
       {
-        description: 'Wall-clock duration of a live catch-up run() call',
+        description: 'Wall-clock duration of a total live catch-up run() call',
+      },
+    );
+    this.liveCatchupRoundDuration = metricService.getHistogram(
+      'osm_live_catchup_round_duration_seconds',
+      {
+        description: 'Wall-clock duration of a live catch-up runLiveCatchup() call',
       },
     );
     this.directorySyncDuration = metricService.getHistogram(
@@ -82,18 +86,30 @@ export class LiveCatchUpCommand {
   public async run(input: {
     liveCatchupOverlappingWindow: number;
     subscriptionId: string;
-  }): Promise<LiveCatchupStatus> {
+  }): Promise<LiveCatchupResult> {
     traceAttrs({ subscriptionId: input.subscriptionId });
-    const runStart = Date.now();
-    const status = await withRetryAttempts<LiveCatchupStatus>({
-      fn: () => this.runLiveCatchup(input),
-      onError: rethrowRateLimitError,
-      getResultFailure: () => 'failed',
+    return recordInHistogram({
+      histogram: this.liveCatchupRunDuration,
+      successAtrributes: (result) => ({
+        status: result.status,
+        errorType:
+          result.status === 'failed'
+            ? isRateLimitError(result.err)
+              ? 'throttling'
+              : 'other'
+            : undefined,
+      }),
+      errorAttributtes: (error) => ({
+        status: 'failed',
+        errorType: isRateLimitError(error) ? 'throttling' : 'other',
+      }),
+      fn: () =>
+        withRetryAttempts<LiveCatchupResult>({
+          fn: () => this.runLiveCatchup(input),
+          onError: rethrowRateLimitError,
+          getResultFailure: (err) => ({ status: 'failed', err }),
+        }),
     });
-    const durationSeconds = (Date.now() - runStart) / 1000;
-    this.liveCatchupRunsCounter.add(1, { status });
-    this.liveCatchupRunDuration.record(durationSeconds, { status });
-    return status;
   }
 
   @Span()
@@ -103,17 +119,17 @@ export class LiveCatchUpCommand {
   }: {
     liveCatchupOverlappingWindow: number;
     subscriptionId: string;
-  }): Promise<LiveCatchupStatus> {
+  }): Promise<LiveCatchupResult> {
     traceAttrs({ subscriptionId });
     this.logger.debug({
       subscriptionId,
       msg: 'Live catch-up triggered',
     });
     if (this.config.mcpBackend === 'MicrosoftGraph') {
-      return 'skipped';
+      return { status: 'skipped' };
     }
 
-    const userProfile = await this.db
+    const userProfileRow = await this.db
       .select({
         userProfileId: userProfiles.id,
         userEmail: userProfiles.email,
@@ -123,74 +139,102 @@ export class LiveCatchUpCommand {
       .innerJoin(userProfiles, eq(subscriptions.userProfileId, userProfiles.id))
       .where(eq(subscriptions.subscriptionId, subscriptionId))
       .then((rows) => rows[0]);
-    if (!userProfile) {
-      return 'skipped';
+    if (!userProfileRow) {
+      return { status: 'skipped' };
     }
-    if (await this.isInboxDeletingQuery.run(userProfile.userProfileId)) {
-      return 'skipped';
+    if (await this.isInboxDeletingQuery.run(userProfileRow.userProfileId)) {
+      return { status: 'skipped' };
     }
 
-    assert.ok(userProfile.userEmail, `Missing email for: ${userProfile.userProfileId}`);
+    const userProfileEmail = userProfileRow.userEmail;
+    assert.ok(userProfileEmail, `Missing email for: ${userProfileRow.userProfileId}`);
+    const userProfile = { ...userProfileRow, userEmail: userProfileEmail };
 
     const lockResult = await this.acquireLock(userProfile.userProfileId);
     if (lockResult.status === 'skip') {
-      return 'skipped';
+      return { status: 'skipped' };
     }
 
     let finalStatus: 'ready' | 'failed' = 'ready';
+    let finalOutput: LiveCatchupResult = { status: 'skipped' };
 
-    // We run maximum 3 rounds to avoid an infinite loop here.
-    for (let round = 0; round < 3; round++) {
-      finalStatus = 'ready';
-      // If we got webhooks while we were running we will run once more but with a smaller overlapping window
-      // because we have some fresh data which appeared while we were running.
-      const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
+    try {
+      // We run maximum 3 rounds to avoid an infinite loop here.
+      for (let round = 0; round < 3; round++) {
+        finalStatus = 'ready';
+        // If we got webhooks while we were running we will run once more but with a smaller overlapping window
+        // because we have some fresh data which appeared while we were running.
+        const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
 
-      const runResult = await this.runLiveCatchupWithLock({
-        watermark: lockResult.watermark,
-        filters: lockResult.filters,
-        user: {
-          email: userProfile.userEmail,
-          profileId: userProfile.userProfileId,
-          providerId: userProfile.providerUserId,
-        },
-        subscriptionId,
-        liveCatchupOverlappingWindow: overlappingWindowInMinutes,
-      });
+        const runResult = await recordInHistogram({
+          histogram: this.liveCatchupRoundDuration,
+          successAtrributes: (result) => ({
+            status: result.status,
+            errorType:
+              result.status === 'failed'
+                ? isRateLimitError(result.err)
+                  ? 'throttling'
+                  : 'other'
+                : undefined,
+          }),
+          errorAttributtes: (error) => ({
+            status: 'failed',
+            errorType: isRateLimitError(error) ? 'throttling' : 'other',
+          }),
+          fn: () =>
+            this.runLiveCatchupWithLock({
+              watermark: lockResult.watermark,
+              filters: lockResult.filters,
+              user: {
+                email: userProfile.userEmail,
+                profileId: userProfile.userProfileId,
+                providerId: userProfile.providerUserId,
+              },
+              subscriptionId,
+              liveCatchupOverlappingWindow: overlappingWindowInMinutes,
+            }),
+        });
 
-      if (runResult.status === 'failed') {
-        finalStatus = 'failed';
-        break;
+        if (runResult.status === 'failed') {
+          if (isRateLimitError(runResult.err)) {
+            // We rethrow rate limit errors
+            throw runResult.err;
+          }
+          finalOutput = { status: 'failed', err: runResult.err };
+          finalStatus = 'failed';
+          break;
+        }
+
+        finalOutput = { status: 'completed' };
+        const inboxConfiguration = await this.db
+          .select({
+            lastWebhookReceivedAt: inboxConfigurations.lastWebhookReceivedAt,
+            deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
+          })
+          .from(inboxConfigurations)
+          .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
+          .then((rows) => rows[0]);
+
+        if (inboxConfiguration?.deletingInboxStartedAt) {
+          break;
+        }
+
+        if (
+          !inboxConfiguration?.lastWebhookReceivedAt ||
+          inboxConfiguration.lastWebhookReceivedAt < runResult.batchProcessingStartedAt
+        ) {
+          break;
+        }
       }
-
-      const inboxConfiguration = await this.db
-        .select({
-          lastWebhookReceivedAt: inboxConfigurations.lastWebhookReceivedAt,
-          deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
-        })
-        .from(inboxConfigurations)
+    } finally {
+      await this.db
+        .update(inboxConfigurations)
+        .set({ liveCatchUpState: finalStatus, liveCatchUpHeartbeatAt: sql`NOW()` })
         .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
-        .then((rows) => rows[0]);
-
-      if (inboxConfiguration?.deletingInboxStartedAt) {
-        break;
-      }
-
-      if (
-        !inboxConfiguration?.lastWebhookReceivedAt ||
-        inboxConfiguration.lastWebhookReceivedAt < runResult.batchProcessingStartedAt
-      ) {
-        break;
-      }
+        .execute();
     }
 
-    await this.db
-      .update(inboxConfigurations)
-      .set({ liveCatchUpState: finalStatus, liveCatchUpHeartbeatAt: sql`NOW()` })
-      .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
-      .execute();
-
-    return finalStatus === 'ready' ? 'completed' : 'failed';
+    return finalOutput;
   }
 
   private async acquireLock(
@@ -264,7 +308,9 @@ export class LiveCatchUpCommand {
     user: { profileId: string; providerId: string; email: string };
     subscriptionId: string;
     liveCatchupOverlappingWindow: number;
-  }): Promise<{ status: 'success'; batchProcessingStartedAt: Date } | { status: 'failed' }> {
+  }): Promise<
+    { status: 'success'; batchProcessingStartedAt: Date } | { status: 'failed'; err: unknown }
+  > {
     const logProps = Object.freeze({ userProfileId: user.profileId, subscriptionId });
 
     try {
@@ -292,7 +338,7 @@ export class LiveCatchUpCommand {
       return { status: 'success', batchProcessingStartedAt };
     } catch (error) {
       this.logger.error({ ...logProps, err: error, msg: 'Failed to execute live catch-up' });
-      return { status: 'failed' };
+      return { status: 'failed', err: error };
     }
   }
 

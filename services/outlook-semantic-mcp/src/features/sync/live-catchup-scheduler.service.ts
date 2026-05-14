@@ -55,7 +55,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
       return;
     }
 
-    const job = new CronJob(this.config.liveCatchupRecovery, () => {
+    const job = new CronJob(this.config.liveCatchupRecoveryCron, () => {
       this.runRecoveryScan();
       this.runReadyLiveCatchupsWhichDidNotRunRecently();
     });

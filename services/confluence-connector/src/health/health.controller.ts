@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
-import { ConnectivityHealthIndicator } from './connectivity-health.indicator';
+import { MsGraphConnectivityHealthIndicator } from './ms-graph-connectivity-health.indicator';
 import { SyncHealthIndicator } from './sync-health.indicator';
 import { UniqueApiHealthIndicator } from './unique-api-health.indicator';
 
@@ -9,7 +9,7 @@ export class HealthController {
   public constructor(
     private readonly healthCheckService: HealthCheckService,
     private readonly syncIndicator: SyncHealthIndicator,
-    private readonly connectivityIndicator: ConnectivityHealthIndicator,
+    private readonly connectivityIndicator: MsGraphConnectivityHealthIndicator,
     private readonly uniqueApiIndicator: UniqueApiHealthIndicator,
   ) {}
 

@@ -21,7 +21,7 @@ const ATLASSIAN_API_URL = 'https://api.atlassian.com/';
  * connectivity issues are not masked by auth problems and vice versa.
  */
 @Injectable()
-export class ConnectivityHealthIndicator {
+export class MsGraphConnectivityHealthIndicator {
   private readonly timeoutMs: number;
 
   public constructor(

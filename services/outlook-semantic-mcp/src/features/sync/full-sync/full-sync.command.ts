@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { Counter, Histogram } from '@opentelemetry/api';
+import type { Histogram } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
 import { MetricService, Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
@@ -40,7 +40,6 @@ export type FullSyncResult =
 export class FullSyncCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  private readonly fullSyncRunsCounter: Counter;
   private readonly fullSyncRunDuration: Histogram;
   private readonly directorySyncDuration: Histogram;
   private readonly batchSyncDuration: Histogram;
@@ -56,9 +55,6 @@ export class FullSyncCommand {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     metricService: MetricService,
   ) {
-    this.fullSyncRunsCounter = metricService.getCounter('osm_full_sync_runs_total', {
-      description: 'Number of full sync run() invocations by outcome',
-    });
     this.fullSyncRunDuration = metricService.getHistogram('osm_full_sync_run_duration_seconds', {
       description: 'Wall-clock duration of a full sync run() call including retries',
     });
@@ -75,21 +71,15 @@ export class FullSyncCommand {
 
   @Span()
   public async run(userProfileId: string): Promise<FullSyncResult> {
-    const runStart = Date.now();
     const result = await withRetryAttempts<FullSyncResult>({
       fn: () => this.runFullSync(userProfileId),
       onError: rethrowRateLimitError,
       getResultFailure: (error) => ({ status: 'failed', error }),
     });
-    const durationSeconds = (Date.now() - runStart) / 1000;
+    // const durationSeconds = (Date.now() - runStart) / 1000;
     const errorType =
-      result.status === 'failed'
-        ? isRateLimitError(result.error)
-          ? 'throttling'
-          : 'other'
-        : 'none';
-    this.fullSyncRunsCounter.add(1, { status: result.status, error_type: errorType });
-    this.fullSyncRunDuration.record(durationSeconds, { status: result.status });
+      result.status !== 'failed' ? 'none' : isRateLimitError(result.error) ? 'throttling' : 'other';
+    this.fullSyncRunDuration.record(durationSeconds, { status: result.status, errorType });
     return result;
   }
 

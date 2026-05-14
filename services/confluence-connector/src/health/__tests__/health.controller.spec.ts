@@ -4,8 +4,8 @@ import { type HealthIndicatorResult, TerminusModule } from '@nestjs/terminus';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConnectivityHealthIndicator } from '../connectivity-health.indicator';
 import { HealthController } from '../health.controller';
+import { MsGraphConnectivityHealthIndicator } from '../ms-graph-connectivity-health.indicator';
 import { SyncHealthIndicator } from '../sync-health.indicator';
 import { UniqueApiHealthIndicator } from '../unique-api-health.indicator';
 
@@ -46,14 +46,14 @@ const syncDown = {
 describe('HealthController', () => {
   let app: INestApplication;
   let syncIndicator: DeepMocked<SyncHealthIndicator>;
-  let connectivityIndicator: DeepMocked<ConnectivityHealthIndicator>;
+  let connectivityIndicator: DeepMocked<MsGraphConnectivityHealthIndicator>;
   let uniqueApiIndicator: DeepMocked<UniqueApiHealthIndicator>;
 
   beforeEach(async () => {
     syncIndicator = createMock<SyncHealthIndicator>({
       check: vi.fn(() => syncUp),
     });
-    connectivityIndicator = createMock<ConnectivityHealthIndicator>({
+    connectivityIndicator = createMock<MsGraphConnectivityHealthIndicator>({
       check: vi.fn(() => Promise.resolve(connectivityUp)),
     });
     uniqueApiIndicator = createMock<UniqueApiHealthIndicator>({
@@ -65,7 +65,7 @@ describe('HealthController', () => {
       controllers: [HealthController],
       providers: [
         { provide: SyncHealthIndicator, useValue: syncIndicator },
-        { provide: ConnectivityHealthIndicator, useValue: connectivityIndicator },
+        { provide: MsGraphConnectivityHealthIndicator, useValue: connectivityIndicator },
         { provide: UniqueApiHealthIndicator, useValue: uniqueApiIndicator },
       ],
     }).compile();

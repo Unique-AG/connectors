@@ -34,7 +34,7 @@ export const withIngestionConfig = z.object({
     .string()
     .prefault('*/2 * * * *')
     .describe('Cron schedule for full sync recovery. Default every 2 minutes'),
-  liveCatchupRecovery: z
+  liveCatchupRecoveryCron: z
     .string()
     .prefault('*/5 * * * *')
     .describe('Cron schedule for full sync recovery. Default every 5 minutes'),
