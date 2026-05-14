@@ -19,6 +19,7 @@ import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-att
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
+import { recordInHistogram } from '~/utils/record-in-histogram';
 
 type InboxConfig = typeof inboxConfigurations.$inferSelect;
 
@@ -71,16 +72,28 @@ export class FullSyncCommand {
 
   @Span()
   public async run(userProfileId: string): Promise<FullSyncResult> {
-    const result = await withRetryAttempts<FullSyncResult>({
-      fn: () => this.runFullSync(userProfileId),
-      onError: rethrowRateLimitError,
-      getResultFailure: (error) => ({ status: 'failed', error }),
+    return await recordInHistogram({
+      histogram: this.fullSyncRunDuration,
+      successAtrributes: (result) => ({
+        status: result.status,
+        errorType:
+          result.status !== 'failed'
+            ? 'none'
+            : isRateLimitError(result.error)
+              ? 'throttling'
+              : 'other',
+      }),
+      errorAttributtes: (err) => ({
+        status: 'failed',
+        errorType: isRateLimitError(err) ? 'throttling' : 'other',
+      }),
+      fn: () =>
+        withRetryAttempts<FullSyncResult>({
+          fn: () => this.runFullSync(userProfileId),
+          onError: rethrowRateLimitError,
+          getResultFailure: (error) => ({ status: 'failed', error }),
+        }),
     });
-    // const durationSeconds = (Date.now() - runStart) / 1000;
-    const errorType =
-      result.status !== 'failed' ? 'none' : isRateLimitError(result.error) ? 'throttling' : 'other';
-    this.fullSyncRunDuration.record(durationSeconds, { status: result.status, errorType });
-    return result;
   }
 
   @Span()
