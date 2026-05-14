@@ -25,6 +25,7 @@ import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
 import { buildUniqueQlSearchFilter } from './build-unique-ql-search-filter.util';
 import { CleanupSearchConditionsForUserQuery } from './cleanup-search-conditions-for-user.query';
+import { SemanticSearchConfig } from './search.config';
 import { SearchEmailsInputSchema } from './search-conditions.dto';
 
 export enum SearchBackend {
@@ -96,12 +97,12 @@ export class SemanticSearchEmailsQuery {
   public async run(
     userProfileId: UserProfileTypeID,
     inputs: z.infer<typeof SearchEmailsInputSchema>[],
-    maxOutputEmails: number,
+    searchConfig: SemanticSearchConfig,
   ): Promise<{
     results: SearchEmailResult[];
     searchSummary: string | undefined;
   }> {
-    assert.ok(maxOutputEmails > 0, `maxOutputEmails: ${maxOutputEmails} cannot be <= 0`);
+    assert.ok(searchConfig, `searchConfig cannot be nullish`);
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const context = await this.loadAccessContext(userProfile);
 
@@ -199,7 +200,7 @@ export class SemanticSearchEmailsQuery {
     );
 
     return {
-      results: results.slice(0, maxOutputEmails),
+      results: results.slice(0, searchConfig.maxEmailsLimit),
       searchSummary: summaries.length > 0 ? summaries.join('\r\n') : undefined,
     };
   }

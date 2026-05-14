@@ -162,11 +162,11 @@ export const SearchEmailsInputSchema = z.object({
   limit: z
     .number()
     .int()
-    .min(SEARCH_CONFIG.semanticSearch.subQueryChunksLimits.min)
-    .max(SEARCH_CONFIG.semanticSearch.subQueryChunksLimits.max)
+    .min(SEARCH_CONFIG.semanticSearch?.subQueryChunksLimits.min ?? 0)
+    .max(SEARCH_CONFIG.semanticSearch?.subQueryChunksLimits.max ?? 0)
     .optional()
-    .prefault(SEARCH_CONFIG.semanticSearch.subQueryChunksLimits.default)
-    .describe(SEARCH_CONFIG.semanticSearch.subQueryChunksLimits.description),
+    .prefault(SEARCH_CONFIG.semanticSearch?.subQueryChunksLimits.default ?? 0)
+    .describe(SEARCH_CONFIG.semanticSearch?.subQueryChunksLimits.description ?? ''),
 });
 
 export type SearchEmailsInput = z.infer<typeof SearchEmailsInputSchema>;

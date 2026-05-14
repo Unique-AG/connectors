@@ -7,21 +7,25 @@ interface SubQueryLimits {
   description: string;
 }
 
+export interface MsGraphSearchConfig {
+  // How many emails does the ms-graph-kql-search-emails.query.ts return
+  maxEmailsLimit: number;
+  // For every ms graph sub query what's the config for their min / max / default and description.
+  subQueryLimits: SubQueryLimits;
+}
+
+export interface SemanticSearchConfig {
+  // How many emails does the semantic-search-emails.query.ts return
+  maxEmailsLimit: number;
+  // For every semantic search sub query what's the config for their min / max / default and description.
+  subQueryChunksLimits: SubQueryLimits;
+}
+
 interface SearchConfig {
   // Max emails returned by search-emails.query.ts
   maxOutputEmails: number;
-  msGraph: {
-    // How many emails does the ms-graph-kql-search-emails.query.ts return
-    maxEmailsLimit: number;
-    // For every ms graph sub query what's the config for their min / max / default and description.
-    subQueryLimits: SubQueryLimits;
-  };
-  semanticSearch: {
-    // How many emails does the semantic-search-emails.query.ts return
-    maxEmailsLimit: number;
-    // For every semantic search sub query what's the config for their min / max / default and description.
-    subQueryChunksLimits: SubQueryLimits;
-  };
+  msGraph: MsGraphSearchConfig;
+  semanticSearch: null | SemanticSearchConfig;
 }
 
 const getMsGraphDescription = (subQueryLimits: Omit<SubQueryLimits, 'description'>): string =>
@@ -49,10 +53,7 @@ export const SEARCH_CONFIG: SearchConfig = isMicrosoftGraphBackend()
           description: getMsGraphDescription(msGraphOnlySubQueryLimits),
         },
       },
-      semanticSearch: {
-        maxEmailsLimit: 0,
-        subQueryChunksLimits: { min: 0, max: 0, default: 0, description: '' },
-      },
+      semanticSearch: null,
     }
   : {
       maxOutputEmails: 200,

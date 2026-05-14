@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { isNullish } from 'remeda';
 import * as z from 'zod';
-import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
@@ -44,19 +44,11 @@ export class SearchEmailsQuery {
       results: SearchEmailResult[];
       searchSummary: string | undefined;
     }> => {
-      if (
-        isMicrosoftGraphBackend() ||
-        !input.uniqueSemanticSearchQueries?.length ||
-        SEARCH_CONFIG.semanticSearch.maxEmailsLimit <= 0
-      ) {
+      if (isNullish(SEARCH_CONFIG.semanticSearch) || !input.uniqueSemanticSearchQueries?.length) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
       return this.semanticSearchQuery
-        .run(
-          userProfileId,
-          input.uniqueSemanticSearchQueries,
-          SEARCH_CONFIG.semanticSearch.maxEmailsLimit,
-        )
+        .run(userProfileId, input.uniqueSemanticSearchQueries, SEARCH_CONFIG.semanticSearch)
         .then(({ results, searchSummary }) => ({ results, searchSummary }));
     },
     [SearchBackend.MsGraph]: (
@@ -72,7 +64,7 @@ export class SearchEmailsQuery {
       return this.msGraphKqlQuery.run(
         userProfileId,
         input.msGraphKeywordSearchQueries,
-        SEARCH_CONFIG.msGraph.maxEmailsLimit,
+        SEARCH_CONFIG.msGraph,
       );
     },
   };
