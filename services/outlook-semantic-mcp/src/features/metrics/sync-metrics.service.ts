@@ -6,6 +6,20 @@ import type { LiveCatchupResult } from '~/features/sync/live-catch-up/live-catch
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { recordInHistogram } from '~/utils/record-in-histogram';
 
+export enum SyncMetricName {
+  FullSyncRunDuration = 'osm_full_sync_run_duration_seconds',
+  FullSyncDirectorySyncDuration = 'osm_full_sync_directory_sync_duration_seconds',
+  FullSyncBatchDuration = 'osm_full_sync_batch_duration_seconds',
+  FullSyncGraphPageDuration = 'osm_full_sync_graph_page_duration_seconds',
+  FullSyncProcessEmailDuration = 'osm_full_sync_process_email_duration_seconds',
+  FullSyncMessagesProcessed = 'osm_full_sync_messages_processed_total',
+  LiveCatchupRunDuration = 'osm_live_catchup_run_duration_seconds',
+  LiveCatchupRoundDuration = 'osm_live_catchup_round_duration_seconds',
+  LiveCatchupDirectorySyncDuration = 'osm_live_catchup_directory_sync_duration_seconds',
+  LiveCatchupBatchDuration = 'osm_live_catchup_batch_duration_seconds',
+  LiveCatchupMessagesProcessed = 'osm_live_catchup_messages_total',
+}
+
 @Injectable()
 export class SyncMetricsService {
   private readonly fullSyncRunDuration: Histogram;
@@ -21,65 +35,62 @@ export class SyncMetricsService {
   private readonly liveCatchupMessagesProcessed: Histogram;
 
   public constructor(metricService: MetricService) {
-    this.fullSyncRunDuration = metricService.getHistogram('osm_full_sync_run_duration_seconds', {
+    this.fullSyncRunDuration = metricService.getHistogram(SyncMetricName.FullSyncRunDuration, {
       description: 'Wall-clock duration of a full sync run() call including retries',
     });
     this.fullSyncDirectorySyncDuration = metricService.getHistogram(
-      'osm_full_sync_directory_sync_duration_seconds',
+      SyncMetricName.FullSyncDirectorySyncDuration,
       {
         description: 'Duration of the directory sync step within a full sync',
       },
     );
-    this.fullSyncBatchDuration = metricService.getHistogram(
-      'osm_full_sync_batch_duration_seconds',
-      {
-        description: 'Duration of the batch processing step within a full sync',
-      },
-    );
+    this.fullSyncBatchDuration = metricService.getHistogram(SyncMetricName.FullSyncBatchDuration, {
+      description: 'Duration of the batch processing step within a full sync',
+    });
     this.fullSyncGraphPageDuration = metricService.getHistogram(
-      'osm_full_sync_graph_page_duration_seconds',
+      SyncMetricName.FullSyncGraphPageDuration,
       {
         description: 'Duration of Graph API page fetch during full sync',
       },
     );
     this.fullSyncProcessEmailDuration = metricService.getHistogram(
-      'osm_full_sync_process_email_duration_seconds',
+      SyncMetricName.FullSyncProcessEmailDuration,
       {
         description: 'Duration of single message ingestion during full sync (including retries)',
       },
     );
     this.fullSyncMessagesProcessed = metricService.getHistogram(
-      'osm_full_sync_messages_processed_total',
+      SyncMetricName.FullSyncMessagesProcessed,
       {
         description: 'Total messages processed during full sync',
       },
     );
     this.liveCatchupRunDuration = metricService.getHistogram(
-      'osm_live_catchup_run_duration_seconds',
+      SyncMetricName.LiveCatchupRunDuration,
       {
         description: 'Wall-clock duration of a total live catch-up run() call',
       },
     );
     this.liveCatchupRoundDuration = metricService.getHistogram(
-      'osm_live_catchup_round_duration_seconds',
+      SyncMetricName.LiveCatchupRoundDuration,
       {
         description: 'Wall-clock duration of a live catch-up runLiveCatchup() call',
       },
     );
     this.liveCatchupDirectorySyncDuration = metricService.getHistogram(
-      'osm_live_catchup_directory_sync_duration_seconds',
+      SyncMetricName.LiveCatchupDirectorySyncDuration,
       {
         description: 'Duration of directory sync during live catch-up',
       },
     );
     this.liveCatchupBatchDuration = metricService.getHistogram(
-      'osm_live_catchup_batch_duration_seconds',
+      SyncMetricName.LiveCatchupBatchDuration,
       {
         description: 'Duration of a single batch processing step during live catch-up',
       },
     );
     this.liveCatchupMessagesProcessed = metricService.getHistogram(
-      'osm_live_catchup_messages_total',
+      SyncMetricName.LiveCatchupMessagesProcessed,
       {
         description: 'Total messages processed during live catch-up',
       },

@@ -1,16 +1,12 @@
 import { join } from 'node:path';
-import {
-  AggregationType,
-  InstrumentType,
-  initOpenTelemetry,
-  runWithInstrumentation,
-} from '@unique-ag/instrumentation';
+import { initOpenTelemetry, runWithInstrumentation } from '@unique-ag/instrumentation';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
 import { Logger, LoggerErrorInterceptor } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { AppModule } from './app.module';
+import { syncMetricViews } from '~/features/metrics/sync-metric-views';
 import { type AppConfig, appConfig } from './config';
 
 async function bootstrap() {
@@ -47,55 +43,6 @@ initOpenTelemetry({
   defaultServiceName: 'outlook-semantic-mcp',
   defaultServiceVersion: packageJson.version,
   includePgInstrumentation: true,
-  views: [
-    {
-      instrumentType: InstrumentType.HISTOGRAM,
-      instrumentName: 'osm_full_sync_run_duration_seconds',
-      aggregation: {
-        type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
-        options: { boundaries: [5, 15, 30, 60, 120, 300, 600, 900] },
-      },
-    },
-    {
-      instrumentType: InstrumentType.HISTOGRAM,
-      instrumentName: 'osm_full_sync_batch_duration_seconds',
-      aggregation: {
-        type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
-        options: { boundaries: [1, 5, 10, 30, 60, 120, 300] },
-      },
-    },
-    {
-      instrumentType: InstrumentType.HISTOGRAM,
-      instrumentName: 'osm_full_sync_directory_sync_duration_seconds',
-      aggregation: {
-        type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
-        options: { boundaries: [0.1, 0.5, 1, 2, 5, 10, 30] },
-      },
-    },
-    {
-      instrumentType: InstrumentType.HISTOGRAM,
-      instrumentName: 'osm_live_catchup_run_duration_seconds',
-      aggregation: {
-        type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
-        options: { boundaries: [1, 5, 10, 30, 60, 120, 300] },
-      },
-    },
-    {
-      instrumentType: InstrumentType.HISTOGRAM,
-      instrumentName: 'osm_live_catchup_directory_sync_duration_seconds',
-      aggregation: {
-        type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
-        options: { boundaries: [0.1, 0.5, 1, 2, 5, 10, 30] },
-      },
-    },
-    {
-      instrumentType: InstrumentType.HISTOGRAM,
-      instrumentName: 'osm_live_catchup_batch_duration_seconds',
-      aggregation: {
-        type: AggregationType.EXPLICIT_BUCKET_HISTOGRAM,
-        options: { boundaries: [1, 5, 10, 30, 60, 120, 300] },
-      },
-    },
-  ],
+  views: syncMetricViews,
 });
 void runWithInstrumentation(bootstrap, 'outlook-semantic-mcp');
