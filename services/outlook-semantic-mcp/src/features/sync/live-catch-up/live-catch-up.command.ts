@@ -168,6 +168,7 @@ export class LiveCatchUpCommand {
 
         const runResult = await recordInHistogram({
           histogram: this.liveCatchupRoundDuration,
+          attributes: { roundNumber: round },
           successAtrributes: (result) => ({
             status: result.status,
             errorType:
