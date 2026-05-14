@@ -77,7 +77,10 @@ export class SyncDelegatedAccessForAllUsersCommand {
       for (const accounts of batch) {
         await withRetryAttempts({
           fn: async () => {
-            await this.syncDelegatedAccessCommand.run({ accountsId: accounts.id });
+            await this.syncDelegatedAccessCommand.run({
+              accountsId: accounts.id,
+              onProgress: () => this.updateProgressTimestamp(),
+            });
             return { status: 'success' };
           },
           onError: rethrowRateLimitError,
@@ -197,6 +200,23 @@ export class SyncDelegatedAccessForAllUsersCommand {
           action: 'skip',
           reason: `Skipped running sync for delegated permissions another sync in progress`,
         };
+      },
+    );
+  }
+
+  private async updateProgressTimestamp(): Promise<void> {
+    await this.persistentCacheService.setWith(
+      SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY,
+      async ({ currentValue, update }): Promise<void> => {
+        assert.ok(currentValue);
+        assert.ok(currentValue.dataType === 'DelegatedAccessVerification');
+        await update({
+          dataType: 'DelegatedAccessVerification',
+          payload: {
+            ...currentValue.payload,
+            lastProgressRegisteredAt: Date.now(),
+          },
+        });
       },
     );
   }

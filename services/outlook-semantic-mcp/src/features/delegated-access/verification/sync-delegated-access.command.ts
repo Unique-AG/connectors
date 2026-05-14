@@ -2,7 +2,7 @@ import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, notInArray } from 'drizzle-orm';
 import pLimit from 'p-limit';
-import { chunk } from 'remeda';
+import { chunk, isNonNullish } from 'remeda';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
@@ -14,6 +14,7 @@ import {
 import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { NewTrace, traceAttrs } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { getRetryAfterMs } from '~/utils/get-retry-after-ms';
 import { GenericRateLimitError } from '~/utils/is-rate-limit-error';
 
 interface FolderNode {
@@ -41,7 +42,7 @@ export class SyncDelegatedAccessCommand {
   ) {}
 
   @NewTrace('sync-delegated-access')
-  public async run(input: { accountsId: string }): Promise<void> {
+  public async run(input: { accountsId: string; onProgress?: () => Promise<void> }): Promise<void> {
     traceAttrs({ accountsId: input.accountsId });
     if (this.config.scan !== 'granularAccess') {
       this.logger.log({
@@ -49,10 +50,15 @@ export class SyncDelegatedAccessCommand {
       });
       return;
     }
-    await this.metrics.measureSyncRun(() => this.runVerification(input.accountsId));
+    await this.metrics.measureSyncRun(() =>
+      this.runVerification(input.accountsId, input.onProgress),
+    );
   }
 
-  private async runVerification(accountsId: string): Promise<void> {
+  private async runVerification(
+    accountsId: string,
+    onProgress?: () => Promise<void>,
+  ): Promise<void> {
     const [accounts] = await this.db
       .select({
         delegateUserId: delegatedAccessAccounts.delegateUserId,
@@ -90,6 +96,7 @@ export class SyncDelegatedAccessCommand {
     const verificationResult = await this.verifyReadAccessInFolders({
       client,
       ownerEmail,
+      onProgress,
     });
     if (verificationResult.hasFullDelegatedAcces) {
       await this.db
@@ -167,9 +174,18 @@ export class SyncDelegatedAccessCommand {
     }
 
     if (foldersWithErrors.some((error) => error.reason === 'transient-error')) {
-      throw new GenericRateLimitError(`Delegated access sync failed because of rate limitting`, {
-        cause: foldersWithErrors,
-      });
+      const foundRetryAfter = foldersWithErrors
+        .map((folder) => getRetryAfterMs(folder.error))
+        .filter(isNonNullish);
+      const maxRetryAfter = foundRetryAfter.length === 0 ? null : Math.max(...foundRetryAfter);
+
+      throw new GenericRateLimitError(
+        `Delegated access sync failed because of rate limitting`,
+        maxRetryAfter,
+        {
+          cause: foldersWithErrors.map((folder) => folder.error),
+        },
+      );
     }
 
     throw new Error(`Delegated access sync failed with some errors`, {
@@ -180,9 +196,11 @@ export class SyncDelegatedAccessCommand {
   private async verifyReadAccessInFolders({
     client,
     ownerEmail,
+    onProgress,
   }: {
     client: Client;
     ownerEmail: string;
+    onProgress?: () => Promise<void>;
   }): Promise<
     | { hasFullDelegatedAcces: true }
     | {
@@ -195,6 +213,10 @@ export class SyncDelegatedAccessCommand {
       client,
       endpoint: `/users/${ownerEmail}/messages`,
     });
+
+    if (testResult.canRead || ('reason' in testResult && testResult.reason === 'no-access')) {
+      await onProgress?.();
+    }
 
     if (testResult.canRead) {
       return { hasFullDelegatedAcces: true };
@@ -211,6 +233,12 @@ export class SyncDelegatedAccessCommand {
               client,
               endpoint: `/users/${ownerEmail}/mailFolders/${folderId}/messages`,
             });
+            if (
+              verificationResult.canRead ||
+              ('reason' in verificationResult && verificationResult.reason === 'no-access')
+            ) {
+              await onProgress?.();
+            }
             return { ...verificationResult, folderId };
           },
         ),

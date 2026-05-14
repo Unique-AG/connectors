@@ -1,5 +1,5 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { isNonNullish } from 'remeda';
+import { isNonNullish, isNumber } from 'remeda';
 import { errors } from 'undici';
 import { GenericRateLimitError } from './is-rate-limit-error';
 
@@ -29,6 +29,9 @@ export const getRetryAfterMs = (error: unknown): number | null => {
     return null;
   }
   if (error instanceof GenericRateLimitError) {
+    if (isNumber(error.retryAfter)) {
+      return error.retryAfter;
+    }
     if (Array.isArray(error.cause)) {
       const nonNullMs = error.cause.map(getRetryAfterMs).filter(isNonNullish);
       if (!nonNullMs.length) {
