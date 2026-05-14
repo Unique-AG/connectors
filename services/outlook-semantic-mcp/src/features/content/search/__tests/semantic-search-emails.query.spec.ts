@@ -215,6 +215,11 @@ function createMockQuery(
   return { instance, contentSearch };
 }
 
+const SEARCH_CONFIG = {
+  maxEmailsLimit: 100,
+  subQueryChunksLimits: { min: 100, max: 200, default: 100, description: '' },
+};
+
 const baseInput = { search: 'test query', limit: 200 as const };
 const delegatedAccess = {
   ownerUserEmail: DELEGATED_EMAIL,
@@ -231,7 +236,7 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[]],
       });
 
-      await instance.run(testUserId, [baseInput], 100);
+      await instance.run(testUserId, [baseInput], SEARCH_CONFIG);
 
       expect(contentSearch).toHaveBeenCalledOnce();
       const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
@@ -244,7 +249,7 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[]],
       });
 
-      await instance.run(testUserId, [{ ...baseInput, mailbox: OWN_EMAIL }], 100);
+      await instance.run(testUserId, [{ ...baseInput, mailbox: OWN_EMAIL }], SEARCH_CONFIG);
 
       expect(contentSearch).toHaveBeenCalledOnce();
       const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
@@ -258,7 +263,7 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[]],
       });
 
-      await instance.run(testUserId, [{ ...baseInput, mailbox: DELEGATED_EMAIL }], 100);
+      await instance.run(testUserId, [{ ...baseInput, mailbox: DELEGATED_EMAIL }], SEARCH_CONFIG);
 
       expect(contentSearch).toHaveBeenCalledOnce();
       const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
@@ -274,7 +279,7 @@ describe('SemanticSearchEmailsQuery', () => {
       const { results } = await instance.run(
         testUserId,
         [{ ...baseInput, mailbox: 'unknown@example.com' }],
-        100,
+        SEARCH_CONFIG,
       );
 
       expect(contentSearch).not.toHaveBeenCalled();
@@ -294,7 +299,7 @@ describe('SemanticSearchEmailsQuery', () => {
           { search: 'query A', limit: 200 as const },
           { search: 'query B', limit: 200 as const },
         ],
-        100,
+        SEARCH_CONFIG,
       );
 
       expect(contentSearch).toHaveBeenCalledTimes(2);
@@ -313,7 +318,7 @@ describe('SemanticSearchEmailsQuery', () => {
           { search: 'failing query', limit: 200 as const },
           { search: 'succeeding query', limit: 200 as const },
         ],
-        100,
+        SEARCH_CONFIG,
       );
 
       expect(contentSearch).toHaveBeenCalledTimes(2);
@@ -336,7 +341,7 @@ describe('SemanticSearchEmailsQuery', () => {
           { search: 'query A', limit: 200 as const },
           { search: 'query B', limit: 200 as const },
         ],
-        100,
+        SEARCH_CONFIG,
       );
 
       expect(results).toHaveLength(1);
@@ -357,7 +362,7 @@ describe('SemanticSearchEmailsQuery', () => {
           { search: 'query A', limit: 200 as const },
           { search: 'query B', limit: 200 as const },
         ],
-        100,
+        SEARCH_CONFIG,
       );
 
       expect(results).toHaveLength(100);

@@ -4,6 +4,11 @@ import { MsGraphKqlSearchEmailsQuery } from '../ms-graph-kql-search-emails.query
 
 const testUserId = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 
+const SEARCH_CONFIG = {
+  maxEmailsLimit: 100,
+  subQueryLimits: { min: 10, max: 150, default: 100, description: '' },
+};
+
 const OWN_EMAIL = 'own@example.com';
 const OWN_USER_ID = 'own-user-profile-id';
 const DELEGATED_EMAIL = 'delegated@example.com';
@@ -91,7 +96,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const mockPost = makeSuccessPost({ [OWN_EMAIL]: [makeMessage('msg1')] });
       const { instance } = createQuery({ mockPost });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'subject:test' }], 100);
+      const { results } = await instance.run(
+        testUserId,
+        [{ kqlQuery: 'subject:test' }],
+        SEARCH_CONFIG,
+      );
 
       expect(mockPost).toHaveBeenCalledOnce();
       const requests = mockPost.mock.calls?.[0]?.[0]?.requests;
@@ -111,7 +120,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         mockPost,
       });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       const requests = mockPost.mock.calls?.[0]?.[0]?.requests;
       expect(requests).toHaveLength(3);
@@ -127,7 +136,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const mockPost = makeSuccessPost({});
       const { instance } = createQuery({ delegatedMailboxes: thirtyDelegates, mockPost });
 
-      await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       const totalRequests = mockPost.mock.calls.flatMap(
         (call) => (call[0] as { requests: unknown[] }).requests,
@@ -148,7 +157,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const { results } = await instance.run(
         testUserId,
         [{ kqlQuery: 'test', mailbox: OWN_EMAIL }],
-        100,
+        SEARCH_CONFIG,
       );
 
       const requests = mockPost.mock.calls?.[0]?.[0]?.requests;
@@ -167,7 +176,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const { results } = await instance.run(
         testUserId,
         [{ kqlQuery: 'test', mailbox: DELEGATED_EMAIL }],
-        100,
+        SEARCH_CONFIG,
       );
 
       const requests = mockPost.mock.calls?.[0]?.[0]?.requests;
@@ -182,7 +191,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const { results, searchSummary } = await instance.run(
         testUserId,
         [{ kqlQuery: 'test', mailbox: 'unknown@example.com' }],
-        100,
+        SEARCH_CONFIG,
       );
 
       expect(results).toHaveLength(0);
@@ -211,7 +220,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         mockPost,
       });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(markAccountsNoFullAccessCommand.run).toHaveBeenCalledWith({
         delegateUserId: OWN_USER_ID,
@@ -238,7 +247,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         mockPost,
       });
 
-      await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(markAccountsNoFullAccessCommand.run).toHaveBeenCalledWith({
         delegateUserId: OWN_USER_ID,
@@ -264,7 +273,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         mockPost: actualMockPost,
       });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(markAccountsNoFullAccessCommand.run).not.toHaveBeenCalled();
       expect(results).toHaveLength(0);
@@ -279,7 +288,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const { results, searchSummary } = await instance.run(
         testUserId,
         [{ kqlQuery: 'test' }],
-        100,
+        SEARCH_CONFIG,
       );
 
       expect(results).toHaveLength(0);
@@ -296,7 +305,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       });
       const { instance } = createQuery({ delegatedMailboxes: [DELEGATED_EMAIL], mockPost });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(results).toHaveLength(5);
       // Round-robin: own-1, del-1, own-2, del-2, own-3
@@ -316,7 +325,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       });
       const { instance } = createQuery({ delegatedMailboxes: [DELEGATED_EMAIL], mockPost });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test', limit: 50 }], 100);
+      const { results } = await instance.run(
+        testUserId,
+        [{ kqlQuery: 'test', limit: 50 }],
+        SEARCH_CONFIG,
+      );
 
       expect(results).toHaveLength(100);
     });
@@ -329,7 +342,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       });
       const { instance } = createQuery({ delegatedMailboxes: [DELEGATED_EMAIL], mockPost });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(results).toHaveLength(1);
     });
@@ -345,7 +358,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         idTranslationMap: new Map([[restId, immutableId]]),
       });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(results[0]?.msGraphMessageId).toBe(immutableId);
     });
@@ -355,7 +368,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const mockPost = makeSuccessPost({ [OWN_EMAIL]: [makeMessage(restId)] });
       const { instance } = createQuery({ mockPost, idTranslationMap: new Map() });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(results[0]?.msGraphMessageId).toBe(restId);
     });
@@ -366,7 +379,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const mockPost = makeSuccessPost({ [OWN_EMAIL]: [makeMessage('own-1')] });
       const { instance } = createQuery({ mockPost });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(results[0]?.outlookWebLink).toBe('https://outlook.com/msg/own-1');
     });
@@ -381,7 +394,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const { results } = await instance.run(
         testUserId,
         [{ kqlQuery: 'test', mailbox: DELEGATED_EMAIL }],
-        100,
+        SEARCH_CONFIG,
       );
 
       expect(results[0]?.outlookWebLink).toBe('');
@@ -405,7 +418,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const { results, searchSummary } = await instance.run(
         testUserId,
         [{ kqlQuery: 'test' }],
-        100,
+        SEARCH_CONFIG,
       );
 
       expect(results).toHaveLength(0);
@@ -422,7 +435,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const mockPost = makeSuccessPost({ [OWN_EMAIL]: [msg] });
       const { instance } = createQuery({ mockPost });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(results[0]?.text).toBe('Full body content');
     });
@@ -432,7 +445,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const mockPost = makeSuccessPost({ [OWN_EMAIL]: [msg] });
       const { instance } = createQuery({ mockPost });
 
-      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], 100);
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(results[0]?.text).toBe('Preview only');
     });

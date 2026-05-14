@@ -133,7 +133,13 @@ function createCommand({
     { run: vi.fn().mockResolvedValue(false) } as any,
     { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
     db as any,
-    { getCounter: () => ({ add: vi.fn() }), getHistogram: () => ({ record: vi.fn() }) } as any,
+    {
+      measureFullSyncRun: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+      measureFullSyncDirectorySync: vi
+        .fn()
+        .mockImplementation((fn: () => Promise<unknown>) => fn()),
+      measureFullSyncBatch: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+    } as any,
   );
 }
 

@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
@@ -105,10 +106,11 @@ export class RunSearchRecallCheckQuery {
         });
 
         const expectedMessageIds = notSkipped.map((e) => e.messageId);
+        assert.ok(SEARCH_CONFIG.semanticSearch, `Semantic search is not configured`);
         const { results } = await this.searchEmailsQuery.run(
           convertUserProfileIdToTypeId(userProfileId),
           [checkCase.search],
-          SEARCH_CONFIG.maxOutputEmails,
+          SEARCH_CONFIG.semanticSearch,
         );
         const returnedEmailIds = new Set(
           pipe(

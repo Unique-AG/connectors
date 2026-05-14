@@ -3,7 +3,7 @@ import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, gt, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { last } from 'remeda';
+import { isNonNullish, last } from 'remeda';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
@@ -12,6 +12,7 @@ import {
   subscriptions,
   userProfiles,
 } from '~/db';
+import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { NewTrace } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -38,6 +39,7 @@ export class DiscoverDelegatedAccessCommand {
     @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly persistentCacheService: PersistentCacheService,
+    private readonly metrics: DelegatedAccessMetricsService,
   ) {}
 
   @NewTrace('discover-delegated-access')
@@ -48,40 +50,42 @@ export class DiscoverDelegatedAccessCommand {
       });
       return;
     }
-    const decision = await this.decide();
-    if (decision.action === 'skip') {
-      this.logger.log({
-        msg: `Skipped running delegated access discovery. Reason: ${decision.reason}`,
-      });
-      return;
-    }
-
-    let finalState: 'ready' | 'failed';
-    try {
-      await this.runDiscoveryInBatches(
-        decision.lastProcessedDelegateId,
-        decision.lastProcessedOwnerIdForDelegate,
-      );
-      finalState = 'ready';
-    } catch (error) {
-      this.logger.error({ msg: `Failed to run delegated access discovery`, err: error });
-      finalState = 'failed';
-    }
-    await this.persistentCacheService.setWith(
-      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
-      async ({ currentValue, update }): Promise<void> => {
-        assert.ok(currentValue);
-        assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
-        await update({
-          dataType: 'DelegatedAccessDiscovery',
-          payload: {
-            ...currentValue.payload,
-            state: finalState,
-            lastProgressRegisteredAt: Date.now(),
-          },
+    await this.metrics.measureDiscoverRun(async () => {
+      const decision = await this.decide();
+      if (decision.action === 'skip') {
+        this.logger.log({
+          msg: `Skipped running delegated access discovery. Reason: ${decision.reason}`,
         });
-      },
-    );
+        return;
+      }
+
+      let finalState: 'ready' | 'failed';
+      try {
+        await this.runDiscoveryInBatches(
+          decision.lastProcessedDelegateId,
+          decision.lastProcessedOwnerIdForDelegate,
+        );
+        finalState = 'ready';
+      } catch (error) {
+        this.logger.error({ msg: `Failed to run delegated access discovery`, err: error });
+        finalState = 'failed';
+      }
+      await this.persistentCacheService.setWith(
+        DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
+        async ({ currentValue, update }): Promise<void> => {
+          assert.ok(currentValue);
+          assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+          await update({
+            dataType: 'DelegatedAccessDiscovery',
+            payload: {
+              ...currentValue.payload,
+              state: finalState,
+              lastProgressRegisteredAt: Date.now(),
+            },
+          });
+        },
+      );
+    });
   }
 
   @Span()
@@ -90,11 +94,14 @@ export class DiscoverDelegatedAccessCommand {
     lastProcessedOwnerIdForDelegate: Nullish<string>,
   ): Promise<void> {
     // If we have an in-progress delegate, resume its inner loop first
-    if (lastProcessedDelegateId && lastProcessedOwnerIdForDelegate) {
-      await this.runInnerLoop({
-        delegateUserId: lastProcessedDelegateId,
-        lastProcessedOwnerIdForDelegate,
-      });
+    if (isNonNullish(lastProcessedDelegateId) && isNonNullish(lastProcessedOwnerIdForDelegate)) {
+      await this.metrics.measureDiscoverUser(() =>
+        this.runInnerLoop({
+          // For some reason isNonNullish(lastProcessedDelegateId) is not enough for typescript here.
+          delegateUserId: lastProcessedDelegateId as string,
+          lastProcessedOwnerIdForDelegate: lastProcessedOwnerIdForDelegate,
+        }),
+      );
     }
 
     // Continue outer loop from the last processed delegate
@@ -104,10 +111,12 @@ export class DiscoverDelegatedAccessCommand {
 
     while (delegatesBatch.length) {
       for (const { userProfileId: delegateUserId } of delegatesBatch) {
-        await this.runInnerLoop({
-          delegateUserId,
-          lastProcessedOwnerIdForDelegate: null,
-        });
+        await this.metrics.measureDiscoverUser(() =>
+          this.runInnerLoop({
+            delegateUserId,
+            lastProcessedOwnerIdForDelegate: null,
+          }),
+        );
         lastProcessedDelegateId = delegateUserId;
       }
 

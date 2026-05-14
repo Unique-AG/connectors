@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, gt } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts } from '~/db';
+import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { NewTrace } from '~/features/tracing.utils';
 import { Nullish } from '~/utils/nullish';
@@ -24,39 +25,44 @@ export class SyncDelegatedAccessForAllUsersCommand {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private persistentCacheService: PersistentCacheService,
     private syncDelegatedAccessCommand: SyncDelegatedAccessCommand,
+    private readonly metrics: DelegatedAccessMetricsService,
   ) {}
 
   @NewTrace('sync-delegated-access-scan')
   public async run(): Promise<void> {
-    const decision = await this.decide();
-    if (decision.action === 'skip') {
-      this.logger.log({ msg: `Skipped running sync delegated access. Reason: ${decision.reason}` });
-      return;
-    }
-
-    let finalState: 'ready' | 'failed';
-    try {
-      await this.runSyncInBatches(decision.lastProcessedAccountsId);
-      finalState = 'ready';
-    } catch (error) {
-      this.logger.error({ msg: `Failed to run delegated access sync`, err: error });
-      finalState = 'failed';
-    }
-    await this.persistentCacheService.setWith(
-      SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY,
-      async ({ currentValue, update }): Promise<void> => {
-        assert.ok(currentValue);
-        assert.ok(currentValue.dataType === 'DelegatedAccessVerification');
-        await update({
-          dataType: 'DelegatedAccessVerification',
-          payload: {
-            ...currentValue.payload,
-            state: finalState,
-            lastProgressRegisteredAt: Date.now(),
-          },
+    await this.metrics.measureSyncForAllUsersRun(async () => {
+      const decision = await this.decide();
+      if (decision.action === 'skip') {
+        this.logger.log({
+          msg: `Skipped running sync delegated access. Reason: ${decision.reason}`,
         });
-      },
-    );
+        return;
+      }
+
+      let finalState: 'ready' | 'failed';
+      try {
+        await this.runSyncInBatches(decision.lastProcessedAccountsId);
+        finalState = 'ready';
+      } catch (error) {
+        this.logger.error({ msg: `Failed to run delegated access sync`, err: error });
+        finalState = 'failed';
+      }
+      await this.persistentCacheService.setWith(
+        SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY,
+        async ({ currentValue, update }): Promise<void> => {
+          assert.ok(currentValue);
+          assert.ok(currentValue.dataType === 'DelegatedAccessVerification');
+          await update({
+            dataType: 'DelegatedAccessVerification',
+            payload: {
+              ...currentValue.payload,
+              state: finalState,
+              lastProgressRegisteredAt: Date.now(),
+            },
+          });
+        },
+      );
+    });
   }
 
   @Span()

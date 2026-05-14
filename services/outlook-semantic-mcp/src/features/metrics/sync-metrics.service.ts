@@ -9,19 +9,7 @@ import type {
 } from '~/features/sync/live-catch-up/live-catch-up.types';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { ProcessEmailCommandResult } from '../process-email/process-email.command';
-
-export enum SyncMetricName {
-  FullSyncRunDuration = 'osm_full_sync_run_duration_seconds',
-  FullSyncDirectorySyncDuration = 'osm_full_sync_directory_sync_duration_seconds',
-  FullSyncBatchDuration = 'osm_full_sync_batch_duration_seconds',
-  FullSyncGraphPageDuration = 'osm_full_sync_graph_page_duration_seconds',
-  FullSyncProcessEmailDuration = 'osm_full_sync_process_email_duration_seconds',
-  LiveCatchupRunDuration = 'osm_live_catchup_run_duration_seconds',
-  LiveCatchupRoundDuration = 'osm_live_catchup_round_duration_seconds',
-  LiveCatchupDirectorySyncDuration = 'osm_live_catchup_directory_sync_duration_seconds',
-  LiveCatchupBatchDuration = 'osm_live_catchup_batch_duration_seconds',
-  LiveCatchupProcessEmailDuration = 'osm_live_catchup_process_email_duration_seconds',
-}
+import { MetricName } from './metric-names';
 
 const getDefaultOnErrorAtrributes: ArgumentsFn<unknown> = (err: unknown) => ({
   status: 'failed',
@@ -44,56 +32,53 @@ export class SyncMetricsService {
   private readonly liveCatchupMessageDuration: Histogram;
 
   public constructor(metricService: MetricService) {
-    this.fullSyncRunDuration = metricService.getHistogram(SyncMetricName.FullSyncRunDuration, {
+    this.fullSyncRunDuration = metricService.getHistogram(MetricName.FullSyncRunDuration, {
       description: 'Wall-clock duration of a full sync run() call including retries',
     });
     this.fullSyncDirectorySyncDuration = metricService.getHistogram(
-      SyncMetricName.FullSyncDirectorySyncDuration,
+      MetricName.FullSyncDirectorySyncDuration,
       {
         description: 'Duration of the directory sync step within a full sync',
       },
     );
-    this.fullSyncBatchDuration = metricService.getHistogram(SyncMetricName.FullSyncBatchDuration, {
+    this.fullSyncBatchDuration = metricService.getHistogram(MetricName.FullSyncBatchDuration, {
       description: 'Duration of the batch processing step within a full sync',
     });
     this.fullSyncGraphPageDuration = metricService.getHistogram(
-      SyncMetricName.FullSyncGraphPageDuration,
+      MetricName.FullSyncGraphPageDuration,
       {
         description: 'Duration of Graph API page fetch during full sync',
       },
     );
     this.fullSyncProcessEmailDuration = metricService.getHistogram(
-      SyncMetricName.FullSyncProcessEmailDuration,
+      MetricName.FullSyncProcessEmailDuration,
       {
         description: 'Duration of single message ingestion during full sync (including retries)',
       },
     );
-    this.liveCatchupRunDuration = metricService.getHistogram(
-      SyncMetricName.LiveCatchupRunDuration,
-      {
-        description: 'Wall-clock duration of a total live catch-up run() call',
-      },
-    );
+    this.liveCatchupRunDuration = metricService.getHistogram(MetricName.LiveCatchupRunDuration, {
+      description: 'Wall-clock duration of a total live catch-up run() call',
+    });
     this.liveCatchupRoundDuration = metricService.getHistogram(
-      SyncMetricName.LiveCatchupRoundDuration,
+      MetricName.LiveCatchupRoundDuration,
       {
         description: 'Wall-clock duration of a live catch-up runLiveCatchup() call',
       },
     );
     this.liveCatchupDirectorySyncDuration = metricService.getHistogram(
-      SyncMetricName.LiveCatchupDirectorySyncDuration,
+      MetricName.LiveCatchupDirectorySyncDuration,
       {
         description: 'Duration of directory sync during live catch-up',
       },
     );
     this.liveCatchupBatchDuration = metricService.getHistogram(
-      SyncMetricName.LiveCatchupBatchDuration,
+      MetricName.LiveCatchupBatchDuration,
       {
         description: 'Duration of a single batch processing step during live catch-up',
       },
     );
     this.liveCatchupMessageDuration = metricService.getHistogram(
-      SyncMetricName.LiveCatchupProcessEmailDuration,
+      MetricName.LiveCatchupProcessEmailDuration,
       {
         description: 'Duration of a single messages processed during live catch-up',
       },

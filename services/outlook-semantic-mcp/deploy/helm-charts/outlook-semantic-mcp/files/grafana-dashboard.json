@@ -5,7 +5,10 @@
   "schemaVersion": 38,
   "version": 1,
   "refresh": "30s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "tags": ["outlook-semantic-mcp"],
@@ -25,7 +28,10 @@
       {
         "name": "job",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
         "definition": "label_values(osm_full_sync_run_duration_seconds_count, job)",
         "query": {
           "query": "label_values(osm_full_sync_run_duration_seconds_count, job)",
@@ -46,11 +52,22 @@
       "id": 1,
       "title": "Full Sync Run Rate",
       "type": "stat",
-      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum(rate(osm_full_sync_run_duration_seconds_count{job=~\"$job\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
@@ -59,13 +76,27 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "auto",
         "colorMode": "background",
@@ -76,11 +107,22 @@
       "id": 2,
       "title": "Live Catch-up Run Rate",
       "type": "stat",
-      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum(rate(osm_live_catchup_run_duration_seconds_count{job=~\"$job\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
@@ -89,13 +131,27 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "auto",
         "colorMode": "background",
@@ -106,11 +162,22 @@
       "id": 3,
       "title": "Graph API Request Rate",
       "type": "stat",
-      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum(rate(osm_msgraph_requests_total{job=~\"$job\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
@@ -119,13 +186,27 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "auto",
         "colorMode": "background",
@@ -136,11 +217,22 @@
       "id": 4,
       "title": "Unique API Request Rate",
       "type": "stat",
-      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum(rate(osm_unique_api_requests_total{job=~\"$job\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
@@ -149,13 +241,27 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "thresholds" },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "auto",
         "colorMode": "background",
@@ -166,7 +272,12 @@
       "id": 5,
       "title": "System",
       "type": "row",
-      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 1
+      },
       "collapsed": false,
       "panels": []
     },
@@ -174,11 +285,22 @@
       "id": 6,
       "title": "CPU Usage",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 5, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum by (state) (rate(process_cpu_time_seconds_total{job=~\"$job\"}[5m])) * 100",
           "legendFormat": "{{state}}",
           "refId": "A"
@@ -187,7 +309,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 10,
@@ -199,31 +323,54 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 7,
       "title": "Memory Usage",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 5, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "process_memory_usage_bytes{job=~\"$job\", type=\"rss\"}",
           "legendFormat": "RSS",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "process_memory_usage_bytes{job=~\"$job\", type=\"heap_used\"}",
           "legendFormat": "Heap Used",
           "refId": "B"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "process_memory_usage_bytes{job=~\"$job\", type=\"heap_total\"}",
           "legendFormat": "Heap Total",
           "refId": "C"
@@ -232,7 +379,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 10,
@@ -244,15 +393,26 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 8,
       "title": "Microsoft Graph",
       "type": "row",
-      "gridPos": { "x": 0, "y": 13, "w": 24, "h": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 24,
+        "h": 1
+      },
       "collapsed": false,
       "panels": []
     },
@@ -260,11 +420,22 @@
       "id": 9,
       "title": "Graph Request Rate by Status",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 14, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum by (status_class) (rate(osm_msgraph_requests_total{job=~\"$job\"}[5m]))",
           "legendFormat": "{{status_class}}",
           "refId": "A"
@@ -273,7 +444,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 10,
@@ -284,41 +457,86 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "4xx" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "4xx"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "5xx" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "5xx"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "desc" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       }
     },
     {
       "id": 10,
       "title": "Graph Request Duration (P50 / P90 / P99)",
       "type": "timeseries",
-      "gridPos": { "x": 8, "y": 14, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 8,
+        "y": 14,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.50, sum by (le) (rate(osm_msgraph_request_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P50",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_msgraph_request_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P90",
           "refId": "B"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.99, sum by (le) (rate(osm_msgraph_request_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P99",
           "refId": "C"
@@ -327,7 +545,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 5,
@@ -339,19 +559,36 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 11,
       "title": "Graph Throttle Events",
       "type": "timeseries",
-      "gridPos": { "x": 16, "y": 14, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 16,
+        "y": 14,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum by (policy) (rate(osm_msgraph_throttle_events_total{job=~\"$job\"}[5m]))",
           "legendFormat": "{{policy}}",
           "refId": "A"
@@ -360,7 +597,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 10,
@@ -372,15 +611,26 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 12,
       "title": "Full Sync",
       "type": "row",
-      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 1
+      },
       "collapsed": false,
       "panels": []
     },
@@ -388,11 +638,22 @@
       "id": 13,
       "title": "Full Sync Runs by Status",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 23, "w": 6, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum by (status) (rate(osm_full_sync_run_duration_seconds_count{job=~\"$job\"}[5m]))",
           "legendFormat": "{{status}}",
           "refId": "A"
@@ -401,7 +662,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 10,
@@ -412,37 +675,71 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "failed" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 14,
       "title": "Full Sync Run Duration (P50 / P90 / P99)",
       "type": "timeseries",
-      "gridPos": { "x": 6, "y": 23, "w": 6, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 6,
+        "y": 23,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.50, sum by (le) (rate(osm_full_sync_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P50",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_full_sync_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P90",
           "refId": "B"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.99, sum by (le) (rate(osm_full_sync_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P99",
           "refId": "C"
@@ -451,7 +748,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 5,
@@ -463,19 +762,36 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 15,
       "title": "Full Sync Messages by Outcome",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 23, "w": 6, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 12,
+        "y": 23,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum by (outcome) (rate(osm_full_sync_messages_processed_total_count{job=~\"$job\"}[5m]))",
           "legendFormat": "{{outcome}}",
           "refId": "A"
@@ -484,7 +800,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 10,
@@ -495,35 +813,77 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "failed" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "ingested" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "ingested"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 16,
       "title": "Full Sync Batch & Directory Sync Duration (P90)",
       "type": "timeseries",
-      "gridPos": { "x": 18, "y": 23, "w": 6, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 18,
+        "y": 23,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_full_sync_batch_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "Batch P90",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_full_sync_directory_sync_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "Directory Sync P90",
           "refId": "B"
@@ -532,7 +892,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 5,
@@ -544,19 +906,36 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 25,
       "title": "Full Sync Graph Page Duration (P90 by page_type)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 31, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le, page_type) (rate(osm_full_sync_graph_page_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "{{page_type}} P90",
           "refId": "A"
@@ -565,7 +944,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 5,
@@ -577,19 +958,36 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 26,
       "title": "Full Sync Email Processing Duration (P90 by outcome)",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 31, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 12,
+        "y": 31,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le, outcome) (rate(osm_full_sync_process_email_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "{{outcome}} P90",
           "refId": "A"
@@ -598,7 +996,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 5,
@@ -609,21 +1009,43 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "failure P90" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "failure P90"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 17,
       "title": "Live Catch-up",
       "type": "row",
-      "gridPos": { "x": 0, "y": 39, "w": 24, "h": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 24,
+        "h": 1
+      },
       "collapsed": false,
       "panels": []
     },
@@ -631,11 +1053,22 @@
       "id": 18,
       "title": "Live Catch-up Runs by Status",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 40, "w": 6, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum by (status) (rate(osm_live_catchup_run_duration_seconds_count{job=~\"$job\"}[5m]))",
           "legendFormat": "{{status}}",
           "refId": "A"
@@ -644,7 +1077,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 10,
@@ -655,37 +1090,71 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "failed" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 19,
       "title": "Live Catch-up Run Duration (P50 / P90 / P99)",
       "type": "timeseries",
-      "gridPos": { "x": 6, "y": 40, "w": 6, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 6,
+        "y": 40,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.50, sum by (le) (rate(osm_live_catchup_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P50",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_live_catchup_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P90",
           "refId": "B"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.99, sum by (le) (rate(osm_live_catchup_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P99",
           "refId": "C"
@@ -694,7 +1163,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 5,
@@ -706,19 +1177,36 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 20,
       "title": "Live Catch-up Messages by Outcome",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 40, "w": 6, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum by (outcome) (rate(osm_live_catchup_messages_total_count{job=~\"$job\"}[5m]))",
           "legendFormat": "{{outcome}}",
           "refId": "A"
@@ -727,7 +1215,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 10,
@@ -738,41 +1228,86 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "failed" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "failed"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "ingested" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "ingested"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 27,
       "title": "Live Catch-up Round Duration (P50 / P90 / P99)",
       "type": "timeseries",
-      "gridPos": { "x": 18, "y": 40, "w": 6, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 18,
+        "y": 40,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.50, sum by (le) (rate(osm_live_catchup_round_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P50",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_live_catchup_round_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P90",
           "refId": "B"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.99, sum by (le) (rate(osm_live_catchup_round_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P99",
           "refId": "C"
@@ -781,7 +1316,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 5,
@@ -793,25 +1330,45 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 28,
       "title": "Live Catch-up Batch & Directory Sync Duration (P90)",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 48, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_live_catchup_batch_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "Batch P90",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_live_catchup_directory_sync_duration_seconds_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "Directory Sync P90",
           "refId": "B"
@@ -820,7 +1377,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 5,
@@ -832,15 +1391,26 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 21,
       "title": "Unique API",
       "type": "row",
-      "gridPos": { "x": 0, "y": 56, "w": 24, "h": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 24,
+        "h": 1
+      },
       "collapsed": false,
       "panels": []
     },
@@ -848,11 +1418,22 @@
       "id": 22,
       "title": "Unique API Request Rate by Target",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 57, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 0,
+        "y": 57,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum by (target, result) (rate(osm_unique_api_requests_total{job=~\"$job\"}[5m]))",
           "legendFormat": "{{target}} / {{result}}",
           "refId": "A"
@@ -861,7 +1442,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 10,
@@ -873,19 +1456,36 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 23,
       "title": "Unique API Error Rate by Target",
       "type": "timeseries",
-      "gridPos": { "x": 8, "y": 57, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 8,
+        "y": 57,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "sum by (target, status_code_class) (rate(osm_unique_api_errors_total{job=~\"$job\"}[5m]))",
           "legendFormat": "{{target}} {{status_code_class}}",
           "refId": "A"
@@ -894,7 +1494,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 10,
@@ -906,31 +1508,54 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 24,
       "title": "Unique API Request Duration (P50 / P90 / P99)",
       "type": "timeseries",
-      "gridPos": { "x": 16, "y": 57, "w": 8, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "x": 16,
+        "y": 57,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.50, sum by (le) (rate(osm_unique_api_request_duration_ms_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P50",
           "refId": "A"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_unique_api_request_duration_ms_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P90",
           "refId": "B"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
           "expr": "histogram_quantile(0.99, sum by (le) (rate(osm_unique_api_request_duration_ms_bucket{job=~\"$job\"}[5m])))",
           "legendFormat": "P99",
           "refId": "C"
@@ -939,7 +1564,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "ms",
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineInterpolation": "smooth",
             "fillOpacity": 5,
@@ -951,8 +1578,307 @@
         "overrides": []
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 29,
+      "title": "Delegated Access",
+      "type": "row",
+      "gridPos": {
+        "x": 0,
+        "y": 65,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 30,
+      "title": "Discover Delegated Access Run Duration (P50 / P90 / P99)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 66,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(osm_discover_delegated_access_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_discover_delegated_access_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P90",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(osm_discover_delegated_access_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 31,
+      "title": "Discover Delegated Access User Duration (P50 / P90 / P99)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 66,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(osm_discover_delegated_access_user_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_discover_delegated_access_user_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P90",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(osm_discover_delegated_access_user_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 32,
+      "title": "Sync Delegated Access For All Users Duration (P50 / P90 / P99)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 74,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(osm_sync_delegated_access_for_all_users_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_sync_delegated_access_for_all_users_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P90",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(osm_sync_delegated_access_for_all_users_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 33,
+      "title": "Sync Delegated Access Duration (P50 / P90 / P99)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 74,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(osm_sync_delegated_access_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_sync_delegated_access_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P90",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(osm_sync_delegated_access_run_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
       }
     }
   ]

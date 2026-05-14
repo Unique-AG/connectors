@@ -154,8 +154,15 @@ function createMockSyncDirectoriesCommand() {
 
 function createMockMetricService() {
   return {
-    getCounter: vi.fn().mockReturnValue({ add: vi.fn() }),
-    getHistogram: vi.fn().mockReturnValue({ record: vi.fn() }),
+    measureLiveCatchupRun: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+    measureLiveCatchupRound: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+    measureLiveCatchupDirectorySync: vi
+      .fn()
+      .mockImplementation((fn: () => Promise<unknown>) => fn()),
+    measureLiveCatchupBatch: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+    measureLiveCatchupMessageProcessing: vi
+      .fn()
+      .mockImplementation((fn: () => Promise<unknown>) => fn()),
   };
 }
 
