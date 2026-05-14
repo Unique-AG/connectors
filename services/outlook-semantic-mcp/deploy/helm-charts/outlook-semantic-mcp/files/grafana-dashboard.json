@@ -774,7 +774,7 @@
     },
     {
       "id": 15,
-      "title": "Full Sync Messages by Outcome",
+      "title": "Full Sync Messages by Status",
       "type": "timeseries",
       "gridPos": {
         "x": 12,
@@ -792,8 +792,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (outcome) (rate(osm_full_sync_messages_processed_total_count{job=~\"$job\"}[5m]))",
-          "legendFormat": "{{outcome}}",
+          "expr": "sum by (status) (rate(osm_full_sync_process_email_duration_seconds_count{job=~\"$job\"}[5m]))",
+          "legendFormat": "{{status}}",
           "refId": "A"
         }
       ],
@@ -1189,7 +1189,7 @@
     },
     {
       "id": 20,
-      "title": "Live Catch-up Messages by Outcome",
+      "title": "Live Catch-up Messages by Status",
       "type": "timeseries",
       "gridPos": {
         "x": 12,
@@ -1207,8 +1207,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (outcome) (rate(osm_live_catchup_messages_total_count{job=~\"$job\"}[5m]))",
-          "legendFormat": "{{outcome}}",
+          "expr": "sum by (status) (rate(osm_live_catchup_process_email_duration_seconds_count{job=~\"$job\"}[5m]))",
+          "legendFormat": "{{status}}",
           "refId": "A"
         }
       ],
