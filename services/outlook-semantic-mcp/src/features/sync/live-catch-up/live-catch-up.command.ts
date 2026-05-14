@@ -13,6 +13,7 @@ import {
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
+import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -22,7 +23,6 @@ import { greatestFrom } from '~/utils/greatest-from';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
-import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import {
   GraphMessage,
   GraphMessageFields,
@@ -55,8 +55,8 @@ export class LiveCatchUpCommand {
     subscriptionId: string;
   }): Promise<LiveCatchupResult> {
     traceAttrs({ subscriptionId: input.subscriptionId });
-    return this.metrics.measureLiveCatchupRun(
-      () => withRetryAttempts<LiveCatchupResult>({
+    return this.metrics.measureLiveCatchupRun(() =>
+      withRetryAttempts<LiveCatchupResult>({
         fn: () => this.runLiveCatchup(input),
         onError: rethrowRateLimitError,
         getResultFailure: (err) => ({ status: 'failed', err }),
@@ -118,8 +118,8 @@ export class LiveCatchUpCommand {
         // because we have some fresh data which appeared while we were running.
         const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
 
-        const runResult = await this.metrics.measureLiveCatchupRound(
-          () => this.runLiveCatchupWithLock({
+        const runResult = await this.metrics.measureLiveCatchupRound(() =>
+          this.runLiveCatchupWithLock({
             watermark: lockResult.watermark,
             filters: lockResult.filters,
             user: {
@@ -251,8 +251,8 @@ export class LiveCatchUpCommand {
     const logProps = Object.freeze({ userProfileId: user.profileId, subscriptionId });
 
     try {
-      await this.metrics.measureLiveCatchupDirectorySync(
-        () => this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(user.profileId)),
+      await this.metrics.measureLiveCatchupDirectorySync(() =>
+        this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(user.profileId)),
       );
 
       const client = this.graphClientFactory.createClientForUser(user.profileId);
@@ -352,7 +352,7 @@ export class LiveCatchUpCommand {
             userEmail: user.email.value,
             messageId: graphMessage.id,
           });
-          const result = await this.metrics.countLiveCatchupMessage(() =>
+          const result = await this.metrics.measureLiveCatchupMessageProcessing(() =>
             this.processEmailCommand.run({
               user,
               client,

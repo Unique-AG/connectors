@@ -12,6 +12,7 @@ import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -20,7 +21,6 @@ import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutof
 import { greatestFrom } from '~/utils/greatest-from';
 import { leastFrom } from '~/utils/least-from';
 import { NonNullishProps } from '~/utils/non-nullish-props';
-import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import {
   GraphMessageFields,
   graphMessagesResponseSchema,
@@ -315,7 +315,10 @@ export class ProcessFullSyncBatchCommand {
     ];
 
     if (nextLink === START_FULL_SYNC_LINK) {
-      const raw = await this.metrics.measureGraphPage(() => this.fetchFirstPage(client, conditions), 'first');
+      const raw = await this.metrics.measureGraphPage(
+        () => this.fetchFirstPage(client, conditions),
+        'first',
+      );
       return {
         status: 'proceed',
         resetBatchIndex: false,
@@ -355,7 +358,10 @@ export class ProcessFullSyncBatchCommand {
       `Created date time is null durring expired next link`,
     );
     conditions.push(`receivedDateTime le ${freshConfig.oldestReceivedEmailDateTime.toISOString()}`);
-    const raw = await this.metrics.measureGraphPage(() => this.fetchFirstPage(client, conditions), 'next');
+    const raw = await this.metrics.measureGraphPage(
+      () => this.fetchFirstPage(client, conditions),
+      'next',
+    );
     return {
       status: 'proceed',
       resetBatchIndex: true,
@@ -378,8 +384,8 @@ export class ProcessFullSyncBatchCommand {
   private async processMessage(
     input: ProcessEmailCommandInput,
   ): Promise<'ingested' | 'skipped' | 'failed'> {
-    const processingResult = await this.metrics.countFullSyncMessage(
-      () => this.metrics.measureEmailProcessing(() => this.processEmailCommand.run(input)),
+    const processingResult = await this.metrics.measureEmailProcessing(() =>
+      this.processEmailCommand.run(input),
     );
 
     if (processingResult === 'failed') {

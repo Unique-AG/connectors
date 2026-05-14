@@ -15,10 +15,10 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import type { FullSyncResult, InboxConfig, LockDecision } from './full-sync.types';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
-import type { FullSyncResult, InboxConfig, LockDecision } from './full-sync.types';
 
 export const START_FULL_SYNC_LINK = 'SYNC_STARTED:__EMPTY_DELTA__';
 
@@ -46,8 +46,8 @@ export class FullSyncCommand {
 
   @Span()
   public async run(userProfileId: string): Promise<FullSyncResult> {
-    return await this.metrics.measureFullSyncRun(
-      () => withRetryAttempts<FullSyncResult>({
+    return await this.metrics.measureFullSyncRun(() =>
+      withRetryAttempts<FullSyncResult>({
         fn: () => this.runFullSync(userProfileId),
         onError: rethrowRateLimitError,
         getResultFailure: (error) => ({ status: 'failed', error }),
@@ -112,12 +112,15 @@ export class FullSyncCommand {
       if (lockResult.shouldFetchCount) {
         await this.fetchAndSaveExpectedTotal(userProfile.id, version, filters);
       }
-      await this.metrics.measureFullSyncDirectorySync(
-        () => this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
+      await this.metrics.measureFullSyncDirectorySync(() =>
+        this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
       );
 
-      const batchResult = await this.metrics.measureFullSyncBatch(
-        () => this.processFullSyncBatchCommand.run({ userProfile: { ...userProfile, email: userProfileEmail }, version }),
+      const batchResult = await this.metrics.measureFullSyncBatch(() =>
+        this.processFullSyncBatchCommand.run({
+          userProfile: { ...userProfile, email: userProfileEmail },
+          version,
+        }),
       );
 
       switch (batchResult.outcome) {

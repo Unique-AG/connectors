@@ -1,7 +1,7 @@
 import { Attributes, Histogram } from '@opentelemetry/api';
 
 type Callback<T> = () => Promise<T>;
-type ArgumentsFn<T> = (params: T) => Attributes;
+export type ArgumentsFn<T> = (params: T) => Attributes;
 
 export const recordInHistogram = async <T>({
   histogram,
