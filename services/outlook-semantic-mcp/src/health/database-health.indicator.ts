@@ -16,7 +16,7 @@ export class DatabaseHealthIndicator {
       await this.db.execute(sql`SELECT 1`);
       return indicator.up();
     } catch (error) {
-      return indicator.down({ message: String(error) });
+      return indicator.down({ message: error instanceof Error ? error.message : String(error) });
     }
   }
 }

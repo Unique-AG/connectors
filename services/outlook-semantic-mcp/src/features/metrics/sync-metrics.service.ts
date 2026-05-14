@@ -11,12 +11,12 @@ import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { ProcessEmailCommandResult } from '../process-email/process-email.command';
 import { MetricName } from './metric-names';
 
-const getDefaultOnErrorAtrributes: ArgumentsFn<unknown> = (err: unknown) => ({
+const getDefaultOnErrorAttributes: ArgumentsFn<unknown> = (err: unknown) => ({
   status: 'failed',
   errorType: isRateLimitError(err) ? 'throttling' : 'other',
 });
 
-const getDefaultSuccessAtrributes: ArgumentsFn<unknown> = () => ({ status: 'success' });
+const getDefaultSuccessAttributes: ArgumentsFn<unknown> = () => ({ status: 'success' });
 
 @Injectable()
 export class SyncMetricsService {
@@ -88,11 +88,11 @@ export class SyncMetricsService {
   public measureFullSyncRun<T extends FullSyncResult>(fn: () => Promise<T>): Promise<T> {
     return recordInHistogram({
       histogram: this.fullSyncRunDuration,
-      successAtrributes: (result) =>
+      successAttributes: (result) =>
         result.status === 'failed'
-          ? getDefaultOnErrorAtrributes(result.error)
+          ? getDefaultOnErrorAttributes(result.error)
           : { status: result.status },
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -100,7 +100,7 @@ export class SyncMetricsService {
   public measureFullSyncDirectorySync<T>(fn: () => Promise<T>): Promise<T> {
     return recordInHistogram({
       histogram: this.fullSyncDirectorySyncDuration,
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -108,8 +108,8 @@ export class SyncMetricsService {
   public measureFullSyncBatch<T extends BatchResult>(fn: () => Promise<T>): Promise<T> {
     return recordInHistogram({
       histogram: this.fullSyncBatchDuration,
-      errorAttributtes: getDefaultOnErrorAtrributes,
-      successAtrributes: (result) => ({ status: result.outcome }),
+      errorAttributes: getDefaultOnErrorAttributes,
+      successAttributes: (result) => ({ status: result.outcome }),
       fn,
     });
   }
@@ -118,8 +118,8 @@ export class SyncMetricsService {
     return recordInHistogram({
       histogram: this.fullSyncGraphPageDuration,
       attributes: { page_type: pageType },
-      successAtrributes: getDefaultSuccessAtrributes,
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      successAttributes: getDefaultSuccessAttributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -129,8 +129,8 @@ export class SyncMetricsService {
   ): Promise<T> {
     return recordInHistogram({
       histogram: this.fullSyncProcessEmailDuration,
-      successAtrributes: (result) => ({ status: result }),
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      successAttributes: (result) => ({ status: result }),
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -138,11 +138,11 @@ export class SyncMetricsService {
   public measureLiveCatchupRun<T extends LiveCatchupResult>(fn: () => Promise<T>): Promise<T> {
     return recordInHistogram({
       histogram: this.liveCatchupRunDuration,
-      successAtrributes: (result) =>
+      successAttributes: (result) =>
         result.status === 'failed'
-          ? getDefaultOnErrorAtrributes(result.err)
+          ? getDefaultOnErrorAttributes(result.err)
           : { status: result.status },
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -152,11 +152,11 @@ export class SyncMetricsService {
   ): Promise<T> {
     return recordInHistogram({
       histogram: this.liveCatchupRoundDuration,
-      successAtrributes: (result) =>
+      successAttributes: (result) =>
         result.status === 'failed'
-          ? getDefaultOnErrorAtrributes(result.err)
+          ? getDefaultOnErrorAttributes(result.err)
           : { status: result.status },
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -164,8 +164,8 @@ export class SyncMetricsService {
   public measureLiveCatchupDirectorySync<T>(fn: () => Promise<T>): Promise<T> {
     return recordInHistogram({
       histogram: this.liveCatchupDirectorySyncDuration,
-      successAtrributes: getDefaultSuccessAtrributes,
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      successAttributes: getDefaultSuccessAttributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -173,8 +173,8 @@ export class SyncMetricsService {
   public measureLiveCatchupBatch<T>(fn: () => Promise<T>): Promise<T> {
     return recordInHistogram({
       histogram: this.liveCatchupBatchDuration,
-      successAtrributes: getDefaultSuccessAtrributes,
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      successAttributes: getDefaultSuccessAttributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -184,8 +184,8 @@ export class SyncMetricsService {
   ): Promise<T> {
     return recordInHistogram({
       histogram: this.liveCatchupMessageDuration,
-      successAtrributes: (r) => ({ status: r }),
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      successAttributes: (r) => ({ status: r }),
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }

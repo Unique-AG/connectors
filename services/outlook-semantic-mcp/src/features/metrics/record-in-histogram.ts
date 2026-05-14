@@ -6,17 +6,17 @@ export type ArgumentsFn<T> = (params: T) => Attributes;
 export const recordInHistogram = async <T>({
   histogram,
   attributes,
-  successAtrributes,
-  errorAttributtes,
+  successAttributes,
+  errorAttributes,
   fn,
 }: {
   histogram: Histogram;
   // static attributes always passed to the histogram
   attributes?: Attributes;
   // callback function to create attributes related to success results
-  successAtrributes?: ArgumentsFn<T>;
+  successAttributes?: ArgumentsFn<T>;
   // callback function to create attributes related to error results
-  errorAttributtes?: ArgumentsFn<unknown>;
+  errorAttributes?: ArgumentsFn<unknown>;
   fn: Callback<T>;
 }): Promise<T> => {
   let result: { type: 'success'; data: T } | { type: 'error'; err: unknown };
@@ -31,13 +31,13 @@ export const recordInHistogram = async <T>({
 
   let attributesData: Attributes = {
     ...attributes,
-    funtionRunResult: result.type,
+    functionRunResult: result.type,
   };
 
   if (result.type === 'success') {
-    attributesData = { ...successAtrributes?.(result.data), ...attributesData };
+    attributesData = { ...successAttributes?.(result.data), ...attributesData };
   } else {
-    attributesData = { ...errorAttributtes?.(result.err), ...attributesData };
+    attributesData = { ...errorAttributes?.(result.err), ...attributesData };
   }
   histogram.record(pageDurationMs / 1000, attributesData);
   if (result.type === 'error') {

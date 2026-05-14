@@ -18,7 +18,7 @@ export class AmqpHealthIndicator {
       if (!this.amqpConnection.connected || !this.amqpConnection.channel) {
         return indicator.down({ message: 'AMQP not connected' });
       }
-      let timeoutHandle: ReturnType<typeof setTimeout>;
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<never>((_, reject) => {
         timeoutHandle = setTimeout(
           () => reject(new Error('AMQP checkExchange timed out')),

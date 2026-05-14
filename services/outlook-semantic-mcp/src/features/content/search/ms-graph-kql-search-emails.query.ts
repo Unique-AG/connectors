@@ -160,7 +160,7 @@ export class MsGraphKqlSearchEmailsQuery {
       }
     }
 
-    return { results: results, searchSummary: undefined };
+    return { results, searchSummary: undefined };
   }
 
   private async translateQueriesToBatchRequests({

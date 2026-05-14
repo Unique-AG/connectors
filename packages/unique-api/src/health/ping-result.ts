@@ -6,6 +6,7 @@ export function extractErrorCode(error: unknown): string {
   }
   // undici wraps transport failures in a TypeError whose `.cause` holds the original
   // system error (ECONNREFUSED, ENOTFOUND, ENETUNREACH, etc.) as a NodeJS.ErrnoException.
+  // We rely on these known undici error shapes; anything else falls through to 'UNKNOWN'.
   const errno = error as NodeJS.ErrnoException;
   const cause = errno.cause as NodeJS.ErrnoException | undefined;
   return errno.code ?? cause?.code ?? 'UNKNOWN';

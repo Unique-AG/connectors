@@ -5,12 +5,12 @@ import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { MetricName } from './metric-names';
 import { ArgumentsFn, recordInHistogram } from './record-in-histogram';
 
-const getDefaultOnErrorAtrributes: ArgumentsFn<unknown> = (err: unknown) => ({
+const getDefaultOnErrorAttributes: ArgumentsFn<unknown> = (err: unknown) => ({
   status: 'failed',
   errorType: isRateLimitError(err) ? 'throttling' : 'other',
 });
 
-const getDefaultSuccessAtrributes: ArgumentsFn<unknown> = () => ({ status: 'success' });
+const getDefaultSuccessAttributes: ArgumentsFn<unknown> = () => ({ status: 'success' });
 
 @Injectable()
 export class DelegatedAccessMetricsService {
@@ -47,8 +47,8 @@ export class DelegatedAccessMetricsService {
   public measureDiscoverRun<T>(fn: () => Promise<T>): Promise<T> {
     return recordInHistogram({
       histogram: this.discoverRunDuration,
-      successAtrributes: getDefaultSuccessAtrributes,
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      successAttributes: getDefaultSuccessAttributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -56,8 +56,8 @@ export class DelegatedAccessMetricsService {
   public measureDiscoverUser<T>(fn: () => Promise<T>): Promise<T> {
     return recordInHistogram({
       histogram: this.discoverUserDuration,
-      successAtrributes: getDefaultSuccessAtrributes,
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      successAttributes: getDefaultSuccessAttributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -65,8 +65,8 @@ export class DelegatedAccessMetricsService {
   public measureSyncForAllUsersRun<T>(fn: () => Promise<T>): Promise<T> {
     return recordInHistogram({
       histogram: this.syncForAllUsersRunDuration,
-      successAtrributes: getDefaultSuccessAtrributes,
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      successAttributes: getDefaultSuccessAttributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
@@ -74,8 +74,8 @@ export class DelegatedAccessMetricsService {
   public measureSyncRun<T>(fn: () => Promise<T>): Promise<T> {
     return recordInHistogram({
       histogram: this.syncRunDuration,
-      successAtrributes: getDefaultSuccessAtrributes,
-      errorAttributtes: getDefaultOnErrorAtrributes,
+      successAttributes: getDefaultSuccessAttributes,
+      errorAttributes: getDefaultOnErrorAttributes,
       fn,
     });
   }
