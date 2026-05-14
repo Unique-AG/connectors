@@ -215,6 +215,11 @@ function createMockQuery(
   return { instance, contentSearch };
 }
 
+const SEARCH_CONFIG = {
+  maxEmailsLimit: 100,
+  subQueryChunksLimits: { min: 100, max: 200, default: 100, description: '' },
+};
+
 const baseInput = { search: 'test query', limit: 200 as const };
 const delegatedAccess = {
   ownerUserEmail: DELEGATED_EMAIL,
@@ -231,7 +236,7 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[]],
       });
 
-      await instance.run(testUserId, [baseInput]);
+      await instance.run(testUserId, [baseInput], SEARCH_CONFIG);
 
       expect(contentSearch).toHaveBeenCalledOnce();
       const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
@@ -244,7 +249,7 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[]],
       });
 
-      await instance.run(testUserId, [{ ...baseInput, mailbox: OWN_EMAIL }]);
+      await instance.run(testUserId, [{ ...baseInput, mailbox: OWN_EMAIL }], SEARCH_CONFIG);
 
       expect(contentSearch).toHaveBeenCalledOnce();
       const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
@@ -258,7 +263,7 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[]],
       });
 
-      await instance.run(testUserId, [{ ...baseInput, mailbox: DELEGATED_EMAIL }]);
+      await instance.run(testUserId, [{ ...baseInput, mailbox: DELEGATED_EMAIL }], SEARCH_CONFIG);
 
       expect(contentSearch).toHaveBeenCalledOnce();
       const metaDataFilter = contentSearch.mock.calls?.[0]?.[0]?.metaDataFilter;
@@ -271,9 +276,11 @@ describe('SemanticSearchEmailsQuery', () => {
         delegatedAccesses: [delegatedAccess],
       });
 
-      const { results } = await instance.run(testUserId, [
-        { ...baseInput, mailbox: 'unknown@example.com' },
-      ]);
+      const { results } = await instance.run(
+        testUserId,
+        [{ ...baseInput, mailbox: 'unknown@example.com' }],
+        SEARCH_CONFIG,
+      );
 
       expect(contentSearch).not.toHaveBeenCalled();
       expect(results).toEqual([]);
@@ -286,10 +293,14 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [[makeSearchItem('a')], [makeSearchItem('b')]],
       });
 
-      const { results } = await instance.run(testUserId, [
-        { search: 'query A', limit: 200 as const },
-        { search: 'query B', limit: 200 as const },
-      ]);
+      const { results } = await instance.run(
+        testUserId,
+        [
+          { search: 'query A', limit: 200 as const },
+          { search: 'query B', limit: 200 as const },
+        ],
+        SEARCH_CONFIG,
+      );
 
       expect(contentSearch).toHaveBeenCalledTimes(2);
       expect(results).toHaveLength(2);
@@ -301,10 +312,14 @@ describe('SemanticSearchEmailsQuery', () => {
         searchErrors: [new Error('search failed'), null],
       });
 
-      const { results } = await instance.run(testUserId, [
-        { search: 'failing query', limit: 200 as const },
-        { search: 'succeeding query', limit: 200 as const },
-      ]);
+      const { results } = await instance.run(
+        testUserId,
+        [
+          { search: 'failing query', limit: 200 as const },
+          { search: 'succeeding query', limit: 200 as const },
+        ],
+        SEARCH_CONFIG,
+      );
 
       expect(contentSearch).toHaveBeenCalledTimes(2);
       expect(results).toHaveLength(1);
@@ -320,10 +335,14 @@ describe('SemanticSearchEmailsQuery', () => {
         ],
       });
 
-      const { results } = await instance.run(testUserId, [
-        { search: 'query A', limit: 200 as const },
-        { search: 'query B', limit: 200 as const },
-      ]);
+      const { results } = await instance.run(
+        testUserId,
+        [
+          { search: 'query A', limit: 200 as const },
+          { search: 'query B', limit: 200 as const },
+        ],
+        SEARCH_CONFIG,
+      );
 
       expect(results).toHaveLength(1);
       expect(results[0]?.text).toBe('from first search');
@@ -337,10 +356,14 @@ describe('SemanticSearchEmailsQuery', () => {
         searchResults: [items400, items300],
       });
 
-      const { results } = await instance.run(testUserId, [
-        { search: 'query A', limit: 200 as const },
-        { search: 'query B', limit: 200 as const },
-      ]);
+      const { results } = await instance.run(
+        testUserId,
+        [
+          { search: 'query A', limit: 200 as const },
+          { search: 'query B', limit: 200 as const },
+        ],
+        SEARCH_CONFIG,
+      );
 
       expect(results).toHaveLength(100);
     });

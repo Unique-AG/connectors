@@ -313,9 +313,9 @@
               "type": "string",
               "description": "Cron schedule for stuck full-sync recovery scans. Default: '*/2 * * * *'. Env var: INGESTION_FULL_SYNC_RECOVERY_CRON"
             },
-            "liveCatchupRecovery": {
+            "liveCatchupRecoveryCron": {
               "type": "string",
-              "description": "Cron schedule for stuck live catch-up recovery scans. Default: '*/5 * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECOVERY"
+              "description": "Cron schedule for stuck live catch-up recovery scans. Default: '*/5 * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECOVERY_CRON"
             },
             "deleteInboxRecoveryCron": {
               "type": "string",

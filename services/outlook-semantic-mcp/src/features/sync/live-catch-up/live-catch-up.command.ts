@@ -3,9 +3,8 @@ import { UniqueApiClient, UniqueFile } from '@unique-ag/unique-api';
 import { createSmeared, Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Attributes, Counter } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
-import { MetricService, Span } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions, userProfiles } from '~/db';
 import {
@@ -14,12 +13,14 @@ import {
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
+import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { greatestFrom } from '~/utils/greatest-from';
+import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import {
@@ -28,6 +29,7 @@ import {
   graphMessagesResponseSchema,
 } from '../../process-email/dtos/microsoft-graph.dtos';
 import { ProcessEmailCommand } from '../../process-email/process-email.command';
+import type { LiveCatchupResult } from './live-catch-up.types';
 
 export const RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES = 20;
 export const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
@@ -36,8 +38,6 @@ export const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 30;
 @Injectable()
 export class LiveCatchUpCommand {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly messagesProcessed: Counter<Attributes>;
-
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly processEmailCommand: ProcessEmailCommand,
@@ -46,24 +46,22 @@ export class LiveCatchUpCommand {
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    metricService: MetricService,
-  ) {
-    this.messagesProcessed = metricService.getCounter('live_catchup_messagest_total', {
-      description: 'Total messages processed during full sync',
-    });
-  }
+    private readonly metrics: SyncMetricsService,
+  ) {}
 
   @NewTrace('live-catchup')
   public async run(input: {
     liveCatchupOverlappingWindow: number;
     subscriptionId: string;
-  }): Promise<void> {
+  }): Promise<LiveCatchupResult> {
     traceAttrs({ subscriptionId: input.subscriptionId });
-    await withRetryAttempts({
-      fn: () => this.runLiveCatchup(input),
-      onError: rethrowRateLimitError,
-      getResultFailure: () => 'failed',
-    });
+    return this.metrics.measureLiveCatchupRun(() =>
+      withRetryAttempts<LiveCatchupResult>({
+        fn: () => this.runLiveCatchup(input),
+        onError: rethrowRateLimitError,
+        getResultFailure: (err) => ({ status: 'failed', err }),
+      }),
+    );
   }
 
   @Span()
@@ -73,17 +71,17 @@ export class LiveCatchUpCommand {
   }: {
     liveCatchupOverlappingWindow: number;
     subscriptionId: string;
-  }): Promise<void> {
+  }): Promise<LiveCatchupResult> {
     traceAttrs({ subscriptionId });
-    this.logger.log({
+    this.logger.debug({
       subscriptionId,
       msg: 'Live catch-up triggered',
     });
     if (this.config.mcpBackend === 'MicrosoftGraph') {
-      return;
+      return { status: 'skipped' };
     }
 
-    const userProfile = await this.db
+    const userProfileRow = await this.db
       .select({
         userProfileId: userProfiles.id,
         userEmail: userProfiles.email,
@@ -93,72 +91,87 @@ export class LiveCatchUpCommand {
       .innerJoin(userProfiles, eq(subscriptions.userProfileId, userProfiles.id))
       .where(eq(subscriptions.subscriptionId, subscriptionId))
       .then((rows) => rows[0]);
-    if (!userProfile) {
-      return;
+    if (!userProfileRow) {
+      return { status: 'skipped' };
     }
-    if (await this.isInboxDeletingQuery.run(userProfile.userProfileId)) {
-      return;
+    if (await this.isInboxDeletingQuery.run(userProfileRow.userProfileId)) {
+      return { status: 'skipped' };
     }
 
-    assert.ok(userProfile.userEmail, `Missing email for: ${userProfile.userProfileId}`);
+    const userProfileEmail = userProfileRow.userEmail;
+    assert.ok(userProfileEmail, `Missing email for: ${userProfileRow.userProfileId}`);
+    const userProfile = { ...userProfileRow, userEmail: userProfileEmail };
 
     const lockResult = await this.acquireLock(userProfile.userProfileId);
     if (lockResult.status === 'skip') {
-      return;
+      return { status: 'skipped' };
     }
 
     let finalStatus: 'ready' | 'failed' = 'ready';
+    let finalOutput: LiveCatchupResult = { status: 'skipped' };
 
-    // We run maximum 3 rounds to avoid an infinite loop here.
-    for (let round = 0; round < 3; round++) {
-      finalStatus = 'ready';
-      // If we got webhooks while we were running we will run once more but with a smaller overlapping window
-      // because we have some fresh data which appeared while we were running.
-      const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
+    try {
+      // We run maximum 3 rounds to avoid an infinite loop here.
+      for (let round = 0; round < 3; round++) {
+        finalStatus = 'ready';
+        // If we got webhooks while we were running we will run once more but with a smaller overlapping window
+        // because we have some fresh data which appeared while we were running.
+        const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
 
-      const runResult = await this.runLiveCatchupWithLock({
-        watermark: lockResult.watermark,
-        filters: lockResult.filters,
-        user: {
-          email: userProfile.userEmail,
-          profileId: userProfile.userProfileId,
-          providerId: userProfile.providerUserId,
-        },
-        subscriptionId,
-        liveCatchupOverlappingWindow: overlappingWindowInMinutes,
-      });
+        const runResult = await this.metrics.measureLiveCatchupRound(() =>
+          this.runLiveCatchupWithLock({
+            watermark: lockResult.watermark,
+            filters: lockResult.filters,
+            user: {
+              email: userProfile.userEmail,
+              profileId: userProfile.userProfileId,
+              providerId: userProfile.providerUserId,
+            },
+            subscriptionId,
+            liveCatchupOverlappingWindow: overlappingWindowInMinutes,
+          }),
+        );
 
-      if (runResult.status === 'failed') {
-        finalStatus = 'failed';
-        break;
+        if (runResult.status === 'failed') {
+          if (isRateLimitError(runResult.err)) {
+            // We rethrow rate limit errors
+            throw runResult.err;
+          }
+          finalOutput = { status: 'failed', err: runResult.err };
+          finalStatus = 'failed';
+          break;
+        }
+
+        finalOutput = { status: 'completed' };
+        const inboxConfiguration = await this.db
+          .select({
+            lastWebhookReceivedAt: inboxConfigurations.lastWebhookReceivedAt,
+            deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
+          })
+          .from(inboxConfigurations)
+          .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
+          .then((rows) => rows[0]);
+
+        if (inboxConfiguration?.deletingInboxStartedAt) {
+          break;
+        }
+
+        if (
+          !inboxConfiguration?.lastWebhookReceivedAt ||
+          inboxConfiguration.lastWebhookReceivedAt < runResult.batchProcessingStartedAt
+        ) {
+          break;
+        }
       }
-
-      const inboxConfiguration = await this.db
-        .select({
-          lastWebhookReceivedAt: inboxConfigurations.lastWebhookReceivedAt,
-          deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
-        })
-        .from(inboxConfigurations)
+    } finally {
+      await this.db
+        .update(inboxConfigurations)
+        .set({ liveCatchUpState: finalStatus, liveCatchUpHeartbeatAt: sql`NOW()` })
         .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
-        .then((rows) => rows[0]);
-
-      if (inboxConfiguration?.deletingInboxStartedAt) {
-        break;
-      }
-
-      if (
-        !inboxConfiguration?.lastWebhookReceivedAt ||
-        inboxConfiguration.lastWebhookReceivedAt < runResult.batchProcessingStartedAt
-      ) {
-        break;
-      }
+        .execute();
     }
 
-    await this.db
-      .update(inboxConfigurations)
-      .set({ liveCatchUpState: finalStatus, liveCatchUpHeartbeatAt: sql`NOW()` })
-      .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
-      .execute();
+    return finalOutput;
   }
 
   private async acquireLock(
@@ -187,7 +200,7 @@ export class LiveCatchUpCommand {
       }
 
       if (inboxConfig.deletingInboxStartedAt !== null) {
-        this.logger.log({
+        this.logger.debug({
           userProfileId,
           msg: 'Inbox deletion in progress, skipping live catch-up',
         });
@@ -198,7 +211,7 @@ export class LiveCatchUpCommand {
         inboxConfig.liveCatchUpState === 'running' &&
         isWithinCooldown(inboxConfig.liveCatchUpHeartbeatAt, RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES)
       ) {
-        this.logger.log({ userProfileId, msg: `Live catch-up already running. Skipping` });
+        this.logger.debug({ userProfileId, msg: `Live catch-up already running. Skipping` });
         return { status: 'skip' };
       }
 
@@ -232,11 +245,15 @@ export class LiveCatchUpCommand {
     user: { profileId: string; providerId: string; email: string };
     subscriptionId: string;
     liveCatchupOverlappingWindow: number;
-  }): Promise<{ status: 'success'; batchProcessingStartedAt: Date } | { status: 'failed' }> {
+  }): Promise<
+    { status: 'success'; batchProcessingStartedAt: Date } | { status: 'failed'; err: unknown }
+  > {
     const logProps = Object.freeze({ userProfileId: user.profileId, subscriptionId });
 
     try {
-      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(user.profileId));
+      await this.metrics.measureLiveCatchupDirectorySync(() =>
+        this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(user.profileId)),
+      );
 
       const client = this.graphClientFactory.createClientForUser(user.profileId);
 
@@ -256,7 +273,7 @@ export class LiveCatchUpCommand {
       return { status: 'success', batchProcessingStartedAt };
     } catch (error) {
       this.logger.error({ ...logProps, err: error, msg: 'Failed to execute live catch-up' });
-      return { status: 'failed' };
+      return { status: 'failed', err: error };
     }
   }
 
@@ -311,44 +328,48 @@ export class LiveCatchUpCommand {
         break;
       }
 
-      const fileKeys = batch.map((item) =>
-        getUniqueKeyForMessage({ userEmail: user.email.value, messageId: item.id }),
-      );
-      const uniqueFiles = await this.uniqueApi.files.getByKeys(fileKeys);
-      const uniqueFilesHashMap = uniqueFiles.reduce<Record<string, UniqueFile>>((acc, file) => {
-        acc[file.key] = file;
-        return acc;
-      }, {});
       const perOutcomeStats: Record<string, number> = {};
 
-      this.logger.debug({
-        ...logContext,
-        msg: `Processing batch`,
-        batchSize: batch.length,
-        numberOfFilesFoundInUnique: uniqueFiles.length,
+      await this.metrics.measureLiveCatchupBatch(async () => {
+        const fileKeys = batch.map((item) =>
+          getUniqueKeyForMessage({ userEmail: user.email.value, messageId: item.id }),
+        );
+        const uniqueFiles = await this.uniqueApi.files.getByKeys(fileKeys);
+        const uniqueFilesHashMap = uniqueFiles.reduce<Record<string, UniqueFile>>((acc, file) => {
+          acc[file.key] = file;
+          return acc;
+        }, {});
+
+        this.logger.debug({
+          ...logContext,
+          msg: `Processing batch`,
+          batchSize: batch.length,
+          numberOfFilesFoundInUnique: uniqueFiles.length,
+        });
+
+        for (const graphMessage of batch) {
+          const fileKey = getUniqueKeyForMessage({
+            userEmail: user.email.value,
+            messageId: graphMessage.id,
+          });
+          const result = await this.metrics.measureLiveCatchupMessageProcessing(() =>
+            this.processEmailCommand.run({
+              user,
+              client,
+              file: uniqueFilesHashMap[fileKey] ?? null,
+              fileKey,
+              filters,
+              graphMessage,
+            }),
+          );
+          const key = `totalMessages_${result}`;
+          perOutcomeStats[key] = (perOutcomeStats[key] ?? 0) + 1;
+          await this.updateWatermarks({ email: graphMessage, userProfileId: user.profileId });
+          processedIds.add(graphMessage.id);
+        }
       });
 
-      for (const graphMessage of batch) {
-        const fileKey = getUniqueKeyForMessage({
-          userEmail: user.email.value,
-          messageId: graphMessage.id,
-        });
-        const result = await this.processEmailCommand.run({
-          user,
-          client,
-          file: uniqueFilesHashMap[fileKey] ?? null,
-          fileKey,
-          filters,
-          graphMessage,
-        });
-        const key = `totalMessages_${result}`;
-        perOutcomeStats[key] = (perOutcomeStats[key] ?? 0) + 1;
-        this.messagesProcessed.add(1, { outcome: result });
-        await this.updateWatermarks({ email: graphMessage, userProfileId: user.profileId });
-        processedIds.add(graphMessage.id);
-      }
-
-      this.logger.log({
+      this.logger.debug({
         ...perOutcomeStats,
         userProfileId: user.profileId,
         batchNumber,

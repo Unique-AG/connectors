@@ -16,8 +16,7 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
-
-const MAX_OUTPUT_RESULTS = 100;
+import { MsGraphSearchConfig } from './search.config';
 
 const batchResponseSchema = z.object({
   responses: z.array(
@@ -87,6 +86,7 @@ export class MsGraphKqlSearchEmailsQuery {
   public async run(
     userProfileId: UserProfileTypeID,
     queries: Array<QueryInput>,
+    searchConfig: MsGraphSearchConfig,
   ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const msGraphBatchRequest: GraphBatchRequest[] = await this.translateQueriesToBatchRequests({
@@ -107,6 +107,7 @@ export class MsGraphKqlSearchEmailsQuery {
     const fetchResult = await this.fetchFromMicrosoft({
       userProfile,
       batchRequests: msGraphBatchRequest,
+      searchConfig,
     });
     if (!fetchResult.success) {
       return { results: [], searchSummary: fetchResult.searchSummary };
@@ -153,6 +154,10 @@ export class MsGraphKqlSearchEmailsQuery {
           idIsImmutable,
         },
       });
+
+      if (results.length >= searchConfig.maxEmailsLimit) {
+        break;
+      }
     }
 
     return { results, searchSummary: undefined };
@@ -228,9 +233,11 @@ export class MsGraphKqlSearchEmailsQuery {
   private async fetchFromMicrosoft({
     userProfile,
     batchRequests,
+    searchConfig,
   }: {
     userProfile: NonNullishProps<UserProfile, 'email'>;
     batchRequests: GraphBatchRequest[];
+    searchConfig: MsGraphSearchConfig;
   }): Promise<
     | {
         success: false;
@@ -311,10 +318,13 @@ export class MsGraphKqlSearchEmailsQuery {
       groupBy((item) => item.mailbox),
     );
 
-    return { success: true, hits: this.mergeResults(results) };
+    return { success: true, hits: this.mergeResults(results, searchConfig) };
   }
 
-  private mergeResults(hitsByMailbox: Record<string, Hit[]>): Hit[] {
+  private mergeResults(
+    hitsByMailbox: Record<string, Hit[]>,
+    searchConfig: MsGraphSearchConfig,
+  ): Hit[] {
     const allResults: Hit[] = [];
     const indicesMap = new Map(Object.keys(hitsByMailbox).map((mailbox) => [mailbox, 0]));
     let hasMoreItems = true;
@@ -336,7 +346,7 @@ export class MsGraphKqlSearchEmailsQuery {
 
         if (!allResults.some((result) => result.restId === item.restId)) {
           allResults.push(item);
-          if (allResults.length >= MAX_OUTPUT_RESULTS) {
+          if (allResults.length >= searchConfig.maxEmailsLimit) {
             return allResults;
           }
         }

@@ -61,6 +61,8 @@ interface BaseLogContext extends Record<string, string | undefined | boolean> {
   userEmail: string;
 }
 
+export type ProcessEmailCommandResult = MessageIngestionResult | 'failed';
+
 @Injectable()
 export class ProcessEmailCommand {
   private readonly logger = new Logger(this.constructor.name);

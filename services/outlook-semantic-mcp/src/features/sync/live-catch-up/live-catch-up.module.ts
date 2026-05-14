@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { InboxDeletingQueryModule } from '~/features/delete-inbox/inbox-deleting-query.module';
 import { DirectoriesSyncModule } from '~/features/directories-sync/directories-sync.module';
+import { MetricsModule } from '~/features/metrics/metrics.module';
 import { ProcessEmailModule } from '~/features/process-email/process-email.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
@@ -18,6 +19,7 @@ import { LiveCatchUpListener } from './live-catch-up.listener';
     ConfigModule,
     UniqueApiFeatureModule,
     InboxDeletingQueryModule,
+    MetricsModule,
   ],
   providers: [LiveCatchUpCommand, LiveCatchUpListener],
   exports: [LiveCatchUpCommand],

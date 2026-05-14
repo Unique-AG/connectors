@@ -8,17 +8,17 @@ import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/d
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
+import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import type { FullSyncResult, InboxConfig, LockDecision } from './full-sync.types';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
-
-type InboxConfig = typeof inboxConfigurations.$inferSelect;
 
 export const START_FULL_SYNC_LINK = 'SYNC_STARTED:__EMPTY_DELTA__';
 
@@ -27,12 +27,6 @@ export const RUNNING_HEARTBEAT_MINUTES = 20;
 export const WAITING_FOR_INGESTION_HEARTBEAT_MINUTES = 5;
 export const FAILED_HEARTBEAT_MINUTES = 20;
 const MAX_ON_GOING_INGESTION_IN_PROGRESS = 10;
-
-export type FullSyncResult =
-  | { status: 'skipped'; reason: string }
-  | { status: 'waiting-for-ingestion' }
-  | { status: 'completed' }
-  | { status: 'failed'; error: unknown };
 
 @Injectable()
 export class FullSyncCommand {
@@ -47,21 +41,24 @@ export class FullSyncCommand {
     private readonly isInboxDeletingQuery: IsInboxDeletingQuery,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    private readonly metrics: SyncMetricsService,
   ) {}
 
   @Span()
   public async run(userProfileId: string): Promise<FullSyncResult> {
-    return await withRetryAttempts({
-      fn: () => this.runFullSync(userProfileId),
-      onError: rethrowRateLimitError,
-      getResultFailure: (error) => ({ status: 'failed', error }),
-    });
+    return await this.metrics.measureFullSyncRun(() =>
+      withRetryAttempts<FullSyncResult>({
+        fn: () => this.runFullSync(userProfileId),
+        onError: rethrowRateLimitError,
+        getResultFailure: (error) => ({ status: 'failed', error }),
+      }),
+    );
   }
 
   @Span()
   public async runFullSync(userProfileId: string): Promise<FullSyncResult> {
     traceAttrs({ userProfileId });
-    this.logger.log({ userProfileId, msg: 'Full sync triggered' });
+    this.logger.debug({ userProfileId, msg: 'Full sync triggered' });
     if (await this.isInboxDeletingQuery.run(userProfileId)) {
       return { status: 'skipped', reason: 'Inbox is in deleting process' };
     }
@@ -87,7 +84,7 @@ export class FullSyncCommand {
 
     if (lockResult.action === 'skip') {
       traceEvent('full sync skipped', { reason: lockResult.reason });
-      this.logger.log({
+      this.logger.debug({
         userProfileId: userProfile.id,
         reason: lockResult.reason,
         msg: 'Full sync skipped',
@@ -115,23 +112,26 @@ export class FullSyncCommand {
       if (lockResult.shouldFetchCount) {
         await this.fetchAndSaveExpectedTotal(userProfile.id, version, filters);
       }
-      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
+      await this.metrics.measureFullSyncDirectorySync(() =>
+        this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
+      );
 
-      const batchResult = await this.processFullSyncBatchCommand.run({
-        userProfile: { ...userProfile, email: userProfileEmail },
-        version,
-      });
+      const batchResult = await this.metrics.measureFullSyncBatch(() =>
+        this.processFullSyncBatchCommand.run({
+          userProfile: { ...userProfile, email: userProfileEmail },
+          version,
+        }),
+      );
 
       switch (batchResult.outcome) {
         case 'version-mismatch':
         case 'missing-full-sync-next-link':
-          this.logger.log({
+          this.logger.warn({
             userProfileId: userProfile.id,
             version,
             msg: `Exiting: ${batchResult.outcome}`,
           });
           return { status: 'skipped', reason: 'version-mismatch' };
-
         case 'batch-uploaded': {
           const newStateSaved = await this.transitionState(
             userProfile.id,
@@ -153,7 +153,6 @@ export class FullSyncCommand {
           });
           return { status: 'waiting-for-ingestion' };
         }
-
         case 'completed': {
           const updated = await this.updateByVersionCommand.run(userProfile.id, version, {
             fullSyncState: 'ready',
@@ -173,7 +172,6 @@ export class FullSyncCommand {
           this.logger.log({ userProfileId: userProfile.id, version, msg: 'Full sync completed' });
           return { status: 'completed' };
         }
-
         default: {
           throw new Error(`Unhandled batch result: ${JSON.stringify(batchResult)}`);
         }
@@ -212,7 +210,7 @@ export class FullSyncCommand {
         return { action: 'skip' as const, reason: 'inbox-deletion-in-progress' };
       }
 
-      const decision = this.decideAction(row);
+      const decision = this.decideAction(row, userProfileId);
       if (decision.action === 'skip') {
         return decision;
       }
@@ -267,6 +265,7 @@ export class FullSyncCommand {
       | 'fullSyncLastRunAt'
       | 'fullSyncExpectedTotal'
     >,
+    userProfileId: string,
   ): { action: 'skip'; reason: string } | { action: 'proceed' } {
     switch (row.fullSyncState) {
       case 'ready':
@@ -280,7 +279,10 @@ export class FullSyncCommand {
         if (isWithinCooldown(row.fullSyncHeartbeatAt, RUNNING_HEARTBEAT_MINUTES)) {
           return { action: 'skip', reason: 'already-running' };
         }
-        this.logger.warn({ msg: 'Recovering stale running sync (heartbeat too old)' });
+        this.logger.warn({
+          userProfileId,
+          msg: 'Recovering stale running sync (heartbeat too old)',
+        });
         return { action: 'proceed' };
       case 'failed':
         if (isWithinCooldown(row.fullSyncHeartbeatAt, FAILED_HEARTBEAT_MINUTES)) {
@@ -314,7 +316,7 @@ export class FullSyncCommand {
         fullSyncHeartbeatAt: sql`NOW()`,
       });
 
-      this.logger.log({ userProfileId, expectedTotal: count, msg: 'Expected total fetched' });
+      this.logger.debug({ userProfileId, expectedTotal: count, msg: 'Expected total fetched' });
     } catch (error) {
       this.logger.warn({
         err: error,
@@ -341,13 +343,21 @@ export class FullSyncCommand {
     }
 
     if (!result.ok) {
-      this.logger.log({ userProfileId, version, msg: 'Ingestion is not reachable, waiting again' });
+      this.logger.warn({
+        userProfileId,
+        version,
+        msg: 'Ingestion is not reachable, waiting again',
+      });
     } else {
-      this.logger.log({ userProfileId, version, msg: 'Scope still draining, waiting again' });
+      this.logger.debug({ userProfileId, version, msg: 'Scope still draining, waiting again' });
     }
     const isSaved = await this.transitionState(userProfileId, version, 'waiting-for-ingestion');
     if (!isSaved) {
-      this.logger.log({ userProfileId, version, msg: 'Skipping state transition failed' });
+      this.logger.warn({
+        userProfileId,
+        version,
+        msg: 'Version mismatch on ingestion wait transition',
+      });
       return { status: 'skipped', reason: 'version-mismatch' };
     }
 
@@ -365,13 +375,3 @@ export class FullSyncCommand {
     });
   }
 }
-
-type LockDecision =
-  | { action: 'skip'; reason: string }
-  | {
-      action: 'proceed';
-      version: string;
-      previousState: InboxConfig['fullSyncState'];
-      shouldFetchCount: boolean;
-      filters: Record<string, unknown>;
-    };

@@ -11,6 +11,7 @@ import {
   delegatedAccessDirectories,
   userProfiles,
 } from '~/db';
+import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { NewTrace, traceAttrs } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { GenericRateLimitError } from '~/utils/is-rate-limit-error';
@@ -36,6 +37,7 @@ export class SyncDelegatedAccessCommand {
     private readonly graphClientFactory: GraphClientFactory,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
+    private readonly metrics: DelegatedAccessMetricsService,
   ) {}
 
   @NewTrace('sync-delegated-access')
@@ -47,8 +49,10 @@ export class SyncDelegatedAccessCommand {
       });
       return;
     }
-    const { accountsId } = input;
+    await this.metrics.measureSyncRun(() => this.runVerification(input.accountsId));
+  }
 
+  private async runVerification(accountsId: string): Promise<void> {
     const [accounts] = await this.db
       .select({
         delegateUserId: delegatedAccessAccounts.delegateUserId,

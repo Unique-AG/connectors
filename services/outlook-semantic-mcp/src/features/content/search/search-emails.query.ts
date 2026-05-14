@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { isNullish } from 'remeda';
 import * as z from 'zod';
-import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
+import { SEARCH_CONFIG } from './search.config';
 import { SearchEmailsInputSchema } from './search-conditions.dto';
 import {
   SearchBackend,
@@ -28,8 +29,6 @@ type BackendExecutor = (
   searchSummary: string | undefined;
 }>;
 
-const MAX_COMBINED_RESULTS = 200;
-
 @Injectable()
 export class SearchEmailsQuery {
   public constructor(
@@ -45,11 +44,11 @@ export class SearchEmailsQuery {
       results: SearchEmailResult[];
       searchSummary: string | undefined;
     }> => {
-      if (isMicrosoftGraphBackend() || !input.uniqueSemanticSearchQueries?.length) {
+      if (isNullish(SEARCH_CONFIG.semanticSearch) || !input.uniqueSemanticSearchQueries?.length) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
       return this.semanticSearchQuery
-        .run(userProfileId, input.uniqueSemanticSearchQueries)
+        .run(userProfileId, input.uniqueSemanticSearchQueries, SEARCH_CONFIG.semanticSearch)
         .then(({ results, searchSummary }) => ({ results, searchSummary }));
     },
     [SearchBackend.MsGraph]: (
@@ -62,7 +61,11 @@ export class SearchEmailsQuery {
       if (!input.msGraphKeywordSearchQueries) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
-      return this.msGraphKqlQuery.run(userProfileId, input.msGraphKeywordSearchQueries);
+      return this.msGraphKqlQuery.run(
+        userProfileId,
+        input.msGraphKeywordSearchQueries,
+        SEARCH_CONFIG.msGraph,
+      );
     },
   };
 
@@ -174,7 +177,7 @@ export class SearchEmailsQuery {
 
     return [...topSemanticMatches, ...commonRemainder, ...semanticOnly, ...remainingGraph].slice(
       0,
-      MAX_COMBINED_RESULTS,
+      SEARCH_CONFIG.maxOutputEmails,
     );
   }
 }

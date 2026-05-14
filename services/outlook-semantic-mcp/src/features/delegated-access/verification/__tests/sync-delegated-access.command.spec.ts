@@ -117,6 +117,7 @@ function createCommand({
     createMockGraphClientFactory(graphApi) as any,
     db as any,
     { scan: 'granularAccess' } as any,
+    { measureSyncRun: (fn: () => Promise<unknown>) => fn() } as any,
   );
 }
 

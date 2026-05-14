@@ -119,8 +119,8 @@ function createMockFindConfigByVersion(config?: {
 
 function createMockMetricService() {
   return {
-    getHistogram: vi.fn().mockReturnValue({ record: vi.fn() }),
-    getCounter: vi.fn().mockReturnValue({ add: vi.fn() }),
+    measureGraphPage: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+    measureEmailProcessing: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
   };
 }
 
