@@ -1,27 +1,24 @@
 import crypto from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type { Histogram } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
-import { MetricService, Span } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
+import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
-import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
-import { recordInHistogram } from '~/utils/record-in-histogram';
-
-type InboxConfig = typeof inboxConfigurations.$inferSelect;
+import type { FullSyncResult, InboxConfig, LockDecision } from './full-sync.types';
 
 export const START_FULL_SYNC_LINK = 'SYNC_STARTED:__EMPTY_DELTA__';
 
@@ -31,15 +28,9 @@ export const WAITING_FOR_INGESTION_HEARTBEAT_MINUTES = 5;
 export const FAILED_HEARTBEAT_MINUTES = 20;
 const MAX_ON_GOING_INGESTION_IN_PROGRESS = 10;
 
-import type { FullSyncResult } from './full-sync.types';
-
 @Injectable()
 export class FullSyncCommand {
   private readonly logger = new Logger(this.constructor.name);
-
-  private readonly fullSyncRunDuration: Histogram;
-  private readonly directorySyncDuration: Histogram;
-  private readonly batchSyncDuration: Histogram;
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
@@ -50,46 +41,18 @@ export class FullSyncCommand {
     private readonly isInboxDeletingQuery: IsInboxDeletingQuery,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    metricService: MetricService,
-  ) {
-    this.fullSyncRunDuration = metricService.getHistogram('osm_full_sync_run_duration_seconds', {
-      description: 'Wall-clock duration of a full sync run() call including retries',
-    });
-    this.directorySyncDuration = metricService.getHistogram(
-      'osm_full_sync_directory_sync_duration_seconds',
-      {
-        description: 'Duration of the directory sync step within a full sync',
-      },
-    );
-    this.batchSyncDuration = metricService.getHistogram('osm_full_sync_batch_duration_seconds', {
-      description: 'Duration of the batch processing step within a full sync',
-    });
-  }
+    private readonly metrics: SyncMetricsService,
+  ) {}
 
   @Span()
   public async run(userProfileId: string): Promise<FullSyncResult> {
-    return await recordInHistogram({
-      histogram: this.fullSyncRunDuration,
-      successAtrributes: (result) => ({
-        status: result.status,
-        errorType:
-          result.status !== 'failed'
-            ? 'none'
-            : isRateLimitError(result.error)
-              ? 'throttling'
-              : 'other',
+    return await this.metrics.measureFullSyncRun(
+      () => withRetryAttempts<FullSyncResult>({
+        fn: () => this.runFullSync(userProfileId),
+        onError: rethrowRateLimitError,
+        getResultFailure: (error) => ({ status: 'failed', error }),
       }),
-      errorAttributtes: (err) => ({
-        status: 'failed',
-        errorType: isRateLimitError(err) ? 'throttling' : 'other',
-      }),
-      fn: () =>
-        withRetryAttempts<FullSyncResult>({
-          fn: () => this.runFullSync(userProfileId),
-          onError: rethrowRateLimitError,
-          getResultFailure: (error) => ({ status: 'failed', error }),
-        }),
-    });
+    );
   }
 
   @Span()
@@ -149,18 +112,13 @@ export class FullSyncCommand {
       if (lockResult.shouldFetchCount) {
         await this.fetchAndSaveExpectedTotal(userProfile.id, version, filters);
       }
-      const dirStart = Date.now();
-      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
-      this.directorySyncDuration.record((Date.now() - dirStart) / 1000);
+      await this.metrics.measureFullSyncDirectorySync(
+        () => this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
+      );
 
-      const batchStart = Date.now();
-      const batchResult = await this.processFullSyncBatchCommand.run({
-        userProfile: { ...userProfile, email: userProfileEmail },
-        version,
-      });
-      this.batchSyncDuration.record((Date.now() - batchStart) / 1000, {
-        outcome: batchResult.outcome,
-      });
+      const batchResult = await this.metrics.measureFullSyncBatch(
+        () => this.processFullSyncBatchCommand.run({ userProfile: { ...userProfile, email: userProfileEmail }, version }),
+      );
 
       switch (batchResult.outcome) {
         case 'version-mismatch':
@@ -414,13 +372,3 @@ export class FullSyncCommand {
     });
   }
 }
-
-type LockDecision =
-  | { action: 'skip'; reason: string }
-  | {
-      action: 'proceed';
-      version: string;
-      previousState: InboxConfig['fullSyncState'];
-      shouldFetchCount: boolean;
-      filters: Record<string, unknown>;
-    };

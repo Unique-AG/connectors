@@ -3,9 +3,8 @@ import { UniqueApiClient, UniqueFile } from '@unique-ag/unique-api';
 import { createSmeared } from '@unique-ag/utils';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
-import type { Counter, Histogram } from '@opentelemetry/api';
 import { sql } from 'drizzle-orm';
-import { MetricService, Span } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import z from 'zod';
 import { inboxConfigurations, UserProfile } from '~/db';
@@ -21,7 +20,7 @@ import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutof
 import { greatestFrom } from '~/utils/greatest-from';
 import { leastFrom } from '~/utils/least-from';
 import { NonNullishProps } from '~/utils/non-nullish-props';
-import { recordInHistogram } from '~/utils/record-in-histogram';
+import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import {
   GraphMessageFields,
   graphMessagesResponseSchema,
@@ -33,16 +32,11 @@ import {
 } from '../../process-email/process-email.command';
 import { FindInboxConfigByVersionQuery } from './find-inbox-config-by-version.query';
 import { START_FULL_SYNC_LINK } from './full-sync.command';
+import type { BatchResult } from './full-sync.types';
 import {
   InboxConfigVersionedUpdate,
   UpdateInboxConfigByVersionCommand,
 } from './update-inbox-config-by-version.command';
-
-export type BatchResult =
-  | { outcome: 'batch-uploaded' }
-  | { outcome: 'completed' }
-  | { outcome: 'version-mismatch' }
-  | { outcome: 'missing-full-sync-next-link' };
 
 const GRAPH_PAGE_LIMIT = 100;
 // We aim to upload 100 messages and we do not want to upload twice as much when a couple failed.
@@ -54,34 +48,14 @@ type PossibleIngestionResults = MessageIngestionResult | 'failed';
 export class ProcessFullSyncBatchCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  private readonly graphPageDuration: Histogram;
-  private readonly processEmailDuration: Histogram;
-  private readonly messagesProcessed: Counter;
-
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly processEmailCommand: ProcessEmailCommand,
     private readonly updateByVersionCommand: UpdateInboxConfigByVersionCommand,
     private readonly findConfigByVersion: FindInboxConfigByVersionQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
-    metricService: MetricService,
-  ) {
-    this.graphPageDuration = metricService.getHistogram(
-      'osm_full_sync_graph_page_duration_seconds',
-      {
-        description: 'Duration of Graph API page fetch during full sync',
-      },
-    );
-    this.processEmailDuration = metricService.getHistogram(
-      'osm_full_sync_process_email_duration_seconds',
-      {
-        description: 'Duration of single message ingestion during full sync (including retries)',
-      },
-    );
-    this.messagesProcessed = metricService.getCounter('osm_full_sync_messages_processed_total', {
-      description: 'Total messages processed during full sync',
-    });
-  }
+    private readonly metrics: SyncMetricsService,
+  ) {}
 
   @NewTrace('process-full-sync-batch')
   public async run({
@@ -341,11 +315,7 @@ export class ProcessFullSyncBatchCommand {
     ];
 
     if (nextLink === START_FULL_SYNC_LINK) {
-      const raw = await recordInHistogram({
-        histogram: this.graphPageDuration,
-        attributes: { page_type: 'first' },
-        fn: () => this.fetchFirstPage(client, conditions),
-      });
+      const raw = await this.metrics.measureGraphPage(() => this.fetchFirstPage(client, conditions), 'first');
       return {
         status: 'proceed',
         resetBatchIndex: false,
@@ -354,11 +324,10 @@ export class ProcessFullSyncBatchCommand {
     }
 
     try {
-      const raw = await recordInHistogram({
-        histogram: this.graphPageDuration,
-        attributes: { page_type: 'next' },
-        fn: () => client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get(),
-      });
+      const raw = await this.metrics.measureGraphPage(
+        () => client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get(),
+        'next',
+      );
       return {
         status: 'proceed',
         resetBatchIndex: false,
@@ -386,11 +355,7 @@ export class ProcessFullSyncBatchCommand {
       `Created date time is null durring expired next link`,
     );
     conditions.push(`receivedDateTime le ${freshConfig.oldestReceivedEmailDateTime.toISOString()}`);
-    const raw = await recordInHistogram({
-      histogram: this.graphPageDuration,
-      attributes: { page_type: 'next' },
-      fn: () => this.fetchFirstPage(client, conditions),
-    });
+    const raw = await this.metrics.measureGraphPage(() => this.fetchFirstPage(client, conditions), 'next');
     return {
       status: 'proceed',
       resetBatchIndex: true,
@@ -413,12 +378,9 @@ export class ProcessFullSyncBatchCommand {
   private async processMessage(
     input: ProcessEmailCommandInput,
   ): Promise<'ingested' | 'skipped' | 'failed'> {
-    const processingResult = await recordInHistogram({
-      histogram: this.processEmailDuration,
-      successAtrributes: (result) => ({ outcome: result === 'failed' ? 'failure' : 'success' }),
-      errorAttributtes: () => ({ outcome: 'failure' }),
-      fn: () => this.processEmailCommand.run(input),
-    });
+    const processingResult = await this.metrics.countFullSyncMessage(
+      () => this.metrics.measureEmailProcessing(() => this.processEmailCommand.run(input)),
+    );
 
     if (processingResult === 'failed') {
       this.logger.warn({
@@ -427,7 +389,6 @@ export class ProcessFullSyncBatchCommand {
         msg: 'Message ingestion failed after retries',
       });
     }
-    this.messagesProcessed.add(1, { outcome: processingResult });
 
     const mapToOurResult: Record<PossibleIngestionResults, 'ingested' | 'skipped' | 'failed'> = {
       ingested: `ingested`,

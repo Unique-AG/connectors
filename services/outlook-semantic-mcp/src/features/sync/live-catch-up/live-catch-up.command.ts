@@ -3,9 +3,8 @@ import { UniqueApiClient, UniqueFile } from '@unique-ag/unique-api';
 import { createSmeared, Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Attributes, Counter, Histogram } from '@opentelemetry/api';
 import { eq, sql } from 'drizzle-orm';
-import { MetricService, Span } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import { AppConfig, appConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions, userProfiles } from '~/db';
 import {
@@ -22,8 +21,8 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { greatestFrom } from '~/utils/greatest-from';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
-import { recordInHistogram } from '~/utils/record-in-histogram';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import {
   GraphMessage,
   GraphMessageFields,
@@ -39,12 +38,6 @@ export const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 30;
 @Injectable()
 export class LiveCatchUpCommand {
   private readonly logger = new Logger(this.constructor.name);
-  private readonly messagesProcessed: Counter<Attributes>;
-  private readonly liveCatchupRunDuration: Histogram;
-  private readonly liveCatchupRoundDuration: Histogram;
-  private readonly directorySyncDuration: Histogram;
-  private readonly batchSyncDuration: Histogram;
-
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly processEmailCommand: ProcessEmailCommand,
@@ -53,33 +46,8 @@ export class LiveCatchUpCommand {
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    metricService: MetricService,
-  ) {
-    this.messagesProcessed = metricService.getCounter('osm_live_catchup_messages_total', {
-      description: 'Total messages processed during live catch-up',
-    });
-    this.liveCatchupRunDuration = metricService.getHistogram(
-      'osm_live_catchup_run_duration_seconds',
-      {
-        description: 'Wall-clock duration of a total live catch-up run() call',
-      },
-    );
-    this.liveCatchupRoundDuration = metricService.getHistogram(
-      'osm_live_catchup_round_duration_seconds',
-      {
-        description: 'Wall-clock duration of a live catch-up runLiveCatchup() call',
-      },
-    );
-    this.directorySyncDuration = metricService.getHistogram(
-      'osm_live_catchup_directory_sync_duration_seconds',
-      {
-        description: 'Duration of directory sync during live catch-up',
-      },
-    );
-    this.batchSyncDuration = metricService.getHistogram('osm_live_catchup_batch_duration_seconds', {
-      description: 'Duration of a single batch processing step during live catch-up',
-    });
-  }
+    private readonly metrics: SyncMetricsService,
+  ) {}
 
   @NewTrace('live-catchup')
   public async run(input: {
@@ -87,28 +55,13 @@ export class LiveCatchUpCommand {
     subscriptionId: string;
   }): Promise<LiveCatchupResult> {
     traceAttrs({ subscriptionId: input.subscriptionId });
-    return recordInHistogram({
-      histogram: this.liveCatchupRunDuration,
-      successAtrributes: (result) => ({
-        status: result.status,
-        errorType:
-          result.status === 'failed'
-            ? isRateLimitError(result.err)
-              ? 'throttling'
-              : 'other'
-            : undefined,
+    return this.metrics.measureLiveCatchupRun(
+      () => withRetryAttempts<LiveCatchupResult>({
+        fn: () => this.runLiveCatchup(input),
+        onError: rethrowRateLimitError,
+        getResultFailure: (err) => ({ status: 'failed', err }),
       }),
-      errorAttributtes: (error) => ({
-        status: 'failed',
-        errorType: isRateLimitError(error) ? 'throttling' : 'other',
-      }),
-      fn: () =>
-        withRetryAttempts<LiveCatchupResult>({
-          fn: () => this.runLiveCatchup(input),
-          onError: rethrowRateLimitError,
-          getResultFailure: (err) => ({ status: 'failed', err }),
-        }),
-    });
+    );
   }
 
   @Span()
@@ -165,35 +118,19 @@ export class LiveCatchUpCommand {
         // because we have some fresh data which appeared while we were running.
         const overlappingWindowInMinutes = round > 0 ? 2 : liveCatchupOverlappingWindow;
 
-        const runResult = await recordInHistogram({
-          histogram: this.liveCatchupRoundDuration,
-          attributes: { roundNumber: round },
-          successAtrributes: (result) => ({
-            status: result.status,
-            errorType:
-              result.status === 'failed'
-                ? isRateLimitError(result.err)
-                  ? 'throttling'
-                  : 'other'
-                : undefined,
+        const runResult = await this.metrics.measureLiveCatchupRound(
+          () => this.runLiveCatchupWithLock({
+            watermark: lockResult.watermark,
+            filters: lockResult.filters,
+            user: {
+              email: userProfile.userEmail,
+              profileId: userProfile.userProfileId,
+              providerId: userProfile.providerUserId,
+            },
+            subscriptionId,
+            liveCatchupOverlappingWindow: overlappingWindowInMinutes,
           }),
-          errorAttributtes: (error) => ({
-            status: 'failed',
-            errorType: isRateLimitError(error) ? 'throttling' : 'other',
-          }),
-          fn: () =>
-            this.runLiveCatchupWithLock({
-              watermark: lockResult.watermark,
-              filters: lockResult.filters,
-              user: {
-                email: userProfile.userEmail,
-                profileId: userProfile.userProfileId,
-                providerId: userProfile.providerUserId,
-              },
-              subscriptionId,
-              liveCatchupOverlappingWindow: overlappingWindowInMinutes,
-            }),
-        });
+        );
 
         if (runResult.status === 'failed') {
           if (isRateLimitError(runResult.err)) {
@@ -314,11 +251,9 @@ export class LiveCatchUpCommand {
     const logProps = Object.freeze({ userProfileId: user.profileId, subscriptionId });
 
     try {
-      await recordInHistogram({
-        histogram: this.directorySyncDuration,
-        attributes: {},
-        fn: () => this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(user.profileId)),
-      });
+      await this.metrics.measureLiveCatchupDirectorySync(
+        () => this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(user.profileId)),
+      );
 
       const client = this.graphClientFactory.createClientForUser(user.profileId);
 
@@ -393,43 +328,46 @@ export class LiveCatchUpCommand {
         break;
       }
 
-      const batchStart = Date.now();
-      const fileKeys = batch.map((item) =>
-        getUniqueKeyForMessage({ userEmail: user.email.value, messageId: item.id }),
-      );
-      const uniqueFiles = await this.uniqueApi.files.getByKeys(fileKeys);
-      const uniqueFilesHashMap = uniqueFiles.reduce<Record<string, UniqueFile>>((acc, file) => {
-        acc[file.key] = file;
-        return acc;
-      }, {});
       const perOutcomeStats: Record<string, number> = {};
 
-      this.logger.debug({
-        ...logContext,
-        msg: `Processing batch`,
-        batchSize: batch.length,
-        numberOfFilesFoundInUnique: uniqueFiles.length,
-      });
+      await this.metrics.measureLiveCatchupBatch(async () => {
+        const fileKeys = batch.map((item) =>
+          getUniqueKeyForMessage({ userEmail: user.email.value, messageId: item.id }),
+        );
+        const uniqueFiles = await this.uniqueApi.files.getByKeys(fileKeys);
+        const uniqueFilesHashMap = uniqueFiles.reduce<Record<string, UniqueFile>>((acc, file) => {
+          acc[file.key] = file;
+          return acc;
+        }, {});
 
-      for (const graphMessage of batch) {
-        const fileKey = getUniqueKeyForMessage({
-          userEmail: user.email.value,
-          messageId: graphMessage.id,
+        this.logger.debug({
+          ...logContext,
+          msg: `Processing batch`,
+          batchSize: batch.length,
+          numberOfFilesFoundInUnique: uniqueFiles.length,
         });
-        const result = await this.processEmailCommand.run({
-          user,
-          client,
-          file: uniqueFilesHashMap[fileKey] ?? null,
-          fileKey,
-          filters,
-          graphMessage,
-        });
-        const key = `totalMessages_${result}`;
-        perOutcomeStats[key] = (perOutcomeStats[key] ?? 0) + 1;
-        this.messagesProcessed.add(1, { outcome: result });
-        await this.updateWatermarks({ email: graphMessage, userProfileId: user.profileId });
-        processedIds.add(graphMessage.id);
-      }
+
+        for (const graphMessage of batch) {
+          const fileKey = getUniqueKeyForMessage({
+            userEmail: user.email.value,
+            messageId: graphMessage.id,
+          });
+          const result = await this.metrics.countLiveCatchupMessage(() =>
+            this.processEmailCommand.run({
+              user,
+              client,
+              file: uniqueFilesHashMap[fileKey] ?? null,
+              fileKey,
+              filters,
+              graphMessage,
+            }),
+          );
+          const key = `totalMessages_${result}`;
+          perOutcomeStats[key] = (perOutcomeStats[key] ?? 0) + 1;
+          await this.updateWatermarks({ email: graphMessage, userProfileId: user.profileId });
+          processedIds.add(graphMessage.id);
+        }
+      });
 
       this.logger.debug({
         ...perOutcomeStats,
@@ -438,7 +376,6 @@ export class LiveCatchUpCommand {
         batchSize: batch.length,
         msg: 'Batch processed',
       });
-      this.batchSyncDuration.record((Date.now() - batchStart) / 1000);
 
       if (!emailResponse['@odata.nextLink']) {
         break;
