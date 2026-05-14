@@ -9,7 +9,7 @@ import { ProxyService } from '../../proxy/proxy.service';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
 import { TenantRegistry } from '../../tenant/tenant-registry';
 import { Redacted } from '../../utils/redacted';
-import { MsGraphConnectivityHealthIndicator } from '../ms-graph-connectivity-health.indicator';
+import { ConnectivityHealthIndicator } from '../connectivity-health.indicator';
 
 const TIMEOUT_MS = 3000;
 type UndiciFetch = typeof import('undici').fetch;
@@ -102,14 +102,14 @@ function makeDeletedTenant(name: string, baseUrl: string): TenantContext {
   return makeCloudTenant(name, baseUrl, TenantStatus.Deleted);
 }
 
-describe('MsGraphConnectivityHealthIndicator', () => {
-  let indicator: MsGraphConnectivityHealthIndicator;
+describe('ConnectivityHealthIndicator', () => {
+  let indicator: ConnectivityHealthIndicator;
   let mockFetch: MockedFunction<UndiciFetch>;
   let tenants: TenantContext[];
   const mockDispatcher = Symbol('dispatcher');
 
   async function buildIndicator(): Promise<void> {
-    const { unit } = await TestBed.solitary(MsGraphConnectivityHealthIndicator)
+    const { unit } = await TestBed.solitary(ConnectivityHealthIndicator)
       .mock(ConfigService)
       .impl((stub) => ({
         ...stub(),

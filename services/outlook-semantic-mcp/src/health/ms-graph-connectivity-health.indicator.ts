@@ -7,7 +7,7 @@ import { IngestionConfig, ingestionConfig } from '~/config';
 const GRAPH_URL = 'https://graph.microsoft.com/v1.0/';
 
 @Injectable()
-export class ConnectivityHealthIndicator {
+export class MsGraphConnectivityHealthIndicator {
   private readonly timeoutMs: number;
 
   public constructor(

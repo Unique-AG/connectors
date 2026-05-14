@@ -3,7 +3,7 @@ import { TerminusModule } from '@nestjs/terminus';
 import { ProxyModule } from '../proxy';
 import { TenantModule } from '../tenant';
 import { HealthController } from './health.controller';
-import { MsGraphConnectivityHealthIndicator } from './ms-graph-connectivity-health.indicator';
+import { ConnectivityHealthIndicator } from './connectivity-health.indicator';
 import { SyncHealthIndicator } from './sync-health.indicator';
 import { SyncStatusStore } from './sync-status.store';
 import { UniqueApiHealthIndicator } from './unique-api-health.indicator';
@@ -14,7 +14,7 @@ import { UniqueApiHealthIndicator } from './unique-api-health.indicator';
   providers: [
     SyncStatusStore,
     SyncHealthIndicator,
-    MsGraphConnectivityHealthIndicator,
+    ConnectivityHealthIndicator,
     UniqueApiHealthIndicator,
   ],
   exports: [SyncStatusStore],

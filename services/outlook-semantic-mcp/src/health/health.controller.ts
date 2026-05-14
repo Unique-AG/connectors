@@ -10,7 +10,7 @@ import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { AmqpHealthIndicator } from './amqp-health.indicator';
-import { ConnectivityHealthIndicator } from './connectivity-health.indicator';
+import { MsGraphConnectivityHealthIndicator } from './ms-graph-connectivity-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { McpProcessesHealthIndicator } from './mcp-processes-health.indicator';
 
@@ -20,7 +20,7 @@ export class HealthController {
     private readonly healthCheckService: HealthCheckService,
     private readonly healthIndicatorService: HealthIndicatorService,
     @InjectUniqueApi() private readonly uniqueApiClient: UniqueApiClient,
-    private readonly connectivityIndicator: ConnectivityHealthIndicator,
+    private readonly connectivityIndicator: MsGraphConnectivityHealthIndicator,
     private readonly databaseIndicator: DatabaseHealthIndicator,
     private readonly amqpIndicator: AmqpHealthIndicator,
     private readonly mcpProcessesIndicator: McpProcessesHealthIndicator,

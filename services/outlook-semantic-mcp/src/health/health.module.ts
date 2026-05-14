@@ -3,7 +3,7 @@ import { TerminusModule } from '@nestjs/terminus';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { AmqpHealthIndicator } from './amqp-health.indicator';
-import { ConnectivityHealthIndicator } from './connectivity-health.indicator';
+import { MsGraphConnectivityHealthIndicator } from './ms-graph-connectivity-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { HealthController } from './health.controller';
 import { McpProcessesHealthIndicator } from './mcp-processes-health.indicator';
@@ -12,7 +12,7 @@ import { McpProcessesHealthIndicator } from './mcp-processes-health.indicator';
   imports: [TerminusModule, UniqueApiFeatureModule, DrizzleModule],
   controllers: [HealthController],
   providers: [
-    ConnectivityHealthIndicator,
+    MsGraphConnectivityHealthIndicator,
     DatabaseHealthIndicator,
     AmqpHealthIndicator,
     McpProcessesHealthIndicator,
