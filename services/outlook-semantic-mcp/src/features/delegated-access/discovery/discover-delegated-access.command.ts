@@ -372,7 +372,8 @@ export class DiscoverDelegatedAccessCommand {
           set: fieldsToUpsert,
         });
 
-      this.logger.log({ delegateUserId, ownerUserId, msg: 'Delegated access discovered' });
+      this.logger.debug({ delegateUserId, ownerUserId, msg: 'Delegated access discovered' });
+      await this.updateProgressTimestamp();
     } catch (error) {
       if (error instanceof GraphError) {
         if (error.statusCode === 403 || error.statusCode === 404) {
@@ -384,27 +385,28 @@ export class DiscoverDelegatedAccessCommand {
                 eq(delegatedAccessAccounts.ownerUserId, ownerUserId),
               ),
             );
-          this.logger.log({
+          this.logger.debug({
             delegateUserId,
             ownerUserId,
             statusCode: error.statusCode,
             msg: 'Delegated access revoked, removed from accounts',
           });
+          await this.updateProgressTimestamp();
           return;
         }
 
         if (error.statusCode === 429 || (error.statusCode >= 500 && error.statusCode < 600)) {
-          this.logger.warn({
+          this.logger.debug({
             delegateUserId,
             ownerUserId,
             statusCode: error.statusCode,
-            msg: 'Transient error during discovery, skipping',
+            msg: 'Transient error during discovery',
           });
           throw error;
         }
       }
 
-      this.logger.error({
+      this.logger.debug({
         delegateUserId,
         ownerUserId,
         error,
@@ -413,5 +415,22 @@ export class DiscoverDelegatedAccessCommand {
 
       throw error;
     }
+  }
+
+  private async updateProgressTimestamp(): Promise<void> {
+    await this.persistentCacheService.setWith(
+      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
+      async ({ currentValue, update }): Promise<void> => {
+        assert.ok(currentValue);
+        assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+        await update({
+          dataType: 'DelegatedAccessDiscovery',
+          payload: {
+            ...currentValue.payload,
+            lastProgressRegisteredAt: Date.now(),
+          },
+        });
+      },
+    );
   }
 }
