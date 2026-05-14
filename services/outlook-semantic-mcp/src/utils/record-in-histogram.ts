@@ -31,7 +31,7 @@ export const recordInHistogram = async <T>({
 
   let attributesData: Attributes = {
     ...attributes,
-    outcome: result.type,
+    funtionRunResult: result.type,
   };
 
   if (result.type === 'success') {

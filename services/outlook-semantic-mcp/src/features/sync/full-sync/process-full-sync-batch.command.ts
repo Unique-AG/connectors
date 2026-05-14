@@ -415,7 +415,8 @@ export class ProcessFullSyncBatchCommand {
   ): Promise<'ingested' | 'skipped' | 'failed'> {
     const processingResult = await recordInHistogram({
       histogram: this.processEmailDuration,
-      attributes: (result) => ({ outcome: result === 'failed' ? 'failure' : 'success' }),
+      successAtrributes: (result) => ({ outcome: result === 'failed' ? 'failure' : 'success' }),
+      errorAttributtes: () => ({ outcome: 'failure' }),
       fn: () => this.processEmailCommand.run(input),
     });
 
