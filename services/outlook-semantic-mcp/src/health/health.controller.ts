@@ -10,9 +10,9 @@ import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { AmqpHealthIndicator } from './amqp-health.indicator';
-import { MsGraphConnectivityHealthIndicator } from './ms-graph-connectivity-health.indicator';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { McpProcessesHealthIndicator } from './mcp-processes-health.indicator';
+import { MsGraphConnectivityHealthIndicator } from './ms-graph-connectivity-health.indicator';
 
 @Controller('health')
 export class HealthController {

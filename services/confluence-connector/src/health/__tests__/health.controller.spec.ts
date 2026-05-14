@@ -4,8 +4,8 @@ import { type HealthIndicatorResult, TerminusModule } from '@nestjs/terminus';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HealthController } from '../health.controller';
 import { ConnectivityHealthIndicator } from '../connectivity-health.indicator';
+import { HealthController } from '../health.controller';
 import { SyncHealthIndicator } from '../sync-health.indicator';
 import { UniqueApiHealthIndicator } from '../unique-api-health.indicator';
 
