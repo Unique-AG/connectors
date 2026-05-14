@@ -81,7 +81,7 @@ Set via `mcpConfig.ingestion` in Helm values:
 | `INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.ingestion.liveCatchupOverlappingWindowMinutes` | `3` | Minutes to overlap each live catch-up sync run to account for Office 365 eventual consistency. Minimum: `2` — see [INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES](#INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES) |
 | `INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.ingestion.liveCatchupRecheckOverlappingWindowMinutes` | `10` | Minutes to overlap live catch-up ready-recheck runs. Minimum: `10` — see [INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES](#INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES) |
 | `INGESTION_FULL_SYNC_RECOVERY_CRON` | `mcpConfig.ingestion.fullSyncRecoveryCron` | `*/2 * * * *` | Cron schedule for stuck full-sync recovery scans |
-| `INGESTION_LIVE_CATCHUP_RECOVERY` | `mcpConfig.ingestion.liveCatchupRecovery` | `*/5 * * * *` | Cron schedule for stuck live catch-up recovery scans |
+| `INGESTION_LIVE_CATCHUP_RECOVERY_CRON` | `mcpConfig.ingestion.liveCatchupRecoveryCron` | `*/5 * * * *` | Cron schedule for stuck live catch-up recovery scans |
 | `INGESTION_DELETE_INBOX_RECOVERY_CRON` | `mcpConfig.ingestion.deleteInboxRecoveryCron` | `*/5 * * * *` | Cron schedule for stuck inbox deletion recovery scans |
 | `INGESTION_CONNECTIVITY_TIMEOUT_MS` | `mcpConfig.ingestion.connectivityTimeoutMs` | `3000` | Timeout in milliseconds for the Microsoft Graph connectivity check in `/health` |
 | `INGESTION_SYNC_FAILURE_THRESHOLD` | `mcpConfig.ingestion.syncFailureThreshold` | `0.15` | Fraction (0–1) of eligible users that may be failing fullSync or liveCatchup before the `/health` check reports down |

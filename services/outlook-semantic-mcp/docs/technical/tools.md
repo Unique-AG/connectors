@@ -576,7 +576,7 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
 - `state: "running"` means the full sync is actively fetching and uploading. Search results will be partial until `state: "finished"`.
 - `scheduledForIngestion` counts emails uploaded to Unique; `ingestionStats.finished` counts those confirmed processed by the knowledge base.
 - `failedToUploadForIngestion` emails were skipped after retries — check operator logs for details.
-- `syncStats.liveCatchUpState: "failed"` indicates the live catch-up pipeline stalled. Recovery is automatic — the `INGESTION_LIVE_CATCHUP_RECOVERY` scheduler resets it within 5 minutes. No user-callable tool exists for this outside `MCP_DEBUG_MODE`; users should wait and operators can monitor pod logs.
+- `syncStats.liveCatchUpState: "failed"` indicates the live catch-up pipeline stalled. Recovery is automatic — the `INGESTION_LIVE_CATCHUP_RECOVERY_CRON` scheduler resets it within 5 minutes. No user-callable tool exists for this outside `MCP_DEBUG_MODE`; users should wait and operators can monitor pod logs.
 
 ---
 
