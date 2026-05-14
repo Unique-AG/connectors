@@ -1,7 +1,7 @@
-import { AggregationType, InstrumentType } from '@unique-ag/instrumentation';
+import { AggregationType, InstrumentType, ViewOptions } from '@unique-ag/instrumentation';
 import { SyncMetricName } from './sync-metrics.service';
 
-export const syncMetricViews = [
+export const syncMetricViews: ViewOptions[] = [
   {
     instrumentType: InstrumentType.HISTOGRAM,
     instrumentName: SyncMetricName.FullSyncRunDuration,

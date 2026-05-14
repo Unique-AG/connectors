@@ -26,9 +26,9 @@
         "name": "job",
         "type": "query",
         "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "definition": "label_values(osm_full_sync_runs_total, job)",
+        "definition": "label_values(osm_full_sync_run_duration_seconds_count, job)",
         "query": {
-          "query": "label_values(osm_full_sync_runs_total, job)",
+          "query": "label_values(osm_full_sync_run_duration_seconds_count, job)",
           "refId": "StandardVariableQuery"
         },
         "label": "Job",
@@ -51,7 +51,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum(rate(osm_full_sync_runs_total{job=~\"$job\"}[5m]))",
+          "expr": "sum(rate(osm_full_sync_run_duration_seconds_count{job=~\"$job\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -81,7 +81,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum(rate(osm_live_catchup_runs_total{job=~\"$job\"}[5m]))",
+          "expr": "sum(rate(osm_live_catchup_run_duration_seconds_count{job=~\"$job\"}[5m]))",
           "legendFormat": "",
           "refId": "A"
         }
@@ -393,7 +393,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum by (status) (rate(osm_full_sync_runs_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (status) (rate(osm_full_sync_run_duration_seconds_count{job=~\"$job\"}[5m]))",
           "legendFormat": "{{status}}",
           "refId": "A"
         }
@@ -476,7 +476,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum by (outcome) (rate(osm_full_sync_messages_processed_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (outcome) (rate(osm_full_sync_messages_processed_total_count{job=~\"$job\"}[5m]))",
           "legendFormat": "{{outcome}}",
           "refId": "A"
         }
@@ -549,10 +549,81 @@
       }
     },
     {
+      "id": 25,
+      "title": "Full Sync Graph Page Duration (P90 by page_type)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 31, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.90, sum by (le, page_type) (rate(osm_full_sync_graph_page_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "{{page_type}} P90",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+    {
+      "id": 26,
+      "title": "Full Sync Email Processing Duration (P90 by outcome)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 31, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.90, sum by (le, outcome) (rate(osm_full_sync_process_email_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "{{outcome}} P90",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "failure P90" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+    {
       "id": 17,
       "title": "Live Catch-up",
       "type": "row",
-      "gridPos": { "x": 0, "y": 31, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 39, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
     },
@@ -560,12 +631,12 @@
       "id": 18,
       "title": "Live Catch-up Runs by Status",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 32, "w": 8, "h": 8 },
+      "gridPos": { "x": 0, "y": 40, "w": 6, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum by (status) (rate(osm_live_catchup_runs_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (status) (rate(osm_live_catchup_run_duration_seconds_count{job=~\"$job\"}[5m]))",
           "legendFormat": "{{status}}",
           "refId": "A"
         }
@@ -598,7 +669,7 @@
       "id": 19,
       "title": "Live Catch-up Run Duration (P50 / P90 / P99)",
       "type": "timeseries",
-      "gridPos": { "x": 8, "y": 32, "w": 8, "h": 8 },
+      "gridPos": { "x": 6, "y": 40, "w": 6, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
@@ -643,12 +714,12 @@
       "id": 20,
       "title": "Live Catch-up Messages by Outcome",
       "type": "timeseries",
-      "gridPos": { "x": 16, "y": 32, "w": 8, "h": 8 },
+      "gridPos": { "x": 12, "y": 40, "w": 6, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum by (outcome) (rate(osm_live_catchup_messages_total{job=~\"$job\"}[5m]))",
+          "expr": "sum by (outcome) (rate(osm_live_catchup_messages_total_count{job=~\"$job\"}[5m]))",
           "legendFormat": "{{outcome}}",
           "refId": "A"
         }
@@ -682,10 +753,94 @@
       }
     },
     {
+      "id": 27,
+      "title": "Live Catch-up Round Duration (P50 / P90 / P99)",
+      "type": "timeseries",
+      "gridPos": { "x": 18, "y": 40, "w": 6, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(osm_live_catchup_round_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_live_catchup_round_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P90",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(osm_live_catchup_round_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+    {
+      "id": 28,
+      "title": "Live Catch-up Batch & Directory Sync Duration (P90)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 48, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_live_catchup_batch_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "Batch P90",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(osm_live_catchup_directory_sync_duration_seconds_bucket{job=~\"$job\"}[5m])))",
+          "legendFormat": "Directory Sync P90",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5,
+            "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      }
+    },
+    {
       "id": 21,
       "title": "Unique API",
       "type": "row",
-      "gridPos": { "x": 0, "y": 40, "w": 24, "h": 1 },
+      "gridPos": { "x": 0, "y": 56, "w": 24, "h": 1 },
       "collapsed": false,
       "panels": []
     },
@@ -693,7 +848,7 @@
       "id": 22,
       "title": "Unique API Request Rate by Target",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 41, "w": 8, "h": 8 },
+      "gridPos": { "x": 0, "y": 57, "w": 8, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
@@ -726,7 +881,7 @@
       "id": 23,
       "title": "Unique API Error Rate by Target",
       "type": "timeseries",
-      "gridPos": { "x": 8, "y": 41, "w": 8, "h": 8 },
+      "gridPos": { "x": 8, "y": 57, "w": 8, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
@@ -759,7 +914,7 @@
       "id": 24,
       "title": "Unique API Request Duration (P50 / P90 / P99)",
       "type": "timeseries",
-      "gridPos": { "x": 16, "y": 41, "w": 8, "h": 8 },
+      "gridPos": { "x": 16, "y": 57, "w": 8, "h": 8 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
