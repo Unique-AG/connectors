@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.5](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.4...outlook-semantic-mcp@0.4.5) (2026-05-14)
+
+
+### Features
+
+* **outlook-semantic-mcp,instrumentation,unique-api,deps:** un-19378, un-20248 add health endpoint, add more metrics, update logs and fix small mcp config issues ([#541](https://github.com/Unique-AG/connectors/issues/541)) ([052fcbc](https://github.com/Unique-AG/connectors/commit/052fcbcd918be0350fa4b6ccf8fdc5960b5e15ce))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** un-20047 add missing icons ([#544](https://github.com/Unique-AG/connectors/issues/544)) ([4d40342](https://github.com/Unique-AG/connectors/commit/4d4034289a65da9d7c3d8b6b56e7bad07f3a09f9))
+
 ## [0.4.4](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.3...outlook-semantic-mcp@0.4.4) (2026-05-13)
 
 
