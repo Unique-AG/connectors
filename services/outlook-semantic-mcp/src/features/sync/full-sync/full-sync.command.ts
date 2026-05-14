@@ -31,11 +31,7 @@ export const WAITING_FOR_INGESTION_HEARTBEAT_MINUTES = 5;
 export const FAILED_HEARTBEAT_MINUTES = 20;
 const MAX_ON_GOING_INGESTION_IN_PROGRESS = 10;
 
-export type FullSyncResult =
-  | { status: 'skipped'; reason: string }
-  | { status: 'waiting-for-ingestion' }
-  | { status: 'completed' }
-  | { status: 'failed'; error: unknown };
+import type { FullSyncResult } from './full-sync.types';
 
 @Injectable()
 export class FullSyncCommand {
