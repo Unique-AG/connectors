@@ -6,6 +6,7 @@ import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 vi.mock('~/features/tracing.utils', () => ({
   traceAttrs: vi.fn(),
   traceEvent: vi.fn(),
+  NewTrace: () => () => ({}),
 }));
 
 // ---------------------------------------------------------------------------
@@ -118,8 +119,8 @@ function createMockFindConfigByVersion(config?: {
 
 function createMockMetricService() {
   return {
-    getHistogram: vi.fn().mockReturnValue({ record: vi.fn() }),
-    getCounter: vi.fn().mockReturnValue({ add: vi.fn() }),
+    measureGraphPage: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+    measureEmailProcessing: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
   };
 }
 

@@ -57,7 +57,11 @@ export class McpStreamableHttpService {
     this.logger.debug('Built MCP capabilities:', capabilities);
 
     const server = new McpServer(
-      { name: this.options.name, version: this.options.version },
+      {
+        name: this.options.name,
+        version: this.options.version,
+        ...(this.options.icons && { icons: this.options.icons }),
+      },
       {
         capabilities: capabilities,
         instructions: this.options.instructions || '',
@@ -183,7 +187,11 @@ export class McpStreamableHttpService {
       this.logger.debug('Built MCP capabilities:', capabilities);
 
       const mcpServer = new McpServer(
-        { name: this.options.name, version: this.options.version },
+        {
+          name: this.options.name,
+          version: this.options.version,
+          ...(this.options.icons && { icons: this.options.icons }),
+        },
         {
           capabilities,
           instructions: this.options.instructions || '',

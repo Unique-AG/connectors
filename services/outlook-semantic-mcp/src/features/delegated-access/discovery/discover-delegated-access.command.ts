@@ -3,8 +3,8 @@ import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, gt, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { last } from 'remeda';
-import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
+import { isNonNullish, last } from 'remeda';
+import { AppConfig, appConfig, DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
   DrizzleDatabase,
@@ -12,7 +12,9 @@ import {
   subscriptions,
   userProfiles,
 } from '~/db';
+import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
+import { NewTrace } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { Nullish } from '~/utils/nullish';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
@@ -35,11 +37,13 @@ export class DiscoverDelegatedAccessCommand {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
+    @Inject(appConfig.KEY) private readonly appConfiguration: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly persistentCacheService: PersistentCacheService,
+    private readonly metrics: DelegatedAccessMetricsService,
   ) {}
 
-  @Span()
+  @NewTrace('discover-delegated-access')
   public async run(): Promise<void> {
     if (this.config.scan === 'disabled') {
       this.logger.log({
@@ -47,40 +51,42 @@ export class DiscoverDelegatedAccessCommand {
       });
       return;
     }
-    const decision = await this.decide();
-    if (decision.action === 'skip') {
-      this.logger.log({
-        msg: `Skipped running delegated access discovery. Reason: ${decision.reason}`,
-      });
-      return;
-    }
-
-    let finalState: 'ready' | 'failed';
-    try {
-      await this.runDiscoveryInBatches(
-        decision.lastProcessedDelegateId,
-        decision.lastProcessedOwnerIdForDelegate,
-      );
-      finalState = 'ready';
-    } catch (error) {
-      this.logger.error({ msg: `Failed to run delegated access discovery`, err: error });
-      finalState = 'failed';
-    }
-    await this.persistentCacheService.setWith(
-      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
-      async ({ currentValue, update }): Promise<void> => {
-        assert.ok(currentValue);
-        assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
-        await update({
-          dataType: 'DelegatedAccessDiscovery',
-          payload: {
-            ...currentValue.payload,
-            state: finalState,
-            lastProgressRegisteredAt: Date.now(),
-          },
+    await this.metrics.measureDiscoverRun(async () => {
+      const decision = await this.decide();
+      if (decision.action === 'skip') {
+        this.logger.log({
+          msg: `Skipped running delegated access discovery. Reason: ${decision.reason}`,
         });
-      },
-    );
+        return;
+      }
+
+      let finalState: 'ready' | 'failed';
+      try {
+        await this.runDiscoveryInBatches(
+          decision.lastProcessedDelegateId,
+          decision.lastProcessedOwnerIdForDelegate,
+        );
+        finalState = 'ready';
+      } catch (error) {
+        this.logger.error({ msg: `Failed to run delegated access discovery`, err: error });
+        finalState = 'failed';
+      }
+      await this.persistentCacheService.setWith(
+        DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
+        async ({ currentValue, update }): Promise<void> => {
+          assert.ok(currentValue);
+          assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+          await update({
+            dataType: 'DelegatedAccessDiscovery',
+            payload: {
+              ...currentValue.payload,
+              state: finalState,
+              lastProgressRegisteredAt: Date.now(),
+            },
+          });
+        },
+      );
+    });
   }
 
   @Span()
@@ -89,11 +95,14 @@ export class DiscoverDelegatedAccessCommand {
     lastProcessedOwnerIdForDelegate: Nullish<string>,
   ): Promise<void> {
     // If we have an in-progress delegate, resume its inner loop first
-    if (lastProcessedDelegateId && lastProcessedOwnerIdForDelegate) {
-      await this.runInnerLoop({
-        delegateUserId: lastProcessedDelegateId,
-        lastProcessedOwnerIdForDelegate,
-      });
+    if (isNonNullish(lastProcessedDelegateId) && isNonNullish(lastProcessedOwnerIdForDelegate)) {
+      await this.metrics.measureDiscoverUser(() =>
+        this.runInnerLoop({
+          // For some reason isNonNullish(lastProcessedDelegateId) is not enough for typescript here.
+          delegateUserId: lastProcessedDelegateId as string,
+          lastProcessedOwnerIdForDelegate: lastProcessedOwnerIdForDelegate,
+        }),
+      );
     }
 
     // Continue outer loop from the last processed delegate
@@ -103,10 +112,12 @@ export class DiscoverDelegatedAccessCommand {
 
     while (delegatesBatch.length) {
       for (const { userProfileId: delegateUserId } of delegatesBatch) {
-        await this.runInnerLoop({
-          delegateUserId,
-          lastProcessedOwnerIdForDelegate: null,
-        });
+        await this.metrics.measureDiscoverUser(() =>
+          this.runInnerLoop({
+            delegateUserId,
+            lastProcessedOwnerIdForDelegate: null,
+          }),
+        );
         lastProcessedDelegateId = delegateUserId;
       }
 
@@ -362,7 +373,8 @@ export class DiscoverDelegatedAccessCommand {
           set: fieldsToUpsert,
         });
 
-      this.logger.log({ delegateUserId, ownerUserId, msg: 'Delegated access discovered' });
+      this.logger.debug({ delegateUserId, ownerUserId, msg: 'Delegated access discovered' });
+      await this.updateProgressTimestamp();
     } catch (error) {
       if (error instanceof GraphError) {
         if (error.statusCode === 403 || error.statusCode === 404) {
@@ -374,34 +386,55 @@ export class DiscoverDelegatedAccessCommand {
                 eq(delegatedAccessAccounts.ownerUserId, ownerUserId),
               ),
             );
-          this.logger.log({
+          this.logger.debug({
             delegateUserId,
             ownerUserId,
             statusCode: error.statusCode,
             msg: 'Delegated access revoked, removed from accounts',
+            ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
           });
+          await this.updateProgressTimestamp();
           return;
         }
 
         if (error.statusCode === 429 || (error.statusCode >= 500 && error.statusCode < 600)) {
-          this.logger.warn({
+          this.logger.debug({
             delegateUserId,
             ownerUserId,
             statusCode: error.statusCode,
-            msg: 'Transient error during discovery, skipping',
+            msg: 'Transient error during discovery',
+            ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
           });
           throw error;
         }
       }
 
-      this.logger.error({
+      this.logger.debug({
         delegateUserId,
         ownerUserId,
         error,
         msg: 'Unexpected error during delegated access discovery',
+        ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
       });
 
       throw error;
     }
+  }
+
+  private async updateProgressTimestamp(): Promise<void> {
+    await this.persistentCacheService.setWith(
+      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
+      async ({ currentValue, update }): Promise<void> => {
+        assert.ok(currentValue);
+        assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+        await update({
+          dataType: 'DelegatedAccessDiscovery',
+          payload: {
+            ...currentValue.payload,
+            lastProgressRegisteredAt: Date.now(),
+          },
+        });
+      },
+    );
   }
 }

@@ -3,148 +3,46 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { isNonNullish, isNullish, sortBy, unique } from 'remeda';
 import { getInheritanceSettings } from '../config/sharepoint.schema';
-import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { ScopeExternalIdMigrationService } from '../scope-external-id-migration/scope-external-id-migration.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { sanitizeError } from '../utils/normalize-error';
 import { isAncestorOfRootPath } from '../utils/paths.util';
 import {
   buildActiveScopesPrefix,
   buildDriveExternalId,
   buildFolderExternalId,
-  buildRootExternalId,
   buildSitePagesExternalId,
   buildStaleScopesPrefix,
   buildSubsiteExternalId,
   buildUnknownExternalId,
-  parseLegacyExternalId,
   toPendingDeleteExternalId,
 } from '../utils/scope-external-id';
 import { getUniqueParentPathFromItem, getUniquePathFromItem } from '../utils/sharepoint.util';
 import { createSmeared, Smeared, smearPath } from '../utils/smeared';
-import { RootScopeMigrationService } from './root-scope-migration.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
-
-export interface RootScopeInfo {
-  serviceUserId: string;
-  rootPath: Smeared;
-  isInitialSync: boolean;
-}
 
 @Injectable()
 export class ScopeManagementService {
   private readonly logger = new Logger(ScopeManagementService.name);
 
-  public constructor(
-    private readonly uniqueScopesService: UniqueScopesService,
-    private readonly uniqueUsersService: UniqueUsersService,
-    private readonly rootScopeMigrationService: RootScopeMigrationService,
-    private readonly scopeExternalIdMigrationService: ScopeExternalIdMigrationService,
-  ) {}
+  public constructor(private readonly uniqueScopesService: UniqueScopesService) {}
 
-  public async initializeRootScope(
-    rootScopeId: string,
-    siteId: Smeared,
-    ingestionMode: IngestionMode,
-  ): Promise<RootScopeInfo> {
-    const userId = await this.uniqueUsersService.getCurrentUserId();
-    assert.ok(userId, 'User ID must be available');
-    const logPrefix = `[RootScopeId: ${rootScopeId}]`;
-
-    this.logger.log(`${logPrefix} Initializing root scope (Mode: ${ingestionMode})`);
-
-    await this.uniqueScopesService.createScopeAccesses(rootScopeId, [
-      { type: 'MANAGE', entityId: userId, entityType: 'USER' },
-      { type: 'READ', entityId: userId, entityType: 'USER' },
-      { type: 'WRITE', entityId: userId, entityType: 'USER' },
-    ]);
-
-    const rootScope = await this.uniqueScopesService.getScopeById(rootScopeId);
-    assert.ok(rootScope, `Root scope with ID ${rootScopeId} not found`);
-
-    const isValid = this.isValidScopeOwnership(rootScope, siteId);
-    assert.ok(
-      isValid,
-      `Root scope ${rootScopeId} is owned by a different site. This scope cannot be synced by this site.`,
-    );
-
-    // Check if the root scope has a legacy externalId and migrate it if needed.
-    const externalIdMigrationResult = await this.scopeExternalIdMigrationService.migrateIfNeeded(
-      siteId.value,
-    );
-    if (externalIdMigrationResult.status === 'migration_failed') {
-      throw new Error(
-        `${logPrefix} Scope externalId migration failed: ` +
-          `migrated=${externalIdMigrationResult.migratedCount}, ` +
-          `failed=${externalIdMigrationResult.failedCount}`,
-      );
-    }
-
-    const isInitialSync = !rootScope.externalId;
-
-    if (isInitialSync) {
-      const migrationResult = await this.rootScopeMigrationService.migrateIfNeeded(
-        rootScopeId,
-        siteId,
-      );
-      if (migrationResult.status === 'migration_failed') {
-        throw new Error(`Root scope migration failed: ${migrationResult.error}`);
-      }
-
-      const externalId = buildRootExternalId(siteId.value);
-      try {
-        const updatedScope = await this.uniqueScopesService.updateScopeExternalId(
-          rootScopeId,
-          externalId,
-        );
-        rootScope.externalId = updatedScope.externalId;
-        this.logger.debug(
-          `${logPrefix} Claimed root scope ${rootScopeId} with externalId: ${externalId}`,
-        );
-      } catch (error) {
-        this.logger.warn({
-          msg: `${logPrefix} Failed to claim root scope ${rootScopeId} with externalId: ${externalId}`,
-          error: sanitizeError(error),
-        });
-      }
-    }
-
-    const pathSegments = [rootScope.name];
-    let currentScope: Scope = rootScope;
-
-    while (currentScope.parentId) {
-      // Grant READ permission first before accessing the parent scope. Otherwise we will not get it
-      // via `getScopeById` call.
-      await this.uniqueScopesService.createScopeAccesses(currentScope.parentId, [
-        { type: 'READ', entityId: userId, entityType: 'USER' },
-      ]);
-
-      const parent = await this.uniqueScopesService.getScopeById(currentScope.parentId);
-
-      assert.ok(
-        parent,
-        `Parent scope ${currentScope.parentId} not found for scope ${currentScope.id}`,
-      );
-
-      pathSegments.unshift(parent.name);
-      currentScope = parent;
-    }
-
-    const rootPath = createSmeared(`/${pathSegments.join('/')}`);
-    this.logger.log(`Resolved root path: ${smearPath(rootPath)}`);
-
-    return { serviceUserId: userId, rootPath, isInitialSync };
-  }
-
-  public async resetRootScope(scopeId: string): Promise<void> {
+  // Finalises a root scope at the end of a site's lifecycle. The two modes differ in what happens
+  // to the scope itself after its children are gone:
+  //   - `fixed`: the scope was provided by the operator and must survive — we clear its externalId
+  //     so it is no longer claimed by this site and can be reused or manually retargeted.
+  //   - `auto`: the scope was provisioned by the connector and is destroyed here. We deliberately
+  //     do NOT clear externalId before the deletion: if `deleteScope` fails partway, an intact
+  //     externalId keeps the scope discoverable by `FindRootScopeQuery` so the next sync can
+  //     retry. Clearing externalId first would orphan an empty scope that nothing can find again.
+  public async resetRootScope(scopeId: string, mode: 'fixed' | 'auto'): Promise<void> {
     const logPrefix = `[RootScopeId: ${scopeId}]`;
-    this.logger.log(`${logPrefix} Resetting root scope (deleting children, clearing externalId)`);
+    const finalAction = mode === 'fixed' ? 'clearing externalId' : 'deleting root scope';
+    this.logger.log(`${logPrefix} Resetting root scope (deleting children, ${finalAction})`);
 
     try {
       const children = await this.uniqueScopesService.listChildrenScopes(scopeId);
@@ -176,8 +74,13 @@ export class ScopeManagementService {
         );
       }
 
-      await this.uniqueScopesService.updateScopeExternalId(scopeId, null);
-      this.logger.log(`${logPrefix} Cleared externalId on root scope`);
+      if (mode === 'fixed') {
+        await this.uniqueScopesService.updateScopeExternalId(scopeId, null);
+        this.logger.log(`${logPrefix} Cleared externalId on root scope`);
+      } else {
+        await this.uniqueScopesService.deleteScope(scopeId, { recursive: true });
+        this.logger.log(`${logPrefix} Deleted root scope`);
+      }
     } catch (error) {
       this.logger.error({
         msg: `${logPrefix} Failed to reset root scope`,
@@ -262,20 +165,6 @@ export class ScopeManagementService {
         });
       }
     }
-  }
-
-  private isValidScopeOwnership(rootScope: Scope, siteId: Smeared): boolean {
-    if (!rootScope.externalId) {
-      return true;
-    }
-
-    // Accept both legacy (spc:site:{id}) and new (spc:{id}/site) formats during
-    // the transition period while existing scopes are being migrated.
-    const legacy = parseLegacyExternalId(rootScope.externalId);
-    if (legacy?.type === 'root' && legacy.siteId === siteId.value) {
-      return true;
-    }
-    return rootScope.externalId === buildRootExternalId(siteId.value).value;
   }
 
   /**
@@ -452,13 +341,13 @@ export class ScopeManagementService {
     }
 
     const currentScopeIds = new Set(currentScopes.map((scope) => scope.id));
-    const configuredRootScopeId = context.siteConfig.scopeId;
+    const configuredRootScopeId = context.rootScopeId;
     const staleScopes = existingScopes.filter(
       (scope): scope is Scope & { externalId: string } =>
         isNonNullish(scope.externalId) &&
         !currentScopeIds.has(scope.id) &&
-        // Paranoid guard: the configured root scope is managed by `initializeRootScope` and must
-        // never be renamed here, even if it somehow failed to appear in `currentScopes`.
+        // Paranoid guard: the configured root scope is managed by InitializeRootScopeCommand and
+        // must never be renamed here, even if it somehow failed to appear in `currentScopes`.
         scope.id !== configuredRootScopeId,
     );
 
@@ -589,7 +478,7 @@ export class ScopeManagementService {
   ): string | undefined {
     if (!scopes || scopes.length === 0) {
       // Flat mode - return the configured scope ID
-      return context.siteConfig.scopeId;
+      return context.rootScopeId;
     }
 
     const scopePath = getUniqueParentPathFromItem(item, context.rootPath, context.siteName);

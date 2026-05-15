@@ -15,7 +15,7 @@ import { clone, isNonNullish, isNullish, omit } from 'remeda';
 import { UniqueConfigNamespaced } from '~/config';
 import { DRIZZLE, DrizzleDatabase, directories } from '~/db';
 import { InboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
-import { traceAttrs, traceEvent } from '~/features/tracing.utils';
+import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { UploadFileForIngestionCommand } from '~/unique/upload-file-for-ingestion.command';
@@ -61,6 +61,8 @@ interface BaseLogContext extends Record<string, string | undefined | boolean> {
   userEmail: string;
 }
 
+export type ProcessEmailCommandResult = MessageIngestionResult | 'failed';
+
 @Injectable()
 export class ProcessEmailCommand {
   private readonly logger = new Logger(this.constructor.name);
@@ -73,8 +75,9 @@ export class ProcessEmailCommand {
     private readonly upsertDirectoryCommand: UpsertDirectoryCommand,
   ) {}
 
-  @Span()
+  @NewTrace('process-email')
   public async run(input: ProcessEmailCommandInput): Promise<MessageIngestionResult | 'failed'> {
+    traceAttrs({ userProfileId: input.user.profileId, messageId: input.graphMessage.id });
     return await withRetryAttempts({
       fn: () => {
         return this.runProcessEmail(input);

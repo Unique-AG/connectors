@@ -3,11 +3,10 @@ import { createSmeared } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes } from '@opentelemetry/api';
 import { and, eq, inArray } from 'drizzle-orm';
-import { Span } from 'nestjs-otel';
 import { isNonNullish, isNullish } from 'remeda';
 import { DirectoriesSync, directories, directoriesSync } from '~/db';
 import { DRIZZLE, DrizzleDatabase } from '~/db/drizzle.module';
-import { traceAttrs, traceEvent } from '~/features/tracing.utils';
+import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
@@ -25,7 +24,7 @@ export class SyncDirectoriesCommand {
     private readonly syncDirectoriesForUserProfileCommand: SyncDirectoriesForUserProfileCommand,
   ) {}
 
-  @Span()
+  @NewTrace('sync-directories')
   public async run(userProfileId: UserProfileTypeID): Promise<void> {
     traceAttrs({ userProfileId: userProfileId.toString() });
     this.logger.log({

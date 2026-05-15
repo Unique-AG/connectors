@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.4.6](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.5...outlook-semantic-mcp@0.4.6) (2026-05-15)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** list mailboxes for delegated access allowed only on folders  ([#547](https://github.com/Unique-AG/connectors/issues/547)) ([9a0ab75](https://github.com/Unique-AG/connectors/commit/9a0ab752ce3ded00b3abbafd4b20e7ce9323948d))
+
+## [0.4.5](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.4...outlook-semantic-mcp@0.4.5) (2026-05-14)
+
+
+### Features
+
+* **outlook-semantic-mcp,instrumentation,unique-api,deps:** un-19378, un-20248 add health endpoint, add more metrics, update logs and fix small mcp config issues ([#541](https://github.com/Unique-AG/connectors/issues/541)) ([052fcbc](https://github.com/Unique-AG/connectors/commit/052fcbcd918be0350fa4b6ccf8fdc5960b5e15ce))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** un-20047 add missing icons ([#544](https://github.com/Unique-AG/connectors/issues/544)) ([4d40342](https://github.com/Unique-AG/connectors/commit/4d4034289a65da9d7c3d8b6b56e7bad07f3a09f9))
+
+## [0.4.4](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.3...outlook-semantic-mcp@0.4.4) (2026-05-13)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** update headers for downloading attachments ([#538](https://github.com/Unique-AG/connectors/issues/538)) ([f821c50](https://github.com/Unique-AG/connectors/commit/f821c508e47e4e28733340aa88eb2d9757f7916c))
+
+## [0.4.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.2...outlook-semantic-mcp@0.4.3) (2026-05-11)
+
+
+### Bug Fixes
+
+* **deps,outlook-semantic-mcp:** argo sync ([#529](https://github.com/Unique-AG/connectors/issues/529)) ([8cb6650](https://github.com/Unique-AG/connectors/commit/8cb66500cb1a06e20ecc9dec8dfae097c7125f1f))
+
+## [0.4.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.1...outlook-semantic-mcp@0.4.2) (2026-05-08)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** un-20441 Make long running traces smaller ([#522](https://github.com/Unique-AG/connectors/issues/522)) ([84f39b8](https://github.com/Unique-AG/connectors/commit/84f39b85d6f22428d0be43a1f22346f7f1876901))
+
+## [0.4.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.0...outlook-semantic-mcp@0.4.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** update limits for next round of tests ([#520](https://github.com/Unique-AG/connectors/issues/520)) ([ff37af5](https://github.com/Unique-AG/connectors/commit/ff37af585ebd21942c9a93137f2b2bd108a0d0bc))
+
 ## [0.4.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.3.3...outlook-semantic-mcp@0.4.0) (2026-05-07)
 
 

@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
@@ -11,6 +12,7 @@ import { traceAttrs, traceError } from '~/features/tracing.utils';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
+import { SEARCH_CONFIG } from '../content/search/search.config';
 import { FAILED_INGESTION_STATUSES } from '../sync/full-sync/get-scope-ingestion-stats.query';
 import { FetchMessagesFromGraphQuery } from './fetch-messages-from-graph.query';
 
@@ -104,9 +106,11 @@ export class RunSearchRecallCheckQuery {
         });
 
         const expectedMessageIds = notSkipped.map((e) => e.messageId);
+        assert.ok(SEARCH_CONFIG.semanticSearch, `Semantic search is not configured`);
         const { results } = await this.searchEmailsQuery.run(
           convertUserProfileIdToTypeId(userProfileId),
           [checkCase.search],
+          SEARCH_CONFIG.semanticSearch,
         );
         const returnedEmailIds = new Set(
           pipe(

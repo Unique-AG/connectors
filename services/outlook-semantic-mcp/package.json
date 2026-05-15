@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/outlook-semantic-mcp",
   "description": "",
-  "version": "0.4.0",
+  "version": "0.4.6",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -39,6 +39,7 @@
     "@nestjs/platform-express": "11.1.18",
     "@nestjs/schedule": "6.1.0",
     "@nestjs/swagger": "11.2.6",
+    "@nestjs/terminus": "11.1.1",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/instrumentation-pg": "0.58.0",
     "@proventuslabs/nestjs-zod": "2.0.0",
@@ -54,6 +55,7 @@
     "bottleneck": "2.19.5",
     "cache-manager": "7.2.0",
     "cron": "4.3.5",
+    "drizzle-kit": "0.31.4",
     "drizzle-orm": "0.45.2",
     "drizzle-zod": "0.8.3",
     "express": "5.1.0",
@@ -94,7 +96,6 @@
     "@types/pg": "8.15.5",
     "@types/supertest": "6.0.3",
     "@vitest/coverage-istanbul": "3.2.4",
-    "drizzle-kit": "0.31.4",
     "globals": "16.3.0",
     "istanbul-badges-readme": "1.9.0",
     "source-map-support": "0.5.21",
@@ -103,5 +104,6 @@
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
     "vitest": "3.2.4"
-  }
+  },
+  "packageManager": "pnpm@10.28.1"
 }

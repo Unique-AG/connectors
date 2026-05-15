@@ -5,7 +5,6 @@ import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { HTTP_STATUS_OK_MAX } from '../../constants/defaults.constants';
 import { GraphApiService } from '../../microsoft-apis/graph/graph-api.service';
-import { DriveItem } from '../../microsoft-apis/graph/types/sharepoint.types';
 import { HttpClientService } from '../../shared/services/http-client.service';
 import { UniqueFilesService } from '../../unique-api/unique-files/unique-files.service';
 import { sanitizeError } from '../../utils/normalize-error';
@@ -38,7 +37,7 @@ export class UploadContentStep implements IPipelineStep {
       if (context.pipelineItem.itemType === 'listItem') {
         await this.uploadListItemContent(context);
       } else {
-        await this.uploadDriveItemContent(context, context.pipelineItem.item);
+        await this.uploadDriveItemContent(context);
       }
 
       context.uploadSucceeded = true;
@@ -95,8 +94,8 @@ export class UploadContentStep implements IPipelineStep {
     await this.streamUpload(context, contentStream);
   }
 
-  private async uploadDriveItemContent(context: ProcessingContext, item: DriveItem): Promise<void> {
-    this.validateMimeType(item);
+  private async uploadDriveItemContent(context: ProcessingContext): Promise<void> {
+    this.validateMimeType(context);
     assert.ok(context.uploadUrl, 'Upload URL not found - content registration may have failed');
 
     const contentStream = await this.apiService.getFileContentStream(
@@ -158,12 +157,12 @@ export class UploadContentStep implements IPipelineStep {
     }
   }
 
-  private validateMimeType(item: DriveItem): void {
+  private validateMimeType(context: ProcessingContext): void {
     const allowedMimeTypes = this.configService.get('processing.allowedMimeTypes', { infer: true });
-    assert.ok(item.file?.mimeType, `MIME type is missing for this item. Skipping download.`);
+    assert.ok(context.mimeType, `MIME type is missing for this item. Skipping download.`);
     assert.ok(
-      allowedMimeTypes.includes(item.file.mimeType),
-      `MIME type ${item.file.mimeType} is not allowed. Skipping download.`,
+      allowedMimeTypes.includes(context.mimeType),
+      `MIME type ${context.mimeType} is not allowed. Skipping download.`,
     );
   }
 }

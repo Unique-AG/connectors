@@ -21,6 +21,22 @@ const recoveryCronSchedule = z
     'Cron schedule for recovering stuck delegated access discovery and verification jobs. Default: every 30 minutes.',
   );
 
+const stalenessThresholdHours = z.coerce
+  .number()
+  .int()
+  .positive()
+  .prefault(24)
+  .describe('Hours after which a delegated access account is considered stale for health checks.');
+
+const delegatedAccessFailureThreshold = z.coerce
+  .number()
+  .min(0)
+  .max(1)
+  .prefault(0.15)
+  .describe(
+    'Fraction of eligible delegated users that may be stale before the check is marked down.',
+  );
+
 const disabledDelegatedAccessScan = z.object({
   mcpBackend: mcpBackendSchema,
   scan: z.literal('disabled'),
@@ -40,6 +56,8 @@ const onlyFullDelegatedAccessScanConfig = z.object({
   scan: z.literal('fullAccessOnly'),
   discoveryCronSchedule,
   recoveryCronSchedule,
+  stalenessThresholdHours,
+  failureThreshold: delegatedAccessFailureThreshold,
 });
 
 const granularDelegatedAccessScanConfig = z.object({
@@ -66,6 +84,8 @@ const granularDelegatedAccessScanConfig = z.object({
     .prefault('0 */4 * * *')
     .describe('Cron schedule for delegated access verification. Default: every 4 hours (6x/day).'),
   recoveryCronSchedule,
+  stalenessThresholdHours,
+  failureThreshold: delegatedAccessFailureThreshold,
 });
 
 export const DelegatedAccessConfigSchema = z.discriminatedUnion('scan', [

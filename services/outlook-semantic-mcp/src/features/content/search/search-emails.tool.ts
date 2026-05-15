@@ -163,24 +163,16 @@ export class SearchEmailsTool {
     if (!isMicrosoftGraphBackend()) {
       const stats = await this.getFullSyncStatsQuery.run(userProfileTypeId);
 
-      if (stats.state === 'error') {
-        return {
-          success: true,
-          syncWarning:
-            'Search results may be inaccurate. Ingestion Statistics could not be fetched. Your inbox is in an unknown state try to use the tools `delete_inbox_data` and `reconnect_inbox` to get it into a proper state',
-          searchNotes: searchSummary,
-          results,
-        };
+      let syncWarning: string | undefined;
+      if (stats.state === 'error' || stats.state === 'running') {
+        syncWarning = `Your mailbox is still being indexed — searching through your emails will improve over time.`;
       }
-      if (stats.state === 'running') {
-        return {
-          success: true,
-          syncWarning:
-            'Email ingestion is still in progress. Search results may be incomplete and not reflect all emails in the inbox. The sync process synchronizes newest emails first.',
-          searchNotes: searchSummary,
-          results,
-        };
-      }
+      return {
+        success: true,
+        syncWarning,
+        searchNotes: searchSummary,
+        results,
+      };
     }
 
     return { success: true, results, searchNotes: searchSummary };

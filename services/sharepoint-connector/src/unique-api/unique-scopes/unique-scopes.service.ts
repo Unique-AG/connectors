@@ -4,11 +4,7 @@ import { isNullish } from 'remeda';
 import { Smeared } from 'src/utils/smeared';
 import { BatchProcessorService } from '../../shared/services/batch-processor.service';
 import { normalizeError } from '../../utils/normalize-error';
-import {
-  INGESTION_CLIENT,
-  SCOPE_MANAGEMENT_CLIENT,
-  UniqueGraphqlClient,
-} from '../clients/unique-graphql.client';
+import { INGESTION_CLIENT, UniqueGraphqlClient } from '../clients/unique-graphql.client';
 import {
   BULK_MOVE_LOG_SAFE_KEYS,
   BULK_MOVE_MUTATION,
@@ -46,8 +42,6 @@ const BATCH_SIZE = 100;
 export class UniqueScopesService {
   private readonly logger = new Logger(this.constructor.name);
   public constructor(
-    @Inject(SCOPE_MANAGEMENT_CLIENT)
-    private readonly scopeManagementClient: UniqueGraphqlClient,
     @Inject(INGESTION_CLIENT)
     private readonly ingestionClient: UniqueGraphqlClient,
     private readonly batchProcessor: BatchProcessorService,
@@ -80,7 +74,7 @@ export class UniqueScopesService {
           variables.inheritAccess = opts.inheritAccess;
         }
 
-        const result = await this.scopeManagementClient.request<
+        const result = await this.ingestionClient.request<
           GenerateScopesBasedOnPathsMutationResult,
           GenerateScopesBasedOnPathsMutationInput
         >(mutation, variables, { logSafeKeys: GENERATE_SCOPES_LOG_SAFE_KEYS });
@@ -99,7 +93,7 @@ export class UniqueScopesService {
     scopeId: string,
     externalId: Smeared | null,
   ): Promise<{ id: string; externalId: string | null }> {
-    const result = await this.scopeManagementClient.request<
+    const result = await this.ingestionClient.request<
       UpdateScopeMutationResult,
       UpdateScopeMutationInput
     >(
@@ -118,7 +112,7 @@ export class UniqueScopesService {
     scopeId: string,
     newParentId: string,
   ): Promise<{ id: string; parentId: string | null }> {
-    const result = await this.scopeManagementClient.request<
+    const result = await this.ingestionClient.request<
       UpdateScopeMutationResult,
       UpdateScopeMutationInput
     >(
@@ -176,7 +170,7 @@ export class UniqueScopesService {
       `Creating ${scopeAccesses.length} scope accesses for scope ${scopeId} (applyToSubScopes: ${applyToSubScopes})`,
     );
 
-    await this.scopeManagementClient.request<
+    await this.ingestionClient.request<
       CreateScopeAccessesMutationResult,
       CreateScopeAccessesMutationInput
     >(
@@ -204,7 +198,7 @@ export class UniqueScopesService {
       `Deleting ${scopeAccesses.length} scope accesses for scope ${scopeId} (applyToSubScopes: ${applyToSubScopes})`,
     );
 
-    await this.scopeManagementClient.request<
+    await this.ingestionClient.request<
       DeleteScopeAccessesMutationResult,
       DeleteScopeAccessesMutationInput
     >(
@@ -224,7 +218,7 @@ export class UniqueScopesService {
   }
 
   public async getScopeById(id: string): Promise<Scope | null> {
-    const result = await this.scopeManagementClient.request<
+    const result = await this.ingestionClient.request<
       PaginatedScopeQueryResult,
       PaginatedScopeQueryInput
     >(
@@ -243,7 +237,7 @@ export class UniqueScopesService {
   }
 
   public async getScopeByExternalId(externalId: string): Promise<Scope | null> {
-    const result = await this.scopeManagementClient.request<
+    const result = await this.ingestionClient.request<
       PaginatedScopeQueryResult,
       PaginatedScopeQueryInput
     >(
@@ -270,7 +264,7 @@ export class UniqueScopesService {
 
     let batchCount = 0;
     do {
-      const batchResult = await this.scopeManagementClient.request<
+      const batchResult = await this.ingestionClient.request<
         PaginatedScopeQueryResult,
         PaginatedScopeQueryInput
       >(
@@ -303,7 +297,7 @@ export class UniqueScopesService {
 
     let batchCount = 0;
     do {
-      const batchResult = await this.scopeManagementClient.request<
+      const batchResult = await this.ingestionClient.request<
         PaginatedScopeQueryResult,
         PaginatedScopeQueryInput
       >(
@@ -334,7 +328,7 @@ export class UniqueScopesService {
     const { recursive = false } = options;
     this.logger.debug(`Deleting scope: ${scopeId} (recursive: ${recursive})`);
 
-    const result = await this.scopeManagementClient.request<
+    const result = await this.ingestionClient.request<
       DeleteFolderMutationResult,
       DeleteFolderMutationInput
     >(

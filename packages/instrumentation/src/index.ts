@@ -1,3 +1,4 @@
+export { AggregationType, InstrumentType, type ViewOptions } from '@opentelemetry/sdk-metrics';
 export {
   type MetricsExporter,
   MetricsExporterType,

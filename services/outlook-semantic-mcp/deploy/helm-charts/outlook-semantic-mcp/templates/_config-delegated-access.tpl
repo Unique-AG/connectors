@@ -1,15 +1,23 @@
 {{- define "chart.config.delegatedAccess" -}}
 {{- /* MCP_BACKEND is declared in _config-app.tpl */ -}}
 {{- with .Values.mcpConfig }}
-DELEGATED_ACCESS_SCAN: {{ .app.delegatedAccessScan | quote }}
-{{- if .app.delegatedAccessDiscoveryCronSchedule }}
-DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE: {{ .app.delegatedAccessDiscoveryCronSchedule | quote }}
+{{- with .delegatedAccess }}
+DELEGATED_ACCESS_SCAN: {{ .scan | quote }}
+{{- if .discoveryCronSchedule }}
+DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE: {{ .discoveryCronSchedule | quote }}
 {{- end }}
-{{- if .app.delegatedAccessVerificationCronSchedule }}
-DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE: {{ .app.delegatedAccessVerificationCronSchedule | quote }}
+{{- if .verificationCronSchedule }}
+DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE: {{ .verificationCronSchedule | quote }}
 {{- end }}
-{{- if .app.delegatedAccessRecoveryCronSchedule }}
-DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE: {{ .app.delegatedAccessRecoveryCronSchedule | quote }}
+{{- if .recoveryCronSchedule }}
+DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE: {{ .recoveryCronSchedule | quote }}
+{{- end }}
+{{- if (hasKey . "stalenessThresholdHours") }}
+DELEGATED_ACCESS_STALENESS_THRESHOLD_HOURS: {{ .stalenessThresholdHours | quote }}
+{{- end }}
+{{- if (hasKey . "failureThreshold") }}
+DELEGATED_ACCESS_FAILURE_THRESHOLD: {{ .failureThreshold | quote }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

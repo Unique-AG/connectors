@@ -121,7 +121,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -161,7 +162,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -201,7 +203,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -234,7 +237,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -283,7 +287,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -341,9 +346,10 @@ describe('ContentSyncService', () => {
         siteConfig: {
           ...mockSiteConfig,
           siteId: new Smeared('test-site-123', false),
-          scopeId: 'scope-id',
+          scopeId: { type: 'fixed', scopeId: 'scope_id' },
           maxFilesToIngest: 2,
         },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -391,7 +397,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -437,7 +444,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -483,7 +491,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -512,7 +521,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -549,7 +559,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -605,7 +616,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -661,7 +673,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };
@@ -692,7 +705,8 @@ describe('ContentSyncService', () => {
         rootPath: new Smeared('/root', false),
         siteName: new Smeared('test-site', false),
         managedPath: 'sites',
-        siteConfig: { ...mockSiteConfig, scopeId: 'scope-id' },
+        siteConfig: { ...mockSiteConfig, scopeId: { type: 'fixed', scopeId: 'scope_id' } },
+        rootScopeId: 'scope_id',
         isInitialSync: false,
         discoveredSubsites: [],
       };

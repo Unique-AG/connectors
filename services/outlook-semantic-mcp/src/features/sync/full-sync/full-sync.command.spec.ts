@@ -5,6 +5,7 @@ import { FullSyncCommand, START_FULL_SYNC_LINK } from './full-sync.command';
 vi.mock('~/features/tracing.utils', () => ({
   traceAttrs: vi.fn(),
   traceEvent: vi.fn(),
+  NewTrace: () => () => ({}),
 }));
 
 // ---------------------------------------------------------------------------
@@ -132,6 +133,13 @@ function createCommand({
     { run: vi.fn().mockResolvedValue(false) } as any,
     { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
     db as any,
+    {
+      measureFullSyncRun: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+      measureFullSyncDirectorySync: vi
+        .fn()
+        .mockImplementation((fn: () => Promise<unknown>) => fn()),
+      measureFullSyncBatch: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+    } as any,
   );
 }
 

@@ -1,9 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import { ModerationStatus } from '../constants/moderation-status.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { MimeTypeResolverService } from '../shared/services/mime-type-resolver.service';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
@@ -134,6 +136,12 @@ describe('ProcessingPipelineService', () => {
       .impl(() => mockSteps.uploadContent as unknown as UploadContentStep)
       .mock(IngestionFinalizationStep)
       .impl(() => mockSteps.ingestionFinalization as unknown as IngestionFinalizationStep)
+      .mock(MimeTypeResolverService)
+      .impl(() => ({
+        resolve: vi.fn((fileName: string, rawMimeType: string | undefined) =>
+          fileName.toLowerCase().endsWith('.csv') ? 'text/csv' : (rawMimeType ?? DEFAULT_MIME_TYPE),
+        ),
+      }))
       .mock(SPC_INGESTION_FILE_PROCESSED_TOTAL)
       .impl(() => ({
         add: vi.fn(),
@@ -149,6 +157,7 @@ describe('ProcessingPipelineService', () => {
     managedPath: 'sites',
     serviceUserId: 'test-user-id',
     rootPath: new Smeared('/Root', false),
+    rootScopeId: 'scope_test',
     isInitialSync: false,
     discoveredSubsites: [],
   };
@@ -179,10 +188,10 @@ describe('ProcessingPipelineService', () => {
 
   it('correctly handles targetScopeId in ProcessingContext by prioritizing target scope over root scope', async () => {
     const targetScopeId = 'specific-folder-scope-id';
-    const rootScopeIdFromConfig = mockSyncContext.siteConfig.scopeId;
+    const rootScopeIdFromContext = mockSyncContext.rootScopeId;
 
     // Ensure they are different for the test
-    expect(targetScopeId).not.toBe(rootScopeIdFromConfig);
+    expect(targetScopeId).not.toBe(rootScopeIdFromContext);
 
     await service.processItem(mockFile, targetScopeId, 'new', mockSyncContext);
 
@@ -190,12 +199,11 @@ describe('ProcessingPipelineService', () => {
     const context = executeCalls[0]?.[0];
 
     // The context.targetScopeId should be the targetScopeId passed to processItem,
-    // not the root scopeId from mockSyncContext.
+    // not the rootScopeId from mockSyncContext.
     expect(context?.targetScopeId).toBe(targetScopeId);
 
-    // We should still have access to the root scope via syncContext.config.scopeId
-    // which contains the SiteConfig (which is also the root scope)
-    expect(context?.syncContext.siteConfig.scopeId).toBe(mockSyncContext.siteConfig.scopeId);
+    // We should still have access to the root scope via syncContext.rootScopeId.
+    expect(context?.syncContext.rootScopeId).toBe(mockSyncContext.rootScopeId);
   });
 
   it('calls cleanup for each completed step', async () => {
@@ -270,5 +278,27 @@ describe('ProcessingPipelineService', () => {
     const result = await service.processItem(mockFile, 'test-scope-id', 'updated', mockSyncContext);
 
     expect(result.success).toBe(true);
+  });
+
+  it('resolves context.mimeType to text/csv for .csv driveItem reported as application/vnd.ms-excel', async () => {
+    const csvFile: SharepointContentItem = {
+      ...mockFile,
+      fileName: 'data.csv',
+      item: {
+        ...mockFile.item,
+        name: 'data.csv',
+        file: {
+          mimeType: 'application/vnd.ms-excel',
+          hashes: { quickXorHash: 'hash1' },
+        },
+      },
+    };
+
+    await service.processItem(csvFile, 'test-scope-id', 'updated', mockSyncContext);
+
+    const executeCalls = vi.mocked(mockSteps.aspxProcessing.execute).mock.calls;
+    const context = executeCalls[0]?.[0];
+
+    expect(context?.mimeType).toBe('text/csv');
   });
 });

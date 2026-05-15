@@ -3,6 +3,8 @@ import { Dispatcher } from 'undici';
 import { z } from 'zod/v4';
 import { UniqueAuthSchema } from './unique-api-auth-schema';
 
+export const DEFAULT_HEALTH_CHECK_TIMEOUT_MS = 3000;
+
 export const uniqueApiFeatureModuleOptionsSchema = z.object({
   auth: UniqueAuthSchema,
   dispatcher: z
@@ -35,6 +37,12 @@ export const uniqueApiFeatureModuleOptionsSchema = z.object({
       tenantKey: z.string().optional(),
     })
     .prefault({}),
+  healthCheckTimeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .prefault(DEFAULT_HEALTH_CHECK_TIMEOUT_MS)
+    .optional(),
 });
 
 export type UniqueApiFeatureModuleOptions = z.infer<typeof uniqueApiFeatureModuleOptionsSchema>;

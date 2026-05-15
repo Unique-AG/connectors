@@ -25,6 +25,7 @@ import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
 import { buildUniqueQlSearchFilter } from './build-unique-ql-search-filter.util';
 import { CleanupSearchConditionsForUserQuery } from './cleanup-search-conditions-for-user.query';
+import { SemanticSearchConfig } from './search.config';
 import { SearchEmailsInputSchema } from './search-conditions.dto';
 
 export enum SearchBackend {
@@ -67,7 +68,10 @@ interface AccessContext {
   rootScopeForUserId: string;
   delegatedAccesses: DelegatedAccess[];
   scopeExternalIdToScopeId: Map<string, string>;
-  mapUniqueFolderPathToOwnerEmail: { uniqueFolderIdPath: string; ownerEmail: string }[];
+  mapUniqueFolderPathToOwnerEmail: {
+    uniqueFolderIdPath: string;
+    ownerEmail: string;
+  }[];
 }
 
 interface ValidSearchJobInput {
@@ -93,7 +97,12 @@ export class SemanticSearchEmailsQuery {
   public async run(
     userProfileId: UserProfileTypeID,
     inputs: z.infer<typeof SearchEmailsInputSchema>[],
-  ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
+    searchConfig: SemanticSearchConfig,
+  ): Promise<{
+    results: SearchEmailResult[];
+    searchSummary: string | undefined;
+  }> {
+    assert.ok(searchConfig, `searchConfig cannot be nullish`);
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const context = await this.loadAccessContext(userProfile);
 
@@ -182,13 +191,16 @@ export class SemanticSearchEmailsQuery {
           receivedDateTime: metadata?.receivedDateTime ?? '',
           backend: SearchBackend.Unique,
           text: concatChunks(Array.from(item.chunks.values())),
-          openEmailParams: { id: item.content.id, idType: SearchBackend.Unique },
+          openEmailParams: {
+            id: item.content.id,
+            idType: SearchBackend.Unique,
+          },
         };
       }),
     );
 
     return {
-      results: results.slice(0, 500),
+      results: results.slice(0, searchConfig.maxEmailsLimit),
       searchSummary: summaries.length > 0 ? summaries.join('\r\n') : undefined,
     };
   }
@@ -217,7 +229,10 @@ export class SemanticSearchEmailsQuery {
     );
     assert.ok(rootScopeForUserId, `Root scope not found for user: ${userProfile.providerUserId}`);
 
-    const mapUniqueFolderPathToOwnerEmail: { uniqueFolderIdPath: string; ownerEmail: string }[] = [
+    const mapUniqueFolderPathToOwnerEmail: {
+      uniqueFolderIdPath: string;
+      ownerEmail: string;
+    }[] = [
       {
         uniqueFolderIdPath: this.getUniqueFolderPath([rootScopeId, rootScopeForUserId]),
         ownerEmail: userProfile.email,

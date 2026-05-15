@@ -8,8 +8,11 @@ import { errors } from 'undici';
 // Then we check the results and if any of them returned 429 and we want to retry we can throw
 // a GenericRateLimitError, to signal that we can retry the whole batch.
 export class GenericRateLimitError extends Error {
-  public constructor(message?: string, options?: ErrorOptions) {
+  public readonly retryAfter: number | undefined | null;
+
+  public constructor(message?: string, retryAfter?: number | null, options?: ErrorOptions) {
     super(message, options);
+    this.retryAfter = retryAfter;
     this.name = `GenericRateLimitError`;
   }
 }

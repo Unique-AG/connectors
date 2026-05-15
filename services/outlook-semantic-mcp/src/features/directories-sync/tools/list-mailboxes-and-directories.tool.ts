@@ -16,24 +16,46 @@ const InputSchema = z.object({});
 
 const UserDirectorySchema: z.ZodType<UserDirectory> = z.lazy(() =>
   z.object({
-    id: z.string(),
-    displayName: z.string(),
-    children: z.array(UserDirectorySchema),
+    id: z
+      .string()
+      .describe('Opaque folder ID — pass this to the email search tool to filter by folder.'),
+    displayName: z.string().describe('Human-readable folder name.'),
+    canReadContent: z
+      .boolean()
+      .describe(
+        'Whether this folder can be searched. Always true for own mailboxes. For delegated mailboxes, true means explicitly shared; false means the folder is a structural ancestor only and cannot be searched.',
+      ),
+    children: z.array(UserDirectorySchema).describe('Nested sub-folders, may be empty.'),
   }),
 );
 
 const UserMailboxSchema: z.ZodType<UserMailbox> = z.object({
-  email: z.string().nullable(),
-  displayName: z.string().nullable(),
-  isOwn: z.boolean(),
-  folders: z.array(UserDirectorySchema),
+  email: z
+    .string()
+    .nullable()
+    .describe('Email address of the mailbox owner, or null if unavailable.'),
+  displayName: z
+    .string()
+    .nullable()
+    .describe('Display name of the mailbox owner, or null if unavailable.'),
+  isOwn: z
+    .boolean()
+    .describe("True for the user's own primary mailbox, false for delegated (shared) mailboxes."),
+  folders: z
+    .array(UserDirectorySchema)
+    .describe('Top-level folders. Each folder may contain nested children.'),
 });
 
 const OutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   status: z.string().optional(),
-  mailboxes: z.array(UserMailboxSchema).optional(),
+  mailboxes: z
+    .array(UserMailboxSchema)
+    .optional()
+    .describe(
+      'List of mailboxes the user has access to, including their own and any delegated mailboxes.',
+    ),
 });
 
 @Injectable()

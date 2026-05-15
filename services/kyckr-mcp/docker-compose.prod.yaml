@@ -1,0 +1,18 @@
+services:
+  kyckr-mcp:
+    # image: ghcr.io/unique-ag/connectors/services/kyckr-mcp:latest
+    build:
+      context: ../.. # Build from monorepo root
+      dockerfile: ./services/kyckr-mcp/deploy/Dockerfile
+    ports:
+      - "9542:9542"
+    environment:
+      - NODE_ENV=production
+      - PORT=9542
+      - KYCKR_API_BASE_URL=${KYCKR_API_BASE_URL:-https://test-api.kyckr.com/v2}
+      - KYCKR_API_KEY=${KYCKR_API_KEY}
+      - MCP_API_KEY=${MCP_API_KEY}
+      # Optional
+      # - KYCKR_DEFAULT_CUSTOMER_REFERENCE=${KYCKR_DEFAULT_CUSTOMER_REFERENCE}
+      # - KYCKR_DEFAULT_CONTACT_EMAIL=${KYCKR_DEFAULT_CONTACT_EMAIL}
+    restart: unless-stopped

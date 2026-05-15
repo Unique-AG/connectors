@@ -111,6 +111,8 @@ UNIQUE_ZITADEL_OAUTH_TOKEN_URL=https://your-zitadel.zitadel.cloud/oauth/v2/token
 UNIQUE_ZITADEL_PROJECT_ID=<zitadel-project-id>
 ```
 
+> **Note on Unique API URLs:** The `http://localhost:8091` and `http://localhost:8092` values assume a locally-running proxy that forwards to the Unique ingestion and scope management services. Replace these with your actual `https://*.unique.app` service URLs when testing against a real Unique tenant.
+
 ### Generating Secrets
 
 See [Configuration — Required Secrets](./configuration.md#Required-Secrets) for the full format reference. Quick generation:

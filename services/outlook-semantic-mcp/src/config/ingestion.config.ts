@@ -4,12 +4,29 @@ import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configura
 import { json } from '~/utils/zod';
 import { McpBackendType } from './mcp-backend-type.config';
 
+const connectivityTimeoutMs = z.coerce
+  .number()
+  .int()
+  .positive()
+  .prefault(3000)
+  .describe('Timeout in milliseconds for connectivity health checks.');
+
 const noIngestionConfig = z.object({
   mcpBackend: z.literal(McpBackendType.MicrosoftGraph),
+  connectivityTimeoutMs,
 });
 
 export const withIngestionConfig = z.object({
   mcpBackend: z.literal(McpBackendType.MicrosoftGraphAndUniqueApi),
+  connectivityTimeoutMs,
+  syncFailureThreshold: z.coerce
+    .number()
+    .min(0)
+    .max(1)
+    .prefault(0.15)
+    .describe(
+      'Fraction of eligible users that may be failing before fullSync or liveCatchup is marked down.',
+    ),
   defaultMailFilters: json(inboxConfigurationMailFilters).describe(
     'Default mail filters applied when syncing emails (e.g. {"retentionWindowInDays":95, "ignoredSenders": [], "ignoredContents": [] }). ',
   ),
@@ -17,7 +34,7 @@ export const withIngestionConfig = z.object({
     .string()
     .prefault('*/2 * * * *')
     .describe('Cron schedule for full sync recovery. Default every 2 minutes'),
-  liveCatchupRecovery: z
+  liveCatchupRecoveryCron: z
     .string()
     .prefault('*/5 * * * *')
     .describe('Cron schedule for full sync recovery. Default every 5 minutes'),

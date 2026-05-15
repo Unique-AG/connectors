@@ -77,8 +77,13 @@ function createCommand({
   const command = new DiscoverDelegatedAccessCommand(
     createMockGraphClientFactory(graphApi) as any,
     {} as any,
+    {} as any,
     db as any,
     persistentCacheService as any,
+    {
+      measureDiscoverRun: (fn: () => Promise<unknown>) => fn(),
+      measureDiscoverUser: (fn: () => Promise<unknown>) => fn(),
+    } as any,
   );
   // Stub decide() so unit tests bypass cache logic and test graph/db behavior directly
   vi.spyOn(command, 'decide').mockResolvedValue({

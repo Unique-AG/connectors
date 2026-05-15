@@ -70,7 +70,11 @@ export class McpSseService {
 
     // Create a new MCP server for this session with dynamic capabilities
     const mcpServer = new McpServer(
-      { name: this.options.name, version: this.options.version },
+      {
+        name: this.options.name,
+        version: this.options.version,
+        ...(this.options.icons && { icons: this.options.icons }),
+      },
       {
         capabilities,
         instructions: this.options.instructions || '',

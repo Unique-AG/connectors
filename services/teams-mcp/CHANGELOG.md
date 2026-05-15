@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.10](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.9...teams-mcp@0.2.10) (2026-05-13)
+
+
+### Bug Fixes
+
+* **teams-mcp:** restore per-occurrence date folder for transcript ingestion ([#540](https://github.com/Unique-AG/connectors/issues/540)) ([6d4f48d](https://github.com/Unique-AG/connectors/commit/6d4f48d55cb13961215c08f9409560757d9bc719))
+
 ## [0.2.9](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.8...teams-mcp@0.2.9) (2026-05-06)
 
 

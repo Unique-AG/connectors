@@ -2,12 +2,14 @@ import type { UniqueAuthFacade } from '../auth/unique-auth.facade';
 import type { UniqueContentFacade } from '../content/unique-content.facade';
 import type { UniqueFilesFacade } from '../files/unique-files.facade';
 import type { UniqueGroupsFacade } from '../groups/unique-groups.facade';
+import type { UniqueApiHealth } from '../health/unique-api-health.service';
 import type { UniqueIngestionFacade } from '../ingestion/unique-ingestion.facade';
 import type { UniqueApiScopesFacade } from '../scopes/unique-scopes.facade';
 import type { UniqueUsersFacade } from '../users/unique-users.facade';
 
 export abstract class UniqueApiClient {
   public abstract readonly auth: UniqueAuthFacade;
+  public abstract readonly health: UniqueApiHealth;
   public abstract readonly scopes: UniqueApiScopesFacade;
   public abstract readonly files: UniqueFilesFacade;
   public abstract readonly users: UniqueUsersFacade;

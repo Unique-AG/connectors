@@ -52,6 +52,9 @@ export class McpPromptsHandler extends McpHandlerBase {
         if (prompt.metadata._meta) {
           promptSchema._meta = prompt.metadata._meta;
         }
+        if (prompt.metadata.icons) {
+          promptSchema.icons = prompt.metadata.icons;
+        }
         return promptSchema;
       });
 

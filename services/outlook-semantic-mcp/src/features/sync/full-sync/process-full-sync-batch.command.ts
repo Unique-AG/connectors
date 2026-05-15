@@ -3,9 +3,8 @@ import { UniqueApiClient, UniqueFile } from '@unique-ag/unique-api';
 import { createSmeared } from '@unique-ag/utils';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
-import type { Counter, Histogram } from '@opentelemetry/api';
 import { sql } from 'drizzle-orm';
-import { MetricService, Span } from 'nestjs-otel';
+import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
 import z from 'zod';
 import { inboxConfigurations, UserProfile } from '~/db';
@@ -13,15 +12,15 @@ import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
 } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
+import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
-import { traceAttrs, traceEvent } from '~/features/tracing.utils';
+import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { greatestFrom } from '~/utils/greatest-from';
 import { leastFrom } from '~/utils/least-from';
 import { NonNullishProps } from '~/utils/non-nullish-props';
-import { recordInHistogram } from '~/utils/record-in-histogram';
 import {
   GraphMessageFields,
   graphMessagesResponseSchema,
@@ -33,16 +32,11 @@ import {
 } from '../../process-email/process-email.command';
 import { FindInboxConfigByVersionQuery } from './find-inbox-config-by-version.query';
 import { START_FULL_SYNC_LINK } from './full-sync.command';
+import type { BatchResult } from './full-sync.types';
 import {
   InboxConfigVersionedUpdate,
   UpdateInboxConfigByVersionCommand,
 } from './update-inbox-config-by-version.command';
-
-export type BatchResult =
-  | { outcome: 'batch-uploaded' }
-  | { outcome: 'completed' }
-  | { outcome: 'version-mismatch' }
-  | { outcome: 'missing-full-sync-next-link' };
 
 const GRAPH_PAGE_LIMIT = 100;
 // We aim to upload 100 messages and we do not want to upload twice as much when a couple failed.
@@ -54,30 +48,16 @@ type PossibleIngestionResults = MessageIngestionResult | 'failed';
 export class ProcessFullSyncBatchCommand {
   private readonly logger = new Logger(this.constructor.name);
 
-  private readonly graphPageDuration: Histogram;
-  private readonly ingestionDuration: Histogram;
-  private readonly messagesProcessed: Counter;
-
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly processEmailCommand: ProcessEmailCommand,
     private readonly updateByVersionCommand: UpdateInboxConfigByVersionCommand,
     private readonly findConfigByVersion: FindInboxConfigByVersionQuery,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
-    metricService: MetricService,
-  ) {
-    this.graphPageDuration = metricService.getHistogram('full_sync_graph_page_duration_seconds', {
-      description: 'Duration of Graph API page fetch during full sync',
-    });
-    this.ingestionDuration = metricService.getHistogram('full_sync_ingestion_duration_seconds', {
-      description: 'Duration of single message ingestion during full sync (including retries)',
-    });
-    this.messagesProcessed = metricService.getCounter('full_sync_messages_processed_total', {
-      description: 'Total messages processed during full sync',
-    });
-  }
+    private readonly metrics: SyncMetricsService,
+  ) {}
 
-  @Span()
+  @NewTrace('process-full-sync-batch')
   public async run({
     userProfile,
     version,
@@ -87,11 +67,9 @@ export class ProcessFullSyncBatchCommand {
   }): Promise<BatchResult> {
     traceAttrs({ userProfileId: userProfile.id, version });
 
-    this.logger.log({ userProfileId: userProfile.id, version, msg: 'Starting batch processing' });
-
     const config = await this.findConfigByVersion.run(userProfile.id, version);
     if (isNullish(config)) {
-      this.logger.log({
+      this.logger.warn({
         userProfileId: userProfile.id,
         version,
         msg: 'Version mismatch on config load',
@@ -99,7 +77,7 @@ export class ProcessFullSyncBatchCommand {
       return { outcome: 'version-mismatch' };
     }
     if (!config.fullSyncNextLink) {
-      this.logger.log({ userProfileId: userProfile.id, version, msg: 'Missing fullSyncNextLink' });
+      this.logger.warn({ userProfileId: userProfile.id, version, msg: 'Missing fullSyncNextLink' });
       return { outcome: 'missing-full-sync-next-link' };
     }
 
@@ -176,16 +154,16 @@ export class ProcessFullSyncBatchCommand {
 
       iterationInfo.pageSize = page.length;
       if (page.length === 0) {
-        this.logger.log({ ...iterationInfo, msg: 'Empty page, ending' });
+        this.logger.log({
+          userProfileId: iterationInfo.userProfileId,
+          version: iterationInfo.version,
+          pageNumber: iterationInfo.pageNumber,
+          msg: 'Empty page, ending sync',
+        });
         break;
       }
 
       const messages = page.slice(iterationInfo.batchIndex);
-
-      this.logger.log({
-        ...iterationInfo,
-        msg: 'Graph API page fetched',
-      });
 
       const fileKeys = messages.map((item) =>
         getUniqueKeyForMessage({ userEmail: userProfile.email, messageId: item.id }),
@@ -250,6 +228,17 @@ export class ProcessFullSyncBatchCommand {
         }
       }
 
+      this.logger.log({
+        userProfileId: iterationInfo.userProfileId,
+        version: iterationInfo.version,
+        pageNumber: iterationInfo.pageNumber,
+        pageSize: iterationInfo.pageSize,
+        uploaded: iterationInfo.uploaded,
+        skipped: iterationInfo.skipped,
+        failed: iterationInfo.failed,
+        msg: 'Page processed',
+      });
+
       iterationInfo.batchIndex = 0;
       iterationInfo.nextLink = nextPageLink ?? null;
 
@@ -272,11 +261,29 @@ export class ProcessFullSyncBatchCommand {
         iterationInfo.uploaded + iterationInfo.failed >= MAX_MESSAGES_PROCESSED_PAGE_LIMIT
       ) {
         traceEvent('batch-uploaded');
+        this.logger.log({
+          userProfileId: iterationInfo.userProfileId,
+          version: iterationInfo.version,
+          uploaded: iterationInfo.uploaded,
+          skipped: iterationInfo.skipped,
+          failed: iterationInfo.failed,
+          pageNumber: iterationInfo.pageNumber,
+          msg: 'Batch yielded, more pages remain',
+        });
         return { outcome: 'batch-uploaded' };
       }
     }
 
     traceEvent('completed');
+    this.logger.log({
+      userProfileId: iterationInfo.userProfileId,
+      version: iterationInfo.version,
+      uploaded: iterationInfo.uploaded,
+      skipped: iterationInfo.skipped,
+      failed: iterationInfo.failed,
+      pageNumber: iterationInfo.pageNumber,
+      msg: 'Full sync batch completed',
+    });
     return { outcome: 'completed' };
   }
 
@@ -308,11 +315,10 @@ export class ProcessFullSyncBatchCommand {
     ];
 
     if (nextLink === START_FULL_SYNC_LINK) {
-      const raw = await recordInHistogram({
-        histogram: this.graphPageDuration,
-        attributes: { page_type: 'first' },
-        fn: () => this.fetchFirstPage(client, conditions),
-      });
+      const raw = await this.metrics.measureGraphPage(
+        () => this.fetchFirstPage(client, conditions),
+        'first',
+      );
       return {
         status: 'proceed',
         resetBatchIndex: false,
@@ -321,11 +327,10 @@ export class ProcessFullSyncBatchCommand {
     }
 
     try {
-      const raw = await recordInHistogram({
-        histogram: this.graphPageDuration,
-        attributes: { page_type: 'next' },
-        fn: () => client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get(),
-      });
+      const raw = await this.metrics.measureGraphPage(
+        () => client.api(nextLink).header('Prefer', 'IdType="ImmutableId"').get(),
+        'next',
+      );
       return {
         status: 'proceed',
         resetBatchIndex: false,
@@ -353,11 +358,10 @@ export class ProcessFullSyncBatchCommand {
       `Created date time is null durring expired next link`,
     );
     conditions.push(`receivedDateTime le ${freshConfig.oldestReceivedEmailDateTime.toISOString()}`);
-    const raw = await recordInHistogram({
-      histogram: this.graphPageDuration,
-      attributes: { page_type: 'next' },
-      fn: () => this.fetchFirstPage(client, conditions),
-    });
+    const raw = await this.metrics.measureGraphPage(
+      () => this.fetchFirstPage(client, conditions),
+      'next',
+    );
     return {
       status: 'proceed',
       resetBatchIndex: true,
@@ -380,11 +384,17 @@ export class ProcessFullSyncBatchCommand {
   private async processMessage(
     input: ProcessEmailCommandInput,
   ): Promise<'ingested' | 'skipped' | 'failed'> {
-    const ingestionResult = await recordInHistogram({
-      histogram: this.ingestionDuration,
-      attributes: (result) => ({ outcome: result === 'failed' ? 'failure' : 'success' }),
-      fn: () => this.processEmailCommand.run(input),
-    });
+    const processingResult = await this.metrics.measureEmailProcessing(() =>
+      this.processEmailCommand.run(input),
+    );
+
+    if (processingResult === 'failed') {
+      this.logger.warn({
+        userProfileId: input.user.profileId,
+        messageId: input.graphMessage.id,
+        msg: 'Message ingestion failed after retries',
+      });
+    }
 
     const mapToOurResult: Record<PossibleIngestionResults, 'ingested' | 'skipped' | 'failed'> = {
       ingested: `ingested`,
@@ -393,17 +403,6 @@ export class ProcessFullSyncBatchCommand {
       'content-updated': `ingested`,
       failed: `failed`,
     };
-
-    if (ingestionResult === 'failed') {
-      this.logger.warn({
-        userProfileId: input.user.profileId,
-        messageId: input.graphMessage.id,
-        msg: 'Message ingestion failed after retries',
-      });
-    }
-    const outcome = mapToOurResult[ingestionResult];
-    this.messagesProcessed.add(1, { outcome });
-
-    return outcome;
+    return mapToOurResult[processingResult];
   }
 }
