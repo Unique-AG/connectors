@@ -31,6 +31,10 @@ describe('parseScopeExternalId', () => {
   it('returns undefined for too many segments after prefix', () => {
     expect(parseScopeExternalId('confc:my-tenant:space-123:ENG:extra')).toBeUndefined();
   });
+
+  it('returns undefined when only the prefix is present', () => {
+    expect(parseScopeExternalId('confc:')).toBeUndefined();
+  });
 });
 
 describe('buildScopeExternalId', () => {
