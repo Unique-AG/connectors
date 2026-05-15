@@ -23,7 +23,6 @@ async function bootstrap() {
   });
 
   const port = configService.get('app.port', { infer: true });
-
   await app.listen(port);
   logger.log({ msg: `Server is running on http://localhost:${port}` });
 }
