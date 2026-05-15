@@ -124,9 +124,6 @@
       ]
     },
     "services/confluence-connector": {
-      "prerelease": true,
-      "prerelease-type": "alpha",
-      "versioning": "prerelease",
       "extra-files": [
         {
           "type": "yaml",
