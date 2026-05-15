@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0-alpha.8](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.7...confluence-connector@2.0.0-alpha.8) (2026-05-15)
+
+
+### Features
+
+* **confluence-connector,unique-api,main:** migrate child scopes when root scopeId changes ([#506](https://github.com/Unique-AG/connectors/issues/506)) ([ad4c9ac](https://github.com/Unique-AG/connectors/commit/ad4c9ac20aa6f5d40ca4d53585960e91ae6085ec))
+
+
+### Bug Fixes
+
+* **confluence-connector,unique-api,utils,logger,deps:** sanitize errors in logging ([#488](https://github.com/Unique-AG/connectors/issues/488)) ([74044db](https://github.com/Unique-AG/connectors/commit/74044db824bf0e792395502beed2e80b473e2ce7))
+
 ## [2.0.0-alpha.7](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.6...confluence-connector@2.0.0-alpha.7) (2026-04-29)
 
 
