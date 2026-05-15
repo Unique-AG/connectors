@@ -58,19 +58,19 @@ describe('getRetryAfterMs', () => {
   describe('GenericRateLimitError', () => {
     it('delegates to single cause', () => {
       const inner = makeGraphError('45');
-      const error = new GenericRateLimitError('rate limit', { cause: inner });
+      const error = new GenericRateLimitError('rate limit', null, { cause: inner });
       expect(getRetryAfterMs(error)).toBe(45_000);
     });
 
     it('returns the maximum ms when cause is an array', () => {
-      const error = new GenericRateLimitError('rate limit', {
+      const error = new GenericRateLimitError('rate limit', null, {
         cause: [makeGraphError('30'), makeGraphError('60')],
       });
       expect(getRetryAfterMs(error)).toBe(60_000);
     });
 
     it('returns null when cause array has no retry-after values', () => {
-      const error = new GenericRateLimitError('rate limit', {
+      const error = new GenericRateLimitError('rate limit', null, {
         cause: [makeGraphError(), makeGraphError()],
       });
       expect(getRetryAfterMs(error)).toBeNull();

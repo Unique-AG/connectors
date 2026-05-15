@@ -4,7 +4,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, gt, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, last } from 'remeda';
-import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
+import { AppConfig, appConfig, DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
   DrizzleDatabase,
@@ -37,6 +37,7 @@ export class DiscoverDelegatedAccessCommand {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
+    @Inject(appConfig.KEY) private readonly appConfiguration: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly persistentCacheService: PersistentCacheService,
     private readonly metrics: DelegatedAccessMetricsService,
@@ -372,7 +373,8 @@ export class DiscoverDelegatedAccessCommand {
           set: fieldsToUpsert,
         });
 
-      this.logger.log({ delegateUserId, ownerUserId, msg: 'Delegated access discovered' });
+      this.logger.debug({ delegateUserId, ownerUserId, msg: 'Delegated access discovered' });
+      await this.updateProgressTimestamp();
     } catch (error) {
       if (error instanceof GraphError) {
         if (error.statusCode === 403 || error.statusCode === 404) {
@@ -384,34 +386,55 @@ export class DiscoverDelegatedAccessCommand {
                 eq(delegatedAccessAccounts.ownerUserId, ownerUserId),
               ),
             );
-          this.logger.log({
+          this.logger.debug({
             delegateUserId,
             ownerUserId,
             statusCode: error.statusCode,
             msg: 'Delegated access revoked, removed from accounts',
+            ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
           });
+          await this.updateProgressTimestamp();
           return;
         }
 
         if (error.statusCode === 429 || (error.statusCode >= 500 && error.statusCode < 600)) {
-          this.logger.warn({
+          this.logger.debug({
             delegateUserId,
             ownerUserId,
             statusCode: error.statusCode,
-            msg: 'Transient error during discovery, skipping',
+            msg: 'Transient error during discovery',
+            ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
           });
           throw error;
         }
       }
 
-      this.logger.error({
+      this.logger.debug({
         delegateUserId,
         ownerUserId,
         error,
         msg: 'Unexpected error during delegated access discovery',
+        ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
       });
 
       throw error;
     }
+  }
+
+  private async updateProgressTimestamp(): Promise<void> {
+    await this.persistentCacheService.setWith(
+      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
+      async ({ currentValue, update }): Promise<void> => {
+        assert.ok(currentValue);
+        assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+        await update({
+          dataType: 'DelegatedAccessDiscovery',
+          payload: {
+            ...currentValue.payload,
+            lastProgressRegisteredAt: Date.now(),
+          },
+        });
+      },
+    );
   }
 }
