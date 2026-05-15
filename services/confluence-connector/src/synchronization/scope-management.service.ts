@@ -92,9 +92,10 @@ export class ScopeManagementService {
         rootScope.id,
         expectedExternalId,
       );
-      if (migrationResult.status === 'migration_failed') {
-        throw new Error(`Root scope migration failed: ${migrationResult.error}`);
-      }
+      assert.ok(
+        migrationResult.status !== 'migration_failed',
+        `Root scope migration failed: ${migrationResult.error}`,
+      );
       if (migrationResult.status === 'migration_completed') {
         this.logger.log({
           scopeId: rootScope.id,
