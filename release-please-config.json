@@ -124,6 +124,7 @@
       ]
     },
     "services/confluence-connector": {
+      "release-as": "2.0.0",
       "extra-files": [
         {
           "type": "yaml",
