@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { MetricsModule } from '../metrics/metrics.module';
@@ -13,7 +14,7 @@ import { VerifyDelegatedAccessListener } from './verification/verify-delegated-a
 import { VerifyDelegatedAccessSchedulerService } from './verification/verify-delegated-access-scheduler.service';
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule, MetricsModule, PersistentCacheModule],
+  imports: [DrizzleModule, MsGraphModule, MetricsModule, PersistentCacheModule, ConfigModule],
   providers: [
     // discovery
     DiscoverDelegatedAccessCommand,
