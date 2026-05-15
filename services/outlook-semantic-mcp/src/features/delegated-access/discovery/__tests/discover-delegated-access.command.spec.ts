@@ -77,6 +77,7 @@ function createCommand({
   const command = new DiscoverDelegatedAccessCommand(
     createMockGraphClientFactory(graphApi) as any,
     {} as any,
+    {} as any,
     db as any,
     persistentCacheService as any,
     {
