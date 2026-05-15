@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.6](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.5...outlook-semantic-mcp@0.4.6) (2026-05-15)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** list mailboxes for delegated access allowed only on folders  ([#547](https://github.com/Unique-AG/connectors/issues/547)) ([9a0ab75](https://github.com/Unique-AG/connectors/commit/9a0ab752ce3ded00b3abbafd4b20e7ce9323948d))
+
 ## [0.4.5](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.4...outlook-semantic-mcp@0.4.5) (2026-05-14)
 
 
