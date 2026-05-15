@@ -478,6 +478,8 @@ Existing deployments that do not set this variable are unaffected — `Microsoft
 
 ### DELEGATED_ACCESS_SCAN
 
+For step-by-step Microsoft 365 setup, see [Features — Delegated Access — Setup](../technical/features.md#Setup).
+
 Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for delegated mailbox access granted between users at the Microsoft Exchange level. Three values are accepted:
 
 - **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. Users only see their own mailbox.
