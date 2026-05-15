@@ -72,50 +72,8 @@ export class ListMailboxesAndDirectoriesQuery {
       folders: ownTree,
     };
 
-    // const delegatedDirectoryRows = [...directoryLevelRows, ...fullAccessRows];
-
-    // if (delegatedDirectoryRows.length === 0) {
-    //   return [ownMailbox];
-    // }
-
-    // const ownerDirs = new Map<
-    //   string,
-    //   { email: string | null; displayName: string | null; dirs: DirectoryNode[] }
-    // >();
-    // for (const row of delegatedDirectoryRows) {
-    //   let directoriesRef = ownerDirs.get(row.ownerUserId)?.dirs;
-    //   if (isNullish(directoriesRef)) {
-    //     directoriesRef = [];
-    //     ownerDirs.set(row.ownerUserId, {
-    //       email: row.ownerEmail ?? null,
-    //       displayName: row.ownerDisplayName ?? null,
-    //       dirs: directoriesRef,
-    //     });
-    //   }
-
-    //   directoriesRef.push({
-    //     id: row.dirId,
-    //     displayName: row.dirDisplayName,
-    //     parentId: row.dirParentId,
-    //     providerDirectoryId: row.dirProviderDirectoryId,
-    //   });
-    // }
-
     const mailbosesWithSharedFolders = await this.getMailboxesWithSharedFolders(userProfileId);
     const mailboxesWithFullAccess = await this.getMailboxesWithFullAccess(userProfileId);
-    // const delegatedMailboxes: UserMailbox[] = [
-    //   ...mailboxesWithFullAccess,
-    //   ...mailbosesWithSharedFolders,
-    // ];
-    // for (const [, ownerInfo] of ownerDirs) {
-    //   const { directoryTree } = this.buildTree(ownerInfo.dirs);
-    //   delegatedMailboxes.push({
-    //     email: ownerInfo.email,
-    //     displayName: ownerInfo.displayName,
-    //     isOwn: false,
-    //     folders: directoryTree,
-    //   });
-    // }
 
     return [ownMailbox, ...mailboxesWithFullAccess, ...mailbosesWithSharedFolders];
   }
