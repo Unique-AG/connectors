@@ -264,18 +264,10 @@ export class MsGraphKqlSearchEmailsQuery {
           requests: batch.map((request) => {
             const kql = sanitizeKqlQuery(request.kqlQuery);
             const search = kql.includes('"') ? kql : `"${kql}"`;
-            const searchParams = new URLSearchParams();
-            searchParams.set(`$search`, search);
-            searchParams.set(
-              `$select`,
-              `subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview`,
-            );
-            searchParams.set(`$top`, `${request.limit}`);
-
             return {
               id: request.requestId,
               method: 'GET',
-              url: `/users/${request.mailbox}/messages?${searchParams.toString()}`,
+              url: `/users/${request.mailbox}/messages?$search=${encodeURIComponent(search)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview&$top=${request.limit}`,
               headers: { Prefer: 'outlook.body-content-type="text"' },
             };
           }),
@@ -339,7 +331,7 @@ export class MsGraphKqlSearchEmailsQuery {
             receivedDateTime: msg.receivedDateTime ?? null,
             parentFolderId: msg.parentFolderId ?? '',
             webLink: msg.webLink ?? '',
-            text: msg.uniqueBody?.content ?? msg.body?.content ?? msg.bodyPreview ?? '',
+            text: msg.uniqueBody?.content || msg.body?.content || msg.bodyPreview || '',
           });
         }
       }
