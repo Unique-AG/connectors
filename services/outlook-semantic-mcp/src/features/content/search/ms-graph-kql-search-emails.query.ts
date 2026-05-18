@@ -1,3 +1,4 @@
+import { createSmeared } from '@unique-ag/utils';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { chunk, filter, groupBy, pipe } from 'remeda';
@@ -295,13 +296,17 @@ export class MsGraphKqlSearchEmailsQuery {
           continue;
         }
 
+        const details = {
+          mailbox: createSmeared(originalRequest.mailbox),
+          kqlQuery: createSmeared(originalRequest.kqlQuery),
+          body: createSmeared(subResponse.body?.toString() ?? ``),
+        };
+
         if (status < 200 || status >= 300) {
           this.logger.error({
+            ...details,
             msg: 'MS Graph batch sub-request failed',
-            mailbox: originalRequest.mailbox,
-            kqlQuery: originalRequest.kqlQuery,
             status,
-            body: subResponse.body,
           });
           continue;
         }
@@ -309,9 +314,8 @@ export class MsGraphKqlSearchEmailsQuery {
         const parsed = messageSchema.safeParse(subResponse.body);
         if (!parsed.success) {
           this.logger.error({
+            ...details,
             msg: 'MS Graph message response failed schema validation',
-            mailbox: originalRequest.mailbox,
-            kqlQuery: originalRequest.kqlQuery,
             error: parsed.error,
           });
           continue;
