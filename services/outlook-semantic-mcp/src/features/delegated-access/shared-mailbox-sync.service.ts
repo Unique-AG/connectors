@@ -188,7 +188,9 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
   }
 
   private getSharedMailboxEmails(): string[] {
-    if (this.config.scan === 'disabled') return [];
+    if (this.config.scan === 'disabled') {
+      return [];
+    }
     return this.config.sharedMailboxEmails;
   }
 

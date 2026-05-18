@@ -175,6 +175,9 @@ mcpConfig:
     # -- Optional. Fraction (0–1) of eligible delegated users that may be stale before health is marked down.
     # Default: 0.15. Env var: DELEGATED_ACCESS_FAILURE_THRESHOLD
     # failureThreshold: 0.15
+    # -- Optional. Comma-separated list of shared mailbox email addresses to sync.
+    # Required when shared mailbox directory sync is needed. Env var: SHARED_MAILBOXES
+    # sharedMailboxEmails: "mailbox1@example.com,mailbox2@example.com"
 
   # -- Optional log settings. To override:
   # logs:

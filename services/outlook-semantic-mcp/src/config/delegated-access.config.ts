@@ -12,7 +12,12 @@ import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
 const sharedMailboxEmails = z
   .string()
   .prefault('')
-  .transform((s) => s.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean))
+  .transform((s) =>
+    s
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  )
   .describe('Comma-separated list of shared mailbox email addresses to sync (SHARED_MAILBOXES).');
 
 const discoveryCronSchedule = z
