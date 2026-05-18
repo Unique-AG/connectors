@@ -262,11 +262,13 @@ export class MsGraphKqlSearchEmailsQuery {
       try {
         const raw = await client.api('$batch').post({
           requests: batch.map((request) => {
+            const kql = sanitizeKqlQuery(request.kqlQuery);
+            const search = kql.includes('"') ? kql : `"${kql}"`;
             const searchParams = new URLSearchParams();
-            searchParams.set(`$search`, sanitizeKqlQuery(request.kqlQuery));
+            searchParams.set(`$search`, search);
             searchParams.set(
               `$select`,
-              `subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,bodyPreview`,
+              `subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview`,
             );
             searchParams.set(`$top`, `${request.limit}`);
 
