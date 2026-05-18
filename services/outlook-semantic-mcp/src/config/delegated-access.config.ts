@@ -9,6 +9,12 @@ import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
 // Read and manage (Full Access) (‎0‎)
 // The Full Access permission allows a delegate to open this mailbox and behave as the mailbox owner.
 
+const sharedMailboxEmails = z
+  .string()
+  .prefault('')
+  .transform((s) => s.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean))
+  .describe('Comma-separated list of shared mailbox email addresses to sync (SHARED_MAILBOXES).');
+
 const discoveryCronSchedule = z
   .string()
   .prefault('0 */12 * * *')
@@ -58,6 +64,7 @@ const onlyFullDelegatedAccessScanConfig = z.object({
   recoveryCronSchedule,
   stalenessThresholdHours,
   failureThreshold: delegatedAccessFailureThreshold,
+  sharedMailboxEmails,
 });
 
 const granularDelegatedAccessScanConfig = z.object({
@@ -86,6 +93,7 @@ const granularDelegatedAccessScanConfig = z.object({
   recoveryCronSchedule,
   stalenessThresholdHours,
   failureThreshold: delegatedAccessFailureThreshold,
+  sharedMailboxEmails,
 });
 
 export const DelegatedAccessConfigSchema = z.discriminatedUnion('scan', [
@@ -98,7 +106,7 @@ export const delegatedAccessConfig = registerConfig(
   'delegatedAccess',
   DelegatedAccessConfigSchema,
   {
-    whitelistKeys: new Set(['MCP_BACKEND']),
+    whitelistKeys: new Set(['MCP_BACKEND', 'SHARED_MAILBOXES']),
   },
 );
 

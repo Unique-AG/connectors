@@ -78,7 +78,7 @@ export class SyncDelegatedAccessCommand {
     const { delegateUserId, ownerUserId } = accounts;
 
     const [ownerProfile] = await this.db
-      .select({ email: userProfiles.email })
+      .select({ email: userProfiles.email, source: userProfiles.source })
       .from(userProfiles)
       .where(eq(userProfiles.id, ownerUserId));
 
@@ -97,6 +97,7 @@ export class SyncDelegatedAccessCommand {
       client,
       ownerEmail,
       onProgress,
+      verifyOnlyFullAccess: ownerProfile.source === 'shared-mailbox',
     });
     if (verificationResult.hasFullDelegatedAcces) {
       await this.db
@@ -197,10 +198,12 @@ export class SyncDelegatedAccessCommand {
     client,
     ownerEmail,
     onProgress,
+    verifyOnlyFullAccess,
   }: {
     client: Client;
     ownerEmail: string;
     onProgress?: () => Promise<void>;
+    verifyOnlyFullAccess?: boolean;
   }): Promise<
     | { hasFullDelegatedAcces: true }
     | {
@@ -220,6 +223,10 @@ export class SyncDelegatedAccessCommand {
 
     if (testResult.canRead) {
       return { hasFullDelegatedAcces: true };
+    }
+
+    if (verifyOnlyFullAccess) {
+      return { hasFullDelegatedAcces: false, accessibleFolderIds: [], foldersWithErrors: [] };
     }
 
     const folderIds = await this.readAllFolders({ client, ownerEmail });

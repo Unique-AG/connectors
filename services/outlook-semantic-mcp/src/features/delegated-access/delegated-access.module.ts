@@ -8,6 +8,7 @@ import { DelegatedAccessRecoverySchedulerService } from './delegated-access-reco
 import { DiscoverDelegatedAccessCommand } from './discovery/discover-delegated-access.command';
 import { DiscoverDelegatedAccessListener } from './discovery/discover-delegated-access.listener';
 import { DiscoverDelegatedAccessSchedulerService } from './discovery/discover-delegated-access-scheduler.service';
+import { SharedMailboxSyncService } from './shared-mailbox-sync.service';
 import { SyncDelegatedAccessCommand } from './verification/sync-delegated-access.command';
 import { SyncDelegatedAccessForAllUsersCommand } from './verification/sync-delegated-access-for-all-users.command';
 import { VerifyDelegatedAccessListener } from './verification/verify-delegated-access.listener';
@@ -27,6 +28,8 @@ import { VerifyDelegatedAccessSchedulerService } from './verification/verify-del
     VerifyDelegatedAccessSchedulerService,
     // recovery
     DelegatedAccessRecoverySchedulerService,
+    // shared mailboxes
+    SharedMailboxSyncService,
   ],
 })
 export class DelegatedAccessModule {}
