@@ -16,6 +16,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
+import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 import { MsGraphSearchConfig } from './search.config';
 
@@ -299,7 +300,7 @@ export class MsGraphKqlSearchEmailsQuery {
         const details = {
           mailbox: createSmeared(originalRequest.mailbox),
           kqlQuery: createSmeared(originalRequest.kqlQuery),
-          body: createSmeared(subResponse.body?.toString() ?? ``),
+          body: createSmeared(safeStringify(subResponse.body)),
         };
 
         if (status < 200 || status >= 300) {
