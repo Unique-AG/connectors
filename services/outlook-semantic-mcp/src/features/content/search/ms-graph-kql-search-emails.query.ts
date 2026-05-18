@@ -264,6 +264,11 @@ export class MsGraphKqlSearchEmailsQuery {
           requests: batch.map((request) => {
             const searchParams = new URLSearchParams();
             searchParams.set(`$search`, sanitizeKqlQuery(request.kqlQuery));
+            searchParams.set(
+              `$select`,
+              `subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,bodyPreview`,
+            );
+            searchParams.set(`$top`, `${request.limit}`);
 
             return {
               id: request.requestId,
