@@ -204,7 +204,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
 
     const matchedUsers = graphUsers
       .map((u) => ({ ...u, mail: u.mail?.toLowerCase() }))
-      .filter((user) => envEmails.includes(user.mail as string)) as NonNullishProps<
+      .filter((user) => user.mail && envEmails.includes(user.mail)) as NonNullishProps<
       GraphUser,
       'mail'
     >[];

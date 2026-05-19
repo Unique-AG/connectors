@@ -3,6 +3,7 @@ import { GraphError } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AllDelegatesFailedError,
+  isNoDelegatesResult,
   MsGraphClientResolver,
   NoDelegatesFoundError,
 } from './ms-graph-client-resolver.service';
@@ -96,7 +97,7 @@ describe('MsGraphClientResolver', () => {
   // Manual path
   // -------------------------------------------------------------------------
 
-  it('source=shared-mailbox, no delegates, sharedMailboxConfig omitted → returns null', async () => {
+  it('source=shared-mailbox, no delegates, sharedMailboxConfig omitted → returns NO_DELEGATES sentinel', async () => {
     const { resolver } = createResolver([]);
 
     const result = await resolver.run({
@@ -104,7 +105,7 @@ describe('MsGraphClientResolver', () => {
       fn: vi.fn(),
     });
 
-    expect(result).toBeNull();
+    expect(isNoDelegatesResult(result)).toBe(true);
   });
 
   it('source=shared-mailbox, no delegates, throwIfNoDelegates: true → throws NoDelegatesFoundError', async () => {

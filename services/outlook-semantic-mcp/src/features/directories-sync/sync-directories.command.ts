@@ -8,7 +8,10 @@ import { isNonNullish, isNullish } from 'remeda';
 import { DirectoriesSync, directories, directoriesSync } from '~/db';
 import { DRIZZLE, DrizzleDatabase } from '~/db/drizzle.module';
 import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { MsGraphClientResolver } from '~/msgraph/ms-graph-client-resolver.service';
+import {
+  isNoDelegatesResult,
+  MsGraphClientResolver,
+} from '~/msgraph/ms-graph-client-resolver.service';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 import { graphOutlookDirectoriesDeltaResponse } from './microsoft-graph.dtos';
@@ -96,7 +99,7 @@ export class SyncDirectoriesCommand {
       },
     });
 
-    if (deltaQueryResult === null) {
+    if (isNoDelegatesResult(deltaQueryResult)) {
       this.logger.warn({
         userProfileId: userProfile.id,
         userEmail,

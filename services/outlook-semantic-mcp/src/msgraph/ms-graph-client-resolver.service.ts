@@ -6,6 +6,11 @@ import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts, UserProfile, userPro
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 
+export const NO_DELEGATES = Symbol('NO_DELEGATES');
+export function isNoDelegatesResult(value: unknown): value is typeof NO_DELEGATES {
+  return value === NO_DELEGATES;
+}
+
 export class NoDelegatesFoundError extends Error {
   public constructor(ownerUserId: string) {
     super(`No delegates found for owner: ${ownerUserId}`);
@@ -42,7 +47,7 @@ export class MsGraphClientResolver {
    * (e.g. `users/${userProfile.email}/…`).
    *
    * Return type depends on `throwIfNoDelegates`:
-   * - omitted / `false` → returns `null` when no delegates exist (shared-mailbox only)
+   * - omitted / `false` → returns `NO_DELEGATES` symbol when no delegates exist (shared-mailbox only); use `isNoDelegates()` to check
    * - `true`            → throws `NoDelegatesFoundError` instead; return type narrows to `T`
    *
    * @example
@@ -51,7 +56,7 @@ export class MsGraphClientResolver {
    *   userProfile,
    *   fn: ({ client }) => fetchSomething(client, userProfile.email),
    * });
-   * if (result === null) return; // shared-mailbox with no delegates yet
+   * if (isNoDelegates(result)) return; // shared-mailbox with no delegates yet
    *
    * @example
    * // Require a delegate — throw if none found
@@ -91,7 +96,7 @@ export class MsGraphClientResolver {
       maxDelegates?: number;
       preferredDelegateUserId?: string;
     };
-  }): Promise<T | null>;
+  }): Promise<T | typeof NO_DELEGATES>;
 
   public async run<T>(input: {
     userProfile: NonNullishProps<UserProfile, 'email'>;
@@ -107,7 +112,7 @@ export class MsGraphClientResolver {
       maxDelegates?: number;
       preferredDelegateUserId?: string;
     };
-  }): Promise<T | null> {
+  }): Promise<T | typeof NO_DELEGATES> {
     const { userProfile, fn, sharedMailboxConfig } = input;
     const maxDelegates = sharedMailboxConfig?.maxDelegates ?? 3;
     const throwIfNoDelegates = sharedMailboxConfig?.throwIfNoDelegates ?? false;
@@ -137,7 +142,7 @@ export class MsGraphClientResolver {
       if (throwIfNoDelegates) {
         throw new NoDelegatesFoundError(userProfile.id);
       }
-      return null;
+      return NO_DELEGATES;
     }
 
     const preferredIdx = delegates.findIndex((d) => d.delegateUserId === preferredDelegateUserId);

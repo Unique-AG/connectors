@@ -12,7 +12,10 @@ import {
   UserProfile,
 } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { MsGraphClientResolver } from '~/msgraph/ms-graph-client-resolver.service';
+import {
+  isNoDelegatesResult,
+  MsGraphClientResolver,
+} from '~/msgraph/ms-graph-client-resolver.service';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
@@ -57,7 +60,7 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
     });
     traceEvent('Finished reading microsoft graph system directories');
 
-    if (microsoftGraphDirectories === null) {
+    if (isNoDelegatesResult(microsoftGraphDirectories)) {
       this.logger.warn({
         userProfileId: userProfile.id,
         userEmail: createSmeared(userProfile.email),

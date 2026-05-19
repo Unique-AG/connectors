@@ -16,7 +16,10 @@ import {
   UserProfile,
 } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { MsGraphClientResolver } from '~/msgraph/ms-graph-client-resolver.service';
+import {
+  isNoDelegatesResult,
+  MsGraphClientResolver,
+} from '~/msgraph/ms-graph-client-resolver.service';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import {
@@ -72,7 +75,7 @@ export class SyncDirectoriesForUserProfileCommand {
       fn: ({ client }) => this.doSync(client, userProfile),
     });
 
-    if (result === null) {
+    if (isNoDelegatesResult(result)) {
       this.logger.log({
         userProfileId: userProfile.id,
         msg: 'No delegates available for shared mailbox, skipping directory sync',

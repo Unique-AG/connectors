@@ -187,8 +187,7 @@ export const MsGraphKqlQuerySchema = z.object({
       'KQL (Keyword Query Language) query string for Microsoft Graph email search.\n' +
         'SEARCH BEHAVIOUR: Results are relevance-ranked by Exchange, not strictly boolean-filtered.\n' +
         '  AND/OR/NOT are hints to the relevance engine — the engine may still return emails that\n' +
-        '  satisfy only some of the terms. Use narrow, specific queries and rely on the semantic\n' +
-        '  search backend (uniqueSemanticSearchQueries) for strict conceptual filtering.\n' +
+        '  satisfy only some of the terms. Use narrow, specific queries for best precision.\n' +
         'Supported property filters:\n' +
         '  from:<email>                    — sender (SMTP address, display name, or domain)\n' +
         '  to:<email>                      — To recipient (SMTP address, display name, or domain)\n' +
