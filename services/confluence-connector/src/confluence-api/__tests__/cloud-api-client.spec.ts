@@ -524,4 +524,145 @@ describe('CloudConfluenceApiClient', () => {
       expect(result).toBe(mockStream);
     });
   });
+
+  describe('fetchPageAttachmentsByTitle', () => {
+    function clientWithAttachments() {
+      return new CloudConfluenceApiClient(mockConfig as never, mockAuth as never, mockHttpClient, {
+        attachmentsEnabled: true,
+      });
+    }
+
+    it('returns null without HTTP when attachmentsEnabled is false', async () => {
+      const result = await client.fetchPageAttachmentsByTitle('SP', 'Other Page');
+
+      expect(result).toBeNull();
+      expect(mockHttpClient.rateLimitedRequest).not.toHaveBeenCalled();
+    });
+
+    it('queries /wiki/rest/api/content with URL-encoded spaceKey, title, type=page, and attachment expand', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
+
+      await clientWithAttachments().fetchPageAttachmentsByTitle(
+        'TST SPACE',
+        'Page With "Quotes" & Stuff',
+      );
+
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
+      expect(url.startsWith(`${API_BASE_URL}/wiki/rest/api/content?`)).toBe(true);
+      expect(url).toContain('spaceKey=TST%20SPACE');
+      expect(url).toContain('title=Page%20With%20%22Quotes%22%20%26%20Stuff');
+      expect(url).toContain('type=page');
+      expect(url).toContain('expand=space');
+      expect(url).toContain('children.attachment');
+    });
+
+    it('returns null when the search returns no results', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
+
+      const result = await clientWithAttachments().fetchPageAttachmentsByTitle('SP', 'Missing');
+
+      expect(result).toBeNull();
+    });
+
+    it('returns pageId + attachments of the first matching page', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [
+          makePage({
+            id: '500',
+            children: {
+              attachment: {
+                results: [
+                  {
+                    id: 'att-x',
+                    title: 'x.png',
+                    extensions: { mediaType: 'image/png', fileSize: 1234 },
+                    version: { when: '2024-01-01' },
+                    _links: { download: '/download/attachments/500/x.png' },
+                  },
+                ],
+                size: 1,
+                limit: 25,
+              },
+            },
+          }),
+        ],
+        _links: {},
+      });
+
+      const result = await clientWithAttachments().fetchPageAttachmentsByTitle('SP', 'Other Page');
+
+      expect(result).toEqual({
+        pageId: '500',
+        attachments: [
+          {
+            id: 'att-x',
+            title: 'x.png',
+            extensions: { mediaType: 'image/png', fileSize: 1234 },
+            version: { when: '2024-01-01' },
+            _links: { download: '/download/attachments/500/x.png' },
+          },
+        ],
+      });
+    });
+
+    it('fetches additional attachments via v2 endpoint when the first page has more than the inline limit', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest)
+        .mockResolvedValueOnce({
+          results: [
+            makePage({
+              id: '700',
+              children: {
+                attachment: {
+                  results: [
+                    {
+                      id: 'att-1',
+                      title: 'a.png',
+                      extensions: { mediaType: 'image/png', fileSize: 1 },
+                      version: { when: '2024-01-01' },
+                      _links: { download: '/d/a.png' },
+                    },
+                  ],
+                  size: 25,
+                  limit: 25,
+                },
+              },
+            }),
+          ],
+          _links: {},
+        })
+        .mockResolvedValueOnce({
+          // Cloud's v2 listing replaces (not appends to) the inline attachment results.
+          results: [
+            {
+              id: 'att-1',
+              title: 'a.png',
+              mediaType: 'image/png',
+              fileSize: 1,
+              downloadLink: '/d/a.png',
+            },
+            {
+              id: 'att-2',
+              title: 'b.png',
+              mediaType: 'image/png',
+              fileSize: 2,
+              downloadLink: '/d/b.png',
+            },
+          ],
+          _links: {},
+        });
+
+      const result = await clientWithAttachments().fetchPageAttachmentsByTitle('SP', 'Other Page');
+
+      const calls = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls;
+      expect(calls).toHaveLength(2);
+      expect(calls[1]?.[0]).toContain(`${API_BASE_URL}/wiki/api/v2/pages/700/attachments`);
+      expect(result?.attachments.map((a) => a.id)).toEqual(['att-1', 'att-2']);
+    });
+  });
 });

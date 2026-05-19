@@ -424,5 +424,161 @@ describe('PageImageInliner', () => {
       expect(result.inlinedAttachmentIds.size).toBe(1);
       expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledTimes(1);
     });
+
+    it('inlines two adjacent <ac:image> macros with no separator between them', async () => {
+      apiClient.getAttachmentDownloadStream
+        .mockResolvedValueOnce(Readable.from(Buffer.from('one')))
+        .mockResolvedValueOnce(Readable.from(Buffer.from('two')));
+      const body =
+        '<ac:image><ri:attachment ri:filename="one.png"/></ac:image><ac:image><ri:attachment ri:filename="two.png"/></ac:image>';
+      const att1: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        id: 'att-one',
+        title: 'one.png',
+      };
+      const att2: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        id: 'att-two',
+        title: 'two.png',
+      };
+
+      const result = await inliner.inlineImages(basePage(body), [att1, att2]);
+
+      expect(result.page.body).not.toContain('<ac:image');
+      expect(result.page.body).toContain(
+        `src="data:image/png;base64,${Buffer.from('one').toString('base64')}"`,
+      );
+      expect(result.page.body).toContain(
+        `src="data:image/png;base64,${Buffer.from('two').toString('base64')}"`,
+      );
+      // The two <img/> tags should be adjacent in the output too.
+      expect(result.page.body).toMatch(/\/>\s*<img\s/);
+    });
+
+    it('inlines a body that is only a single <ac:image> macro', async () => {
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+      const body = '<ac:image><ri:attachment ri:filename="diagram.png"/></ac:image>';
+
+      const result = await inliner.inlineImages(basePage(body), [sampleDiscoveredImageAttachment]);
+
+      expect(result.page.body.startsWith('<img ')).toBe(true);
+      expect(result.page.body.endsWith('/>')).toBe(true);
+      expect(result.page.body).not.toContain('<ac:image');
+    });
+  });
+
+  describe('partial-success and keying', () => {
+    it('inlines the images it can and leaves the rest of the macros untouched', async () => {
+      // Two image references on one page: the second filename has no matching attachment,
+      // so only the first should be inlined.
+      const body =
+        '<p>a</p><ac:image><ri:attachment ri:filename="known.png"/></ac:image><p>b</p><ac:image><ri:attachment ri:filename="unknown.png"/></ac:image><p>c</p>';
+      const knownAtt: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        id: 'att-known',
+        title: 'known.png',
+      };
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+
+      const result = await inliner.inlineImages(basePage(body), [knownAtt]);
+
+      expect(result.page.body).toContain('data:image/png;base64,');
+      expect(result.page.body).toContain(
+        '<ac:image><ri:attachment ri:filename="unknown.png"/></ac:image>',
+      );
+      expect(result.inlinedAttachmentIds).toEqual(
+        new Set([buildInlinedAttachmentKey('1', 'att-known')]),
+      );
+      expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('records the same attachment id under different keys when it appears on two different pages', async () => {
+      // Cross-page image lookup: lookup.pageId='99', resolved attachment id reused
+      // elsewhere by coincidence. The inlined key must be pageId-scoped.
+      apiClient.fetchPageAttachmentsByTitle.mockResolvedValue({
+        pageId: '99',
+        attachments: [createConfluenceImageAttachment({ id: 'shared-id', title: 'other.png' })],
+      });
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+
+      // Same inliner instance, two pages. First page (id='1') has a local image with the
+      // same attachment id; the second page (id='2') has a cross-page reference resolving
+      // to the same id on a different page.
+      const localAtt: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        id: 'shared-id',
+        title: 'local.png',
+        pageId: '1',
+      };
+      const localBody = '<ac:image><ri:attachment ri:filename="local.png"/></ac:image>';
+      const local = await inliner.inlineImages(basePage(localBody), [localAtt]);
+      const remote = await inliner.inlineImages(
+        { ...basePage(PAGE_BODY_CROSS_PAGE_IMAGE), id: '2' },
+        [],
+      );
+
+      expect(local.inlinedAttachmentIds).toEqual(
+        new Set([buildInlinedAttachmentKey('1', 'shared-id')]),
+      );
+      expect(remote.inlinedAttachmentIds).toEqual(
+        new Set([buildInlinedAttachmentKey('99', 'shared-id')]),
+      );
+      // Verify the keys are not equal — same attachment id, different pages.
+      expect(buildInlinedAttachmentKey('1', 'shared-id')).not.toBe(
+        buildInlinedAttachmentKey('99', 'shared-id'),
+      );
+    });
+  });
+
+  describe('mediaType + stream handling', () => {
+    it('treats mediaType with charset/parameters as image and emits a clean data URI mime', async () => {
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+      const att: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        mediaType: 'image/PNG; charset=binary',
+      };
+
+      const result = await inliner.inlineImages(basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE), [
+        att,
+      ]);
+
+      expect(result.page.body).toContain('data:image/png;base64,');
+      expect(result.page.body).not.toContain('charset=binary');
+    });
+
+    it('accumulates image bytes from a stream that yields strings (not Buffers)', async () => {
+      const stringStream = Readable.from(['PNG', 'DATA']);
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(stringStream);
+
+      const result = await inliner.inlineImages(basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE), [
+        sampleDiscoveredImageAttachment,
+      ]);
+
+      expect(result.page.body).toContain(
+        `src="data:image/png;base64,${Buffer.from('PNGDATA').toString('base64')}"`,
+      );
+    });
+  });
+
+  describe('attribute escaping', () => {
+    it('html-escapes & < " in the alt attribute when the filename contains them', async () => {
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+      // Confluence storage format entity-encodes attribute values. The parser decodes
+      // them back to the raw characters; the inliner must re-encode for the produced
+      // <img alt="...">.
+      const trickyName = 'a&b "c" <d>.png';
+      const att: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        title: trickyName,
+      };
+      const body =
+        '<ac:image><ri:attachment ri:filename="a&amp;b &quot;c&quot; &lt;d>.png"/></ac:image>';
+
+      const result = await inliner.inlineImages(basePage(body), [att]);
+
+      expect(result.page.body).toContain('alt="a&amp;b &quot;c&quot; &lt;d>.png"');
+      // Must not contain a raw " inside the attribute value.
+      expect(result.page.body).not.toMatch(/alt="[^"]*"c"/);
+    });
   });
 });
