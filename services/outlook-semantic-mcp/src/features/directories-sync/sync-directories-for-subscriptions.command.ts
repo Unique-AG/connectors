@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq, gt, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, directoriesSync, subscriptions } from '~/db';
+import { DRIZZLE, DrizzleDatabase, directoriesSync, subscriptions, userProfiles } from '~/db';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SyncDirectoriesCommand } from './sync-directories.command';
+import { unique } from 'remeda';
 
 @Injectable()
 export class SyncDirectoriesForSubscriptionsCommand {
@@ -14,7 +15,12 @@ export class SyncDirectoriesForSubscriptionsCommand {
 
   @Span()
   public async run() {
-    const results = await this.db
+    const sharedMailboxes = await this.db
+      .select({ id: userProfiles.id })
+      .from(userProfiles)
+      .where(eq(userProfiles.source, 'shared-mailbox'));
+
+    const usersWithActiveSubscriptions = await this.db
       .select()
       .from(subscriptions)
       .leftJoin(directoriesSync, eq(subscriptions.userProfileId, directoriesSync.userProfileId))
@@ -23,10 +29,13 @@ export class SyncDirectoriesForSubscriptionsCommand {
       .limit(10)
       .execute();
 
-    for (const result of results) {
-      await this.syncDirectoriesCommand.run(
-        convertUserProfileIdToTypeId(result.subscriptions.userProfileId),
-      );
+    const ids = unique([
+      ...sharedMailboxes.map((item) => item.id),
+      ...usersWithActiveSubscriptions.map((item) => item.subscriptions.userProfileId),
+    ]);
+
+    for (const id of ids) {
+      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(id));
     }
   }
 }

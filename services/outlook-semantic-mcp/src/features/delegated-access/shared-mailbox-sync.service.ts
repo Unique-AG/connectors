@@ -170,8 +170,12 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       throw new FetchUsersError(userId, `Failed to fetch users from ms graph`, { cause: err });
     }
 
-    const matchedUsers = graphUsers.filter((u) => u.mail) as NonNullishProps<GraphUser, 'mail'>[];
-    const matchedEmails = matchedUsers.map((u) => u.mail.toLowerCase());
+    const matchedUsers = graphUsers
+      .map((u) => ({ ...u, mail: u.mail?.toLowerCase() }))
+      .filter((user) => envEmails.includes(user.mail as string)) as NonNullishProps<
+      GraphUser,
+      'mail'
+    >[];
 
     if (matchedUsers.length === 0 && envEmails.length > 0) {
       this.logger.warn({
@@ -179,18 +183,20 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
         envEmails,
       });
     }
-
     // Delete source='shared-mailbox' rows whose email is NOT in the intersection
-    await this.db
-      .delete(userProfiles)
-      .where(
-        and(
-          eq(userProfiles.source, 'shared-mailbox'),
-          matchedEmails.length > 0
-            ? not(inArray(sql`lower(${userProfiles.email})`, matchedEmails))
-            : undefined,
-        ),
-      );
+    await this.db.delete(userProfiles).where(
+      and(
+        eq(userProfiles.source, 'shared-mailbox'),
+        matchedUsers.length > 0
+          ? not(
+              inArray(
+                sql`lower(${userProfiles.email})`,
+                matchedUsers.map((item) => item.mail),
+              ),
+            )
+          : undefined,
+      ),
+    );
 
     // Upsert matched users
     if (matchedUsers.length > 0) {
