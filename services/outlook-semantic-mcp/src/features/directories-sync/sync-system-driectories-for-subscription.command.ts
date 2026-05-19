@@ -1,5 +1,5 @@
 import { Client } from '@microsoft/microsoft-graph-client';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import {
@@ -16,6 +16,7 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 import { GraphOutlookDirectory, graphOutlookDirectory } from './microsoft-graph.dtos';
+import { createSmeared } from '@unique-ag/utils';
 
 const MAP_SYSTEM_DIRECTORY_TO_MS_GRAPH_API_NAME: Record<SystemDirectoryType, string> = {
   Archive: 'archive',
@@ -37,6 +38,8 @@ interface GraphDirectoryInfo {
 
 @Injectable()
 export class SyncSystemDirectoriesForSubscriptionCommand {
+  private logger = new Logger(this.constructor.name);
+
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly msGraphClientResolver: MsGraphClientResolver,
@@ -55,6 +58,11 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
     traceEvent('Finished reading microsoft graph system directories');
 
     if (microsoftGraphDirectories === null) {
+      this.logger.warn({
+        userProfileId: userProfile.id,
+        userEmail: createSmeared(userProfile.email),
+        msg: `No delegates found for shared mailbox, skipping directory sync`,
+      });
       return;
     }
 

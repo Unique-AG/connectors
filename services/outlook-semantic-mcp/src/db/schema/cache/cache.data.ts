@@ -41,14 +41,12 @@ export const cacheData = z.discriminatedUnion('dataType', [
 
 export type CacheData = z.infer<typeof cacheData>;
 
+// biome-ignore format: flat conditional chain is easier to read than biome's nested indentation
 export type GetCacheDataByType<T extends CacheData['dataType']> =
-  T extends SharedMailboxSyncCacheType['dataType']
-    ? SharedMailboxSyncCacheType
-    : T extends DelegatedAccessDiscoveryCacheType['dataType']
-      ? DelegatedAccessDiscoveryCacheType
-      : T extends DelegatedAccessVerificationCacheType['dataType']
-        ? DelegatedAccessVerificationCacheType
-        : unknown;
+  T extends SharedMailboxSyncCacheType['dataType'] ? SharedMailboxSyncCacheType :
+  T extends DelegatedAccessDiscoveryCacheType['dataType'] ? DelegatedAccessDiscoveryCacheType :
+  T extends DelegatedAccessVerificationCacheType['dataType'] ? DelegatedAccessVerificationCacheType
+  : unknown;
 
 export function isCacheDataOfType<T extends CacheData['dataType']>(
   t: CacheData,
