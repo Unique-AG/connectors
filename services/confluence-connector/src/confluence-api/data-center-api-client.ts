@@ -9,12 +9,14 @@ import {
   type ApiClientOptions,
   ConfluenceApiClient,
   type InstanceIdentifier,
+  type PageAttachmentLookupResult,
 } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
 import {
   type ConfluencePage,
   confluenceAttachmentSchema,
   confluencePageSchema,
+  paginatedResponseSchema,
 } from './types/confluence-api.types';
 
 const SEARCH_PAGE_SIZE = 100;
@@ -83,6 +85,31 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     const raw = await this.makeAuthenticatedRequest(url);
     const result = confluencePageSchema.safeParse(raw);
     return result.success ? result.data : null;
+  }
+
+  public async fetchPageAttachmentsByTitle(
+    spaceKey: string,
+    title: string,
+  ): Promise<PageAttachmentLookupResult | null> {
+    if (!this.options.attachmentsEnabled) {
+      return null;
+    }
+
+    const expand = `space${this.attachmentExpand}`;
+    const url = `${this.config.baseUrl}/rest/api/content?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(title)}&type=page&expand=${expand}`;
+    const raw = await this.makeAuthenticatedRequest(url);
+
+    const response = paginatedResponseSchema(confluencePageSchema).parse(raw);
+    const page = response.results[0];
+    if (!page) {
+      return null;
+    }
+
+    await this.fetchMoreAttachments([page]);
+    return {
+      pageId: page.id,
+      attachments: page.children?.attachment?.results ?? [],
+    };
   }
 
   public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {

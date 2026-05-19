@@ -1,5 +1,5 @@
 import type { Readable } from 'node:stream';
-import type { ConfluencePage } from './types/confluence-api.types';
+import type { ConfluenceAttachment, ConfluencePage } from './types/confluence-api.types';
 
 export interface InstanceIdentifier {
   type: 'cloud' | 'data-center';
@@ -8,6 +8,11 @@ export interface InstanceIdentifier {
 
 export interface ApiClientOptions {
   attachmentsEnabled: boolean;
+}
+
+export interface PageAttachmentLookupResult {
+  pageId: string;
+  attachments: ConfluenceAttachment[];
 }
 
 export abstract class ConfluenceApiClient {
@@ -32,4 +37,13 @@ export abstract class ConfluenceApiClient {
     pageId: string,
     downloadPath: string,
   ): Promise<Readable>;
+
+  // Resolves a page in the given space by exact title and returns its attachments.
+  // Used by the page image inliner to fulfil cross-page <ri:attachment> references
+  // (<ac:image><ri:attachment ri:filename="..."><ri:page ri:space-key="..." ri:content-title="..."/></ri:attachment>).
+  // Returns null when the page is not found or when attachment ingestion is disabled.
+  public abstract fetchPageAttachmentsByTitle(
+    spaceKey: string,
+    title: string,
+  ): Promise<PageAttachmentLookupResult | null>;
 }
