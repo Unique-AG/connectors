@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, gt, or, sql } from 'drizzle-orm';
+import { eq, gt, inArray, or, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, directoriesSync, subscriptions, userProfiles } from '~/db';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
@@ -16,12 +16,22 @@ export class SyncDirectoriesForAllUserProfilesCommand {
   @Span()
   public async run() {
     const results = await this.db
-      .selectDistinct({ id: sql<string>`${userProfiles.id}` })
+      .select({ id: sql<string>`${userProfiles.id}` })
       .from(userProfiles)
-      .leftJoin(subscriptions, eq(subscriptions.userProfileId, userProfiles.id))
       .leftJoin(directoriesSync, eq(directoriesSync.userProfileId, userProfiles.id))
-      .where(or(eq(userProfiles.source, 'shared-mailbox'), gt(subscriptions.expiresAt, sql`now()`)))
-      .orderBy(sql`${directoriesSync.lastDeltaSyncRanAt.name} asc nulls first`)
+      .where(
+        or(
+          eq(userProfiles.source, 'shared-mailbox'),
+          inArray(
+            userProfiles.id,
+            this.db
+              .select({ userProfileId: subscriptions.userProfileId })
+              .from(subscriptions)
+              .where(gt(subscriptions.expiresAt, sql`now()`)),
+          ),
+        ),
+      )
+      .orderBy(sql`${directoriesSync.lastDeltaSyncRanAt} asc nulls first`)
       .limit(10);
 
     type SuccessOrFailureResult = 'success' | 'failed';
