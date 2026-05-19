@@ -230,8 +230,8 @@ export class PageImageInliner {
     spaceKey: string,
     contentTitle: string,
   ): Promise<PageAttachmentLookupResult | null> {
-    // JSON.stringify avoids collisions when either component contains spaces or
-    // other separator characters (e.g. ("A B", "C") vs ("A", "B C")).
+    // JSON.stringify avoids collisions when either component contains a separator
+    // character that a plain concatenation would merge into a single ambiguous key.
     const cacheKey = JSON.stringify([spaceKey, contentTitle]);
     const cached = this.crossPageCache.get(cacheKey);
     if (cached) {
@@ -369,11 +369,9 @@ export class PageImageInliner {
           }
           // parser.endIndex points at the final '>' of </ac:image>, so +1 is exclusive.
           const endIndex = parser.endIndex + 1;
-          // Guard against EOF-synthesized close tags (htmlparser2 emits onclosetag for
-          // every still-open tag when parser.end() runs). For a real close, the slice
-          // must terminate with '</ac:image>' or '/>' (self-closing). Anything else
-          // means the macro was unclosed in the source — skip to avoid splicing into
-          // unrelated content.
+          // htmlparser2 synthesizes onclosetag for every still-open tag when parser.end()
+          // runs at EOF. Reject blocks whose slice does not terminate with a real close
+          // ('</ac:image>' or self-closing '/>') so we never splice into unrelated content.
           const blockText = body.slice(imageOpen.startIndex, endIndex);
           if (!blockText.endsWith('</ac:image>') && !blockText.endsWith('/>')) {
             imageOpen = null;

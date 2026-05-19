@@ -180,8 +180,7 @@ export class ConfluenceSynchronizationService {
               inlinedAttachmentIds.add(id);
             }
           } catch (err) {
-            // A hard failure inside the inliner (parser surprise, OOM in Buffer.concat,
-            // etc.) must not lose the page. Fall back to ingesting the original body;
+            // A hard failure inside the inliner must not lose the page. Fall back to ingesting the original body;
             // the standalone attachment pass will still handle the images.
             this.logger.warn({
               pageId: page.id,

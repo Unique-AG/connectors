@@ -15,9 +15,8 @@ export interface PageAttachmentLookupResult {
   attachments: ConfluenceAttachment[];
 }
 
-// Shared shape-up used by Cloud and Data Center implementations of
-// fetchPageAttachmentsByTitle. Centralizes the page-to-lookup mapping so the only
-// per-platform difference is URL construction + the post-page attachment pagination.
+// Shared by both fetchPageAttachmentsByTitle implementations so the only
+// per-platform difference is URL construction and attachment pagination.
 export function buildPageAttachmentLookupResult(page: ConfluencePage): PageAttachmentLookupResult {
   return {
     pageId: page.id,
@@ -49,8 +48,7 @@ export abstract class ConfluenceApiClient {
   ): Promise<Readable>;
 
   // Resolves a page in the given space by exact title and returns its attachments.
-  // Used by the page image inliner to fulfil cross-page <ri:attachment> references
-  // (<ac:image><ri:attachment ri:filename="..."><ri:page ri:space-key="..." ri:content-title="..."/></ri:attachment>).
+  // Used by the page image inliner to fulfil cross-page <ri:attachment> references.
   // Returns null when the page is not found or when attachment ingestion is disabled.
   public abstract fetchPageAttachmentsByTitle(
     spaceKey: string,
