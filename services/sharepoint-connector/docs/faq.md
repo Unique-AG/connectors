@@ -196,7 +196,7 @@ The same migration path covers transitions between the two `scopeId` variants:
 
 ### When should I use `in_parent:` instead of a fixed scope ID?
 
-**Answer:** Use `in_parent:scope_<parentId>` when you want the connector to find-or-create a per-site root scope under a shared parent automatically, instead of pre-creating one scope per site. It's useful when many sites need to be onboarded quickly and you don't want operators to materialise a scope before each ingestion request. The auto-created scope is named after the SharePoint site's URL slug. Removing the site (via `syncStatus: deleted`) removes the auto-created scope; the parent stays operator-managed and is never claimed by the connector.
+**Answer:** Use `in_parent:scope_<parentId>` when you want the connector to find-or-create a per-site root scope under a shared parent automatically, instead of pre-creating one scope per site. It's useful when many sites need to be onboarded quickly and you don't want operators to materialise a scope before each ingestion request. The auto-created scope is named after the SharePoint site's URL slug. Removing the site (via `syncStatus: deleted`) removes the auto-created scope.
 
 ### What happens if I unflag a document?
 

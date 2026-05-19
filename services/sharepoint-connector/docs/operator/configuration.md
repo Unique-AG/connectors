@@ -102,12 +102,13 @@ sharepoint:
     thumbprintSha1: AB12CD34EF56...
 ```
 
-| Option                                | Required | Default | Description                                                                                      |
-| ------------------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------ |
-| `tenantId`                            | Yes      | —       | Azure AD tenant ID                                                                               |
-| `baseUrl`                             | Yes      | —       | Company SharePoint URL (e.g., `https://acme.sharepoint.com`). Must not end with a trailing slash |
-| `graphApiRateLimitPerMinuteThousands` | No       | `780`   | Microsoft Graph API rate limit in thousands of requests per minute                               |
-| `auth`                                | Yes      | —       | Authentication configuration (see below)                                                         |
+| Option                                | Required | Default | Description                                                                                       |
+| ------------------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------- |
+| `tenantId`                            | Yes      | —       | Azure AD tenant ID                                                                                |
+| `baseUrl`                             | Yes      | —       | Company SharePoint URL (e.g., `https://acme.sharepoint.com`). Must not end with a trailing slash  |
+| `graphApiRateLimitPerMinuteThousands` | No       | `780`   | Microsoft Graph API rate limit in thousands of requests per minute                                |
+| `auth`                                | Yes      | —       | Authentication configuration (see [Authentication](#Authentication))                              |
+| `siteDefaults`                        | No       | `{}`    | Deployment-level fallbacks applied to every per-site config (see [Site Defaults](#Site-Defaults)) |
 
 ### Authentication
 
@@ -199,18 +200,18 @@ The connector supports HTTP/HTTPS proxy for environments where internet access i
 
 When using `sharepoint_list` as the sites source, create a SharePoint list with the following columns:
 
-| Column Display Name          | Type             | Description                                                                                  |
-| ---------------------------- | ---------------- | -------------------------------------------------------------------------------------------- |
-| `siteId`                     | Single line text | SharePoint site ID (UUID or compound format: `hostname,siteCollectionId,webId` for subsites) |
-| `syncColumnName`             | Single line text | Column that marks files for sync                                                             |
-| `ingestionMode`              | Choice           | `flat` or `recursive`                                                                        |
+| Column Display Name          | Type             | Description                                                                                                       |
+| ---------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `siteId`                     | Single line text | SharePoint site ID (UUID or compound format: `hostname,siteCollectionId,webId` for subsites)                      |
+| `syncColumnName`             | Single line text | Column that marks files for sync                                                                                  |
+| `ingestionMode`              | Choice           | `flat` or `recursive`                                                                                             |
 | `uniqueScopeId`              | Single line text | Unique scope ID. Either `scope_<id>` (existing root) or `in_parent:scope_<parentId>` (auto-resolve under parent). |
-| `maxFilesToIngest`           | Number           | Maximum new + updated files per sync cycle; sync fails for the site if exceeded              |
-| `storeInternally`            | Choice           | `enabled` or `disabled`                                                                      |
-| `syncStatus`                 | Choice           | `active`, `inactive`, or `deleted`                                                           |
-| `syncMode`                   | Choice           | `content_only` or `content_and_permissions`                                                  |
-| `permissionsInheritanceMode` | Choice           | Optional inheritance mode                                                                    |
-| `subsitesScan`               | Choice           | `enabled` or `disabled` (default: `disabled`)                                                |
+| `maxFilesToIngest`           | Number           | Maximum new + updated files per sync cycle; sync fails for the site if exceeded                                   |
+| `storeInternally`            | Choice           | `enabled` or `disabled`                                                                                           |
+| `syncStatus`                 | Choice           | `active`, `inactive`, or `deleted`                                                                                |
+| `syncMode`                   | Choice           | `content_only` or `content_and_permissions`                                                                       |
+| `permissionsInheritanceMode` | Choice           | Optional inheritance mode                                                                                         |
+| `subsitesScan`               | Choice           | `enabled` or `disabled` (default: `disabled`)                                                                     |
 
 ### Benefits of SharePoint List Configuration
 
@@ -223,24 +224,24 @@ When using `sharepoint_list` as the sites source, create a SharePoint list with 
 
 **Important:** The connector is a singleton — each SharePoint site must be configured in at most one connector process per Unique instance. Configuring the same site in multiple processes leads to conflicting state and unexpected behavior of the connector.
 
-| Option                       | Values                                          | Default                    | Description                                                                                                                                                                                                                                                                                                                                                                |
-| ---------------------------- | ----------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `siteId`                     | UUID or compound ID                             | — (required)               | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId`                                                                                                                                                                                                                                                                                        |
-| `syncColumnName`             | String                                          | `FinanceGPTKnowledge`      | Display name or internal name of the sync flag column (display name takes priority)                                                                                                                                                                                                                                                                                        |
-| `ingestionMode`              | `flat`, `recursive`                             | — (required)               | Flat ingests all to one scope; recursive maintains hierarchy                                                                                                                                                                                                                                                                                                               |
-| `scopeId`                    | `scope_<id>` or `in_parent:scope_<parentId>`    | — (required)               | Where to mount this site's content. `scope_<id>` uses an existing scope as the site root (operator must have created it). `in_parent:scope_<parentId>` finds-or-creates a child scope under the given parent automatically — useful when many sites share a single parent and the operator doesn't want to pre-create a scope per site.                                    |
-| `maxFilesToIngest`           | Number                                          | — (unlimited)              | Maximum new + updated files per sync cycle; sync fails for the site if exceeded                                                                                                                                                                                                                                                                                            |
-| `storeInternally`            | `enabled`, `disabled`                           | `enabled`                  | Whether to store content in Unique                                                                                                                                                                                                                                                                                                                                         |
-| `syncStatus`                 | `active`, `inactive`, `deleted`                 | `active`                   | Control sync behavior                                                                                                                                                                                                                                                                                                                                                      |
-| `syncMode`                   | `content_only`, `content_and_permissions`       | — (required)               | What to sync                                                                                                                                                                                                                                                                                                                                                               |
-| `permissionsInheritanceMode` | See below                                       | `inherit_scopes_and_files` | Inheritance settings for content_only mode                                                                                                                                                                                                                                                                                                                                 |
-| `subsitesScan`               | `enabled`, `disabled`                           | `disabled`                 | Recursively discover and sync content from subsites                                                                                                                                                                                                                                                                                                                        |
+| Option                       | Values                                                                | Default                    | Description                                                                                                                                                    |
+| ---------------------------- | --------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `siteId`                     | UUID or compound ID                                                   | — (required)               | SharePoint site ID. Subsites use compound format: `hostname,siteCollectionId,webId`                                                                            |
+| `syncColumnName`             | String                                                                | `FinanceGPTKnowledge`      | Display name or internal name of the sync flag column (display name takes priority)                                                                            |
+| `ingestionMode`              | `flat`, `recursive`                                                   | — (required)               | Flat ingests all to one scope; recursive maintains hierarchy                                                                                                   |
+| `scopeId`                    | `scope_<id>` or `in_parent:scope_<parentId>`                          | — (required)               | Where to mount this site's content, see [Choosing between fixed scope and `in_parent:` auto-resolve](#Choosing-between-fixed-scope-and-in_parent-auto-resolve) |
+| `maxFilesToIngest`           | Number                                                                | — (unlimited)              | Maximum new + updated files per sync cycle; sync fails for the site if exceeded                                                                                |
+| `storeInternally`            | `enabled`, `disabled`                                                 | `enabled`                  | Whether to store content in Unique                                                                                                                             |
+| `syncStatus`                 | `active`, `inactive`, `deleted`                                       | `active`                   | Control sync behavior                                                                                                                                          |
+| `syncMode`                   | `content_only`, `content_and_permissions`                             | — (required)               | What to sync                                                                                                                                                   |
+| `permissionsInheritanceMode` | `none`, `inherit_files`, `inherit_scopes`, `inherit_scopes_and_files` | `inherit_scopes_and_files` | Inheritance settings for content_only, see [Permissions Inheritance Modes](#Permissions-Inheritance-Modes) mode                                                |
+| `subsitesScan`               | `enabled`, `disabled`                                                 | `disabled`                 | Recursively discover and sync content from subsites                                                                                                            |
 
 ### Choosing between fixed scope and `in_parent:` auto-resolve
 
 **Fixed (`scope_<id>`)** — each site needs its own scope, pre-created by the operator before the site is configured. Best when scopes are managed centrally and named or permissioned individually, since the operator stays in full control of the scope's identity, ACLs, and lifecycle.
 
-**Auto (`in_parent:scope_<parentId>`)** — the connector finds-or-creates a child scope under the parent on every sync, named after the SharePoint site's URL slug. Multiple sites can legitimately share the same parent — the connector intentionally does not dedup by parent. Removing a site (via `syncStatus: deleted`) removes the auto-created scope; removing the parent itself stays the operator's responsibility, since the parent's externalId is never written by the connector. If a sibling scope under the parent already has the same site name and isn't claimed by us, the connector aborts the sync with a typed error rather than guessing — the four codes are `unclaimed_name_match` (orphan with no externalId), `foreign_name_match` (claimed by a different site), `ambiguous_name_match` (multiple siblings share the name), and `claim_failed` (creation succeeded but the externalId update didn't — the connector rolls back the create).
+**Auto (`in_parent:scope_<parentId>`)** — the connector finds-or-creates a child scope under the parent on every sync, named after the SharePoint site's URL slug. Removing a site (via `syncStatus: deleted`) removes the auto-created scope. If a sibling scope under the parent already has the same site name and isn't claimed by us, the connector aborts the sync with a typed error rather than guessing to stay on the safe side and not sync a site into a user folder.
 
 ### Permissions Inheritance Modes
 
@@ -252,6 +253,86 @@ Only used when `syncMode` is `content_only`. It controls whether newly created s
 | `inherit_scopes`           | Yes            | No            |
 | `inherit_files`            | No             | Yes           |
 | `none`                     | No             | No            |
+
+## Site Defaults
+
+`sharepoint.siteDefaults` lets you set deployment-level fallbacks for any per-site option except `siteId`. Each site (whether sourced from `config_file` or from a `sharepoint_list` row) is merged with the defaults: if the per-site value is set, it wins; otherwise the default is used. This keeps individual site entries terse and makes it easy to change a policy across an entire deployment in one place.
+
+### With `config_file`
+
+```yaml
+sharepoint:
+  # ... auth and base configuration ...
+
+  siteDefaults:
+    syncColumnName: FinanceGPTKnowledge
+    ingestionMode: recursive
+    storeInternally: enabled
+    syncStatus: active
+    syncMode: content_only
+    permissionsInheritanceMode: inherit_scopes_and_files
+    subsitesScan: disabled
+
+  sitesSource: config_file
+  sites:
+    # Inherits everything from siteDefaults except scopeId / maxFilesToIngest
+    - siteId: 12345678-1234-1234-1234-123456789abc
+      scopeId: scope_bu4gokr0atzj0kfiuaaaaaaa
+      maxFilesToIngest: 1000
+    # Overrides syncColumnName and ingestionMode for this site
+    - siteId: 87654321-4321-4321-4321-cba987654321
+      syncColumnName: HRKnowledge
+      ingestionMode: flat
+      scopeId: scope_bu4gokr0atzj0kfiubbbbbb
+```
+
+### With `sharepoint_list`
+
+`siteDefaults` works identically for `sharepoint_list`: any column whose value is set on a row wins; any column that is blank (or whose mapped field is `undefined` because the column is not present on the list at all) falls back to the default. This means **columns covered by `siteDefaults` can be omitted from the SharePoint list entirely** — only the columns you want to vary per row need to exist. At minimum, the list must carry `siteId`; everything else can live in `siteDefaults`.
+
+```yaml
+sharepoint:
+  # ... auth and base configuration ...
+
+  siteDefaults:
+    syncColumnName: FinanceGPTKnowledge
+    ingestionMode: recursive
+    storeInternally: enabled
+    syncStatus: active
+    syncMode: content_only
+    permissionsInheritanceMode: inherit_scopes_and_files
+    subsitesScan: disabled
+    # Common pattern: every site auto-creates a child under one shared parent scope,
+    # so the list does not need a `uniqueScopeId` column at all.
+    scopeId: in_parent:scope_bu4gokr0atzj0kfiucccccc
+
+  sitesSource: sharepoint_list
+  sharepointList:
+    siteId: your-config-site-id-here
+    listId: 00000000-0000-0000-0000-000000000000
+```
+
+With the example above, the SharePoint list can be reduced to a single `siteId` column — every other per-site field is supplied by `siteDefaults`. Add columns back to the list only when you need per-site overrides for those fields.
+
+### Merge Rules
+
+- **Per-site value wins when "set".** For string-typed fields (including `siteId`, `scopeId`, `syncColumnName`), "set" means non-`undefined` and non-empty after trim — so a blank cell in a SharePoint list row falls back to the default. For numeric/enum fields, any non-`undefined` value counts as set.
+- **Required-after-merge.** `ingestionMode`, `scopeId`, and `syncMode` are required on the final merged config. If a per-site entry omits them and `siteDefaults` does not supply them either, the merger throws — and because sites are merged eagerly at the start of every sync cycle (for both `config_file` and `sharepoint_list`), a single unmergeable row aborts the **entire sync cycle**, not just that site. The service stays running and retries on the next scheduled cycle; the failure is recorded as a full-sync failure with step `SitesConfigLoading`.
+- **`siteId` cannot be defaulted.** It must always be set per site.
+
+### Schema Defaults
+
+The fields below have schema-level defaults applied even when you do not provide a `siteDefaults` block. Listing them in `siteDefaults` is still allowed if you want to make them explicit, but it is optional.
+
+| Field                        | Schema Default             |
+| ---------------------------- | -------------------------- |
+| `syncColumnName`             | `FinanceGPTKnowledge`      |
+| `storeInternally`            | `enabled`                  |
+| `syncStatus`                 | `active`                   |
+| `permissionsInheritanceMode` | `inherit_scopes_and_files` |
+| `subsitesScan`               | `disabled`                 |
+
+The remaining defaultable fields (`ingestionMode`, `scopeId`, `maxFilesToIngest`, `syncMode`) have no schema default — they take effect only if you set them under `siteDefaults` or per site.
 
 ## SharePoint Site Configuration
 
