@@ -19,7 +19,7 @@ DELEGATED_ACCESS_STALENESS_THRESHOLD_HOURS: {{ .stalenessThresholdHours | quote 
 DELEGATED_ACCESS_FAILURE_THRESHOLD: {{ .failureThreshold | quote }}
 {{- end }}
 {{- if .sharedMailboxEmails }}
-SHARED_MAILBOXES: {{ .sharedMailboxEmails | quote }}
+DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS: {{ .sharedMailboxEmails | quote }}
 {{- end }}
 {{- end }}
 {{- end }}
