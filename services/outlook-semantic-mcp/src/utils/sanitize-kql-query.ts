@@ -29,8 +29,8 @@ const BOOLEAN_OP_RE = /^(?:AND|OR|NOT)$/;
  *
  * Input forms handled:
  *   property:value              → "property:value"
- *   property:"phrase value"     → "property:phrase value"
- *   property:'phrase value'     → "property:phrase value"
+ *   property:"phrase value"     → "property:\"phrase value\""
+ *   property:'phrase value'     → "property:\"phrase value\""
  *   "already quoted"            → "already quoted"  (unchanged)
  *   free text words             → "free text words"  (accumulated into a phrase)
  *   AND / OR / NOT              → kept as-is between clauses
@@ -73,19 +73,23 @@ function quoteKqlClauses(kql: string): string {
       flushFreeText();
       pushClause(token);
     } else if (/^\w+:"[^"]*"$/.test(token)) {
-      // property:"quoted value" → "property:quoted value"
+      // property:"phrase value" → "property:\"phrase value\""  (preserve phrase semantics)
       flushFreeText();
       const colonIdx = token.indexOf(':');
-      pushClause(`"${token.slice(0, colonIdx)}:${token.slice(colonIdx + 2, -1)}"`);
+      const phrase = token.slice(colonIdx + 2, -1).replace(/\\/g, '\\\\');
+      pushClause(`"${token.slice(0, colonIdx)}:\\"${phrase}\\""`);
     } else if (/^\w+:'[^']*'$/.test(token)) {
-      // property:'quoted value' → "property:quoted value"
+      // property:'phrase value' → "property:\"phrase value\""
       flushFreeText();
       const colonIdx = token.indexOf(':');
-      pushClause(`"${token.slice(0, colonIdx)}:${token.slice(colonIdx + 2, -1)}"`);
+      const phrase = token.slice(colonIdx + 2, -1).replace(/\\/g, '\\\\');
+      pushClause(`"${token.slice(0, colonIdx)}:\\"${phrase}\\""`);
     } else if (/^\w+:[^\s"']+$/.test(token)) {
-      // property:value → "property:value"
+      // property:value → "property:value"  (escape any backslashes in the value)
       flushFreeText();
-      pushClause(`"${token}"`);
+      const colonIdx = token.indexOf(':');
+      const value = token.slice(colonIdx + 1).replace(/\\/g, '\\\\');
+      pushClause(`"${token.slice(0, colonIdx)}:${value}"`);
     } else {
       // Bare free-text word — accumulate into a single quoted phrase.
       freeText.push(token);

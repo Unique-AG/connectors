@@ -3,12 +3,12 @@ import { sanitizeKqlQuery } from './sanitize-kql-query';
 
 describe('sanitizeKqlQuery', () => {
   describe('smart quote normalization', () => {
-    it("replaces Unicode left/right single quotes ('') with ASCII apostrophes and quotes the clause", () => {
-      expect(sanitizeKqlQuery('subject:‘hello world’')).toBe('"subject:hello world"');
+    it('replaces Unicode left/right single quotes (‘’) with ASCII apostrophes and quotes the clause', () => {
+      expect(sanitizeKqlQuery('subject:‘hello world’')).toBe('"subject:\\"hello world\\""');
     });
 
-    it('replaces Unicode left/right double quotes ("") with ASCII double quotes and quotes the clause', () => {
-      expect(sanitizeKqlQuery('subject:“hello world”')).toBe('"subject:hello world"');
+    it('replaces Unicode left/right double quotes (“”) with ASCII double quotes and quotes the clause', () => {
+      expect(sanitizeKqlQuery('subject:“hello world”')).toBe('"subject:\\"hello world\\""');
     });
   });
 
@@ -44,11 +44,11 @@ describe('sanitizeKqlQuery', () => {
 
     it('does not uppercase boolean keywords inside double-quoted phrases', () => {
       expect(sanitizeKqlQuery('subject:"budget and planning"')).toBe(
-        '"subject:budget and planning"',
+        '"subject:\\"budget and planning\\""',
       );
-      expect(sanitizeKqlQuery('body:"risk or return"')).toBe('"body:risk or return"');
+      expect(sanitizeKqlQuery('body:"risk or return"')).toBe('"body:\\"risk or return\\""');
       expect(sanitizeKqlQuery('subject:"do not reply" AND from:alice@example.com')).toBe(
-        '"subject:do not reply" AND "from:alice@example.com"',
+        '"subject:\\"do not reply\\"" AND "from:alice@example.com"',
       );
     });
   });
@@ -115,7 +115,7 @@ describe('sanitizeKqlQuery', () => {
       ['importance:high', '"importance:high"'],
       ['kind:meetings', '"kind:meetings"'],
       ['size:1..1048576', '"size:1..1048576"'],
-      ['category:"Red Category"', '"category:Red Category"'],
+      ['category:"Red Category"', '"category:\\"Red Category\\""'],
     ])('quotes %s correctly', (input, expected) => {
       expect(sanitizeKqlQuery(input)).toBe(expected);
     });
@@ -125,7 +125,7 @@ describe('sanitizeKqlQuery', () => {
     it('quotes each clause and adds explicit AND between adjacent property clauses', () => {
       const query = 'from:alice@example.com subject:"Q2 budget" received>=2024-01-01';
       expect(sanitizeKqlQuery(query)).toBe(
-        '"from:alice@example.com" AND "subject:Q2 budget" AND "received>=2024-01-01"',
+        '"from:alice@example.com" AND "subject:\\"Q2 budget\\"" AND "received>=2024-01-01"',
       );
     });
 
