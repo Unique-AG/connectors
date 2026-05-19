@@ -185,6 +185,10 @@ export const MsGraphKqlQuerySchema = z.object({
     .nonempty()
     .describe(
       'KQL (Keyword Query Language) query string for Microsoft Graph email search.\n' +
+        'SEARCH BEHAVIOUR: Results are relevance-ranked by Exchange, not strictly boolean-filtered.\n' +
+        '  AND/OR/NOT are hints to the relevance engine — the engine may still return emails that\n' +
+        '  satisfy only some of the terms. Use narrow, specific queries and rely on the semantic\n' +
+        '  search backend (uniqueSemanticSearchQueries) for strict conceptual filtering.\n' +
         'Supported property filters:\n' +
         '  from:<email>                    — sender (SMTP address, display name, or domain)\n' +
         '  to:<email>                      — To recipient (SMTP address, display name, or domain)\n' +
@@ -209,7 +213,9 @@ export const MsGraphKqlQuerySchema = z.object({
         '  - Boolean operators AND/OR/NOT must be UPPERCASE\n' +
         '  - Suffix wildcards only: report* or budget*, NOT *report\n' +
         '  - Phrases must be in double quotes: subject:"quarterly report"\n' +
-        '  - DO NOT use folder: — it is not supported and will cause a request error\n' +
+        'Unsupported properties (silently stripped — do NOT use them, they produce no filtering effect):\n' +
+        '  folder:, isRead:, read:, flag:, flagStatus:, sensitivity:, hasFlag:, isAttachment:\n' +
+        '  Any property not in the supported list above is removed before the query is sent.\n' +
         'Free-text terms (no property prefix) search across subject, body, and from.\n' +
         'Examples:\n' +
         '  "from:alice@example.com subject:\\"Q2 budget\\" received>=2024-01-01"\n' +
