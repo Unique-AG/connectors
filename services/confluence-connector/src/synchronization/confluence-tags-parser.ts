@@ -23,9 +23,6 @@ export interface ParsedImageBlock {
 // byte range, attributes, and resolved resource reference. The byte ranges are intended
 // for surgical splicing back into the original string so content outside the macros is
 // preserved byte-for-byte.
-//
-// We buffer the full DOM rather than streaming because the caller already buffers the
-// entire page body string, and Confluence page bodies are KB-scale.
 export function parseImageBlocks(body: string): ParsedImageBlock[] {
   const doc = parseDocument(body, {
     xmlMode: true,

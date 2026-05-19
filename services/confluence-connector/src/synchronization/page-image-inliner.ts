@@ -15,18 +15,14 @@ import {
 } from './confluence-tags-parser';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
-// ac:image attributes we forward onto the produced <img>. Other presentational hints
-// (ac:align, ac:thumbnail, ac:vspace, ac:hspace, ac:border, ac:class, ac:style) are
-// Confluence-renderer specific and dropped.
+// ac:image attributes forwarded onto <img>; presentational hints (align, thumbnail, etc.) are dropped.
 const AC_IMAGE_ATTRS_TO_KEEP: ReadonlyArray<[string, string]> = [
   ['ac:title', 'title'],
   ['ac:width', 'width'],
   ['ac:height', 'height'],
 ];
 
-// Per-page cap on concurrent image downloads. Outer page concurrency is bounded by
-// processing.concurrency; this guards against an image-heavy page allocating a
-// per-image Buffer for every <ac:image> in one go.
+// Caps concurrent image downloads per page so one image-heavy page can't buffer N images at once.
 const IMAGE_DOWNLOAD_CONCURRENCY = 5;
 
 export interface InlineImagesResult {
@@ -43,18 +39,14 @@ interface ResolvedAttachment {
   filename: string;
 }
 
-// inlinedAttachmentIds entries are keyed by ${pageId}::${attachmentId} to avoid
-// collisions across pages on instances where attachment ids are not globally unique.
+// Keyed by ${pageId}::${attachmentId} since attachment ids aren't globally unique across pages.
 export function buildInlinedAttachmentKey(pageId: string, attachmentId: string): string {
   return `${pageId}::${attachmentId}`;
 }
 
 export class PageImageInliner {
   private readonly logger = new Logger(PageImageInliner.name);
-  // Cross-page page-by-title lookups are cached for the duration of one sync run.
-  // The orchestrator calls resetCrossPageCache() at the start of every sync so that
-  // attachment changes on a target page (or a previously-missing page becoming
-  // available) are picked up on the next cycle.
+  // Per-sync cache; orchestrator calls resetCrossPageCache() at the start of each sync.
   private readonly crossPageCache = new Map<string, Promise<PageAttachmentLookupResult | null>>();
 
   public constructor(
@@ -144,10 +136,7 @@ export class PageImageInliner {
       return null;
     }
 
-    // Current-page attachments have already been filtered by allowedMimeTypes during
-    // discovery, but cross-page lookups read raw attachment metadata from the API and
-    // must be re-checked here so unsupported image formats (GIF, WebP, SVG, etc.) are
-    // never inlined.
+    // Cross-page lookups bypass discovery's allowedMimeTypes filter; re-check here.
     if (!this.isAllowedMediaType(resolved.mediaType)) {
       this.logger.debug({
         pageId: page.id,
@@ -242,8 +231,7 @@ export class PageImageInliner {
     spaceKey: string,
     contentTitle: string,
   ): Promise<PageAttachmentLookupResult | null> {
-    // JSON.stringify avoids collisions when either component contains a separator
-    // character that a plain concatenation would merge into a single ambiguous key.
+    // JSON.stringify avoids separator collisions that a plain concatenation would create.
     const cacheKey = JSON.stringify([spaceKey, contentTitle]);
     const cached = this.crossPageCache.get(cacheKey);
     if (cached) {
@@ -252,8 +240,7 @@ export class PageImageInliner {
     const promise = this.confluenceApiClient
       .fetchPageAttachmentsByTitle(spaceKey, contentTitle)
       .catch((err) => {
-        // Don't permanently cache transient errors; allow retry on the next reference.
-        // A legitimate 404 resolves to null and stays cached for the rest of the sync.
+        // Don't cache errors permanently; a legitimate null (404) stays cached.
         this.crossPageCache.delete(cacheKey);
         this.logger.warn({
           spaceKey,
