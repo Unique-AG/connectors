@@ -678,4 +678,140 @@ describe('ConfluenceSynchronizationService', () => {
       expect(metrics.recordSyncItemTotals).not.toHaveBeenCalled();
     });
   });
+
+  describe('page image inlining', () => {
+    const imageAttachment: DiscoveredAttachment = {
+      id: 'att-image-1',
+      title: 'diagram.png',
+      mediaType: 'image/png',
+      fileSize: 4096,
+      downloadPath: '/download/attachments/1/diagram.png',
+      versionTimestamp: '2026-02-01T00:00:00.000Z',
+      pageId: '1',
+      spaceId: 'space-1',
+      spaceKey: 'SP',
+      spaceName: 'Space',
+      webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/att-image-1`,
+    };
+    const pdfAttachment: DiscoveredAttachment = {
+      id: 'att-pdf-1',
+      title: 'spec.pdf',
+      mediaType: 'application/pdf',
+      fileSize: 8192,
+      downloadPath: '/download/attachments/1/spec.pdf',
+      versionTimestamp: '2026-02-01T00:00:00.000Z',
+      pageId: '1',
+      spaceId: 'space-1',
+      spaceKey: 'SP',
+      spaceName: 'Space',
+      webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/att-pdf-1`,
+    };
+
+    beforeEach(() => {
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: discoveredPagesFixture,
+        attachments: [imageAttachment, pdfAttachment],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['1', `1::${imageAttachment.id}`, `1::${pdfAttachment.id}`],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+    });
+
+    it('passes inlined page body to ingestPage and skips standalone ingestion of the inlined image', async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+        inlineImages: vi.fn(async (page) => ({
+          page: {
+            ...page,
+            body: '<p>before</p><img src="data:image/png;base64,XYZ" /><p>after</p>',
+          },
+          inlinedAttachmentIds: new Set([imageAttachment.id]),
+        })),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(inliner.inlineImages).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }), [
+        imageAttachment,
+      ]);
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: '1',
+          body: expect.stringContaining('data:image/png;base64,'),
+        }),
+        'scope-1',
+      );
+      // image attachment was inlined → must NOT be ingested standalone
+      expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: imageAttachment.id }),
+        expect.anything(),
+      );
+      // PDF attachment is non-image → still ingested standalone
+      expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: pdfAttachment.id }),
+        'scope-1',
+      );
+    });
+
+    it('falls back to standalone image ingestion when the inliner reports no successful inlines', async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+        inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: imageAttachment.id }),
+        'scope-1',
+      );
+      expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: pdfAttachment.id }),
+        'scope-1',
+      );
+    });
+
+    it('only passes image-type attachments (not PDFs) to the inliner', async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+        inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(inliner.inlineImages).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
+        expect.arrayContaining([expect.objectContaining({ id: imageAttachment.id })]),
+      );
+      const passedAttachments = vi.mocked(inliner.inlineImages).mock.calls[0]?.[1] ?? [];
+      expect(passedAttachments.some((a) => a.id === pdfAttachment.id)).toBe(false);
+    });
+  });
 });

@@ -1,0 +1,322 @@
+import { Readable } from 'node:stream';
+import { Smeared } from '@unique-ag/utils';
+import { createMock } from '@golevelup/ts-vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TenantConfig } from '../../config';
+import type {
+  ConfluenceApiClient,
+  ConfluenceAttachment,
+  PageAttachmentLookupResult,
+} from '../../confluence-api';
+import {
+  CONFLUENCE_BASE_URL,
+  PAGE_BODY_CROSS_PAGE_IMAGE,
+  PAGE_BODY_EXTERNAL_URL_IMAGE,
+  PAGE_BODY_IMAGE_WITH_ATTRS,
+  PAGE_BODY_MULTIPLE_CURRENT_PAGE_IMAGES,
+  PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE,
+  PAGE_BODY_TWO_REFERENCES_SAME_CROSS_PAGE,
+  PAGE_BODY_WITH_CDATA_AND_IMAGE,
+  sampleDiscoveredImageAttachment,
+  sampleDiscoveredPdfAttachment,
+} from '../__mocks__/sync.fixtures';
+import { PageImageInliner } from '../page-image-inliner';
+import type { DiscoveredAttachment, FetchedPage } from '../sync.types';
+
+const mockLogger = vi.hoisted(() => ({
+  log: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+
+vi.mock('@nestjs/common', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@nestjs/common')>();
+  return {
+    ...actual,
+    Logger: vi.fn().mockImplementation(() => mockLogger),
+  };
+});
+
+function createTenantConfigWithMaxFileSize(maxFileSizeMb: number): TenantConfig {
+  return {
+    ingestion: { attachments: { maxFileSizeMb } },
+  } as unknown as TenantConfig;
+}
+
+const baseTenantConfig: TenantConfig = createTenantConfigWithMaxFileSize(200);
+
+function basePage(body: string): FetchedPage {
+  return {
+    id: '1',
+    title: new Smeared('Page 1', false),
+    body,
+    webUrl: `${CONFLUENCE_BASE_URL}/page/1`,
+    spaceId: 'space-1',
+    spaceKey: 'SP',
+    spaceName: 'Space',
+  };
+}
+
+function imageBuffer(content = 'PNGDATA'): Buffer {
+  return Buffer.from(content);
+}
+
+function createConfluenceImageAttachment(
+  overrides: Partial<{
+    id: string;
+    title: string;
+    mediaType: string;
+    fileSize: number;
+    download: string;
+  }> = {},
+): ConfluenceAttachment {
+  return {
+    id: overrides.id ?? 'remote-att-1',
+    title: overrides.title ?? 'other.png',
+    extensions: {
+      mediaType: overrides.mediaType ?? 'image/png',
+      fileSize: overrides.fileSize ?? 1024,
+    },
+    _links: { download: overrides.download ?? '/download/attachments/77/other.png' },
+  };
+}
+
+describe('PageImageInliner', () => {
+  let apiClient: ReturnType<typeof createMock<ConfluenceApiClient>>;
+  let inliner: PageImageInliner;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiClient = createMock<ConfluenceApiClient>();
+    inliner = new PageImageInliner(baseTenantConfig, apiClient);
+  });
+
+  describe('no-op cases', () => {
+    it('returns the page unchanged when body is empty', async () => {
+      const page = basePage('');
+      const result = await inliner.inlineImages(page, []);
+      expect(result.page).toBe(page);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+    });
+
+    it('returns the page unchanged when no <ac:image> macros are present', async () => {
+      const page = basePage('<p>just text</p>');
+      const result = await inliner.inlineImages(page, []);
+      expect(result.page).toBe(page);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+    });
+  });
+
+  describe('current-page attachment inlining', () => {
+    it('replaces a single <ac:image> with <img src="data:...;base64,...">', async () => {
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+      const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
+
+      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+
+      const expectedBase64 = imageBuffer().toString('base64');
+      expect(result.page.body).toContain(`src="data:image/png;base64,${expectedBase64}"`);
+      expect(result.page.body).not.toContain('<ac:image');
+      expect(result.page.body.startsWith('<p>before</p>')).toBe(true);
+      expect(result.page.body.endsWith('<p>after</p>')).toBe(true);
+      expect(result.inlinedAttachmentIds.has(sampleDiscoveredImageAttachment.id)).toBe(true);
+    });
+
+    it('preserves byte-perfect surroundings of the swapped block', async () => {
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+      const page = basePage(PAGE_BODY_WITH_CDATA_AND_IMAGE);
+
+      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+
+      expect(result.page.body).toContain(
+        '<ac:plain-text-body><![CDATA[const x = "<not a tag>" & 1 < 2;]]></ac:plain-text-body>',
+      );
+      expect(result.page.body).not.toContain('<ac:image');
+    });
+
+    it('replaces multiple images, each with its own data URI', async () => {
+      apiClient.getAttachmentDownloadStream
+        .mockResolvedValueOnce(Readable.from(Buffer.from('one')))
+        .mockResolvedValueOnce(Readable.from(Buffer.from('two')));
+      const oneAtt: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        id: 'att-one',
+        title: 'one.png',
+        mediaType: 'image/png',
+        downloadPath: '/download/attachments/1/one.png',
+      };
+      const twoAtt: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        id: 'att-two',
+        title: 'two.jpg',
+        mediaType: 'image/jpeg',
+        downloadPath: '/download/attachments/1/two.jpg',
+      };
+
+      const result = await inliner.inlineImages(basePage(PAGE_BODY_MULTIPLE_CURRENT_PAGE_IMAGES), [
+        oneAtt,
+        twoAtt,
+      ]);
+
+      expect(result.page.body).toContain(
+        `src="data:image/png;base64,${Buffer.from('one').toString('base64')}"`,
+      );
+      expect(result.page.body).toContain(
+        `src="data:image/jpeg;base64,${Buffer.from('two').toString('base64')}"`,
+      );
+      expect(result.page.body).not.toContain('<ac:image');
+      expect(result.inlinedAttachmentIds).toEqual(new Set(['att-one', 'att-two']));
+    });
+
+    it('maps ac:alt, ac:title, ac:width, ac:height onto the produced <img>', async () => {
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+      const result = await inliner.inlineImages(basePage(PAGE_BODY_IMAGE_WITH_ATTRS), [
+        sampleDiscoveredImageAttachment,
+      ]);
+
+      expect(result.page.body).toMatch(/<img\s[^>]*\balt="An alt"/);
+      expect(result.page.body).toMatch(/<img\s[^>]*\btitle="A title"/);
+      expect(result.page.body).toMatch(/<img\s[^>]*\bwidth="320"/);
+      expect(result.page.body).toMatch(/<img\s[^>]*\bheight="240"/);
+      expect(result.page.body).not.toMatch(/ac:align="center"/);
+      expect(result.page.body).not.toMatch(/\balign="center"/);
+      expect(result.page.body).not.toMatch(/\bthumbnail=/);
+    });
+  });
+
+  describe('skip / fallback cases', () => {
+    it('leaves <ac:image> untouched when the filename is not among page attachments', async () => {
+      const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
+      const result = await inliner.inlineImages(page, []);
+      expect(result.page.body).toBe(page.body);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+    });
+
+    it('leaves <ac:image> untouched when the matching attachment is not image/*', async () => {
+      const page = basePage('<ac:image><ri:attachment ri:filename="spec.pdf"/></ac:image>');
+      const result = await inliner.inlineImages(page, [sampleDiscoveredPdfAttachment]);
+      expect(result.page.body).toBe(page.body);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+    });
+
+    it('leaves <ac:image> untouched when the attachment exceeds maxFileSizeMb', async () => {
+      const oversize: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        fileSize: 5 * 1024 * 1024,
+      };
+      const smallLimitInliner = new PageImageInliner(
+        createTenantConfigWithMaxFileSize(1),
+        apiClient,
+      );
+      const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
+      const result = await smallLimitInliner.inlineImages(page, [oversize]);
+      expect(result.page.body).toBe(page.body);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+    });
+
+    it('leaves <ac:image> untouched when the download stream errors', async () => {
+      const failingStream = new Readable({
+        read() {
+          this.destroy(new Error('download failed'));
+        },
+      });
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(failingStream);
+
+      const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
+      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+
+      expect(result.page.body).toBe(page.body);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+    });
+
+    it('leaves <ri:url> external images untouched and never fetches them', async () => {
+      const page = basePage(PAGE_BODY_EXTERNAL_URL_IMAGE);
+      const result = await inliner.inlineImages(page, []);
+      expect(result.page.body).toBe(page.body);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+      expect(apiClient.fetchPageAttachmentsByTitle).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cross-page resolution', () => {
+    it('resolves a cross-page <ri:attachment> via fetchPageAttachmentsByTitle and inlines it', async () => {
+      const remoteAttachment = createConfluenceImageAttachment({
+        id: 'remote-att-1',
+        title: 'other.png',
+        mediaType: 'image/png',
+      });
+      const lookup: PageAttachmentLookupResult = {
+        pageId: '77',
+        attachments: [remoteAttachment],
+      };
+      apiClient.fetchPageAttachmentsByTitle.mockResolvedValue(lookup);
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+
+      const page = basePage(PAGE_BODY_CROSS_PAGE_IMAGE);
+      const result = await inliner.inlineImages(page, []);
+
+      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledWith('OTHER', 'Other Page');
+      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
+      expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledWith(
+        'remote-att-1',
+        '77',
+        '/download/attachments/77/other.png',
+      );
+      expect(result.page.body).toContain(
+        `src="data:image/png;base64,${imageBuffer().toString('base64')}"`,
+      );
+      expect(result.inlinedAttachmentIds.has('remote-att-1')).toBe(true);
+    });
+
+    it('caches cross-page lookups and only calls the API once per (spaceKey, title)', async () => {
+      const remoteA = createConfluenceImageAttachment({
+        id: 'remote-a',
+        title: 'a.png',
+      });
+      const remoteB = createConfluenceImageAttachment({
+        id: 'remote-b',
+        title: 'b.png',
+      });
+      apiClient.fetchPageAttachmentsByTitle.mockResolvedValue({
+        pageId: '77',
+        attachments: [remoteA, remoteB],
+      });
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+
+      const result = await inliner.inlineImages(
+        basePage(PAGE_BODY_TWO_REFERENCES_SAME_CROSS_PAGE),
+        [],
+      );
+
+      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
+      expect(result.inlinedAttachmentIds).toEqual(new Set(['remote-a', 'remote-b']));
+    });
+
+    it('leaves cross-page macro untouched when the target page is not found', async () => {
+      apiClient.fetchPageAttachmentsByTitle.mockResolvedValue(null);
+
+      const page = basePage(PAGE_BODY_CROSS_PAGE_IMAGE);
+      const result = await inliner.inlineImages(page, []);
+
+      expect(result.page.body).toBe(page.body);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+    });
+
+    it('leaves cross-page macro untouched when fetchPageAttachmentsByTitle throws', async () => {
+      apiClient.fetchPageAttachmentsByTitle.mockRejectedValue(new Error('lookup boom'));
+
+      const page = basePage(PAGE_BODY_CROSS_PAGE_IMAGE);
+      const result = await inliner.inlineImages(page, []);
+
+      expect(result.page.body).toBe(page.body);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+    });
+  });
+});
