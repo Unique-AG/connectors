@@ -13,27 +13,27 @@ describe('sanitizeKqlQuery', () => {
   });
 
   describe('boolean operator uppercasing', () => {
-    it('uppercases lowercase and', () => {
+    it('uppercases lowercase and and drops it (space is implicit AND)', () => {
       expect(sanitizeKqlQuery('from:alice@example.com and subject:report')).toBe(
-        '"from:alice@example.com" AND "subject:report"',
+        '"from:alice@example.com subject:report"',
       );
     });
 
-    it('uppercases lowercase or', () => {
+    it('uppercases lowercase or and keeps it explicit', () => {
       expect(sanitizeKqlQuery('from:alice@example.com or from:bob@example.com')).toBe(
-        '"from:alice@example.com" OR "from:bob@example.com"',
+        '"from:alice@example.com OR from:bob@example.com"',
       );
     });
 
-    it('uppercases lowercase not', () => {
+    it('uppercases lowercase not and keeps it explicit', () => {
       expect(sanitizeKqlQuery('subject:report not from:alice@example.com')).toBe(
-        '"subject:report" NOT "from:alice@example.com"',
+        '"subject:report NOT from:alice@example.com"',
       );
     });
 
-    it('leaves already-uppercase operators unchanged', () => {
+    it('drops already-uppercase AND (space is implicit AND)', () => {
       expect(sanitizeKqlQuery('from:alice@example.com AND subject:report')).toBe(
-        '"from:alice@example.com" AND "subject:report"',
+        '"from:alice@example.com subject:report"',
       );
     });
 
@@ -48,7 +48,7 @@ describe('sanitizeKqlQuery', () => {
       );
       expect(sanitizeKqlQuery('body:"risk or return"')).toBe('"body:\\"risk or return\\""');
       expect(sanitizeKqlQuery('subject:"do not reply" AND from:alice@example.com')).toBe(
-        '"subject:\\"do not reply\\"" AND "from:alice@example.com"',
+        '"subject:\\"do not reply\\" from:alice@example.com"',
       );
     });
   });
@@ -122,22 +122,22 @@ describe('sanitizeKqlQuery', () => {
   });
 
   describe('compound queries', () => {
-    it('quotes each clause and adds explicit AND between adjacent property clauses', () => {
+    it('wraps the whole query in a single outer-quoted string with space as implicit AND', () => {
       const query = 'from:alice@example.com subject:"Q2 budget" received>=2024-01-01';
       expect(sanitizeKqlQuery(query)).toBe(
-        '"from:alice@example.com" AND "subject:\\"Q2 budget\\"" AND "received>=2024-01-01"',
+        '"from:alice@example.com subject:\\"Q2 budget\\" received>=2024-01-01"',
       );
     });
 
     it('strips unsupported filters while keeping supported ones in compound query', () => {
       expect(sanitizeKqlQuery('from:alice@example.com folder:Inbox subject:report')).toBe(
-        '"from:alice@example.com" AND "subject:report"',
+        '"from:alice@example.com subject:report"',
       );
     });
 
-    it('normalises boolean operators in compound query', () => {
+    it('normalises boolean operators in compound query, keeping OR and dropping AND', () => {
       expect(sanitizeKqlQuery('from:hr@acme.com or from:payroll@acme.com and subject:salary')).toBe(
-        '"from:hr@acme.com" OR "from:payroll@acme.com" AND "subject:salary"',
+        '"from:hr@acme.com OR from:payroll@acme.com subject:salary"',
       );
     });
 
@@ -147,17 +147,17 @@ describe('sanitizeKqlQuery', () => {
   });
 
   describe('free text queries', () => {
-    it('wraps a single free-text word in quotes', () => {
+    it('wraps a single free-text word in outer quotes', () => {
       expect(sanitizeKqlQuery('TanStack')).toBe('"TanStack"');
     });
 
-    it('wraps multiple free-text words as a single quoted phrase', () => {
+    it('wraps multiple free-text words as a single outer-quoted phrase', () => {
       expect(sanitizeKqlQuery('supply chain attack')).toBe('"supply chain attack"');
     });
 
-    it('preserves already-quoted free-text terms and honours boolean operators between them', () => {
-      expect(sanitizeKqlQuery('"TanStack" AND "Mini Shai-Hulud"')).toBe(
-        '"TanStack" AND "Mini Shai-Hulud"',
+    it('keeps OR between free-text terms within the outer-quoted string', () => {
+      expect(sanitizeKqlQuery('TanStack OR "Mini Shai-Hulud"')).toBe(
+        '"TanStack OR \\"Mini Shai-Hulud\\""',
       );
     });
   });

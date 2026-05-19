@@ -20,84 +20,32 @@ const SUPPORTED_KQL_PROPERTIES = new Set([
   'to',
 ]);
 
-const BOOLEAN_OP_RE = /^(?:AND|OR|NOT)$/;
-
 /**
- * Wraps each KQL clause in double quotes and inserts an explicit AND between
- * adjacent clauses that have no boolean operator between them. The output is
- * ready to pass directly as the $search value on the /messages endpoint.
+ * Wraps the entire KQL expression in outer double quotes, escaping any inner
+ * double quotes. AND is dropped because the Graph API treats spaces as implicit
+ * AND; OR and NOT are kept as explicit keywords.
  *
- * Input forms handled:
- *   property:value              → "property:value"
- *   property:"phrase value"     → "property:\"phrase value\""
- *   property:'phrase value'     → "property:\"phrase value\""
- *   "already quoted"            → "already quoted"  (unchanged)
- *   free text words             → "free text words"  (accumulated into a phrase)
- *   AND / OR / NOT              → kept as-is between clauses
+ *   subject:"Request for access" from:alex@domain.com
+ *     → "subject:\"Request for access\" from:alex@domain.com"
+ *
+ *   from:alex@domain.com OR subject:hello
+ *     → "from:alex@domain.com OR subject:hello"
  */
 function quoteKqlClauses(kql: string): string {
   if (!kql) {
     return kql;
   }
 
-  // Order matters: more specific alternatives must come before more general ones.
-  // Created fresh each call so the g-flag lastIndex is always 0.
-  const TOKEN_RE = /"[^"]*"|\w+:"[^"]*"|\w+:'[^']*'|\w+:[^\s"']+|\b(?:AND|OR|NOT)\b|\S+/g;
+  // Normalize single-quoted property values to double-quoted: prop:'value' → prop:"value"
+  const normalized = kql.replace(/\b(\w+):'([^']*)'/g, '$1:"$2"');
 
-  const parts: string[] = [];
-  const freeText: string[] = [];
-  let lastWasClause = false;
+  // Drop explicit AND — the Graph API treats spaces as implicit AND
+  const withoutAnd = normalized
+    .replace(/\bAND\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  const pushClause = (clause: string) => {
-    if (lastWasClause) {
-      parts.push('AND');
-    }
-    parts.push(clause);
-    lastWasClause = true;
-  };
-
-  const flushFreeText = () => {
-    if (freeText.length) {
-      pushClause(`"${freeText.join(' ')}"`);
-      freeText.length = 0;
-    }
-  };
-
-  for (const [token] of kql.matchAll(TOKEN_RE)) {
-    if (BOOLEAN_OP_RE.test(token)) {
-      flushFreeText();
-      parts.push(token);
-      lastWasClause = false;
-    } else if (token.startsWith('"')) {
-      // Already double-quoted — pass through as-is.
-      flushFreeText();
-      pushClause(token);
-    } else if (/^\w+:"[^"]*"$/.test(token)) {
-      // property:"phrase value" → "property:\"phrase value\""  (preserve phrase semantics)
-      flushFreeText();
-      const colonIdx = token.indexOf(':');
-      const phrase = token.slice(colonIdx + 2, -1).replace(/\\/g, '\\\\');
-      pushClause(`"${token.slice(0, colonIdx)}:\\"${phrase}\\""`);
-    } else if (/^\w+:'[^']*'$/.test(token)) {
-      // property:'phrase value' → "property:\"phrase value\""
-      flushFreeText();
-      const colonIdx = token.indexOf(':');
-      const phrase = token.slice(colonIdx + 2, -1).replace(/\\/g, '\\\\');
-      pushClause(`"${token.slice(0, colonIdx)}:\\"${phrase}\\""`);
-    } else if (/^\w+:[^\s"']+$/.test(token)) {
-      // property:value → "property:value"  (escape any backslashes in the value)
-      flushFreeText();
-      const colonIdx = token.indexOf(':');
-      const value = token.slice(colonIdx + 1).replace(/\\/g, '\\\\');
-      pushClause(`"${token.slice(0, colonIdx)}:${value}"`);
-    } else {
-      // Bare free-text word — accumulate into a single quoted phrase.
-      freeText.push(token);
-    }
-  }
-
-  flushFreeText();
-  return parts.join(' ');
+  return `"${withoutAnd.replace(/(?<!\\)"/g, '\\"')}"`;
 }
 
 export function sanitizeKqlQuery(kql: string): string {

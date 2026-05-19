@@ -186,8 +186,13 @@ export const MsGraphKqlQuerySchema = z.object({
     .describe(
       'KQL (Keyword Query Language) query string for Microsoft Graph email search.\n' +
         'SEARCH BEHAVIOUR: Results are relevance-ranked by Exchange, not strictly boolean-filtered.\n' +
-        '  AND/OR/NOT are hints to the relevance engine — the engine may still return emails that\n' +
+        '  OR/NOT are hints to the relevance engine — the engine may still return emails that\n' +
         '  satisfy only some of the terms. Use narrow, specific queries for best precision.\n' +
+        'FORMAT: Provide plain KQL — do NOT add outer double quotes or pre-escape inner quotes.\n' +
+        '  The system automatically wraps the query in outer quotes and escapes phrase values.\n' +
+        '  Space between clauses is the implicit AND — do NOT write AND (it is silently removed).\n' +
+        '  OR and NOT must be UPPERCASE.\n' +
+        '  Example: from:alice@example.com subject:"Q2 budget" received>=2024-01-01\n' +
         'Supported property filters:\n' +
         '  from:<email>                    — sender (SMTP address, display name, or domain)\n' +
         '  to:<email>                      — To recipient (SMTP address, display name, or domain)\n' +
@@ -203,24 +208,25 @@ export const MsGraphKqlQuerySchema = z.object({
         '  sent>=YYYY-MM-DD                — sent on or after date\n' +
         '  sent<=YYYY-MM-DD                — sent on or before date\n' +
         '  hasAttachment:true/false        — whether the email has attachments\n' +
-        '  category:"label"                — Outlook category label\n' +
+        '  category:"label"               — Outlook category label\n' +
         '  importance:low/medium/high      — email importance level\n' +
         '  kind:email/meetings/voicemail   — message type; other values: contacts, docs, faxes, im, journals, notes, posts, rssfeeds, tasks\n' +
         '  size>=<bytes>                   — message size in bytes (e.g. size>=1048576 for >1 MB); range: size:1..1048576\n' +
         'Syntax rules:\n' +
         '  - NO space between property name and value: from:alice@example.com NOT from: alice@example.com\n' +
-        '  - Boolean operators AND/OR/NOT must be UPPERCASE\n' +
+        '  - Space between clauses is implicit AND — never write AND\n' +
+        '  - OR and NOT must be UPPERCASE\n' +
         '  - Suffix wildcards only: report* or budget*, NOT *report\n' +
-        '  - Phrases must be in double quotes: subject:"quarterly report"\n' +
+        '  - Multi-word phrases: wrap in regular double quotes — subject:"quarterly report"\n' +
         'Unsupported properties (silently stripped — do NOT use them, they produce no filtering effect):\n' +
         '  folder:, isRead:, read:, flag:, flagStatus:, sensitivity:, hasFlag:, isAttachment:\n' +
         '  Any property not in the supported list above is removed before the query is sent.\n' +
         'Free-text terms (no property prefix) search across subject, body, and from.\n' +
         'Examples:\n' +
-        '  "from:alice@example.com subject:\\"Q2 budget\\" received>=2024-01-01"\n' +
-        '  "project proposal hasAttachment:true received>=2024-03-01 received<=2024-03-31"\n' +
-        '  "from:hr@acme.com OR from:payroll@acme.com subject:salary"\n' +
-        '  "participants:alice@example.com kind:meetings received>=2024-01-01"',
+        '  from:alice@example.com subject:"Q2 budget" received>=2024-01-01\n' +
+        '  project proposal hasAttachment:true received>=2024-03-01 received<=2024-03-31\n' +
+        '  from:hr@acme.com OR from:payroll@acme.com subject:salary\n' +
+        '  participants:alice@example.com kind:meetings received>=2024-01-01',
     ),
   limit: z
     .number()
