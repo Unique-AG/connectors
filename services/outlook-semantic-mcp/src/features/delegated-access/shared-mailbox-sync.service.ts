@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { OAuthUserProfile } from '@unique-ag/mcp-oauth';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
@@ -8,11 +9,12 @@ import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, userProfiles } from '~/db';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
+import { sleep } from '~/utils/sleep';
 import { PersistentCacheService } from '../persistent-cache/persistent-cache.service';
 
 export const SHARED_MAILBOX_SYNC_CACHE_KEY = 'SharedMailboxSync';
 const CRON_JOB_NAME = 'shared-mailbox-sync';
-const CRON_SCHEDULE = '0 0 * * 0';
+const CRON_SCHEDULE = '* * * * *';
 
 interface GraphUser {
   id: string;
@@ -20,10 +22,21 @@ interface GraphUser {
   displayName: string | null;
 }
 
+class FetchUsersError extends Error {
+  public constructor(
+    public readonly userId: string,
+    message: string,
+    options: ErrorOptions,
+  ) {
+    super(message, options);
+  }
+}
+
 @Injectable()
 export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(this.constructor.name);
   private isShuttingDown = false;
+  private syncIsRunning: boolean = false;
 
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
@@ -34,8 +47,9 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   public async onModuleInit(): Promise<void> {
+    // On startup we run it just in case anything changed in ms graph api.
+    await this.runSyncWithRetries();
     this.setupCronJob();
-    await this.runIfHashChanged();
   }
 
   public onModuleDestroy(): void {
@@ -51,7 +65,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
   private setupCronJob(): void {
     const job = new CronJob(CRON_SCHEDULE, async () => {
       try {
-        await this.sync();
+        await this.runSyncWithRetries();
       } catch (err) {
         this.logger.error({ msg: 'Unexpected error during shared mailbox sync cron', err });
       }
@@ -60,23 +74,75 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     job.start();
   }
 
-  private async runIfHashChanged(): Promise<void> {
-    const sharedMailboxEmails = this.getSharedMailboxEmails();
-    const currentHash = createHash('sha256').update(sharedMailboxEmails.join(',')).digest('hex');
-
-    const cached = await this.persistentCacheService.get(
-      SHARED_MAILBOX_SYNC_CACHE_KEY,
-      `SharedMailboxSync`,
-    );
-    if (cached && cached.payload.envarHash === currentHash) {
-      this.logger.log({ msg: 'SharedMailboxSync: env var unchanged, skipping startup sync' });
+  private async runSyncWithRetries(): Promise<void> {
+    if (this.syncIsRunning) {
       return;
     }
+    this.syncIsRunning = true;
+    const excludedUserIds: string[] = [];
+    const handleGraphError = (attempt: number, err: unknown): { shouldRetry: boolean } => {
+      const msgBase = `Sync shared mailboxes failed, attempt: ${attempt}.`;
+      if (!(err instanceof FetchUsersError)) {
+        this.logger.error({
+          msg: `${msgBase}. Error is not FetchUsersError. Sync will not be retried`,
+          err,
+        });
+        return { shouldRetry: false };
+      }
+      const cause = err.cause;
+      if (!(cause instanceof GraphError)) {
+        this.logger.error({
+          msg: `${msgBase}. Error is FetchUsersError cause is not GraphError. Sync will not be retried`,
+          err,
+        });
+        return { shouldRetry: false };
+      }
 
-    await this.sync();
+      if (cause.statusCode === 401 || cause.statusCode === 403) {
+        this.logger.log({
+          msg: `${msgBase}. cause is GraphError, user has not enought permissions. Retrying with another user`,
+          statusCode: cause.statusCode,
+          err,
+        });
+        excludedUserIds.push(err.userId);
+        return { shouldRetry: true };
+      }
+
+      if (cause.statusCode === 429 || (cause.statusCode >= 500 && cause.statusCode < 600)) {
+        this.logger.log({
+          msg: `${msgBase}. cause is GraphError, transient graph api error. Retrying with the same user`,
+          statusCode: cause.statusCode,
+          err,
+        });
+        return { shouldRetry: true };
+      }
+
+      this.logger.error({
+        msg: `${msgBase}. cause is GraphError, unhandled status code`,
+        statusCode: cause.statusCode,
+        err,
+      });
+      return { shouldRetry: false };
+    };
+
+    const backOffMs = 500;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        this.sync(excludedUserIds);
+      } catch (err) {
+        const { shouldRetry } = handleGraphError(attempt, err);
+
+        if (!shouldRetry) {
+          this.syncIsRunning = false;
+          return;
+        }
+        await sleep(backOffMs * 2 ** (attempt - 1));
+      }
+    }
+    this.syncIsRunning = false;
   }
 
-  public async sync(): Promise<void> {
+  private async sync(excludedUserIds: string[]): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({ msg: 'Skipping shared mailbox sync due to shutdown' });
       return;
@@ -89,31 +155,21 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn({ msg: 'SharedMailboxSync: SHARED_MAILBOXES env var is empty or unset' });
     }
 
-    const client = await this.graphClientFactory.createClientForAnyAuthorizedUser();
-    if (!client) {
+    const result = await this.graphClientFactory.createClientForAnyAuthorizedUser(excludedUserIds);
+    if (!result) {
       this.logger.warn({
         msg: 'SharedMailboxSync: no authorized user profile found, skipping sync',
       });
       return;
     }
+    const { client, userId } = result;
 
     // Fetch disabled users from Graph (shared mailboxes are disabled accounts)
-    let graphUsers: GraphUser[];
+    let graphUsers: GraphUser[] = [];
     try {
       graphUsers = await this.fetchDisabledUsersFromGraph(client);
     } catch (err) {
-      if (
-        err instanceof GraphError &&
-        (err.statusCode === 429 || (err.statusCode >= 500 && err.statusCode < 600))
-      ) {
-        this.logger.error({
-          msg: 'SharedMailboxSync: transient Graph error, skipping sync',
-          statusCode: err.statusCode,
-          err,
-        });
-        return;
-      }
-      throw err;
+      throw new FetchUsersError(userId, `Failed to fetch users from ms graph`, { cause: err });
     }
 
     // Intersect Graph results with env var email list (case-insensitive)
@@ -131,36 +187,45 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Delete source='shared-mailbox' rows whose email is NOT in the intersection
-    if (matchedEmails.length > 0) {
-      await this.db
-        .delete(userProfiles)
-        .where(
-          and(
-            eq(userProfiles.source, 'shared-mailbox'),
-            not(inArray(sql`lower(${userProfiles.email})`, matchedEmails)),
-          ),
-        );
-    } else {
-      // No matches — delete all manual rows
-      await this.db.delete(userProfiles).where(eq(userProfiles.source, 'shared-mailbox'));
-    }
+    await this.db
+      .delete(userProfiles)
+      .where(
+        and(
+          eq(userProfiles.source, 'shared-mailbox'),
+          matchedEmails.length > 0
+            ? not(inArray(sql`lower(${userProfiles.email})`, matchedEmails))
+            : undefined,
+        ),
+      );
 
     // Upsert matched users
     if (matchedUsers.length > 0) {
+      type UserProfileInsert = typeof userProfiles.$inferInsert;
+      const mappedProfiles: UserProfileInsert[] = matchedUsers.map((user) => {
+        const rawData: OAuthUserProfile = {
+          id: user.id ?? undefined,
+          displayName: user.displayName ?? undefined,
+          username: user.mail ?? undefined,
+          email: user.mail ?? undefined,
+          avatarUrl: undefined,
+          raw: user,
+        };
+        return {
+          provider: 'microsoft' as const,
+          providerUserId: user.id,
+          username: user.mail,
+          email: user.mail,
+          displayName: user.displayName ?? null,
+          source: 'shared-mailbox' as const,
+          accessToken: null,
+          refreshToken: null,
+          raw: rawData,
+        };
+      });
+
       await this.db
         .insert(userProfiles)
-        .values(
-          matchedUsers.map((u) => ({
-            provider: 'microsoft' as const,
-            providerUserId: u.id,
-            username: u.mail,
-            email: u.mail,
-            displayName: u.displayName ?? null,
-            source: 'shared-mailbox' as const,
-            accessToken: null,
-            refreshToken: null,
-          })),
-        )
+        .values(mappedProfiles)
         .onConflictDoUpdate({
           target: [userProfiles.provider, userProfiles.providerUserId],
           set: {
@@ -172,7 +237,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Update cache with new hash and timestamp
-    const newHash = createHash('sha256').update(envEmails.join(',')).digest('hex');
+    const newHash = this.hashMailboxes(envEmails);
     await this.persistentCacheService.set(SHARED_MAILBOX_SYNC_CACHE_KEY, {
       dataType: 'SharedMailboxSync',
       payload: {
@@ -214,5 +279,9 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     }
 
     return users;
+  }
+
+  private hashMailboxes(mailboxes: string[]): string {
+    return createHash('sha256').update(mailboxes.sort().join(',')).digest('hex');
   }
 }

@@ -12,13 +12,15 @@ import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
 const sharedMailboxEmails = z
   .string()
   .prefault('')
-  .transform((s) =>
-    s
+  .transform((s) => {
+    return s
       .split(',')
       .map((e) => e.trim().toLowerCase())
-      .filter(Boolean),
-  )
-  .describe('Comma-separated list of shared mailbox email addresses to sync (SHARED_MAILBOXES).');
+      .filter(Boolean);
+  })
+  .describe(
+    'Comma-separated list of shared mailbox email addresses to sync (DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS).',
+  );
 
 const discoveryCronSchedule = z
   .string()
@@ -111,7 +113,7 @@ export const delegatedAccessConfig = registerConfig(
   'delegatedAccess',
   DelegatedAccessConfigSchema,
   {
-    whitelistKeys: new Set(['MCP_BACKEND', 'SHARED_MAILBOXES']),
+    whitelistKeys: new Set(['MCP_BACKEND']),
   },
 );
 
