@@ -191,6 +191,7 @@ export class TenantRegistry implements OnModuleInit {
       fetcher,
       fileDiffService,
       ingestionService,
+      pageImageInliner,
       scopeManagementService,
       this.metrics,
     );

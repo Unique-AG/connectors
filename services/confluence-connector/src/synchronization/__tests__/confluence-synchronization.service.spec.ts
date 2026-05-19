@@ -16,6 +16,7 @@ import type { ConfluencePageScanner } from '../confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../confluence-synchronization.service';
 import type { FileDiffService } from '../file-diff.service';
 import type { IngestionService } from '../ingestion.service';
+import type { PageImageInliner } from '../page-image-inliner';
 import type { ScopeManagementService } from '../scope-management.service';
 import type { DiscoveredAttachment, FileDiffResult } from '../sync.types';
 
@@ -40,6 +41,10 @@ const mockScopeManagementService = {
   cleanupRemovedSpaces: vi.fn().mockResolvedValue(undefined),
 } as unknown as ScopeManagementService;
 
+const passthroughPageImageInliner: Pick<PageImageInliner, 'inlineImages'> = {
+  inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+};
+
 function createService(
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
   contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>,
@@ -49,12 +54,14 @@ function createService(
     'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'
   >,
   metrics: Metrics = createNoopMetrics(),
+  pageImageInliner: Pick<PageImageInliner, 'inlineImages'> = passthroughPageImageInliner,
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
     scanner as ConfluencePageScanner,
     contentFetcher as ConfluenceContentFetcher,
     fileDiffService as FileDiffService,
     ingestionService as IngestionService,
+    pageImageInliner as PageImageInliner,
     mockScopeManagementService,
     metrics,
   );

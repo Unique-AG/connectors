@@ -9,6 +9,7 @@ import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
+import type { PageImageInliner } from './page-image-inliner';
 import type { ScopeManagementService } from './scope-management.service';
 import type { DiscoveredAttachment, DiscoveredPage } from './sync.types';
 
@@ -22,6 +23,7 @@ export class ConfluenceSynchronizationService {
     private readonly contentFetcher: ConfluenceContentFetcher,
     private readonly fileDiffService: FileDiffService,
     private readonly ingestionService: IngestionService,
+    private readonly pageImageInliner: PageImageInliner,
     private readonly scopeManagementService: ScopeManagementService,
     private readonly metrics: Metrics,
   ) {}
@@ -90,12 +92,25 @@ export class ConfluenceSynchronizationService {
         );
 
         const concurrency = tenant.config.processing.concurrency;
+        const imageAttachmentsByPageId =
+          this.buildImageAttachmentsByPageIdMap(discoveredAttachments);
+        const inlinedAttachmentIds = new Set<string>();
 
         this.metrics.setSyncPhase(SyncPhase.IngestingPages);
-        await this.fetchAndIngestPages(pagesToFetch, spaceScopes, concurrency);
+        await this.fetchAndIngestPages(
+          pagesToFetch,
+          spaceScopes,
+          concurrency,
+          imageAttachmentsByPageId,
+          inlinedAttachmentIds,
+        );
+
+        const remainingAttachments = attachmentsToIngest.filter(
+          (a) => !inlinedAttachmentIds.has(a.id),
+        );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingAttachments);
-        await this.ingestAttachments(attachmentsToIngest, spaceScopes, concurrency);
+        await this.ingestAttachments(remainingAttachments, spaceScopes, concurrency);
       }
 
       if (diffResult.deletedItems.length > 0) {
@@ -129,6 +144,8 @@ export class ConfluenceSynchronizationService {
     pages: DiscoveredPage[],
     spaceScopes: Map<string, string>,
     concurrency: number,
+    imageAttachmentsByPageId: Map<string, DiscoveredAttachment[]>,
+    inlinedAttachmentIds: Set<string>,
   ): Promise<void> {
     const limit = pLimit(concurrency);
 
@@ -154,7 +171,12 @@ export class ConfluenceSynchronizationService {
           }
           const scopeId = spaceScopes.get(page.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
-          await this.ingestionService.ingestPage(fetched, scopeId);
+          const pageImageAttachments = imageAttachmentsByPageId.get(page.id) ?? [];
+          const inlined = await this.pageImageInliner.inlineImages(fetched, pageImageAttachments);
+          for (const id of inlined.inlinedAttachmentIds) {
+            inlinedAttachmentIds.add(id);
+          }
+          await this.ingestionService.ingestPage(inlined.page, scopeId);
           ingested++;
           this.metrics.recordPagesProcessed(1, 'success');
         })
@@ -237,6 +259,24 @@ export class ConfluenceSynchronizationService {
     });
   }
 
+  private buildImageAttachmentsByPageIdMap(
+    attachments: DiscoveredAttachment[],
+  ): Map<string, DiscoveredAttachment[]> {
+    const map = new Map<string, DiscoveredAttachment[]>();
+    for (const attachment of attachments) {
+      if (!isImageMediaType(attachment.mediaType)) {
+        continue;
+      }
+      const existing = map.get(attachment.pageId);
+      if (existing) {
+        existing.push(attachment);
+      } else {
+        map.set(attachment.pageId, [attachment]);
+      }
+    }
+    return map;
+  }
+
   private buildSpaceKeyToSpaceIdMap(
     pages: DiscoveredPage[],
     attachments: DiscoveredAttachment[],
@@ -250,4 +290,9 @@ export class ConfluenceSynchronizationService {
     }
     return map;
   }
+}
+
+function isImageMediaType(mediaType: string): boolean {
+  const normalized = mediaType.split(';')[0]?.trim().toLowerCase() ?? '';
+  return normalized.startsWith('image/');
 }
