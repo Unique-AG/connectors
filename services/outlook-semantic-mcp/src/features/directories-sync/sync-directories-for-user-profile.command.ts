@@ -69,7 +69,7 @@ export class SyncDirectoriesForUserProfileCommand {
 
     const result = await this.msGraphClientResolver.run({
       userProfile,
-      fn: ({ client, userProfile: profile }) => this.doSync(client, profile),
+      fn: ({ client }) => this.doSync(client, userProfile),
     });
 
     if (result === null) {

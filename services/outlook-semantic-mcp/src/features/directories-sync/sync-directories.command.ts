@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { createSmeared } from '@unique-ag/utils';
-import { Client } from '@microsoft/microsoft-graph-client';
+import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes } from '@opentelemetry/api';
 import { and, eq, inArray } from 'drizzle-orm';
@@ -62,14 +62,37 @@ export class SyncDirectoriesCommand {
       msg: `Checked force sync condition`,
     });
 
+    const syncStats = await this.findOrCreateStats(userProfile.id);
+    let activeDelegateUserId: string | undefined;
     const deltaQueryResult = await this.msGraphClientResolver.run({
       userProfile,
-      fn: ({ client }) => {
+      fn: async ({ client, clientUserProfileId }) => {
+        activeDelegateUserId = clientUserProfileId;
         const initialDeltaEndpoint =
           userProfile.source === 'shared-mailbox'
             ? `/users/${userProfile.email}/mailFolders/delta`
             : `/me/mailFolders/delta`;
-        return this.runDeltaQuery(userProfile.id, client, initialDeltaEndpoint);
+        try {
+          return await this.runDeltaQuery(userProfile.id, client, initialDeltaEndpoint, syncStats);
+        } catch (err) {
+          if (err instanceof GraphError && err.statusCode === 410 && syncStats.deltaLink) {
+            // Stale delta link from a previous delegate session — clear it and restart from scratch
+            await this.db
+              .update(directoriesSync)
+              .set({ deltaLink: null, synchronizedByUserProfileId: null })
+              .where(eq(directoriesSync.id, syncStats.id))
+              .execute();
+            return this.runDeltaQuery(userProfile.id, client, initialDeltaEndpoint, {
+              ...syncStats,
+              deltaLink: null,
+              synchronizedByUserProfileId: null,
+            });
+          }
+          throw err;
+        }
+      },
+      sharedMailboxConfig: {
+        preferredDelegateUserId: syncStats.synchronizedByUserProfileId ?? undefined,
       },
     });
 
@@ -111,6 +134,8 @@ export class SyncDirectoriesCommand {
       .set({
         deltaLink,
         lastDeltaSyncRanAt: new Date(),
+        synchronizedByUserProfileId:
+          userProfile.source === 'shared-mailbox' ? (activeDelegateUserId ?? null) : null,
       })
       .where(eq(directoriesSync.id, syncStatsId))
       .execute();
@@ -125,12 +150,12 @@ export class SyncDirectoriesCommand {
     userProfileId: string,
     client: Client,
     initialDeltaEndpoint: string,
+    syncStats: DirectoriesSync,
   ): Promise<{
     shouldSyncDirectories: boolean;
     deltaLink: string | null;
     syncStatsId: string;
   }> {
-    const syncStats = await this.findOrCreateStats(userProfileId);
     const isInitialSync = !syncStats.deltaLink;
     traceAttrs({ deltaQueryIsInitialSync: isInitialSync, syncStatsId: syncStats.id });
     this.logger.log({

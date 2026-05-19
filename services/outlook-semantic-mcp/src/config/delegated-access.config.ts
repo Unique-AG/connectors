@@ -27,6 +27,13 @@ const discoveryCronSchedule = z
   .prefault('0 */12 * * *')
   .describe('Cron schedule for delegated access discovery. Default: every 12 hours (2x/day).');
 
+const sharedMailboxSyncCronSchedule = z
+  .string()
+  .prefault('0 */6 * * *')
+  .describe(
+    'Cron schedule for shared mailbox sync. Default: every 6 hours (4x/day). Env var: DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE.',
+  );
+
 const recoveryCronSchedule = z
   .string()
   .prefault('*/30 * * * *')
@@ -72,6 +79,7 @@ const onlyFullDelegatedAccessScanConfig = z.object({
   stalenessThresholdHours,
   failureThreshold: delegatedAccessFailureThreshold,
   sharedMailboxEmails,
+  sharedMailboxSyncCronSchedule,
 });
 
 const granularDelegatedAccessScanConfig = z.object({
@@ -101,6 +109,7 @@ const granularDelegatedAccessScanConfig = z.object({
   stalenessThresholdHours,
   failureThreshold: delegatedAccessFailureThreshold,
   sharedMailboxEmails,
+  sharedMailboxSyncCronSchedule,
 });
 
 export const DelegatedAccessConfigSchema = z.discriminatedUnion('scan', [

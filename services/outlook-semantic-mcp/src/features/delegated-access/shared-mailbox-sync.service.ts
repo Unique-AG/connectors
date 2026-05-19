@@ -14,7 +14,6 @@ import { PersistentCacheService } from '../persistent-cache/persistent-cache.ser
 
 export const SHARED_MAILBOX_SYNC_CACHE_KEY = 'SharedMailboxSync';
 const CRON_JOB_NAME = 'shared-mailbox-sync';
-const CRON_SCHEDULE = '* * * * *';
 
 interface GraphUser {
   id: string;
@@ -47,8 +46,16 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   public async onModuleInit(): Promise<void> {
-    // On startup we run it just in case anything changed in ms graph api.
-    await this.runSyncWithRetries();
+    if (this.config.scan === 'disabled') {
+      return;
+    }
+    if (await this.hasConfigChangedSinceLastSync()) {
+      await this.runSyncWithRetries();
+    } else {
+      this.logger.log({
+        msg: 'SharedMailboxSync: config unchanged since last sync, skipping startup sync',
+      });
+    }
     this.setupCronJob();
   }
 
@@ -63,7 +70,10 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
   }
 
   private setupCronJob(): void {
-    const job = new CronJob(CRON_SCHEDULE, async () => {
+    if (this.config.scan === 'disabled') {
+      return;
+    }
+    const job = new CronJob(this.config.sharedMailboxSyncCronSchedule, async () => {
       try {
         await this.runSyncWithRetries();
       } catch (err) {
@@ -74,13 +84,28 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     job.start();
   }
 
+  private async hasConfigChangedSinceLastSync(): Promise<boolean> {
+    const cached = await this.persistentCacheService.get(
+      SHARED_MAILBOX_SYNC_CACHE_KEY,
+      'SharedMailboxSync',
+    );
+    if (!cached) {
+      return true;
+    }
+    const currentHash = this.hashMailboxes(this.getSharedMailboxEmails());
+    return cached.payload.envarHash !== currentHash;
+  }
+
   private async runSyncWithRetries(): Promise<void> {
     if (this.syncIsRunning) {
       return;
     }
     this.syncIsRunning = true;
     const excludedUserIds: string[] = [];
-    const handleGraphError = (attempt: number, err: unknown): { shouldRetry: boolean } => {
+    const handleGraphError = (
+      attempt: number,
+      err: unknown,
+    ): { shouldRetry: boolean; excludeUserId?: string } => {
       const msgBase = `Sync shared mailboxes failed, attempt: ${attempt}.`;
       if (!(err instanceof FetchUsersError)) {
         this.logger.error({
@@ -104,8 +129,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
           statusCode: cause.statusCode,
           err,
         });
-        excludedUserIds.push(err.userId);
-        return { shouldRetry: true };
+        return { shouldRetry: true, excludeUserId: err.userId };
       }
 
       if (cause.statusCode === 429 || (cause.statusCode >= 500 && cause.statusCode < 600)) {
@@ -126,19 +150,25 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     };
 
     const backOffMs = 500;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        await this.sync(excludedUserIds);
-        break;
-      } catch (err) {
-        const { shouldRetry } = handleGraphError(attempt, err);
-        if (!shouldRetry) {
+    try {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await this.sync(excludedUserIds);
           break;
+        } catch (err) {
+          const { shouldRetry, excludeUserId } = handleGraphError(attempt, err);
+          if (excludeUserId) {
+            excludedUserIds.push(excludeUserId);
+          }
+          if (!shouldRetry) {
+            break;
+          }
+          await sleep(backOffMs * 2 ** (attempt - 1));
         }
-        await sleep(backOffMs * 2 ** (attempt - 1));
       }
+    } finally {
+      this.syncIsRunning = false;
     }
-    this.syncIsRunning = false;
   }
 
   private async sync(excludedUserIds: string[]): Promise<void> {
@@ -151,7 +181,9 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
 
     const envEmails = this.getSharedMailboxEmails();
     if (envEmails.length === 0) {
-      this.logger.warn({ msg: 'SharedMailboxSync: SHARED_MAILBOXES env var is empty or unset' });
+      this.logger.warn({
+        msg: 'SharedMailboxSync: DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS env var is empty or unset',
+      });
     }
 
     const result = await this.graphClientFactory.createClientForAnyAuthorizedUser(excludedUserIds);
@@ -165,7 +197,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
 
     let graphUsers: GraphUser[] = [];
     try {
-      graphUsers = await this.fetchDisabledUsersFromGraph(client);
+      graphUsers = await this.fetchSharedMailboxCandidatesFromGraph(client);
     } catch (err) {
       throw new FetchUsersError(userId, `Failed to fetch users from ms graph`, { cause: err });
     }
@@ -229,9 +261,9 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
         .onConflictDoUpdate({
           target: [userProfiles.provider, userProfiles.providerUserId],
           set: {
-            email: sql`excluded.email`,
-            username: sql`excluded.username`,
-            displayName: sql`excluded.display_name`,
+            email: sql.raw(`excluded.${userProfiles.email.name}`),
+            username: sql.raw(`excluded.${userProfiles.username.name}`),
+            displayName: sql.raw(`excluded.${userProfiles.displayName.name}`),
           },
         });
     }
@@ -259,9 +291,10 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     return this.config.sharedMailboxEmails;
   }
 
-  private async fetchDisabledUsersFromGraph(client: Client): Promise<GraphUser[]> {
+  private async fetchSharedMailboxCandidatesFromGraph(client: Client): Promise<GraphUser[]> {
     const users: GraphUser[] = [];
 
+    // Shared mailboxes appear in Entra ID as accountEnabled=false accounts
     let response = (await client
       .api('/users')
       .filter('accountEnabled eq false')

@@ -1,6 +1,7 @@
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, desc, eq, isNotNull } from 'drizzle-orm';
+import { swapIndices } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts, UserProfile, userProfiles } from '~/db';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
@@ -14,7 +15,7 @@ export class NoDelegatesFoundError extends Error {
 
 export class AllDelegatesFailedError extends Error {
   public constructor(ownerUserId: string) {
-    super(`All delegates exhausted with 403 for owner: ${ownerUserId}`);
+    super(`All delegates exhausted (401/403) for owner: ${ownerUserId}`);
     this.name = 'AllDelegatesFailedError';
   }
 }
@@ -33,12 +34,12 @@ export class MsGraphClientResolver {
    *
    * - **oauth profiles** — creates a client directly for the user's own token; `fn` is called once.
    * - **shared-mailbox profiles** — queries `delegatedAccessAccounts` for delegates ordered by
-   *   `lastVerifiedAt DESC`, then tries each in turn (up to `maxRetries`, default 3). A 403 from
-   *   Graph moves to the next candidate; any other error is rethrown immediately. If all candidates
-   *   exhaust with 403, `AllDelegatesFailedError` is thrown.
+   *   `lastVerifiedAt DESC`, then tries each in turn (up to `maxDelegates`, default 3). A 401/403
+   *   from Graph moves to the next candidate; any other error is rethrown immediately. If all
+   *   candidates exhaust with 401/403, `AllDelegatesFailedError` is thrown.
    *
-   * The `userProfile` passed to `fn` is always the **owner** (the mailbox being operated on), not
-   * the delegate. Graph paths should use `userProfile.email` (e.g. `users/${userProfile.email}/…`).
+   * Graph paths inside `fn` should use the `userProfile` from the outer scope
+   * (e.g. `users/${userProfile.email}/…`).
    *
    * Return type depends on `throwIfNoDelegates`:
    * - omitted / `false` → returns `null` when no delegates exist (shared-mailbox only)
@@ -48,7 +49,7 @@ export class MsGraphClientResolver {
    * // Basic usage — skip silently when no delegates are available
    * const result = await this.msGraphClientResolver.run({
    *   userProfile,
-   *   fn: ({ client, userProfile }) => fetchSomething(client, userProfile.email),
+   *   fn: ({ client }) => fetchSomething(client, userProfile.email),
    * });
    * if (result === null) return; // shared-mailbox with no delegates yet
    *
@@ -56,41 +57,65 @@ export class MsGraphClientResolver {
    * // Require a delegate — throw if none found
    * const result = await this.msGraphClientResolver.run({
    *   userProfile,
-   *   fn: ({ client, userProfile }) => fetchSomething(client, userProfile.email),
+   *   fn: ({ client }) => fetchSomething(client, userProfile.email),
    *   sharedMailboxConfig: { throwIfNoDelegates: true },
    * });
    */
   public async run<T>(input: {
     userProfile: NonNullishProps<UserProfile, 'email'>;
-    fn: (ctx: { client: Client; userProfile: NonNullishProps<UserProfile, 'email'> }) => Promise<T>;
-    sharedMailboxConfig: { throwIfNoDelegates: true; maxRetries?: number };
+    fn: (ctx: {
+      client: Client;
+      /** The user profile ID the client is authenticated as.
+       * For `oauth` profiles this equals `userProfile.id`.
+       * For `shared-mailbox` profiles this is the delegated OAuth user that was selected. */
+      clientUserProfileId: string;
+    }) => Promise<T>;
+    sharedMailboxConfig: {
+      throwIfNoDelegates: true;
+      maxDelegates?: number;
+      preferredDelegateUserId?: string;
+    };
   }): Promise<T>;
 
   public async run<T>(input: {
     userProfile: NonNullishProps<UserProfile, 'email'>;
-    fn: (ctx: { client: Client; userProfile: NonNullishProps<UserProfile, 'email'> }) => Promise<T>;
-    sharedMailboxConfig?: { throwIfNoDelegates?: false; maxRetries?: number };
+    fn: (ctx: {
+      client: Client;
+      /** The user profile ID the client is authenticated as.
+       * For `oauth` profiles this equals `userProfile.id`.
+       * For `shared-mailbox` profiles this is the delegated OAuth user that was selected. */
+      clientUserProfileId: string;
+    }) => Promise<T>;
+    sharedMailboxConfig?: {
+      throwIfNoDelegates?: false;
+      maxDelegates?: number;
+      preferredDelegateUserId?: string;
+    };
   }): Promise<T | null>;
 
-  // Covers callers that pass a runtime boolean variable for throwIfNoDelegates.
   public async run<T>(input: {
     userProfile: NonNullishProps<UserProfile, 'email'>;
-    fn: (ctx: { client: Client; userProfile: NonNullishProps<UserProfile, 'email'> }) => Promise<T>;
-    sharedMailboxConfig?: { throwIfNoDelegates?: boolean; maxRetries?: number };
-  }): Promise<T | null>;
-
-  public async run<T>(input: {
-    userProfile: NonNullishProps<UserProfile, 'email'>;
-    fn: (ctx: { client: Client; userProfile: NonNullishProps<UserProfile, 'email'> }) => Promise<T>;
-    sharedMailboxConfig?: { throwIfNoDelegates?: boolean; maxRetries?: number };
+    fn: (ctx: {
+      client: Client;
+      /** The user profile ID the client is authenticated as.
+       * For `oauth` profiles this equals `userProfile.id`.
+       * For `shared-mailbox` profiles this is the delegated OAuth user that was selected. */
+      clientUserProfileId: string;
+    }) => Promise<T>;
+    sharedMailboxConfig?: {
+      throwIfNoDelegates?: boolean;
+      maxDelegates?: number;
+      preferredDelegateUserId?: string;
+    };
   }): Promise<T | null> {
     const { userProfile, fn, sharedMailboxConfig } = input;
-    const maxRetries = sharedMailboxConfig?.maxRetries ?? 3;
+    const maxDelegates = sharedMailboxConfig?.maxDelegates ?? 3;
     const throwIfNoDelegates = sharedMailboxConfig?.throwIfNoDelegates ?? false;
+    const preferredDelegateUserId = sharedMailboxConfig?.preferredDelegateUserId;
 
     if (userProfile.source === 'oauth') {
       const client = this.graphClientFactory.createClientForUser(userProfile.id);
-      return fn({ client, userProfile });
+      return fn({ client, clientUserProfileId: userProfile.id });
     }
 
     // source === 'shared-mailbox': use delegated access
@@ -115,12 +140,16 @@ export class MsGraphClientResolver {
       return null;
     }
 
-    const candidates = delegates.slice(0, maxRetries);
+    const preferredIdx = delegates.findIndex((d) => d.delegateUserId === preferredDelegateUserId);
+    if (preferredIdx > 0) {
+      swapIndices(delegates, 0, preferredIdx);
+    }
+    const candidates = delegates.slice(0, maxDelegates);
 
     for (const delegate of candidates) {
       const client = this.graphClientFactory.createClientForUser(delegate.delegateUserId);
       try {
-        return await fn({ client, userProfile });
+        return await fn({ client, clientUserProfileId: delegate.delegateUserId });
       } catch (error) {
         if (error instanceof GraphError && (error.statusCode === 401 || error.statusCode === 403)) {
           continue;
@@ -129,7 +158,7 @@ export class MsGraphClientResolver {
       }
     }
 
-    this.logger.warn({ ownerUserId: userProfile.id, msg: 'All delegates exhausted with 403' });
+    this.logger.warn({ ownerUserId: userProfile.id, msg: 'All delegates exhausted (401/403)' });
     throw new AllDelegatesFailedError(userProfile.id);
   }
 }

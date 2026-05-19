@@ -85,7 +85,10 @@ describe('MsGraphClientResolver', () => {
     expect(factory.createClientForUser).toHaveBeenCalledOnce();
     expect(factory.createClientForUser).toHaveBeenCalledWith(OWNER_USER_ID);
     expect(fn).toHaveBeenCalledOnce();
-    expect(fn).toHaveBeenCalledWith({ client: expect.any(Object), userProfile });
+    expect(fn).toHaveBeenCalledWith({
+      client: expect.any(Object),
+      clientUserProfileId: OWNER_USER_ID,
+    });
     expect(db.select).not.toHaveBeenCalled();
   });
 
@@ -93,7 +96,7 @@ describe('MsGraphClientResolver', () => {
   // Manual path
   // -------------------------------------------------------------------------
 
-  it('source=manual, no delegates, sharedMailboxConfig omitted → returns null', async () => {
+  it('source=shared-mailbox, no delegates, sharedMailboxConfig omitted → returns null', async () => {
     const { resolver } = createResolver([]);
 
     const result = await resolver.run({
@@ -104,7 +107,7 @@ describe('MsGraphClientResolver', () => {
     expect(result).toBeNull();
   });
 
-  it('source=manual, no delegates, throwIfNoDelegates: true → throws NoDelegatesFoundError', async () => {
+  it('source=shared-mailbox, no delegates, throwIfNoDelegates: true → throws NoDelegatesFoundError', async () => {
     const { resolver } = createResolver([]);
 
     await expect(
@@ -116,7 +119,7 @@ describe('MsGraphClientResolver', () => {
     ).rejects.toThrow(NoDelegatesFoundError);
   });
 
-  it('source=manual, first delegate succeeds → returns result, only one delegate tried', async () => {
+  it('source=shared-mailbox, first delegate succeeds → returns result, only one delegate tried', async () => {
     const fn = vi.fn().mockResolvedValue('success');
     const { resolver, db, factory } = createResolver([
       { delegateUserId: DELEGATE_USER_ID_1 },
@@ -131,10 +134,13 @@ describe('MsGraphClientResolver', () => {
     expect(factory.createClientForUser).toHaveBeenCalledOnce();
     expect(factory.createClientForUser).toHaveBeenCalledWith(DELEGATE_USER_ID_1);
     expect(fn).toHaveBeenCalledOnce();
-    expect(fn).toHaveBeenCalledWith({ client: expect.any(Object), userProfile });
+    expect(fn).toHaveBeenCalledWith({
+      client: expect.any(Object),
+      clientUserProfileId: DELEGATE_USER_ID_1,
+    });
   });
 
-  it('source=manual, first delegate throws 403, second succeeds → returns result from second', async () => {
+  it('source=shared-mailbox, first delegate throws 403, second succeeds → returns result from second', async () => {
     const fn = vi
       .fn()
       .mockRejectedValueOnce(makeGraphError(403))
@@ -156,7 +162,7 @@ describe('MsGraphClientResolver', () => {
     expect(factory.createClientForUser).toHaveBeenNthCalledWith(2, DELEGATE_USER_ID_2);
   });
 
-  it('source=manual, all delegates throw 403 → throws AllDelegatesFailedError', async () => {
+  it('source=shared-mailbox, all delegates throw 403 → throws AllDelegatesFailedError', async () => {
     const fn = vi.fn().mockRejectedValue(makeGraphError(403));
     const { resolver } = createResolver([
       { delegateUserId: DELEGATE_USER_ID_1 },
@@ -171,7 +177,7 @@ describe('MsGraphClientResolver', () => {
     ).rejects.toThrow(AllDelegatesFailedError);
   });
 
-  it('source=manual, non-403 error → rethrows immediately, no more delegates tried', async () => {
+  it('source=shared-mailbox, non-403 error → rethrows immediately, no more delegates tried', async () => {
     const nonFourOhThree = makeGraphError(500);
     const fn = vi
       .fn()
@@ -194,7 +200,7 @@ describe('MsGraphClientResolver', () => {
     expect(fn).toHaveBeenCalledOnce();
   });
 
-  it('source=manual, maxRetries: 2 cap — with 3 delegates all throwing 403, only 2 tried', async () => {
+  it('source=shared-mailbox, maxDelegates: 2 cap — with 3 delegates all throwing 403, only 2 tried', async () => {
     const fn = vi.fn().mockRejectedValue(makeGraphError(403));
     const { resolver, factory } = createResolver([
       { delegateUserId: DELEGATE_USER_ID_1 },
@@ -206,7 +212,7 @@ describe('MsGraphClientResolver', () => {
       resolver.run({
         userProfile: makeManualProfile(),
         fn,
-        sharedMailboxConfig: { maxRetries: 2 },
+        sharedMailboxConfig: { maxDelegates: 2 },
       }),
     ).rejects.toThrow(AllDelegatesFailedError);
 
@@ -214,7 +220,7 @@ describe('MsGraphClientResolver', () => {
     expect(factory.createClientForUser).not.toHaveBeenCalledWith(DELEGATE_USER_ID_3);
   });
 
-  it('source=manual, default maxRetries=3 — with 4 delegates all throwing 403, only 3 tried', async () => {
+  it('source=shared-mailbox, default maxDelegates=3 — with 4 delegates all throwing 403, only 3 tried', async () => {
     const fn = vi.fn().mockRejectedValue(makeGraphError(403));
     const { resolver, factory } = createResolver([
       { delegateUserId: DELEGATE_USER_ID_1 },
@@ -231,5 +237,74 @@ describe('MsGraphClientResolver', () => {
     ).rejects.toThrow(AllDelegatesFailedError);
 
     expect(factory.createClientForUser).toHaveBeenCalledTimes(3);
+  });
+
+  it('source=shared-mailbox, first delegate throws 401, second succeeds → returns result from second', async () => {
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(makeGraphError(401))
+      .mockResolvedValueOnce('from-second-after-401');
+
+    const { resolver, factory } = createResolver([
+      { delegateUserId: DELEGATE_USER_ID_1 },
+      { delegateUserId: DELEGATE_USER_ID_2 },
+    ]);
+
+    const result = await resolver.run({
+      userProfile: makeManualProfile(),
+      fn,
+    });
+
+    expect(result).toBe('from-second-after-401');
+    expect(factory.createClientForUser).toHaveBeenCalledTimes(2);
+    expect(factory.createClientForUser).toHaveBeenNthCalledWith(1, DELEGATE_USER_ID_1);
+    expect(factory.createClientForUser).toHaveBeenNthCalledWith(2, DELEGATE_USER_ID_2);
+  });
+
+  it('source=shared-mailbox, preferredDelegateUserId specified → that delegate is tried first', async () => {
+    const fn = vi.fn().mockResolvedValue('preferred-result');
+    const { resolver, factory } = createResolver([
+      { delegateUserId: DELEGATE_USER_ID_1 },
+      { delegateUserId: DELEGATE_USER_ID_2 },
+      { delegateUserId: DELEGATE_USER_ID_3 },
+    ]);
+
+    const result = await resolver.run({
+      userProfile: makeManualProfile(),
+      fn,
+      sharedMailboxConfig: { preferredDelegateUserId: DELEGATE_USER_ID_2 },
+    });
+
+    expect(result).toBe('preferred-result');
+    expect(factory.createClientForUser).toHaveBeenCalledOnce();
+    expect(factory.createClientForUser).toHaveBeenCalledWith(DELEGATE_USER_ID_2);
+  });
+
+  it('source=shared-mailbox, fn receives clientUserProfileId of the used delegate', async () => {
+    let capturedClientUserProfileId: string | null | undefined;
+    const fn = vi.fn().mockImplementation(async ({ clientUserProfileId }) => {
+      capturedClientUserProfileId = clientUserProfileId;
+      return 'ok';
+    });
+    const { resolver } = createResolver([{ delegateUserId: DELEGATE_USER_ID_1 }]);
+
+    await resolver.run({ userProfile: makeManualProfile(), fn });
+
+    expect(capturedClientUserProfileId).toBe(DELEGATE_USER_ID_1);
+  });
+
+  it('source=oauth, fn receives clientUserProfileId equal to userProfile.id', async () => {
+    let capturedClientUserProfileId: string | undefined;
+    const fn = vi.fn().mockImplementation(async ({ clientUserProfileId }) => {
+      capturedClientUserProfileId = clientUserProfileId;
+      return 'ok';
+    });
+    const factory = createMockGraphClientFactory();
+    const db = createMockDb([]);
+    const resolver = new MsGraphClientResolver(db as any, factory as any);
+
+    await resolver.run({ userProfile: makeOauthProfile(), fn });
+
+    expect(capturedClientUserProfileId).toBe(OWNER_USER_ID);
   });
 });

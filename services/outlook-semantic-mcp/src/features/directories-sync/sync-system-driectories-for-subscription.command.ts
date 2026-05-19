@@ -50,8 +50,7 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
     traceEvent('Start system folders sync');
     const microsoftGraphDirectories = await this.msGraphClientResolver.run({
       userProfile,
-      fn: ({ client, userProfile: resolvedProfile }) =>
-        this.fetchMicrosoftSystemFolders(client, resolvedProfile),
+      fn: ({ client }) => this.fetchMicrosoftSystemFolders(client, userProfile),
     });
     traceEvent('Finished reading microsoft graph system directories');
 

@@ -218,6 +218,13 @@
       "when": 1779148800000,
       "tag": "0030_add_user_profiles_source",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1779235200000,
+      "tag": "0031_add_synchronized_by_user_profile_id",
+      "breakpoints": true
     }
   ]
 }

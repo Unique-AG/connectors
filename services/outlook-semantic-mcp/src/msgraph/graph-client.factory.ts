@@ -13,7 +13,7 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, isNotNull, notInArray } from 'drizzle-orm';
+import { and, eq, isNotNull, notInArray } from 'drizzle-orm';
 import { MetricService } from 'nestjs-otel';
 import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';
 import { SCOPES } from '../auth/microsoft.provider';
@@ -52,6 +52,7 @@ export class GraphClientFactory {
   ): Promise<{ client: Client; userId: string } | null> {
     const profile = await this.drizzle.query.userProfiles.findFirst({
       where: and(
+        eq(userProfiles.source, 'oauth'),
         isNotNull(userProfiles.accessToken),
         excludeIds && excludeIds.length > 0 ? notInArray(userProfiles.id, excludeIds) : undefined,
       ),
