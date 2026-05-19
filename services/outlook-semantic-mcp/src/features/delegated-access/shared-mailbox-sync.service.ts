@@ -315,6 +315,8 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
   }
 
   private hashMailboxes(mailboxes: string[]): string {
-    return createHash('sha256').update(mailboxes.sort().join(',')).digest('hex');
+    return createHash('sha256')
+      .update([...mailboxes].sort().join(','))
+      .digest('hex');
   }
 }

@@ -21,6 +21,9 @@ DELEGATED_ACCESS_FAILURE_THRESHOLD: {{ .failureThreshold | quote }}
 {{- if .sharedMailboxEmails }}
 DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS: {{ .sharedMailboxEmails | quote }}
 {{- end }}
+{{- if .sharedMailboxSyncCronSchedule }}
+DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE: {{ .sharedMailboxSyncCronSchedule | quote }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
