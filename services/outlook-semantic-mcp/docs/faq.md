@@ -18,6 +18,7 @@
   - [Can an operator with database access read my emails?](#Can-an-operator-with-database-access-read-my-emails?)
   - [What happens to my email data when I disconnect?](#What-happens-to-my-email-data-when-I-disconnect?)
 - [Shared Inbox & Delegated Access](#Shared-Inbox-&-Delegated-Access)
+  - [How do I set up delegated access?](#How-do-I-set-up-delegated-access?)
   - [Who has access to a shared inbox?](#Who-has-access-to-a-shared-inbox?)
   - [What happens with delegated access?](#What-happens-with-delegated-access?)
   - [When shared inbox access is revoked, are previously ingested emails still accessible?](#When-shared-inbox-access-is-revoked,-are-previously-ingested-emails-still-accessible?)
@@ -193,6 +194,12 @@ In Mode B (`MicrosoftGraph`), there is no inbox data to delete — `delete_inbox
 > mailboxes — honouring folder-level delegations would require querying every
 > accessible folder individually, which is not implemented due to API rate
 > limits.
+
+### How do I set up delegated access?
+
+**Answer:** Delegated access setup happens in Microsoft 365, not in the MCP. The MCP supports three configurations: an Exchange admin grants Full Access (Read & Manage), a user shares specific folders via Outlook desktop (with a required root-mailbox visibility step), or a shared inbox is configured as a normal mailbox and connected to the MCP. See [Features — Delegated Access — Setup](./technical/features.md#Setup) for step-by-step instructions and the Outlook root-mailbox visibility gotcha.
+
+---
 
 ### Who has access to a shared inbox?
 
