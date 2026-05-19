@@ -22,6 +22,7 @@ import { ConfluencePageScanner } from '../synchronization/confluence-page-scanne
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import { FileDiffService } from '../synchronization/file-diff.service';
 import { IngestionService } from '../synchronization/ingestion.service';
+import { PageImageInliner } from '../synchronization/page-image-inliner';
 import { RootScopeMigrationService } from '../synchronization/root-scope-migration.service';
 import { ScopeManagementService } from '../synchronization/scope-management.service';
 import { ServiceRegistry } from './service-registry';
@@ -170,6 +171,9 @@ export class TenantRegistry implements OnModuleInit {
       blobUploadDispatcher,
     );
     this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
+
+    const pageImageInliner = new PageImageInliner(config, apiClient);
+    this.serviceRegistry.register(tenantName, PageImageInliner, pageImageInliner);
 
     const rootScopeMigrationService = new RootScopeMigrationService(uniqueClient);
     const scopeManagementService = new ScopeManagementService(
