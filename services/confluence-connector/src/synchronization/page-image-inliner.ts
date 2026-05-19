@@ -1,7 +1,5 @@
 import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
-import { type Element, isTag, type ParentNode } from 'domhandler';
-import { parseDocument } from 'htmlparser2';
 import pLimit from 'p-limit';
 import type { TenantConfig } from '../config';
 import { BYTES_PER_MB } from '../config/ingestion.schema';
@@ -10,6 +8,11 @@ import type {
   ConfluenceAttachment,
   PageAttachmentLookupResult,
 } from '../confluence-api';
+import {
+  type ParsedImageBlock,
+  parseImageBlocks,
+  type ResourceRef,
+} from './confluence-tags-parser';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 // ac:image attributes we forward onto the produced <img>. Other presentational hints
@@ -25,24 +28,6 @@ const AC_IMAGE_ATTRS_TO_KEEP: ReadonlyArray<[string, string]> = [
 // processing.concurrency; this guards against an image-heavy page allocating a
 // per-image Buffer for every <ac:image> in one go.
 const IMAGE_DOWNLOAD_CONCURRENCY = 5;
-
-type ResourceRef =
-  | { kind: 'current-attachment'; filename: string }
-  | {
-      kind: 'cross-page-attachment';
-      filename: string;
-      spaceKey: string;
-      contentTitle: string;
-    }
-  | { kind: 'external-url' }
-  | { kind: 'unknown' };
-
-interface ParsedImageBlock {
-  startIndex: number;
-  endIndex: number;
-  imgAttrs: Record<string, string>;
-  resource: ResourceRef;
-}
 
 export interface InlineImagesResult {
   page: FetchedPage;
@@ -89,15 +74,15 @@ export class PageImageInliner {
       return { page, inlinedAttachmentIds: new Set() };
     }
 
-    const blocks = this.parseImageBlocks(page.body);
+    const blocks = parseImageBlocks(page.body);
     if (blocks.length === 0) {
       return { page, inlinedAttachmentIds: new Set() };
     }
 
     const limit = pLimit(IMAGE_DOWNLOAD_CONCURRENCY);
-    const resolutions = await Promise.all(
+    const replacements = await Promise.all(
       blocks.map((block) =>
-        limit(() => this.resolveAndDownload(block, page, pageImageAttachments)).catch((err) => {
+        limit(() => this.buildImageReplacement(block, page, pageImageAttachments)).catch((err) => {
           this.logger.warn({
             pageId: page.id,
             resource: block.resource,
@@ -110,37 +95,41 @@ export class PageImageInliner {
     );
 
     const inlinedAttachmentIds = new Set<string>();
-    const replacements: Array<{ start: number; end: number; html: string }> = [];
+    const splicePoints: Array<{ start: number; end: number; html: string }> = [];
 
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
-      const resolution = resolutions[i];
-      if (!block || !resolution) {
+      const replacement = replacements[i];
+      if (!block || !replacement) {
         continue;
       }
-      replacements.push({ start: block.startIndex, end: block.endIndex, html: resolution.html });
+      splicePoints.push({ start: block.startIndex, end: block.endIndex, html: replacement.html });
       inlinedAttachmentIds.add(
-        buildInlinedAttachmentKey(resolution.pageId, resolution.attachmentId),
+        buildInlinedAttachmentKey(replacement.pageId, replacement.attachmentId),
       );
     }
 
-    if (replacements.length === 0) {
+    if (splicePoints.length === 0) {
       return { page, inlinedAttachmentIds: new Set() };
     }
 
-    const newBody = this.splice(page.body, replacements);
+    const newBody = this.applyReplacements(page.body, splicePoints);
     return {
       page: { ...page, body: newBody },
       inlinedAttachmentIds,
     };
   }
 
-  private async resolveAndDownload(
+  private async buildImageReplacement(
     block: ParsedImageBlock,
     page: FetchedPage,
     pageImageAttachments: DiscoveredAttachment[],
   ): Promise<{ attachmentId: string; pageId: string; html: string } | null> {
-    const resolved = await this.resolveAttachment(block.resource, page, pageImageAttachments);
+    const resolved = await this.resolveAttachmentMetadata(
+      block.resource,
+      page,
+      pageImageAttachments,
+    );
     if (!resolved) {
       return null;
     }
@@ -189,7 +178,7 @@ export class PageImageInliner {
     return { attachmentId: resolved.attachmentId, pageId: resolved.pageId, html };
   }
 
-  private async resolveAttachment(
+  private async resolveAttachmentMetadata(
     resource: ResourceRef,
     page: FetchedPage,
     pageImageAttachments: DiscoveredAttachment[],
@@ -218,7 +207,7 @@ export class PageImageInliner {
       };
     }
 
-    const lookup = await this.lookupCrossPage(resource.spaceKey, resource.contentTitle);
+    const lookup = await this.lookupCrossPageAttachments(resource.spaceKey, resource.contentTitle);
     if (!lookup) {
       this.logger.debug({
         spaceKey: resource.spaceKey,
@@ -249,7 +238,7 @@ export class PageImageInliner {
     };
   }
 
-  private async lookupCrossPage(
+  private async lookupCrossPageAttachments(
     spaceKey: string,
     contentTitle: string,
   ): Promise<PageAttachmentLookupResult | null> {
@@ -334,7 +323,7 @@ export class PageImageInliner {
     return `<img ${parts.join(' ')} />`;
   }
 
-  private splice(
+  private applyReplacements(
     original: string,
     replacements: Array<{ start: number; end: number; html: string }>,
   ): string {
@@ -349,88 +338,6 @@ export class PageImageInliner {
     result += original.slice(cursor);
     return result;
   }
-
-  private parseImageBlocks(body: string): ParsedImageBlock[] {
-    // We buffer the full DOM rather than streaming because the upstream code already
-    // buffers the entire page body string, and Confluence page bodies are KB-scale.
-    const doc = parseDocument(body, {
-      xmlMode: true,
-      withStartIndices: true,
-      withEndIndices: true,
-    });
-
-    const imageNodes: Element[] = [];
-    collectElementsByName(doc, 'ac:image', imageNodes);
-
-    const blocks: ParsedImageBlock[] = [];
-    for (const node of imageNodes) {
-      if (node.startIndex == null || node.endIndex == null) {
-        continue;
-      }
-      // Element.endIndex points at the final '>' of either '</ac:image>' or self-closing
-      // '/>', so +1 is exclusive. Reject blocks whose slice does not terminate with a
-      // real close so an unclosed macro can never splice into unrelated content.
-      const endIndex = node.endIndex + 1;
-      const blockText = body.slice(node.startIndex, endIndex);
-      if (!blockText.endsWith('</ac:image>') && !blockText.endsWith('/>')) {
-        continue;
-      }
-      blocks.push({
-        startIndex: node.startIndex,
-        endIndex,
-        imgAttrs: node.attribs,
-        resource: resolveResourceFromNodes(node),
-      });
-    }
-    return blocks;
-  }
-}
-
-function collectElementsByName(parent: ParentNode, name: string, out: Element[]): void {
-  for (const child of parent.children) {
-    if (!isTag(child)) {
-      continue;
-    }
-    if (child.name === name) {
-      out.push(child);
-      // <ac:image> is never nested inside another <ac:image>; no need to recurse into hits.
-      continue;
-    }
-    collectElementsByName(child, name, out);
-  }
-}
-
-function firstChildElementByName(parent: Element, name: string): Element | undefined {
-  for (const child of parent.children) {
-    if (isTag(child) && child.name === name) {
-      return child;
-    }
-  }
-  return undefined;
-}
-
-function resolveResourceFromNodes(imageNode: Element): ResourceRef {
-  const url = firstChildElementByName(imageNode, 'ri:url');
-  if (url) {
-    return { kind: 'external-url' };
-  }
-  const attachment = firstChildElementByName(imageNode, 'ri:attachment');
-  if (!attachment) {
-    return { kind: 'unknown' };
-  }
-  const filename = attachment.attribs['ri:filename'];
-  if (!filename) {
-    return { kind: 'unknown' };
-  }
-  const page = firstChildElementByName(attachment, 'ri:page');
-  if (page) {
-    const spaceKey = page.attribs['ri:space-key'];
-    const contentTitle = page.attribs['ri:content-title'];
-    if (spaceKey && contentTitle) {
-      return { kind: 'cross-page-attachment', filename, spaceKey, contentTitle };
-    }
-  }
-  return { kind: 'current-attachment', filename };
 }
 
 function escapeAttr(value: string): string {
