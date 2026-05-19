@@ -118,7 +118,11 @@ See the [Configuration Guide](./operator/configuration.md) for all available opt
 
 ### Are embedded images ingested?
 
-**Answer:** Yes. Images embedded in a Confluence page (drag/drop, paste, or "Insert image") are stored by Confluence as regular page attachments, so they flow through the same path as PDFs and Office files. With attachment ingestion enabled, PNG and JPEG images are ingested out of the box because both MIME types are in the default `allowedMimeTypes` list. The connector also requests OCR-based processing for each image (`jpgReadMode = DOC_INTELLIGENCE_DEFAULT`) by default, so chunks are produced without further scope-side configuration; this can be turned off via `attachments.imageOcr = disabled`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service. Images inserted as external URLs (rather than uploaded) are not attachments and are not ingested.
+**Answer:** Yes, and they are inlined directly into the page they appear on. During page ingestion the connector parses the Confluence storage XML, downloads each referenced image attachment (PNG or JPEG), and replaces the `<ac:image>` macro with an `<img src="data:image/...;base64,...">` element. The result is a single self-contained page artifact per Confluence page; the image is no longer a separate ingestion item. Cross-page references (`<ri:attachment><ri:page/></ri:attachment>`, pointing to an image attached to another page in the same Confluence instance) are resolved through the same path. Images inserted as external URLs (`<ri:url>`) are left untouched in the HTML and never fetched.
+
+### What happens if an image cannot be inlined into its page?
+
+**Answer:** The connector falls back to the standalone attachment ingestion path. This safety net covers: image attachments that no page body references (orphan images), images larger than `attachments.maxFileSizeMb`, images whose download fails, references whose target page or filename cannot be resolved, and references with a non-image MIME type. Standalone-ingested images still receive `jpgReadMode = DOC_INTELLIGENCE_DEFAULT` when `attachments.imageOcr` is `enabled` (the default). To distinguish the two paths in logs, look for `Failed to inline image, leaving macro untouched` or `Image exceeds max file size` warnings from the `PageImageInliner`; standalone ingestion for an unreferenced image proceeds quietly through the existing `IngestionService.ingestAttachment` flow.
 
 ### How do I find my Atlassian Cloud ID?
 

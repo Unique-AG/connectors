@@ -70,9 +70,11 @@ The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and 
 
 **Image Ingestion**
 
-When attachment ingestion is enabled, images embedded in Confluence pages (PNG and JPEG) are ingested as attachments. Confluence stores editor-inserted images (drag/drop, paste, "Insert image") as regular page attachments, so they flow through the same path as PDFs and Office files. Images inserted as external URLs (rather than uploaded) are not attachments and are not ingested.
+When attachment ingestion is enabled, images embedded in Confluence pages (PNG and JPEG) are inlined into the page they appear on. The connector parses each page's Confluence storage XML, replaces every `<ac:image>` macro that points to a Confluence attachment with an `<img src="data:image/...;base64,...">` element, and uploads a single self-contained HTML artifact per page. Both attachments of the page itself and attachments from another page in the same instance (referenced via `<ri:attachment><ri:page/></ri:attachment>`) are resolved through the existing Confluence client. Inline images therefore no longer produce separate attachment artifacts.
 
-The connector also requests OCR-based ingestion for each image automatically (`attachments.imageOcr` is `enabled` by default), so chunks are produced without any scope-side configuration. Set `attachments.imageOcr = disabled` to defer to the destination scope's own `ingestionConfig.jpgReadMode`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service and should be left out of `allowedMimeTypes`.
+Images that cannot be inlined fall back to the standalone attachment ingestion path. This safety net catches: image attachments that no page references, downloads that fail, images larger than `attachments.maxFileSizeMb`, and references whose target page or filename cannot be resolved. External image references (`<ac:image><ri:url ri:value="https://..."/></ac:image>`) are left untouched in the HTML and never fetched by the connector.
+
+The connector requests OCR-based ingestion (`attachments.imageOcr` enabled by default) for image attachments that still go through the standalone path (orphan or failed-inline images). Set `attachments.imageOcr = disabled` to defer to the destination scope's own `ingestionConfig.jpgReadMode`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service and should be left out of `allowedMimeTypes`.
 
 **Skipped Content Types**
 
@@ -131,8 +133,8 @@ flowchart TB
     Discover["Discover Labeled Pages & Attachments"]
     Diff["Compute File Diff"]
     EnsureScopes["Ensure Space Scopes"]
-    IngestPages["Ingest New/Updated Pages"]
-    IngestAttachments["Ingest New/Updated Attachments"]
+    IngestPages["Ingest Pages (inline images into HTML)"]
+    IngestAttachments["Ingest Remaining Attachments (non-images + orphan images)"]
     Delete["Delete Removed Items"]
     Done(("Done"))
   end
@@ -186,9 +188,12 @@ sequenceDiagram
 
         Connector->>Confluence: Fetch full page content
         Confluence->>Connector: Page HTML body
-        Connector->>Unique: Register, upload, finalize
+        Connector->>Confluence: Download referenced image attachments
+        Confluence->>Connector: Image streams
+        Connector->>Connector: Inline images as base64 data URIs in page HTML
+        Connector->>Unique: Register, upload, finalize (single page artifact)
 
-        Connector->>Confluence: Download attachment stream
+        Connector->>Confluence: Download remaining (non-image / orphan) attachment streams
         Confluence->>Connector: File stream
         Connector->>Unique: Register, upload, finalize
 

@@ -302,11 +302,13 @@ These are matched against the `mediaType` reported by the Confluence API. Operat
 
 #### Image Attachments
 
-Images embedded in Confluence pages (drag/drop, paste, or "Insert image") are stored as regular page attachments by Confluence and are ingested through this same configuration when `image/png` or `image/jpeg` is in `allowedMimeTypes`. Both formats are in the default list, so enabling attachment ingestion is sufficient to ingest embedded images out of the box.
+Images embedded in Confluence pages (drag/drop, paste, or "Insert image") are stored as regular page attachments by Confluence. During page ingestion the connector inlines each referenced image directly into the page HTML as a base64 `data:` URI, producing a single self-contained page artifact rather than a separate image artifact. This applies to images attached to the page being ingested as well as images attached to other pages in the same Confluence instance (cross-page references). PNG and JPEG are the supported formats; both are in the default `allowedMimeTypes`.
 
-For images to produce searchable chunks, the Unique ingestion worker must run them through Document Intelligence (`jpgReadMode = DOC_INTELLIGENCE_DEFAULT`). The connector handles this automatically: with `attachments.imageOcr = enabled` (the default), each image content registration is sent with `ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT`, which overrides the scope-level default (`NO_INGESTION`). Set `attachments.imageOcr = disabled` to leave the decision to the destination scope's own `ingestionConfig`.
+Image attachments fall back to standalone ingestion when they cannot be inlined: orphan images (attached but not referenced by any page body), images that exceed `attachments.maxFileSizeMb`, images whose download fails, and cross-page references whose target page cannot be resolved.
 
-Images inserted as external URLs (rather than uploaded to Confluence) are stored as plain URL references in the page body, not as attachments, and are therefore not ingested.
+`attachments.imageOcr` only affects images that go through the standalone path. With `attachments.imageOcr = enabled` (the default), each standalone-ingested image registration is sent with `ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT`, which overrides the scope-level default (`NO_INGESTION`). Set `attachments.imageOcr = disabled` to leave the decision to the destination scope's own `ingestionConfig`. Images inlined into a page are processed via the page artifact and are unaffected by this flag.
+
+Images inserted as external URLs (`<ac:image><ri:url ri:value="https://..."/></ac:image>`) are left untouched in the page HTML and are never fetched by the connector.
 
 Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service. Adding them to `allowedMimeTypes` will cause uploads to be rejected with HTTP 400.
 
