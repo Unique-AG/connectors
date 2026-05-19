@@ -7,6 +7,7 @@ import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import {
   type ApiClientOptions,
+  buildPageAttachmentLookupResult,
   ConfluenceApiClient,
   type InstanceIdentifier,
   type PageAttachmentLookupResult,
@@ -106,10 +107,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     }
 
     await this.fetchMoreAttachments([page]);
-    return {
-      pageId: page.id,
-      attachments: page.children?.attachment?.results ?? [],
-    };
+    return buildPageAttachmentLookupResult(page);
   }
 
   public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {

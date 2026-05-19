@@ -15,6 +15,16 @@ export interface PageAttachmentLookupResult {
   attachments: ConfluenceAttachment[];
 }
 
+// Shared shape-up used by Cloud and Data Center implementations of
+// fetchPageAttachmentsByTitle. Centralizes the page-to-lookup mapping so the only
+// per-platform difference is URL construction + the post-page attachment pagination.
+export function buildPageAttachmentLookupResult(page: ConfluencePage): PageAttachmentLookupResult {
+  return {
+    pageId: page.id,
+    attachments: page.children?.attachment?.results ?? [],
+  };
+}
+
 export abstract class ConfluenceApiClient {
   public abstract resolveInstanceIdentifier(): Promise<InstanceIdentifier>;
 

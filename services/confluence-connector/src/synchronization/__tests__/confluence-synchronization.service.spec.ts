@@ -16,7 +16,7 @@ import type { ConfluencePageScanner } from '../confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../confluence-synchronization.service';
 import type { FileDiffService } from '../file-diff.service';
 import type { IngestionService } from '../ingestion.service';
-import type { PageImageInliner } from '../page-image-inliner';
+import { buildInlinedAttachmentKey, type PageImageInliner } from '../page-image-inliner';
 import type { ScopeManagementService } from '../scope-management.service';
 import type { DiscoveredAttachment, FileDiffResult } from '../sync.types';
 
@@ -727,7 +727,9 @@ describe('ConfluenceSynchronizationService', () => {
             ...page,
             body: '<p>before</p><img src="data:image/png;base64,XYZ" /><p>after</p>',
           },
-          inlinedAttachmentIds: new Set([imageAttachment.id]),
+          inlinedAttachmentIds: new Set([
+            buildInlinedAttachmentKey(imageAttachment.pageId, imageAttachment.id),
+          ]),
         })),
       };
 
@@ -812,6 +814,113 @@ describe('ConfluenceSynchronizationService', () => {
       );
       const passedAttachments = vi.mocked(inliner.inlineImages).mock.calls[0]?.[1] ?? [];
       expect(passedAttachments.some((a) => a.id === pdfAttachment.id)).toBe(false);
+    });
+
+    it('skips standalone ingestion of a cross-page image when the referencing page also syncs the target', async () => {
+      // Page 1 references an image attached to page 2 (cross-page). Both pages are
+      // being synced this cycle, and the cross-page image is in the diff. The inliner
+      // claims it inlined the image into page 1's body. The orchestrator must then
+      // filter the cross-page image out of the standalone attachment pass.
+      const pageA = discoveredPagesFixture[0];
+      if (!pageA) {
+        throw new Error('expected fixture page 1');
+      }
+      const pageB: typeof pageA = { ...pageA, id: '2' };
+      const crossPageImage: DiscoveredAttachment = {
+        ...imageAttachment,
+        id: 'att-on-b',
+        title: 'shared.png',
+        downloadPath: '/download/attachments/2/shared.png',
+        pageId: '2',
+        webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/2/attachments/att-on-b`,
+      };
+
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: [pageA, pageB],
+        attachments: [crossPageImage],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['1', '2', `2::${crossPageImage.id}`],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+      vi.mocked(mockContentFetcher.fetchPageContent).mockImplementation((page: { id: string }) => {
+        const base = fetchedPagesFixture[0];
+        if (!base) {
+          throw new Error('expected fetched fixture');
+        }
+        return Promise.resolve({ ...base, id: page.id });
+      });
+
+      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+        inlineImages: vi.fn(async (fetchedPage) => {
+          // Page A inlines the cross-page image; Page B has no image attachments referenced.
+          if (fetchedPage.id === '1') {
+            return {
+              page: fetchedPage,
+              inlinedAttachmentIds: new Set([
+                buildInlinedAttachmentKey(crossPageImage.pageId, crossPageImage.id),
+              ]),
+            };
+          }
+          return { page: fetchedPage, inlinedAttachmentIds: new Set<string>() };
+        }),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      // Both pages ingested.
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
+        expect.anything(),
+      );
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '2' }),
+        expect.anything(),
+      );
+      // Cross-page image inlined into page A → not standalone-ingested even though
+      // it lives on page B which is also part of this sync.
+      expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalled();
+    });
+
+    it('falls back to ingesting the original body when the inliner throws', async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+        inlineImages: vi.fn(async () => {
+          throw new Error('inliner exploded');
+        }),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      // Page still gets ingested (with its original body).
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
+        'scope-1',
+      );
+      // Image attachment was not inlined → falls through to standalone ingestion.
+      expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: imageAttachment.id }),
+        'scope-1',
+      );
     });
   });
 });

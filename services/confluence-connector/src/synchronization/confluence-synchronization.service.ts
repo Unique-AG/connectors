@@ -9,7 +9,7 @@ import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
-import type { PageImageInliner } from './page-image-inliner';
+import { buildInlinedAttachmentKey, type PageImageInliner } from './page-image-inliner';
 import type { ScopeManagementService } from './scope-management.service';
 import type { DiscoveredAttachment, DiscoveredPage } from './sync.types';
 
@@ -106,7 +106,7 @@ export class ConfluenceSynchronizationService {
         );
 
         const remainingAttachments = attachmentsToIngest.filter(
-          (a) => !inlinedAttachmentIds.has(a.id),
+          (a) => !inlinedAttachmentIds.has(buildInlinedAttachmentKey(a.pageId, a.id)),
         );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingAttachments);
@@ -172,11 +172,24 @@ export class ConfluenceSynchronizationService {
           const scopeId = spaceScopes.get(page.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
           const pageImageAttachments = imageAttachmentsByPageId.get(page.id) ?? [];
-          const inlined = await this.pageImageInliner.inlineImages(fetched, pageImageAttachments);
-          for (const id of inlined.inlinedAttachmentIds) {
-            inlinedAttachmentIds.add(id);
+          let pageToIngest = fetched;
+          try {
+            const inlined = await this.pageImageInliner.inlineImages(fetched, pageImageAttachments);
+            pageToIngest = inlined.page;
+            for (const id of inlined.inlinedAttachmentIds) {
+              inlinedAttachmentIds.add(id);
+            }
+          } catch (err) {
+            // A hard failure inside the inliner (parser surprise, OOM in Buffer.concat,
+            // etc.) must not lose the page. Fall back to ingesting the original body;
+            // the standalone attachment pass will still handle the images.
+            this.logger.warn({
+              pageId: page.id,
+              err,
+              msg: 'Image inliner threw, ingesting original body',
+            });
           }
-          await this.ingestionService.ingestPage(inlined.page, scopeId);
+          await this.ingestionService.ingestPage(pageToIngest, scopeId);
           ingested++;
           this.metrics.recordPagesProcessed(1, 'success');
         })

@@ -5,6 +5,7 @@ import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import {
   type ApiClientOptions,
+  buildPageAttachmentLookupResult,
   ConfluenceApiClient,
   type InstanceIdentifier,
   type PageAttachmentLookupResult,
@@ -96,10 +97,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     }
 
     await this.fetchMoreAttachments([page]);
-    return {
-      pageId: page.id,
-      attachments: page.children?.attachment?.results ?? [],
-    };
+    return buildPageAttachmentLookupResult(page);
   }
 
   // V1 CQL `ancestor` returns all descendants at any depth with labels; V2 bulk pages lacks label support.

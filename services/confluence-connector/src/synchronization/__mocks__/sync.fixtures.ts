@@ -63,6 +63,16 @@ export const PAGE_BODY_EXTERNAL_URL_IMAGE =
 export const PAGE_BODY_WITH_CDATA_AND_IMAGE =
   '<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[const x = "<not a tag>" & 1 < 2;]]></ac:plain-text-body></ac:structured-macro><ac:image><ri:attachment ri:filename="diagram.png"/></ac:image>';
 
+export const PAGE_BODY_SELF_CLOSING_IMAGE = '<p>before</p><ac:image/><p>after</p>';
+
+// Malformed: <ac:image> is opened but never closed. The inliner must leave the
+// surrounding content intact and skip the orphan macro.
+export const PAGE_BODY_UNCLOSED_IMAGE =
+  '<p>start</p><ac:image><ri:attachment ri:filename="x.png"/><p>more</p>';
+
+export const PAGE_BODY_MIXED_URL_AND_ATTACHMENT =
+  '<p>external first</p><ac:image><ri:url ri:value="https://example.com/banner.png"/></ac:image><p>then attachment</p><ac:image><ri:attachment ri:filename="diagram.png"/></ac:image>';
+
 export const sampleDiscoveredImageAttachment: DiscoveredAttachment = {
   id: 'att-image-1',
   title: 'diagram.png',
