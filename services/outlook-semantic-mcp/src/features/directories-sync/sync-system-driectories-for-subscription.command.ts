@@ -1,3 +1,4 @@
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -10,8 +11,9 @@ import {
   UserProfile,
 } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { MsGraphClientResolver } from '~/msgraph/ms-graph-client-resolver.service';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { NonNullishProps } from '~/utils/non-nullish-props';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 import { GraphOutlookDirectory, graphOutlookDirectory } from './microsoft-graph.dtos';
 
@@ -37,7 +39,7 @@ interface GraphDirectoryInfo {
 export class SyncSystemDirectoriesForSubscriptionCommand {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    private readonly graphClientFactory: GraphClientFactory,
+    private readonly msGraphClientResolver: MsGraphClientResolver,
     private readonly getUserProfileQuery: GetUserProfileQuery,
   ) {}
 
@@ -46,8 +48,16 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
 
     traceEvent('Start system folders sync');
-    const microsoftGraphDirectories = await this.fetchMicrosoftSystemFolders(userProfile.id);
+    const microsoftGraphDirectories = await this.msGraphClientResolver.run({
+      userProfile,
+      fn: ({ client, userProfile: resolvedProfile }) =>
+        this.fetchMicrosoftSystemFolders(client, resolvedProfile),
+    });
     traceEvent('Finished reading microsoft graph system directories');
+
+    if (microsoftGraphDirectories === null) {
+      return;
+    }
 
     await this.syncSystemFolders({
       microsoftGraphDirectories,
@@ -57,16 +67,22 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
   }
 
   @Span()
-  private async fetchMicrosoftSystemFolders(userProfileId: string): Promise<GraphDirectoryInfo[]> {
-    traceAttrs({ userProfileId: userProfileId.toString() });
+  private async fetchMicrosoftSystemFolders(
+    client: Client,
+    userProfile: NonNullishProps<UserProfile, 'email'>,
+  ): Promise<GraphDirectoryInfo[]> {
+    traceAttrs({ userProfileId: userProfile.id });
 
     traceEvent('Start fetching system directories from microsoft graph');
-    const client = this.graphClientFactory.createClientForUser(userProfileId);
+    const baseUrl =
+      userProfile.source === 'shared-mailbox'
+        ? `users/${userProfile.email}/mailFolders`
+        : `me/mailFolders`;
     const microsoftGraphDirectories: GraphDirectoryInfo[] = [];
     for (const [directoryType, apiName] of Object.entries(
       MAP_SYSTEM_DIRECTORY_TO_MS_GRAPH_API_NAME,
     )) {
-      const directoryResponse = await client.api(`me/mailFolders/${apiName}`).get();
+      const directoryResponse = await client.api(`${baseUrl}/${apiName}`).get();
       microsoftGraphDirectories.push({
         type: directoryType as SystemDirectoryType,
         directoryInfo: graphOutlookDirectory.parse(directoryResponse),

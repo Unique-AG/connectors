@@ -1,7 +1,7 @@
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
-import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts, UserProfile } from '~/db';
+import { and, desc, eq, isNotNull } from 'drizzle-orm';
+import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts, UserProfile, userProfiles } from '~/db';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 
@@ -97,6 +97,14 @@ export class MsGraphClientResolver {
     const delegates = await this.db
       .select({ delegateUserId: delegatedAccessAccounts.delegateUserId })
       .from(delegatedAccessAccounts)
+      .innerJoin(
+        userProfiles,
+        and(
+          eq(userProfiles.id, delegatedAccessAccounts.delegateUserId),
+          eq(userProfiles.source, 'oauth'),
+          isNotNull(userProfiles.accessToken),
+        ),
+      )
       .where(eq(delegatedAccessAccounts.ownerUserId, userProfile.id))
       .orderBy(desc(delegatedAccessAccounts.lastVerifiedAt));
 
@@ -114,7 +122,7 @@ export class MsGraphClientResolver {
       try {
         return await fn({ client, userProfile });
       } catch (error) {
-        if (error instanceof GraphError && error.statusCode === 403) {
+        if (error instanceof GraphError && (error.statusCode === 401 || error.statusCode === 403)) {
           continue;
         }
         throw error;

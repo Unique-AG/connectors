@@ -340,8 +340,16 @@ describe('DiscoverDelegatedAccessCommand', () => {
     await command.run();
 
     expect(db.__insert).toHaveBeenCalledTimes(2); // A→B and A→C
-    expect(spy).toHaveBeenCalledWith({ lastFetchedId: USER_ID_B, excludedProfileIds: [USER_ID_A], includeSharedMailboxes: true });
-    expect(spy).toHaveBeenCalledWith({ lastFetchedId: USER_ID_C, excludedProfileIds: [USER_ID_A], includeSharedMailboxes: true });
+    expect(spy).toHaveBeenCalledWith({
+      lastFetchedId: USER_ID_B,
+      excludedProfileIds: [USER_ID_A],
+      includeSharedMailboxes: true,
+    });
+    expect(spy).toHaveBeenCalledWith({
+      lastFetchedId: USER_ID_C,
+      excludedProfileIds: [USER_ID_A],
+      includeSharedMailboxes: true,
+    });
   });
 
   it('excludes the delegate from its own owner query', async () => {

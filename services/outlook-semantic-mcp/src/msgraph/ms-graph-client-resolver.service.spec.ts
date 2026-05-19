@@ -37,7 +37,8 @@ function makeManualProfile(id = OWNER_USER_ID) {
 function createMockDb(delegates: { delegateUserId: string }[]) {
   const orderBy = vi.fn().mockResolvedValue(delegates);
   const where = vi.fn().mockReturnValue({ orderBy });
-  const from = vi.fn().mockReturnValue({ where });
+  const innerJoin = vi.fn().mockReturnValue({ where });
+  const from = vi.fn().mockReturnValue({ innerJoin });
   const select = vi.fn().mockReturnValue({ from });
 
   return { select, __where: where };
