@@ -112,7 +112,11 @@ sequenceDiagram
             Confluence->>Connector: Page HTML content
             Note over Connector: Parse storage XML, locate &lt;ac:image&gt; macros
             opt Image attachments referenced
-                Connector->>Confluence: Download each referenced image<br/>(current page + cross-page lookup if needed)
+                opt Some references point to another page
+                    Connector->>Confluence: GET /rest/api/content?spaceKey=&amp;title=<br/>(cached per sync)
+                    Confluence->>Connector: Target page + its attachments
+                end
+                Connector->>Confluence: Download each referenced image
                 Confluence->>Connector: Image binary streams
                 Note over Connector: Base64-encode and splice<br/>&lt;img src="data:..."&gt; in place of macros
             end
@@ -223,7 +227,7 @@ A macro is left untouched (and falls back to the standalone attachment path if t
 - The image download stream errors.
 - The cross-page lookup returns no page.
 
-Page upload itself remains a single buffered PUT per page (`registerContent` requires the final byte size up front). The buffer is just larger when inlining occurs. Memory per in-flight page is bounded by `pageHtmlSize + sum(imageSize * 1.34)`, gated by `processing.concurrency` and the per-image `maxFileSizeMb` cap.
+Per-page memory is bounded by the inlined page size, the per-image `attachments.maxFileSizeMb` cap, and `processing.concurrency`. Image downloads within a single page are also concurrency-capped to keep memory usage predictable on image-heavy pages.
 
 ### Content Type Ingestion Map
 
@@ -237,7 +241,7 @@ Content that passes the filter has its `body.storage` HTML extracted and ingeste
 |---|---|---|---|
 | Page | **Yes** | Yes (`body.storage` / ADF) | Primary content type. Full body ingestion. |
 | Blog Post | **Yes** | Yes (`body.storage` / ADF) | Treated identically to pages by the connector. |
-| Attachment | **Yes** (conditional) | No (binary) | Only when `attachments.mode=enabled`. Filtered by MIME type and size. Includes embedded images (PNG, JPEG). |
+| Attachment | **Yes** (conditional) | No (binary) | Only when `attachments.mode=enabled`. Filtered by MIME type and size. Embedded images (PNG, JPEG) are inlined into the page artifact (see [Page Image Inlining](#page-image-inlining)) rather than ingested as separate attachments. |
 | Whiteboard | **No** | No (no body via API) | Explicitly skipped. API returns no body content. Descendants are still discovered. |
 | Database | **No** | No (structured data, not exposed) | Explicitly skipped. No body via API. Descendants (sub-pages) are still discovered and ingested. |
 | Embed / Smart Link | **No** | No (only has `embedUrl`) | Explicitly skipped. Only contains a URL reference, no renderable body. |
