@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, gt, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, notInArray, or, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, last } from 'remeda';
 import { AppConfig, appConfig, DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
@@ -108,6 +108,7 @@ export class DiscoverDelegatedAccessCommand {
     // Continue outer loop from the last processed delegate
     let delegatesBatch = await this.fetchBatch({
       lastFetchedId: lastProcessedDelegateId ?? undefined,
+      includeSharedMailboxes: false,
     });
 
     while (delegatesBatch.length) {
@@ -123,6 +124,7 @@ export class DiscoverDelegatedAccessCommand {
 
       delegatesBatch = await this.fetchBatch({
         lastFetchedId: lastProcessedDelegateId ?? undefined,
+        includeSharedMailboxes: false,
       });
     }
   }
@@ -140,25 +142,29 @@ export class DiscoverDelegatedAccessCommand {
     let ownersBatch = await this.fetchBatch({
       lastFetchedId: ownersLastFetchedId ?? undefined,
       excludedProfileIds: [delegateUserId],
+      includeSharedMailboxes: true,
     });
 
     while (ownersBatch.length) {
       const batchResults = await Promise.all(
-        ownersBatch.map(({ userProfileId: ownerUserId, email: ownerEmail }) => {
-          return withRetryAttempts({
-            fn: async () => {
-              await this.updateDelegatedAccess({
-                ownerUserId,
-                ownerEmail,
-                client,
-                delegateUserId,
-              });
-              return { status: 'success' as const };
-            },
-            onError: rethrowRateLimitError,
-            getResultFailure: (error) => ({ status: 'failed' as const, error }),
-          });
-        }),
+        ownersBatch.map(
+          ({ userProfileId: ownerUserId, email: ownerEmail, source: ownerSource }) => {
+            return withRetryAttempts({
+              fn: async () => {
+                await this.updateDelegatedAccess({
+                  ownerUserId,
+                  ownerEmail,
+                  ownerSource,
+                  client,
+                  delegateUserId,
+                });
+                return { status: 'success' as const };
+              },
+              onError: rethrowRateLimitError,
+              getResultFailure: (error) => ({ status: 'failed' as const, error }),
+            });
+          },
+        ),
       );
 
       const successCount = batchResults.filter((r) => r.status === 'success').length;
@@ -186,6 +192,7 @@ export class DiscoverDelegatedAccessCommand {
       ownersBatch = await this.fetchBatch({
         lastFetchedId: ownersLastFetchedId ?? undefined,
         excludedProfileIds: [delegateUserId],
+        includeSharedMailboxes: true,
       });
     }
 
@@ -299,17 +306,23 @@ export class DiscoverDelegatedAccessCommand {
   private async fetchBatch({
     lastFetchedId,
     excludedProfileIds,
+    includeSharedMailboxes,
   }: {
     lastFetchedId?: string;
     excludedProfileIds?: string[];
-  }): Promise<{ userProfileId: string; email: string }[]> {
+    includeSharedMailboxes: boolean;
+  }): Promise<{ userProfileId: string; email: string; source: string }[]> {
     const activeSubscriptions = this.db
       .select({ userProfileId: subscriptions.userProfileId })
       .from(subscriptions)
       .where(and(gt(subscriptions.expiresAt, sql`NOW()`)));
 
     const items = await this.db
-      .select({ userProfileId: userProfiles.id, email: userProfiles.email })
+      .select({
+        userProfileId: userProfiles.id,
+        email: userProfiles.email,
+        source: userProfiles.source,
+      })
       .from(userProfiles)
       .where(
         and(
@@ -318,26 +331,33 @@ export class DiscoverDelegatedAccessCommand {
           excludedProfileIds && excludedProfileIds.length > 0
             ? notInArray(userProfiles.id, excludedProfileIds)
             : undefined,
-          inArray(userProfiles.id, activeSubscriptions),
+          includeSharedMailboxes
+            ? or(
+                inArray(userProfiles.id, activeSubscriptions),
+                eq(userProfiles.source, 'shared-mailbox'),
+              )
+            : inArray(userProfiles.id, activeSubscriptions),
         ),
       )
       .orderBy(userProfiles.id)
       .limit(100);
 
-    // Type casting is safe because isNotNull(userProfiles.email) ensures the email is not null
-    return items as { userProfileId: string; email: string }[];
+    // Type casting is safe because isNotNull(userProfiles.email) ensures email is not null
+    return items as { userProfileId: string; email: string; source: string }[];
   }
 
   private async updateDelegatedAccess({
     ownerEmail,
     delegateUserId,
     ownerUserId,
+    ownerSource,
     client,
   }: {
     client: Client;
     delegateUserId: string;
     ownerUserId: string;
     ownerEmail: string | null;
+    ownerSource: string;
   }): Promise<void> {
     if (!ownerEmail) {
       this.logger.warn({ ownerUserId, msg: 'Skipping owner with null email' });
@@ -345,7 +365,10 @@ export class DiscoverDelegatedAccessCommand {
     }
 
     try {
-      const apiEndpoint = this.config.scan === 'fullAccessOnly' ? `messages` : 'mailFolders';
+      const apiEndpoint =
+        ownerSource === 'shared-mailbox' || this.config.scan === 'fullAccessOnly'
+          ? 'messages'
+          : 'mailFolders';
       await client.api(`/users/${ownerEmail}/${apiEndpoint}`).top(1).select('id').get();
 
       const now = new Date();

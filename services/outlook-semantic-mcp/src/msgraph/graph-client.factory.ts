@@ -13,10 +13,12 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { and, eq, isNotNull, notInArray } from 'drizzle-orm';
 import { MetricService } from 'nestjs-otel';
 import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';
 import { SCOPES } from '../auth/microsoft.provider';
 import { DRIZZLE, DrizzleDatabase } from '../db/drizzle.module';
+import { userProfiles } from '../db/schema';
 import { MetricsMiddleware } from './metrics.middleware';
 import { TokenProvider } from './token.provider';
 import { TokenRefreshMiddleware } from './token-refresh.middleware';
@@ -43,6 +45,23 @@ export class GraphClientFactory {
       infer: true,
     }).value;
     this.scopes = SCOPES;
+  }
+
+  public async createClientForAnyAuthorizedUser(
+    excludeIds?: string[],
+  ): Promise<{ client: Client; userId: string } | null> {
+    const profile = await this.drizzle.query.userProfiles.findFirst({
+      where: and(
+        eq(userProfiles.source, 'oauth'),
+        isNotNull(userProfiles.accessToken),
+        excludeIds && excludeIds.length > 0 ? notInArray(userProfiles.id, excludeIds) : undefined,
+      ),
+      columns: { id: true },
+    });
+    if (!profile) {
+      return null;
+    }
+    return { userId: profile.id, client: this.createClientForUser(profile.id) };
   }
 
   public createClientForUser(userProfileId: string): Client {

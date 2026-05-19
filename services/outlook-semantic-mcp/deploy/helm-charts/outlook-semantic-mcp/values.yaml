@@ -175,6 +175,12 @@ mcpConfig:
     # -- Optional. Fraction (0–1) of eligible delegated users that may be stale before health is marked down.
     # Default: 0.15. Env var: DELEGATED_ACCESS_FAILURE_THRESHOLD
     # failureThreshold: 0.15
+    # -- Optional. Comma-separated list of shared mailbox email addresses to sync.
+    # Required when shared mailbox directory sync is needed. Env var: DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS
+    # sharedMailboxEmails: "mailbox1@example.com,mailbox2@example.com"
+    # -- Optional. Cron schedule for shared mailbox sync. Default: every 6 hours.
+    # Env var: DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE
+    # sharedMailboxSyncCronSchedule: "0 */6 * * *"
 
   # -- Optional log settings. To override:
   # logs:

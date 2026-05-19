@@ -10,6 +10,7 @@ locals {
   # Based on SCOPES in services/outlook-semantic-mcp/src/auth/microsoft.provider.ts
   graph_scopes = toset([
     "User.Read",
+    "User.Read.All",
     "Mail.ReadWrite",
     "Mail.ReadWrite.Shared",
     "MailboxSettings.Read",
