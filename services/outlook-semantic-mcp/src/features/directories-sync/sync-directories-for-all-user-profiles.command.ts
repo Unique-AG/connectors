@@ -33,6 +33,7 @@ export class SyncDirectoriesForAllUserProfilesCommand {
           return 'success';
         },
         onError: rethrowRateLimitError,
+        getResultFailure: () => 'failed',
       });
     }
   }

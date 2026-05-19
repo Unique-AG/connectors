@@ -119,7 +119,7 @@ export class MsGraphClientResolver {
     }
 
     // source === 'shared-mailbox': use delegated access
-    const delegates = await this.db
+    let delegates = await this.db
       .select({ delegateUserId: delegatedAccessAccounts.delegateUserId })
       .from(delegatedAccessAccounts)
       .innerJoin(
@@ -142,7 +142,7 @@ export class MsGraphClientResolver {
 
     const preferredIdx = delegates.findIndex((d) => d.delegateUserId === preferredDelegateUserId);
     if (preferredIdx > 0) {
-      swapIndices(delegates, 0, preferredIdx);
+      delegates = swapIndices(delegates, 0, preferredIdx);
     }
     const candidates = delegates.slice(0, maxDelegates);
 

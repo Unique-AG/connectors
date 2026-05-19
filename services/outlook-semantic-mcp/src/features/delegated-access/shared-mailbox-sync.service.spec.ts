@@ -481,7 +481,7 @@ describe('SharedMailboxSyncService', () => {
       await (service as any).runSyncWithRetries();
 
       expect(db.insert).toHaveBeenCalledOnce();
-      const insertedValues = db.insert.mock.results[0].value.values.mock.calls[0][0];
+      const insertedValues = db.insert.mock.results[0]?.value.values.mock.calls[0][0];
       expect(insertedValues).toHaveLength(1);
       expect(insertedValues[0]).toMatchObject({
         provider: 'microsoft',
@@ -535,7 +535,7 @@ describe('SharedMailboxSyncService', () => {
       await (service as any).runSyncWithRetries();
 
       expect(db.insert).toHaveBeenCalledOnce();
-      const insertedValues = db.insert.mock.results[0].value.values.mock.calls[0][0];
+      const insertedValues = db.insert.mock.results[0]?.value.values.mock.calls[0][0];
       expect(insertedValues).toHaveLength(2);
       expect(insertedValues.map((v: any) => v.email)).toEqual(
         expect.arrayContaining(['shared1@example.com', 'shared2@example.com']),
