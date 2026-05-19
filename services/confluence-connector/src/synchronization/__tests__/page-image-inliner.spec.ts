@@ -12,6 +12,7 @@ import {
   CONFLUENCE_BASE_URL,
   PAGE_BODY_CROSS_PAGE_IMAGE,
   PAGE_BODY_EXTERNAL_URL_IMAGE,
+  PAGE_BODY_IMAGE_NESTED_IN_TABLE,
   PAGE_BODY_IMAGE_WITH_ATTRS,
   PAGE_BODY_MIXED_URL_AND_ATTACHMENT,
   PAGE_BODY_MULTIPLE_CURRENT_PAGE_IMAGES,
@@ -514,6 +515,24 @@ describe('PageImageInliner', () => {
       );
       expect(result.inlinedAttachmentIds.size).toBe(1);
       expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('inlines an <ac:image> nested several levels deep inside a table cell', async () => {
+      // Confluence happily places image macros inside any block container. The parser
+      // must find them at any depth, not just as direct children of the page body.
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+      const page = basePage(PAGE_BODY_IMAGE_NESTED_IN_TABLE);
+
+      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+
+      expect(result.page.body).toContain(
+        `src="data:image/png;base64,${imageBuffer().toString('base64')}"`,
+      );
+      expect(result.page.body).not.toContain('<ac:image');
+      // Surrounding table structure must remain intact byte-for-byte.
+      expect(result.page.body.startsWith('<table><tbody><tr><td><p>cell text</p>')).toBe(true);
+      expect(result.page.body.endsWith('</td></tr></tbody></table>')).toBe(true);
+      expect(result.inlinedAttachmentIds.size).toBe(1);
     });
 
     it('inlines two adjacent <ac:image> macros with no separator between them', async () => {

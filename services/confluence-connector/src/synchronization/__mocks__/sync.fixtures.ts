@@ -73,6 +73,11 @@ export const PAGE_BODY_UNCLOSED_IMAGE =
 export const PAGE_BODY_MIXED_URL_AND_ATTACHMENT =
   '<p>external first</p><ac:image><ri:url ri:value="https://example.com/banner.png"/></ac:image><p>then attachment</p><ac:image><ri:attachment ri:filename="diagram.png"/></ac:image>';
 
+// <ac:image> wrapped inside a table cell. Exercises the parser's any-depth traversal:
+// the macro is not a direct child of the body, but several levels down inside <table>.
+export const PAGE_BODY_IMAGE_NESTED_IN_TABLE =
+  '<table><tbody><tr><td><p>cell text</p><ac:image><ri:attachment ri:filename="diagram.png"/></ac:image></td></tr></tbody></table>';
+
 export const sampleDiscoveredImageAttachment: DiscoveredAttachment = {
   id: 'att-image-1',
   title: 'diagram.png',
