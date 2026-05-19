@@ -65,12 +65,20 @@ export function buildInlinedAttachmentKey(pageId: string, attachmentId: string):
 
 export class PageImageInliner {
   private readonly logger = new Logger(PageImageInliner.name);
+  // Cross-page page-by-title lookups are cached for the duration of one sync run.
+  // The orchestrator calls resetCrossPageCache() at the start of every sync so that
+  // attachment changes on a target page (or a previously-missing page becoming
+  // available) are picked up on the next cycle.
   private readonly crossPageCache = new Map<string, Promise<PageAttachmentLookupResult | null>>();
 
   public constructor(
     private readonly config: TenantConfig,
     private readonly confluenceApiClient: ConfluenceApiClient,
   ) {}
+
+  public resetCrossPageCache(): void {
+    this.crossPageCache.clear();
+  }
 
   public async inlineImages(
     page: FetchedPage,
@@ -142,6 +150,20 @@ export class PageImageInliner {
         filename: resolved.filename,
         mediaType: resolved.mediaType,
         msg: 'Referenced attachment is not an image, leaving macro untouched',
+      });
+      return null;
+    }
+
+    // Current-page attachments have already been filtered by allowedMimeTypes during
+    // discovery, but cross-page lookups read raw attachment metadata from the API and
+    // must be re-checked here so unsupported image formats (GIF, WebP, SVG, etc.) are
+    // never inlined.
+    if (!this.isAllowedMediaType(resolved.mediaType)) {
+      this.logger.debug({
+        pageId: page.id,
+        filename: resolved.filename,
+        mediaType: resolved.mediaType,
+        msg: 'Referenced image MIME type is not in allowedMimeTypes, leaving macro untouched',
       });
       return null;
     }
@@ -258,6 +280,11 @@ export class PageImageInliner {
   private isImageMediaType(mediaType: string): boolean {
     const normalized = mediaType.split(';')[0]?.trim().toLowerCase() ?? '';
     return normalized.startsWith('image/');
+  }
+
+  private isAllowedMediaType(mediaType: string): boolean {
+    const normalized = mediaType.split(';')[0]?.trim().toLowerCase() ?? '';
+    return this.config.ingestion.attachments.allowedMimeTypes.includes(normalized);
   }
 
   private exceedsMaxSize(fileSize: number): boolean {

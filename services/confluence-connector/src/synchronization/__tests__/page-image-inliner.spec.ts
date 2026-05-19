@@ -41,13 +41,24 @@ vi.mock('@nestjs/common', async (importOriginal) => {
   };
 });
 
-function createTenantConfigWithMaxFileSize(maxFileSizeMb: number): TenantConfig {
+function createTestTenantConfig(
+  overrides: { maxFileSizeMb?: number; allowedMimeTypes?: string[] } = {},
+): TenantConfig {
   return createMock<TenantConfig>({
-    ingestion: { attachments: { maxFileSizeMb } },
+    ingestion: {
+      attachments: {
+        maxFileSizeMb: overrides.maxFileSizeMb ?? 200,
+        allowedMimeTypes: overrides.allowedMimeTypes ?? [
+          'image/png',
+          'image/jpeg',
+          'application/pdf',
+        ],
+      },
+    },
   });
 }
 
-const baseTenantConfig: TenantConfig = createTenantConfigWithMaxFileSize(200);
+const baseTenantConfig: TenantConfig = createTestTenantConfig();
 
 function basePage(body: string): FetchedPage {
   return {
@@ -224,7 +235,7 @@ describe('PageImageInliner', () => {
         fileSize: 5 * 1024 * 1024,
       };
       const smallLimitInliner = new PageImageInliner(
-        createTenantConfigWithMaxFileSize(1),
+        createTestTenantConfig({ maxFileSizeMb: 1 }),
         apiClient,
       );
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
@@ -247,6 +258,21 @@ describe('PageImageInliner', () => {
 
       expect(result.page.body).toBe(page.body);
       expect(result.inlinedAttachmentIds.size).toBe(0);
+    });
+
+    it('leaves <ac:image> untouched when the matching attachment is an image/* type that is not in allowedMimeTypes', async () => {
+      // A current-page reference resolving to image/gif is dropped even though the
+      // attachment exists. Defensive in case discovery ever produces a non-allowlisted
+      // image type (today the scanner already filters by allowedMimeTypes).
+      const gifAttachment: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        mediaType: 'image/gif',
+      };
+      const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
+      const result = await inliner.inlineImages(page, [gifAttachment]);
+      expect(result.page.body).toBe(page.body);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
     it('leaves <ri:url> external images untouched and never fetches them', async () => {
@@ -320,6 +346,29 @@ describe('PageImageInliner', () => {
       );
     });
 
+    it('leaves cross-page macro untouched when the resolved attachment is an image type outside allowedMimeTypes', async () => {
+      // Cross-page lookups return raw Confluence attachment metadata that has not
+      // been filtered by discovery. A GIF/WebP/SVG on the target page must be
+      // rejected by the inliner so it doesn't end up base64-embedded into the page.
+      apiClient.fetchPageAttachmentsByTitle.mockResolvedValue({
+        pageId: '77',
+        attachments: [
+          createConfluenceImageAttachment({
+            id: 'remote-gif',
+            title: 'other.png',
+            mediaType: 'image/gif',
+          }),
+        ],
+      });
+
+      const page = basePage(PAGE_BODY_CROSS_PAGE_IMAGE);
+      const result = await inliner.inlineImages(page, []);
+
+      expect(result.page.body).toBe(page.body);
+      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+    });
+
     it('leaves cross-page macro untouched when the target page is not found', async () => {
       apiClient.fetchPageAttachmentsByTitle.mockResolvedValue(null);
 
@@ -366,6 +415,48 @@ describe('PageImageInliner', () => {
       });
       await Promise.all([first, second]);
       expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-fetches the same target page after resetCrossPageCache() is called between syncs', async () => {
+      // First sync: lookup succeeds and is cached on the instance.
+      apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce({
+        pageId: '77',
+        attachments: [createConfluenceImageAttachment({ id: 'remote-1', title: 'other.png' })],
+      });
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+      await inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
+      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
+
+      // Second sync after the orchestrator clears the cache: the same lookup must
+      // hit the API again so any attachment changes on the target page are picked up.
+      inliner.resetCrossPageCache();
+      apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce({
+        pageId: '77',
+        attachments: [
+          createConfluenceImageAttachment({ id: 'remote-1', title: 'other.png' }),
+          createConfluenceImageAttachment({ id: 'remote-2', title: 'new.png' }),
+        ],
+      });
+      await inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
+      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-fetches after resetCrossPageCache() even when the previous lookup returned null', async () => {
+      apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce(null);
+      const firstSync = await inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
+      expect(firstSync.inlinedAttachmentIds.size).toBe(0);
+
+      // Without resetCrossPageCache() the null result would stick. After reset, the
+      // newly-available target page should be picked up.
+      inliner.resetCrossPageCache();
+      apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce({
+        pageId: '77',
+        attachments: [createConfluenceImageAttachment({ id: 'remote-1', title: 'other.png' })],
+      });
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+      const secondSync = await inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
+      expect(secondSync.inlinedAttachmentIds.size).toBe(1);
+      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(2);
     });
 
     it('does not permanently cache a rejected cross-page lookup; retries on next reference', async () => {

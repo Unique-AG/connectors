@@ -41,9 +41,11 @@ const mockScopeManagementService = {
   cleanupRemovedSpaces: vi.fn().mockResolvedValue(undefined),
 } as unknown as ScopeManagementService;
 
-const passthroughPageImageInliner: Pick<PageImageInliner, 'inlineImages'> = {
-  inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
-};
+const passthroughPageImageInliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> =
+  {
+    inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+    resetCrossPageCache: vi.fn(),
+  };
 
 function createService(
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
@@ -54,7 +56,10 @@ function createService(
     'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'
   >,
   metrics: Metrics = createNoopMetrics(),
-  pageImageInliner: Pick<PageImageInliner, 'inlineImages'> = passthroughPageImageInliner,
+  pageImageInliner: Pick<
+    PageImageInliner,
+    'inlineImages' | 'resetCrossPageCache'
+  > = passthroughPageImageInliner,
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
     scanner as ConfluencePageScanner,
@@ -721,7 +726,7 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('passes inlined page body to ingestPage and skips standalone ingestion of the inlined image', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
         inlineImages: vi.fn(async (page) => ({
           page: {
             ...page,
@@ -731,6 +736,7 @@ describe('ConfluenceSynchronizationService', () => {
             buildInlinedAttachmentKey(imageAttachment.pageId, imageAttachment.id),
           ]),
         })),
+        resetCrossPageCache: vi.fn(),
       };
 
       const svc = createService(
@@ -767,8 +773,9 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('falls back to standalone image ingestion when the inliner reports no successful inlines', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
         inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+        resetCrossPageCache: vi.fn(),
       };
 
       const svc = createService(
@@ -793,8 +800,9 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('only passes image-type attachments (not PDFs) to the inliner', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
         inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+        resetCrossPageCache: vi.fn(),
       };
 
       const svc = createService(
@@ -853,7 +861,7 @@ describe('ConfluenceSynchronizationService', () => {
         return Promise.resolve({ ...base, id: page.id });
       });
 
-      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
         inlineImages: vi.fn(async (fetchedPage) => {
           // Page A inlines the cross-page image; Page B has no image attachments referenced.
           if (fetchedPage.id === '1') {
@@ -866,6 +874,7 @@ describe('ConfluenceSynchronizationService', () => {
           }
           return { page: fetchedPage, inlinedAttachmentIds: new Set<string>() };
         }),
+        resetCrossPageCache: vi.fn(),
       };
 
       const svc = createService(
@@ -893,11 +902,33 @@ describe('ConfluenceSynchronizationService', () => {
       expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalled();
     });
 
+    it('clears the inliner cross-page cache at the start of every sync', async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
+        inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+        resetCrossPageCache: vi.fn(),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(inliner.resetCrossPageCache).toHaveBeenCalledTimes(2);
+    });
+
     it('falls back to ingesting the original body when the inliner throws', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
         inlineImages: vi.fn(async () => {
           throw new Error('inliner exploded');
         }),
+        resetCrossPageCache: vi.fn(),
       };
 
       const svc = createService(
