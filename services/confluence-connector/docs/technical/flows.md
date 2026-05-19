@@ -110,12 +110,23 @@ sequenceDiagram
         loop For each new/updated page (concurrency-limited)
             Connector->>Confluence: GET page by ID<br/>(body.storage)
             Confluence->>Connector: Page HTML content
+            Note over Connector: Parse storage XML, locate &lt;ac:image&gt; macros
+            opt Image attachments referenced
+                opt Some references point to another page
+                    Connector->>Confluence: GET /rest/api/content?spaceKey=&amp;title=<br/>(cached per sync)
+                    Confluence->>Connector: Target page + its attachments
+                end
+                Connector->>Confluence: Download each referenced image
+                Confluence->>Connector: Image binary streams
+                Note over Connector: Base64-encode and splice<br/>&lt;img src="data:..."&gt; in place of macros
+            end
             Connector->>Unique: Register content
             Connector->>Unique: PUT buffer upload (text/html)
             Connector->>Unique: Finalize ingestion
         end
 
-        loop For each new/updated attachment (concurrency-limited)
+        loop For each new/updated remaining attachment (concurrency-limited)
+            Note over Connector: Skips image attachments successfully inlined into a page.<br/>Processes non-image attachments and orphan/failed-inline images.
             Connector->>Unique: Register content
             Connector->>Confluence: Get attachment stream
             Confluence->>Connector: File stream
@@ -196,9 +207,27 @@ An attachment is accepted if:
 - Its file size does not exceed `maxFileSizeMb` (default: 200 MB)
 - The `maxItemsToScan` capacity has not been exhausted (pages count first, attachments use remaining capacity)
 
-Images embedded in a page body (via the editor's drag/drop, paste, or "Insert image" actions) are stored by Confluence as regular page attachments and surface in the same `expand=children.attachment` results, so they are ingested through this path when `image/png` or `image/jpeg` is in `allowedMimeTypes`. Images inserted as external URLs are not attachments and are not ingested.
+Images embedded in a page body (via the editor's drag/drop, paste, or "Insert image" actions) are stored by Confluence as regular page attachments and surface in the same `expand=children.attachment` results. During page ingestion these images are inlined directly into the page HTML (see the [Page Image Inlining](#page-image-inlining) section below) rather than ingested as separate artifacts. Images that cannot be inlined fall back to the standalone attachment path. Images inserted as external URLs (`<ri:url>`) are not attachments and are not ingested.
 
-When `attachments.imageOcr` is `enabled` (default), each image content registration includes `ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT`, which the Unique ingestion service merges over its environment defaults and the destination scope's own config (request body has highest precedence). This forces OCR-based processing on the worker so chunks are produced; without it, the worker default (`NO_INGESTION`) returns zero chunks and the worker raises `FAILED_IMAGE`.
+When `attachments.imageOcr` is `enabled` (default), each image content registration that still goes through the standalone attachment path (orphan or failed-inline) includes `ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT`, which the Unique ingestion service merges over its environment defaults and the destination scope's own config (request body has highest precedence). This forces OCR-based processing on the worker so chunks are produced; without it, the worker default (`NO_INGESTION`) returns zero chunks and the worker raises `FAILED_IMAGE`. Images inlined into a page are processed via the page artifact and do not go through this OCR path.
+
+### Page Image Inlining
+
+During page ingestion, the connector parses each page's Confluence storage XML and replaces every `<ac:image>` macro that points to a Confluence attachment with an `<img src="data:image/...;base64,...">` element before uploading the page. Two reference shapes are resolved:
+
+- **Current-page attachment:** `<ac:image><ri:attachment ri:filename="..."/></ac:image>` is matched against the page's discovered image attachments by filename.
+- **Cross-page attachment:** `<ac:image><ri:attachment ri:filename="..."><ri:page ri:space-key="..." ri:content-title="..."/></ri:attachment></ac:image>` triggers an on-demand lookup of the target page's attachments. Results are cached for the lifetime of one sync.
+
+A macro is left untouched (and falls back to the standalone attachment path if the underlying attachment is otherwise queued for ingestion) when any of these conditions hold:
+
+- The reference is an external URL (`<ri:url>`). Never fetched.
+- The filename does not match any attachment on the resolved page.
+- The matched attachment is not an `image/*` MIME type.
+- The image size exceeds `attachments.maxFileSizeMb`.
+- The image download stream errors.
+- The cross-page lookup returns no page.
+
+Per-page memory is bounded by the inlined page size, the per-image `attachments.maxFileSizeMb` cap, and `processing.concurrency`. Image downloads within a single page are also concurrency-capped to keep memory usage predictable on image-heavy pages.
 
 ### Content Type Ingestion Map
 
@@ -212,7 +241,7 @@ Content that passes the filter has its `body.storage` HTML extracted and ingeste
 |---|---|---|---|
 | Page | **Yes** | Yes (`body.storage` / ADF) | Primary content type. Full body ingestion. |
 | Blog Post | **Yes** | Yes (`body.storage` / ADF) | Treated identically to pages by the connector. |
-| Attachment | **Yes** (conditional) | No (binary) | Only when `attachments.mode=enabled`. Filtered by MIME type and size. Includes embedded images (PNG, JPEG). |
+| Attachment | **Yes** (conditional) | No (binary) | Only when `attachments.mode=enabled`. Filtered by MIME type and size. Embedded images (PNG, JPEG) are inlined into the page artifact (see [Page Image Inlining](#page-image-inlining)) rather than ingested as separate attachments. |
 | Whiteboard | **No** | No (no body via API) | Explicitly skipped. API returns no body content. Descendants are still discovered. |
 | Database | **No** | No (structured data, not exposed) | Explicitly skipped. No body via API. Descendants (sub-pages) are still discovered and ingested. |
 | Embed / Smart Link | **No** | No (only has `embedUrl`) | Explicitly skipped. Only contains a URL reference, no renderable body. |
