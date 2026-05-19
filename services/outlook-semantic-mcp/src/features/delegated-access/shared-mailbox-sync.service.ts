@@ -128,13 +128,12 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     const backOffMs = 500;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        this.sync(excludedUserIds);
+        await this.sync(excludedUserIds);
+        break;
       } catch (err) {
         const { shouldRetry } = handleGraphError(attempt, err);
-
         if (!shouldRetry) {
-          this.syncIsRunning = false;
-          return;
+          break;
         }
         await sleep(backOffMs * 2 ** (attempt - 1));
       }
@@ -164,7 +163,6 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     }
     const { client, userId } = result;
 
-    // Fetch disabled users from Graph (shared mailboxes are disabled accounts)
     let graphUsers: GraphUser[] = [];
     try {
       graphUsers = await this.fetchDisabledUsersFromGraph(client);
@@ -172,16 +170,12 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       throw new FetchUsersError(userId, `Failed to fetch users from ms graph`, { cause: err });
     }
 
-    // Intersect Graph results with env var email list (case-insensitive)
-    const matchedUsers = graphUsers.filter(
-      (u) => u.mail && envEmails.includes(u.mail.toLowerCase()),
-    ) as NonNullishProps<GraphUser, 'mail'>[];
-
-    const matchedEmails = matchedUsers.map((u) => u.mail?.toLowerCase()).filter(Boolean);
+    const matchedUsers = graphUsers.filter((u) => u.mail) as NonNullishProps<GraphUser, 'mail'>[];
+    const matchedEmails = matchedUsers.map((u) => u.mail.toLowerCase());
 
     if (matchedUsers.length === 0 && envEmails.length > 0) {
       this.logger.warn({
-        msg: 'SharedMailboxSync: no Graph users matched the configured shared mailbox emails',
+        msg: 'SharedMailboxSync: no Graph users found for the configured shared mailbox emails',
         envEmails,
       });
     }
