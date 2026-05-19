@@ -50,24 +50,28 @@ Sites can be configured in two ways:
 sharepoint:
   # ... auth and base configuration ...
 
+  # Deployment-wide defaults applied to every site below; per-site values
+  # win when set. See "Site Defaults" further down for full semantics.
+  siteDefaults:
+    syncColumnName: FinanceGPTKnowledge
+    storeInternally: enabled
+    syncStatus: active
+    syncMode: content_only
+    permissionsInheritanceMode: inherit_scopes_and_files
+
   sitesSource: config_file
   sites:
+    # Overrides syncMode for this site; everything else inherits from siteDefaults.
     - siteId: 12345678-1234-1234-1234-123456789abc
-      syncColumnName: FinanceGPTKnowledge
       ingestionMode: recursive
       scopeId: scope_bu4gokr0atzj0kfiuaaaaaaa
       maxFilesToIngest: 1000
-      storeInternally: enabled
-      syncStatus: active
       syncMode: content_and_permissions
+    # Overrides syncColumnName for this site; everything else inherits from siteDefaults.
     - siteId: 87654321-4321-4321-4321-cba987654321
       syncColumnName: HRKnowledge
       ingestionMode: flat
       scopeId: scope_bu4gokr0atzj0kfiubbbbbb
-      storeInternally: enabled
-      syncStatus: active
-      syncMode: content_only
-      permissionsInheritanceMode: inherit_scopes_and_files
 ```
 
 ### Dynamic Sites Configuration (sharepoint_list)
@@ -198,7 +202,7 @@ The connector supports HTTP/HTTPS proxy for environments where internet access i
 
 ## SharePoint List Configuration
 
-When using `sharepoint_list` as the sites source, create a SharePoint list with the following columns:
+When using `sharepoint_list` as the sites source, create a SharePoint list with the following columns. Only `siteId` is strictly required as a column on the list — any other column whose value is set via [Site Defaults](#Site-Defaults) can be omitted from the list entirely, and rows will inherit the deployment-wide value.
 
 | Column Display Name          | Type             | Description                                                                                                       |
 | ---------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------- |

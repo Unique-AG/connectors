@@ -110,16 +110,16 @@ sharepoint:
 
 ### What columns are needed for the SharePoint configuration list?
 
-**Answer:** When using `sharepoint_list` as the sites source, create a list with these columns:
+**Answer:** When using `sharepoint_list` as the sites source, create a list with these columns. Only `siteId` must be present as a column on the list — every other column marked `Yes*` can instead be supplied via `sharepoint.siteDefaults` in the tenant config, in which case the column can be omitted from the list entirely. See [Site Defaults](./operator/configuration.md#Site-Defaults).
 
 | Column Display Name          | Type             | Required | Description                                   |
 | ---------------------------- | ---------------- | -------- | --------------------------------------------- |
 | `siteId`                     | Single line text | Yes      | SharePoint site ID (UUID)                     |
-| `syncColumnName`             | Single line text | Yes      | Column marking files for sync                 |
-| `ingestionMode`              | Choice           | Yes      | `flat` or `recursive`                         |
-| `uniqueScopeId`              | Single line text | Yes      | Unique scope ID                               |
-| `syncStatus`                 | Choice           | Yes      | `active`, `inactive`, or `deleted`            |
-| `syncMode`                   | Choice           | Yes      | `content_only` or `content_and_permissions`   |
+| `syncColumnName`             | Single line text | Yes\*    | Column marking files for sync                 |
+| `ingestionMode`              | Choice           | Yes\*    | `flat` or `recursive`                         |
+| `uniqueScopeId`              | Single line text | Yes\*    | Unique scope ID                               |
+| `syncStatus`                 | Choice           | Yes\*    | `active`, `inactive`, or `deleted`            |
+| `syncMode`                   | Choice           | Yes\*    | `content_only` or `content_and_permissions`   |
 | `maxFilesToIngest`           | Number           | No       | Optional limit                                |
 | `storeInternally`            | Choice           | No       | `enabled` or `disabled`                       |
 | `permissionsInheritanceMode` | Choice           | No       | Inheritance settings                          |
