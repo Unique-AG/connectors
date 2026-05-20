@@ -317,8 +317,8 @@ export class DiscoverDelegatedAccessCommand {
       'shared-mailbox': includeSharedMailboxes,
     };
     const userProfilesSourcesToInclude: UserProfileSource[] = Object.entries(sourcesToInclude)
-      .filter((_, shouldInclude) => shouldInclude)
-      .map((key) => key as unknown as UserProfileSource);
+      .filter(([_, shouldInclude]) => shouldInclude)
+      .map(([key]) => key as unknown as UserProfileSource);
 
     const items = await this.db
       .select({
