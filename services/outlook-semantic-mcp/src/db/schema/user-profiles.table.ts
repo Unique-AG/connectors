@@ -5,7 +5,11 @@ import { timestamps } from '../timestamps.columns';
 import { authorizationCodes } from './auth/authorization-codes.table';
 import { tokens } from './auth/tokens.table';
 
-export const userProfileSource = pgEnum('user_profile_source', ['oauth', 'shared-mailbox']);
+const userProfileSourceValues = ['oauth', 'shared-mailbox'] as const;
+
+export type UserProfileSource = (typeof userProfileSourceValues)[number];
+
+export const userProfileSource = pgEnum('user_profile_source', userProfileSourceValues);
 
 export const userProfiles = pgTable(
   'user_profiles',

@@ -13,7 +13,7 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, eq, isNotNull, notInArray } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, notInArray } from 'drizzle-orm';
 import { MetricService } from 'nestjs-otel';
 import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';
 import { SCOPES } from '../auth/microsoft.provider';
@@ -47,15 +47,21 @@ export class GraphClientFactory {
     this.scopes = SCOPES;
   }
 
+  // Use this when reading a MS Graph resource that any authenticated user can access (e.g. listing
+  // all users via User.Read.All). Do NOT use it for mailbox-specific operations — those require a
+  // client scoped to a particular user via createClientForUser.
   public async createClientForAnyAuthorizedUser(
     excludeIds?: string[],
   ): Promise<{ client: Client; userId: string } | null> {
     const profile = await this.drizzle.query.userProfiles.findFirst({
       where: and(
+        // We filter only users which can get an oauth token
         eq(userProfiles.source, 'oauth'),
         isNotNull(userProfiles.accessToken),
         excludeIds && excludeIds.length > 0 ? notInArray(userProfiles.id, excludeIds) : undefined,
       ),
+      // We order by updatedAt descending so that we minize the chance of getting a deactivated user
+      orderBy: (t) => desc(t.updatedAt),
       columns: { id: true },
     });
     if (!profile) {

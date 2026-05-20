@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, gt, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { DRIZZLE, DrizzleDatabase, directoriesSync, subscriptions, userProfiles } from '~/db';
+import { DRIZZLE, DrizzleDatabase, directoriesSync, userProfiles } from '~/db';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { SyncDirectoriesCommand } from './sync-directories.command';
@@ -22,13 +22,7 @@ export class SyncDirectoriesForAllUserProfilesCommand {
       .where(
         or(
           eq(userProfiles.source, 'shared-mailbox'),
-          inArray(
-            userProfiles.id,
-            this.db
-              .select({ userProfileId: subscriptions.userProfileId })
-              .from(subscriptions)
-              .where(gt(subscriptions.expiresAt, sql`now()`)),
-          ),
+          and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)),
         ),
       )
       .orderBy(sql`${directoriesSync.lastDeltaSyncRanAt} asc nulls first`)

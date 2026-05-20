@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, gt, inArray, isNotNull, notInArray, or, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, notInArray } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, last } from 'remeda';
 import { AppConfig, appConfig, DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
@@ -9,7 +9,7 @@ import {
   DRIZZLE,
   DrizzleDatabase,
   delegatedAccessAccounts,
-  subscriptions,
+  UserProfileSource,
   userProfiles,
 } from '~/db';
 import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
@@ -312,10 +312,13 @@ export class DiscoverDelegatedAccessCommand {
     excludedProfileIds?: string[];
     includeSharedMailboxes: boolean;
   }): Promise<{ userProfileId: string; email: string; source: string }[]> {
-    const activeSubscriptions = this.db
-      .select({ userProfileId: subscriptions.userProfileId })
-      .from(subscriptions)
-      .where(and(gt(subscriptions.expiresAt, sql`NOW()`)));
+    const sourcesToInclude: Record<UserProfileSource, boolean> = {
+      oauth: true,
+      'shared-mailbox': includeSharedMailboxes,
+    };
+    const userProfilesSourcesToInclude: UserProfileSource[] = Object.entries(sourcesToInclude)
+      .filter((_, shouldInclude) => shouldInclude)
+      .map((key) => key as unknown as UserProfileSource);
 
     const items = await this.db
       .select({
@@ -331,12 +334,7 @@ export class DiscoverDelegatedAccessCommand {
           excludedProfileIds && excludedProfileIds.length > 0
             ? notInArray(userProfiles.id, excludedProfileIds)
             : undefined,
-          includeSharedMailboxes
-            ? or(
-                inArray(userProfiles.id, activeSubscriptions),
-                eq(userProfiles.source, 'shared-mailbox'),
-              )
-            : inArray(userProfiles.id, activeSubscriptions),
+          inArray(userProfiles.source, userProfilesSourcesToInclude),
         ),
       )
       .orderBy(userProfiles.id)

@@ -79,7 +79,11 @@ export class SyncDirectoriesCommand {
           return await this.runDeltaQuery(userProfile.id, client, initialDeltaEndpoint, syncStats);
         } catch (err) {
           if (err instanceof GraphError && err.statusCode === 410 && syncStats.deltaLink) {
-            // Stale delta link from a previous delegate session — clear it and restart from scratch
+            // MS Graph returns 410 when a delta token is no longer usable — this happens either
+            // because the token expired (tokens are valid for ~7 days of inactivity) or because
+            // the delegate who originally obtained it no longer has access to this mailbox.
+            // We clear both the delta link and the stored delegate so the retry below starts a
+            // full re-sync using whichever delegate the resolver picks now.
             await this.db
               .update(directoriesSync)
               .set({ deltaLink: null, synchronizedByUserProfileId: null })
