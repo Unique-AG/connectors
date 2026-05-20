@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.8](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.7...outlook-semantic-mcp@0.4.8) (2026-05-20)
+
+
+### Features
+
+* **outlook-semantic-mcp:** un-20852 add support for shared mailboxes for microsoft graph backend ([#561](https://github.com/Unique-AG/connectors/issues/561)) ([e322231](https://github.com/Unique-AG/connectors/commit/e322231a92c55dca5abd3d56039c7899eca9e322))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** update grafana dashboard, preselect data source and job ([#549](https://github.com/Unique-AG/connectors/issues/549)) ([56ebf4f](https://github.com/Unique-AG/connectors/commit/56ebf4fef2078c77e4fa7e5ba45f5c52ab76b577))
+
 ## [0.4.7](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.6...outlook-semantic-mcp@0.4.7) (2026-05-18)
 
 
