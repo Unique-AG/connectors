@@ -2,7 +2,11 @@ import { processInBatches } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import { isNullish } from 'remeda';
 import type { UniqueGraphqlClient } from '../clients/unique-graphql.client';
+import { toSafeBulkMoveError } from './bulk-move-error';
 import {
+  BULK_MOVE_MUTATION,
+  type BulkMoveMutationInput,
+  type BulkMoveMutationResult,
   CREATE_SCOPE_ACCESSES_MUTATION,
   type CreateScopeAccessesMutationInput,
   type CreateScopeAccessesMutationResult,
@@ -22,7 +26,7 @@ import {
   type UpdateScopeMutationInput,
   type UpdateScopeMutationResult,
 } from './scopes.queries';
-import type { DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
+import type { BulkMoveResult, DeleteFolderResult, Scope, ScopeAccess } from './scopes.types';
 import { UniqueApiScopesFacade } from './unique-scopes.facade';
 
 const BATCH_SIZE = 100;
@@ -192,6 +196,44 @@ export class ScopesService implements UniqueApiScopesFacade {
     } while (batchCount === BATCH_SIZE);
 
     return scopes;
+  }
+
+  /*
+   * Depending on the number of files it has to move, bulkMove can be a sync operation or an async operation.
+   * But it always returns *after the new parent was correctly set for scopes and files*.
+   * What it actually does asynchronously is the metadata update where it computes the new folderIdPath, for example
+   *  - folderIdpath: "uniquepathid://scope_o5jr5ig8k4iugk8lhd8nq42e/scope_xrqbd1pjg71xq7o6r762w01o"
+   * Recomputing the metadata is a slower process that's why for more files (default is 10) it'll be async
+   */
+  public async bulkMove(scopeIds: string[], targetScopeId: string): Promise<BulkMoveResult> {
+    this.logger.debug(`Bulk-moving ${scopeIds.length} scopes to target ${targetScopeId}`);
+
+    let result: BulkMoveMutationResult;
+    try {
+      result = await this.scopeManagementClient.request<
+        BulkMoveMutationResult,
+        BulkMoveMutationInput
+      >(
+        BULK_MOVE_MUTATION,
+        { input: { scopeIds, targetScopeId } },
+        { errorTransform: toSafeBulkMoveError },
+      );
+    } catch (error) {
+      throw toSafeBulkMoveError(error);
+    }
+
+    this.logger.debug({
+      msg: 'bulkMove response',
+      response: result.bulkMove,
+    });
+
+    return {
+      scopeIds: result.bulkMove.scopeIds,
+      asyncMetadataRebuild: result.bulkMove.asyncMetadataRebuild,
+      jobId: result.bulkMove.jobId ?? null,
+      affectedFiles: result.bulkMove.affectedFiles ?? null,
+      message: result.bulkMove.message ?? null,
+    };
   }
 
   public async createAccesses(

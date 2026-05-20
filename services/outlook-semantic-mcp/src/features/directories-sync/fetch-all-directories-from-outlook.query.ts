@@ -4,36 +4,39 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import { clone, sumBy, unique } from 'remeda';
+import { UserProfile } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { GraphClientFactory } from '../../msgraph/graph-client.factory';
+import { NonNullishProps } from '~/utils/non-nullish-props';
 import { GraphOutlookDirectory, graphOutlookDirectoriesResponse } from './microsoft-graph.dtos';
 
 @Injectable()
 export class FetchAllDirectoriesFromOutlookQuery {
   private readonly logger = new Logger(FetchAllDirectoriesFromOutlookQuery.name);
 
-  public constructor(private readonly graphClientFactory: GraphClientFactory) {}
-
   @Span()
-  public async run(userProfileId: string): Promise<GraphOutlookDirectory[]> {
-    traceAttrs({ userProfileId: userProfileId });
-    this.logger.log({ userProfileId, msg: `Fetching all directories from Outlook` });
-
-    const client = this.graphClientFactory.createClientForUser(userProfileId);
+  public async run(
+    client: Client,
+    ownerProfile: NonNullishProps<UserProfile, 'email'>,
+  ): Promise<GraphOutlookDirectory[]> {
+    traceAttrs({ userProfileId: ownerProfile.id });
+    this.logger.log({
+      userProfileId: ownerProfile.id,
+      msg: `Fetching all directories from Outlook`,
+    });
 
     const rootDirectories: GraphOutlookDirectory[] = await this.fetchAllDirectories({
-      apiUrl: `me/mailFolders`,
+      apiUrl: `users/${ownerProfile.email}/mailFolders`,
       client,
     });
 
     traceEvent('root directories fetched', { count: rootDirectories.length });
     this.logger.log({
-      userProfileId,
+      userProfileId: ownerProfile.id,
       rootDirectoryCount: rootDirectories.length,
       msg: `Root directories fetched`,
     });
     this.logFullDirectoriesStructure({
-      userProfileId,
+      userProfileId: ownerProfile.id,
       directories: rootDirectories,
       msg: `Directories from microsoft before expansion`,
     });
@@ -47,6 +50,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
       directory.childFolders = await limit(() =>
         this.fetchChildDirectories({
           parentDirectoryId: directory.id,
+          ownerMailboxEmail: ownerProfile.email,
           client,
         }),
       );
@@ -55,7 +59,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
 
     await Promise.all(rootDirectories.map(expandDirectoryRecursive));
     this.logFullDirectoriesStructure({
-      userProfileId,
+      userProfileId: ownerProfile.id,
       directories: rootDirectories,
       msg: `Directories from microsoft after expansion`,
     });
@@ -69,7 +73,7 @@ export class FetchAllDirectoriesFromOutlookQuery {
       directoriesTree,
     });
     this.logger.log({
-      userProfileId,
+      userProfileId: ownerProfile.id,
       totalCount,
       rootDirectoriesCount: rootDirectories.length,
       directoriesTree,
@@ -154,13 +158,15 @@ export class FetchAllDirectoriesFromOutlookQuery {
 
   private async fetchChildDirectories({
     parentDirectoryId,
+    ownerMailboxEmail,
     client,
   }: {
     parentDirectoryId: string;
+    ownerMailboxEmail: string;
     client: Client;
   }): Promise<GraphOutlookDirectory[]> {
     let graphResponse = await client
-      .api(`me/mailFolders/${parentDirectoryId}/childFolders`)
+      .api(`users/${ownerMailboxEmail}/mailFolders/${parentDirectoryId}/childFolders`)
       .query({ includeHiddenFolders: 'true' })
       .top(500)
       .header(`Prefer`, `IdType="ImmutableId"`)

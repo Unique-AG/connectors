@@ -20,6 +20,7 @@ import { EmailManagementModule } from './email-management/email-management.modul
 import { CreateDraftEmailTool } from './email-management/tools/create-draft-email.tool';
 import { LookupContactsTool } from './email-management/tools/lookup-contacts.tool';
 import { MailSubscriptionController } from './mail-subscription.controller';
+import { PostAuthorizationUserFlowModule } from './post-authorization-user-flow/post-authorization-user-flow.module';
 import { ProcessEmailModule } from './process-email/process-email.module';
 import { SubscriptionModule } from './subscriptions/subscription.module';
 import { ReconnectInboxTool, VerifyInboxConnectionTool } from './subscriptions/tools';
@@ -88,6 +89,7 @@ export function registerBackendModule(): DynamicModule {
       UniqueApiFeatureModule,
       AdminModule,
       DelegatedAccessModule,
+      PostAuthorizationUserFlowModule,
     ],
     providers: [
       ...uniqueAndMicrosoftBackendCommonTools,

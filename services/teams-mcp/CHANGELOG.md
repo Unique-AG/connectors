@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.11](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.10...teams-mcp@0.2.11) (2026-05-18)
+
+
+### Bug Fixes
+
+* **deps,teams-mcp:** argo sync ([#559](https://github.com/Unique-AG/connectors/issues/559)) ([c43a883](https://github.com/Unique-AG/connectors/commit/c43a8837f998d05408e872df31e87137b5cc3808))
+
 ## [0.2.10](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.9...teams-mcp@0.2.10) (2026-05-13)
 
 

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { createSmeared } from '@unique-ag/utils';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { chunk, filter, groupBy, pipe } from 'remeda';
 import { typeid } from 'typeid-js';
@@ -15,6 +16,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
+import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 import { MsGraphSearchConfig } from './search.config';
 
@@ -41,6 +43,7 @@ const messageSchema = z.object({
       parentFolderId: z.string().optional().nullish(),
       webLink: z.string().optional().nullish(),
       uniqueBody: z.object({ content: z.string() }).optional().nullish(),
+      body: z.object({ content: z.string() }).optional().nullish(),
       bodyPreview: z.string().optional().nullish(),
     }),
   ),
@@ -74,6 +77,8 @@ interface QueryInput {
 
 @Injectable()
 export class MsGraphKqlSearchEmailsQuery {
+  private readonly logger = new Logger(MsGraphKqlSearchEmailsQuery.name);
+
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
@@ -256,12 +261,15 @@ export class MsGraphKqlSearchEmailsQuery {
       let batchResponse: z.infer<typeof batchResponseSchema>;
       try {
         const raw = await client.api('$batch').post({
-          requests: batch.map((request) => ({
-            id: request.requestId,
-            method: 'GET',
-            url: `/users/${request.mailbox}/messages?$search=${encodeURIComponent(`"${sanitizeKqlQuery(request.kqlQuery)}"`)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,bodyPreview&$top=${request.limit}`,
-            headers: { Prefer: 'outlook.body-content-type="text"' },
-          })),
+          requests: batch.map((request) => {
+            const search = sanitizeKqlQuery(request.kqlQuery);
+            return {
+              id: request.requestId,
+              method: 'GET',
+              url: `/users/${request.mailbox}/messages?$search=${encodeURIComponent(search)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview&$top=${request.limit}`,
+              headers: { Prefer: 'outlook.body-content-type="text"' },
+            };
+          }),
         });
         batchResponse = batchResponseSchema.parse(raw);
       } catch {
@@ -287,12 +295,28 @@ export class MsGraphKqlSearchEmailsQuery {
           continue;
         }
 
+        const details = {
+          mailbox: createSmeared(originalRequest.mailbox),
+          kqlQuery: createSmeared(originalRequest.kqlQuery),
+          body: createSmeared(safeStringify(subResponse.body)),
+        };
+
         if (status < 200 || status >= 300) {
+          this.logger.error({
+            ...details,
+            msg: 'MS Graph batch sub-request failed',
+            status,
+          });
           continue;
         }
 
         const parsed = messageSchema.safeParse(subResponse.body);
         if (!parsed.success) {
+          this.logger.error({
+            ...details,
+            msg: 'MS Graph message response failed schema validation',
+            error: parsed.error,
+          });
           continue;
         }
 
@@ -306,7 +330,7 @@ export class MsGraphKqlSearchEmailsQuery {
             receivedDateTime: msg.receivedDateTime ?? null,
             parentFolderId: msg.parentFolderId ?? '',
             webLink: msg.webLink ?? '',
-            text: msg.uniqueBody?.content ?? msg.bodyPreview ?? '',
+            text: msg.uniqueBody?.content || msg.body?.content || msg.bodyPreview || '',
           });
         }
       }

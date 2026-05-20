@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.7](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.6...outlook-semantic-mcp@0.4.7) (2026-05-18)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** ensure kql queries are sanitized properly, fallback to body if unique body is empty for forwarded emails. ([#557](https://github.com/Unique-AG/connectors/issues/557)) ([9d394af](https://github.com/Unique-AG/connectors/commit/9d394af790342d708a37ddb799d8dddd93db2534))
+
 ## [0.4.6](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.5...outlook-semantic-mcp@0.4.6) (2026-05-15)
 
 
