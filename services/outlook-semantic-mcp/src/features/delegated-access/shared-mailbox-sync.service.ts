@@ -220,6 +220,11 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
         };
       });
 
+      // source is intentionally omitted from the conflict update: if an Entra identity
+      // already exists as an OAuth row we leave it as oauth. Overwriting source would
+      // silently strip the user's own token-based access and subject them to delegate-only
+      // logic, which is the wrong behaviour for a real user who also happens to be listed
+      // as a shared mailbox.
       await this.db
         .insert(userProfiles)
         .values(mappedProfiles)
