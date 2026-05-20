@@ -22,7 +22,9 @@ const AC_IMAGE_ATTRS_TO_KEEP: ReadonlyArray<[string, string]> = [
   ['ac:height', 'height'],
 ];
 
-// Caps concurrent image downloads per page so one image-heavy page can't buffer N images at once.
+// Caps simultaneous in-flight image downloads per page. Bottleneck enforces req/min, not
+// concurrency, so this is the only guard against an image-heavy page running N parallel
+// downloads. Peak per-page memory is still dominated by the total size of inlined images.
 const IMAGE_DOWNLOAD_CONCURRENCY = 5;
 
 export interface InlineImagesResult {
