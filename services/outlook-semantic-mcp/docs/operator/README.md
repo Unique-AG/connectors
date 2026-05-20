@@ -39,7 +39,7 @@ See [Configuration — MCP_BACKEND](./configuration.md#MCP_BACKEND) for details.
 
 ## Architecture Overview
 
-The diagram below shows the full **Mode A** (`MicrosoftGraphAndUniqueApi`) topology. In Mode B (`MicrosoftGraph`), all infrastructure components are identical but the ingestion arrows to the Unique Knowledge Base are inactive — no email content is indexed.
+The diagram below shows the full **Mode A** (`MicrosoftGraphAndUniqueApi`) topology. In Mode B (`MicrosoftGraph`), all infrastructure components are identical but the ingestion arrows to the Unique Knowledge Base are inactive — no email content is ingested.
 
 ```mermaid
 flowchart LR

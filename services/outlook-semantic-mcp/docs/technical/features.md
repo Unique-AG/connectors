@@ -1,4 +1,4 @@
-<!-- confluence-page-id: TBD -->
+<!-- confluence-page-id: 2258862199 -->
 <!-- confluence-space-key: PUBDOC -->
 
 # Outlook Semantic MCP – Features
@@ -11,8 +11,8 @@ The MCP server operates in two modes controlled by the [`MCP_BACKEND`](../operat
 
 | Mode | `MCP_BACKEND` value | How it works |
 |------|---------------------|--------------|
-| **Mode A** | `MicrosoftGraphAndUniqueApi` | Emails are indexed into the Unique knowledge base after a user connects. `search_emails` runs semantic search (Unique KB) and KQL keyword search (Microsoft Graph) in parallel. |
-| **Mode B** | `MicrosoftGraph` | No email indexing. `search_emails` queries Microsoft Graph directly using KQL keyword search only. |
+| **Mode A** | `MicrosoftGraphAndUniqueApi` | Emails are ingested into the Unique knowledge base after a user connects. `search_emails` runs semantic search (Unique KB) and KQL keyword search (Microsoft Graph) in parallel. |
+| **Mode B** | `MicrosoftGraph` | No email ingesting. `search_emails` queries Microsoft Graph directly using KQL keyword search only. |
 
 Where a feature works the same in both modes, this page says so once. Where behaviour differs, Mode A and Mode B are called out separately.
 
