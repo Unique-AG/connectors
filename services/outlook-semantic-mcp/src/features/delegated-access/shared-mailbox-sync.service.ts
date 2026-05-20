@@ -203,9 +203,6 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       allMatchedUsers.push(...matched);
     }
 
-    // Delete source='shared-mailbox' rows that belong to a synced domain but are no longer matched.
-    // We only delete for successfully synced domains so that rows for domains with no authorized
-    // user are left untouched until a future run can verify them.
     await this.db.delete(userProfiles).where(
       and(
         eq(userProfiles.source, 'shared-mailbox'),

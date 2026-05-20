@@ -306,7 +306,7 @@ describe('SharedMailboxSyncService', () => {
       vi.clearAllMocks();
     });
 
-    it('returns null from factory → logs warning, no DB operations, no cache update', async () => {
+    it('returns null from factory → logs warning, cleans up stale rows, no cache update', async () => {
       const { service, db, graphClientFactory, persistentCacheService } = createService({
         config: { sharedMailboxEmails: ['shared@example.com'] },
         factoryResults: [null],
@@ -315,7 +315,9 @@ describe('SharedMailboxSyncService', () => {
       await (service as any).runSyncWithRetries();
 
       expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenCalledOnce();
-      expect(db.delete).not.toHaveBeenCalled();
+      // Cleanup always runs; with no matched users the delete has no NOT IN clause
+      expect(db.delete).toHaveBeenCalledOnce();
+      expect(db.insert).not.toHaveBeenCalled();
       expect(persistentCacheService.set).not.toHaveBeenCalled();
     });
   });
