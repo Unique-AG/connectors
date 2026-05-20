@@ -42,10 +42,8 @@ export class ConfluenceSynchronizationService {
     tenant.isScanning = true;
     const startTime = Date.now();
     let syncResult: 'success' | 'failure' = 'success';
-    // The page image inliner caches cross-page lookups for the duration of one sync
-    // so multiple references to the same target page share one API call. Reset here
-    // so attachment changes on a target page (or a target page newly becoming
-    // available) are picked up on the next cycle.
+    // Scope cross-page attachment lookup caching to a single sync cycle so target
+    // page attachment changes are visible on the next run.
     this.pageImageInliner.resetCrossPageCache();
 
     try {
