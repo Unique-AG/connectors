@@ -378,7 +378,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_cpu_time_total{job=~\"$job\", process_cpu_state=\"user\"}",
+          "expr": "rate(process_cpu_time_total{job=~\"$job\", process_cpu_state=\"user\"}[5m]) * 100",
           "legendFormat": "CPU User Time",
           "refId": "A"
         },
@@ -387,7 +387,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_cpu_time_total{job=~\"$job\", process_cpu_state=\"system\"}",
+          "expr": "rate(process_cpu_time_total{job=~\"$job\", process_cpu_state=\"system\"}[5m]) * 100",
           "legendFormat": "CPU System Time",
           "refId": "B"
         }
