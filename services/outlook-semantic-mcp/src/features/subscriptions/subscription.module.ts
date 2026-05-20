@@ -6,7 +6,6 @@ import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { InboxDeletingQueryModule } from '../delete-inbox/inbox-deleting-query.module';
 import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';
 import { GetSubscriptionStatusQuery } from './get-subscription-status.query';
-import { PostAuthorizationListener } from './listeners/post-authorization.listener';
 import { SubscriptionCreateService } from './subscription-create.service';
 import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscription-remove.service';
@@ -24,7 +23,6 @@ import { MailSubscriptionUtilsService } from './subscription-utils.service';
   providers: [
     MailSubscriptionUtilsService,
     SubscriptionCreateService,
-    PostAuthorizationListener,
     SubscriptionReauthorizeService,
     SubscriptionRemoveService,
     GetSubscriptionStatusQuery,

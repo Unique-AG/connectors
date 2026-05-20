@@ -1,5 +1,6 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { createSmeared } from '@unique-ag/utils';
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, inArray, not, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -12,11 +13,20 @@ import {
   directoriesSync,
   SystemDirectoriesIgnoredForSync,
   systemDirectories,
+  UserProfile,
 } from '~/db';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
+import {
+  isNoDelegatesResult,
+  MsGraphClientResolver,
+} from '~/msgraph/ms-graph-client-resolver.service';
 import { getRootScopeExternalIdForUser } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
-import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import {
+  convertUserProfileIdToTypeId,
+  UserProfileTypeID,
+} from '~/utils/convert-user-profile-id-to-type-id';
+import { NonNullishProps } from '~/utils/non-nullish-props';
 import { IsInboxDeletingQuery } from '../delete-inbox/is-inbox-deleting.query';
 import { GetUserProfileQuery } from '../user-utils/get-user-profile.query';
 import { CreateRootScopeCommand } from './create-root-scope.command';
@@ -40,6 +50,7 @@ export class SyncDirectoriesForUserProfileCommand {
     private readonly createRootScopeCommand: CreateRootScopeCommand,
     private readonly upsertDirectoryCommand: UpsertDirectoryCommand,
     private readonly isInboxDeletingQuery: IsInboxDeletingQuery,
+    private readonly msGraphClientResolver: MsGraphClientResolver,
   ) {}
 
   @Span()
@@ -51,13 +62,33 @@ export class SyncDirectoriesForUserProfileCommand {
     });
 
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    traceAttrs({ userProfileId: userProfile.id });
     const userEmail = createSmeared(userProfile.email);
+    traceAttrs({ userProfileId: userProfile.id });
     this.logger.log({
       userProfileId: userProfile.id,
       userEmail,
       msg: `Resolved user profile`,
     });
+
+    const result = await this.msGraphClientResolver.run({
+      userProfile,
+      fn: ({ client }) => this.doSync(client, userProfile),
+    });
+
+    if (isNoDelegatesResult(result)) {
+      this.logger.log({
+        userProfileId: userProfile.id,
+        msg: 'No delegates available for shared mailbox, skipping directory sync',
+      });
+      return;
+    }
+  }
+
+  private async doSync(
+    client: Client,
+    userProfile: NonNullishProps<UserProfile, 'email'>,
+  ): Promise<void> {
+    const userEmail = createSmeared(userProfile.email);
 
     await this.createRootScopeCommand.run({
       userProviderUserId: userProfile.providerUserId,
@@ -89,10 +120,13 @@ export class SyncDirectoriesForUserProfileCommand {
         userEmail,
         msg: `No existing directories found, syncing system directories`,
       });
-      await this.syncSystemDirectoriesCommand.run(userProfileId);
+      await this.syncSystemDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
     }
 
-    const microsoftDirectories = await this.fetchAllDirectoriesFromOutlookQuery.run(userProfile.id);
+    const microsoftDirectories = await this.fetchAllDirectoriesFromOutlookQuery.run(
+      client,
+      userProfile,
+    );
     traceEvent('microsoft directories fetched', { count: microsoftDirectories.length });
     this.logger.log({
       userProfileId: userProfile.id,

@@ -3,7 +3,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { AppConfig, appConfig } from '~/config';
 import { NewTrace } from '~/features/tracing.utils';
-import { SyncDirectoriesForSubscriptionsCommand } from './sync-directories-for-subscriptions.command';
+import { SyncDirectoriesForAllUserProfilesCommand } from './sync-directories-for-all-user-profiles.command';
 
 @Injectable()
 export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -12,7 +12,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
 
   public constructor(
     private readonly schedulerRegistry: SchedulerRegistry,
-    private syncDirectoriesForSubscriptionsCommand: SyncDirectoriesForSubscriptionsCommand,
+    private syncDirectoriesForAllUserProfilesCommand: SyncDirectoriesForAllUserProfilesCommand,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
   ) {}
 
@@ -47,7 +47,7 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
     try {
       this.logger.log({ msg: 'Scheduler triggered' });
 
-      await this.syncDirectoriesForSubscriptionsCommand.run();
+      await this.syncDirectoriesForAllUserProfilesCommand.run();
     } catch (err) {
       this.logger.error({ msg: 'An unexpected error occurred during the scheduled scan', err });
     }

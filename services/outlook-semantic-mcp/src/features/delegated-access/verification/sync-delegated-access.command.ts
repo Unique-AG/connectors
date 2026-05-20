@@ -78,7 +78,7 @@ export class SyncDelegatedAccessCommand {
     const { delegateUserId, ownerUserId } = accounts;
 
     const [ownerProfile] = await this.db
-      .select({ email: userProfiles.email })
+      .select({ email: userProfiles.email, source: userProfiles.source })
       .from(userProfiles)
       .where(eq(userProfiles.id, ownerUserId));
 
@@ -93,12 +93,13 @@ export class SyncDelegatedAccessCommand {
     }
 
     const client = this.graphClientFactory.createClientForUser(delegateUserId);
-    const verificationResult = await this.verifyReadAccessInFolders({
+    const verificationResult = await this.verifyReadAccess({
       client,
       ownerEmail,
       onProgress,
+      verifyOnlyFullAccess: ownerProfile.source === 'shared-mailbox',
     });
-    if (verificationResult.hasFullDelegatedAcces) {
+    if (verificationResult.hasFullDelegatedAccess) {
       await this.db
         .delete(delegatedAccessDirectories)
         .where(eq(delegatedAccessDirectories.accountsId, accountsId));
@@ -193,18 +194,20 @@ export class SyncDelegatedAccessCommand {
     });
   }
 
-  private async verifyReadAccessInFolders({
+  private async verifyReadAccess({
     client,
     ownerEmail,
     onProgress,
+    verifyOnlyFullAccess,
   }: {
     client: Client;
     ownerEmail: string;
     onProgress?: () => Promise<void>;
+    verifyOnlyFullAccess?: boolean;
   }): Promise<
-    | { hasFullDelegatedAcces: true }
+    | { hasFullDelegatedAccess: true }
     | {
-        hasFullDelegatedAcces: false;
+        hasFullDelegatedAccess: false;
         accessibleFolderIds: string[];
         foldersWithErrors: FolderWithError[];
       }
@@ -219,7 +222,11 @@ export class SyncDelegatedAccessCommand {
     }
 
     if (testResult.canRead) {
-      return { hasFullDelegatedAcces: true };
+      return { hasFullDelegatedAccess: true };
+    }
+
+    if (verifyOnlyFullAccess) {
+      return { hasFullDelegatedAccess: false, accessibleFolderIds: [], foldersWithErrors: [] };
     }
 
     const folderIds = await this.readAllFolders({ client, ownerEmail });
@@ -258,7 +265,7 @@ export class SyncDelegatedAccessCommand {
         break;
       }
     }
-    return { hasFullDelegatedAcces: false, foldersWithErrors, accessibleFolderIds };
+    return { hasFullDelegatedAccess: false, foldersWithErrors, accessibleFolderIds };
   }
 
   private async readAllFolders({

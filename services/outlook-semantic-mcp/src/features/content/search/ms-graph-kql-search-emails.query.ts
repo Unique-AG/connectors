@@ -262,8 +262,7 @@ export class MsGraphKqlSearchEmailsQuery {
       try {
         const raw = await client.api('$batch').post({
           requests: batch.map((request) => {
-            const kql = sanitizeKqlQuery(request.kqlQuery);
-            const search = kql.includes('"') ? kql : `"${kql}"`;
+            const search = sanitizeKqlQuery(request.kqlQuery);
             return {
               id: request.requestId,
               method: 'GET',

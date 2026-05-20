@@ -9,10 +9,30 @@ import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
 // Read and manage (Full Access) (‎0‎)
 // The Full Access permission allows a delegate to open this mailbox and behave as the mailbox owner.
 
+const sharedMailboxEmails = z
+  .string()
+  .prefault('')
+  .transform((s) => {
+    return s
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+  })
+  .describe(
+    'Comma-separated list of shared mailbox email addresses to sync (DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS).',
+  );
+
 const discoveryCronSchedule = z
   .string()
   .prefault('0 */12 * * *')
   .describe('Cron schedule for delegated access discovery. Default: every 12 hours (2x/day).');
+
+const sharedMailboxSyncCronSchedule = z
+  .string()
+  .prefault('0 */6 * * *')
+  .describe(
+    'Cron schedule for shared mailbox sync. Default: every 6 hours (4x/day). Env var: DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE.',
+  );
 
 const recoveryCronSchedule = z
   .string()
@@ -58,6 +78,8 @@ const onlyFullDelegatedAccessScanConfig = z.object({
   recoveryCronSchedule,
   stalenessThresholdHours,
   failureThreshold: delegatedAccessFailureThreshold,
+  sharedMailboxEmails,
+  sharedMailboxSyncCronSchedule,
 });
 
 const granularDelegatedAccessScanConfig = z.object({
@@ -86,6 +108,8 @@ const granularDelegatedAccessScanConfig = z.object({
   recoveryCronSchedule,
   stalenessThresholdHours,
   failureThreshold: delegatedAccessFailureThreshold,
+  sharedMailboxEmails,
+  sharedMailboxSyncCronSchedule,
 });
 
 export const DelegatedAccessConfigSchema = z.discriminatedUnion('scan', [

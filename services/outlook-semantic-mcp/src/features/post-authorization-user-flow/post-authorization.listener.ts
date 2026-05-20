@@ -3,21 +3,25 @@ import {
   RabbitPayload,
   RabbitSubscribe,
 } from '@golevelup/nestjs-rabbitmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { pick } from 'remeda';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { UserAuthorizedEventDto } from '~/auth/dtos/user-authorized-event.dto';
+import { AppConfig, appConfig, McpBackendType } from '~/config';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { NewTrace } from '~/features/tracing.utils';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { SubscriptionCreateService } from '../subscription-create.service';
+import { SyncDirectoriesCommand } from '../directories-sync/sync-directories.command';
+import { SubscriptionCreateService } from '../subscriptions/subscription-create.service';
 
 @Injectable()
 export class PostAuthorizationListener {
   private readonly logger = new Logger(PostAuthorizationListener.name);
 
   public constructor(
+    @Inject(appConfig.KEY) private readonly config: AppConfig,
+    private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
     private readonly subscriptionCreateService: SubscriptionCreateService,
     private readonly isInboxDeleting: IsInboxDeletingQuery,
   ) {}
@@ -37,6 +41,20 @@ export class PostAuthorizationListener {
     const event = UserAuthorizedEventDto.parse(payload);
     const { userProfileId } = event.payload;
 
+    const handleByMcpBackend: Record<McpBackendType, () => Promise<void>> = {
+      [McpBackendType.MicrosoftGraph]: () => this.handleForMicrosoftGraphBackend(userProfileId),
+      [McpBackendType.MicrosoftGraphAndUniqueApi]: () =>
+        this.handleForMicrosoftGraphAndUniqueApi(userProfileId),
+    };
+
+    await handleByMcpBackend[this.config.mcpBackend]();
+  }
+
+  private async handleForMicrosoftGraphBackend(userProfileId: string): Promise<void> {
+    await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfileId));
+  }
+
+  private async handleForMicrosoftGraphAndUniqueApi(userProfileId: string): Promise<void> {
     if (await this.isInboxDeleting.run(userProfileId)) {
       this.logger.warn({
         userProfileId,
