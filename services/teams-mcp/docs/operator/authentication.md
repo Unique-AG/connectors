@@ -3,19 +3,49 @@
 
 ## Overview
 
-The Teams MCP Server requires a Microsoft Entra ID (formerly Azure AD) app registration with delegated permissions to access Microsoft Graph API on behalf of users.
+The Teams MCP Server requires a Microsoft Entra ID (formerly Azure AD) app registration with **delegated permissions** to access Microsoft Graph API on behalf of users.
 
-For technical details about the OAuth flow and why client credentials are required, see:
+How the app registration is provisioned depends on your deployment model:
 
-- [Microsoft OAuth Setup Flow](../technical/flows.md#microsoft-oauth-setup-flow)
-- [Authentication Architecture - Required App Registration Components](../technical/architecture.md#required-app-registration-components)
-- [FAQ - Why do I need a client ID and client secret?](../faq.md#why-do-i-need-a-client-id-and-client-secret)
+- **Unique SaaS** — Unique provisions and manages the registration; you grant admin consent
+- **Self-Hosted** — your organization provisions the registration, manages secrets, and operates the server
 
-## App Registration
+For technical details about the OAuth flow, see [Microsoft OAuth Setup Flow](../technical/flows.md#microsoft-oauth-setup-flow) and [FAQ - Why do I need a client ID and client secret?](../faq.md#why-do-i-need-a-client-id-and-client-secret).
 
-### Option 1: Terraform (Recommended)
+## Required Permissions
 
-Use the provided Terraform module:
+All permissions are **delegated** — they act on behalf of the signed-in user. Two permissions require admin consent before users can connect.
+
+| Permission | Type | Admin Consent |
+|------------|------|---------------|
+| `User.Read` | Delegated | No |
+| `Calendars.Read` | Delegated | No |
+| `OnlineMeetings.Read` | Delegated | No |
+| `OnlineMeetingRecording.Read.All` | Delegated | **Yes** |
+| `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** |
+| `offline_access` | Delegated | No |
+
+For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
+
+## Unique SaaS
+
+**Recommended for most clients.** When Unique runs Teams MCP, Unique provisions the Entra ID app registration for you. You only need to grant admin consent:
+
+```
+https://login.microsoftonline.com/organizations/adminconsent?client_id=8ddffb12-1579-4fa8-8844-ca122e4308bc
+```
+
+The consent prompt lists the [Required Permissions](#required-permissions) above. Note that `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` require admin consent — the URL above handles that in one step. Without it, users will see an error when trying to connect.
+
+If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `8ddffb12-1579-4fa8-8844-ca122e4308bc`.
+
+## Self-Hosted
+
+When your organization hosts Teams MCP, your team manages the full setup: Entra app registration, redirect URIs, secret management, and server configuration.
+
+### App Registration
+
+#### Option 1: Terraform (Recommended)
 
 ```hcl
 module "teams_mcp_app" {
@@ -41,103 +71,26 @@ module "teams_mcp_app" {
 }
 ```
 
-### Option 2: Azure Portal (Manual)
+#### Option 2: Azure Portal (Manual)
 
-1. **Navigate to App Registrations**
-
-   - Go to [Azure Portal](https://portal.azure.com)
-   - Search for "App registrations"
-   - Click "New registration"
-
-2. **Configure Basic Settings**
-
+1. Go to [Azure Portal](https://portal.azure.com) → **Azure Active Directory** → **App registrations** → **New registration**:
    - **Name**: Teams MCP Server
    - **Supported account types**: Accounts in this organizational directory only
-   - **Redirect URI**: Web - `https://teams.mcp.example.com/auth/callback`
+   - **Redirect URI**: Web — `https://teams.mcp.example.com/auth/callback`
 
-3. **Add API Permissions**
+2. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
+   - Add all permissions listed under [Required Permissions](#required-permissions)
 
-   - Go to "API permissions"
-   - Click "Add a permission" → "Microsoft Graph" → "Delegated permissions"
-   - Add the following permissions:
+3. Click **Grant admin consent for [Tenant]** and confirm.
+   `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` require this step — without it users cannot connect.
 
-   | Permission | Type | Admin Consent |
-   |------------|------|---------------|
-   | `User.Read` | Delegated | No |
-   | `Calendars.Read` | Delegated | No |
-   | `OnlineMeetings.Read` | Delegated | No |
-   | `OnlineMeetingRecording.Read.All` | Delegated | **Yes** |
-   | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** |
-   | `offline_access` | Delegated | No |
-
-4. **Grant Admin Consent**
-
-   - Click "Grant admin consent for [Tenant]"
-   - Confirm the action
-   
-   **Important**: Admin consent is required for `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` permissions. Without admin consent, users will see an error when trying to connect. See [Understanding Admin Consent](#understanding-admin-consent-and-user-consent) below for details.
-
-5. **Create Client Secret**
-
-   - Go to "Certificates & secrets"
-   - Click "New client secret"
+4. Go to **Certificates & secrets** → **New client secret**:
    - Set description and expiration
    - **Copy the secret value immediately** (shown only once)
 
-6. **Note Application Details**
+5. Go to **Overview** and note the **Application (client) ID** and **Directory (tenant) ID**
 
-   - Go to "Overview"
-   - Copy the **Application (client) ID**
-   - Copy the **Directory (tenant) ID**
-
-## Required Permissions
-
-All permissions are **delegated**, meaning they act on behalf of the signed-in user. See [Microsoft Graph Permissions](../technical/permissions.md) for the complete list with justifications.
-
-**Required:**
-
-- `User.Read` - Read user profile
-- `Calendars.Read` - Read calendar events (for recurring meeting detection)
-- `OnlineMeetings.Read` - Read meeting details
-- `OnlineMeetingRecording.Read.All` - Read recordings (admin consent required)
-- `OnlineMeetingTranscript.Read.All` - Read transcripts (admin consent required)
-- `offline_access` - Obtain refresh tokens
-
-## Understanding Microsoft Consent Flows
-
-**This is standard Microsoft behavior, not Teams MCP specific.** All Microsoft 365 apps use the same consent model.
-
-### Standard Microsoft Consent Process
-
-1. **Admin grants consent** for permissions requiring admin approval (`OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`)
-
-   - Organization-wide OR per-user
-2. **Admin approval workflow** (if enabled in tenant) - users request approval
-3. **User consent** (always required for delegated permissions, even after admin consent)
-
-**How to grant admin consent:**
-
-1. Azure Portal → App Registration → API permissions
-2. Click "Grant admin consent for [Your Organization]"
-3. Or use [admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) for per-user approval
-
-**Microsoft Documentation:**
-
-- [User and admin consent overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview) - Standard Microsoft consent flows
-- [Grant admin consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) - Step-by-step guide
-- [Admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) - Per-user approval process
-
-For detailed explanation, see [Microsoft Graph Permissions - Understanding Consent Requirements](../technical/permissions.md#understanding-consent-requirements).
-
-### User Reconnection Experience (The "Login Flicker")
-
-**First-time connection:** User sees full Microsoft consent screen and approves permissions.
-
-**Subsequent reconnections:** User sees a quick "flicker" (brief redirect sequence). This is **normal** - Microsoft validates the existing session through rapid OAuth redirects. Standard Microsoft OAuth behavior. See [FAQ - Login "Flicker"](../faq.md#what-is-the-login-flicker-when-users-reconnect) for details.
-
-For troubleshooting consent issues, see [FAQ - Authentication & Permissions](../faq.md#authentication--permissions).
-
-## Redirect URI Configuration
+### Redirect URI Configuration
 
 The redirect URI must match exactly what's configured in the app registration:
 
@@ -152,30 +105,27 @@ Examples:
 
 **Multiple redirect URIs** can be configured for different environments.
 
-## Tenant Configuration
+### Tenant Configuration
 
-### Single Tenant (Recommended)
+#### Single Tenant (Recommended)
 
-For enterprise deployments within one organization, use single-tenant configuration:
+For enterprise deployments within one organization:
 
-- **Sign-in audience**: "Accounts in this organizational directory only"
-- **Terraform**: `sign_in_audience = "AzureADMyOrg"`
+| Setting | Value |
+|---------|-------|
+| Azure Portal → "Supported account types" | **Accounts in this organizational directory only** |
+| Terraform `sign_in_audience` | `"AzureADMyOrg"` |
 
-### Multi-Tenant App Registration
+#### Multi-Tenant
 
-You can configure the Entra ID app registration to serve **multiple Microsoft tenants** with a single MCP server deployment:
+For SaaS deployments serving users from multiple Microsoft 365 organizations:
 
-- **Sign-in audience**: "Accounts in any organizational directory"
-- **Terraform**: `sign_in_audience = "AzureADMultipleOrgs"`
+| Setting | Value |
+|---------|-------|
+| Azure Portal → "Supported account types" | **Accounts in any organizational directory** |
+| Terraform `sign_in_audience` | `"AzureADMultipleOrgs"` |
 
-#### Multi-Tenant Configuration
-
-For SaaS deployments serving multiple organizations:
-
-1. **Single App Registration**: Created in your tenant with one `CLIENT_ID` and `CLIENT_SECRET`
-2. **Enterprise Application Creation**: When each organization's admin grants consent, Microsoft creates an "Enterprise Application" in their tenant
-3. **User Authentication Flow**: Users authenticate via the Enterprise Application in their tenant
-4. **Shared Infrastructure**: One MCP deployment serves all tenants
+**How it works:** One app registration serves all tenants. When each organization's admin grants consent, Microsoft creates an Enterprise Application in their tenant. Users then authenticate via that Enterprise Application.
 
 **Considerations:**
 
@@ -185,16 +135,18 @@ For SaaS deployments serving multiple organizations:
 
 See [Authentication Architecture - Single App Registration Architecture](../technical/architecture.md#single-app-registration-architecture) for details.
 
-## Client Secret Management
+### Secret Management
 
-### Best Practices
+#### Client Secret
 
-1. **Set appropriate expiration** - Balance security vs. operational overhead
-2. **Rotate before expiration** - Create new secret before old one expires
-3. **Use Key Vault** - Store secrets in Azure Key Vault, not directly in Kubernetes
-4. **Monitor expiration** - Set up alerts for upcoming secret expiration
+**Best practices:**
 
-### Rotation Process
+1. Set appropriate expiration — balance security vs. operational overhead
+2. Rotate before expiration — create the new secret before the old one expires
+3. Use Key Vault — store secrets in Azure Key Vault, not directly in Kubernetes
+4. Monitor expiration — set up alerts for upcoming secret expiration
+
+**Rotation process:**
 
 1. Create new client secret in Entra app registration
 2. Update Kubernetes secret with new value
@@ -202,9 +154,9 @@ See [Authentication Architecture - Single App Registration Architecture](../tech
 4. Verify authentication works
 5. Delete old client secret from Entra
 
-## Webhook Secret
+#### Webhook Secret
 
-The `MICROSOFT_WEBHOOK_SECRET` is used to validate incoming webhook notifications from Microsoft Graph:
+The `MICROSOFT_WEBHOOK_SECRET` validates incoming webhook notifications from Microsoft Graph:
 
 - **Length**: 128 characters (recommended)
 - **Format**: Random alphanumeric string
@@ -212,7 +164,26 @@ The `MICROSOFT_WEBHOOK_SECRET` is used to validate incoming webhook notification
 
 This secret is passed to Microsoft when creating Graph subscriptions and returned in webhook payloads for validation.
 
-For troubleshooting authentication issues, see [FAQ - Authentication & Permissions](../faq.md#authentication--permissions).
+### Understanding Consent Flows
+
+**This is standard Microsoft behavior, not Teams MCP specific.** All Microsoft 365 apps use the same consent model.
+
+Because `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` require admin consent, the consent sequence is:
+
+1. **Admin grants consent** for the two admin-required permissions (organisation-wide or per-user)
+2. **User consent** — on first connection, the user sees the Microsoft consent screen and approves the remaining permissions
+
+**How to grant admin consent:**
+
+1. Azure Portal → App Registration → API permissions
+2. Click "Grant admin consent for [Your Organization]"
+3. Or use the [admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) for per-user approval
+
+**User Reconnection Experience (The "Login Flicker"):**
+
+After first connection, subsequent reconnections show a quick "flicker" (brief redirect sequence). This is **normal** — Microsoft validates the existing session through rapid OAuth redirects. See [FAQ - Login "Flicker"](../faq.md#what-is-the-login-flicker-when-users-reconnect) for details.
+
+For troubleshooting consent issues, see [FAQ - Authentication & Permissions](../faq.md#authentication--permissions).
 
 ## Microsoft Documentation
 

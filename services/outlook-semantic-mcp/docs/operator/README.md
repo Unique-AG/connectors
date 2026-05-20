@@ -66,9 +66,17 @@ The Outlook Semantic MCP Server runs as a **single pod** that handles MCP tool r
 
 ## Quick Start
 
+### Unique SaaS
+
+After [granting admin consent](./authentication.md#unique-saas), no additional technical information is required from you. Unique configures the entire deployment using your existing tenant context.
+
+Unique will provide you with the MCP server endpoint URL once the deployment is ready.
+
+### Self-Hosted
+
 Follow these steps to go from zero to a running deployment:
 
-### Mode A: MicrosoftGraphAndUniqueApi
+#### Mode A: MicrosoftGraphAndUniqueApi
 
 1. **Register Microsoft Entra ID application** — Create an app registration with the required delegated permissions. See [Authentication Guide](./authentication.md).
 2. **Create Zitadel service account** — Create a service user with the `KB_Admin` role in Zitadel. Required for both `cluster_local` and `external` auth modes. See [Zitadel Service Account](./configuration.md#Zitadel-Service-Account).
@@ -83,7 +91,7 @@ Follow these steps to go from zero to a running deployment:
    4. Send a test email to the connected account, wait a moment, then use `search_emails` to confirm it appears
 8. **(Optional) Enable delegated access** — If your organization uses Exchange mailbox delegation (Full Access or folder-level), set `delegatedAccessScan` to `fullAccessOnly` or `granularAccess` in your Helm values. Both users (delegate and owner) must connect their accounts for delegated search to work. See [Configuration — DELEGATED_ACCESS_SCAN](./configuration.md#DELEGATED_ACCESS_SCAN).
 
-### Mode B: MicrosoftGraph
+#### Mode B: MicrosoftGraph
 
 1. **Register Microsoft Entra ID application** — same as Mode A. See [Authentication Guide](./authentication.md).
 2. **Provision infrastructure** — PostgreSQL 17+, RabbitMQ 4+, and Unique Knowledge Base (all three are required, same as Mode A). See [Deployment — Prerequisites](./deployment.md#Prerequisites).

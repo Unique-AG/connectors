@@ -50,6 +50,14 @@ flowchart TB
 
 The Teams MCP Server runs as a **single pod** that handles both API requests and background processing via RabbitMQ consumers.
 
+## Quick Start
+
+### Unique SaaS
+
+After [granting admin consent](./authentication.md#unique-saas), no additional technical information is required from you. Unique configures the entire deployment using your existing tenant context.
+
+Unique will provide you with the MCP server endpoint URL once the deployment is ready.
+
 ## Infrastructure Requirements
 
 | Component | Requirement | Notes |
