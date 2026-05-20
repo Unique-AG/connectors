@@ -68,7 +68,16 @@ The Outlook Semantic MCP Server runs as a **single pod** that handles MCP tool r
 
 ### Unique SaaS
 
-After [granting admin consent](./authentication.md#unique-saas), no additional technical information is required from you. Unique configures the entire deployment using your existing tenant context.
+After [granting admin consent](./authentication.md#unique-saas), provide the following to Unique Support or Solution Engineering:
+
+- [ ] **Backend mode** — controls how email search works; see [`MCP_BACKEND`](./configuration.md#MCP_BACKEND) for the full trade-offs:
+  - `MicrosoftGraph` — live KQL search directly against Microsoft Graph; no email ingestion into Unique KB; lighter deployment
+  - `MicrosoftGraphAndUniqueApi` *(default)* — emails ingested into Unique KB; semantic search merged with live KQL results; heavier but richer
+
+- [ ] **Delegated access scan** — only relevant if your organization uses Exchange mailbox delegation (i.e. users who have been granted access to another user's mailbox or folders); see [`DELEGATED_ACCESS_SCAN`](./configuration.md#DELEGATED_ACCESS_SCAN):
+  - `disabled` *(default)* — no delegation scanning
+  - `fullAccessOnly` — Full Access (Read & Manage) grants via Exchange admin
+  - `granularAccess` — folder-level grants (e.g. shared Inbox or RFQ folder); subsumes `fullAccessOnly`
 
 Unique will provide you with the MCP server endpoint URL once the deployment is ready.
 
