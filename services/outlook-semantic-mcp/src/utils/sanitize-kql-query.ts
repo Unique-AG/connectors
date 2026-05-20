@@ -39,9 +39,13 @@ function quoteKqlClauses(kql: string): string {
   // Normalize single-quoted property values to double-quoted: prop:'value' → prop:"value"
   const normalized = kql.replace(/\b(\w+):'([^']*)'/g, '$1:"$2"');
 
-  // Drop explicit AND — the Graph API treats spaces as implicit AND
+  // Drop explicit AND — the Graph API treats spaces as implicit AND.
+  // The alternation skips double-quoted phrases so that subject:"budget AND plan"
+  // is not mangled; bare AND between clauses (bounded by whitespace/string edges)
+  // is replaced with a space. Property values like subject:and-report are not
+  // touched because AND there is not surrounded by whitespace.
   const withoutAnd = normalized
-    .replace(/\bAND\b/g, ' ')
+    .replace(/"[^"]*"|(?:^|\s)AND(?:\s|$)/g, (match) => (match.startsWith('"') ? match : ' '))
     .replace(/\s+/g, ' ')
     .trim();
 

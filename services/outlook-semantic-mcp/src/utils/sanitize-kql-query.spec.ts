@@ -146,6 +146,31 @@ describe('sanitizeKqlQuery', () => {
     });
   });
 
+  describe('AND inside property values is preserved', () => {
+    it('does not strip AND that is part of a hyphenated unquoted value', () => {
+      // "and" in "and-report" sits at a word boundary (\b matches before "-"),
+      // so it gets uppercased to AND by the boolean step; the AND-removal step
+      // must not then strip it, producing "subject: -report".
+      expect(sanitizeKqlQuery('subject:and-report')).toBe('"subject:AND-report"');
+    });
+
+    it('does not strip AND that appears before @ in an email address value', () => {
+      expect(sanitizeKqlQuery('from:and@example.com')).toBe('"from:AND@example.com"');
+    });
+
+    it('still drops AND used as a boolean operator between clauses', () => {
+      expect(sanitizeKqlQuery('subject:and-report AND from:alice@example.com')).toBe(
+        '"subject:AND-report from:alice@example.com"',
+      );
+    });
+
+    it('preserves AND inside double-quoted phrases', () => {
+      expect(sanitizeKqlQuery('subject:"budget AND planning"')).toBe(
+        '"subject:\\"budget AND planning\\""',
+      );
+    });
+  });
+
   describe('free text queries', () => {
     it('wraps a single free-text word in outer quotes', () => {
       expect(sanitizeKqlQuery('TanStack')).toBe('"TanStack"');
