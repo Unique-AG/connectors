@@ -39,7 +39,8 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
 
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
-    @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
+    @Inject(delegatedAccessConfig.KEY)
+    private readonly config: DelegatedAccessConfig,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly persistentCacheService: PersistentCacheService,
     private readonly schedulerRegistry: SchedulerRegistry,
@@ -66,7 +67,10 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       const job = this.schedulerRegistry.getCronJob(CRON_JOB_NAME);
       job.stop();
     } catch (err) {
-      this.logger.error({ msg: 'Error stopping shared-mailbox-sync cron job', err });
+      this.logger.error({
+        msg: 'Error stopping shared-mailbox-sync cron job',
+        err,
+      });
     }
   }
 
@@ -82,7 +86,10 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       try {
         await this.runSyncWithRetries();
       } catch (err) {
-        this.logger.error({ msg: 'Unexpected error during shared mailbox sync cron', err });
+        this.logger.error({
+          msg: 'Unexpected error during shared mailbox sync cron',
+          err,
+        });
       }
     });
     this.schedulerRegistry.addCronJob(CRON_JOB_NAME, job);
@@ -148,47 +155,62 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    const result = await this.graphClientFactory.createClientForAnyAuthorizedUser(excludedUserIds);
-    if (!result) {
-      this.logger.warn({
-        msg: 'SharedMailboxSync: no authorized user profile found, skipping sync',
-      });
-      return;
-    }
-    const { client, userId } = result;
+    // We group by email because the mcp in our QA handles 2 tenants, the unique prod and the dogfood tenant.
+    const emailsByDomain = this.groupEmailsByDomain(envEmails);
+    const allMatchedUsers: NonNullishProps<GraphUser, 'mail'>[] = [];
+    const syncedDomains: string[] = [];
 
-    let graphUsers: GraphUser[] = [];
-    try {
-      graphUsers = await this.fetchSharedMailboxCandidatesFromGraph(client);
-    } catch (err) {
-      if (err instanceof GraphError) {
-        throw new FetchUsersError(userId, `Failed to fetch users from ms graph`, { cause: err });
+    for (const [domain, domainEmails] of emailsByDomain) {
+      const result = await this.graphClientFactory.createClientForAnyAuthorizedUser(
+        excludedUserIds,
+        domain,
+      );
+      if (!result) {
+        this.logger.warn({
+          msg: 'SharedMailboxSync: no authorized user profile found for domain, skipping',
+          domain,
+        });
+        continue;
       }
-      throw err;
+      const { client, userId } = result;
+
+      let graphUsers: GraphUser[] = [];
+      try {
+        graphUsers = await this.fetchSharedMailboxCandidatesFromGraph(client);
+        syncedDomains.push(domain);
+      } catch (err) {
+        if (err instanceof GraphError) {
+          throw new FetchUsersError(userId, `Failed to fetch users from ms graph`, { cause: err });
+        }
+        throw err;
+      }
+
+      const matched = graphUsers
+        .map((u) => ({ ...u, mail: u.mail?.toLowerCase() }))
+        .filter((user) => user.mail && domainEmails.includes(user.mail)) as NonNullishProps<
+        GraphUser,
+        'mail'
+      >[];
+
+      if (matched.length === 0 && domainEmails.length > 0) {
+        this.logger.warn({
+          msg: 'SharedMailboxSync: no Graph users found for the configured shared mailbox emails',
+          domain,
+          domainEmails,
+        });
+      }
+
+      allMatchedUsers.push(...matched);
     }
 
-    const matchedUsers = graphUsers
-      .map((u) => ({ ...u, mail: u.mail?.toLowerCase() }))
-      .filter((user) => user.mail && envEmails.includes(user.mail)) as NonNullishProps<
-      GraphUser,
-      'mail'
-    >[];
-
-    if (matchedUsers.length === 0 && envEmails.length > 0) {
-      this.logger.warn({
-        msg: 'SharedMailboxSync: no Graph users found for the configured shared mailbox emails',
-        envEmails,
-      });
-    }
-    // Delete source='shared-mailbox' rows whose email is NOT in the intersection
     await this.db.delete(userProfiles).where(
       and(
         eq(userProfiles.source, 'shared-mailbox'),
-        matchedUsers.length > 0
+        allMatchedUsers.length > 0
           ? not(
               inArray(
                 sql`lower(${userProfiles.email})`,
-                matchedUsers.map((item) => item.mail),
+                allMatchedUsers.map((item) => item.mail),
               ),
             )
           : undefined,
@@ -196,9 +218,9 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     );
 
     // Upsert matched users
-    if (matchedUsers.length > 0) {
+    if (allMatchedUsers.length > 0) {
       type UserProfileInsert = typeof userProfiles.$inferInsert;
-      const mappedProfiles: UserProfileInsert[] = matchedUsers.map((user) => {
+      const mappedProfiles: UserProfileInsert[] = allMatchedUsers.map((user) => {
         const rawData: OAuthUserProfile = {
           id: user.id ?? undefined,
           displayName: user.displayName ?? undefined,
@@ -238,20 +260,43 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
         });
     }
 
-    // Update cache with new hash and timestamp
-    const newHash = this.hashMailboxes(envEmails);
-    await this.persistentCacheService.set(SHARED_MAILBOX_SYNC_CACHE_KEY, {
-      dataType: 'SharedMailboxSync',
-      payload: {
-        envarHash: newHash,
-        lastSyncedAt: Date.now(),
-      },
-    });
+    // Only update the cache when every configured domain was successfully queried.
+    // If some domains had no authorized user we leave the cache stale so the next
+    // cron run retries them once a matching user logs in.
+    if (syncedDomains.length === emailsByDomain.size) {
+      const newHash = this.hashMailboxes(envEmails);
+      await this.persistentCacheService.set(SHARED_MAILBOX_SYNC_CACHE_KEY, {
+        dataType: 'SharedMailboxSync',
+        payload: {
+          envarHash: newHash,
+          lastSyncedAt: Date.now(),
+        },
+      });
+    }
 
     this.logger.log({
       msg: 'SharedMailboxSync: sync complete',
-      upserted: matchedUsers.length,
+      upserted: allMatchedUsers.length,
+      syncedDomains,
     });
+  }
+
+  private groupEmailsByDomain(emails: string[]): Map<string, string[]> {
+    const map = new Map<string, string[]>();
+    for (const email of emails) {
+      const atIdx = email.lastIndexOf('@');
+      if (atIdx === -1) {
+        continue;
+      }
+      const domain = email.slice(atIdx + 1).toLowerCase();
+      const existing = map.get(domain);
+      if (existing) {
+        existing.push(email);
+      } else {
+        map.set(domain, [email]);
+      }
+    }
+    return map;
   }
 
   // The error handling here is very specific to the shared mailbox profile sync.

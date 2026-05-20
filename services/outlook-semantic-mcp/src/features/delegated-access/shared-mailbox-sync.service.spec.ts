@@ -255,7 +255,10 @@ describe('SharedMailboxSyncService', () => {
         resolveFactory = resolve;
       });
 
-      const { service, graphClientFactory } = createService({ cacheResult: null });
+      const { service, graphClientFactory } = createService({
+        cacheResult: null,
+        config: { sharedMailboxEmails: ['shared@example.com'] },
+      });
       graphClientFactory.createClientForAnyAuthorizedUser.mockReturnValue(delayedFactory);
 
       const first = (service as any).runSyncWithRetries();
@@ -280,6 +283,7 @@ describe('SharedMailboxSyncService', () => {
     it('syncIsRunning is reset after a run, allowing a subsequent call to proceed', async () => {
       const mockClient = makeGraphClient([{ value: [] }, { value: [] }]);
       const { service, graphClientFactory } = createService({
+        config: { sharedMailboxEmails: ['shared@example.com'] },
         factoryResults: [
           { client: mockClient, userId: 'user1' },
           { client: mockClient, userId: 'user1' },
@@ -302,7 +306,7 @@ describe('SharedMailboxSyncService', () => {
       vi.clearAllMocks();
     });
 
-    it('returns null from factory → logs warning, no DB operations, no cache update', async () => {
+    it('returns null from factory → logs warning, cleans up stale rows, no cache update', async () => {
       const { service, db, graphClientFactory, persistentCacheService } = createService({
         config: { sharedMailboxEmails: ['shared@example.com'] },
         factoryResults: [null],
@@ -311,7 +315,9 @@ describe('SharedMailboxSyncService', () => {
       await (service as any).runSyncWithRetries();
 
       expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenCalledOnce();
-      expect(db.delete).not.toHaveBeenCalled();
+      // Cleanup always runs; with no matched users the delete has no NOT IN clause
+      expect(db.delete).toHaveBeenCalledOnce();
+      expect(db.insert).not.toHaveBeenCalled();
       expect(persistentCacheService.set).not.toHaveBeenCalled();
     });
   });
@@ -335,7 +341,7 @@ describe('SharedMailboxSyncService', () => {
       // factoryResults: [] keeps the Once queue empty so our mockImplementationOnce
       // calls below are the first entries and aren't shadowed by pre-queued values.
       const { service, graphClientFactory } = createService({
-        config: { sharedMailboxEmails: [] },
+        config: { sharedMailboxEmails: ['shared@example.com'] },
         factoryResults: [],
       });
       graphClientFactory.createClientForAnyAuthorizedUser
@@ -360,7 +366,7 @@ describe('SharedMailboxSyncService', () => {
       const clientSuccess = makeGraphClient([{ value: [] }]);
 
       const { service, graphClientFactory } = createService({
-        config: { sharedMailboxEmails: [] },
+        config: { sharedMailboxEmails: ['shared@example.com'] },
         factoryResults: [
           { client: client401, userId: 'user1' },
           { client: clientSuccess, userId: 'user2' },
@@ -370,9 +376,11 @@ describe('SharedMailboxSyncService', () => {
       await (service as any).runSyncWithRetries();
 
       expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenCalledTimes(2);
-      expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenNthCalledWith(2, [
-        'user1',
-      ]);
+      expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenNthCalledWith(
+        2,
+        ['user1'],
+        'example.com',
+      );
     });
 
     it('429 from Graph → retries with same user (no exclusion)', async () => {
@@ -380,7 +388,7 @@ describe('SharedMailboxSyncService', () => {
       const clientSuccess = makeGraphClient([{ value: [] }]);
 
       const { service, graphClientFactory } = createService({
-        config: { sharedMailboxEmails: [] },
+        config: { sharedMailboxEmails: ['shared@example.com'] },
         factoryResults: [
           { client: client429, userId: 'user1' },
           { client: clientSuccess, userId: 'user1' },
@@ -391,8 +399,16 @@ describe('SharedMailboxSyncService', () => {
 
       expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenCalledTimes(2);
       // Both calls exclude nothing extra — excludedUserIds stays empty on 429
-      expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenNthCalledWith(1, []);
-      expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenNthCalledWith(2, []);
+      expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenNthCalledWith(
+        1,
+        [],
+        'example.com',
+      );
+      expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenNthCalledWith(
+        2,
+        [],
+        'example.com',
+      );
     });
 
     it('500 from Graph → retries with same user (transient error)', async () => {
@@ -400,7 +416,7 @@ describe('SharedMailboxSyncService', () => {
       const clientSuccess = makeGraphClient([{ value: [] }]);
 
       const { service, graphClientFactory } = createService({
-        config: { sharedMailboxEmails: [] },
+        config: { sharedMailboxEmails: ['shared@example.com'] },
         factoryResults: [
           { client: client500, userId: 'user1' },
           { client: clientSuccess, userId: 'user1' },
@@ -410,14 +426,18 @@ describe('SharedMailboxSyncService', () => {
       await (service as any).runSyncWithRetries();
 
       expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenCalledTimes(2);
-      expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenNthCalledWith(2, []);
+      expect(graphClientFactory.createClientForAnyAuthorizedUser).toHaveBeenNthCalledWith(
+        2,
+        [],
+        'example.com',
+      );
     });
 
     it('non-retryable GraphError (e.g. 404) → stops after first attempt, no retry', async () => {
       const client404 = makeGraphClient([makeGraphError(404)]);
 
       const { service, graphClientFactory } = createService({
-        config: { sharedMailboxEmails: [] },
+        config: { sharedMailboxEmails: ['shared@example.com'] },
         factoryResults: [{ client: client404, userId: 'user1' }],
       });
 
@@ -431,7 +451,7 @@ describe('SharedMailboxSyncService', () => {
       const clientPlainError = makeGraphClient([new Error('unexpected')]);
 
       const { service, graphClientFactory } = createService({
-        config: { sharedMailboxEmails: [] },
+        config: { sharedMailboxEmails: ['shared@example.com'] },
         factoryResults: [{ client: clientPlainError, userId: 'user1' }],
       });
 
