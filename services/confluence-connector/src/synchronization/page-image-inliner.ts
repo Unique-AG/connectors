@@ -8,7 +8,7 @@ import type {
   PageAttachmentLookupResult,
 } from '../confluence-api';
 import {
-  type ParsedImageBlock,
+  type ParsedImageMacro,
   parseImageBlocks,
   type ResourceRef,
 } from './confluence-tags-parser';
@@ -108,7 +108,7 @@ export class PageImageInliner {
   }
 
   private async buildImageReplacement(
-    block: ParsedImageBlock,
+    block: ParsedImageMacro,
     page: FetchedPage,
     pageImageAttachments: DiscoveredAttachment[],
   ): Promise<{ attachmentId: string; pageId: string; html: string } | null> {

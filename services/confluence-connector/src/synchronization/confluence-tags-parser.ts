@@ -12,7 +12,7 @@ export type ResourceRef =
   | { kind: 'external-url' }
   | { kind: 'unknown' };
 
-export interface ParsedImageBlock {
+export interface ParsedImageMacro {
   startIndex: number;
   endIndex: number;
   imgAttrs: Record<string, string>;
@@ -23,7 +23,7 @@ export interface ParsedImageBlock {
 // byte range, attributes, and resolved resource reference. The byte ranges are intended
 // for surgical splicing back into the original string so content outside the macros is
 // preserved byte-for-byte.
-export function parseImageBlocks(body: string): ParsedImageBlock[] {
+export function parseImageBlocks(body: string): ParsedImageMacro[] {
   const doc = parseDocument(body, {
     xmlMode: true,
     withStartIndices: true,
@@ -31,9 +31,9 @@ export function parseImageBlocks(body: string): ParsedImageBlock[] {
   });
 
   const imageNodes: Element[] = [];
-  collectElementsByName(doc, 'ac:image', imageNodes);
+  collectImageNodes(doc, imageNodes);
 
-  const blocks: ParsedImageBlock[] = [];
+  const blocks: ParsedImageMacro[] = [];
   for (const node of imageNodes) {
     if (node.startIndex == null || node.endIndex == null) {
       continue;
@@ -56,17 +56,17 @@ export function parseImageBlocks(body: string): ParsedImageBlock[] {
   return blocks;
 }
 
-function collectElementsByName(parent: ParentNode, name: string, out: Element[]): void {
+function collectImageNodes(parent: ParentNode, out: Element[]): void {
   for (const child of parent.children) {
     if (!isTag(child)) {
       continue;
     }
-    if (child.name === name) {
+    if (child.name === 'ac:image') {
       out.push(child);
       // <ac:image> is never nested inside another <ac:image>; no need to recurse into hits.
       continue;
     }
-    collectElementsByName(child, name, out);
+    collectImageNodes(child, out);
   }
 }
 
