@@ -466,8 +466,8 @@ The server listens on `PORT` (default `9542`). In Helm deployments, `server.port
 
 | If you want... | Use |
 |---|---|
-| Semantic search against indexed email history + live KQL | `MicrosoftGraphAndUniqueApi` |
-| Live KQL search only, no email indexing | `MicrosoftGraph` |
+| Semantic search against ingested email history + live KQL | `MicrosoftGraphAndUniqueApi` |
+| Live KQL search only, no email ingestion | `MicrosoftGraph` |
 
 Selects the search and email-open backend at deploy time. Two values are accepted:
 
@@ -477,6 +477,8 @@ Selects the search and email-open backend at deploy time. Two values are accepte
 Existing deployments that do not set this variable are unaffected — `MicrosoftGraphAndUniqueApi` is the default.
 
 ### DELEGATED_ACCESS_SCAN
+
+For step-by-step Microsoft 365 setup, see [Features — Delegated Access — Setup](../technical/features.md#Setup).
 
 Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for delegated mailbox access granted between users at the Microsoft Exchange level. Three values are accepted:
 
@@ -531,7 +533,7 @@ Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callb
 
 When `enabled` (default), emails are ingested into the Unique Knowledge Base and stored as physical files, making them available for semantic search via `search_emails`.
 
-When `disabled`, emails are indexed (metadata recorded) but not stored as files. They remain searchable via `search_emails`, but the email content is not persisted in the Knowledge Base.
+When `disabled`, emails are ingested (metadata recorded) but not stored as files. They remain searchable via `search_emails`, but the email content is not persisted in the Knowledge Base.
 
 ### UNIQUE_SERVICE_EXTRA_HEADERS
 

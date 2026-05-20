@@ -28,7 +28,7 @@ The Outlook Semantic MCP Server stores **no email content** in its own database.
 | Sync state and progress counters          | PostgreSQL `inbox_configurations` | Plaintext metadata           | No                      |
 | Outlook folder structure (names + IDs)    | PostgreSQL `directories`          | Plaintext metadata           | No                      |
 | Microsoft Graph subscription IDs          | PostgreSQL `subscriptions`        | Plaintext metadata           | No                      |
-| Email subject, body, sender, recipients   | Unique Knowledge Base             | Indexed for semantic search  | **Yes**                 |
+| Email subject, body, sender, recipients   | Unique Knowledge Base             | Ingested for semantic search  | **Yes**                 |
 
 
 ### Data Flow

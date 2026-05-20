@@ -75,6 +75,7 @@ All permissions are delegated and require no admin consent. This includes `Mail.
 
 - When `DELEGATED_ACCESS_SCAN` is enabled, the server automatically discovers users who have been granted Exchange mailbox delegation by other users
 - Delegates can search and access the inboxes of users who have granted them Full Access or folder-level delegation via Exchange admin
+- See [Features — Delegated Access](./technical/features.md#Delegated-Access) for supported configurations and setup
 - See [DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN) for configuration details
 
 **Subscription Management**

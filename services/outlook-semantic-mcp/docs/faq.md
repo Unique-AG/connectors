@@ -18,6 +18,7 @@
   - [Can an operator with database access read my emails?](#Can-an-operator-with-database-access-read-my-emails?)
   - [What happens to my email data when I disconnect?](#What-happens-to-my-email-data-when-I-disconnect?)
 - [Shared Inbox & Delegated Access](#Shared-Inbox-&-Delegated-Access)
+  - [How do I set up delegated access?](#How-do-I-set-up-delegated-access?)
   - [Who has access to a shared inbox?](#Who-has-access-to-a-shared-inbox?)
   - [What happens with delegated access?](#What-happens-with-delegated-access?)
   - [When shared inbox access is revoked, are previously ingested emails still accessible?](#When-shared-inbox-access-is-revoked,-are-previously-ingested-emails-still-accessible?)
@@ -118,7 +119,7 @@ In `MicrosoftGraph` mode, only the first 6 categories are available (Email Searc
 
 ### Does the MCP server store my emails?
 
-**Answer:** No. The Outlook Semantic MCP Server stores **no email content** in its own database. Emails are fetched from Microsoft Graph into memory and forwarded directly to the Unique knowledge base for indexing. Nothing from the email body, subject, sender, or recipients is written to the MCP server's PostgreSQL database.
+**Answer:** No. The Outlook Semantic MCP Server stores **no email content** in its own database. Emails are fetched from Microsoft Graph into memory and forwarded directly to the Unique knowledge base for ingestion. Nothing from the email body, subject, sender, or recipients is written to the MCP server's PostgreSQL database.
 
 The MCP server's PostgreSQL database stores only encrypted OAuth tokens, opaque MCP bearer tokens, sync state, folder metadata, and subscription IDs — no email content. See [Data Classification and Flow](./technical/security.md#Data-Classification-and-Flow) for the full breakdown of what is stored where.
 
@@ -126,7 +127,7 @@ In `MicrosoftGraph` mode, no email content is ever fetched into memory beyond wh
 
 ### Where is my email content stored?
 
-**Answer:** Email content (subject, body, sender, recipients, and metadata) is stored in the **Unique knowledge base**, not in the MCP server itself. It is indexed there for semantic search and is accessible via the `search_emails` tool.
+**Answer:** Email content (subject, body, sender, recipients, and metadata) is stored in the **Unique knowledge base**, not in the MCP server itself. It is ingested there for semantic search and is accessible via the `search_emails` tool.
 
 The Unique knowledge base organizes each user's emails into a dedicated **root scope** (a top-level isolation boundary that logically separates one user's ingested data from another's within the Unique platform).
 
@@ -194,6 +195,12 @@ In Mode B (`MicrosoftGraph`), there is no inbox data to delete — `delete_inbox
 > accessible folder individually, which is not implemented due to API rate
 > limits.
 
+### How do I set up delegated access?
+
+**Answer:** Delegated access setup happens in Microsoft 365, not in the MCP. The MCP supports three configurations: an Exchange admin grants Full Access (Read & Manage), a user shares specific folders via Outlook desktop (with a required root-mailbox visibility step), or a shared inbox is configured as a normal mailbox and connected to the MCP. See [Features — Delegated Access — Setup](./technical/features.md#Setup) for step-by-step instructions and the Outlook root-mailbox visibility gotcha.
+
+---
+
 ### Who has access to a shared inbox?
 
 **Answer:** Any user whose Microsoft 365 account has been granted access to
@@ -204,7 +211,7 @@ enabling `DELEGATED_ACCESS_SCAN`.
 
 **Mode A (`MicrosoftGraphAndUniqueApi`):** A background discovery job
 periodically tests which other mailboxes each connected user can access via
-Microsoft Graph. When a delegation is detected, the owner's already-indexed
+Microsoft Graph. When a delegation is detected, the owner's already-ingested
 emails become searchable by the delegate through `search_emails` — no additional
 ingestion occurs. **Both users must be connected** to the MCP connector: the
 owner's emails are only available if the owner has also connected their account
@@ -320,7 +327,7 @@ longer include the revoked mailbox.
 
 ## Supported Email Attachment Types
 
-> This section applies to Mode A (`MicrosoftGraphAndUniqueApi`) only. In `MicrosoftGraph` mode, attachments are not indexed.
+> This section applies to Mode A (`MicrosoftGraphAndUniqueApi`) only. In `MicrosoftGraph` mode, attachments are not ingested.
 
 ### Documents
 - **PDF** (`.pdf`)
