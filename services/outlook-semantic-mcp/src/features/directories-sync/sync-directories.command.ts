@@ -109,6 +109,11 @@ export class SyncDirectoriesCommand {
         userEmail,
         msg: `No delegates found for shared mailbox, skipping directory sync`,
       });
+      await this.db
+        .update(directoriesSync)
+        .set({ lastDeltaSyncRanAt: new Date() })
+        .where(eq(directoriesSync.id, syncStats.id))
+        .execute();
       return;
     }
 
