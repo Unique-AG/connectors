@@ -12,6 +12,7 @@ import {
   parseImageBlocks,
   type ResourceRef,
 } from './confluence-tags-parser';
+import { isImageMediaType } from './media-type';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 // ac:image attributes forwarded onto <img>; presentational hints (align, thumbnail, etc.) are dropped.
@@ -121,7 +122,7 @@ export class PageImageInliner {
       return null;
     }
 
-    if (!this.isImageMediaType(resolved.mediaType)) {
+    if (!isImageMediaType(resolved.mediaType)) {
       this.logger.debug({
         pageId: page.id,
         filename: resolved.filename,
@@ -247,11 +248,6 @@ export class PageImageInliner {
       });
     this.crossPageCache.set(cacheKey, promise);
     return promise;
-  }
-
-  private isImageMediaType(mediaType: string): boolean {
-    const normalized = mediaType.split(';')[0]?.trim().toLowerCase() ?? '';
-    return normalized.startsWith('image/');
   }
 
   private isAllowedMediaType(mediaType: string): boolean {

@@ -9,6 +9,7 @@ import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
+import { isImageMediaType } from './media-type';
 import { buildInlinedAttachmentKey, type PageImageInliner } from './page-image-inliner';
 import type { ScopeManagementService } from './scope-management.service';
 import type { DiscoveredAttachment, DiscoveredPage } from './sync.types';
@@ -305,9 +306,4 @@ export class ConfluenceSynchronizationService {
     }
     return map;
   }
-}
-
-function isImageMediaType(mediaType: string): boolean {
-  const normalized = mediaType.split(';')[0]?.trim().toLowerCase() ?? '';
-  return normalized.startsWith('image/');
 }
