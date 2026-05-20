@@ -381,6 +381,30 @@ describe('PageImageInliner', () => {
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
+    it('leaves macro untouched when <ri:page> is present but missing required attrs (does not silently fall back to current-page)', async () => {
+      // A malformed <ri:page> (missing ri:space-key or ri:content-title) must NOT be
+      // treated as a current-page attachment, even if the current page happens to have
+      // an attachment with the same filename. The presence of <ri:page> signals
+      // cross-page intent; we'd rather skip than inline the wrong image.
+      const samePageDecoy: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        title: 'other.png',
+      };
+      const bodyMissingSpaceKey =
+        '<ac:image><ri:attachment ri:filename="other.png"><ri:page ri:content-title="Other Page"/></ri:attachment></ac:image>';
+      const bodyMissingContentTitle =
+        '<ac:image><ri:attachment ri:filename="other.png"><ri:page ri:space-key="OTHER"/></ri:attachment></ac:image>';
+
+      for (const body of [bodyMissingSpaceKey, bodyMissingContentTitle]) {
+        vi.clearAllMocks();
+        const result = await inliner.inlineImages(basePage(body), [samePageDecoy]);
+        expect(result.page.body).toBe(body);
+        expect(result.inlinedAttachmentIds.size).toBe(0);
+        expect(apiClient.fetchPageAttachmentsByTitle).not.toHaveBeenCalled();
+        expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+      }
+    });
+
     it('leaves cross-page macro untouched when fetchPageAttachmentsByTitle throws', async () => {
       apiClient.fetchPageAttachmentsByTitle.mockRejectedValue(new Error('lookup boom'));
 

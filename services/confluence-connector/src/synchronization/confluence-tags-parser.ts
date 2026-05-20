@@ -99,6 +99,10 @@ function resolveResourceFromNodes(imageNode: Element): ResourceRef {
     if (spaceKey && contentTitle) {
       return { kind: 'cross-page-attachment', filename, spaceKey, contentTitle };
     }
+    // <ri:page> is present but malformed (missing ri:space-key or ri:content-title).
+    // Falling through to 'current-attachment' would risk inlining the wrong image if
+    // the current page happens to have an attachment with the same filename.
+    return { kind: 'unknown' };
   }
   return { kind: 'current-attachment', filename };
 }
