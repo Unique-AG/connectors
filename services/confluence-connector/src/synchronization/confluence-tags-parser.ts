@@ -16,7 +16,7 @@ export interface ParsedImageMacro {
   startIndex: number;
   endIndex: number;
   imgAttrs: Record<string, string>;
-  resource: ResourceRef;
+  resourceRef: ResourceRef;
 }
 
 // Locates every <ac:image> macro in a Confluence storage-format body and returns its
@@ -50,7 +50,7 @@ export function parseImageBlocks(body: string): ParsedImageMacro[] {
       startIndex: node.startIndex,
       endIndex,
       imgAttrs: node.attribs,
-      resource: resolveResourceFromNodes(node),
+      resourceRef: resolveResourceRefFromNodes(node),
     });
   }
   return blocks;
@@ -79,7 +79,7 @@ function firstChildElementByName(parent: Element, name: string): Element | undef
   return undefined;
 }
 
-function resolveResourceFromNodes(imageNode: Element): ResourceRef {
+function resolveResourceRefFromNodes(imageNode: Element): ResourceRef {
   const url = firstChildElementByName(imageNode, 'ri:url');
   if (url) {
     return { kind: 'external-url' };

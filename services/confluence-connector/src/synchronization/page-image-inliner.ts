@@ -73,7 +73,7 @@ export class PageImageInliner {
         this.buildImageReplacement(block, page, pageImageAttachments).catch((err) => {
           this.logger.warn({
             pageId: page.id,
-            resource: block.resource,
+            resource: block.resourceRef,
             err,
             msg: 'Failed to inline image, leaving macro untouched',
           });
@@ -114,7 +114,7 @@ export class PageImageInliner {
     pageImageAttachments: DiscoveredAttachment[],
   ): Promise<{ attachmentId: string; pageId: string; html: string } | null> {
     const resolved = await this.resolveAttachmentMetadata(
-      block.resource,
+      block.resourceRef,
       page,
       pageImageAttachments,
     );
