@@ -374,6 +374,7 @@ export class DiscoverDelegatedAccessCommand {
         apiEndpoint === 'messages'
           ? {
               lastDiscoveredAt: now,
+              lastVerifiedAt: now,
               hasFullDelegatedAccess: true,
             }
           : {
