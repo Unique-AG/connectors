@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.9](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.8...outlook-semantic-mcp@0.4.9) (2026-05-20)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** load users from the same tenant ([#566](https://github.com/Unique-AG/connectors/issues/566)) ([bd848a1](https://github.com/Unique-AG/connectors/commit/bd848a12dcd32b5411da9e88497f295c289b9385))
+
 ## [0.4.8](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.7...outlook-semantic-mcp@0.4.8) (2026-05-20)
 
 
