@@ -4,7 +4,7 @@ import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, eq, ilike, inArray, not, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, not, sql } from 'drizzle-orm';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import { DRIZZLE, DrizzleDatabase, userProfiles } from '~/db';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -206,22 +206,19 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     // Delete source='shared-mailbox' rows that belong to a synced domain but are no longer matched.
     // We only delete for successfully synced domains so that rows for domains with no authorized
     // user are left untouched until a future run can verify them.
-    if (syncedDomains.length > 0) {
-      await this.db.delete(userProfiles).where(
-        and(
-          eq(userProfiles.source, 'shared-mailbox'),
-          or(...syncedDomains.map((d) => ilike(userProfiles.email, `%@${d}`))),
-          allMatchedUsers.length > 0
-            ? not(
-                inArray(
-                  sql`lower(${userProfiles.email})`,
-                  allMatchedUsers.map((item) => item.mail),
-                ),
-              )
-            : undefined,
-        ),
-      );
-    }
+    await this.db.delete(userProfiles).where(
+      and(
+        eq(userProfiles.source, 'shared-mailbox'),
+        allMatchedUsers.length > 0
+          ? not(
+              inArray(
+                sql`lower(${userProfiles.email})`,
+                allMatchedUsers.map((item) => item.mail),
+              ),
+            )
+          : undefined,
+      ),
+    );
 
     // Upsert matched users
     if (allMatchedUsers.length > 0) {
