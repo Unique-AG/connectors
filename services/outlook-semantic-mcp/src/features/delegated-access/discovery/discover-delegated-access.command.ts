@@ -5,13 +5,7 @@ import { and, eq, gt, isNotNull, notInArray, or } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, last } from 'remeda';
 import { AppConfig, appConfig, DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
-import {
-  DRIZZLE,
-  DrizzleDatabase,
-  delegatedAccessAccounts,
-  UserProfileSource,
-  userProfiles,
-} from '~/db';
+import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts, userProfiles } from '~/db';
 import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { NewTrace } from '~/features/tracing.utils';
