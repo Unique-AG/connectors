@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
-import pLimit from 'p-limit';
 import type { TenantConfig } from '../config';
 import { BYTES_PER_MB } from '../config/ingestion.schema';
 import type {
@@ -21,11 +20,6 @@ const AC_IMAGE_ATTRS_TO_KEEP: ReadonlyArray<[string, string]> = [
   ['ac:width', 'width'],
   ['ac:height', 'height'],
 ];
-
-// Caps simultaneous in-flight image downloads per page. Bottleneck enforces req/min, not
-// concurrency, so this is the only guard against an image-heavy page running N parallel
-// downloads. Peak per-page memory is still dominated by the total size of inlined images.
-const IMAGE_DOWNLOAD_CONCURRENCY = 5;
 
 export interface InlineImagesResult {
   page: FetchedPage;
@@ -73,10 +67,9 @@ export class PageImageInliner {
       return { page, inlinedAttachmentIds: new Set() };
     }
 
-    const limit = pLimit(IMAGE_DOWNLOAD_CONCURRENCY);
     const replacements = await Promise.all(
       blocks.map((block) =>
-        limit(() => this.buildImageReplacement(block, page, pageImageAttachments)).catch((err) => {
+        this.buildImageReplacement(block, page, pageImageAttachments).catch((err) => {
           this.logger.warn({
             pageId: page.id,
             resource: block.resource,
