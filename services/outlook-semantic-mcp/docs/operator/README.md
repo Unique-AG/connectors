@@ -66,9 +66,26 @@ The Outlook Semantic MCP Server runs as a **single pod** that handles MCP tool r
 
 ## Quick Start
 
+### Unique SaaS
+
+After [granting admin consent](./authentication.md#unique-saas), provide the following to Unique Support or Solution Engineering:
+
+- [ ] **Backend mode** — controls how email search works; see [`MCP_BACKEND`](./configuration.md#MCP_BACKEND) for the full trade-offs:
+  - `MicrosoftGraph` — live KQL search directly against Microsoft Graph; no email ingestion into Unique KB; lighter deployment
+  - `MicrosoftGraphAndUniqueApi` *(default)* — emails ingested into Unique KB; semantic search merged with live KQL results; heavier but richer
+
+- [ ] **Delegated access scan** — only relevant if your organization uses Exchange mailbox delegation (i.e. users who have been granted access to another user's mailbox or folders); see [`DELEGATED_ACCESS_SCAN`](./configuration.md#DELEGATED_ACCESS_SCAN):
+  - `disabled` *(default)* — no delegation scanning
+  - `fullAccessOnly` — Full Access (Read & Manage) grants via Exchange admin
+  - `granularAccess` — folder-level grants (e.g. shared Inbox or RFQ folder); subsumes `fullAccessOnly`
+
+Unique will provide you with the MCP server endpoint URL once the deployment is ready.
+
+### Self-Hosted
+
 Follow these steps to go from zero to a running deployment:
 
-### Mode A: MicrosoftGraphAndUniqueApi
+#### Mode A: MicrosoftGraphAndUniqueApi
 
 1. **Register Microsoft Entra ID application** — Create an app registration with the required delegated permissions. See [Authentication Guide](./authentication.md).
 2. **Create Zitadel service account** — Create a service user with the `KB_Admin` role in Zitadel. Required for both `cluster_local` and `external` auth modes. See [Zitadel Service Account](./configuration.md#Zitadel-Service-Account).
@@ -83,7 +100,7 @@ Follow these steps to go from zero to a running deployment:
    4. Send a test email to the connected account, wait a moment, then use `search_emails` to confirm it appears
 8. **(Optional) Enable delegated access** — If your organization uses Exchange mailbox delegation (Full Access or folder-level), set `delegatedAccessScan` to `fullAccessOnly` or `granularAccess` in your Helm values. Both users (delegate and owner) must connect their accounts for delegated search to work. See [Configuration — DELEGATED_ACCESS_SCAN](./configuration.md#DELEGATED_ACCESS_SCAN).
 
-### Mode B: MicrosoftGraph
+#### Mode B: MicrosoftGraph
 
 1. **Register Microsoft Entra ID application** — same as Mode A. See [Authentication Guide](./authentication.md).
 2. **Provision infrastructure** — PostgreSQL 17+, RabbitMQ 4+, and Unique Knowledge Base (all three are required, same as Mode A). See [Deployment — Prerequisites](./deployment.md#Prerequisites).

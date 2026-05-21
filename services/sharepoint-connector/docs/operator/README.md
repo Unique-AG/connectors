@@ -88,6 +88,31 @@ flowchart TB
 
 In cluster-internal mode, Zitadel token validation is not needed as services communicate securely within the cluster using custom request headers for company and user scope.
 
+## Quick Start
+
+### Unique SaaS
+
+When Unique hosts the SharePoint Connector, Unique provisions the app registration, certificate, and deployment infrastructure. Your side of the setup is:
+
+1. Provide the information below to Unique Support or Solution Engineering
+2. [Grant admin consent](./authentication.md#unique-saas) using the URL Unique sends you
+3. Grant site-specific access for Unique's app registration to each SharePoint site (see [Grant Site-Specific Access](./authentication.md#4-grant-site-specific-access)
+
+**What to provide to Unique (all items are required):**
+
+- [ ] **Microsoft Entra Tenant ID** — Azure Portal → Microsoft Entra ID → Overview → Directory (tenant) ID
+  (e.g. `e7d7bf31-647b-47c2-a5e6-994918b4e07d`)
+- [ ] **SharePoint base URL** — the root URL of your SharePoint Online tenant
+  (e.g. `https://contoso.sharepoint.com`)
+- [ ] **Site configuration source** — how the connector discovers which sites to sync:
+  - **`sharepoint_list`** *(recommended)* — a SharePoint list controls which sites are synced dynamically; provide:
+    - [ ] **Configuration site ID** — the ID of the SharePoint site that hosts the sync control list
+    - [ ] **Configuration list ID** — the ID of the list within that site
+  - **`config_file`** — a static list of site IDs baked into the deployment; provide:
+    - [ ] The **Site IDs** to sync (and optionally Document Library IDs for library-level access)
+
+For Multi Tenant deployments, grant site access to Unique's shared app ID `29a02f83-6586-429e-9a49-7af46db05f00`. For Single Tenant deployments, Unique will provide the dedicated app ID after provisioning.
+
 ## Infrastructure Requirements
 
 | Component | Requirement | Notes |
