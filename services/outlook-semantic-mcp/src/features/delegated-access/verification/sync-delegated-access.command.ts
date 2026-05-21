@@ -260,12 +260,15 @@ export class SyncDelegatedAccessCommand {
             endpoint: `/users/${ownerEmail}/mailFolders/${folderId}/messages`,
           });
 
-          if (!isDataAccessError(verificationResult)) {
-            accessibleFolderIds.push(folderId);
-            await onProgress?.();
+          if (isDataAccessError(verificationResult)) {
+            errors.push({ ...verificationResult, folderId });
             return;
           }
-          errors.push({ ...verificationResult, folderId });
+
+          await onProgress?.();
+          if (verificationResult.canRead) {
+            accessibleFolderIds.push(folderId);
+          }
         }),
       );
 
