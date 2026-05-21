@@ -13,8 +13,8 @@ import {
 import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { NewTrace, traceAttrs } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { ReadOwnerMailboxFoldersFromMsGraphQuery } from '../commands/read-owner-mailbox-folders-for-delegated-acess-verification.query';
-import { TestReadAccessFromGraphEndpointQuery } from '../commands/test-read-access-from-graph-endpint.query';
+import { ReadOwnerMailboxFoldersFromMsGraphQuery } from '../commands/read-owner-mailbox-folders-for-delegated-access-verification.query';
+import { TestReadAccessFromGraphEndpointQuery } from '../commands/test-read-access-from-graph-endpoint.query';
 import {
   CannotReadErrorReason,
   DataAccessError,
@@ -218,7 +218,7 @@ export class SyncDelegatedAccessCommand {
     }
 
     // We have no reason to run the folder tests the token expired
-    if ('reason' in testResult && testResult.reason === CannotReadErrorReason.TokenExpired) {
+    if (isDataAccessError(testResult) && testResult.reason === CannotReadErrorReason.TokenExpired) {
       await onProgress?.();
       return {
         hasFullDelegatedAccess: false,
@@ -231,7 +231,7 @@ export class SyncDelegatedAccessCommand {
       return {
         hasFullDelegatedAccess: false,
         accessibleFolderIds: [],
-        errors: [],
+        errors: isDataAccessError(testResult) ? [testResult] : [],
       };
     }
 
@@ -253,32 +253,21 @@ export class SyncDelegatedAccessCommand {
 
     const accessibleFolderIds: string[] = [];
     for (const folderIdsChunk of chunk(fetchFoldersResult.folderIds, 100)) {
-      const foldersWithAccessFetched = await Promise.all(
-        folderIdsChunk.map(
-          async (folderId): Promise<{ canRead: boolean; folderId: string } | DataAccessError> => {
-            const verificationResult = await this.testReadAccessFromGraphEndpointQuery.run({
-              client,
-              endpoint: `/users/${ownerEmail}/mailFolders/${folderId}/messages`,
-            });
+      await Promise.all(
+        folderIdsChunk.map(async (folderId): Promise<void> => {
+          const verificationResult = await this.testReadAccessFromGraphEndpointQuery.run({
+            client,
+            endpoint: `/users/${ownerEmail}/mailFolders/${folderId}/messages`,
+          });
 
-            if (!isDataAccessError(verificationResult)) {
-              await onProgress?.();
-            }
-            return { ...verificationResult, folderId };
-          },
-        ),
+          if (!isDataAccessError(verificationResult)) {
+            accessibleFolderIds.push(folderId);
+            await onProgress?.();
+            return;
+          }
+          errors.push({ ...verificationResult, folderId });
+        }),
       );
-
-      for (const item of foldersWithAccessFetched) {
-        if (isDataAccessError(item)) {
-          errors.push(item);
-          continue;
-        }
-
-        if (item.canRead) {
-          accessibleFolderIds.push(item.folderId);
-        }
-      }
 
       if (errors.length > 0) {
         const error = new Error(`Stop delegated access sync. Some ms graph api calls failed`, {
