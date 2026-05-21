@@ -60,4 +60,30 @@ describe('convertDateTimeToTimezone', () => {
       '2024-01-16T00:00:00+01:00',
     );
   });
+
+  describe('Windows timezone names (as returned by Microsoft Graph)', () => {
+    it('converts "Eastern Standard Time" the same as "America/New_York"', () => {
+      expect(convertDateTimeToTimezone('2024-01-15T17:00:00Z', 'Eastern Standard Time')).toBe(
+        '2024-01-15T12:00:00-05:00',
+      );
+    });
+
+    it('converts "W. Europe Standard Time" the same as "Europe/Berlin" (winter UTC+1)', () => {
+      expect(convertDateTimeToTimezone('2024-01-15T12:00:00Z', 'W. Europe Standard Time')).toBe(
+        '2024-01-15T13:00:00+01:00',
+      );
+    });
+
+    it('converts "India Standard Time" the same as "Asia/Kolkata" (UTC+5:30)', () => {
+      expect(convertDateTimeToTimezone('2024-01-15T06:30:00Z', 'India Standard Time')).toBe(
+        '2024-01-15T12:00:00+05:30',
+      );
+    });
+
+    it('returns utcString unchanged for a completely unknown timezone name', () => {
+      expect(convertDateTimeToTimezone('2024-01-15T12:00:00Z', 'Not A Real Timezone')).toBe(
+        '2024-01-15T12:00:00Z',
+      );
+    });
+  });
 });

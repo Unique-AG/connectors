@@ -1,3 +1,5 @@
+import { resolveIanaTimezone } from './resolve-iana-timezone';
+
 export function convertDateTimeToTimezone(
   utcString: string | null | undefined,
   timezone: string | undefined,
@@ -11,8 +13,13 @@ export function convertDateTimeToTimezone(
       return utcString;
     }
 
+    const ianaTimezone = resolveIanaTimezone(timezone);
+    if (!ianaTimezone) {
+      return utcString;
+    }
+
     const parts = new Intl.DateTimeFormat('en', {
-      timeZone: timezone,
+      timeZone: ianaTimezone,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
