@@ -133,13 +133,13 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).
 
   ## Opening an email after search
-  When the user asks to open, read, or see the full content of a specific email that appeared in the results, call \`open_email_by_id\` — pass the \`openEmailParams\` object from that result directly as the tool input. Do NOT tell the user you cannot access the email or that you lack mailbox access.`,
+  When the user asks to open, read, or see the full content of a specific email that appeared in the results, call \`open_email\` — pass the \`openEmailParams\` object from that result directly as the tool input. Do NOT tell the user you cannot access the email or that you lack mailbox access.`,
   toolFormatInformation: TOOL_FORMAT_INFORMATION,
 });
 
 export const META_MS_GRAPH = createMeta({
   icon: 'search',
-  systemPrompt: `Searches Outlook emails using Microsoft Graph KQL queries. Returns matched emails with metadata and full body content in the \`text\` field — answer questions about email content directly from \`text\` without calling \`open_email_by_id\` unless the user explicitly asks to open an email.
+  systemPrompt: `Searches Outlook emails using Microsoft Graph KQL queries. Returns matched emails with metadata and full body content in the \`text\` field — answer questions about email content directly from \`text\` without calling \`open_email\` unless the user explicitly asks to open an email.
 
   By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
   After returning results, inform the user that they can narrow the search with more specific KQL terms if needed.
@@ -178,6 +178,6 @@ export const META_MS_GRAPH = createMeta({
   Use body: for mentions in the email text and participants: for appearances in address fields.
 
   ## Opening an email after search
-  When the user asks to open, read, or see the full content of a specific email that appeared in the results, call \`open_email_by_id\` — pass the \`openEmailParams\` object from that result directly as the tool input. Do NOT tell the user you cannot access the email or that you lack mailbox access.`,
+  When the user asks to open, read, or see the full content of a specific email that appeared in the results, call \`open_email\` — pass the \`openEmailParams\` object from that result directly as the tool input. Do NOT tell the user you cannot access the email or that you lack mailbox access.`,
   toolFormatInformation: TOOL_FORMAT_INFORMATION,
 });

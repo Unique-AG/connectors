@@ -59,7 +59,14 @@ export class OpenEmailQuery {
     outputTimeZone?: string,
   ): Promise<OpenEmailResult> {
     if (idType === SearchBackend.MsGraph) {
-      return this.readMessageFromMsGraph(userProfileId, id, mailbox, folderId, idIsImmutable, outputTimeZone);
+      return this.readMessageFromMsGraph(
+        userProfileId,
+        id,
+        mailbox,
+        folderId,
+        idIsImmutable,
+        outputTimeZone,
+      );
     }
     return this.readMessageFromUnique(id, outputTimeZone);
   }
@@ -111,7 +118,10 @@ export class OpenEmailQuery {
     };
   }
 
-  private async readMessageFromUnique(id: string, outputTimeZone?: string): Promise<OpenEmailResult> {
+  private async readMessageFromUnique(
+    id: string,
+    outputTimeZone?: string,
+  ): Promise<OpenEmailResult> {
     const emailData = await this.uniqueApi.content.getContentById({ contentId: id });
     const metadata = emailData.metadata as MessageMetadata | undefined;
 

@@ -3,7 +3,6 @@ import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { isDebugMode, isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
-import { UserUtilsModule } from './user-utils/user-utils.module';
 import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
 import { CategoriesModule } from './categories/categories.module';
@@ -35,6 +34,7 @@ import {
 import { FullSyncModule } from './sync/full-sync/full-sync.module';
 import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
+import { UserUtilsModule } from './user-utils/user-utils.module';
 
 @Module({})
 export class BackendModule {}

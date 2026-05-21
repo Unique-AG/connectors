@@ -52,7 +52,12 @@ export class SearchEmailsQuery {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
       return this.semanticSearchQuery
-        .run(userProfileId, input.uniqueSemanticSearchQueries, SEARCH_CONFIG.semanticSearch, outputTimeZone)
+        .run(
+          userProfileId,
+          input.uniqueSemanticSearchQueries,
+          SEARCH_CONFIG.semanticSearch,
+          outputTimeZone,
+        )
         .then(({ results, searchSummary }) => ({ results, searchSummary }));
     },
     [SearchBackend.MsGraph]: (

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import {
   convertUserProfileIdToTypeId,
   type UserProfileTypeID,
 } from '~/utils/convert-user-profile-id-to-type-id';
-import type { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import type { MsGraphKqlSearchEmailsQuery } from '../ms-graph-kql-search-emails.query';
 import { SearchEmailsQuery } from '../search-emails.query';
 import {

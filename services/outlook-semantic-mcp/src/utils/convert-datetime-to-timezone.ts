@@ -2,10 +2,14 @@ export function convertDateTimeToTimezone(
   utcString: string | null | undefined,
   timezone: string | undefined,
 ): string | null | undefined {
-  if (!utcString || !timezone) return utcString;
+  if (!utcString || !timezone) {
+    return utcString;
+  }
   try {
     const date = new Date(utcString);
-    if (isNaN(date.getTime())) return utcString;
+    if (Number.isNaN(date.getTime())) {
+      return utcString;
+    }
 
     const parts = new Intl.DateTimeFormat('en', {
       timeZone: timezone,
@@ -25,7 +29,7 @@ export function convertDateTimeToTimezone(
     const localStr = `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}:${get('second')}`;
 
     // Compute the UTC offset by treating the local parts as UTC and comparing to the original
-    const offsetMs = Date.parse(localStr + 'Z') - date.getTime();
+    const offsetMs = Date.parse(`${localStr}Z`) - date.getTime();
     const offsetMin = Math.round(offsetMs / 60000);
     const sign = offsetMin >= 0 ? '+' : '-';
     const absMin = Math.abs(offsetMin);

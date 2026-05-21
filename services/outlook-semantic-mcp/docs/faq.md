@@ -95,7 +95,7 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. In the def
 
 | Category | Tools |
 |----------|-------|
-| Email Search | `search_emails`, `open_email_by_id` |
+| Email Search | `search_emails`, `open_email` |
 | Draft Creation | `create_draft_email` |
 | Contact Lookup | `lookup_contacts` |
 | Mailbox Utilities | `list_categories`, `list_mailboxes_and_directories` |

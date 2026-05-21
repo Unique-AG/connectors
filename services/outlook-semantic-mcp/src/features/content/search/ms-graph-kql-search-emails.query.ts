@@ -14,9 +14,9 @@ import { GetMailboxesWithFullDelegatedAccessQuery } from '~/features/delegated-a
 import { TranslateGraphIdsToImmutableIdsQuery } from '~/features/graph-utils/translate-graph-ids-to-immutable-ids.query';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
-import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 import { MsGraphSearchConfig } from './search.config';
@@ -332,7 +332,8 @@ export class MsGraphKqlSearchEmailsQuery {
             isDelegated: originalRequest.isDelegated,
             subject: msg.subject ?? '',
             from: msg.from?.emailAddress.address ?? '',
-            receivedDateTime: convertDateTimeToTimezone(msg.receivedDateTime, outputTimeZone) ?? null,
+            receivedDateTime:
+              convertDateTimeToTimezone(msg.receivedDateTime, outputTimeZone) ?? null,
             parentFolderId: msg.parentFolderId ?? '',
             webLink: msg.webLink ?? '',
             text: msg.uniqueBody?.content || msg.body?.content || msg.bodyPreview || '',
