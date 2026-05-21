@@ -49,15 +49,23 @@ export class OpenEmailQuery {
   ) {}
 
   @Span()
-  public async run(
-    userProfileId: string,
-    id: string,
-    idType: SearchBackend,
-    mailbox?: string,
-    folderId?: string,
-    idIsImmutable?: boolean,
-    outputTimeZone?: string,
-  ): Promise<OpenEmailResult> {
+  public async run({
+    userProfileId,
+    id,
+    idType,
+    mailbox,
+    folderId,
+    idIsImmutable,
+    outputTimeZone,
+  }: {
+    userProfileId: string;
+    id: string;
+    idType: SearchBackend;
+    mailbox?: string;
+    folderId?: string;
+    idIsImmutable?: boolean;
+    outputTimeZone?: string;
+  }): Promise<OpenEmailResult> {
     if (idType === SearchBackend.MsGraph) {
       return this.readMessageFromMsGraph(
         userProfileId,

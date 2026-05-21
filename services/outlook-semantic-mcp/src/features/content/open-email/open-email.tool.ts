@@ -102,15 +102,15 @@ export class OpenEmailTool {
     }
 
     const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileTypeId);
-    const emailData = await this.openEmailQuery.run(
-      userProfileTypeId.toString(),
-      input.id,
-      input.idType,
-      input.mailbox,
-      input.parentFolderId,
-      input.idIsImmutable,
-      outputTimeZone,
-    );
+    const emailData = await this.openEmailQuery.run({
+      userProfileId: userProfileTypeId.toString(),
+      id: input.id,
+      idType: input.idType,
+      mailbox: input.mailbox,
+      folderId: input.parentFolderId,
+      idIsImmutable: input.idIsImmutable,
+      outputTimeZone: outputTimeZone,
+    });
     return { success: true, emailData };
   }
 }
