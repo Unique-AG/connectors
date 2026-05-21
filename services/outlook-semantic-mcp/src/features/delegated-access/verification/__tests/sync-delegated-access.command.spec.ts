@@ -1,6 +1,8 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ReadOwnerMailboxFoldersFromMsGraphQuery } from '../../commands/read-owner-mailbox-folders-for-delegated-acess-verification.query';
+import { TestReadAccessFromGraphEndpointQuery } from '../../commands/test-read-access-from-graph-endpint.query';
 import { SyncDelegatedAccessCommand } from '../sync-delegated-access.command';
 
 // ---------------------------------------------------------------------------
@@ -115,6 +117,8 @@ function createCommand({
 } = {}): SyncDelegatedAccessCommand {
   return new SyncDelegatedAccessCommand(
     createMockGraphClientFactory(graphApi) as any,
+    new TestReadAccessFromGraphEndpointQuery(),
+    new ReadOwnerMailboxFoldersFromMsGraphQuery(),
     db as any,
     { scan: 'granularAccess' } as any,
     { measureSyncRun: (fn: () => Promise<unknown>) => fn() } as any,

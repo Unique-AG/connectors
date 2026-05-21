@@ -11,7 +11,8 @@ import { getRetryAfterMs } from '~/utils/get-retry-after-ms';
 import { GenericRateLimitError } from '~/utils/is-rate-limit-error';
 import { Nullish } from '~/utils/nullish';
 import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
-import { CannotReadErrorReason, SyncDelegatedAccessCommand } from './sync-delegated-access.command';
+import { CannotReadErrorReason } from '../utils/data-access-error';
+import { SyncDelegatedAccessCommand } from './sync-delegated-access.command';
 
 export const SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY = `SyncDelegatedAccessForAllUsers`;
 export const SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_NO_PROGRESS_THRESHOLD_MINUTES = 10;

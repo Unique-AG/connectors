@@ -14,7 +14,7 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { isTokenExpiredError } from '~/utils/is-token-expired-error';
 import { Nullish } from '~/utils/nullish';
 import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
-import { isDelegatedAccessNotAvailableError } from '../is-delegated-access-not-available-error';
+import { isDelegatedAccessNotAvailableError } from '../utils/is-delegated-access-not-available-error';
 
 export const DISCOVER_DELEGATED_ACCESS_CACHE_KEY = `DiscoverDelegatedAccess`;
 export const DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES = 10;

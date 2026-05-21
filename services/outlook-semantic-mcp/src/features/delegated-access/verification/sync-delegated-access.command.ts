@@ -1,8 +1,7 @@
-import { Client, GraphError } from '@microsoft/microsoft-graph-client';
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, notInArray } from 'drizzle-orm';
-import pLimit from 'p-limit';
-import { chunk, isNumber, isObjectType } from 'remeda';
+import { chunk, pick } from 'remeda';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
@@ -14,33 +13,13 @@ import {
 import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { NewTrace, traceAttrs } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { isTokenExpiredError } from '~/utils/is-token-expired-error';
-import { isDelegatedAccessNotAvailableError } from '../is-delegated-access-not-available-error';
-import { isRateLimitError } from '~/utils/is-rate-limit-error';
-
-interface FolderNode {
-  id: string;
-  childFolderCount: number;
-  childFolders?: FolderNode[];
-}
-
-export enum CannotReadErrorReason {
-  TokenExpired = 'token-expired',
-  TransientError = 'transient-error',
-  UnexpectedError = 'unexpected-error',
-}
-
-export interface DataAccessError {
-  canRead: false;
-  folderId?: string;
-  reason: CannotReadErrorReason;
-  error: unknown;
-}
-
-const isDataAccessError = (input: unknown): input is DataAccessError =>
-  isObjectType(input) &&
-  'reason' in input &&
-  Object.values(CannotReadErrorReason).includes(input.reason as CannotReadErrorReason);
+import { ReadOwnerMailboxFoldersFromMsGraphQuery } from '../commands/read-owner-mailbox-folders-for-delegated-acess-verification.query';
+import { TestReadAccessFromGraphEndpointQuery } from '../commands/test-read-access-from-graph-endpint.query';
+import {
+  CannotReadErrorReason,
+  DataAccessError,
+  isDataAccessError,
+} from '../utils/data-access-error';
 
 export type VerificationResult =
   | { status: 'success' }
@@ -59,6 +38,8 @@ export class SyncDelegatedAccessCommand {
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
+    private readonly testReadAccessFromGraphEndpointQuery: TestReadAccessFromGraphEndpointQuery,
+    private readonly readOwnerMailboxFoldersFromMsGraphQuery: ReadOwnerMailboxFoldersFromMsGraphQuery,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
     private readonly metrics: DelegatedAccessMetricsService,
@@ -180,6 +161,9 @@ export class SyncDelegatedAccessCommand {
       .set({ hasFullDelegatedAccess: false })
       .where(eq(delegatedAccessAccounts.id, accountsId));
 
+    // If after directory updates there are no readable directories and during the verification there were no errors
+    // we can safely remove this accounts pair because the current delegated user can only view directories inside
+    // the owner mailbox but he cannot read data from any directory.
     if (dirCount === 0 && !dataAccessErrors.length) {
       await this.db
         .delete(delegatedAccessAccounts)
@@ -199,7 +183,10 @@ export class SyncDelegatedAccessCommand {
       this.logger.log({ accountsId, dirCount, msg: 'Accounts lastVerifiedAt updated' });
       return { status: 'success' };
     }
-    return { status: 'failed', errors: dataAccessErrors };
+    return {
+      status: 'failed',
+      errors: dataAccessErrors.map((item) => pick(item, ['error', 'reason'])),
+    };
   }
 
   private async verifyReadAccess({
@@ -220,7 +207,7 @@ export class SyncDelegatedAccessCommand {
         errors: DataAccessError[];
       }
   > {
-    const testResult = await this.testGraphEndpointForReadAccess({
+    const testResult = await this.testReadAccessFromGraphEndpointQuery.run({
       client,
       endpoint: `/users/${ownerEmail}/messages`,
     });
@@ -249,46 +236,27 @@ export class SyncDelegatedAccessCommand {
     }
 
     const errors: DataAccessError[] = [];
-    let folderIds: string[] = [];
-
-    try {
-      folderIds = await this.readAllFolders({ client, ownerEmail });
-    } catch (error) {
-      // This should only happen if someone lost access completly to the delegated mailbox.
-      if (isDelegatedAccessNotAvailableError(error)) {
-        return {
-          hasFullDelegatedAccess: false,
-          accessibleFolderIds: [],
-          errors: [],
-        };
-      }
-
-      const mapErrorToReason = (error: unknown): CannotReadErrorReason => {
-        if (isTokenExpiredError(error)) {
-          return CannotReadErrorReason.TokenExpired;
-        }
-        if (isRateLimitError(error)) {
-          return CannotReadErrorReason.TransientError;
-        }
-        return CannotReadErrorReason.UnexpectedError;
-      };
-
+    const fetchFoldersResult = await this.readOwnerMailboxFoldersFromMsGraphQuery.run({
+      client,
+      ownerEmail,
+    });
+    if (isDataAccessError(fetchFoldersResult)) {
       return {
         hasFullDelegatedAccess: false,
         accessibleFolderIds: [],
-        errors: [{ error: error, canRead: false, reason: mapErrorToReason(error) }],
+        errors: [fetchFoldersResult],
       };
     }
-
-    if (!folderIds.length) {
+    if (!fetchFoldersResult.canRead || !fetchFoldersResult.folderIds.length) {
       return { hasFullDelegatedAccess: false, accessibleFolderIds: [], errors: [] };
     }
+
     const accessibleFolderIds: string[] = [];
-    for (const folderIdsChunk of chunk(folderIds, 100)) {
+    for (const folderIdsChunk of chunk(fetchFoldersResult.folderIds, 100)) {
       const foldersWithAccessFetched = await Promise.all(
         folderIdsChunk.map(
           async (folderId): Promise<{ canRead: boolean; folderId: string } | DataAccessError> => {
-            const verificationResult = await this.testGraphEndpointForReadAccess({
+            const verificationResult = await this.testReadAccessFromGraphEndpointQuery.run({
               client,
               endpoint: `/users/${ownerEmail}/mailFolders/${folderId}/messages`,
             });
@@ -321,100 +289,5 @@ export class SyncDelegatedAccessCommand {
       }
     }
     return { hasFullDelegatedAccess: false, errors: errors, accessibleFolderIds };
-  }
-
-  private async readAllFolders({
-    client,
-    ownerEmail,
-  }: {
-    client: Client;
-    ownerEmail: string;
-  }): Promise<string[]> {
-    const readFolders = async (
-      url: string,
-      limit?: number,
-    ): Promise<{ '@odata.nextLink'?: string; value: FolderNode[] }> => {
-      let call = client.api(url);
-      if (isNumber(limit)) {
-        call = call.top(limit);
-      }
-      return await call.header('Prefer', 'IdType="ImmutableId"').get();
-    };
-
-    const fetchChildFolders = async (folderId: string): Promise<FolderNode[]> => {
-      const children: FolderNode[] = [];
-
-      let response = await readFolders(
-        `/users/${ownerEmail}/mailFolders/${folderId}/childFolders`,
-        500,
-      );
-      children.push(...(response?.value ?? []));
-
-      while (response?.['@odata.nextLink']) {
-        response = await readFolders(response['@odata.nextLink']);
-        children.push(...(response?.value ?? []));
-      }
-
-      return children;
-    };
-
-    const limit = pLimit(10);
-    const expandRecursive = async (folder: FolderNode): Promise<void> => {
-      if (!folder.childFolderCount) {
-        return;
-      }
-
-      folder.childFolders = await limit(() => fetchChildFolders(folder.id));
-      await Promise.all(folder.childFolders.map(expandRecursive));
-    };
-
-    const rootFolders: FolderNode[] = [];
-    let response = await client
-      .api(`/users/${ownerEmail}/mailFolders`)
-      .header('Prefer', 'IdType="ImmutableId"')
-      .top(500)
-      .get();
-    rootFolders.push(...(response?.value ?? []));
-
-    while (response?.['@odata.nextLink']) {
-      response = await client
-        .api(response['@odata.nextLink'])
-        .header('Prefer', 'IdType="ImmutableId"')
-        .get();
-      rootFolders.push(...(response?.value ?? []));
-    }
-
-    await Promise.all(rootFolders.map(expandRecursive));
-
-    const flattenFolders = (items: FolderNode[]): Array<string> =>
-      items.flatMap((item) => [item.id, ...flattenFolders(item.childFolders ?? [])]);
-
-    return flattenFolders(rootFolders);
-  }
-
-  private async testGraphEndpointForReadAccess({
-    client,
-    endpoint,
-  }: {
-    client: Client;
-    endpoint: string;
-  }): Promise<Omit<DataAccessError, 'folderId'> | { canRead: true } | { canRead: false }> {
-    try {
-      await client.api(endpoint).select('id').top(1).get();
-      return { canRead: true };
-    } catch (error) {
-      if (isDelegatedAccessNotAvailableError(error)) {
-        return { canRead: false };
-      }
-      if (error instanceof GraphError) {
-        if (isTokenExpiredError(error)) {
-          return { canRead: false, reason: CannotReadErrorReason.TokenExpired, error };
-        }
-        if (error.statusCode === 429 || (error.statusCode >= 500 && error.statusCode < 600)) {
-          return { canRead: false, reason: CannotReadErrorReason.TransientError, error };
-        }
-      }
-      return { canRead: false, reason: CannotReadErrorReason.UnexpectedError, error };
-    }
   }
 }

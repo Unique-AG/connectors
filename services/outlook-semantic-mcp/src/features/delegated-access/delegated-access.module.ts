@@ -4,6 +4,8 @@ import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { PersistentCacheModule } from '../persistent-cache/persistent-cache.module';
+import { ReadOwnerMailboxFoldersFromMsGraphQuery } from './commands/read-owner-mailbox-folders-for-delegated-acess-verification.query';
+import { TestReadAccessFromGraphEndpointQuery } from './commands/test-read-access-from-graph-endpint.query';
 import { DelegatedAccessRecoverySchedulerService } from './delegated-access-recovery-scheduler.service';
 import { DiscoverDelegatedAccessCommand } from './discovery/discover-delegated-access.command';
 import { DiscoverDelegatedAccessListener } from './discovery/discover-delegated-access.listener';
@@ -17,6 +19,8 @@ import { VerifyDelegatedAccessSchedulerService } from './verification/verify-del
 @Module({
   imports: [DrizzleModule, MsGraphModule, MetricsModule, PersistentCacheModule, ConfigModule],
   providers: [
+    TestReadAccessFromGraphEndpointQuery,
+    ReadOwnerMailboxFoldersFromMsGraphQuery,
     // discovery
     DiscoverDelegatedAccessCommand,
     DiscoverDelegatedAccessListener,
