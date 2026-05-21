@@ -35,7 +35,10 @@ export class GetMailboxTimezoneQuery {
       this.cache.set(key, parsed.data.timeZone);
       return parsed.data.timeZone;
     } catch (error) {
-      this.logger.warn({ msg: 'Failed to fetch mailbox timezone, falling back to UTC', err: error });
+      this.logger.warn({
+        msg: 'Failed to fetch mailbox timezone, falling back to UTC',
+        err: error,
+      });
       return undefined;
     }
   }
