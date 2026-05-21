@@ -212,14 +212,10 @@ export class SyncDelegatedAccessCommand {
       endpoint: `/users/${ownerEmail}/messages`,
     });
 
-    if (testResult.canRead) {
-      await onProgress?.();
-      return { hasFullDelegatedAccess: true };
-    }
-
-    // We have no reason to run the folder tests the token expired
-    if (isDataAccessError(testResult) && testResult.reason === CannotReadErrorReason.TokenExpired) {
-      await onProgress?.();
+    if (isDataAccessError(testResult)) {
+      if (testResult.reason === CannotReadErrorReason.TokenExpired) {
+        await onProgress?.();
+      }
       return {
         hasFullDelegatedAccess: false,
         accessibleFolderIds: [],
@@ -227,11 +223,16 @@ export class SyncDelegatedAccessCommand {
       };
     }
 
+    if (testResult.canRead) {
+      await onProgress?.();
+      return { hasFullDelegatedAccess: true };
+    }
+
     if (verifyOnlyFullAccess) {
       return {
         hasFullDelegatedAccess: false,
         accessibleFolderIds: [],
-        errors: isDataAccessError(testResult) ? [testResult] : [],
+        errors: [],
       };
     }
 

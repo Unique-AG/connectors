@@ -27,13 +27,13 @@ export class TestReadAccessFromGraphEndpointQuery {
       }
       if (error instanceof GraphError) {
         if (isTokenExpiredError(error)) {
-          return { canRead: false, reason: CannotReadErrorReason.TokenExpired, error };
+          return { reason: CannotReadErrorReason.TokenExpired, error };
         }
         if (error.statusCode === 429 || (error.statusCode >= 500 && error.statusCode < 600)) {
-          return { canRead: false, reason: CannotReadErrorReason.TransientError, error };
+          return { reason: CannotReadErrorReason.TransientError, error };
         }
       }
-      return { canRead: false, reason: CannotReadErrorReason.UnexpectedError, error };
+      return { reason: CannotReadErrorReason.UnexpectedError, error };
     }
   }
 }

@@ -445,6 +445,7 @@ export class DiscoverDelegatedAccessCommand {
       throw error;
     }
   }
+
   private async updateProgress(
     cursors?: Partial<{
       lastProcessedDelegateId: string | null;

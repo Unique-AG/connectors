@@ -7,7 +7,6 @@ export enum CannotReadErrorReason {
 }
 
 export interface DataAccessError {
-  canRead: false;
   reason: CannotReadErrorReason;
   error: unknown;
   // More error context if it happens for 1 folder we can pass the folder id
@@ -16,7 +15,5 @@ export interface DataAccessError {
 
 export const isDataAccessError = (input: unknown): input is DataAccessError =>
   isObjectType(input) &&
-  'canRead' in input &&
-  input.canRead === false &&
   'reason' in input &&
   Object.values(CannotReadErrorReason).includes(input.reason as CannotReadErrorReason);

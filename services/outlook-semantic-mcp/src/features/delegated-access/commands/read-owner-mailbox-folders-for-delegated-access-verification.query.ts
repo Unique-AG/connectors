@@ -43,7 +43,6 @@ export class ReadOwnerMailboxFoldersFromMsGraphQuery {
       };
 
       return {
-        canRead: false,
         reason: mapErrorToReason(error),
         error,
       };
