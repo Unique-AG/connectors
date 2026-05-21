@@ -5,19 +5,49 @@
 
 ## Overview
 
-The Outlook Semantic MCP Server requires a Microsoft Entra ID (formerly Azure AD) app registration with delegated permissions to access Microsoft Graph API on behalf of users.
+The Outlook Semantic MCP Server requires a Microsoft Entra ID (formerly Azure AD) app registration with **delegated permissions** to access Microsoft Graph API on behalf of users.
 
-For technical details about the OAuth flow and why client credentials are required, see:
+How the app registration is provisioned depends on your deployment model:
 
-- [Authentication Flows](../technical/flows.md)
-- [Microsoft Graph Permissions](../technical/permissions.md)
-- [FAQ - Why do I need a client ID and client secret?](../faq.md#Why-do-I-need-a-client-ID-and-client-secret)
+- **Unique SaaS** — Unique provisions and manages the registration; you grant admin consent
+- **Self-Hosted** — your organization provisions the registration, manages secrets, and operates the server
 
-## App Registration
+For technical details about the OAuth flow, see [Authentication Flows](../technical/flows.md) and [FAQ - Why do I need a client ID and client secret?](../faq.md#Why-do-I-need-a-client-ID-and-client-secret).
 
-### Option 1: Terraform (Recommended)
+## Required Permissions
 
-Use the provided Terraform module:
+All permissions are **delegated** — they act on behalf of the signed-in user. None require admin consent. `Mail.ReadWrite.Shared` is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`).
+
+| Permission | Type | Admin Consent |
+|------------|------|---------------|
+| `User.Read` | Delegated | No |
+| `Mail.ReadWrite` | Delegated | No |
+| `Mail.ReadWrite.Shared` | Delegated | No |
+| `MailboxSettings.Read` | Delegated | No |
+| `People.Read` | Delegated | No |
+| `offline_access` | Delegated | No |
+
+For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
+
+## Unique SaaS
+
+**Recommended for most clients.** When Unique runs Outlook Semantic MCP, Unique provisions the Entra ID app registration for you. You only need to grant admin consent:
+
+```
+https://login.microsoftonline.com/organizations/adminconsent?client_id=ba326974-edcf-49ef-bf7a-74b3e0ea450a
+```
+
+The consent prompt lists the [Required Permissions](#required-permissions) above. None require admin consent — users can also approve permissions themselves on first connection. Granting admin consent up front is optional but skips the per-user consent prompt.
+
+If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `ba326974-edcf-49ef-bf7a-74b3e0ea450a`.
+
+## Self-Hosted
+
+When your organization hosts Outlook Semantic MCP, your team manages the full setup: Entra app registration, redirect URIs, secret rotation, and server configuration.
+
+### App Registration
+
+#### Option 1: Terraform (Recommended)
 
 > **Prerequisite:** Assumes an existing Azure Key Vault resource (referenced as `azurerm_key_vault.main` below). The Terraform module writes the client secret to Key Vault automatically.
 
@@ -50,88 +80,23 @@ module "outlook_semantic_mcp_app" {
 
 > **`service_principal_configuration` (optional):** When set, the module creates a service principal and pre-grants delegated permissions tenant-wide via `azuread_service_principal_delegated_permission_grant`. Omit this variable for multi-tenant deployments where admin consent is granted by each customer tenant individually.
 
-### Option 2: Azure Portal (Manual)
+#### Option 2: Azure Portal (Manual)
 
-1. **Navigate to App Registrations**
-
-   - Go to [Azure Portal](https://portal.azure.com)
-   - Search for "App registrations"
-   - Click "New registration"
-
-2. **Configure Basic Settings**
-
+1. Go to [Azure Portal](https://portal.azure.com) → **Azure Active Directory** → **App registrations** → **New registration**:
    - **Name**: Outlook Semantic MCP Server
    - **Supported account types**: Accounts in this organizational directory only
-   - **Redirect URI**: Web - `https://outlook.semantic.mcp.example.com/auth/callback`
+   - **Redirect URI**: Web — `https://outlook.semantic.mcp.example.com/auth/callback`
 
-3. **Add API Permissions**
+2. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
+   - Add all permissions listed under [Required Permissions](#required-permissions)
 
-   - Go to "API permissions"
-   - Click "Add a permission" → "Microsoft Graph" → "Delegated permissions"
-   - Add the following permissions:
-
-   | Permission | Type | Admin Consent |
-   |------------|------|---------------|
-   | `User.Read` | Delegated | No |
-   | `Mail.ReadWrite` | Delegated | No |
-   | `Mail.ReadWrite.Shared` | Delegated | No |
-   | `MailboxSettings.Read` | Delegated | No |
-   | `People.Read` | Delegated | No |
-   | `offline_access` | Delegated | No |
-
-4. **Create Client Secret**
-
-   - Go to "Certificates & secrets"
-   - Click "New client secret"
+3. Go to **Certificates & secrets** → **New client secret**:
    - Set description and expiration
    - **Copy the secret value immediately** (shown only once)
 
-5. **Note Application Details**
+4. Go to **Overview** and note the **Application (client) ID** and **Directory (tenant) ID**
 
-   - Go to "Overview"
-   - Copy the **Application (client) ID**
-   - Copy the **Directory (tenant) ID**
-
-## Required Permissions
-
-All permissions are delegated and do not require admin consent. `Mail.ReadWrite.Shared` is always included in the OAuth consent screen (even when `DELEGATED_ACCESS_SCAN=disabled`) because it is requested unconditionally at OAuth time.
-
-For the complete permissions reference with justifications for each permission, see [Permissions](../technical/permissions.md).
-
-## Understanding Microsoft Consent Flows
-
-**This is standard Microsoft behavior, not Outlook Semantic MCP specific.** All Microsoft 365 apps use the same consent model.
-
-### Standard Microsoft Consent Process
-
-Because no permission in this app requires admin consent, users can complete the full consent flow independently:
-
-1. **User consent** — on first connection, the user sees the Microsoft consent screen and approves the listed permissions
-2. **Optional admin pre-consent** — an admin can grant consent organisation-wide via Azure Portal to skip the per-user consent prompt
-
-**How to grant admin consent (optional):**
-
-1. Azure Portal → App Registration → API permissions
-2. Click "Grant admin consent for [Your Organization]"
-3. Or use the [admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) for per-user approval
-
-**Microsoft Documentation:**
-
-- [User and admin consent overview](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/user-admin-consent-overview) - Standard Microsoft consent flows
-- [Grant admin consent](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) - Step-by-step guide
-- [Admin consent workflow](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/configure-admin-consent-workflow) - Per-user approval process
-
-For detailed explanation, see [Microsoft Graph Permissions - Understanding Consent Requirements](../technical/permissions.md#Understanding-Consent-Requirements).
-
-### User Reconnection Experience (The "Login Flicker")
-
-**First-time connection:** User sees full Microsoft consent screen and approves permissions.
-
-**Subsequent reconnections:** User sees a quick "flicker" (brief redirect sequence). This is **normal** — Microsoft validates the existing session through rapid OAuth redirects. Standard Microsoft OAuth behavior.
-
-For troubleshooting consent issues, see [FAQ - Authentication & Permissions](../faq.md#Authentication-&-Permissions).
-
-## Redirect URI Configuration
+### Redirect URI Configuration
 
 The redirect URI must match exactly what's configured in the app registration:
 
@@ -144,63 +109,55 @@ Examples:
 - Production: `https://outlook.semantic.mcp.example.com/auth/callback`
 - Local development: `http://localhost:9542/auth/callback`
 
-**Multiple redirect URIs** can be configured for different environments. If you run multiple server instances (e.g., staging and production), add each instance's redirect URI to the same app registration — you do not need a separate app registration per instance.
+**Multiple redirect URIs** can be configured for different environments. If you run multiple server instances (e.g. staging and production), add each instance's redirect URI to the same app registration — you do not need a separate app registration per instance.
 
 The redirect URI is derived from `SELF_URL`: the app registration redirect URI must be `<SELF_URL>/auth/callback`. This is unrelated to the `MICROSOFT_PUBLIC_WEBHOOK_URL` variable, which controls webhook callbacks only.
 
-## Tenant Configuration
+### Tenant Configuration
 
-The Entra ID app registration's **sign-in audience** controls which users can authenticate. The service itself works identically in both modes — there is no code-level difference, no `MICROSOFT_TENANT_ID` environment variable, and no runtime tenant configuration. The choice is made once at app registration time.
-
-### Which option to pick
+The Entra ID app registration's **sign-in audience** controls which users can authenticate. The service works identically in both modes — there is no code-level difference, no `MICROSOFT_TENANT_ID` environment variable, and no runtime tenant configuration. The choice is made once at app registration time.
 
 | Question | → Pick |
 |----------|--------|
 | Will **only users from your own Microsoft 365 organization** connect? | **Single Tenant** |
 | Will **users from multiple organizations** (e.g. customer tenants) connect to the same deployment? | **Multi-Tenant** |
 
-### Single Tenant
-
-Use this when the MCP server serves one organization only.
+#### Single Tenant
 
 | Setting | Value |
 |---------|-------|
 | Azure Portal → "Supported account types" | **Accounts in this organizational directory only** |
 | Terraform `sign_in_audience` | `"AzureADMyOrg"` |
 
-**What happens:** Only users from the tenant where the app is registered can sign in. No additional setup is needed for other tenants (they simply cannot authenticate).
+Only users from the tenant where the app is registered can sign in. Admin consent is optional: set the `service_principal_configuration` Terraform variable to pre-grant permissions tenant-wide and skip per-user prompts.
 
-**Admin consent (optional):** You can pre-grant permissions tenant-wide so users are not prompted individually. In Terraform, set the `service_principal_configuration` variable to create a service principal and grant delegated permissions automatically.
-
-### Multi-Tenant
-
-Use this when one MCP server deployment serves users from multiple Microsoft 365 organizations (e.g. a SaaS deployment).
+#### Multi-Tenant
 
 | Setting | Value |
 |---------|-------|
 | Azure Portal → "Supported account types" | **Accounts in any organizational directory** |
-| Terraform `sign_in_audience` | `"AzureADMultipleOrgs"` (this is the Terraform default) |
+| Terraform `sign_in_audience` | `"AzureADMultipleOrgs"` (Terraform default) |
 
-**What happens:** Users from any Microsoft 365 organization can sign in. When a user authenticates, Microsoft's OAuth flow automatically routes them to their home tenant.
+Users from any Microsoft 365 organization can sign in. When a user authenticates, Microsoft's OAuth flow automatically routes them to their home tenant.
 
-**How customer onboarding works:**
+**Customer onboarding:**
 
-1. You create a single app registration in your own tenant with one `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET`.
-2. Each customer tenant admin must grant consent for their organization. Share this URL with them:
+1. Create a single app registration in your own tenant with one `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET`.
+2. Each customer tenant admin grants consent for their organization:
    ```
    https://login.microsoftonline.com/{customer-tenant-id}/adminconsent?client_id={your-client-id}
    ```
-   When the admin approves, Microsoft creates an **Enterprise Application** in their tenant and grants the delegated permissions tenant-wide.
-3. After consent, users from that tenant can sign in and connect their mailbox — the server handles them the same as any other user.
+   When approved, Microsoft creates an Enterprise Application in their tenant and grants the delegated permissions tenant-wide.
+3. After consent, users from that tenant can sign in and connect their mailbox.
 
-**Important considerations:**
+**Considerations:**
 
-- **No Terraform `service_principal_configuration`**: For multi-tenant, set this to `null`. Service principals and delegated permission grants are created per-customer-tenant through the admin consent URL above, not via Terraform.
-- **Data isolation**: All tenants share the same database. Data is scoped per-user (each user gets their own inbox configuration, tokens, and Knowledge Base root scope). There is no tenant-level isolation boundary within the service.
+- **No `service_principal_configuration`**: Set to `null` for multi-tenant — service principals are created per-customer-tenant via the admin consent URL, not Terraform.
+- **Data isolation**: All tenants share the same database. Data is scoped per-user; there is no tenant-level isolation boundary within the service.
 - **Enterprise Application management**: Each customer tenant admin can independently control user assignment and revoke access from their Azure Portal.
-- **Compliance**: Some organizations may require dedicated infrastructure for data residency — in that case, deploy a separate instance per tenant with single-tenant configuration instead.
+- **Compliance**: Some organizations require dedicated infrastructure for data residency — deploy a separate instance per tenant with single-tenant configuration in that case.
 
-## Secret Rotation
+### Secret Management
 
 The service requires four secrets for authentication and data protection. All must be stored in Kubernetes Secrets (not ConfigMaps).
 
@@ -211,9 +168,7 @@ The service requires four secrets for authentication and data protection. All mu
 | `AUTH_HMAC_SECRET` | 64-char hex string | `openssl rand -hex 32` | Signs OAuth session state during the MCP client authentication flow (HMAC-SHA256) |
 | `ENCRYPTION_KEY` | 64-char hex string | `openssl rand -hex 32` | Encrypts Microsoft OAuth tokens (access + refresh) at rest in PostgreSQL using AES-256-GCM |
 
-### `MICROSOFT_CLIENT_SECRET`
-
-The client secret from the Entra ID app registration. The server uses it to exchange authorization codes for tokens and to refresh expired access tokens.
+#### `MICROSOFT_CLIENT_SECRET`
 
 **What happens if it expires or is deleted:** All OAuth flows fail immediately — no new users can connect, and existing users' tokens cannot be refreshed. Once an access token expires (~1 hour), that user's sync and tool calls stop working.
 
@@ -225,65 +180,72 @@ The client secret from the Entra ID app registration. The server uses it to exch
 4. Verify authentication works (connect a test user)
 5. Delete the old secret from Entra ID
 
-This supports zero-downtime rotation because Microsoft allows multiple active client secrets simultaneously.
+Zero-downtime rotation is supported because Microsoft allows multiple active client secrets simultaneously.
 
-**Best practices:**
+**Best practices:** Set an appropriate expiration; rotate before expiration; store in Key Vault (the Terraform module does this automatically); set up Azure alerts for upcoming expiration.
 
-- Set appropriate expiration — balance security vs. operational overhead
-- Rotate before expiration — create the new secret well in advance
-- Use Key Vault — the Terraform module writes the secret to Key Vault automatically
-- Monitor expiration — set up Azure alerts for upcoming secret expiration
+#### `MICROSOFT_WEBHOOK_SECRET`
 
-### `MICROSOFT_WEBHOOK_SECRET`
+Passed to Microsoft as the `clientState` field when creating Graph subscriptions. Microsoft returns it unchanged in every webhook payload — the server rejects any notification where the value does not match.
 
-Passed to Microsoft as the `clientState` field when creating Graph subscriptions. Microsoft returns it unchanged in every webhook payload, and the server rejects any notification where the value does not match.
-
-**What happens if it is changed:** All existing subscriptions break. Every webhook notification from Microsoft will carry the old `clientState` and the server will reject it. This means:
+**What happens if it is changed:** All existing subscriptions break.
 
 - **Live catch-up stops** — all incoming email notifications are rejected until subscriptions are recreated.
 - **Full sync is unaffected** — it pulls directly from Microsoft Graph and does not use webhooks.
-- **Emails received during the gap will not be ingested into the Knowledge Base** until subscriptions are recreated. Once a user calls `reconnect_inbox` and the next live catch-up runs (triggered by a new notification or the 30-minute inactivity scheduler), it queries from the last watermark and picks up any emails missed during the gap.
+- **Emails received during the gap** are not ingested until subscriptions are recreated. Once a user calls `reconnect_inbox`, live catch-up picks them up from the last watermark.
 
 **How to rotate:**
 
 1. Generate a new secret: `openssl rand -hex 64`
 2. Update the Kubernetes secret and redeploy the service
 3. All users must call `reconnect_inbox` to recreate their subscriptions with the new secret
-4. Emails arriving during the gap will not be ingested until `reconnect_inbox` is called. After that, live catch-up picks them up automatically on the next notification or the 30-minute inactivity scheduler (it queries from the last watermark)
 
 Plan this as a maintenance window — there is no zero-downtime rotation path.
 
-### `ENCRYPTION_KEY`
+#### `ENCRYPTION_KEY`
 
-Used to encrypt Microsoft OAuth tokens (access and refresh tokens) before storing them in PostgreSQL with AES-256-GCM. Tokens are decrypted in memory when the server needs to call Microsoft Graph.
+Encrypts Microsoft OAuth tokens at rest in PostgreSQL using AES-256-GCM. Tokens are decrypted in memory when the server needs to call Microsoft Graph.
 
-**What happens if it is changed:** All stored Microsoft tokens become unreadable. Every user's sync stops and all tool calls that require Microsoft Graph access fail. Users must re-authenticate by calling `reconnect_inbox`.
+**What happens if it is changed:** All stored tokens become unreadable. Every user's sync stops and all tool calls fail. Users must re-authenticate by calling `reconnect_inbox`.
 
 **How to rotate:**
 
 1. Generate a new key: `openssl rand -hex 32`
 2. Update the Kubernetes secret and redeploy
-3. All users must call `reconnect_inbox` to re-authenticate — their stored tokens are no longer decryptable
+3. All users must call `reconnect_inbox` to re-authenticate
 
-Plan this as a maintenance window and notify users in advance — there is no zero-downtime rotation path.
+Plan this as a maintenance window — there is no zero-downtime rotation path.
 
-### `AUTH_HMAC_SECRET`
+#### `AUTH_HMAC_SECRET`
 
-Used to sign and validate OAuth session state during the MCP client authentication flow (HMAC-SHA256). This prevents CSRF and session tampering during the OAuth redirect sequence.
+Signs and validates OAuth session state during the MCP client authentication flow (HMAC-SHA256), preventing CSRF and session tampering during the OAuth redirect sequence.
 
-**What happens if it is changed:** All in-flight OAuth sessions are immediately invalidated. Users who are in the middle of connecting will see an error and need to restart the flow. Already-connected users are not affected — their existing tokens and subscriptions continue to work.
+**What happens if it is changed:** Only in-flight OAuth sessions are invalidated. Already-connected users are not affected — their existing tokens and subscriptions continue to work.
 
 **How to rotate:**
 
 1. Generate a new secret: `openssl rand -hex 32`
 2. Update the Kubernetes secret and redeploy
-3. Already-authenticated users are **not** affected — their existing MCP tokens and Microsoft tokens continue to work. Only users who are mid-OAuth-flow at the moment of rotation will see an error and need to restart the flow. When an MCP access token expires (60 seconds), the MCP refresh token (unaffected by the HMAC change) is used to obtain a new one — no user action needed.
+3. Users mid-OAuth-flow will see an error and need to restart the flow; already-authenticated users are unaffected
 
-This is the lowest-impact secret to rotate. Existing connections are unaffected.
+This is the lowest-impact secret to rotate.
 
 For the full security context, see [Secret Management](../technical/security.md#Secret-Management).
 
-For troubleshooting authentication issues, see [FAQ - Authentication & Permissions](../faq.md#Authentication-&-Permissions).
+### Understanding Consent Flows
+
+**This is standard Microsoft behavior, not Outlook Semantic MCP specific.** All Microsoft 365 apps use the same consent model.
+
+Because no permission in this app requires admin consent, users can complete the full consent flow independently:
+
+1. **User consent** — on first connection, the user sees the Microsoft consent screen and approves the listed permissions
+2. **Optional admin pre-consent** — an admin can grant consent organisation-wide via Azure Portal to skip the per-user consent prompt
+
+**User Reconnection Experience (The "Login Flicker"):**
+
+After first connection, subsequent reconnections show a quick "flicker" (brief redirect sequence). This is **normal** — Microsoft validates the existing session through rapid OAuth redirects. See [FAQ - Login "Flicker"](../faq.md#Authentication-&-Permissions) for details.
+
+For detailed explanation, see [Microsoft Graph Permissions - Understanding Consent Requirements](../technical/permissions.md#Understanding-Consent-Requirements).
 
 ## Microsoft Documentation
 
