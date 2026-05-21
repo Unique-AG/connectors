@@ -1,5 +1,4 @@
 import assert from 'node:assert';
-import { Logger } from '@nestjs/common';
 import { isObjectType } from 'remeda';
 import { getRetryAfterMs } from './get-retry-after-ms';
 import { isRateLimitError } from './is-rate-limit-error';
@@ -102,7 +101,6 @@ export function makeDefaultOnErrorHandler<T>(
  * ```
  */
 
-const logger = new Logger(`withRetryAttempts`);
 export const withRetryAttempts = async <T, Err = T>({
   fn,
   maxAttempts = 3,
