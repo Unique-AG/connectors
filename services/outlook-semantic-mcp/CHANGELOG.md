@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.10](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.9...outlook-semantic-mcp@0.4.10) (2026-05-21)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,deps:** bug bash improvements and bug fixes ([#569](https://github.com/Unique-AG/connectors/issues/569)) ([8855ffb](https://github.com/Unique-AG/connectors/commit/8855ffba8fa865fabd789dd198366104bd88072c))
+
 ## [0.4.9](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.8...outlook-semantic-mcp@0.4.9) (2026-05-20)
 
 
