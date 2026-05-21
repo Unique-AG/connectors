@@ -92,6 +92,22 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   2. Mirror any structured conditions as KQL property filters (e.g. \`fromSenders\` → \`from:\`, date range → \`received>=\`/\`received<=\`, attachments → \`hasAttachment:true\`).
   3. Run multiple KQL queries in parallel for different angles: synonyms, subject-focus vs. body-focus, alternative keyword combinations.
 
+  ## Scoping to a specific mailbox
+  To search within a specific mailbox (own or delegated), set the top-level \`mailbox\` field on each query object — do NOT encode the mailbox in the \`search\` text, in \`conditions\`, or as \`mailbox:\` inside a KQL string (it is not a KQL property). Set \`mailbox\` on EVERY entry in both \`uniqueSemanticSearchQueries\` and \`msGraphKeywordSearchQueries\` when scoping to a delegated inbox.
+  Always call \`list_mailboxes_and_directories\` first if you are unsure of the exact mailbox address.
+
+  Example — user asks "list all emails in the shared bug-bash mailbox":
+  - Semantic entry 1: \`{ mailbox: "bug-bash@example.com", search: "email", limit: 300 }\`
+  - KQL query 1: \`{ mailbox: "bug-bash@example.com", kqlQuery: "kind:email", limit: 50 }\`
+  The \`mailbox\` field is set on both entries — the search is scoped to that inbox on both backends.
+
+  Example — user asks "emails about the Q2 budget in the shared finance mailbox":
+  - Semantic entry 1: \`{ mailbox: "finance@example.com", search: "Q2 budget report", limit: 300 }\`
+  - Semantic entry 2: \`{ mailbox: "finance@example.com", search: "quarterly financial summary", limit: 300 }\`
+  - KQL query 1: \`{ mailbox: "finance@example.com", kqlQuery: "subject:\\"Q2 budget\\"" }\`
+  - KQL query 2: \`{ mailbox: "finance@example.com", kqlQuery: "body:\\"budget\\" received>=2024-04-01 received<=2024-06-30" }\`
+  Both the \`mailbox\` scoping and structured filters are expressed on every entry.
+
   Example — user asks "Q2 budget report from Alice":
   - Semantic entry 1: \`search: "Q2 budget report"\`, conditions: \`[{ fromSenders: { value: "alice@example.com", operator: "equals" } }]\`
   - Semantic entry 2: \`search: "quarterly financial summary"\`, conditions: \`[{ fromSenders: { value: "alice@example.com", operator: "equals" } }]\`
@@ -114,13 +130,16 @@ export const META_UNIQUE_AND_MS_GRAPH = createMeta({
   For custom user-defined folders, call \`list_mailboxes_and_directories\` first to get the folder ID.
 
   If the response includes a "syncWarning", display it to the user before showing results so they understand results may be incomplete.
-  If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).`,
+  If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).
+
+  ## Opening an email after search
+  When the user asks to open, read, or see the full content of a specific email that appeared in the results, call \`open_email_by_id\` — pass the \`openEmailParams\` object from that result directly as the tool input. Do NOT tell the user you cannot access the email or that you lack mailbox access.`,
   toolFormatInformation: TOOL_FORMAT_INFORMATION,
 });
 
 export const META_MS_GRAPH = createMeta({
   icon: 'search',
-  systemPrompt: `Searches Outlook emails using Microsoft Graph KQL queries. Returns matched emails with metadata.
+  systemPrompt: `Searches Outlook emails using Microsoft Graph KQL queries. Returns matched emails with metadata and full body content in the \`text\` field — answer questions about email content directly from \`text\` without calling \`open_email_by_id\` unless the user explicitly asks to open an email.
 
   By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
   After returning results, inform the user that they can narrow the search with more specific KQL terms if needed.
@@ -128,6 +147,37 @@ export const META_MS_GRAPH = createMeta({
   Build precise KQL queries using supported property filters: from:, to:, cc:, subject:, body:, received>=, received<=, hasAttachment:, category:, participants:. Do NOT use folder: — it is not supported.
   For entity/name mentions that may appear anywhere in the email (e.g. "emails mentioning UBS", "where Zach Greenwald appears"), always include a body: entry — e.g. body:UBS or body:"Zach Greenwald". Use participants: when the name may appear in any address field.
   Combine clauses with AND/OR for complex searches. You can run multiple KQL queries in parallel (up to 10) for broader coverage.
-  If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).`,
+  If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).
+
+  ## Scoping to a specific mailbox
+  To search within a specific mailbox (own or delegated), set the top-level \`mailbox\` field on the query object — do NOT put mailbox: inside the kqlQuery string (it is not a KQL property and will be stripped).
+  Always call \`list_mailboxes_and_directories\` first if you are unsure of the exact mailbox address.
+
+  ## Examples
+
+  **User asks "list all emails in the shared bug-bash mailbox":**
+  - Query 1: \`{ mailbox: "bug-bash@example.com", kqlQuery: "kind:email", limit: 50 }\`
+
+  **User asks "emails from Alice about the Q2 budget":**
+  - Query 1: \`{ kqlQuery: "from:alice@example.com subject:\\"Q2 budget\\"" }\`
+  - Query 2: \`{ kqlQuery: "from:alice@example.com body:\\"budget\\" received>=2024-04-01 received<=2024-06-30" }\`
+  Run both in parallel — one anchors on subject, the other on body with a date range.
+
+  **User asks "find emails mentioning UBS from last month":**
+  - Query 1: \`{ kqlQuery: "body:UBS received>=2026-04-01 received<=2026-04-30" }\`
+  - Query 2: \`{ kqlQuery: "subject:UBS received>=2026-04-01 received<=2026-04-30" }\`
+  Use both subject: and body: in parallel — the entity may appear in either place.
+
+  **User asks "unread emails with attachments from the DevOps team this week":**
+  - Query 1: \`{ kqlQuery: "from:devops@acme.com hasAttachment:true received>=2026-05-19" }\`
+  Note: isRead/read: are not supported KQL properties — filter by read status is not possible via KQL.
+
+  **User asks "emails where Zach Greenwald is mentioned":**
+  - Query 1: \`{ kqlQuery: "body:\\"Zach Greenwald\\"" }\`
+  - Query 2: \`{ kqlQuery: "participants:\\"Zach Greenwald\\"" }\`
+  Use body: for mentions in the email text and participants: for appearances in address fields.
+
+  ## Opening an email after search
+  When the user asks to open, read, or see the full content of a specific email that appeared in the results, call \`open_email_by_id\` — pass the \`openEmailParams\` object from that result directly as the tool input. Do NOT tell the user you cannot access the email or that you lack mailbox access.`,
   toolFormatInformation: TOOL_FORMAT_INFORMATION,
 });

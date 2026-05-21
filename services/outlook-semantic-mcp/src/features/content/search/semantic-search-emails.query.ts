@@ -25,6 +25,7 @@ import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
 import { buildUniqueQlSearchFilter } from './build-unique-ql-search-filter.util';
 import { CleanupSearchConditionsForUserQuery } from './cleanup-search-conditions-for-user.query';
+import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { SemanticSearchConfig } from './search.config';
 import { SearchEmailsInputSchema } from './search-conditions.dto';
 
@@ -98,6 +99,7 @@ export class SemanticSearchEmailsQuery {
     userProfileId: UserProfileTypeID,
     inputs: z.infer<typeof SearchEmailsInputSchema>[],
     searchConfig: SemanticSearchConfig,
+    outputTimeZone?: string,
   ): Promise<{
     results: SearchEmailResult[];
     searchSummary: string | undefined;
@@ -188,7 +190,7 @@ export class SemanticSearchEmailsQuery {
           msGraphMessageId: metadata?.id || undefined,
           folderId: metadata?.parentFolderId ?? '',
           from: metadata?.fromEmailAddress ?? '',
-          receivedDateTime: metadata?.receivedDateTime ?? '',
+          receivedDateTime: convertDateTimeToTimezone(metadata?.receivedDateTime, outputTimeZone) ?? '',
           backend: SearchBackend.Unique,
           text: concatChunks(Array.from(item.chunks.values())),
           openEmailParams: {

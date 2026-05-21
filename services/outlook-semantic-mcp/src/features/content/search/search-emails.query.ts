@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { isNullish } from 'remeda';
 import * as z from 'zod';
+import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
@@ -24,6 +25,7 @@ export interface SearchEmailsToolInput {
 type BackendExecutor = (
   userProfileId: UserProfileTypeID,
   input: SearchEmailsToolInput,
+  outputTimeZone: string | undefined,
 ) => Promise<{
   results: SearchEmailResult[];
   searchSummary: string | undefined;
@@ -34,12 +36,14 @@ export class SearchEmailsQuery {
   public constructor(
     private readonly semanticSearchQuery: SemanticSearchEmailsQuery,
     private readonly msGraphKqlQuery: MsGraphKqlSearchEmailsQuery,
+    private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
   ) {}
 
   private readonly executors: Record<SearchBackend, BackendExecutor> = {
     [SearchBackend.Unique]: (
       userProfileId: UserProfileTypeID,
       input: SearchEmailsToolInput,
+      outputTimeZone: string | undefined,
     ): Promise<{
       results: SearchEmailResult[];
       searchSummary: string | undefined;
@@ -48,12 +52,13 @@ export class SearchEmailsQuery {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
       return this.semanticSearchQuery
-        .run(userProfileId, input.uniqueSemanticSearchQueries, SEARCH_CONFIG.semanticSearch)
+        .run(userProfileId, input.uniqueSemanticSearchQueries, SEARCH_CONFIG.semanticSearch, outputTimeZone)
         .then(({ results, searchSummary }) => ({ results, searchSummary }));
     },
     [SearchBackend.MsGraph]: (
       userProfileId: UserProfileTypeID,
       input: SearchEmailsToolInput,
+      outputTimeZone: string | undefined,
     ): Promise<{
       results: SearchEmailResult[];
       searchSummary: string | undefined;
@@ -65,6 +70,7 @@ export class SearchEmailsQuery {
         userProfileId,
         input.msGraphKeywordSearchQueries,
         SEARCH_CONFIG.msGraph,
+        outputTimeZone,
       );
     },
   };
@@ -76,12 +82,14 @@ export class SearchEmailsQuery {
     results: SearchEmailResult[];
     searchSummary: string | undefined;
   }> {
+    const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileId);
+
     const [
       { results: semanticResults, searchSummary: semanticSummary },
       { results: graphResults, searchSummary: graphSummary },
     ] = await Promise.all([
-      this.executors[SearchBackend.Unique](userProfileId, input),
-      this.executors[SearchBackend.MsGraph](userProfileId, input),
+      this.executors[SearchBackend.Unique](userProfileId, input, outputTimeZone),
+      this.executors[SearchBackend.MsGraph](userProfileId, input, outputTimeZone),
     ]);
 
     const summaries = [semanticSummary, graphSummary].filter((s): s is string => s !== undefined);

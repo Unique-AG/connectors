@@ -3,6 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
+import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
@@ -66,6 +67,7 @@ export class OpenEmailTool {
   public constructor(
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     private readonly openEmailQuery: OpenEmailQuery,
+    private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
   ) {}
 
   @Tool({
@@ -99,6 +101,7 @@ export class OpenEmailTool {
       }
     }
 
+    const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileTypeId);
     const emailData = await this.openEmailQuery.run(
       userProfileTypeId.toString(),
       input.id,
@@ -106,6 +109,7 @@ export class OpenEmailTool {
       input.mailbox,
       input.parentFolderId,
       input.idIsImmutable,
+      outputTimeZone,
     );
     return { success: true, emailData };
   }

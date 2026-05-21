@@ -3,6 +3,7 @@ import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { isDebugMode, isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
+import { UserUtilsModule } from './user-utils/user-utils.module';
 import { AdminModule } from './admin/admin.module';
 import { AdminOpsTool } from './admin/admin-ops.tool';
 import { CategoriesModule } from './categories/categories.module';
@@ -87,6 +88,7 @@ export function registerBackendModule(): DynamicModule {
       SyncRecoveryModule,
       SearchModule,
       UniqueApiFeatureModule,
+      UserUtilsModule,
       AdminModule,
       DelegatedAccessModule,
       PostAuthorizationUserFlowModule,

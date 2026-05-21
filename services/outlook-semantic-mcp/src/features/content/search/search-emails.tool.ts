@@ -20,7 +20,7 @@ const SearchEmailsToolInputSchema = isMicrosoftGraphBackend()
   : SearchEmailsUnifiedInputSchema;
 
 const SearchEmailsToolDescription = isMicrosoftGraphBackend()
-  ? 'Search emails using Microsoft Graph KQL queries across your own and delegated mailboxes. Returns matched emails with an id per result.\n\nTo read the full body of a result, call `open_email_by_id` passing the `openEmailParams` object from the result directly as the tool input.\n\nIf the response includes `searchNotes`, display them to the user after results.'
+  ? 'Search emails using Microsoft Graph KQL queries across your own and delegated mailboxes. Returns matched emails — the `text` field contains the full email body, so you can answer questions about email content directly without calling `open_email_by_id`. Only call `open_email_by_id` if the user explicitly asks to open or view an email.\n\nIf the response includes `searchNotes`, display them to the user after results.'
   : 'Search emails semantically with optional structured filters. Returns matched email passages with an id per result.\n\nTo filter by a well-known folder (Inbox, Sent Items, Drafts, etc.) pass the name directly in `directories` — no need to call `list_mailboxes_and_directories`. For custom folders, call `list_mailboxes_and_directories` first to get the folder id. To filter by category, call `list_categories` first to obtain valid category names. To read the full body of a result, call `open_email_by_id` passing the `openEmailParams` object from the result directly as the tool input. If the response includes a `syncWarning`, call `sync_progress` to check ingestion status — results may be incomplete. If the response includes `searchNotes`, display them to the user after results.';
 
 const SearchEmailResultSchema = z.object({
@@ -51,7 +51,11 @@ const SearchEmailResultSchema = z.object({
   text: z
     .string()
     .describe(
-      'Matched passage or excerpt from the email body — not the full body. Call `open_email_by_id` to retrieve complete content.',
+      'Email content, structured with markdown section headers depending on which backends matched:\n' +
+        '- `## Semantically Matched Content` — relevant excerpts or passages that matched the semantic query. May be incomplete; call `open_email_by_id` if the full body is needed.\n' +
+        '- `## Full Email Content Without Attachments` — complete email body text (no attachments). Use this to answer questions about email content directly without calling `open_email_by_id`.\n' +
+        'When both sections are present, prefer `## Full Email Content Without Attachments` for answering content questions — it is the complete body. `## Semantically Matched Content` highlights the most relevant passages.\n' +
+        'When only `## Semantically Matched Content` is present, use it to answer but note the content may be a partial excerpt.',
     ),
   outlookWebLink: z
     .string()

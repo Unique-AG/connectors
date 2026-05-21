@@ -16,6 +16,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
+import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 import { MsGraphSearchConfig } from './search.config';
@@ -92,6 +93,7 @@ export class MsGraphKqlSearchEmailsQuery {
     userProfileId: UserProfileTypeID,
     queries: Array<QueryInput>,
     searchConfig: MsGraphSearchConfig,
+    outputTimeZone?: string,
   ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const msGraphBatchRequest: GraphBatchRequest[] = await this.translateQueriesToBatchRequests({
@@ -113,6 +115,7 @@ export class MsGraphKqlSearchEmailsQuery {
       userProfile,
       batchRequests: msGraphBatchRequest,
       searchConfig,
+      outputTimeZone,
     });
     if (!fetchResult.success) {
       return { results: [], searchSummary: fetchResult.searchSummary };
@@ -239,10 +242,12 @@ export class MsGraphKqlSearchEmailsQuery {
     userProfile,
     batchRequests,
     searchConfig,
+    outputTimeZone,
   }: {
     userProfile: NonNullishProps<UserProfile, 'email'>;
     batchRequests: GraphBatchRequest[];
     searchConfig: MsGraphSearchConfig;
+    outputTimeZone: string | undefined;
   }): Promise<
     | {
         success: false;
@@ -327,7 +332,7 @@ export class MsGraphKqlSearchEmailsQuery {
             isDelegated: originalRequest.isDelegated,
             subject: msg.subject ?? '',
             from: msg.from?.emailAddress.address ?? '',
-            receivedDateTime: msg.receivedDateTime ?? null,
+            receivedDateTime: convertDateTimeToTimezone(msg.receivedDateTime, outputTimeZone) ?? null,
             parentFolderId: msg.parentFolderId ?? '',
             webLink: msg.webLink ?? '',
             text: msg.uniqueBody?.content || msg.body?.content || msg.bodyPreview || '',
