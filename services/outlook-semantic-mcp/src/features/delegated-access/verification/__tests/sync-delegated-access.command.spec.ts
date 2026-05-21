@@ -205,7 +205,9 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await expect(command.run({ accountsId: ACCOUNTS_ID })).resolves.toMatchObject({ status: 'failed' });
+    await expect(command.run({ accountsId: ACCOUNTS_ID })).resolves.toMatchObject({
+      status: 'failed',
+    });
 
     expect(db.__insert).not.toHaveBeenCalled();
   });
@@ -219,7 +221,9 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await expect(command.run({ accountsId: ACCOUNTS_ID })).resolves.toMatchObject({ status: 'failed' });
+    await expect(command.run({ accountsId: ACCOUNTS_ID })).resolves.toMatchObject({
+      status: 'failed',
+    });
 
     expect(db.__insert).not.toHaveBeenCalled();
   });
@@ -234,7 +238,9 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await expect(command.run({ accountsId: ACCOUNTS_ID })).resolves.toMatchObject({ status: 'failed' });
+    await expect(command.run({ accountsId: ACCOUNTS_ID })).resolves.toMatchObject({
+      status: 'failed',
+    });
 
     expect(db.__updateSet).not.toHaveBeenCalledWith(
       expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
@@ -251,7 +257,9 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 1 });
     const command = createCommand({ graphApi, db });
 
-    await expect(command.run({ accountsId: ACCOUNTS_ID })).resolves.toMatchObject({ status: 'failed' });
+    await expect(command.run({ accountsId: ACCOUNTS_ID })).resolves.toMatchObject({
+      status: 'failed',
+    });
 
     expect(db.__updateSet).not.toHaveBeenCalledWith(
       expect.objectContaining({ lastVerifiedAt: expect.any(Date) }),
@@ -287,7 +295,9 @@ describe('SyncDelegatedAccessCommand', () => {
     const db = createMockDb({ directoryCount: 0 });
     const command = createCommand({ graphApi, db });
 
-    await expect(command.run({ accountsId: ACCOUNTS_ID })).resolves.toMatchObject({ status: 'failed' });
+    await expect(command.run({ accountsId: ACCOUNTS_ID })).resolves.toMatchObject({
+      status: 'failed',
+    });
 
     // Only the directory delete is called, not the accounts delete
     expect(db.__delete).toHaveBeenCalledOnce();
