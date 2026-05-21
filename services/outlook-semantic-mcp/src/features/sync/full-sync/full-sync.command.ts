@@ -49,7 +49,14 @@ export class FullSyncCommand {
     return await this.metrics.measureFullSyncRun(() =>
       withRetryAttempts<FullSyncResult>({
         fn: () => this.runFullSync(userProfileId),
-        onError: makeDefaultOnErrorHandler((error) => ({ status: 'failed', error })),
+        onError: makeDefaultOnErrorHandler((error) => {
+          this.logger.warn({
+            msg: `Full sync unexpectedly failed with error`,
+            userProfileId,
+            err: error,
+          });
+          return { status: 'failed', error };
+        }),
       }),
     );
   }

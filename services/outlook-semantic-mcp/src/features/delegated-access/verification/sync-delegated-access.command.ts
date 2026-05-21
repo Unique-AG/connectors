@@ -2,7 +2,7 @@ import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, notInArray } from 'drizzle-orm';
 import pLimit from 'p-limit';
-import { chunk } from 'remeda';
+import { chunk, isObjectType } from 'remeda';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
@@ -23,7 +23,6 @@ interface FolderNode {
 }
 
 export enum CannotReadErrorReason {
-  NoAccess = 'no-access',
   TokenExpired = 'token-expired',
   TransientError = 'transient-error',
   UnexpectedError = 'unexpected-error',
@@ -35,6 +34,11 @@ export interface DataAccessError {
   reason: CannotReadErrorReason;
   error: unknown;
 }
+
+const isDataAccessError = (input: unknown): input is DataAccessError =>
+  isObjectType(input) &&
+  'reason' in input &&
+  Object.values(CannotReadErrorReason).includes(input.reason as CannotReadErrorReason);
 
 export type VerificationResult =
   | { status: 'success' }
@@ -133,7 +137,7 @@ export class SyncDelegatedAccessCommand {
       return { status: 'success' };
     }
 
-    const { accessibleFolderIds, errors: foldersWithErrors } = verificationResult;
+    const { accessibleFolderIds, errors: dataAccessErrors } = verificationResult;
 
     // Intentional: we flush the DB to the confirmed-accessible state even when a transient error
     // caused an early loop exit. This is safer than leaving stale access grants in place — the
@@ -163,18 +167,18 @@ export class SyncDelegatedAccessCommand {
         .onConflictDoNothing();
     }
 
-    const [result] = await this.db
+    const dirCount = await this.db
       .select({ count: count() })
       .from(delegatedAccessDirectories)
-      .where(eq(delegatedAccessDirectories.accountsId, accountsId));
+      .where(eq(delegatedAccessDirectories.accountsId, accountsId))
+      .then((rows) => rows?.[0]?.count ?? 0);
 
     await this.db
       .update(delegatedAccessAccounts)
       .set({ hasFullDelegatedAccess: false })
       .where(eq(delegatedAccessAccounts.id, accountsId));
 
-    const dirCount = result?.count ?? 0;
-    if (dirCount === 0 && !foldersWithErrors.length) {
+    if (dirCount === 0 && !dataAccessErrors.length) {
       await this.db
         .delete(delegatedAccessAccounts)
         .where(eq(delegatedAccessAccounts.id, accountsId));
@@ -185,7 +189,7 @@ export class SyncDelegatedAccessCommand {
       return { status: 'success' };
     }
 
-    if (!foldersWithErrors.length) {
+    if (!dataAccessErrors.length) {
       await this.db
         .update(delegatedAccessAccounts)
         .set({ lastVerifiedAt: new Date() })
@@ -193,7 +197,7 @@ export class SyncDelegatedAccessCommand {
       this.logger.log({ accountsId, dirCount, msg: 'Accounts lastVerifiedAt updated' });
       return { status: 'success' };
     }
-    return { status: 'failed', errors: foldersWithErrors };
+    return { status: 'failed', errors: dataAccessErrors };
   }
 
   private async verifyReadAccess({
@@ -225,7 +229,7 @@ export class SyncDelegatedAccessCommand {
     }
 
     // We have no reason to run the folder tests the token expired
-    if (testResult.reason === CannotReadErrorReason.TokenExpired) {
+    if ('reason' in testResult && testResult.reason === CannotReadErrorReason.TokenExpired) {
       await onProgress?.();
       return {
         hasFullDelegatedAccess: false,
@@ -238,40 +242,40 @@ export class SyncDelegatedAccessCommand {
       return {
         hasFullDelegatedAccess: false,
         accessibleFolderIds: [],
-        errors: [testResult],
+        errors: [],
       };
     }
 
-    const folderIds = await this.readAllFolders({ client, ownerEmail });
     const errors: DataAccessError[] = [];
+    const folderIds = await this.readAllFolders({ client, ownerEmail });
     const accessibleFolderIds: string[] = [];
     for (const folderIdsChunk of chunk(folderIds, 100)) {
       const foldersWithAccessFetched = await Promise.all(
         folderIdsChunk.map(
-          async (folderId): Promise<{ canRead: true; folderId: string } | DataAccessError> => {
+          async (folderId): Promise<{ canRead: boolean; folderId: string } | DataAccessError> => {
             const verificationResult = await this.testGraphEndpointForReadAccess({
               client,
               endpoint: `/users/${ownerEmail}/mailFolders/${folderId}/messages`,
             });
-            if (
-              verificationResult.canRead ||
-              ('reason' in verificationResult &&
-                verificationResult.reason === CannotReadErrorReason.NoAccess)
-            ) {
+
+            if (!isDataAccessError(verificationResult)) {
               await onProgress?.();
             }
             return { ...verificationResult, folderId };
           },
         ),
       );
-      errors.push(
-        ...(foldersWithAccessFetched.filter(
-          (item) => !item.canRead && item.reason !== CannotReadErrorReason.NoAccess,
-        ) as DataAccessError[]),
-      );
-      accessibleFolderIds.push(
-        ...foldersWithAccessFetched.filter((item) => item.canRead).map((item) => item.folderId),
-      );
+
+      for (const item of foldersWithAccessFetched) {
+        if (isDataAccessError(item)) {
+          errors.push(item);
+          continue;
+        }
+
+        if (item.canRead) {
+          accessibleFolderIds.push(item.folderId);
+        }
+      }
 
       if (errors.length > 0) {
         const error = new Error(`Stop delegated access sync. Some ms graph api calls failed`, {
@@ -351,14 +355,14 @@ export class SyncDelegatedAccessCommand {
   }: {
     client: Client;
     endpoint: string;
-  }): Promise<Omit<DataAccessError, 'folderId'> | { canRead: true }> {
+  }): Promise<Omit<DataAccessError, 'folderId'> | { canRead: true } | { canRead: false }> {
     try {
       await client.api(endpoint).select('id').top(1).get();
       return { canRead: true };
     } catch (error) {
       if (error instanceof GraphError) {
         if (error.statusCode === 403 || error.statusCode === 404) {
-          return { canRead: false, reason: CannotReadErrorReason.NoAccess, error };
+          return { canRead: false };
         }
         if (isTokenExpiredError(error)) {
           return { canRead: false, reason: CannotReadErrorReason.TokenExpired, error };

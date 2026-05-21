@@ -80,7 +80,16 @@ export class SyncDelegatedAccessForAllUsersCommand {
       for (const accounts of batch) {
         await withRetryAttempts({
           fn: () => this.syncDelegatedAccessForAccounts(accounts),
-          onError: makeDefaultOnErrorHandler((error) => ({ status: 'failed', error })),
+          onError: makeDefaultOnErrorHandler((err) => {
+            this.logger.warn({
+              msg: `Running delegated access sync for accounts: ${accounts.id} failed`,
+              accountsId: accounts.id,
+              delegateUserId: accounts.delegateUserId,
+              ownerUserId: accounts.ownerUserId,
+              err,
+            });
+            return { status: 'failed', error: err };
+          }),
         });
         lastProcessedAccountsId = accounts.id;
         await this.persistentCacheService.setWith(
@@ -136,12 +145,12 @@ export class SyncDelegatedAccessForAllUsersCommand {
     // If there are rate limitting errors we rethrow a generic rate limit error because we want
     // retry to continue the batches later.
     if (rateLimitErrors.length > 0) {
-      const retryAfter = rateLimitErrors
+      const retryAfterValues = rateLimitErrors
         .map(({ error }) => getRetryAfterMs(error))
         .filter(isNonNullish) as number[];
       throw new GenericRateLimitError(
         `Delegated access sync failed because of rate limitting`,
-        Math.max(...retryAfter),
+        retryAfterValues.length > 0 ? Math.max(...retryAfterValues) : null,
         { cause: result.errors },
       );
     }
@@ -156,11 +165,12 @@ export class SyncDelegatedAccessForAllUsersCommand {
     lastProcessedAccountsId,
   }: {
     lastProcessedAccountsId: Nullish<string>;
-  }): Promise<{ id: string; delegateUserId: string }[]> {
+  }): Promise<{ id: string; delegateUserId: string; ownerUserId: string }[]> {
     return await this.db
       .select({
         id: delegatedAccessAccounts.id,
         delegateUserId: delegatedAccessAccounts.delegateUserId,
+        ownerUserId: delegatedAccessAccounts.ownerUserId,
       })
       .from(delegatedAccessAccounts)
       .where(

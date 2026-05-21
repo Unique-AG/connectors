@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, directoriesSync, userProfiles } from '~/db';
@@ -8,6 +8,8 @@ import { SyncDirectoriesCommand } from './sync-directories.command';
 
 @Injectable()
 export class SyncDirectoriesForAllUserProfilesCommand {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private syncDirectoriesCommand: SyncDirectoriesCommand,
@@ -36,7 +38,14 @@ export class SyncDirectoriesForAllUserProfilesCommand {
           await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(id));
           return 'success';
         },
-        onError: makeDefaultOnErrorHandler(() => 'failed'),
+        onError: makeDefaultOnErrorHandler((err) => {
+          this.logger.warn({
+            msg: `Scan directories failed for user profile`,
+            userProfileId: id,
+            err,
+          });
+          return 'failed';
+        }),
       });
     }
   }
