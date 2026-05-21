@@ -28,13 +28,13 @@ export const makeRetryResponse = (retryAfter?: number | null | undefined): Retry
 const isRetryResponse = (result: unknown): result is RetryResponse =>
   isObjectType(result) && '__type' in result && result.__type === RETRY_SYMBOL;
 
-type OnErrorHanlderResponse<T> = T | Promise<T> | never | RetryResponse;
+type OnErrorHandlerResponse<T> = T | Promise<T> | never | RetryResponse;
 
-type OnErrorHanler<T> = (input: {
+type OnErrorHandler<T> = (input: {
   error: unknown;
   attempt: number;
   wasLastAttempt: boolean;
-}) => OnErrorHanlderResponse<T>;
+}) => OnErrorHandlerResponse<T>;
 
 /**
  * Standard `onError` handler for Microsoft Graph calls.
@@ -55,7 +55,7 @@ type OnErrorHanler<T> = (input: {
  */
 export function makeDefaultOnErrorHandler<T>(
   createFailureResponseFactory: (error: unknown) => T | never,
-): OnErrorHanler<T> {
+): OnErrorHandler<T> {
   // Default on error handler logic
   return ({ error, wasLastAttempt }) => {
     // 1. If it wasn't the last attempt and it's a rate limit error we return a retry response and we try to extract the delayed time for retry.
@@ -107,7 +107,7 @@ export const withRetryAttempts = async <T, Err = T>({
   fn: PromiseFn<T>;
   maxAttempts?: number;
   backOffMs?: number;
-  onError: OnErrorHanler<Err>;
+  onError: OnErrorHandler<Err>;
 }): Promise<T | Err> => {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
