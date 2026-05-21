@@ -19,13 +19,12 @@ export function convertDateTimeToTimezone(
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
-      hour12: false,
+      hourCycle: 'h23',
     }).formatToParts(date);
 
     const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
 
-    // hour12:false can return '24' for midnight on some platforms
-    const hour = get('hour') === '24' ? '00' : get('hour');
+    const hour = get('hour');
     const localStr = `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}:${get('second')}`;
 
     // Compute the UTC offset by treating the local parts as UTC and comparing to the original
