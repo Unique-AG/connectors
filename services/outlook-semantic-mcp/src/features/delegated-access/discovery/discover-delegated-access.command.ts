@@ -445,7 +445,7 @@ export class DiscoverDelegatedAccessCommand {
           ownerUserId,
           errorCode: error.code,
           statusCode: error.statusCode,
-          msg: `Delegated access revoked, removed from accounts: ${error.message}`,
+          msg: `Delegated access revoked, removed from accounts`,
           ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
         });
         await this.updateProgressTimestamp();
