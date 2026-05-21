@@ -447,6 +447,7 @@ export class DiscoverDelegatedAccessCommand {
           ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
         });
         await this.updateProgressTimestamp();
+        return;
       }
 
       throw error;
