@@ -134,7 +134,9 @@ export class SyncDelegatedAccessForAllUsersCommand {
       await this.db
         .delete(delegatedAccessAccounts)
         .where(eq(delegatedAccessAccounts.delegateUserId, accounts.delegateUserId));
-      // We throw the error so that the batch is read again from the last user and we can conttinue.
+      // Throwing causes this run to fail. The next scheduled run resumes from lastProcessedAccountsId,
+      // which points to the user before this one. Since the accounts record is now deleted, this user
+      // is skipped and processing continues from where it left off.
       throw tokenExpiredError.error;
     }
 
@@ -142,14 +144,14 @@ export class SyncDelegatedAccessForAllUsersCommand {
       (error) => error.reason === CannotReadErrorReason.TransientError,
     );
 
-    // If there are rate limitting errors we rethrow a generic rate limit error because we want
+    // If there are rate limiting errors we rethrow a generic rate limit error because we want
     // retry to continue the batches later.
     if (rateLimitErrors.length > 0) {
       const retryAfterValues = rateLimitErrors
         .map(({ error }) => getRetryAfterMs(error))
         .filter(isNonNullish) as number[];
       throw new GenericRateLimitError(
-        `Delegated access sync failed because of rate limitting`,
+        `Delegated access sync failed because of rate limiting`,
         retryAfterValues.length > 0 ? Math.max(...retryAfterValues) : null,
         { cause: result.errors },
       );

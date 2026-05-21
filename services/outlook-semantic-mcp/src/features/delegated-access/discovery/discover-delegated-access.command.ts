@@ -161,7 +161,7 @@ export class DiscoverDelegatedAccessCommand {
                 },
                 onError: makeDefaultOnErrorHandler((err) => {
                   this.logger.warn({
-                    msg: `Delegated access dicovery failed for accounts pair. Process will continue`,
+                    msg: `Delegated access discovery failed for accounts pair. Process will continue`,
                     delegateUserId,
                     ownerUserId,
                     ownerEmail: createSmeared(ownerEmail).toString(),

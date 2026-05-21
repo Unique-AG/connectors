@@ -58,20 +58,17 @@ export function makeDefaultOnErrorHandler<T>(
 ): OnErrorHanler<T> {
   // Default on error handler logic
   return ({ error, wasLastAttempt }) => {
-    // 1. If it wasn't the last attept and it's a rate limit error we return a retry response and we try to extract the delayed time for retry.
+    // 1. If it wasn't the last attempt and it's a rate limit error we return a retry response and we try to extract the delayed time for retry.
     if (!wasLastAttempt && isRateLimitError(error)) {
       return makeRetryResponse(getRetryAfterMs(error));
     }
-    // 2. If it was the last attept and it's a rate limit error or a token refresh error we retrow it.
-    //    Generally our processes are resumable and they move to a failed state if we retrow the error
-    //    if we need another logic for this cases we can make a different onError callback on that specific
-    //    case, basically if it's rate limit error the upper process can handle it and resume later
-    //    if it's token expired error we can't really do much we can move things to failed and resume them
-    //    once the user token is refreshed.
+    // 2. Rate limit errors on the last attempt are rethrown so the job moves to a failed/resumable state.
+    //    Token expired errors are rethrown on any attempt — there is no point retrying with an expired token.
+    //    If you need different behaviour, pass a custom onError instead of using this helper.
     if (isRateLimitError(error) || isTokenExpiredError(error)) {
       throw error;
     }
-    // 3. If it's another kind of error we call the factory fuction to create the error response, it's the responsability
+    // 3. If it's another kind of error we call the factory function to create the error response, it's the responsibility
     //    of the function to log the error / rethrow it or gracefully exit.
     return createFailureResponseFactory(error);
   };
@@ -116,13 +113,12 @@ export const withRetryAttempts = async <T, Err = T>({
     try {
       return await fn();
     } catch (error) {
-      // If it's the last attempt and we are rate limited we throw the error again.
       const result = await onError?.({ error, attempt, wasLastAttempt: attempt >= maxAttempts });
 
       if (isRetryResponse(result)) {
         assert(
           attempt < maxAttempts,
-          `withRetryAttempts: Invalid response type from error hanlder, retry response can be returned if wasLastAttempt is false, on last attempt you need to throw or return a result`,
+          `withRetryAttempts: Invalid response type from error handler, retry response can be returned if wasLastAttempt is false, on last attempt you need to throw or return a result`,
         );
 
         const retryAfter =
