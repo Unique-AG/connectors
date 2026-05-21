@@ -2,7 +2,7 @@ import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, notInArray } from 'drizzle-orm';
 import pLimit from 'p-limit';
-import { chunk, isObjectType } from 'remeda';
+import { chunk, isNumber, isObjectType } from 'remeda';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
@@ -15,6 +15,8 @@ import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-acce
 import { NewTrace, traceAttrs } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { isTokenExpiredError } from '~/utils/is-token-expired-error';
+import { isDelegatedAccessNotAvailableError } from '../is-delegated-access-not-available-error';
+import { isRateLimitError } from '~/utils/is-rate-limit-error';
 
 interface FolderNode {
   id: string;
@@ -247,7 +249,40 @@ export class SyncDelegatedAccessCommand {
     }
 
     const errors: DataAccessError[] = [];
-    const folderIds = await this.readAllFolders({ client, ownerEmail });
+    let folderIds: string[] = [];
+
+    try {
+      folderIds = await this.readAllFolders({ client, ownerEmail });
+    } catch (error) {
+      // This should only happen if someone lost access completly to the delegated mailbox.
+      if (isDelegatedAccessNotAvailableError(error)) {
+        return {
+          hasFullDelegatedAccess: false,
+          accessibleFolderIds: [],
+          errors: [],
+        };
+      }
+
+      const mapErrorToReason = (error: unknown): CannotReadErrorReason => {
+        if (isTokenExpiredError(error)) {
+          return CannotReadErrorReason.TokenExpired;
+        }
+        if (isRateLimitError(error)) {
+          return CannotReadErrorReason.TransientError;
+        }
+        return CannotReadErrorReason.UnexpectedError;
+      };
+
+      return {
+        hasFullDelegatedAccess: false,
+        accessibleFolderIds: [],
+        errors: [{ error: error, canRead: false, reason: mapErrorToReason(error) }],
+      };
+    }
+
+    if (!folderIds.length) {
+      return { hasFullDelegatedAccess: false, accessibleFolderIds: [], errors: [] };
+    }
     const accessibleFolderIds: string[] = [];
     for (const folderIdsChunk of chunk(folderIds, 100)) {
       const foldersWithAccessFetched = await Promise.all(
@@ -295,20 +330,28 @@ export class SyncDelegatedAccessCommand {
     client: Client;
     ownerEmail: string;
   }): Promise<string[]> {
+    const readFolders = async (
+      url: string,
+      limit?: number,
+    ): Promise<{ '@odata.nextLink'?: string; value: FolderNode[] }> => {
+      let call = client.api(url);
+      if (isNumber(limit)) {
+        call = call.top(limit);
+      }
+      return await call.header('Prefer', 'IdType="ImmutableId"').get();
+    };
+
     const fetchChildFolders = async (folderId: string): Promise<FolderNode[]> => {
       const children: FolderNode[] = [];
-      let response = await client
-        .api(`/users/${ownerEmail}/mailFolders/${folderId}/childFolders`)
-        .top(500)
-        .header('Prefer', 'IdType="ImmutableId"')
-        .get();
+
+      let response = await readFolders(
+        `/users/${ownerEmail}/mailFolders/${folderId}/childFolders`,
+        500,
+      );
       children.push(...(response?.value ?? []));
 
       while (response?.['@odata.nextLink']) {
-        response = await client
-          .api(response['@odata.nextLink'])
-          .header('Prefer', 'IdType="ImmutableId"')
-          .get();
+        response = await readFolders(response['@odata.nextLink']);
         children.push(...(response?.value ?? []));
       }
 
@@ -360,10 +403,10 @@ export class SyncDelegatedAccessCommand {
       await client.api(endpoint).select('id').top(1).get();
       return { canRead: true };
     } catch (error) {
+      if (isDelegatedAccessNotAvailableError(error)) {
+        return { canRead: false };
+      }
       if (error instanceof GraphError) {
-        if (error.code === 'MailboxInfoStale' || error.statusCode === 403 || error.statusCode === 404) {
-          return { canRead: false };
-        }
         if (isTokenExpiredError(error)) {
           return { canRead: false, reason: CannotReadErrorReason.TokenExpired, error };
         }

@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { createSmeared } from '@unique-ag/utils';
-import { Client, GraphError } from '@microsoft/microsoft-graph-client';
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, gt, isNotNull, notInArray, or } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -14,6 +14,7 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { isTokenExpiredError } from '~/utils/is-token-expired-error';
 import { Nullish } from '~/utils/nullish';
 import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { isDelegatedAccessNotAvailableError } from '../is-delegated-access-not-available-error';
 
 export const DISCOVER_DELEGATED_ACCESS_CACHE_KEY = `DiscoverDelegatedAccess`;
 export const DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES = 10;
@@ -430,10 +431,7 @@ export class DiscoverDelegatedAccessCommand {
       this.logger.debug({ delegateUserId, ownerUserId, msg: 'Delegated access discovered' });
       await this.updateProgressTimestamp();
     } catch (error) {
-      if (
-        error instanceof GraphError &&
-        (error.statusCode === 403 || error.statusCode === 404 || error.code === 'MailboxInfoStale')
-      ) {
+      if (isDelegatedAccessNotAvailableError(error)) {
         await this.db
           .delete(delegatedAccessAccounts)
           .where(
@@ -445,8 +443,9 @@ export class DiscoverDelegatedAccessCommand {
         this.logger.debug({
           delegateUserId,
           ownerUserId,
+          errorCode: error.code,
           statusCode: error.statusCode,
-          msg: 'Delegated access revoked, removed from accounts',
+          msg: `Delegated access revoked, removed from accounts: ${error.message}`,
           ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
         });
         await this.updateProgressTimestamp();
