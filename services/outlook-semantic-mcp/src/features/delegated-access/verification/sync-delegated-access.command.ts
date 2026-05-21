@@ -361,7 +361,7 @@ export class SyncDelegatedAccessCommand {
       return { canRead: true };
     } catch (error) {
       if (error instanceof GraphError) {
-        if (error.statusCode === 403 || error.statusCode === 404) {
+        if (error.code === 'MailboxInfoStale' || error.statusCode === 403 || error.statusCode === 404) {
           return { canRead: false };
         }
         if (isTokenExpiredError(error)) {

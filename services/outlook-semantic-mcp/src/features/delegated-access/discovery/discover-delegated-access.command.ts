@@ -430,7 +430,10 @@ export class DiscoverDelegatedAccessCommand {
       this.logger.debug({ delegateUserId, ownerUserId, msg: 'Delegated access discovered' });
       await this.updateProgressTimestamp();
     } catch (error) {
-      if (error instanceof GraphError && (error.statusCode === 403 || error.statusCode === 404)) {
+      if (
+        error instanceof GraphError &&
+        (error.statusCode === 403 || error.statusCode === 404 || error.code === 'MailboxInfoStale')
+      ) {
         await this.db
           .delete(delegatedAccessAccounts)
           .where(
