@@ -22,7 +22,7 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { greatestFrom } from '~/utils/greatest-from';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
 import {
   GraphMessage,
   GraphMessageFields,
@@ -58,8 +58,14 @@ export class LiveCatchUpCommand {
     return this.metrics.measureLiveCatchupRun(() =>
       withRetryAttempts<LiveCatchupResult>({
         fn: () => this.runLiveCatchup(input),
-        onError: rethrowRateLimitError,
-        getResultFailure: (err) => ({ status: 'failed', err }),
+        onError: makeDefaultOnErrorHandler((err) => {
+          this.logger.warn({
+            msg: `Live catchup failed`,
+            subscriptionId: input.subscriptionId,
+            err,
+          });
+          return { status: 'failed', err };
+        }),
       }),
     );
   }
@@ -134,7 +140,7 @@ export class LiveCatchUpCommand {
 
         if (runResult.status === 'failed') {
           if (isRateLimitError(runResult.err)) {
-            // We rethrow rate limit errors
+            // We rethrow rate limit errors so that the retry mechanism kicks in.
             throw runResult.err;
           }
           finalOutput = { status: 'failed', err: runResult.err };

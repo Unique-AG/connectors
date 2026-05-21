@@ -472,7 +472,7 @@ The server listens on `PORT` (default `9542`). In Helm deployments, `server.port
 Selects the search and email-open backend at deploy time. Two values are accepted:
 
 - **`MicrosoftGraphAndUniqueApi`** (default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; all sync tools (`sync_progress`, `run_full_sync`, etc.) are registered. Requires the `mcpConfig.ingestion` section to be configured.
-- **`MicrosoftGraph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email_by_id` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not registered. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate. The `mcpConfig.ingestion` section is not required and is ignored.
+- **`MicrosoftGraph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not registered. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate. The `mcpConfig.ingestion` section is not required and is ignored.
 
 Existing deployments that do not set this variable are unaffected — `MicrosoftGraphAndUniqueApi` is the default.
 

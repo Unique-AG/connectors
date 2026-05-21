@@ -61,6 +61,7 @@
     "express": "5.1.0",
     "fastest-levenshtein": "1.0.16",
     "jsonwebtoken": "9.0.3",
+    "lru-cache": "11.5.0",
     "nestjs-otel": "8.0.2",
     "nestjs-pino": "4.6.1",
     "nestjs-zod": "5.0.1",
@@ -75,6 +76,7 @@
     "serialize-error-cjs": "0.2.0",
     "typeid-js": "1.2.0",
     "undici": "7.24.4",
+    "windows-iana": "5.1.0",
     "zod": "4.1.5"
   },
   "devDependencies": {

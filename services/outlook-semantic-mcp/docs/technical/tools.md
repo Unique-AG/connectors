@@ -16,7 +16,7 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | Tool | Category | Mutating | Mode |
 |------|----------|----------|------|
 | [`search_emails`](#search_emails) | Email Search | No | Both |
-| [`open_email_by_id`](#open_email_by_id) | Email Search | No | Both |
+| [`open_email`](#open_email) | Email Search | No | Both |
 | [`create_draft_email`](#create_draft_email) | Draft Creation | Yes | Both |
 | [`lookup_contacts`](#lookup_contacts) | Contact Lookup | No | Both |
 | [`list_categories`](#list_categories) | Mailbox Utilities | No | Both |
@@ -217,7 +217,7 @@ Syntax rules:
     text: string;                  // matched passage or excerpt — not the full body
     outlookWebLink: string;        // direct URL to open in Outlook Web — use as link target when non-empty
     sourceMailbox?: string | null; // mailbox this email belongs to
-    openEmailParams: {             // pass directly to open_email_by_id without modification
+    openEmailParams: {             // pass directly to open_email without modification
       id: string;
       idType: "Unique" | "MsGraph";
       mailbox?: string;
@@ -230,7 +230,7 @@ Syntax rules:
 
 **Usage notes:**
 
-- Pass the `openEmailParams` object from a result directly to `open_email_by_id` to retrieve the full email body.
+- Pass the `openEmailParams` object from a result directly to `open_email` to retrieve the full email body.
 - If `syncWarning` is present (Mode A only), display it to the user and call `sync_progress` to check ingestion status — results may be incomplete.
 - If `searchNotes` is present, display it to the user after showing results.
 - Folder filtering via `conditions[].directories` is supported in Mode A only.
@@ -239,7 +239,7 @@ Syntax rules:
 
 ---
 
-### `open_email_by_id`
+### `open_email`
 
 Retrieve the full content of an email by its ID returned from `search_emails`.
 

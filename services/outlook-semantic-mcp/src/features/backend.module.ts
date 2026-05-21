@@ -34,6 +34,7 @@ import {
 import { FullSyncModule } from './sync/full-sync/full-sync.module';
 import { LiveCatchUpModule } from './sync/live-catch-up/live-catch-up.module';
 import { SyncRecoveryModule } from './sync/sync-recovery.module';
+import { UserUtilsModule } from './user-utils/user-utils.module';
 
 @Module({})
 export class BackendModule {}
@@ -87,6 +88,7 @@ export function registerBackendModule(): DynamicModule {
       SyncRecoveryModule,
       SearchModule,
       UniqueApiFeatureModule,
+      UserUtilsModule,
       AdminModule,
       DelegatedAccessModule,
       PostAuthorizationUserFlowModule,

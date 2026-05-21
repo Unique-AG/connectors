@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import {
   convertUserProfileIdToTypeId,
   type UserProfileTypeID,
@@ -66,6 +67,7 @@ describe('SearchEmailsQuery', () => {
     instance = new SearchEmailsQuery(
       semanticSearchQuery as unknown as SemanticSearchEmailsQuery,
       msGraphKqlQuery as unknown as MsGraphKqlSearchEmailsQuery,
+      { run: vi.fn().mockResolvedValue(undefined) } as unknown as GetMailboxTimezoneQuery,
     );
   });
 

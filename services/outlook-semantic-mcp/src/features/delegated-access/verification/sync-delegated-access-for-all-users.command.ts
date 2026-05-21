@@ -1,14 +1,17 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, gt } from 'drizzle-orm';
+import { and, eq, gt } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
+import { isNonNullish } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, delegatedAccessAccounts } from '~/db';
 import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { NewTrace } from '~/features/tracing.utils';
+import { getRetryAfterMs } from '~/utils/get-retry-after-ms';
+import { GenericRateLimitError } from '~/utils/is-rate-limit-error';
 import { Nullish } from '~/utils/nullish';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
-import { SyncDelegatedAccessCommand } from './sync-delegated-access.command';
+import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { CannotReadErrorReason, SyncDelegatedAccessCommand } from './sync-delegated-access.command';
 
 export const SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY = `SyncDelegatedAccessForAllUsers`;
 export const SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_NO_PROGRESS_THRESHOLD_MINUTES = 10;
@@ -76,15 +79,17 @@ export class SyncDelegatedAccessForAllUsersCommand {
       });
       for (const accounts of batch) {
         await withRetryAttempts({
-          fn: async () => {
-            await this.syncDelegatedAccessCommand.run({
+          fn: () => this.syncDelegatedAccessForAccounts(accounts),
+          onError: makeDefaultOnErrorHandler((err) => {
+            this.logger.warn({
+              msg: `Running delegated access sync for accounts: ${accounts.id} failed`,
               accountsId: accounts.id,
-              onProgress: () => this.updateProgressTimestamp(),
+              delegateUserId: accounts.delegateUserId,
+              ownerUserId: accounts.ownerUserId,
+              err,
             });
-            return { status: 'success' };
-          },
-          onError: rethrowRateLimitError,
-          getResultFailure: (error) => ({ status: 'failed', error }),
+            return { status: 'failed', error: err };
+          }),
         });
         lastProcessedAccountsId = accounts.id;
         await this.persistentCacheService.setWith(
@@ -108,14 +113,67 @@ export class SyncDelegatedAccessForAllUsersCommand {
     }
   }
 
+  private async syncDelegatedAccessForAccounts(accounts: {
+    id: string;
+    delegateUserId: string;
+  }): Promise<{ status: 'success' | 'skipped' }> {
+    const result = await this.syncDelegatedAccessCommand.run({
+      accountsId: accounts.id,
+      onProgress: () => this.updateProgressTimestamp(),
+    });
+    if (result.status !== 'failed') {
+      return { status: result.status };
+    }
+
+    const tokenExpiredError = result.errors.find(
+      (error) => error.reason === CannotReadErrorReason.TokenExpired,
+    );
+
+    if (tokenExpiredError) {
+      // We remove the user with token expired so that we can pick up the process again.
+      await this.db
+        .delete(delegatedAccessAccounts)
+        .where(eq(delegatedAccessAccounts.delegateUserId, accounts.delegateUserId));
+      // Throwing causes this run to fail. The next scheduled run resumes from lastProcessedAccountsId,
+      // which points to the user before this one. Since the accounts record is now deleted, this user
+      // is skipped and processing continues from where it left off.
+      throw tokenExpiredError.error;
+    }
+
+    const rateLimitErrors = result.errors.filter(
+      (error) => error.reason === CannotReadErrorReason.TransientError,
+    );
+
+    // If there are rate limiting errors we rethrow a generic rate limit error because we want
+    // retry to continue the batches later.
+    if (rateLimitErrors.length > 0) {
+      const retryAfterValues = rateLimitErrors
+        .map(({ error }) => getRetryAfterMs(error))
+        .filter(isNonNullish) as number[];
+      throw new GenericRateLimitError(
+        `Delegated access sync failed because of rate limiting`,
+        retryAfterValues.length > 0 ? Math.max(...retryAfterValues) : null,
+        { cause: result.errors },
+      );
+    }
+
+    throw new Error(`Delegated access sync failed with unhandled errors`, {
+      cause: result.errors,
+    });
+  }
+
   @Span()
   private async fetchBatch({
     lastProcessedAccountsId,
   }: {
     lastProcessedAccountsId: Nullish<string>;
-  }): Promise<{ id: string }[]> {
+  }): Promise<{ id: string; delegateUserId: string; ownerUserId: string }[]> {
     return await this.db
-      .select({ id: delegatedAccessAccounts.id })
+      .select({
+        id: delegatedAccessAccounts.id,
+        delegateUserId: delegatedAccessAccounts.delegateUserId,
+        ownerUserId: delegatedAccessAccounts.ownerUserId,
+      })
       .from(delegatedAccessAccounts)
       .where(
         and(

@@ -53,7 +53,7 @@ All permissions are delegated and require no admin consent. This includes `Mail.
 **Email Search**
 
 - Unique semantic search across the user's mailbox via the `search_emails` tool
-- Open individual emails by message ID via `open_email_by_id`
+- Open individual emails by message ID via `open_email`
 - Search emails using the `search_emails` tool. In `MicrosoftGraphAndUniqueApi` mode, the tool runs semantic search against the Unique knowledge base and a live KQL query against Microsoft Graph in parallel, merging the results. In `MicrosoftGraph` mode, the tool queries Microsoft Graph directly using KQL — no knowledge base or ingestion is involved.
 
 **Draft Creation**
@@ -213,7 +213,7 @@ See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) 
 
 4. **AI-Assisted Email Tasks** (On-demand)
    - Search emails with `search_emails`
-   - Open specific messages with `open_email_by_id`
+   - Open specific messages with `open_email`
    - Compose drafts with `create_draft_email`
    - Look up contacts with `lookup_contacts`
    - Use `list_mailboxes_and_directories` and `list_categories` to obtain folder IDs and category names for filtering searches

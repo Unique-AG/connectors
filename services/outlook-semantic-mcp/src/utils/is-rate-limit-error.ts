@@ -18,7 +18,8 @@ export class GenericRateLimitError extends Error {
 }
 
 export const isRateLimitError = (error: unknown): boolean => {
-  const isMicrosoftRateLimit = error instanceof GraphError && error.statusCode === 429;
+  const isMicrosoftRateLimit =
+    error instanceof GraphError && (error.statusCode === 429 || error.statusCode === 503);
   if (isMicrosoftRateLimit) {
     return true;
   }

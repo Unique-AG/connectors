@@ -2,7 +2,7 @@ import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, notInArray } from 'drizzle-orm';
 import pLimit from 'p-limit';
-import { chunk, isNonNullish } from 'remeda';
+import { chunk, isObjectType } from 'remeda';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
@@ -14,8 +14,7 @@ import {
 import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-access-metrics.service';
 import { NewTrace, traceAttrs } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { getRetryAfterMs } from '~/utils/get-retry-after-ms';
-import { GenericRateLimitError } from '~/utils/is-rate-limit-error';
+import { isTokenExpiredError } from '~/utils/is-token-expired-error';
 
 interface FolderNode {
   id: string;
@@ -23,12 +22,34 @@ interface FolderNode {
   childFolders?: FolderNode[];
 }
 
-interface FolderWithError {
-  canRead: boolean;
-  folderId: string;
-  reason: string;
+export enum CannotReadErrorReason {
+  TokenExpired = 'token-expired',
+  TransientError = 'transient-error',
+  UnexpectedError = 'unexpected-error',
+}
+
+export interface DataAccessError {
+  canRead: false;
+  folderId?: string;
+  reason: CannotReadErrorReason;
   error: unknown;
 }
+
+const isDataAccessError = (input: unknown): input is DataAccessError =>
+  isObjectType(input) &&
+  'reason' in input &&
+  Object.values(CannotReadErrorReason).includes(input.reason as CannotReadErrorReason);
+
+export type VerificationResult =
+  | { status: 'success' }
+  | { status: 'skipped' }
+  | {
+      status: 'failed';
+      errors: {
+        reason: CannotReadErrorReason;
+        error: unknown;
+      }[];
+    };
 
 @Injectable()
 export class SyncDelegatedAccessCommand {
@@ -42,15 +63,18 @@ export class SyncDelegatedAccessCommand {
   ) {}
 
   @NewTrace('sync-delegated-access')
-  public async run(input: { accountsId: string; onProgress?: () => Promise<void> }): Promise<void> {
+  public async run(input: {
+    accountsId: string;
+    onProgress?: () => Promise<void>;
+  }): Promise<VerificationResult> {
     traceAttrs({ accountsId: input.accountsId });
     if (this.config.scan !== 'granularAccess') {
       this.logger.log({
         msg: `Skipped running delegated access verification. Reason: delegated access is not set to "granularAccess"`,
       });
-      return;
+      return { status: 'skipped' };
     }
-    await this.metrics.measureSyncRun(() =>
+    return await this.metrics.measureSyncRun(() =>
       this.runVerification(input.accountsId, input.onProgress),
     );
   }
@@ -58,7 +82,7 @@ export class SyncDelegatedAccessCommand {
   private async runVerification(
     accountsId: string,
     onProgress?: () => Promise<void>,
-  ): Promise<void> {
+  ): Promise<VerificationResult> {
     const [accounts] = await this.db
       .select({
         delegateUserId: delegatedAccessAccounts.delegateUserId,
@@ -72,7 +96,7 @@ export class SyncDelegatedAccessCommand {
         accountsId,
         msg: 'Accounts not found, skipping verification',
       });
-      return;
+      return { status: 'success' };
     }
 
     const { delegateUserId, ownerUserId } = accounts;
@@ -89,7 +113,7 @@ export class SyncDelegatedAccessCommand {
         ownerUserId,
         msg: 'Owner email not found, skipping verification',
       });
-      return;
+      return { status: 'success' };
     }
 
     const client = this.graphClientFactory.createClientForUser(delegateUserId);
@@ -110,10 +134,10 @@ export class SyncDelegatedAccessCommand {
           hasFullDelegatedAccess: true,
         })
         .where(eq(delegatedAccessAccounts.id, accountsId));
-      return;
+      return { status: 'success' };
     }
 
-    const { accessibleFolderIds, foldersWithErrors } = verificationResult;
+    const { accessibleFolderIds, errors: dataAccessErrors } = verificationResult;
 
     // Intentional: we flush the DB to the confirmed-accessible state even when a transient error
     // caused an early loop exit. This is safer than leaving stale access grants in place — the
@@ -143,18 +167,18 @@ export class SyncDelegatedAccessCommand {
         .onConflictDoNothing();
     }
 
-    const [result] = await this.db
+    const dirCount = await this.db
       .select({ count: count() })
       .from(delegatedAccessDirectories)
-      .where(eq(delegatedAccessDirectories.accountsId, accountsId));
+      .where(eq(delegatedAccessDirectories.accountsId, accountsId))
+      .then((rows) => rows?.[0]?.count ?? 0);
 
     await this.db
       .update(delegatedAccessAccounts)
       .set({ hasFullDelegatedAccess: false })
       .where(eq(delegatedAccessAccounts.id, accountsId));
 
-    const dirCount = result?.count ?? 0;
-    if (dirCount === 0 && !foldersWithErrors.length) {
+    if (dirCount === 0 && !dataAccessErrors.length) {
       await this.db
         .delete(delegatedAccessAccounts)
         .where(eq(delegatedAccessAccounts.id, accountsId));
@@ -162,36 +186,18 @@ export class SyncDelegatedAccessCommand {
         accountsId,
         msg: 'No accessible directories, accounts deleted',
       });
-      return;
+      return { status: 'success' };
     }
 
-    if (!foldersWithErrors.length) {
+    if (!dataAccessErrors.length) {
       await this.db
         .update(delegatedAccessAccounts)
         .set({ lastVerifiedAt: new Date() })
         .where(eq(delegatedAccessAccounts.id, accountsId));
       this.logger.log({ accountsId, dirCount, msg: 'Accounts lastVerifiedAt updated' });
-      return;
+      return { status: 'success' };
     }
-
-    if (foldersWithErrors.some((error) => error.reason === 'transient-error')) {
-      const foundRetryAfter = foldersWithErrors
-        .map((folder) => getRetryAfterMs(folder.error))
-        .filter(isNonNullish);
-      const maxRetryAfter = foundRetryAfter.length === 0 ? null : Math.max(...foundRetryAfter);
-
-      throw new GenericRateLimitError(
-        `Delegated access sync failed because of rate limitting`,
-        maxRetryAfter,
-        {
-          cause: foldersWithErrors.map((folder) => folder.error),
-        },
-      );
-    }
-
-    throw new Error(`Delegated access sync failed with some errors`, {
-      cause: foldersWithErrors,
-    });
+    return { status: 'failed', errors: dataAccessErrors };
   }
 
   private async verifyReadAccess({
@@ -209,7 +215,7 @@ export class SyncDelegatedAccessCommand {
     | {
         hasFullDelegatedAccess: false;
         accessibleFolderIds: string[];
-        foldersWithErrors: FolderWithError[];
+        errors: DataAccessError[];
       }
   > {
     const testResult = await this.testGraphEndpointForReadAccess({
@@ -217,55 +223,69 @@ export class SyncDelegatedAccessCommand {
       endpoint: `/users/${ownerEmail}/messages`,
     });
 
-    if (testResult.canRead || ('reason' in testResult && testResult.reason === 'no-access')) {
-      await onProgress?.();
-    }
-
     if (testResult.canRead) {
+      await onProgress?.();
       return { hasFullDelegatedAccess: true };
     }
 
-    if (verifyOnlyFullAccess) {
-      return { hasFullDelegatedAccess: false, accessibleFolderIds: [], foldersWithErrors: [] };
+    // We have no reason to run the folder tests the token expired
+    if ('reason' in testResult && testResult.reason === CannotReadErrorReason.TokenExpired) {
+      await onProgress?.();
+      return {
+        hasFullDelegatedAccess: false,
+        accessibleFolderIds: [],
+        errors: [testResult],
+      };
     }
 
+    if (verifyOnlyFullAccess) {
+      return {
+        hasFullDelegatedAccess: false,
+        accessibleFolderIds: [],
+        errors: [],
+      };
+    }
+
+    const errors: DataAccessError[] = [];
     const folderIds = await this.readAllFolders({ client, ownerEmail });
-    let foldersWithErrors: FolderWithError[] = [];
     const accessibleFolderIds: string[] = [];
     for (const folderIdsChunk of chunk(folderIds, 100)) {
       const foldersWithAccessFetched = await Promise.all(
         folderIdsChunk.map(
-          async (folderId): Promise<{ canRead: true; folderId: string } | FolderWithError> => {
+          async (folderId): Promise<{ canRead: boolean; folderId: string } | DataAccessError> => {
             const verificationResult = await this.testGraphEndpointForReadAccess({
               client,
               endpoint: `/users/${ownerEmail}/mailFolders/${folderId}/messages`,
             });
-            if (
-              verificationResult.canRead ||
-              ('reason' in verificationResult && verificationResult.reason === 'no-access')
-            ) {
+
+            if (!isDataAccessError(verificationResult)) {
               await onProgress?.();
             }
             return { ...verificationResult, folderId };
           },
         ),
       );
-      foldersWithErrors = foldersWithAccessFetched.filter(
-        (item) => !item.canRead && item.reason !== 'no-access',
-      ) as FolderWithError[];
-      accessibleFolderIds.push(
-        ...foldersWithAccessFetched.filter((item) => item.canRead).map((item) => item.folderId),
-      );
 
-      if (foldersWithErrors.length > 0) {
+      for (const item of foldersWithAccessFetched) {
+        if (isDataAccessError(item)) {
+          errors.push(item);
+          continue;
+        }
+
+        if (item.canRead) {
+          accessibleFolderIds.push(item.folderId);
+        }
+      }
+
+      if (errors.length > 0) {
         const error = new Error(`Stop delegated access sync. Some ms graph api calls failed`, {
-          cause: foldersWithErrors,
+          cause: errors,
         });
         this.logger.error(error);
         break;
       }
     }
-    return { hasFullDelegatedAccess: false, foldersWithErrors, accessibleFolderIds };
+    return { hasFullDelegatedAccess: false, errors: errors, accessibleFolderIds };
   }
 
   private async readAllFolders({
@@ -335,20 +355,23 @@ export class SyncDelegatedAccessCommand {
   }: {
     client: Client;
     endpoint: string;
-  }): Promise<Omit<FolderWithError, 'folderId'> | { canRead: true }> {
+  }): Promise<Omit<DataAccessError, 'folderId'> | { canRead: true } | { canRead: false }> {
     try {
       await client.api(endpoint).select('id').top(1).get();
       return { canRead: true };
     } catch (error) {
       if (error instanceof GraphError) {
         if (error.statusCode === 403 || error.statusCode === 404) {
-          return { canRead: false, reason: 'no-access', error };
+          return { canRead: false };
+        }
+        if (isTokenExpiredError(error)) {
+          return { canRead: false, reason: CannotReadErrorReason.TokenExpired, error };
         }
         if (error.statusCode === 429 || (error.statusCode >= 500 && error.statusCode < 600)) {
-          return { canRead: false, reason: 'transient-error', error };
+          return { canRead: false, reason: CannotReadErrorReason.TransientError, error };
         }
       }
-      return { canRead: false, reason: 'unexpected-error', error };
+      return { canRead: false, reason: CannotReadErrorReason.UnexpectedError, error };
     }
   }
 }

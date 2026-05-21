@@ -24,7 +24,7 @@ import { getTimeStampWithoutMilliseconds } from '~/utils/date/get-time-stamp-wit
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { Nullish } from '~/utils/nullish';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { UpsertDirectoryCommand } from '../directories-sync/upsert-directory.command';
 import { GraphMessage } from './dtos/microsoft-graph.dtos';
 import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
@@ -82,15 +82,14 @@ export class ProcessEmailCommand {
       fn: () => {
         return this.runProcessEmail(input);
       },
-      onError: rethrowRateLimitError,
-      getResultFailure: (error) => {
+      onError: makeDefaultOnErrorHandler((error) => {
         this.logger.warn({
           ...createLogContext(input),
           msg: `Failed to process message: ${input.graphMessage.id} ${input.file ? `with unique file key: ${input.file.key}` : `without unique file`}`,
           err: error,
         });
         return 'failed';
-      },
+      }),
     });
   }
 

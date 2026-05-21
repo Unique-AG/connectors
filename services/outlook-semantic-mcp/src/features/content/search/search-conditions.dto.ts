@@ -220,6 +220,7 @@ export const MsGraphKqlQuerySchema = z.object({
         '  - Multi-word phrases: wrap in regular double quotes — subject:"quarterly report"\n' +
         'Unsupported properties (silently stripped — do NOT use them, they produce no filtering effect):\n' +
         '  folder:, isRead:, read:, flag:, flagStatus:, sensitivity:, hasFlag:, isAttachment:\n' +
+        '  mailbox: — NOT a KQL property. To scope to a specific mailbox use the top-level `mailbox` field on this query object instead.\n' +
         '  Any property not in the supported list above is removed before the query is sent.\n' +
         'Free-text terms (no property prefix) search across subject, body, and from.\n' +
         'Examples:\n' +
