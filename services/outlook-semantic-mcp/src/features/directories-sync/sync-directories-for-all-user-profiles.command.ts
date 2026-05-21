@@ -3,7 +3,7 @@ import { and, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, directoriesSync, userProfiles } from '~/db';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { SyncDirectoriesCommand } from './sync-directories.command';
 
 @Injectable()
@@ -36,8 +36,7 @@ export class SyncDirectoriesForAllUserProfilesCommand {
           await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(id));
           return 'success';
         },
-        onError: rethrowRateLimitError,
-        getResultFailure: () => 'failed',
+        onError: makeDefaultOnErrorHandler(() => 'failed'),
       });
     }
   }

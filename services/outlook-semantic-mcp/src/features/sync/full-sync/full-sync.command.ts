@@ -14,7 +14,7 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
 import type { FullSyncResult, InboxConfig, LockDecision } from './full-sync.types';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
@@ -49,8 +49,7 @@ export class FullSyncCommand {
     return await this.metrics.measureFullSyncRun(() =>
       withRetryAttempts<FullSyncResult>({
         fn: () => this.runFullSync(userProfileId),
-        onError: rethrowRateLimitError,
-        getResultFailure: (error) => ({ status: 'failed', error }),
+        onError: makeDefaultOnErrorHandler((error) => ({ status: 'failed', error })),
       }),
     );
   }

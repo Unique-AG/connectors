@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { createSmeared } from '@unique-ag/utils';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, gt, isNotNull, notInArray, or } from 'drizzle-orm';
@@ -10,8 +11,9 @@ import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-acce
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { NewTrace } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { isTokenExpiredError } from '~/utils/is-token-expired-error';
 import { Nullish } from '~/utils/nullish';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
 
 export const DISCOVER_DELEGATED_ACCESS_CACHE_KEY = `DiscoverDelegatedAccess`;
 export const DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES = 10;
@@ -139,33 +141,75 @@ export class DiscoverDelegatedAccessCommand {
       includeSharedMailboxes: true,
     });
 
-    while (ownersBatch.length) {
-      const batchResults = await Promise.all(
-        ownersBatch.map(
-          ({ userProfileId: ownerUserId, email: ownerEmail, source: ownerSource }) => {
-            return withRetryAttempts({
-              fn: async () => {
-                await this.updateDelegatedAccess({
-                  ownerUserId,
-                  ownerEmail,
-                  ownerSource,
-                  client,
-                  delegateUserId,
-                });
-                return { status: 'success' as const };
+    try {
+      while (ownersBatch.length) {
+        const batchResults = await Promise.all(
+          ownersBatch.map(
+            ({ userProfileId: ownerUserId, email: ownerEmail, source: ownerSource }) => {
+              return withRetryAttempts<
+                { status: 'success' } | { status: 'failed'; error: unknown }
+              >({
+                fn: async () => {
+                  await this.updateDelegatedAccess({
+                    ownerUserId,
+                    ownerEmail,
+                    ownerSource,
+                    client,
+                    delegateUserId,
+                  });
+                  return { status: 'success' as const };
+                },
+                onError: makeDefaultOnErrorHandler((err) => {
+                  this.logger.warn({
+                    msg: `Delegated access dicovery failed for accounts pair. Process will continue`,
+                    delegateUserId,
+                    ownerUserId,
+                    ownerEmail: createSmeared(ownerEmail).toString(),
+                    ownerSource,
+                    err,
+                  });
+                  return { status: 'failed' as const, error: err };
+                }),
+              });
+            },
+          ),
+        );
+
+        const successCount = batchResults.filter((r) => r.status === 'success').length;
+        const failedCount = batchResults.filter((r) => r.status === 'failed').length;
+        this.logger.log({
+          delegateUserId,
+          successCount,
+          failedCount,
+          msg: 'Owner batch processed',
+        });
+
+        ownersLastFetchedId = last(ownersBatch)?.userProfileId;
+        await this.persistentCacheService.setWith(
+          DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
+          async ({ currentValue, update }): Promise<void> => {
+            assert.ok(currentValue);
+            assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+            await update({
+              dataType: 'DelegatedAccessDiscovery',
+              payload: {
+                ...currentValue.payload,
+                lastProcessedDelegateId: delegateUserId,
+                lastProcessedOwnerIdForDelegate: ownersLastFetchedId,
+                lastProgressRegisteredAt: Date.now(),
               },
-              onError: rethrowRateLimitError,
-              getResultFailure: (error) => ({ status: 'failed' as const, error }),
             });
           },
-        ),
-      );
+        );
 
-      const successCount = batchResults.filter((r) => r.status === 'success').length;
-      const failedCount = batchResults.filter((r) => r.status === 'failed').length;
-      this.logger.log({ delegateUserId, successCount, failedCount, msg: 'Owner batch processed' });
+        ownersBatch = await this.fetchBatch({
+          lastFetchedId: ownersLastFetchedId ?? undefined,
+          excludedProfileIds: [delegateUserId],
+          includeSharedMailboxes: true,
+        });
+      }
 
-      ownersLastFetchedId = last(ownersBatch)?.userProfileId;
+      // Inner loop complete for this delegate — clear the owner cursor
       await this.persistentCacheService.setWith(
         DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
         async ({ currentValue, update }): Promise<void> => {
@@ -176,37 +220,32 @@ export class DiscoverDelegatedAccessCommand {
             payload: {
               ...currentValue.payload,
               lastProcessedDelegateId: delegateUserId,
-              lastProcessedOwnerIdForDelegate: ownersLastFetchedId,
+              lastProcessedOwnerIdForDelegate: null,
               lastProgressRegisteredAt: Date.now(),
             },
           });
         },
       );
-
-      ownersBatch = await this.fetchBatch({
-        lastFetchedId: ownersLastFetchedId ?? undefined,
-        excludedProfileIds: [delegateUserId],
-        includeSharedMailboxes: true,
-      });
-    }
-
-    // Inner loop complete for this delegate — clear the owner cursor
-    await this.persistentCacheService.setWith(
-      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
-      async ({ currentValue, update }): Promise<void> => {
-        assert.ok(currentValue);
-        assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
-        await update({
-          dataType: 'DelegatedAccessDiscovery',
-          payload: {
-            ...currentValue.payload,
-            lastProcessedDelegateId: delegateUserId,
-            lastProcessedOwnerIdForDelegate: null,
-            lastProgressRegisteredAt: Date.now(),
-          },
+    } catch (error) {
+      if (isTokenExpiredError(error)) {
+        // The delegate's OAuth token cannot be refreshed (revoked consent, expired refresh token).
+        // Clearing their access records is the safe choice: the MCP must not expose mailboxes it
+        // can no longer authenticate against. Entries will be re-discovered when the user
+        // re-authenticates and the next discovery run processes this delegate again.
+        await this.db
+          .delete(delegatedAccessAccounts)
+          .where(eq(delegatedAccessAccounts.delegateUserId, delegateUserId));
+        this.logger.warn({
+          delegateUserId,
+          msg: 'Cleared delegated access records: delegate token refresh failed, skipping remaining owner batches for this delegate',
         });
-      },
-    );
+        return;
+      }
+      // Rate limit errors that exhausted retries (and other unexpected errors) propagate to run(),
+      // which sets finalState = 'failed'. The DelegatedAccessRecoverySchedulerService then detects
+      // the failed state and retriggers discovery.
+      throw error;
+    }
   }
 
   @Span()
@@ -391,46 +430,24 @@ export class DiscoverDelegatedAccessCommand {
       this.logger.debug({ delegateUserId, ownerUserId, msg: 'Delegated access discovered' });
       await this.updateProgressTimestamp();
     } catch (error) {
-      if (error instanceof GraphError) {
-        if (error.statusCode === 403 || error.statusCode === 404) {
-          await this.db
-            .delete(delegatedAccessAccounts)
-            .where(
-              and(
-                eq(delegatedAccessAccounts.delegateUserId, delegateUserId),
-                eq(delegatedAccessAccounts.ownerUserId, ownerUserId),
-              ),
-            );
-          this.logger.debug({
-            delegateUserId,
-            ownerUserId,
-            statusCode: error.statusCode,
-            msg: 'Delegated access revoked, removed from accounts',
-            ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
-          });
-          await this.updateProgressTimestamp();
-          return;
-        }
-
-        if (error.statusCode === 429 || (error.statusCode >= 500 && error.statusCode < 600)) {
-          this.logger.debug({
-            delegateUserId,
-            ownerUserId,
-            statusCode: error.statusCode,
-            msg: 'Transient error during discovery',
-            ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
-          });
-          throw error;
-        }
+      if (error instanceof GraphError && (error.statusCode === 403 || error.statusCode === 404)) {
+        await this.db
+          .delete(delegatedAccessAccounts)
+          .where(
+            and(
+              eq(delegatedAccessAccounts.delegateUserId, delegateUserId),
+              eq(delegatedAccessAccounts.ownerUserId, ownerUserId),
+            ),
+          );
+        this.logger.debug({
+          delegateUserId,
+          ownerUserId,
+          statusCode: error.statusCode,
+          msg: 'Delegated access revoked, removed from accounts',
+          ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
+        });
+        await this.updateProgressTimestamp();
       }
-
-      this.logger.debug({
-        delegateUserId,
-        ownerUserId,
-        error,
-        msg: 'Unexpected error during delegated access discovery',
-        ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
-      });
 
       throw error;
     }

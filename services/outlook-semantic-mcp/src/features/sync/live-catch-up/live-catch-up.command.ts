@@ -22,7 +22,7 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { greatestFrom } from '~/utils/greatest-from';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
 import {
   GraphMessage,
   GraphMessageFields,
@@ -58,8 +58,7 @@ export class LiveCatchUpCommand {
     return this.metrics.measureLiveCatchupRun(() =>
       withRetryAttempts<LiveCatchupResult>({
         fn: () => this.runLiveCatchup(input),
-        onError: rethrowRateLimitError,
-        getResultFailure: (err) => ({ status: 'failed', err }),
+        onError: makeDefaultOnErrorHandler((err) => ({ status: 'failed', err })),
       }),
     );
   }
