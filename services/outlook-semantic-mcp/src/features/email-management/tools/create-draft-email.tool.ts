@@ -13,7 +13,7 @@ const CreateDraftEmailInputSchema = z.object({
   content: z
     .string()
     .describe(
-      'The body content of the draft email. Must match the format declared in contentType: raw HTML markup when "html", plain text when "text".',
+      'The body content of the draft email, written in Markdown. Supports paragraphs, line breaks, **bold**, *italic*, bullet and numbered lists, [links](https://example.com), blockquotes, and inline `code`. Raw HTML is not rendered (it is escaped) — use Markdown syntax instead.',
     ),
   toRecipients: z
     .array(
