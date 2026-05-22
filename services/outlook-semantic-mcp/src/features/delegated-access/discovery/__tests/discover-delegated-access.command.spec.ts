@@ -3,6 +3,8 @@ import { GraphError } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DiscoverDelegatedAccessCommand } from '../discover-delegated-access.command';
 
+vi.mock('../../../../utils/sleep', () => ({ sleep: vi.fn().mockResolvedValue(undefined) }));
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -61,6 +63,7 @@ function createMockDb() {
 
 function createMockPersistentCacheService() {
   return {
+    get: vi.fn().mockResolvedValue(null),
     setWith: vi.fn().mockResolvedValue(undefined),
   };
 }

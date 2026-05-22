@@ -11,7 +11,8 @@ import { getRetryAfterMs } from '~/utils/get-retry-after-ms';
 import { GenericRateLimitError } from '~/utils/is-rate-limit-error';
 import { Nullish } from '~/utils/nullish';
 import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
-import { CannotReadErrorReason, SyncDelegatedAccessCommand } from './sync-delegated-access.command';
+import { CannotReadErrorReason } from '../utils/data-access-error';
+import { SyncDelegatedAccessCommand } from './sync-delegated-access.command';
 
 export const SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY = `SyncDelegatedAccessForAllUsers`;
 export const SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_NO_PROGRESS_THRESHOLD_MINUTES = 10;
@@ -134,10 +135,9 @@ export class SyncDelegatedAccessForAllUsersCommand {
       await this.db
         .delete(delegatedAccessAccounts)
         .where(eq(delegatedAccessAccounts.delegateUserId, accounts.delegateUserId));
-      // Throwing causes this run to fail. The next scheduled run resumes from lastProcessedAccountsId,
-      // which points to the user before this one. Since the accounts record is now deleted, this user
-      // is skipped and processing continues from where it left off.
-      throw tokenExpiredError.error;
+      // We are not throwing because we remove the account so it's safe to mark it as processed and move to the next one in the
+      // batch.
+      return { status: 'skipped' };
     }
 
     const rateLimitErrors = result.errors.filter(

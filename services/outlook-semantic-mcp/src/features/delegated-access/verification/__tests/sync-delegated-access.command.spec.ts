@@ -1,6 +1,8 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ReadOwnerMailboxFoldersFromMsGraphQuery } from '../../commands/read-owner-mailbox-folders-for-delegated-access-verification.query';
+import { TestReadAccessFromGraphEndpointQuery } from '../../commands/test-read-access-from-graph-endpoint.query';
 import { SyncDelegatedAccessCommand } from '../sync-delegated-access.command';
 
 // ---------------------------------------------------------------------------
@@ -22,6 +24,12 @@ const FOLDER_ID_3 = 'folder-id-3';
 function makeGraphError(statusCode: number): GraphError {
   const err = new GraphError(statusCode, 'Graph error');
   err.statusCode = statusCode;
+  return err;
+}
+
+function makeMailboxInfoStaleError(): GraphError {
+  const err = new GraphError(0, 'Mailbox info is stale.');
+  err.code = 'MailboxInfoStale';
   return err;
 }
 
@@ -115,6 +123,8 @@ function createCommand({
 } = {}): SyncDelegatedAccessCommand {
   return new SyncDelegatedAccessCommand(
     createMockGraphClientFactory(graphApi) as any,
+    new TestReadAccessFromGraphEndpointQuery(),
+    new ReadOwnerMailboxFoldersFromMsGraphQuery(),
     db as any,
     { scan: 'granularAccess' } as any,
     { measureSyncRun: (fn: () => Promise<unknown>) => fn() } as any,
@@ -362,5 +372,34 @@ describe('SyncDelegatedAccessCommand', () => {
     await command.run({ accountsId: ACCOUNTS_ID });
 
     expect(db.__insert).toHaveBeenCalledOnce();
+  });
+
+  it('treats MailboxInfoStale on preliminary check as no-access and deletes the accounts pair', async () => {
+    // MailboxInfoStale on /messages → falls through to folder listing → MailboxInfoStale again
+    graphApi.get
+      .mockRejectedValueOnce(makeMailboxInfoStaleError()) // preliminary /messages check
+      .mockRejectedValueOnce(makeMailboxInfoStaleError()); // mailFolders listing
+
+    const db = createMockDb({ directoryCount: 0 });
+    const command = createCommand({ graphApi, db });
+
+    const result = await command.run({ accountsId: ACCOUNTS_ID });
+
+    expect(result).toMatchObject({ status: 'success' });
+    // Both directories and the accounts row are deleted (no accessible folders, no errors)
+    expect(db.__delete).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats MailboxInfoStale on preliminary check as no-access — does not return failed status', async () => {
+    graphApi.get
+      .mockRejectedValueOnce(makeMailboxInfoStaleError()) // preliminary /messages check
+      .mockRejectedValueOnce(makeMailboxInfoStaleError()); // mailFolders listing
+
+    const db = createMockDb({ directoryCount: 0 });
+    const command = createCommand({ graphApi, db });
+
+    const result = await command.run({ accountsId: ACCOUNTS_ID });
+
+    expect(result).not.toMatchObject({ status: 'failed' });
   });
 });

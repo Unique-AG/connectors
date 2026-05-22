@@ -8,12 +8,12 @@ const mailboxTimezoneSchema = z.object({
   timeZone: z.string(),
 });
 
-const TTL_7_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const TTL_1_DAY_MS = 1 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class GetMailboxTimezoneQuery {
   private readonly logger = new Logger(GetMailboxTimezoneQuery.name);
-  private readonly cache = new LRUCache<string, string>({ max: 500, ttl: TTL_7_DAYS_MS });
+  private readonly cache = new LRUCache<string, string>({ max: 500, ttl: TTL_1_DAY_MS });
 
   public constructor(private readonly graphClientFactory: GraphClientFactory) {}
 
