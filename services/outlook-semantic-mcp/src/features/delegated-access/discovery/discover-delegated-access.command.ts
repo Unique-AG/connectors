@@ -14,7 +14,10 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { isTokenExpiredError } from '~/utils/is-token-expired-error';
 import { Nullish } from '~/utils/nullish';
 import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
-import { isDelegatedAccessNotAvailableError } from '../utils/is-delegated-access-not-available-error';
+import {
+  getDelegatedAccessErrorInfo,
+  isDelegatedAccessNotAvailableError,
+} from '../utils/is-delegated-access-not-available-error';
 
 export const DISCOVER_DELEGATED_ACCESS_CACHE_KEY = `DiscoverDelegatedAccess`;
 export const DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES = 10;
@@ -65,7 +68,18 @@ export class DiscoverDelegatedAccessCommand {
         );
         finalState = 'ready';
       } catch (error) {
-        this.logger.error({ msg: `Failed to run delegated access discovery`, err: error });
+        const currentCachedValue = await this.persistentCacheService.get(
+          DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
+          `DelegatedAccessDiscovery`,
+        );
+        const payload = currentCachedValue?.payload;
+        this.logger.error({
+          msg: `Failed to run delegated access discovery`,
+          lastProcessedDelegateId: payload?.lastProcessedDelegateId,
+          lastProcessedOwnerIdForDelegate: payload?.lastProcessedOwnerIdForDelegate,
+          lastProgressRegisteredAt: payload?.lastProgressRegisteredAt,
+          err: error,
+        });
         finalState = 'failed';
       }
       await this.persistentCacheService.setWith(
@@ -431,11 +445,10 @@ export class DiscoverDelegatedAccessCommand {
             ),
           );
         this.logger.debug({
+          msg: `Delegated access revoked, removed from accounts`,
           delegateUserId,
           ownerUserId,
-          errorCode: error.code,
-          statusCode: error.statusCode,
-          msg: `Delegated access revoked, removed from accounts`,
+          ...getDelegatedAccessErrorInfo(error),
           ...(this.appConfiguration.mcpDebugMode ? { err: error } : {}),
         });
         await this.updateProgress();
