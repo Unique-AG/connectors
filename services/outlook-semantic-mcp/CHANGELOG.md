@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.11](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.10...outlook-semantic-mcp@0.4.11) (2026-05-22)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** handle MailboxInfoStale as no-access in delegated access flows ([#571](https://github.com/Unique-AG/connectors/issues/571)) ([6ba4f6d](https://github.com/Unique-AG/connectors/commit/6ba4f6d429b3020d2b4ffeeba3083c4d81f449e4))
+
 ## [0.4.10](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.9...outlook-semantic-mcp@0.4.10) (2026-05-21)
 
 
