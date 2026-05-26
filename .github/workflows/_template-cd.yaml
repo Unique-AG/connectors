@@ -4,7 +4,7 @@ on:
   workflow_call:
     inputs:
       service-name:
-        description: "Name of the service (e.g., factset-mcp)"
+        description: "Name of the service (e.g., outlook-semantic-mcp,teams-mcp)"
         required: true
         type: string
       service-version:
@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       dockerfile:
-        description: "Path to a specific Dockerfile (e.g., services/factset-mcp/deploy/Dockerfile)"
+        description: "Path to a specific Dockerfile (e.g., services/outlook-semantic-mcp/deploy/Dockerfile)"
         default: "./Dockerfile"
         type: string
       docs-path:
