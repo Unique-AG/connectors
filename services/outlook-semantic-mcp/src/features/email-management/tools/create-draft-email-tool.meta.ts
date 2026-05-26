@@ -35,7 +35,41 @@ export const META = createMeta({
     The **only** exception: if after searching with \`search_emails\` and \`lookup_contacts\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
 
     ### What \`draft_email\` Does
-    Creates a draft email in the user's Outlook mailbox. Provide subject, body content and type (html or text), and at least one recipient. Optionally include CC recipients and attachments. The draft is saved and can be reviewed or sent later.
+    Creates a draft email in the user's Outlook mailbox. Provide subject, body content (Markdown), and at least one recipient. Optionally include CC recipients and attachments. The draft is saved and can be reviewed or sent later.
+
+    ### Body Formatting
+    The \`content\` field is **Markdown**. It is converted to HTML on the server before being sent to Outlook, so use Markdown syntax for all formatting — do **not** write raw HTML tags (\`<br>\`, \`<p>\`, \`<strong>\`, etc.); they will be shown as literal text.
+
+    Supported:
+    - Blank line between paragraphs.
+    - \`**bold**\`, \`*italic*\`, \`\`inline code\`\`.
+    - Bullet lists with \`-\` and numbered lists with \`1.\`.
+    - Links as \`[label](https://example.com)\`.
+    - Blockquotes with \`>\`.
+
+    Example of a well-formatted body:
+    \`\`\`markdown
+    Hi Sarah,
+
+    Please find attached the **minutes** from the meeting for the inception of the new fund.
+
+    Key points discussed:
+    - Fund structure and target size
+    - Investment thesis and sector focus
+    - Timeline for first close
+
+    Next steps:
+    1. Review the attached minutes
+    2. Share feedback by end of week
+    3. Schedule a follow-up call
+
+    Let me know if you have any questions. More info on our [website](https://unique.ai).
+
+    Best regards,
+    Nicolae
+    \`\`\`
+
+    Use blank lines to separate paragraphs. Inside the signature, a single line break between "Best regards," and the name is preserved as a line break.
 
     ### Attachments
     To attach files, pass an array of objects in the \`attachments\` field. Each object must have:

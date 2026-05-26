@@ -677,184 +677,6 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.16.5)(jiti@2.6.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3)
 
-  services/outlook-mcp:
-    dependencies:
-      '@microsoft/microsoft-graph-client':
-        specifier: 3.0.7
-        version: 3.0.7
-      '@modelcontextprotocol/sdk':
-        specifier: 1.27.1
-        version: 1.27.1(zod@4.1.5)
-      '@nestjs/cache-manager':
-        specifier: 3.0.1
-        version: 3.0.1(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(cache-manager@7.2.0)(keyv@5.6.0)(rxjs@7.8.2)
-      '@nestjs/common':
-        specifier: 11.1.18
-        version: 11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/config':
-        specifier: 4.0.3
-        version: 4.0.3(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
-      '@nestjs/core':
-        specifier: 11.1.18
-        version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/platform-express':
-        specifier: 11.1.18
-        version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)
-      '@nestjs/swagger':
-        specifier: 11.2.6
-        version: 11.2.6(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)
-      '@opentelemetry/api':
-        specifier: 1.9.0
-        version: 1.9.0
-      '@opentelemetry/instrumentation-pg':
-        specifier: 0.58.0
-        version: 0.58.0(@opentelemetry/api@1.9.0)
-      '@unique-ag/aes-gcm-encryption':
-        specifier: workspace:*
-        version: link:../../packages/aes-gcm-encryption
-      '@unique-ag/instrumentation':
-        specifier: workspace:*
-        version: file:packages/instrumentation(@prisma/instrumentation@6.19.3(@opentelemetry/api@1.9.0))
-      '@unique-ag/logger':
-        specifier: workspace:*
-        version: link:../../packages/logger
-      '@unique-ag/mcp-oauth':
-        specifier: workspace:*
-        version: link:../../packages/mcp-oauth
-      '@unique-ag/mcp-server-module':
-        specifier: workspace:*
-        version: link:../../packages/mcp-server-module
-      '@unique-ag/probe':
-        specifier: workspace:*
-        version: link:../../packages/probe
-      cache-manager:
-        specifier: 7.2.0
-        version: 7.2.0
-      drizzle-orm:
-        specifier: 0.45.2
-        version: 0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.2))
-      drizzle-zod:
-        specifier: 0.8.3
-        version: 0.8.3(drizzle-orm@0.45.2(@opentelemetry/api@1.9.0)(@prisma/client@6.19.3(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.2))(typescript@5.9.2))(@types/pg@8.15.5)(pg@8.16.3)(prisma@6.19.3(magicast@0.3.5)(typescript@5.9.2)))(zod@4.1.5)
-      jsonwebtoken:
-        specifier: 9.0.3
-        version: 9.0.3
-      nestjs-otel:
-        specifier: 8.0.2
-        version: 8.0.2(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)
-      nestjs-pino:
-        specifier: 4.6.1
-        version: 4.6.1(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
-      nestjs-zod:
-        specifier: 5.0.1
-        version: 5.0.1(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.2.6(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.1.5)
-      passport:
-        specifier: 0.7.0
-        version: 0.7.0
-      passport-microsoft:
-        specifier: 2.1.0
-        version: 2.1.0
-      pg:
-        specifier: 8.16.3
-        version: 8.16.3
-      pino-http:
-        specifier: 10.5.0
-        version: 10.5.0
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.2
-        version: 7.8.2
-      serialize-error-cjs:
-        specifier: 0.2.0
-        version: 0.2.0
-      typeid-js:
-        specifier: 1.2.0
-        version: 1.2.0
-      zod:
-        specifier: 4.1.5
-        version: 4.1.5
-    devDependencies:
-      '@microsoft/microsoft-graph-types':
-        specifier: 2.43.1
-        version: 2.43.1
-      '@nestjs/cli':
-        specifier: 11.0.18
-        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5))(@swc/core@1.13.5)(@types/node@22.16.5)(esbuild@0.25.12)
-      '@nestjs/schematics':
-        specifier: 11.0.10
-        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
-      '@nestjs/testing':
-        specifier: 11.1.18
-        version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/platform-express@11.1.18)
-      '@suites/di.nestjs':
-        specifier: 3.0.1
-        version: 3.0.1(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
-      '@suites/doubles.vitest':
-        specifier: 3.0.1
-        version: 3.0.1(@vitest/spy@3.2.4)(vitest@3.2.4(@types/node@22.16.5)(jiti@2.6.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))
-      '@suites/unit':
-        specifier: 3.0.1
-        version: 3.0.1
-      '@swc/cli':
-        specifier: 0.8.1
-        version: 0.8.1(@swc/core@1.13.5)(chokidar@4.0.3)
-      '@swc/core':
-        specifier: 1.13.5
-        version: 1.13.5
-      '@types/express':
-        specifier: 5.0.3
-        version: 5.0.3
-      '@types/jsonwebtoken':
-        specifier: 9.0.10
-        version: 9.0.10
-      '@types/node':
-        specifier: 22.16.5
-        version: 22.16.5
-      '@types/passport':
-        specifier: 1.0.17
-        version: 1.0.17
-      '@types/passport-microsoft':
-        specifier: 2.1.0
-        version: 2.1.0
-      '@types/pg':
-        specifier: 8.15.5
-        version: 8.15.5
-      '@types/supertest':
-        specifier: 6.0.3
-        version: 6.0.3
-      '@vitest/coverage-istanbul':
-        specifier: 3.2.4
-        version: 3.2.4(vitest@3.2.4(@types/node@22.16.5)(jiti@2.6.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))
-      drizzle-kit:
-        specifier: 0.31.4
-        version: 0.31.4
-      globals:
-        specifier: 16.3.0
-        version: 16.3.0
-      istanbul-badges-readme:
-        specifier: 1.9.0
-        version: 1.9.0
-      pino-http-print:
-        specifier: 3.1.0
-        version: 3.1.0
-      source-map-support:
-        specifier: 0.5.21
-        version: 0.5.21
-      supertest:
-        specifier: 7.1.4
-        version: 7.1.4
-      typescript:
-        specifier: 5.9.2
-        version: 5.9.2
-      unplugin-swc:
-        specifier: 1.5.7
-        version: 1.5.7(@swc/core@1.13.5)(rollup@4.60.1)
-      vitest:
-        specifier: 3.2.4
-        version: 3.2.4(@types/node@22.16.5)(jiti@2.6.1)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3)
-
   services/outlook-semantic-mcp:
     dependencies:
       '@golevelup/nestjs-rabbitmq':
@@ -959,6 +781,9 @@ importers:
       lru-cache:
         specifier: 11.5.0
         version: 11.5.0
+      markdown-it:
+        specifier: 14.1.1
+        version: 14.1.1
       nestjs-otel:
         specifier: 8.0.2
         version: 8.0.2(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)
@@ -1013,7 +838,7 @@ importers:
         version: 2.43.1
       '@nestjs/cli':
         specifier: 11.0.18
-        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
+        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5))(@swc/core@1.13.5)(@types/node@22.16.5)(esbuild@0.25.12)
       '@nestjs/schematics':
         specifier: 11.0.10
         version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
@@ -1044,6 +869,9 @@ importers:
       '@types/jsonwebtoken':
         specifier: 9.0.10
         version: 9.0.10
+      '@types/markdown-it':
+        specifier: 14.1.2
+        version: 14.1.2
       '@types/node':
         specifier: 22.16.5
         version: 22.16.5
@@ -3533,8 +3361,17 @@ packages:
   '@types/jsonwebtoken@9.0.10':
     resolution: {integrity: sha512-asx5hIG9Qmf/1oStypjanR7iKTv0gXQ1Ov/jfrX6kS/EO0OFni8orbmGCn0672NHR3kXHwpAwR+B368ZGN/2rA==}
 
+  '@types/linkify-it@5.0.0':
+    resolution: {integrity: sha512-sVDA58zAw4eWAffKOaQH5/5j3XeayukzDk+ewSsnv3p4yJEZHCCzMDiZM8e0OUrRvmpGZ85jf4yDHkHsgBNr9Q==}
+
   '@types/luxon@3.7.1':
     resolution: {integrity: sha512-H3iskjFIAn5SlJU7OuxUmTEpebK6TKB8rxZShDslBMZJ5u9S//KM1sbdAisiSrqwLQncVjnpi2OK2J51h+4lsg==}
+
+  '@types/markdown-it@14.1.2':
+    resolution: {integrity: sha512-promo4eFwuiW+TfGxhi+0x3czqTYJkG8qB17ZUJiVF10Xm7NLVRSLUsfRTU/6h1e24VvRnXCx+hG7li58lkzog==}
+
+  '@types/mdurl@2.0.0':
+    resolution: {integrity: sha512-RGdgjQUZba5p6QEFAVx2OGb8rQDL/cPRG7GiedRzMcJ1tYnUANBncjbSB1NRGwbvjcPeikRABz2nshyPk1bhWg==}
 
   '@types/memcached@2.2.10':
     resolution: {integrity: sha512-AM9smvZN55Gzs2wRrqeMHVP7KE8KWgCJO/XL5yCly2xF6EKa4YlbpK+cLSAH4NG/Ah64HrlegmGqW8kYws7Vxg==}
@@ -8448,7 +8285,16 @@ snapshots:
       '@types/ms': 2.1.0
       '@types/node': 22.16.5
 
+  '@types/linkify-it@5.0.0': {}
+
   '@types/luxon@3.7.1': {}
+
+  '@types/markdown-it@14.1.2':
+    dependencies:
+      '@types/linkify-it': 5.0.0
+      '@types/mdurl': 2.0.0
+
+  '@types/mdurl@2.0.0': {}
 
   '@types/memcached@2.2.10':
     dependencies:
