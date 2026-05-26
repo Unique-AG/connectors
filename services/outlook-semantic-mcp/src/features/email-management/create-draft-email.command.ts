@@ -5,6 +5,7 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
 import { AttachmentFailure } from './email-attachments/utils';
+import { markdownToHtml } from './markdown-to-html';
 
 const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string().optional() });
 
@@ -81,9 +82,8 @@ export class CreateDraftEmailCommand {
     const body: Record<string, unknown> = {
       subject: input.subject,
       body: {
-        // We defalt to HTML because plain text is considered to be valid html from outlook api.
         contentType: 'HTML',
-        content: input.content,
+        content: markdownToHtml(input.content),
       },
       toRecipients: input.toRecipients.map((r) => ({
         emailAddress: { name: r.name, address: r.email },
