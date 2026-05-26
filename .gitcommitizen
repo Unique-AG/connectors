@@ -24,7 +24,6 @@ revert = Reverts a previous commit
 
 [scopes]
 # Services
-factset-mcp = services/factset-mcp/**
 kyckr-mcp = services/kyckr-mcp/**
 outlook-mcp = services/outlook-mcp/**
 outlook-semantic-mcp = services/outlook-semantic-mcp/**
