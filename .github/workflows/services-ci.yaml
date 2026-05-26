@@ -85,7 +85,7 @@ jobs:
             # Packages are shared dependencies — run CI for all services to catch breakage
             services=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
           elif [ "$SERVICES_CHANGED" = "true" ]; then
-            services=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            services=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r s; do [ -d "services/$s" ] && echo "$s"; done | jq -R -s -c 'split("\n") | map(select(length > 0))')
           else
             services='[]'
           fi
