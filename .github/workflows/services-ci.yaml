@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       services:
-        description: 'Services to run CI for (comma-separated, e.g., "teams-mcp,outlook-mcp" or "all")'
+        description: 'Services to run CI for (comma-separated, e.g., "teams-mcp,outlook-semantic-mcp" or "all")'
         required: true
         default: "all"
 
