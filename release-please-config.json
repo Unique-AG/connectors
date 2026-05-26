@@ -26,24 +26,6 @@
         }
       ]
     },
-    "services/outlook-mcp": {
-      "extra-files": [
-        {
-          "type": "yaml",
-          "path": "deploy/helm-charts/outlook-mcp/Chart.yaml",
-          "jsonpath": "$.version"
-        },
-        {
-          "type": "yaml",
-          "path": "deploy/helm-charts/outlook-mcp/Chart.yaml",
-          "jsonpath": "$.appVersion"
-        },
-        {
-          "type": "generic",
-          "path": "deploy/helm-charts/outlook-mcp/values.yaml"
-        }
-      ]
-    },
     "services/sharepoint-connector": {
       "extra-files": [
         {

@@ -24,8 +24,6 @@ jobs:
     outputs:
       "services/factset-mcp--release_created": ${{ steps.release.outputs['services/factset-mcp--release_created'] }}
       "services/factset-mcp--version": ${{ steps.release.outputs['services/factset-mcp--version'] }}
-      "services/outlook-mcp--release_created": ${{ steps.release.outputs['services/outlook-mcp--release_created'] }}
-      "services/outlook-mcp--version": ${{ steps.release.outputs['services/outlook-mcp--version'] }}
       "services/sharepoint-connector--release_created": ${{ steps.release.outputs['services/sharepoint-connector--release_created'] }}
       "services/sharepoint-connector--version": ${{ steps.release.outputs['services/sharepoint-connector--version'] }}
       "services/teams-mcp--release_created": ${{ steps.release.outputs['services/teams-mcp--release_created'] }}
@@ -58,15 +56,6 @@ jobs:
       service-name: factset-mcp
       service-version: ${{ needs.release-please.outputs['services/factset-mcp--version'] }}
       dockerfile: services/factset-mcp/deploy/Dockerfile
-
-  release-outlook-mcp:
-    needs: release-please
-    if: ${{ needs.release-please.outputs['services/outlook-mcp--release_created'] == 'true' }}
-    uses: ./.github/workflows/_template-cd.yaml
-    with:
-      service-name: outlook-mcp
-      service-version: ${{ needs.release-please.outputs['services/outlook-mcp--version'] }}
-      dockerfile: services/outlook-mcp/deploy/Dockerfile
 
   release-sharepoint-connector:
     needs: release-please
