@@ -4,11 +4,11 @@ on:
   workflow_call:
     inputs:
       service-name:
-        description: "Name of the service (e.g., factset-mcp, sharepoint-connector)"
+        description: "Name of the service (e.g., sharepoint-connector)"
         required: true
         type: string
       service-path:
-        description: "Path to the services directory (e.g., services/factset-mcp)"
+        description: "Path to the services directory (e.g., services/sharepoint-connector)"
         required: true
         type: string
 
