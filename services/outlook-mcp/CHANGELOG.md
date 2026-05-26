@@ -1,5 +1,16 @@
 ## Changelog
 
+## [0.6.1](https://github.com/Unique-AG/connectors/compare/outlook-mcp@0.6.0...outlook-mcp@0.6.1) (2026-05-26)
+
+
+### Bug Fixes
+
+* **deps:** enable stripLeadingPaths in SWC builder for all services ([#458](https://github.com/Unique-AG/connectors/issues/458)) ([caa3abc](https://github.com/Unique-AG/connectors/commit/caa3abc26b9aea44dede0ce89101df64b3f97b77))
+* **deps:** resolve Dependabot security alerts for multiple transitive dependencies ([#449](https://github.com/Unique-AG/connectors/issues/449)) ([c800b51](https://github.com/Unique-AG/connectors/commit/c800b51439145282cababd491a6fba1a84a748a9))
+* **deps:** resolve Dependabot security alerts related to jsonwebtoken, js-yaml and @nestjs/ libraries ([#446](https://github.com/Unique-AG/connectors/issues/446)) ([44835ec](https://github.com/Unique-AG/connectors/commit/44835ec851589e2288fd2e1551ca22edb148190e))
+* **deps:** upgrade nestjs-otel to v8 to resolve systeminformation CVEs ([#471](https://github.com/Unique-AG/connectors/issues/471)) ([ec584a9](https://github.com/Unique-AG/connectors/commit/ec584a95427b3a9989387c548d654c8b4fbbd775))
+* **outlook-mcp,outlook-semantic-mcp:** reduce metrics cardinality by sanitizing endpoint IDs ([#497](https://github.com/Unique-AG/connectors/issues/497)) ([38ee132](https://github.com/Unique-AG/connectors/commit/38ee1327439d030fdccd42713bf63d76a9653e09))
+
 ## [0.6.0](https://github.com/Unique-AG/connectors/compare/outlook-mcp@v0.5.1...outlook-mcp@0.6.0) (2026-01-19)
 
 
