@@ -27,9 +27,19 @@ variable "sign_in_audience" {
 }
 
 variable "redirect_uris" {
-  description = "List of OAuth redirect URIs for the application. Should include the callback URL for your Teams MCP server."
+  description = "List of OAuth redirect URIs for the application. Must include the callback URL(s) for your Teams MCP server(s). At least one URI is required — omitting it causes AADSTS500113 at runtime."
   type        = list(string)
-  default     = []
+
+  validation {
+    condition     = length(var.redirect_uris) > 0
+    error_message = "At least one redirect URI must be registered to avoid AADSTS500113 during OAuth flows."
+  }
+}
+
+variable "admin_consent_redirect_uri" {
+  description = "Optional URI to redirect admins to after granting consent. When set, it is registered as an additional redirect URI and used in admin_consent_url instead of the first entry in redirect_uris. Use a branded landing page for a better admin UX."
+  type        = string
+  default     = "https://www.unique.ai/setup/consent-completed/entra-id"
 }
 
 variable "client_secrets_prefix" {

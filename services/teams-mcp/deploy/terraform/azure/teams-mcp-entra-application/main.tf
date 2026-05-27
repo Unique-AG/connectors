@@ -33,7 +33,7 @@ resource "azuread_application" "teams_mcp" {
     }
   }
   web {
-    redirect_uris = var.redirect_uris
+    redirect_uris = compact(concat(var.redirect_uris, [var.admin_consent_redirect_uri]))
 
     implicit_grant {
       access_token_issuance_enabled = false
