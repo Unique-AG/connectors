@@ -32,6 +32,12 @@ variable "redirect_uris" {
   default     = []
 }
 
+variable "admin_consent_redirect_uri" {
+  description = "Optional URI to redirect admins to after granting consent. When set, it is registered as an additional redirect URI and used in admin_consent_url instead of the first entry in redirect_uris. Use a branded landing page for a better admin UX."
+  type        = string
+  default     = "https://www.unique.ai/setup/consent-completed/entra-id"
+}
+
 variable "client_secrets_prefix" {
   description = "The prefix for the client secrets. This will be prepended to the client secret name but omitted if a secrets.explicit_name is provided."
   type        = string

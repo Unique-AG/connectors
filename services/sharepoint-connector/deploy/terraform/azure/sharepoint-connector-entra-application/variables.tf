@@ -65,6 +65,18 @@ variable "federated_identity_credentials" {
   # }
 }
 
+variable "redirect_uris" {
+  description = "Optional list of redirect URIs to register on the application. Not required for the daemon (app-only) OAuth flow, but at least one URI must be provided when sharing the admin_consent_url with customer tenant admins to avoid AADSTS500113."
+  type        = list(string)
+  default     = []
+}
+
+variable "admin_consent_redirect_uri" {
+  description = "Optional URI to redirect admins to after granting consent. When set, it is registered as an additional redirect URI and used in admin_consent_url. Use a branded landing page for a better admin UX."
+  type        = string
+  default     = "https://www.unique.ai/setup/consent-completed/entra-id"
+}
+
 variable "certificates" {
   description = "A map of Entra application certificates for the Azure AD application. Each key is the display name and the value contains the certificate configuration."
   type = map(object({
