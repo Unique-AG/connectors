@@ -125,13 +125,11 @@ export class TranscriptCreatedService {
         .then(Transcript.parseAsync),
       // Wrap WHATWG stream with Node Readable so the upload fetch() with duplex:'half'
       // does not hit "Response body object should not be disturbed or locked".
-      (async (): Promise<Readable> =>
-        Readable.fromWeb(
-          await client
-            .api(`/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
-            .header('Accept', 'text/vtt')
-            .getStream(),
-        ))(),
+      client
+        .api(`/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
+        .header('Accept', 'text/vtt')
+        .getStream()
+        .then((stream) => Readable.fromWeb(stream)),
     ]);
 
     span?.addEvent('microsoft graph data retrieved', {
