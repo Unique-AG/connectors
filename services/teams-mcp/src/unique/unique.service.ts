@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
@@ -36,10 +37,10 @@ export class UniqueService {
       participants: { id?: string; name: string; email: string }[];
       owner: { id: string; name: string; email: string };
     },
-    transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
+    transcript: { id: string; content: Readable },
     recording?: {
       id: string;
-      content: ReadableStream<Uint8Array<ArrayBuffer>>;
+      content: Readable;
       startDateTime: Date;
       endDateTime: Date;
     },

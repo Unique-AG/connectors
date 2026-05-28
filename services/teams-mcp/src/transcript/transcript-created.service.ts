@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { Readable } from 'node:stream';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
@@ -122,10 +123,15 @@ export class TranscriptCreatedService {
         .api(`/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}`)
         .get()
         .then(Transcript.parseAsync),
-      client
-        .api(`/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
-        .header('Accept', 'text/vtt')
-        .getStream(),
+      // Wrap WHATWG stream with Node Readable so the upload fetch() with duplex:'half'
+      // does not hit "Response body object should not be disturbed or locked".
+      (async (): Promise<Readable> =>
+        Readable.fromWeb(
+          await client
+            .api(`/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
+            .header('Accept', 'text/vtt')
+            .getStream(),
+        ))(),
     ]);
 
     span?.addEvent('microsoft graph data retrieved', {

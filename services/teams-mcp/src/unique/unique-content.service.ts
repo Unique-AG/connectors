@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import type { Readable } from 'node:stream';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { FetchFn } from '@qfetch/qfetch';
 import { Span, TraceService } from 'nestjs-otel';
@@ -78,11 +79,7 @@ export class UniqueContentService {
   }
 
   @Span()
-  public async uploadToStorage(
-    writeUrl: string,
-    content: ReadableStream<Uint8Array<ArrayBuffer>>,
-    mime: string,
-  ): Promise<void> {
+  public async uploadToStorage(writeUrl: string, content: Readable, mime: string): Promise<void> {
     const span = this.trace.getSpan();
 
     const urlObj = new URL(writeUrl);
@@ -97,7 +94,10 @@ export class UniqueContentService {
         'Content-Type': mime,
         'x-ms-blob-type': 'BlockBlob',
       },
-      body: content,
+      // Node's undici fetch accepts a Node Readable here at runtime, but lib.dom's
+      // BodyInit type does not include it. Same story for `duplex: 'half'`, required
+      // for streaming uploads.
+      body: content as unknown as BodyInit,
       // @ts-expect-error: nodejs fetch requires `half` for streaming uploads
       duplex: 'half',
     });

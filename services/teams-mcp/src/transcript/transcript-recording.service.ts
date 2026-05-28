@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -5,7 +6,7 @@ import { RecordingCollection } from './transcript.dtos';
 
 export interface RecordingData {
   id: string;
-  content: ReadableStream<Uint8Array<ArrayBuffer>>;
+  content: Readable;
   startDateTime: Date;
   endDateTime: Date;
 }
@@ -64,11 +65,15 @@ export class TranscriptRecordingService {
         'Located correlated meeting recording in Microsoft Graph',
       );
 
-      // Fetch recording content (MP4 stream)
-      const mp4Stream: ReadableStream<Uint8Array<ArrayBuffer>> = await client
-        .api(`/users/${userId}/onlineMeetings/${meetingId}/recordings/${recording.id}/content`)
-        .header('Accept', 'video/mp4')
-        .getStream();
+      // Wrap WHATWG stream with Node Readable so the upload fetch() with duplex:'half'
+      // does not hit "Response body object should not be disturbed or locked" when bytes
+      // started flowing during the Graph SDK middleware chain.
+      const mp4Stream: Readable = Readable.fromWeb(
+        await client
+          .api(`/users/${userId}/onlineMeetings/${meetingId}/recordings/${recording.id}/content`)
+          .header('Accept', 'video/mp4')
+          .getStream(),
+      );
 
       span?.addEvent('recording_content_retrieved');
       this.logger.log(
