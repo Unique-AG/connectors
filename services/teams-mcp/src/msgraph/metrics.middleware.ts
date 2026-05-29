@@ -41,40 +41,6 @@ export class MetricsMiddleware implements Middleware {
     return options?.method?.toUpperCase() || 'GET';
   }
 
-  /**
-   * Detect streaming media downloads (recording MP4, transcript VTT). Inspecting the
-   * Response body for these would risk "body disturbed/locked" errors and is meaningless
-   * for binary streams — skip the slow-request WARN that would otherwise fire for every
-   * media download since they inherently exceed the 5s threshold.
-   */
-  private isStreamingAccept(options: RequestInit | undefined): boolean {
-    const headers = options?.headers;
-    if (!headers) {
-      return false;
-    }
-
-    let accept: string | null = null;
-    if (headers instanceof Headers) {
-      accept = headers.get('Accept') ?? headers.get('accept');
-    } else if (Array.isArray(headers)) {
-      for (const [key, value] of headers) {
-        if (key.toLowerCase() === 'accept') {
-          accept = value;
-          break;
-        }
-      }
-    } else {
-      const record = headers as Record<string, string>;
-      accept = record.Accept ?? record.accept ?? null;
-    }
-
-    if (!accept) {
-      return false;
-    }
-    const lower = accept.toLowerCase();
-    return lower.startsWith('video/') || lower.startsWith('audio/') || lower === 'text/vtt';
-  }
-
   private getStatusClass(statusCode: number): string {
     if (statusCode >= 200 && statusCode < 300) {
       return '2xx';
@@ -173,7 +139,7 @@ export class MetricsMiddleware implements Middleware {
         );
       }
 
-      if (duration > 5000 && !this.isStreamingAccept(context.options)) {
+      if (duration > 5000) {
         this.logger.warn(
           {
             method,
