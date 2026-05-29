@@ -5,7 +5,7 @@ import { RecordingCollection } from './transcript.dtos';
 
 export interface RecordingData {
   id: string;
-  content: ReadableStream<Uint8Array<ArrayBuffer>>;
+  content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>;
   startDateTime: Date;
   endDateTime: Date;
 }
@@ -64,21 +64,13 @@ export class TranscriptRecordingService {
         'Located correlated meeting recording in Microsoft Graph',
       );
 
-      // Fetch recording content (MP4 stream)
-      const mp4Stream: ReadableStream<Uint8Array<ArrayBuffer>> = await client
-        .api(`/users/${userId}/onlineMeetings/${meetingId}/recordings/${recording.id}/content`)
-        .header('Accept', 'video/mp4')
-        .getStream();
-
-      span?.addEvent('recording_content_retrieved');
-      this.logger.log(
-        { recordingId: recording.id },
-        'Successfully fetched recording from MS Graph',
-      );
-
       return {
         id: recording.id,
-        content: mp4Stream,
+        content: () =>
+          client
+            .api(`/users/${userId}/onlineMeetings/${meetingId}/recordings/${recording.id}/content`)
+            .header('Accept', 'video/mp4')
+            .getStream(),
         startDateTime: recording.createdDateTime,
         endDateTime: recording.endDateTime,
       };
