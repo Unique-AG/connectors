@@ -80,7 +80,7 @@ export class UniqueContentService {
   @Span()
   public async uploadToStorage(
     writeUrl: string,
-    content: ReadableStream<Uint8Array<ArrayBuffer>>,
+    content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>,
     mime: string,
   ): Promise<void> {
     const span = this.trace.getSpan();
@@ -91,13 +91,14 @@ export class UniqueContentService {
 
     this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
 
+    const stream = await content();
     const response = await fetch(writeUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': mime,
         'x-ms-blob-type': 'BlockBlob',
       },
-      body: content,
+      body: stream,
       // @ts-expect-error: nodejs fetch requires `half` for streaming uploads
       duplex: 'half',
     });

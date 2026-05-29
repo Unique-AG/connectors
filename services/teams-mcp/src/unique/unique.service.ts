@@ -36,10 +36,13 @@ export class UniqueService {
       participants: { id?: string; name: string; email: string }[];
       owner: { id: string; name: string; email: string };
     },
-    transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
+    transcript: {
+      id: string;
+      content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>;
+    },
     recording?: {
       id: string;
-      content: ReadableStream<Uint8Array<ArrayBuffer>>;
+      content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>;
       startDateTime: Date;
       endDateTime: Date;
     },

@@ -116,34 +116,27 @@ export class TranscriptCreatedService {
       'Retrieving transcript data from Microsoft Graph using parallel API calls',
     );
 
-    const [meeting, transcript, vttStream] = await Promise.all([
+    const [meeting, transcript] = await Promise.all([
       client.api(`/users/${userId}/onlineMeetings/${meetingId}`).get().then(Meeting.parseAsync),
       client
         .api(`/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}`)
         .get()
         .then(Transcript.parseAsync),
-      client
-        .api(`/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
-        .header('Accept', 'text/vtt')
-        .getStream(),
     ]);
 
     span?.addEvent('microsoft graph data retrieved', {
       meetingId,
       transcriptId,
       contentCorrelationId: transcript.contentCorrelationId,
-      hasVtt: !!vttStream,
     });
     this.logger.debug(
       {
         meetingId,
         transcriptId,
         contentCorrelationId: transcript.contentCorrelationId,
-        hasVtt: !!vttStream,
       },
       'Successfully retrieved data from Microsoft Graph',
     );
-    assert.ok(vttStream, 'expected a vtt transcript body');
 
     span?.addEvent('transcript processing completed');
 
@@ -176,7 +169,14 @@ export class TranscriptCreatedService {
           email: p.upn,
         })),
       },
-      { id: transcript.id, content: vttStream },
+      {
+        id: transcript.id,
+        content: () =>
+          client
+            .api(`/users/${userId}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
+            .header('Accept', 'text/vtt')
+            .getStream(),
+      },
       recording ?? undefined,
     );
   }
