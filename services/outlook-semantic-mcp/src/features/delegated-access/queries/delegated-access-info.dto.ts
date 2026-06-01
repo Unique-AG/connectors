@@ -3,4 +3,5 @@ export interface DelegatedAccessInfoDto {
   ownerUserId: string;
   ownerProviderUserId: string;
   msGraphDirectoryIds: string[];
+  hasFullDelegatedAccess: boolean;
 }

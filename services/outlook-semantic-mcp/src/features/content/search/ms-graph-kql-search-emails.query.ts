@@ -10,7 +10,6 @@ import {
   SearchEmailResult,
 } from '~/features/content/search/semantic-search-emails.query';
 import { MarkAccountsNoFullAccessCommand } from '~/features/delegated-access/commands/mark-accounts-no-full-access.command';
-import { GetMailboxesWithFullDelegatedAccessQuery } from '~/features/delegated-access/queries/get-mailboxes-with-full-delegated-access.query';
 import { TranslateGraphIdsToImmutableIdsQuery } from '~/features/graph-utils/translate-graph-ids-to-immutable-ids.query';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -20,6 +19,7 @@ import { NonNullishProps } from '~/utils/non-nullish-props';
 import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 import { MsGraphSearchConfig } from './search.config';
+import { GetDelegatedAccessQuery } from '~/features/delegated-access/queries/get-delegates-access.query';
 
 const batchResponseSchema = z.object({
   responses: z.array(
@@ -84,7 +84,7 @@ export class MsGraphKqlSearchEmailsQuery {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly translateGraphIdsToImmutableIdsQuery: TranslateGraphIdsToImmutableIdsQuery,
-    private readonly getMailboxesWithFullDelegatedAccessQuery: GetMailboxesWithFullDelegatedAccessQuery,
+    private readonly getDelegatedAccessQuery: GetDelegatedAccessQuery,
     private readonly markAccountsNoFullAccessCommand: MarkAccountsNoFullAccessCommand,
   ) {}
 
@@ -178,9 +178,10 @@ export class MsGraphKqlSearchEmailsQuery {
     queries: Array<QueryInput>;
     userProfile: NonNullishProps<UserProfile, 'email'>;
   }) {
-    const delegatedAccesses = await this.getMailboxesWithFullDelegatedAccessQuery.run({
-      delegateUserId: userProfile.id,
-    });
+    const delegatedAccesses = await this.getDelegatedAccessQuery.run(userProfile.id);
+    const fullDelegatedAccessToMailboxes = delegatedAccesses.filter(
+      (item) => item.hasFullDelegatedAccess,
+    );
     const getRequestId = () => typeid(`batch_request`).toString();
 
     return queries.flatMap((query): GraphBatchRequest[] => {
@@ -200,7 +201,9 @@ export class MsGraphKqlSearchEmailsQuery {
           ];
         }
 
-        const foundMailbox = delegatedAccesses.find((item) => mailbox === item);
+        const foundMailbox = fullDelegatedAccessToMailboxes.find(
+          ({ ownerUserEmail }) => mailbox === ownerUserEmail,
+        );
         if (!foundMailbox) {
           return [];
         }
@@ -208,7 +211,7 @@ export class MsGraphKqlSearchEmailsQuery {
         return [
           {
             requestId: getRequestId(),
-            mailbox: foundMailbox,
+            mailbox: foundMailbox.ownerUserEmail,
             isDelegated: true,
             kqlQuery: query.kqlQuery,
             limit,
@@ -218,7 +221,7 @@ export class MsGraphKqlSearchEmailsQuery {
 
       // For safety to not expload the number of request we cap the delegated access search to 25. 25 Is not an arbitrary number
       // Microsoft documents that a exchange user can have delegated access to at most 25 other inboxes.
-      const delegatesToFilter = delegatedAccesses.slice(0, 25);
+      const delegatesToFilter = fullDelegatedAccessToMailboxes.slice(0, 25);
       return [
         {
           requestId: getRequestId(),
@@ -227,9 +230,9 @@ export class MsGraphKqlSearchEmailsQuery {
           kqlQuery: query.kqlQuery,
           limit,
         },
-        ...delegatesToFilter.map((ownerEmail) => ({
+        ...delegatesToFilter.map(({ ownerUserEmail }) => ({
           requestId: getRequestId(),
-          mailbox: ownerEmail,
+          mailbox: ownerUserEmail,
           isDelegated: true,
           kqlQuery: query.kqlQuery,
           limit,
