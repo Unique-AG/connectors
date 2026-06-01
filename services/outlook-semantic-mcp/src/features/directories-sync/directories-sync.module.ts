@@ -7,7 +7,6 @@ import { UserUtilsModule } from '../user-utils/user-utils.module';
 import { CreateRootScopeCommand } from './create-root-scope.command';
 import { DirectorySyncSchedulerService } from './directories-sync-scheduler.service';
 import { FetchAllDirectoriesFromOutlookQuery } from './fetch-all-directories-from-outlook.query';
-import { ListMailboxesAndDirectoriesQuery } from './list-mailboxes-and-directories.query';
 import { RemoveRootScopeAndDirectoriesCommand } from './remove-root-scope-and-directories.command';
 import { SyncDirectoriesCommand } from './sync-directories.command';
 import { SyncDirectoriesForAllUserProfilesCommand } from './sync-directories-for-all-user-profiles.command';
@@ -15,7 +14,7 @@ import { SyncDirectoriesForUserProfileCommand } from './sync-directories-for-use
 import { SyncSystemDirectoriesForSubscriptionCommand } from './sync-system-driectories-for-subscription.command';
 import { UpsertDirectoryCommand } from './upsert-directory.command';
 
-const QUERIES = [FetchAllDirectoriesFromOutlookQuery, ListMailboxesAndDirectoriesQuery];
+const QUERIES = [FetchAllDirectoriesFromOutlookQuery];
 
 const COMMANDS = [
   SyncDirectoriesForUserProfileCommand,

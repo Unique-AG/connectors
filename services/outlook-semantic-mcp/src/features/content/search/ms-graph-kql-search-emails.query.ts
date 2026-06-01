@@ -1,14 +1,14 @@
 import { createSmeared } from '@unique-ag/utils';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { groupBy } from 'remeda';
+import { groupBy, isNullish, unique } from 'remeda';
 import * as z from 'zod';
 import { UserProfile } from '~/db';
 import {
   SearchBackend,
   SearchEmailResult,
 } from '~/features/content/search/semantic-search-emails.query';
-import { MarkAccountsNoFullAccessCommand } from '~/features/delegated-access/commands/mark-accounts-no-full-access.command';
+import { RemoveDelegatedAccessCommand } from '~/features/delegated-access/commands/remove-delegated-access.command';
 import { TranslateGraphIdsToImmutableIdsQuery } from '~/features/graph-utils/translate-graph-ids-to-immutable-ids.query';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -17,18 +17,20 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
-import { MsGraphSearchConfig } from './search.config';
+import { sleep } from '~/utils/sleep';
 import {
   BuildMsGraphKqlBatchRequestsQuery,
   GraphBatchRequest,
   QueryInput,
 } from './build-ms-graph-kql-batch-requests.query';
+import { MsGraphSearchConfig } from './search.config';
 
 const batchResponseSchema = z.object({
   responses: z.array(
     z.object({
       id: z.string(),
       status: z.number(),
+      headers: z.record(z.string(), z.string()).optional(),
       body: z.unknown(),
     }),
   ),
@@ -74,7 +76,7 @@ export class MsGraphKqlSearchEmailsQuery {
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly translateGraphIdsToImmutableIdsQuery: TranslateGraphIdsToImmutableIdsQuery,
     private readonly buildMsGraphKqlBatchRequestsQuery: BuildMsGraphKqlBatchRequestsQuery,
-    private readonly markAccountsNoFullAccessCommand: MarkAccountsNoFullAccessCommand,
+    private readonly removeDelegatedAccessCommand: RemoveDelegatedAccessCommand,
   ) {}
 
   @Span()
@@ -99,6 +101,7 @@ export class MsGraphKqlSearchEmailsQuery {
     }
 
     const round1 = await this.executeBatchRound(allRequests, userProfile, outputTimeZone);
+    await sleep(round1.retryAfterMs);
     const round2 = await this.executeBatchRound(round1.retryRequests, userProfile, outputTimeZone);
 
     const hits = [...round1.hits, ...round2.hits];
@@ -107,12 +110,31 @@ export class MsGraphKqlSearchEmailsQuery {
       ...round1.throttledMailboxes,
       ...round2.throttledMailboxes,
     ]);
-    const lostAccessMailboxes = new Set([
-      ...round1.lostAccessMailboxes,
-      ...round2.lostAccessMailboxes,
-    ]);
 
-    const filteredHits = hits.filter((item) => !lostAccessMailboxes.has(item.mailbox));
+    const lostAccessMailboxes = new Map<
+      string,
+      { allAccessWasRemoved: boolean; folderIds: string[] }
+    >();
+    for (const [mailbox, data] of [...round1.lostAccessMailboxes, ...round2.lostAccessMailboxes]) {
+      const existing = lostAccessMailboxes.get(mailbox);
+      if (existing) {
+        existing.allAccessWasRemoved = existing.allAccessWasRemoved || data.allAccessWasRemoved;
+        existing.folderIds = unique([...existing.folderIds, ...data.folderIds]);
+      } else {
+        lostAccessMailboxes.set(mailbox, { ...data });
+      }
+    }
+
+    const filteredHits = hits.filter((item) => {
+      const lostAccess = lostAccessMailboxes.get(item.mailbox);
+      if (!lostAccess) {
+        return true;
+      }
+      if (lostAccess.allAccessWasRemoved) {
+        return false;
+      }
+      return !lostAccess.folderIds.includes(item.parentFolderId);
+    });
 
     const hitsByMailbox = groupBy(filteredHits, (item) => item.mailbox);
 
@@ -167,8 +189,12 @@ export class MsGraphKqlSearchEmailsQuery {
     if (throttledMailboxes.size > 0) {
       summaryParts.push('Search was throttled for some mailboxes — results may be incomplete.');
     }
-    for (const mailbox of lostAccessMailboxes) {
-      summaryParts.push(`Could not access mailbox ${mailbox} — it was excluded from results.`);
+    for (const [mailbox, accessConfig] of lostAccessMailboxes) {
+      if (accessConfig.allAccessWasRemoved) {
+        summaryParts.push(`Could not access mailbox ${mailbox} — it was excluded from results.`);
+      } else {
+        summaryParts.push(`Could not access some folders in mailbox ${mailbox}.`);
+      }
     }
     for (const { mailbox, folder } of skippedFolders) {
       summaryParts.push(
@@ -188,35 +214,40 @@ export class MsGraphKqlSearchEmailsQuery {
   ): Promise<{
     hits: Hit[];
     retryRequests: GraphBatchRequest[];
-    lostAccessMailboxes: Set<string>;
+    lostAccessMailboxes: Map<string, { allAccessWasRemoved: boolean; folderIds: string[] }>;
     throttledMailboxes: Set<string>;
+    retryAfterMs: number;
   }> {
     const client = this.graphClientFactory.createClientForUser(userProfile.id);
-    const queue = [...requests];
+    let queue = [...requests];
     const hits: Hit[] = [];
     const retryRequests: GraphBatchRequest[] = [];
-    const lostAccessMailboxes = new Set<string>();
+    const lostAccessMailboxes = new Map<
+      string,
+      { allAccessWasRemoved: boolean; folderIds: string[] }
+    >();
     const throttledMailboxes = new Set<string>();
+    let retryAfterMs = -1;
 
     while (queue.length > 0) {
       const batch = queue.splice(0, 20);
 
+      const batchApiInput = batch.map((request) => {
+        const search = sanitizeKqlQuery(request.kqlQuery);
+        const base = request.folderId
+          ? `/users/${request.mailbox}/mailFolders/${request.folderId}/messages`
+          : `/users/${request.mailbox}/messages`;
+        return {
+          id: request.requestId,
+          method: 'GET',
+          url: `${base}?$search=${encodeURIComponent(search)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview&$top=${request.limit}`,
+          headers: { Prefer: 'outlook.body-content-type="text"' },
+        };
+      });
+
       let batchResponse: z.infer<typeof batchResponseSchema>;
       try {
-        const raw = await client.api('$batch').post({
-          requests: batch.map((request) => {
-            const search = sanitizeKqlQuery(request.kqlQuery);
-            const base = request.folderId
-              ? `/users/${request.mailbox}/mailFolders/${request.folderId}/messages`
-              : `/users/${request.mailbox}/messages`;
-            return {
-              id: request.requestId,
-              method: 'GET',
-              url: `${base}?$search=${encodeURIComponent(search)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview&$top=${request.limit}`,
-              headers: { Prefer: 'outlook.body-content-type="text"' },
-            };
-          }),
-        });
+        const raw = await client.api('$batch').post({ requests: batchApiInput });
         batchResponse = batchResponseSchema.parse(raw);
       } catch {
         retryRequests.push(...batch);
@@ -233,33 +264,48 @@ export class MsGraphKqlSearchEmailsQuery {
 
         if (status === 429 || status >= 500) {
           retryRequests.push(originalRequest);
-          if (status === 429) {
-            throttledMailboxes.add(originalRequest.mailbox);
+          throttledMailboxes.add(originalRequest.mailbox);
+          const retryAfterHeader =
+            subResponse.headers?.['Retry-After'] ?? subResponse.headers?.['retry-after'];
+          if (retryAfterHeader) {
+            const seconds = parseInt(retryAfterHeader, 10);
+            if (!Number.isNaN(seconds)) {
+              retryAfterMs = Math.max(retryAfterMs, seconds * 1000);
+            }
           }
           continue;
         }
 
         if (originalRequest.isDelegated && (status === 403 || status === 404)) {
-          if (!originalRequest.folderId) {
-            for (let i = queue.length - 1; i >= 0; i--) {
-              if (queue[i]!.mailbox === originalRequest.mailbox) {
-                queue.splice(i, 1);
-              }
-            }
-            lostAccessMailboxes.add(originalRequest.mailbox);
-            this.markAccountsNoFullAccessCommand
-              .run({ delegateUserId: userProfile.id, ownerEmail: originalRequest.mailbox })
-              .catch(() => undefined);
-          } else {
-            for (let i = queue.length - 1; i >= 0; i--) {
-              if (
-                queue[i]!.mailbox === originalRequest.mailbox &&
-                queue[i]!.folderId === originalRequest.folderId
-              ) {
-                queue.splice(i, 1);
-              }
-            }
+          // Remove delegated access.
+          await this.removeDelegatedAccessCommand.run({
+            delegateUserId: userProfile.id,
+            ownerEmail: originalRequest.mailbox,
+            where: !originalRequest.folderId
+              ? { fullAccess: true }
+              : { msGraphDirectoryId: originalRequest.folderId },
+          });
+
+          let item = lostAccessMailboxes.get(originalRequest.mailbox);
+          if (!item) {
+            item = { allAccessWasRemoved: false, folderIds: [] };
           }
+          if (originalRequest.folderId) {
+            item.folderIds.push(originalRequest.folderId);
+          } else {
+            item.allAccessWasRemoved = true;
+          }
+          lostAccessMailboxes.set(originalRequest.mailbox, item);
+
+          // Remove further requests which will request data from
+          const filterFunction = !originalRequest.folderId
+            ? (item: GraphBatchRequest): boolean =>
+                isNullish(item.folderId) && item.mailbox !== originalRequest.mailbox
+            : (item: GraphBatchRequest): boolean =>
+                item.folderId === originalRequest.folderId &&
+                item.mailbox !== originalRequest.mailbox;
+
+          queue = queue.filter(filterFunction);
           continue;
         }
 
@@ -305,7 +351,13 @@ export class MsGraphKqlSearchEmailsQuery {
       }
     }
 
-    return { hits, retryRequests, lostAccessMailboxes, throttledMailboxes };
+    return {
+      hits,
+      retryRequests,
+      lostAccessMailboxes,
+      throttledMailboxes,
+      retryAfterMs: retryAfterMs <= 0 ? 500 : retryAfterMs,
+    };
   }
 
   private mergeResults(

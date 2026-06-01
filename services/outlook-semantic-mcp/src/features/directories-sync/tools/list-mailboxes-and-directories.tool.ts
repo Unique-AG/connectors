@@ -8,7 +8,7 @@ import {
   ListMailboxesAndDirectoriesQuery,
   type UserDirectory,
   type UserMailbox,
-} from '../list-mailboxes-and-directories.query';
+} from '../../user-utils/list-mailboxes-and-directories.query';
 import { SyncDirectoriesCommand } from '../sync-directories.command';
 import { META } from './list-mailboxes-and-directories-tool.meta';
 
@@ -30,6 +30,7 @@ const UserDirectorySchema: z.ZodType<UserDirectory> = z.lazy(() =>
 );
 
 const UserMailboxSchema: z.ZodType<UserMailbox> = z.object({
+  ownerId: z.string().describe('Internal user profile ID of the mailbox owner.'),
   email: z
     .string()
     .nullable()
@@ -38,6 +39,11 @@ const UserMailboxSchema: z.ZodType<UserMailbox> = z.object({
     .string()
     .nullable()
     .describe('Display name of the mailbox owner, or null if unavailable.'),
+  hasFullAccess: z
+    .boolean()
+    .describe(
+      "True when the user has full delegated access to this mailbox (or it's their own), false when only specific folders were shared.",
+    ),
   isOwn: z
     .boolean()
     .describe("True for the user's own primary mailbox, false for delegated (shared) mailboxes."),

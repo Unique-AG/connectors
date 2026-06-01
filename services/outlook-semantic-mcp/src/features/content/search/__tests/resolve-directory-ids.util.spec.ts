@@ -4,7 +4,11 @@ import { resolveDirectoryIds } from '../resolve-directory-ids.util';
 const dirs = [
   { providerDirectoryId: 'id-inbox', displayName: 'Inbox', internalType: 'Inbox' },
   { providerDirectoryId: 'id-sent', displayName: 'Sent Items', internalType: 'Sent Items' },
-  { providerDirectoryId: 'id-custom', displayName: 'My Custom Folder', internalType: 'User Defined Directory' },
+  {
+    providerDirectoryId: 'id-custom',
+    displayName: 'My Custom Folder',
+    internalType: 'User Defined Directory',
+  },
 ];
 
 describe('resolveDirectoryIds', () => {
@@ -33,7 +37,10 @@ describe('resolveDirectoryIds', () => {
   });
 
   it('mix: one recognized + one unrecognized → both parts correct', () => {
-    const { resolvedIds, unrecognized } = resolveDirectoryIds(['Inbox', 'CompletelyUnknownFolder'], dirs);
+    const { resolvedIds, unrecognized } = resolveDirectoryIds(
+      ['Inbox', 'CompletelyUnknownFolder'],
+      dirs,
+    );
     expect(resolvedIds).toContain('id-inbox');
     expect(unrecognized).toContain('CompletelyUnknownFolder');
   });
@@ -48,7 +55,11 @@ describe('resolveDirectoryIds', () => {
     // Both orderings actually produce the same result: if system-id were first, user-id would
     // fail isNewItemBetter(user-id, system-id) and system-id would stay as winner.
     const dirsWithTie = [
-      { providerDirectoryId: 'user-id', displayName: 'My Folder', internalType: 'User Defined Directory' },
+      {
+        providerDirectoryId: 'user-id',
+        displayName: 'My Folder',
+        internalType: 'User Defined Directory',
+      },
       { providerDirectoryId: 'system-id', displayName: 'My Folder', internalType: 'Inbox' },
     ];
     const { resolvedIds } = resolveDirectoryIds(['My Folder'], dirsWithTie);

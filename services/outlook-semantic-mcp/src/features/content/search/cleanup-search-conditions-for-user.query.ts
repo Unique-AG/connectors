@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { clone, isNonNullish } from 'remeda';
 import { DRIZZLE, DrizzleDatabase, directories } from '~/db';
-import { SearchCondition } from './search-conditions.dto';
 import { resolveDirectoryIds } from './resolve-directory-ids.util';
+import { SearchCondition } from './search-conditions.dto';
 
 @Injectable()
 export class CleanupSearchConditionsForUserQuery {

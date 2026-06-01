@@ -58,7 +58,6 @@ describe('SearchEmailsInputSchema', () => {
   });
 });
 
-
 const testUserId = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 
 const OWN_EMAIL = 'own@example.com';

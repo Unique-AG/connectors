@@ -3,7 +3,11 @@ import { findBestMatch } from '~/utils/find-best-match';
 
 export function resolveDirectoryIds(
   rawIds: string[],
-  availableDirectories: Array<{ providerDirectoryId: string; displayName: string; internalType: string }>,
+  availableDirectories: Array<{
+    providerDirectoryId: string;
+    displayName: string;
+    internalType: string;
+  }>,
 ): { resolvedIds: string[]; unrecognized: string[] } {
   const resolvedIds: string[] = [];
   const unrecognized: string[] = [];

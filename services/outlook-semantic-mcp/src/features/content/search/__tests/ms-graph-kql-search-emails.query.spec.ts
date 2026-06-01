@@ -44,21 +44,26 @@ function createQuery(opts: {
   delegatedMailboxes?: string[];
   mockPost?: ReturnType<typeof vi.fn>;
   idTranslationMap?: Map<string, string>;
-  mockBuildResult?: { requests: GraphBatchRequest[]; skippedFolders: Array<{ mailbox: string; folder: string }> };
+  mockBuildResult?: {
+    requests: GraphBatchRequest[];
+    skippedFolders: Array<{ mailbox: string; folder: string }>;
+  };
 }) {
   const { delegatedMailboxes = [], mockPost, idTranslationMap = new Map(), mockBuildResult } = opts;
 
   // Build default mock result from delegatedMailboxes if mockBuildResult not explicitly provided
-  const defaultBuildResult: { requests: GraphBatchRequest[]; skippedFolders: Array<{ mailbox: string; folder: string }> } =
-    mockBuildResult ?? {
-      requests: [
-        makeRequest({ mailbox: OWN_EMAIL, kqlQuery: 'test', isDelegated: false }),
-        ...delegatedMailboxes.map((email) =>
-          makeRequest({ mailbox: email, kqlQuery: 'test', isDelegated: true }),
-        ),
-      ],
-      skippedFolders: [],
-    };
+  const defaultBuildResult: {
+    requests: GraphBatchRequest[];
+    skippedFolders: Array<{ mailbox: string; folder: string }>;
+  } = mockBuildResult ?? {
+    requests: [
+      makeRequest({ mailbox: OWN_EMAIL, kqlQuery: 'test', isDelegated: false }),
+      ...delegatedMailboxes.map((email) =>
+        makeRequest({ mailbox: email, kqlQuery: 'test', isDelegated: true }),
+      ),
+    ],
+    skippedFolders: [],
+  };
 
   const apiMock = { post: mockPost ?? vi.fn().mockResolvedValue({ responses: [] }) };
   const graphClientFactory = {
@@ -78,7 +83,7 @@ function createQuery(opts: {
     run: vi.fn().mockResolvedValue(defaultBuildResult),
   };
 
-  const markAccountsNoFullAccessCommand = {
+  const removeDelegatedAccessCommand = {
     run: vi.fn().mockResolvedValue(undefined),
   };
 
@@ -92,13 +97,13 @@ function createQuery(opts: {
     // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
     buildMsGraphKqlBatchRequestsQuery as any,
     // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
-    markAccountsNoFullAccessCommand as any,
+    removeDelegatedAccessCommand as any,
   );
 
   return {
     instance,
     apiMock,
-    markAccountsNoFullAccessCommand,
+    removeDelegatedAccessCommand,
     translateGraphIdsToImmutableIdsQuery,
     buildMsGraphKqlBatchRequestsQuery,
   };
@@ -253,16 +258,17 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           return Promise.resolve({ responses });
         });
 
-      const { instance, markAccountsNoFullAccessCommand } = createQuery({
+      const { instance, removeDelegatedAccessCommand } = createQuery({
         delegatedMailboxes: [DELEGATED_EMAIL],
         mockPost,
       });
 
       const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
-      expect(markAccountsNoFullAccessCommand.run).toHaveBeenCalledWith({
+      expect(removeDelegatedAccessCommand.run).toHaveBeenCalledWith({
         delegateUserId: OWN_USER_ID,
         ownerEmail: DELEGATED_EMAIL,
+        where: { fullAccess: true },
       });
       expect(results).toHaveLength(1);
       expect(results[0]?.sourceMailbox).toBe(OWN_EMAIL);
@@ -280,16 +286,17 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           return Promise.resolve({ responses });
         });
 
-      const { instance, markAccountsNoFullAccessCommand } = createQuery({
+      const { instance, removeDelegatedAccessCommand } = createQuery({
         delegatedMailboxes: [DELEGATED_EMAIL],
         mockPost,
       });
 
       await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
-      expect(markAccountsNoFullAccessCommand.run).toHaveBeenCalledWith({
+      expect(removeDelegatedAccessCommand.run).toHaveBeenCalledWith({
         delegateUserId: OWN_USER_ID,
         ownerEmail: DELEGATED_EMAIL,
+        where: { fullAccess: true },
       });
     });
 
@@ -302,13 +309,13 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           }),
         );
 
-      const { instance, markAccountsNoFullAccessCommand } = createQuery({
+      const { instance, removeDelegatedAccessCommand } = createQuery({
         mockPost: actualMockPost,
       });
 
       const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
-      expect(markAccountsNoFullAccessCommand.run).not.toHaveBeenCalled();
+      expect(removeDelegatedAccessCommand.run).not.toHaveBeenCalled();
       expect(results).toHaveLength(0);
     });
   });
@@ -360,11 +367,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       });
       const { instance } = createQuery({ delegatedMailboxes: [DELEGATED_EMAIL], mockPost });
 
-      const { results } = await instance.run(
-        testUserId,
-        [{ kqlQuery: 'test' }],
-        SEARCH_CONFIG,
-      );
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
       expect(results).toHaveLength(100);
     });
@@ -442,13 +445,13 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
   });
 
   describe('non-2xx response handling', () => {
-    it('skips sub-responses with non-2xx status without error', async () => {
+    it('skips sub-responses with 4xx status (not 403/404 delegated) without error', async () => {
       const mockPost = vi
         .fn()
         .mockImplementation(({ requests }: { requests: { id: string; url: string }[] }) => {
           const responses = requests.map((req) => ({
             id: req.id,
-            status: req.url.includes(OWN_EMAIL) ? 500 : 200,
+            status: req.url.includes(OWN_EMAIL) ? 400 : 200,
             body: { value: [] },
           }));
           return Promise.resolve({ responses });
@@ -523,9 +526,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const mockPost = makeSuccessPost({ [OWN_EMAIL]: [makeMessage('msg-no-folder')] });
       const { instance } = createQuery({
         mockBuildResult: {
-          requests: [
-            makeRequest({ mailbox: OWN_EMAIL, kqlQuery: 'test', isDelegated: false }),
-          ],
+          requests: [makeRequest({ mailbox: OWN_EMAIL, kqlQuery: 'test', isDelegated: false })],
           skippedFolders: [],
         },
         mockPost,
@@ -572,7 +573,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           return Promise.resolve({ responses });
         });
 
-      const { instance, markAccountsNoFullAccessCommand } = createQuery({
+      const { instance, removeDelegatedAccessCommand } = createQuery({
         mockBuildResult: {
           requests: [req1, req2],
           skippedFolders: [],
@@ -582,7 +583,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
       const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
-      expect(markAccountsNoFullAccessCommand.run).not.toHaveBeenCalled();
+      expect(removeDelegatedAccessCommand.run).toHaveBeenCalledWith({
+        delegateUserId: OWN_USER_ID,
+        ownerEmail: DELEGATED_EMAIL,
+        where: { msGraphDirectoryId: f1Id },
+      });
       expect(results.some((r) => r.msGraphMessageId === 'f2-msg')).toBe(true);
     });
 
@@ -612,7 +617,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           return Promise.resolve({ responses });
         });
 
-      const { instance, markAccountsNoFullAccessCommand } = createQuery({
+      const { instance, removeDelegatedAccessCommand } = createQuery({
         mockBuildResult: {
           requests: [req1, req2],
           skippedFolders: [],
@@ -622,10 +627,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
       const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
-      expect(markAccountsNoFullAccessCommand.run).toHaveBeenCalledOnce();
-      expect(markAccountsNoFullAccessCommand.run).toHaveBeenCalledWith({
+      expect(removeDelegatedAccessCommand.run).toHaveBeenCalledOnce();
+      expect(removeDelegatedAccessCommand.run).toHaveBeenCalledWith({
         delegateUserId: OWN_USER_ID,
         ownerEmail: DELEGATED_EMAIL,
+        where: { fullAccess: true },
       });
       expect(results.every((r) => r.sourceMailbox === OWN_EMAIL)).toBe(true);
     });
@@ -674,9 +680,19 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       // After 403, all remaining DELEGATED_EMAIL requests are drained from the queue.
       // Second batch chunk should contain only the OWN_EMAIL request.
       const delegatedRequests = Array.from({ length: 25 }, (_, i) =>
-        makeRequest({ mailbox: DELEGATED_EMAIL, isDelegated: true, kqlQuery: 'test', requestId: `del-${i}` }),
+        makeRequest({
+          mailbox: DELEGATED_EMAIL,
+          isDelegated: true,
+          kqlQuery: 'test',
+          requestId: `del-${i}`,
+        }),
       );
-      const ownRequest = makeRequest({ mailbox: OWN_EMAIL, isDelegated: false, kqlQuery: 'test', requestId: 'own-0' });
+      const ownRequest = makeRequest({
+        mailbox: OWN_EMAIL,
+        isDelegated: false,
+        kqlQuery: 'test',
+        requestId: 'own-0',
+      });
 
       const mockPost = vi
         .fn()
@@ -701,7 +717,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           });
         });
 
-      const { instance, markAccountsNoFullAccessCommand } = createQuery({
+      const { instance, removeDelegatedAccessCommand } = createQuery({
         mockPost,
         mockBuildResult: { requests: [...delegatedRequests, ownRequest], skippedFolders: [] },
       });
@@ -712,7 +728,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       const secondBatchRequests = mockPost.mock.calls[1]?.[0]?.requests as { url: string }[];
       expect(secondBatchRequests.every((r) => r.url.includes(OWN_EMAIL))).toBe(true);
       expect(secondBatchRequests.some((r) => r.url.includes(DELEGATED_EMAIL))).toBe(false);
-      expect(markAccountsNoFullAccessCommand.run).toHaveBeenCalledOnce();
+      expect(removeDelegatedAccessCommand.run).toHaveBeenCalledOnce();
     });
 
     it('searchSummary includes skipped folder name when build query returns skippedFolders', async () => {
