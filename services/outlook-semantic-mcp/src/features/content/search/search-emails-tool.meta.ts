@@ -142,9 +142,13 @@ export const META_MS_GRAPH = createMeta({
   systemPrompt: `Searches Outlook emails using Microsoft Graph KQL queries. Returns matched emails with metadata and full body content in the \`text\` field — answer questions about email content directly from \`text\` without calling \`open_email\` unless the user explicitly asks to open an email.
 
   By default search across ALL folders. Do not restrict to a specific folder unless the user asks.
+  To restrict a search to specific folders, use the \`directories\` field on the query object — do NOT put \`folder:\` inside the \`kqlQuery\` string (it is not a supported KQL property and is silently stripped).
+  Pass well-known folder names directly: "Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History".
+  Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized and will not return results.
+  For custom folders, call \`list_mailboxes_and_directories\` first to get the folder ID.
   After returning results, inform the user that they can narrow the search with more specific KQL terms if needed.
 
-  Build precise KQL queries using supported property filters: from:, to:, cc:, subject:, body:, received>=, received<=, hasAttachment:, category:, participants:. Do NOT use folder: — it is not supported.
+  Build precise KQL queries using supported property filters: from:, to:, cc:, subject:, body:, received>=, received<=, hasAttachment:, category:, participants:. Do NOT put folder: inside kqlQuery — it is not a supported KQL property and is silently stripped. Use the directories field instead.
   For entity/name mentions that may appear anywhere in the email (e.g. "emails mentioning UBS", "where Zach Greenwald appears"), always include a body: entry — e.g. body:UBS or body:"Zach Greenwald". Use participants: when the name may appear in any address field.
   Combine clauses with AND/OR for complex searches. You can run multiple KQL queries in parallel (up to 10) for broader coverage.
   If the response includes a "searchNotes", display it to the user after results — it contains context about the search run (e.g. excluded folders, partially unavailable mailboxes).
@@ -176,6 +180,9 @@ export const META_MS_GRAPH = createMeta({
   - Query 1: \`{ kqlQuery: "body:\\"Zach Greenwald\\"" }\`
   - Query 2: \`{ kqlQuery: "participants:\\"Zach Greenwald\\"" }\`
   Use body: for mentions in the email text and participants: for appearances in address fields.
+
+  **User asks "emails about the Q2 budget in my Inbox":**
+  - Query: \`{ kqlQuery: "subject:\\"Q2 budget\\"", directories: ["Inbox"] }\`
 
   ## Opening an email after search
   When the user asks to open, read, or see the full content of a specific email that appeared in the results, call \`open_email\` — pass the \`openEmailParams\` object from that result directly as the tool input. Do NOT tell the user you cannot access the email or that you lack mailbox access.`,
