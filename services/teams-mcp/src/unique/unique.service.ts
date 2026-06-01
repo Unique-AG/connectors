@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
@@ -99,7 +100,11 @@ export class UniqueService {
     );
 
     const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
-    const { subjectPath, datePath } = this.mapMeetingToRelativePaths(meeting.subject, meeting.date);
+    const { subjectPath, datePath } = this.mapMeetingToRelativePaths(
+      meeting.subject,
+      meeting.meetingId,
+      meeting.date,
+    );
 
     const parentScope = await this.scopeService.createScope(rootScopeId, subjectPath, false);
     span?.setAttribute('parent_scope_id', parentScope.id);
@@ -265,18 +270,37 @@ export class UniqueService {
 
   private mapMeetingToRelativePaths(
     subject: string,
+    meetingId: string,
     happenedAt: Date,
   ): { subjectPath: string; datePath: string } {
-    // Second-precision UTC timestamp (not just the calendar date) so multiple
-    // transcripts/recordings on the same day each get their own folder.
-    // `happenedAt` is the transcript's createdDateTime — the onlineMeeting
-    // startDateTime is the recurring series' master time and is identical for
-    // every occurrence, so it cannot be used here. ':' -> '-' keeps the path
-    // segment safe (the folder API treats ':' specially and splits on '/').
-    // e.g. "2024-01-15 14-30-45"
+    // Parent (subject) folder: human-readable subject plus a stable, path-safe
+    // suffix derived from the meetingId. Recurring occurrences of one series
+    // share the same meetingId (and subject) so they collapse into one folder
+    // as intended; two *different* meetings that happen to share a title get
+    // distinct folders, so their `meeting` externalIds no longer overwrite each
+    // other. e.g. "Weekly Sync (a1b2c3d4)"
+    const subjectPath = `${subject || 'Untitled Meeting'} (${this.shortHash(meetingId)})`;
+
+    // Child (session) folder: second-precision UTC timestamp (not just the
+    // calendar date) so multiple transcripts/recordings on the same day each
+    // get their own folder. `happenedAt` is the transcript's createdDateTime —
+    // the onlineMeeting startDateTime is the recurring series' master time and
+    // is identical for every occurrence, so it cannot be used here. ':' -> '-'
+    // keeps the segment path-safe (the folder API splits on '/'). e.g.
+    // "2024-01-15 14-30-45"
     const datePath = happenedAt.toISOString().slice(0, 19).replace('T', ' ').replaceAll(':', '-');
-    const subjectPath = subject || 'Untitled Meeting';
+
     return { subjectPath, datePath };
+  }
+
+  /**
+   * Short, stable, path-safe digest of an id — used to disambiguate folder
+   * names without leaking the raw Graph id (which can contain '/', '+', '='
+   * that would break folder paths). Deterministic, so re-ingestion re-uses the
+   * same folder.
+   */
+  private shortHash(value: string): string {
+    return createHash('sha256').update(value).digest('hex').slice(0, 8);
   }
 
   private buildContentMetadata(
