@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.12](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.11...teams-mcp@0.2.12) (2026-06-01)
+
+
+### Features
+
+* **charts,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** add admin consent redirect uris ([#577](https://github.com/Unique-AG/connectors/issues/577)) ([3e36a6d](https://github.com/Unique-AG/connectors/commit/3e36a6deea5e620b6e5316a7f3df0dd4fd5c74b3))
+
+
+### Bug Fixes
+
+* **teams-mcp:** remove inline networkPolicy chart defaults ([#581](https://github.com/Unique-AG/connectors/issues/581)) ([fe8c617](https://github.com/Unique-AG/connectors/commit/fe8c6172312c2be603fac26aa73f44dbe23e6140))
+
 ## [0.2.11](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.10...teams-mcp@0.2.11) (2026-05-18)
 
 
