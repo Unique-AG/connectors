@@ -299,7 +299,7 @@ export class MsGraphKqlSearchEmailsQuery {
             ? (item: GraphBatchRequest): boolean => item.mailbox !== originalRequest.mailbox
             : (item: GraphBatchRequest): boolean =>
                 !(
-                  item.mailbox === originalRequest.mailbox ||
+                  item.mailbox === originalRequest.mailbox &&
                   item.folderId === originalRequest.folderId
                 );
 
