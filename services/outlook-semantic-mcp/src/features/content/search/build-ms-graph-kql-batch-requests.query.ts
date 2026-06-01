@@ -6,7 +6,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import {
   ListMailboxesAndDirectoriesQuery,
   UserDirectory,
-} from '~/features/user-utils/list-mailboxes-and-directories.query';
+} from '~/features/delegated-access/queries/list-mailboxes-and-directories.query';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import { resolveDirectoryIds } from './resolve-directory-ids.util';

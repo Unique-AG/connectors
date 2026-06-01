@@ -636,7 +636,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       expect(results.every((r) => r.sourceMailbox === OWN_EMAIL)).toBe(true);
     });
 
-    it('429 in round 1 → request retried in round 2 → results included and searchSummary mentions throttled', async () => {
+    it('429 in round 1 → request retried in round 2 → results included and no searchSummary', async () => {
       const delReq = makeRequest({
         mailbox: DELEGATED_EMAIL,
         kqlQuery: 'test',
@@ -671,7 +671,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       );
 
       expect(results.some((r) => r.msGraphMessageId === 'throttled-msg')).toBe(true);
-      expect(searchSummary).toMatch(/throttled/i);
+      expect(searchSummary).toBeUndefined();
     });
 
     it('403 on full-access mailbox in first chunk drains that mailbox from subsequent chunks', async () => {

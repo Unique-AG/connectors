@@ -4,7 +4,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { ListMailboxesAndDirectoriesQuery } from '../../user-utils/list-mailboxes-and-directories.query';
+import { ListMailboxesAndDirectoriesQuery } from '../../delegated-access/queries/list-mailboxes-and-directories.query';
 import { SyncDirectoriesCommand } from '../sync-directories.command';
 import { META } from './list-mailboxes-and-directories-tool.meta';
 

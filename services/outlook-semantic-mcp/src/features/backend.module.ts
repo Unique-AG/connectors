@@ -11,6 +11,7 @@ import { SearchEmailsTool, SearchModule } from './content';
 import { OpenEmailModule } from './content/open-email/open-email.module';
 import { OpenEmailTool } from './content/open-email/open-email.tool';
 import { DelegatedAccessModule } from './delegated-access/delegated-access.module';
+import { DelegatedAccessUtilsModule } from './delegated-access/delegated-access-utils.module';
 import { DeleteInboxModule } from './delete-inbox/delete-inbox.module';
 import { DeleteInboxDataTool } from './delete-inbox/delete-inbox-data.tool';
 import { InboxDeletingQueryModule } from './delete-inbox/inbox-deleting-query.module';
@@ -92,6 +93,7 @@ export function registerBackendModule(): DynamicModule {
       AdminModule,
       DelegatedAccessModule,
       PostAuthorizationUserFlowModule,
+      DelegatedAccessUtilsModule,
     ],
     providers: [
       ...uniqueAndMicrosoftBackendCommonTools,
