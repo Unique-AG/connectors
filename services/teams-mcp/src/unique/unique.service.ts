@@ -3,10 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import type { UniqueConfigNamespaced } from '~/config';
+import { buildMeetingExternalId, buildOccurrenceExternalId } from './scope-external-id';
+import { TEAMS_SOURCE_KIND, TEAMS_SOURCE_NAME } from './unique.consts';
 import {
   type PublicScopeAccessSchema,
   ScopeAccessEntityType,
   ScopeAccessType,
+  SourceOwnerType,
   UniqueIngestionMode,
 } from './unique.dtos';
 import { UniqueContentService } from './unique-content.service';
@@ -28,6 +31,7 @@ export class UniqueService {
   @Span()
   public async ingestTranscript(
     meeting: {
+      meetingId: string;
       subject: string;
       date: Date;
       startDateTime: Date;
@@ -100,6 +104,12 @@ export class UniqueService {
     const parentScope = await this.scopeService.createScope(rootScopeId, subjectPath, false);
     span?.setAttribute('parent_scope_id', parentScope.id);
 
+    // Stamp the meeting (subject) scope with a deterministic externalId so it is
+    // externally managed (locked in the UI) and idempotently re-stampable.
+    await this.scopeService.updateScope(parentScope.id, {
+      externalId: buildMeetingExternalId(meeting.meetingId),
+    });
+
     const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
       entityId: p.id,
       entityType: ScopeAccessEntityType.User,
@@ -125,6 +135,12 @@ export class UniqueService {
     const childScope = await this.scopeService.createScope(parentScope.id, datePath, true);
     span?.setAttribute('child_scope_id', childScope.id);
 
+    // Stamp the occurrence (session) scope, anchored on the transcript id so each
+    // recording session gets a unique externalId even for same-day meetings.
+    await this.scopeService.updateScope(childScope.id, {
+      externalId: buildOccurrenceExternalId(meeting.meetingId, transcript.id),
+    });
+
     this.logger.log(
       { transcriptId: transcript.id, scopeId: childScope.id },
       'Beginning transcript upload to Unique system',
@@ -133,6 +149,9 @@ export class UniqueService {
     const transcriptUpload = await this.contentService.upsertContent({
       storeInternally: true,
       scopeId: childScope.id,
+      sourceKind: TEAMS_SOURCE_KIND,
+      sourceName: TEAMS_SOURCE_NAME,
+      sourceOwnerType: SourceOwnerType.Company,
       input: {
         key: transcript.id,
         mimeType: 'text/vtt',
@@ -151,6 +170,9 @@ export class UniqueService {
     await this.contentService.upsertContent({
       storeInternally: true,
       scopeId: childScope.id,
+      sourceKind: TEAMS_SOURCE_KIND,
+      sourceName: TEAMS_SOURCE_NAME,
+      sourceOwnerType: SourceOwnerType.Company,
       fileUrl: transcriptUpload.readUrl,
       input: {
         key: transcript.id,
@@ -177,6 +199,9 @@ export class UniqueService {
         const recordingUpload = await this.contentService.upsertContent({
           storeInternally: true,
           scopeId: childScope.id,
+          sourceKind: TEAMS_SOURCE_KIND,
+          sourceName: TEAMS_SOURCE_NAME,
+          sourceOwnerType: SourceOwnerType.Company,
           input: {
             key: recording.id,
             mimeType: 'video/mp4',
@@ -196,6 +221,9 @@ export class UniqueService {
         await this.contentService.upsertContent({
           storeInternally: true,
           scopeId: childScope.id,
+          sourceKind: TEAMS_SOURCE_KIND,
+          sourceName: TEAMS_SOURCE_NAME,
+          sourceOwnerType: SourceOwnerType.Company,
           fileUrl: recordingUpload.readUrl,
           input: {
             key: recording.id,
