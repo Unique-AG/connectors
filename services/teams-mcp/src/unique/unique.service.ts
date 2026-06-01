@@ -267,10 +267,16 @@ export class UniqueService {
     subject: string,
     happenedAt: Date,
   ): { subjectPath: string; datePath: string } {
-    // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
-    const formattedDate = happenedAt.toISOString().split('T').at(0)!;
+    // Second-precision UTC timestamp (not just the calendar date) so multiple
+    // transcripts/recordings on the same day each get their own folder.
+    // `happenedAt` is the transcript's createdDateTime — the onlineMeeting
+    // startDateTime is the recurring series' master time and is identical for
+    // every occurrence, so it cannot be used here. ':' -> '-' keeps the path
+    // segment safe (the folder API treats ':' specially and splits on '/').
+    // e.g. "2024-01-15 14-30-45"
+    const datePath = happenedAt.toISOString().slice(0, 19).replace('T', ' ').replaceAll(':', '-');
     const subjectPath = subject || 'Untitled Meeting';
-    return { subjectPath, datePath: formattedDate };
+    return { subjectPath, datePath };
   }
 
   private buildContentMetadata(
