@@ -751,6 +751,76 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     });
   });
 
+  describe('queue drain across batches', () => {
+    it('folder-level 403: only drains remaining requests for the failed folder, keeps sibling folder in queue', async () => {
+      // 21 requests for f1Id fill the first batch (20) and leave 1 in the queue.
+      // When the first f1Id request gets 403, the remaining f1Id request in the queue
+      // must be drained but the f2Id (sibling) request must survive to the second batch.
+      const f1Id = 'folder-f1';
+      const f2Id = 'folder-f2';
+
+      const f1Requests = Array.from({ length: 21 }, (_, i) =>
+        makeRequest({
+          mailbox: DELEGATED_EMAIL,
+          kqlQuery: 'test',
+          isDelegated: true,
+          folderId: f1Id,
+          requestId: `f1-${i}`,
+        }),
+      );
+      const f2Request = makeRequest({
+        mailbox: DELEGATED_EMAIL,
+        kqlQuery: 'test',
+        isDelegated: true,
+        folderId: f2Id,
+        requestId: 'f2-0',
+      });
+
+      const mockPost = vi
+        .fn()
+        .mockImplementationOnce(({ requests }: { requests: { id: string; url: string }[] }) => {
+          // First batch of 20: all f1Id — first one 403, rest 200 (already out of queue)
+          return Promise.resolve({
+            responses: requests.map((req, i) => ({
+              id: req.id,
+              status: i === 0 ? 403 : 200,
+              body: i === 0 ? {} : { value: [] },
+            })),
+          });
+        })
+        .mockImplementationOnce(({ requests }: { requests: { id: string; url: string }[] }) => {
+          // Second batch: should contain f2Id but NOT the leftover f1Id request
+          return Promise.resolve({
+            responses: requests.map((req) => ({
+              id: req.id,
+              status: 200,
+              body: { value: [makeMessage('f2-msg')] },
+            })),
+          });
+        });
+
+      const { instance, removeDelegatedAccessCommand } = createQuery({
+        mockBuildResult: { requests: [...f1Requests, f2Request], skippedFolders: [] },
+        mockPost,
+      });
+
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
+
+      const secondBatchRequests = mockPost.mock.calls[1]?.[0]?.requests as {
+        id: string;
+        url: string;
+      }[];
+      expect(secondBatchRequests.every((r) => r.url.includes(f2Id))).toBe(true);
+      expect(secondBatchRequests.some((r) => r.url.includes(f1Id))).toBe(false);
+      expect(results.some((r) => r.msGraphMessageId === 'f2-msg')).toBe(true);
+      expect(removeDelegatedAccessCommand.run).toHaveBeenCalledWith({
+        delegateUserId: OWN_USER_ID,
+        ownerEmail: DELEGATED_EMAIL,
+        where: { msGraphDirectoryId: f1Id },
+      });
+    });
+  });
+
   describe('retry round', () => {
     it('network error in round 1 → whole batch retried in round 2 → round 2 succeeds', async () => {
       let callCount = 0;

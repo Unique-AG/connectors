@@ -2,11 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { isNullish } from 'remeda';
 import { typeid } from 'typeid-js';
 import { DirectoryType } from '~/db';
-import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import {
   ListMailboxesAndDirectoriesQuery,
   UserDirectory,
 } from '~/features/delegated-access/queries/list-mailboxes-and-directories.query';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import { resolveDirectoryIds } from './resolve-directory-ids.util';
@@ -37,6 +37,7 @@ interface MailboxAccessInfo {
   ownerId: string;
   ownerEmail: string;
   hasFullAccess: boolean;
+  isOwn: boolean;
   directories: DirectoryInfo[];
 }
 
@@ -44,9 +45,13 @@ const getRequestId = () => typeid('batch_request').toString();
 
 const mapFoldersToDirectoryAccessFolders = (dirs: UserDirectory[]): DirectoryInfo[] => {
   return dirs.flatMap((dir): DirectoryInfo[] => {
+    const children = mapFoldersToDirectoryAccessFolders(dir.children ?? []);
+    if (!dir.canReadContent) {
+      return children;
+    }
     return [
       { displayName: dir.displayName, internalType: dir.internalType, providerDirectoryId: dir.id },
-      ...mapFoldersToDirectoryAccessFolders(dir.children ?? []),
+      ...children,
     ];
   });
 };
@@ -68,16 +73,15 @@ export class BuildMsGraphKqlBatchRequestsQuery {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const accessibleMailboxes = await this.listMailboxesAndDirectoriesQuery.run(userProfile.id);
     const mailboxAccessInfos: MailboxAccessInfo[] = accessibleMailboxes.map(
-      ({ id, email, hasFullAccess, folders }) => ({
+      ({ id, email, hasFullAccess, isOwn, folders }) => ({
         ownerId: id,
         ownerEmail: email,
         hasFullAccess,
+        isOwn,
         directories: mapFoldersToDirectoryAccessFolders(folders),
       }),
     );
 
-    const requests: GraphBatchRequest[] = [];
-    const skippedFolders: Array<{ mailbox: string; folder: string }> = [];
     const output: {
       requests: GraphBatchRequest[];
       skippedFolders: { mailbox: string; folder: string }[];
@@ -108,7 +112,7 @@ export class BuildMsGraphKqlBatchRequestsQuery {
       }
     }
 
-    return { requests, skippedFolders };
+    return output;
   }
 
   private addQueryToGraphBatchRequests({
@@ -128,13 +132,15 @@ export class BuildMsGraphKqlBatchRequestsQuery {
       return;
     }
 
+    const isDelegated = !mailboxAccessInfo.isOwn;
+
     if (!query.directories) {
       if (mailboxAccessInfo.hasFullAccess) {
         // The user has full access we can search in all directories at once.
         output.requests.push({
           requestId: getRequestId(),
           mailbox: mailboxAccessInfo.ownerEmail,
-          isDelegated: false,
+          isDelegated,
           kqlQuery: query.kqlQuery,
           limit,
         });
@@ -146,7 +152,7 @@ export class BuildMsGraphKqlBatchRequestsQuery {
         output.requests.push({
           requestId: getRequestId(),
           mailbox: mailboxAccessInfo.ownerEmail,
-          isDelegated: false,
+          isDelegated,
           folderId: providerDirectoryId,
           kqlQuery: query.kqlQuery,
           limit,
@@ -162,7 +168,7 @@ export class BuildMsGraphKqlBatchRequestsQuery {
       output.requests.push({
         requestId: getRequestId(),
         mailbox: mailboxAccessInfo.ownerEmail,
-        isDelegated: false,
+        isDelegated,
         kqlQuery: query.kqlQuery,
         limit,
         folderId,

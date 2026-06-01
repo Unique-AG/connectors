@@ -1,7 +1,7 @@
 import { createSmeared } from '@unique-ag/utils';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { groupBy, isNullish, unique } from 'remeda';
+import { groupBy, unique } from 'remeda';
 import * as z from 'zod';
 import { UserProfile } from '~/db';
 import {
@@ -296,11 +296,12 @@ export class MsGraphKqlSearchEmailsQuery {
 
           // Remove further requests which will request data from
           const filterFunction = !originalRequest.folderId
-            ? (item: GraphBatchRequest): boolean =>
-                isNullish(item.folderId) && item.mailbox !== originalRequest.mailbox
+            ? (item: GraphBatchRequest): boolean => item.mailbox !== originalRequest.mailbox
             : (item: GraphBatchRequest): boolean =>
-                item.folderId === originalRequest.folderId &&
-                item.mailbox !== originalRequest.mailbox;
+                !(
+                  item.mailbox === originalRequest.mailbox ||
+                  item.folderId === originalRequest.folderId
+                );
 
           queue = queue.filter(filterFunction);
           continue;
