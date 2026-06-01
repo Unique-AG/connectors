@@ -81,6 +81,6 @@
     "supertest": "7.1.4",
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
-    "vitest": "3.2.4"
+    "vitest": "4.1.0"
   }
 }
