@@ -1,17 +1,15 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
-import { typeid } from 'typeid-js';
-import { DRIZZLE, DirectoryType, DrizzleDatabase, directories } from '~/db';
-import { GetDelegatedAccessQuery } from '~/features/delegated-access/queries/get-delegates-access.query';
-import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
-import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { resolveDirectoryIds } from './resolve-directory-ids.util';
-import { Nullish } from '~/utils/nullish';
+import { Injectable } from '@nestjs/common';
 import { isNullish } from 'remeda';
+import { typeid } from 'typeid-js';
+import { DirectoryType } from '~/db';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import {
   ListMailboxesAndDirectoriesQuery,
   UserDirectory,
 } from '~/features/user-utils/list-mailboxes-and-directories.query';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { Nullish } from '~/utils/nullish';
+import { resolveDirectoryIds } from './resolve-directory-ids.util';
 
 export interface QueryInput {
   kqlQuery: string;
@@ -44,11 +42,11 @@ interface MailboxAccessInfo {
 
 const getRequestId = () => typeid('batch_request').toString();
 
-const flattenFolders = (dirs: UserDirectory[]): DirectoryInfo[] => {
+const mapFoldersToDirectoryAccessFolders = (dirs: UserDirectory[]): DirectoryInfo[] => {
   return dirs.flatMap((dir): DirectoryInfo[] => {
     return [
       { displayName: dir.displayName, internalType: dir.internalType, providerDirectoryId: dir.id },
-      ...flattenFolders(dir.children ?? []).flatMap(),
+      ...mapFoldersToDirectoryAccessFolders(dir.children ?? []),
     ];
   });
 };
@@ -56,7 +54,6 @@ const flattenFolders = (dirs: UserDirectory[]): DirectoryInfo[] => {
 @Injectable()
 export class BuildMsGraphKqlBatchRequestsQuery {
   public constructor(
-    @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly listMailboxesAndDirectoriesQuery: ListMailboxesAndDirectoriesQuery,
     private readonly getUserProfileQuery: GetUserProfileQuery,
   ) {}
@@ -71,16 +68,12 @@ export class BuildMsGraphKqlBatchRequestsQuery {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const accessibleMailboxes = await this.listMailboxesAndDirectoriesQuery.run(userProfile.id);
     const mailboxAccessInfos: MailboxAccessInfo[] = accessibleMailboxes.map(
-      ({ ownerId, email, hasFullAccess, folders }) => {
-        const foldersFlat = flattenFolders(folders);
-
-        return {
-          ownerId,
-          ownerEmail: email,
-          hasFullAccess,
-          directories: foldersFlat,
-        };
-      },
+      ({ id, email, hasFullAccess, folders }) => ({
+        ownerId: id,
+        ownerEmail: email,
+        hasFullAccess,
+        directories: mapFoldersToDirectoryAccessFolders(folders),
+      }),
     );
 
     const requests: GraphBatchRequest[] = [];
@@ -137,6 +130,7 @@ export class BuildMsGraphKqlBatchRequestsQuery {
 
     if (!query.directories) {
       if (mailboxAccessInfo.hasFullAccess) {
+        // The user has full access we can search in all directories at once.
         output.requests.push({
           requestId: getRequestId(),
           mailbox: mailboxAccessInfo.ownerEmail,
@@ -147,6 +141,7 @@ export class BuildMsGraphKqlBatchRequestsQuery {
         return;
       }
 
+      // Since we do not have full access we have to search in every folder individually.
       for (const { providerDirectoryId } of mailboxAccessInfo.directories) {
         output.requests.push({
           requestId: getRequestId(),
@@ -160,6 +155,8 @@ export class BuildMsGraphKqlBatchRequestsQuery {
       return;
     }
 
+    // Since we filter based on directories we do a fuzzy match on directory ids to resolve them properly for the
+    // api calls.
     const resolved = resolveDirectoryIds(query.directories, mailboxAccessInfo.directories);
     for (const folderId of resolved.resolvedIds) {
       output.requests.push({

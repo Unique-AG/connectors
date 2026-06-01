@@ -1,11 +1,12 @@
+import assert from 'node:assert';
 import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish, unique } from 'remeda';
 import {
-  DRIZZLE,
   type DirectoryType,
+  DRIZZLE,
   type DrizzleDatabase,
   delegatedAccessAccounts,
   delegatedAccessDirectories,
@@ -30,9 +31,11 @@ export interface UserDirectory {
 }
 
 export interface UserMailbox {
-  email: string | null;
+  id: string;
+  email: string;
   displayName: string | null;
   isOwn: boolean;
+  hasFullAccess: boolean;
   folders: UserDirectory[];
 }
 
@@ -48,6 +51,7 @@ export class ListMailboxesAndDirectoriesQuery {
     const ownProfile = await this.db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });
+    assert.ok(ownProfile, `Profile could not be found for user: ${userProfileId}`);
 
     // Fetch own directories
     const ownDirectories = await this.db.query.directories.findMany({
@@ -69,8 +73,10 @@ export class ListMailboxesAndDirectoriesQuery {
     });
 
     const ownMailbox: UserMailbox = {
-      email: ownProfile?.email ?? null,
-      displayName: ownProfile?.displayName ?? null,
+      email: `${ownProfile.email ?? ''}`,
+      displayName: ownProfile.displayName ?? null,
+      id: ownProfile.id,
+      hasFullAccess: true,
       isOwn: true,
       folders: ownTree,
     };
@@ -130,6 +136,7 @@ export class ListMailboxesAndDirectoriesQuery {
 
     return this.mapDirectoriesInfoToMailboses({
       directorisInfo: result.rows,
+      hasFullAccess: false,
       readableProviderDirectoryIds: new Set(
         result.rows.filter((r) => r.isReadable).map((r) => r.dirProviderDirectoryId),
       ),
@@ -167,6 +174,7 @@ export class ListMailboxesAndDirectoriesQuery {
 
     return this.mapDirectoriesInfoToMailboses({
       directorisInfo: fullAccessRows,
+      hasFullAccess: true,
       readableProviderDirectoryIds: new Set(
         fullAccessRows.map((item) => item.dirProviderDirectoryId),
       ),
@@ -176,7 +184,9 @@ export class ListMailboxesAndDirectoriesQuery {
   private mapDirectoriesInfoToMailboses({
     directorisInfo,
     readableProviderDirectoryIds,
+    hasFullAccess,
   }: {
+    hasFullAccess: boolean;
     readableProviderDirectoryIds: Set<string>;
     directorisInfo: DirectoryInfoRow[];
   }): UserMailbox[] {
@@ -204,13 +214,15 @@ export class ListMailboxesAndDirectoriesQuery {
       });
     }
     const mailboses: UserMailbox[] = [];
-    for (const [, ownerInfo] of ownerDirs) {
+    for (const [ownerId, ownerInfo] of ownerDirs) {
       const { directoryTree } = this.buildTree({
         allDirectories: ownerInfo.dirs,
         isReadable: (item) => readableProviderDirectoryIds.has(item.providerDirectoryId),
       });
       mailboses.push({
-        email: ownerInfo.email,
+        id: ownerId,
+        hasFullAccess,
+        email: `${ownerInfo.email ?? ''}`,
         displayName: ownerInfo.displayName,
         isOwn: false,
         folders: directoryTree,

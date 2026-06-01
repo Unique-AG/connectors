@@ -106,10 +106,7 @@ export class MsGraphKqlSearchEmailsQuery {
 
     const hits = [...round1.hits, ...round2.hits];
 
-    const throttledMailboxes = new Set([
-      ...round1.throttledMailboxes,
-      ...round2.throttledMailboxes,
-    ]);
+    const throttledMailboxes = round2.throttledMailboxes;
 
     const lostAccessMailboxes = new Map<
       string,

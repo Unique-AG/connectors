@@ -4,15 +4,25 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import {
-  ListMailboxesAndDirectoriesQuery,
-  type UserDirectory,
-  type UserMailbox,
-} from '../../user-utils/list-mailboxes-and-directories.query';
+import { ListMailboxesAndDirectoriesQuery } from '../../user-utils/list-mailboxes-and-directories.query';
 import { SyncDirectoriesCommand } from '../sync-directories.command';
 import { META } from './list-mailboxes-and-directories-tool.meta';
 
 const InputSchema = z.object({});
+
+export interface UserDirectory {
+  id: string;
+  displayName: string;
+  canReadContent: boolean;
+  children: UserDirectory[];
+}
+
+export interface UserMailbox {
+  email: string | null;
+  displayName: string | null;
+  isOwn: boolean;
+  folders: UserDirectory[];
+}
 
 const UserDirectorySchema: z.ZodType<UserDirectory> = z.lazy(() =>
   z.object({
@@ -30,7 +40,6 @@ const UserDirectorySchema: z.ZodType<UserDirectory> = z.lazy(() =>
 );
 
 const UserMailboxSchema: z.ZodType<UserMailbox> = z.object({
-  ownerId: z.string().describe('Internal user profile ID of the mailbox owner.'),
   email: z
     .string()
     .nullable()
@@ -39,11 +48,6 @@ const UserMailboxSchema: z.ZodType<UserMailbox> = z.object({
     .string()
     .nullable()
     .describe('Display name of the mailbox owner, or null if unavailable.'),
-  hasFullAccess: z
-    .boolean()
-    .describe(
-      "True when the user has full delegated access to this mailbox (or it's their own), false when only specific folders were shared.",
-    ),
   isOwn: z
     .boolean()
     .describe("True for the user's own primary mailbox, false for delegated (shared) mailboxes."),
@@ -110,7 +114,7 @@ export class ListMailboxesAndDirectoriesTool {
     return {
       success: true,
       message: 'Directories available',
-      mailboxes,
+      mailboxes: mailboxes.map((item) => UserMailboxSchema.parse(item)),
     };
   }
 }
