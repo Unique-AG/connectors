@@ -1,8 +1,7 @@
 import { createSmeared } from '@unique-ag/utils';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { chunk, filter, groupBy, pipe } from 'remeda';
-import { typeid } from 'typeid-js';
+import { groupBy } from 'remeda';
 import * as z from 'zod';
 import { UserProfile } from '~/db';
 import {
@@ -19,7 +18,11 @@ import { NonNullishProps } from '~/utils/non-nullish-props';
 import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 import { MsGraphSearchConfig } from './search.config';
-import { GetDelegatedAccessQuery } from '~/features/delegated-access/queries/get-delegates-access.query';
+import {
+  BuildMsGraphKqlBatchRequestsQuery,
+  GraphBatchRequest,
+  QueryInput,
+} from './build-ms-graph-kql-batch-requests.query';
 
 const batchResponseSchema = z.object({
   responses: z.array(
@@ -50,14 +53,6 @@ const messageSchema = z.object({
   ),
 });
 
-interface GraphBatchRequest {
-  requestId: string;
-  mailbox: string;
-  isDelegated: boolean;
-  kqlQuery: string;
-  limit: number;
-}
-
 interface Hit {
   restId: string;
   mailbox: string;
@@ -70,12 +65,6 @@ interface Hit {
   text: string;
 }
 
-interface QueryInput {
-  kqlQuery: string;
-  limit?: number;
-  mailbox?: string | null | undefined;
-}
-
 @Injectable()
 export class MsGraphKqlSearchEmailsQuery {
   private readonly logger = new Logger(MsGraphKqlSearchEmailsQuery.name);
@@ -84,7 +73,7 @@ export class MsGraphKqlSearchEmailsQuery {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly translateGraphIdsToImmutableIdsQuery: TranslateGraphIdsToImmutableIdsQuery,
-    private readonly getDelegatedAccessQuery: GetDelegatedAccessQuery,
+    private readonly buildMsGraphKqlBatchRequestsQuery: BuildMsGraphKqlBatchRequestsQuery,
     private readonly markAccountsNoFullAccessCommand: MarkAccountsNoFullAccessCommand,
   ) {}
 
@@ -96,12 +85,10 @@ export class MsGraphKqlSearchEmailsQuery {
     outputTimeZone?: string,
   ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const msGraphBatchRequest: GraphBatchRequest[] = await this.translateQueriesToBatchRequests({
-      userProfile,
-      queries,
-    });
+    const { requests: allRequests, skippedFolders } =
+      await this.buildMsGraphKqlBatchRequestsQuery.run(userProfileId, queries);
 
-    if (!msGraphBatchRequest.length) {
+    if (!allRequests.length) {
       return {
         results: [],
         searchSummary: [
@@ -111,23 +98,30 @@ export class MsGraphKqlSearchEmailsQuery {
       };
     }
 
-    const fetchResult = await this.fetchFromMicrosoft({
-      userProfile,
-      batchRequests: msGraphBatchRequest,
-      searchConfig,
-      outputTimeZone,
-    });
-    if (!fetchResult.success) {
-      return { results: [], searchSummary: fetchResult.searchSummary };
-    }
+    const round1 = await this.executeBatchRound(allRequests, userProfile, outputTimeZone);
+    const round2 = await this.executeBatchRound(round1.retryRequests, userProfile, outputTimeZone);
 
-    const hitsByMailbox = groupBy(fetchResult.hits, (item) => item.mailbox);
+    const hits = [...round1.hits, ...round2.hits];
+
+    const throttledMailboxes = new Set([
+      ...round1.throttledMailboxes,
+      ...round2.throttledMailboxes,
+    ]);
+    const lostAccessMailboxes = new Set([
+      ...round1.lostAccessMailboxes,
+      ...round2.lostAccessMailboxes,
+    ]);
+
+    const filteredHits = hits.filter((item) => !lostAccessMailboxes.has(item.mailbox));
+
+    const hitsByMailbox = groupBy(filteredHits, (item) => item.mailbox);
+
     const idsTranslationMaps = new Map<string, Map<string, string>>(
       await Promise.all(
-        Object.entries(hitsByMailbox).map(async ([mailbox, hits]) => {
+        Object.entries(hitsByMailbox).map(async ([mailbox, mailboxHits]) => {
           const translationMap = await this.translateGraphIdsToImmutableIdsQuery.run({
             userProfileId: userProfile.id,
-            ids: hits.map(({ restId }) => restId),
+            ids: mailboxHits.map(({ restId }) => restId),
             ownerEmail: mailbox === userProfile.email ? undefined : mailbox,
           });
           return [mailbox, translationMap] as const;
@@ -137,7 +131,7 @@ export class MsGraphKqlSearchEmailsQuery {
 
     const results: SearchEmailResult[] = [];
 
-    for (const hit of fetchResult.hits) {
+    for (const hit of this.mergeResults(hitsByMailbox, searchConfig)) {
       const translationMap = idsTranslationMaps.get(hit.mailbox);
       const translatedId = translationMap?.get(hit.restId);
       const idIsImmutable = translatedId !== undefined;
@@ -168,123 +162,65 @@ export class MsGraphKqlSearchEmailsQuery {
       }
     }
 
-    return { results, searchSummary: undefined };
+    const summaryParts: string[] = [];
+
+    if (throttledMailboxes.size > 0) {
+      summaryParts.push('Search was throttled for some mailboxes — results may be incomplete.');
+    }
+    for (const mailbox of lostAccessMailboxes) {
+      summaryParts.push(`Could not access mailbox ${mailbox} — it was excluded from results.`);
+    }
+    for (const { mailbox, folder } of skippedFolders) {
+      summaryParts.push(
+        `Folder '${folder}' in mailbox ${mailbox} was not recognized and was excluded.`,
+      );
+    }
+
+    const searchSummary = summaryParts.length > 0 ? summaryParts.join('\n') : undefined;
+
+    return { results, searchSummary };
   }
 
-  private async translateQueriesToBatchRequests({
-    userProfile,
-    queries,
-  }: {
-    queries: Array<QueryInput>;
-    userProfile: NonNullishProps<UserProfile, 'email'>;
-  }) {
-    const delegatedAccesses = await this.getDelegatedAccessQuery.run(userProfile.id);
-    const fullDelegatedAccessToMailboxes = delegatedAccesses.filter(
-      (item) => item.hasFullDelegatedAccess,
-    );
-    const getRequestId = () => typeid(`batch_request`).toString();
-
-    return queries.flatMap((query): GraphBatchRequest[] => {
-      const limit = query.limit ?? 100;
-      const { mailbox } = query;
-
-      if (mailbox) {
-        if (mailbox === userProfile.email) {
-          return [
-            {
-              requestId: getRequestId(),
-              mailbox: userProfile.email,
-              isDelegated: false,
-              kqlQuery: query.kqlQuery,
-              limit,
-            },
-          ];
-        }
-
-        const foundMailbox = fullDelegatedAccessToMailboxes.find(
-          ({ ownerUserEmail }) => mailbox === ownerUserEmail,
-        );
-        if (!foundMailbox) {
-          return [];
-        }
-
-        return [
-          {
-            requestId: getRequestId(),
-            mailbox: foundMailbox.ownerUserEmail,
-            isDelegated: true,
-            kqlQuery: query.kqlQuery,
-            limit,
-          },
-        ];
-      }
-
-      // For safety to not expload the number of request we cap the delegated access search to 25. 25 Is not an arbitrary number
-      // Microsoft documents that a exchange user can have delegated access to at most 25 other inboxes.
-      const delegatesToFilter = fullDelegatedAccessToMailboxes.slice(0, 25);
-      return [
-        {
-          requestId: getRequestId(),
-          mailbox: userProfile.email,
-          isDelegated: false,
-          kqlQuery: query.kqlQuery,
-          limit,
-        },
-        ...delegatesToFilter.map(({ ownerUserEmail }) => ({
-          requestId: getRequestId(),
-          mailbox: ownerUserEmail,
-          isDelegated: true,
-          kqlQuery: query.kqlQuery,
-          limit,
-        })),
-      ];
-    });
-  }
-
-  private async fetchFromMicrosoft({
-    userProfile,
-    batchRequests,
-    searchConfig,
-    outputTimeZone,
-  }: {
-    userProfile: NonNullishProps<UserProfile, 'email'>;
-    batchRequests: GraphBatchRequest[];
-    searchConfig: MsGraphSearchConfig;
-    outputTimeZone: string | undefined;
-  }): Promise<
-    | {
-        success: false;
-        searchSummary: string;
-      }
-    | {
-        success: true;
-        hits: Hit[];
-      }
-  > {
+  private async executeBatchRound(
+    requests: GraphBatchRequest[],
+    userProfile: NonNullishProps<UserProfile, 'email'>,
+    outputTimeZone: string | undefined,
+  ): Promise<{
+    hits: Hit[];
+    retryRequests: GraphBatchRequest[];
+    lostAccessMailboxes: Set<string>;
+    throttledMailboxes: Set<string>;
+  }> {
     const client = this.graphClientFactory.createClientForUser(userProfile.id);
-    const mailboxesWhichLostAccess = new Set<string>();
-    const allHits: Hit[] = [];
+    const queue = [...requests];
+    const hits: Hit[] = [];
+    const retryRequests: GraphBatchRequest[] = [];
+    const lostAccessMailboxes = new Set<string>();
+    const throttledMailboxes = new Set<string>();
 
-    for (const batch of chunk(batchRequests, 20)) {
+    while (queue.length > 0) {
+      const batch = queue.splice(0, 20);
+
       let batchResponse: z.infer<typeof batchResponseSchema>;
       try {
         const raw = await client.api('$batch').post({
           requests: batch.map((request) => {
             const search = sanitizeKqlQuery(request.kqlQuery);
+            const base = request.folderId
+              ? `/users/${request.mailbox}/mailFolders/${request.folderId}/messages`
+              : `/users/${request.mailbox}/messages`;
             return {
               id: request.requestId,
               method: 'GET',
-              url: `/users/${request.mailbox}/messages?$search=${encodeURIComponent(search)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview&$top=${request.limit}`,
+              url: `${base}?$search=${encodeURIComponent(search)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview&$top=${request.limit}`,
               headers: { Prefer: 'outlook.body-content-type="text"' },
             };
           }),
         });
         batchResponse = batchResponseSchema.parse(raw);
       } catch {
-        return {
-          success: false,
-          searchSummary: 'KQL search is currently unavailable; results were not returned.',
-        };
+        retryRequests.push(...batch);
+        continue;
       }
 
       for (const subResponse of batchResponse.responses) {
@@ -295,11 +231,35 @@ export class MsGraphKqlSearchEmailsQuery {
 
         const status = subResponse.status;
 
+        if (status === 429 || status >= 500) {
+          retryRequests.push(originalRequest);
+          if (status === 429) {
+            throttledMailboxes.add(originalRequest.mailbox);
+          }
+          continue;
+        }
+
         if (originalRequest.isDelegated && (status === 403 || status === 404)) {
-          mailboxesWhichLostAccess.add(originalRequest.mailbox);
-          this.markAccountsNoFullAccessCommand
-            .run({ delegateUserId: userProfile.id, ownerEmail: originalRequest.mailbox })
-            .catch(() => undefined);
+          if (!originalRequest.folderId) {
+            for (let i = queue.length - 1; i >= 0; i--) {
+              if (queue[i]!.mailbox === originalRequest.mailbox) {
+                queue.splice(i, 1);
+              }
+            }
+            lostAccessMailboxes.add(originalRequest.mailbox);
+            this.markAccountsNoFullAccessCommand
+              .run({ delegateUserId: userProfile.id, ownerEmail: originalRequest.mailbox })
+              .catch(() => undefined);
+          } else {
+            for (let i = queue.length - 1; i >= 0; i--) {
+              if (
+                queue[i]!.mailbox === originalRequest.mailbox &&
+                queue[i]!.folderId === originalRequest.folderId
+              ) {
+                queue.splice(i, 1);
+              }
+            }
+          }
           continue;
         }
 
@@ -329,7 +289,7 @@ export class MsGraphKqlSearchEmailsQuery {
         }
 
         for (const msg of parsed.data.value) {
-          allHits.push({
+          hits.push({
             restId: msg.id,
             mailbox: originalRequest.mailbox,
             isDelegated: originalRequest.isDelegated,
@@ -345,13 +305,7 @@ export class MsGraphKqlSearchEmailsQuery {
       }
     }
 
-    const results = pipe(
-      allHits,
-      filter((item) => !mailboxesWhichLostAccess.has(item.mailbox)),
-      groupBy((item) => item.mailbox),
-    );
-
-    return { success: true, hits: this.mergeResults(results, searchConfig) };
+    return { hits, retryRequests, lostAccessMailboxes, throttledMailboxes };
   }
 
   private mergeResults(
@@ -371,7 +325,7 @@ export class MsGraphKqlSearchEmailsQuery {
           indicesMap.delete(mailbox);
           continue;
         }
-        const item = itemsList?.[index];
+        const item = itemsList[index];
         if (!item) {
           indicesMap.delete(mailbox);
           continue;
