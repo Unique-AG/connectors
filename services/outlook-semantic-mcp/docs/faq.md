@@ -22,6 +22,7 @@
   - [Who has access to a shared inbox?](#Who-has-access-to-a-shared-inbox?)
   - [What happens with delegated access?](#What-happens-with-delegated-access?)
   - [When shared inbox access is revoked, are previously ingested emails still accessible?](#When-shared-inbox-access-is-revoked,-are-previously-ingested-emails-still-accessible?)
+  - [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
 - [Supported Email Attachment Types](#Supported-Email-Attachment-Types)
 - [Tool Usage](#Tool-Usage)
   - [How does search_emails search?](#How-does-search_emails-search?)
@@ -191,9 +192,9 @@ In Mode B (`MicrosoftGraph`), there is no inbox data to delete — `delete_inbox
 > Ingestion never occurs in Mode B (`MicrosoftGraph`) regardless of
 > `DELEGATED_ACCESS_SCAN`. The discovery job runs in both modes when enabled.
 > In Mode B, only delegates with **full mailbox access** can search delegated
-> mailboxes — honouring folder-level delegations would require querying every
-> accessible folder individually, which is not implemented due to API rate
-> limits.
+> mailboxes — Microsoft Graph's `$search` parameter requires full mailbox
+> access and returns HTTP 403 for any search against a partially-delegated
+> mailbox. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
 
 ### How do I set up delegated access?
 
@@ -223,11 +224,11 @@ records delegated mailbox relationships (`granularAccess` is not supported in
 Mode B — use `fullAccessOnly`). When `search_emails` is called, it queries each
 discovered delegated mailbox via a live Microsoft Graph KQL search alongside the
 user's own mailbox. Only delegates with **full mailbox access** can search
-delegated mailboxes in Mode B — honouring folder-level delegations would require
-querying every accessible folder individually, which is not implemented due to
-API rate limits. Microsoft Graph enforces permissions at query time — if the user no
-longer has access in Microsoft 365, that query returns no results. No ingestion
-occurs.
+delegated mailboxes in Mode B — Microsoft Graph's `$search` parameter requires full
+mailbox access and returns HTTP 403 for any search against a partially-delegated
+mailbox. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
+Microsoft Graph enforces permissions at query time — if the user no longer has
+access in Microsoft 365, that query returns no results. No ingestion occurs.
 
 **See also:** [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
 
@@ -272,10 +273,10 @@ only considers connected users, so if the owner has not connected their account
 there is nothing to discover or search. Each `search_emails` call queries the
 discovered delegated mailboxes via live Microsoft Graph KQL in addition to the
 user's own mailbox. **Only full mailbox access is supported in Mode B** —
-honouring folder-level delegations would require querying every accessible
-folder individually, which is not implemented due to API rate limits. Delegates
-who only have folder-level access to a mailbox cannot search it in Mode B. Folder filtering via `directories` is not supported in Mode B regardless
-of delegation.
+Microsoft Graph's `$search` parameter requires full mailbox access and returns
+HTTP 403 for any search against a mailbox where you only have folder-level access.
+Delegates who only have folder-level access to a mailbox cannot search it in Mode B
+at all. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
 
 **See also:** [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
 
@@ -324,6 +325,23 @@ longer include the revoked mailbox.
 
 **See also:** [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
 
+---
+
+### Why can't I search emails in a mailbox my colleague shared folders from?
+
+**Answer:** This is a known Microsoft Graph API limitation that affects **Mode B (`MicrosoftGraph`) only**.
+
+When a colleague shares individual folders with you (but has not granted you Full Access to their entire mailbox), Microsoft Graph returns HTTP 403 to any keyword search (`$search`) against that mailbox — regardless of whether you specify a folder or not. The `$search` parameter requires full mailbox access; there is no Microsoft Graph API that supports keyword search in a partially-delegated mailbox. The connector detects the 403, skips that mailbox entirely, and includes a notice in the search response:
+
+> Could not search in mailbox colleague@example.com — Microsoft does not offer an API to search in shared folders from this mailbox.
+
+**Workaround options:**
+
+- **Get Full Access.** Ask your colleague (or an Exchange administrator) to grant you Full Access (Read & Manage) to their mailbox. This allows `$search` queries against the entire mailbox, including the previously shared folders.
+- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, connect it to the MCP as its own account, and grant Full Access to everyone who needs to search it. See [Shared inbox configured as a normal inbox](#3-shared-inbox-configured-as-a-normal-inbox).
+
+**See also:** [Features — Known Limitations](./technical/features.md#known-limitations) — [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
+
 
 ## Supported Email Attachment Types
 
@@ -351,7 +369,7 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 
 **Mode A (`MicrosoftGraphAndUniqueApi`):** `search_emails` runs two searches in parallel — semantic search against the Unique knowledge base and a KQL keyword search against Microsoft Graph — then merges and deduplicates the results. It supports natural-language queries and returns semantically relevant results even when exact keywords do not match. The input requires two arrays: `uniqueSemanticSearchQueries` (semantic, 1–10 entries) and `msGraphKeywordSearchQueries` (KQL, 1–10 entries), both addressing the same user question from different angles. A `limit` parameter on each entry (100–200 for semantic, 1–100 for KQL) controls the maximum per-query results. Search results may be incomplete while full sync is in progress — a `syncWarning` is returned in that case.
 
-**Mode B (`MicrosoftGraph`):** `search_emails` calls the Microsoft Graph Search API directly using KQL queries only. Only `msGraphKeywordSearchQueries` is accepted. There is no semantic search and no Knowledge Base interaction. Folder filtering is not supported.
+**Mode B (`MicrosoftGraph`):** `search_emails` queries Microsoft Graph directly using KQL keyword search only. Only `msGraphKeywordSearchQueries` is accepted. There is no semantic search and no Knowledge Base interaction. Folder filtering via the `directories` field is supported for your own mailbox and for mailboxes where you have Full Access delegation. Search is **not supported at all** for mailboxes where you only have folder-level (partial) access — Microsoft Graph rejects any search request against such mailboxes. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
 
 **See also:** [Tools — search_emails](./technical/tools.md#search_emails)
 
@@ -381,7 +399,7 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 }
 ```
 
-**Mode B (`MicrosoftGraph`) limitation:** Folder filtering is not supported. The Microsoft Graph Search API does not expose a folder-scoped KQL predicate.
+**Mode B (`MicrosoftGraph`):** Folder filtering is supported for your own mailbox and for mailboxes where you have Full Access delegation. Pass the folder ID (from `list_mailboxes_and_directories`) or a well-known name in the `directories` field of the relevant `msGraphKeywordSearchQueries` entry. Note: if you only have folder-level (partial) access to a mailbox, search does not work against it at all — not just when filtering by folder. The response will include a notice and no results are returned from that mailbox. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
 
 **See also:** [Tools — list_mailboxes_and_directories](./technical/tools.md#list_mailboxes_and_directories) — [Tools — search_emails](./technical/tools.md#search_emails)
 
