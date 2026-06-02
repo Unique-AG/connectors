@@ -1,7 +1,7 @@
 import { createSmeared } from '@unique-ag/utils';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { groupBy, unique } from 'remeda';
+import { groupBy } from 'remeda';
 import * as z from 'zod';
 import { UserProfile } from '~/db';
 import {
@@ -87,8 +87,11 @@ export class MsGraphKqlSearchEmailsQuery {
     outputTimeZone?: string,
   ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const { requests: allRequests, skippedFolders } =
-      await this.buildMsGraphKqlBatchRequestsQuery.run(userProfileId, queries);
+    const {
+      requests: allRequests,
+      skippedFolders,
+      queriedMailboxesWithoutFullAccess,
+    } = await this.buildMsGraphKqlBatchRequestsQuery.run(userProfileId, queries);
 
     if (!allRequests.length) {
       return {
@@ -108,30 +111,12 @@ export class MsGraphKqlSearchEmailsQuery {
 
     const throttledMailboxes = round2.throttledMailboxes;
 
-    const lostAccessMailboxes = new Map<
-      string,
-      { allAccessWasRemoved: boolean; folderIds: string[] }
-    >();
-    for (const [mailbox, data] of [...round1.lostAccessMailboxes, ...round2.lostAccessMailboxes]) {
-      const existing = lostAccessMailboxes.get(mailbox);
-      if (existing) {
-        existing.allAccessWasRemoved = existing.allAccessWasRemoved || data.allAccessWasRemoved;
-        existing.folderIds = unique([...existing.folderIds, ...data.folderIds]);
-      } else {
-        lostAccessMailboxes.set(mailbox, { ...data });
-      }
-    }
+    const lostAccessMailboxes = new Set([
+      ...round1.lostAccessMailboxes,
+      ...round2.lostAccessMailboxes,
+    ]);
 
-    const filteredHits = hits.filter((item) => {
-      const lostAccess = lostAccessMailboxes.get(item.mailbox);
-      if (!lostAccess) {
-        return true;
-      }
-      if (lostAccess.allAccessWasRemoved) {
-        return false;
-      }
-      return !lostAccess.folderIds.includes(item.parentFolderId);
-    });
+    const filteredHits = hits.filter((item) => !lostAccessMailboxes.has(item.mailbox));
 
     const hitsByMailbox = groupBy(filteredHits, (item) => item.mailbox);
 
@@ -186,12 +171,13 @@ export class MsGraphKqlSearchEmailsQuery {
     if (throttledMailboxes.size > 0) {
       summaryParts.push('Search was throttled for some mailboxes — results may be incomplete.');
     }
-    for (const [mailbox, accessConfig] of lostAccessMailboxes) {
-      if (accessConfig.allAccessWasRemoved) {
-        summaryParts.push(`Could not access mailbox ${mailbox} — it was excluded from results.`);
-      } else {
-        summaryParts.push(`Could not access some folders in mailbox ${mailbox}.`);
-      }
+    for (const mailbox of lostAccessMailboxes) {
+      summaryParts.push(`Could not access mailbox ${mailbox} — it was excluded from results.`);
+    }
+    for (const mailbox of queriedMailboxesWithoutFullAccess) {
+      summaryParts.push(
+        `Could search in mailbox ${mailbox} — Microsoft does not offer an api to search in shared folders from this mailbox.`,
+      );
     }
     for (const { mailbox, folder } of skippedFolders) {
       summaryParts.push(
@@ -211,7 +197,7 @@ export class MsGraphKqlSearchEmailsQuery {
   ): Promise<{
     hits: Hit[];
     retryRequests: GraphBatchRequest[];
-    lostAccessMailboxes: Map<string, { allAccessWasRemoved: boolean; folderIds: string[] }>;
+    lostAccessMailboxes: Set<string>;
     throttledMailboxes: Set<string>;
     retryAfterMs: number;
   }> {
@@ -219,10 +205,7 @@ export class MsGraphKqlSearchEmailsQuery {
     let queue = [...requests];
     const hits: Hit[] = [];
     const retryRequests: GraphBatchRequest[] = [];
-    const lostAccessMailboxes = new Map<
-      string,
-      { allAccessWasRemoved: boolean; folderIds: string[] }
-    >();
+    const lostAccessMailboxes = new Set<string>();
     const throttledMailboxes = new Set<string>();
     let retryAfterMs = -1;
 
@@ -278,32 +261,11 @@ export class MsGraphKqlSearchEmailsQuery {
           await this.removeDelegatedAccessCommand.run({
             delegateUserId: userProfile.id,
             ownerEmail: originalRequest.mailbox,
-            where: !originalRequest.folderId
-              ? { fullAccess: true }
-              : { msGraphDirectoryId: originalRequest.folderId },
+            where: { fullAccess: true },
           });
 
-          let item = lostAccessMailboxes.get(originalRequest.mailbox);
-          if (!item) {
-            item = { allAccessWasRemoved: false, folderIds: [] };
-          }
-          if (originalRequest.folderId) {
-            item.folderIds.push(originalRequest.folderId);
-          } else {
-            item.allAccessWasRemoved = true;
-          }
-          lostAccessMailboxes.set(originalRequest.mailbox, item);
-
-          // Remove further requests which will request data from
-          const filterFunction = !originalRequest.folderId
-            ? (item: GraphBatchRequest): boolean => item.mailbox !== originalRequest.mailbox
-            : (item: GraphBatchRequest): boolean =>
-                !(
-                  item.mailbox === originalRequest.mailbox &&
-                  item.folderId === originalRequest.folderId
-                );
-
-          queue = queue.filter(filterFunction);
+          lostAccessMailboxes.add(originalRequest.mailbox);
+          queue = queue.filter((item) => item.mailbox !== originalRequest.mailbox);
           continue;
         }
 

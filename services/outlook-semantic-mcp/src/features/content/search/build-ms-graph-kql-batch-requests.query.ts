@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isNullish } from 'remeda';
+import { isNullish, unique } from 'remeda';
 import { typeid } from 'typeid-js';
 import { DirectoryType } from '~/db';
 import {
@@ -36,7 +36,6 @@ export interface GraphBatchRequest {
 interface MailboxAccessInfo {
   ownerId: string;
   ownerEmail: string;
-  hasFullAccess: boolean;
   isOwn: boolean;
   directories: DirectoryInfo[];
 }
@@ -69,25 +68,36 @@ export class BuildMsGraphKqlBatchRequestsQuery {
   ): Promise<{
     requests: GraphBatchRequest[];
     skippedFolders: Array<{ mailbox: string; folder: string }>;
+    queriedMailboxesWithoutFullAccess: string[];
   }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const accessibleMailboxes = await this.listMailboxesAndDirectoriesQuery.run(userProfile.id);
-    const mailboxAccessInfos: MailboxAccessInfo[] = accessibleMailboxes.map(
-      ({ id, email, hasFullAccess, isOwn, folders }) => ({
+    const mailboxAccessInfos: MailboxAccessInfo[] = accessibleMailboxes
+      // We only take the mailboxes to which we have full access because we cannot search in folders of mailboxes
+      // to which we do not have full access - this is a known msgraph limitation. The $search parameter works only
+      // if a user got full access to another user mailbox.
+      // For example: tester1@admin.com shared 2 folders with tester2@admin.com then tester2@admin.com can see the
+      // folders and even enumerate the emails inside the folders using:
+      // https://graph.microsoft.com/v1.0/users/tester1@admin.com/mailFolders/{{folderId}}/messages
+      // but if he tries to search in the folder using
+      // https://graph.microsoft.com/v1.0/users/tester1@admin.com/mailFolders/{{folderId}}/messages?$search="body: \"test\""
+      // microsoft graph will return 403 because "$search" works only if you got full delegated access to that inbox.
+      .filter(({ hasFullAccess }) => hasFullAccess)
+      .map(({ id, email, isOwn, folders }) => ({
         ownerId: id,
         ownerEmail: email,
-        hasFullAccess,
         isOwn,
         directories: mapFoldersToDirectoryAccessFolders(folders),
-      }),
-    );
+      }));
 
     const output: {
       requests: GraphBatchRequest[];
       skippedFolders: { mailbox: string; folder: string }[];
+      queriedMailboxesWithoutFullAccess: string[];
     } = {
       requests: [],
       skippedFolders: [],
+      queriedMailboxesWithoutFullAccess: [],
     };
 
     for (const query of queries) {
@@ -95,6 +105,16 @@ export class BuildMsGraphKqlBatchRequestsQuery {
 
       if (mailbox) {
         const mailboxAccessInfo = mailboxAccessInfos.find((item) => item.ownerEmail === mailbox);
+        if (isNullish(mailboxAccessInfo)) {
+          const mailboxExists = accessibleMailboxes.find((item) => item.email === mailbox);
+          if (mailboxExists && !mailboxExists.hasFullAccess) {
+            output.queriedMailboxesWithoutFullAccess = unique([
+              ...output.queriedMailboxesWithoutFullAccess,
+              mailboxExists.email,
+            ]);
+          }
+          continue;
+        }
         this.addQueryToGraphBatchRequests({
           output,
           query,
@@ -135,29 +155,14 @@ export class BuildMsGraphKqlBatchRequestsQuery {
     const isDelegated = !mailboxAccessInfo.isOwn;
 
     if (!query.directories) {
-      if (mailboxAccessInfo.hasFullAccess) {
-        // The user has full access we can search in all directories at once.
-        output.requests.push({
-          requestId: getRequestId(),
-          mailbox: mailboxAccessInfo.ownerEmail,
-          isDelegated,
-          kqlQuery: query.kqlQuery,
-          limit,
-        });
-        return;
-      }
-
-      // Since we do not have full access we have to search in every folder individually.
-      for (const { providerDirectoryId } of mailboxAccessInfo.directories) {
-        output.requests.push({
-          requestId: getRequestId(),
-          mailbox: mailboxAccessInfo.ownerEmail,
-          isDelegated,
-          folderId: providerDirectoryId,
-          kqlQuery: query.kqlQuery,
-          limit,
-        });
-      }
+      // The user has full access we can search in all directories at once.
+      output.requests.push({
+        requestId: getRequestId(),
+        mailbox: mailboxAccessInfo.ownerEmail,
+        isDelegated,
+        kqlQuery: query.kqlQuery,
+        limit,
+      });
       return;
     }
 

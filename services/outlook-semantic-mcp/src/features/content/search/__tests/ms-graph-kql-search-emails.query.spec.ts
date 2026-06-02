@@ -47,6 +47,7 @@ function createQuery(opts: {
   mockBuildResult?: {
     requests: GraphBatchRequest[];
     skippedFolders: Array<{ mailbox: string; folder: string }>;
+    queriedMailboxesWithoutFullAccess?: string[];
   };
 }) {
   const { delegatedMailboxes = [], mockPost, idTranslationMap = new Map(), mockBuildResult } = opts;
@@ -55,14 +56,18 @@ function createQuery(opts: {
   const defaultBuildResult: {
     requests: GraphBatchRequest[];
     skippedFolders: Array<{ mailbox: string; folder: string }>;
-  } = mockBuildResult ?? {
-    requests: [
-      makeRequest({ mailbox: OWN_EMAIL, kqlQuery: 'test', isDelegated: false }),
-      ...delegatedMailboxes.map((email) =>
-        makeRequest({ mailbox: email, kqlQuery: 'test', isDelegated: true }),
-      ),
-    ],
-    skippedFolders: [],
+    queriedMailboxesWithoutFullAccess: string[];
+  } = {
+    queriedMailboxesWithoutFullAccess: [],
+    ...(mockBuildResult ?? {
+      requests: [
+        makeRequest({ mailbox: OWN_EMAIL, kqlQuery: 'test', isDelegated: false }),
+        ...delegatedMailboxes.map((email) =>
+          makeRequest({ mailbox: email, kqlQuery: 'test', isDelegated: true }),
+        ),
+      ],
+      skippedFolders: [],
+    }),
   };
 
   const apiMock = { post: mockPost ?? vi.fn().mockResolvedValue({ responses: [] }) };
@@ -541,8 +546,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       expect(results).toHaveLength(1);
     });
 
-    // Case 3: per-folder requests for the same mailbox — 403 on one folder does not drain the whole mailbox
-    it('directory-only delegated: 403 on folder-level request does not trigger markNoAccess, sibling folder still returns results', async () => {
+    it('403 on folder-scoped request triggers full-access removal and excludes all results from that mailbox', async () => {
       const f1Id = 'folder-f1';
       const f2Id = 'folder-f2';
 
@@ -586,9 +590,10 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       expect(removeDelegatedAccessCommand.run).toHaveBeenCalledWith({
         delegateUserId: OWN_USER_ID,
         ownerEmail: DELEGATED_EMAIL,
-        where: { msGraphDirectoryId: f1Id },
+        where: { fullAccess: true },
       });
-      expect(results.some((r) => r.msGraphMessageId === 'f2-msg')).toBe(true);
+      // f2-msg is from the same mailbox that got 403, so it is excluded via lostAccessMailboxes filter
+      expect(results.some((r) => r.msGraphMessageId === 'f2-msg')).toBe(false);
     });
 
     it('full-access delegated: 403 without folderId triggers markNoAccess and excludes all results for that mailbox', async () => {
@@ -752,10 +757,10 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
   });
 
   describe('queue drain across batches', () => {
-    it('folder-level 403: only drains remaining requests for the failed folder, keeps sibling folder in queue', async () => {
+    it('folder-level 403: drains all remaining requests for that entire mailbox, including sibling folders', async () => {
       // 21 requests for f1Id fill the first batch (20) and leave 1 in the queue.
-      // When the first f1Id request gets 403, the remaining f1Id request in the queue
-      // must be drained but the f2Id (sibling) request must survive to the second batch.
+      // When the first f1Id request gets 403, ALL remaining DELEGATED_EMAIL requests
+      // (both leftover f1Id and the sibling f2Id) are drained from the queue.
       const f1Id = 'folder-f1';
       const f2Id = 'folder-f2';
 
@@ -787,16 +792,6 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
               body: i === 0 ? {} : { value: [] },
             })),
           });
-        })
-        .mockImplementationOnce(({ requests }: { requests: { id: string; url: string }[] }) => {
-          // Second batch: should contain f2Id but NOT the leftover f1Id request
-          return Promise.resolve({
-            responses: requests.map((req) => ({
-              id: req.id,
-              status: 200,
-              body: { value: [makeMessage('f2-msg')] },
-            })),
-          });
         });
 
       const { instance, removeDelegatedAccessCommand } = createQuery({
@@ -806,17 +801,13 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
       const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
 
-      const secondBatchRequests = mockPost.mock.calls[1]?.[0]?.requests as {
-        id: string;
-        url: string;
-      }[];
-      expect(secondBatchRequests.every((r) => r.url.includes(f2Id))).toBe(true);
-      expect(secondBatchRequests.some((r) => r.url.includes(f1Id))).toBe(false);
-      expect(results.some((r) => r.msGraphMessageId === 'f2-msg')).toBe(true);
+      // Both the leftover f1Id and the f2Id were drained from the queue — only one batch call
+      expect(mockPost).toHaveBeenCalledOnce();
+      expect(results.some((r) => r.msGraphMessageId === 'f2-msg')).toBe(false);
       expect(removeDelegatedAccessCommand.run).toHaveBeenCalledWith({
         delegateUserId: OWN_USER_ID,
         ownerEmail: DELEGATED_EMAIL,
-        where: { msGraphDirectoryId: f1Id },
+        where: { fullAccess: true },
       });
     });
   });

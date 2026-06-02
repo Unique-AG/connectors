@@ -85,50 +85,38 @@ describe('BuildMsGraphKqlBatchRequestsQuery', () => {
     });
   });
 
-  describe('Case 3: directory-only delegated mailbox, no directories', () => {
-    it('produces one request per canReadContent:true folder with isDelegated:true', async () => {
+  describe('Case 3: mailbox without full access is skipped', () => {
+    it('produces no requests and reports mailbox in queriedMailboxesWithoutFullAccess', async () => {
       const readableFolder = makeFolder({ id: 'folder-readable', canReadContent: true });
-      const unreadableAncestor = makeFolder({ id: 'folder-ancestor', canReadContent: false });
       const instance = createInstance([
         makeMailbox({ email: OWN_EMAIL, id: OWN_PROFILE_ID, isOwn: true, hasFullAccess: true }),
         makeMailbox({
           email: DELEGATED_EMAIL,
           isOwn: false,
           hasFullAccess: false,
-          folders: [unreadableAncestor, readableFolder],
+          folders: [readableFolder],
         }),
       ]);
 
-      const { requests } = await instance.run(testUserId, [
+      const { requests, queriedMailboxesWithoutFullAccess } = await instance.run(testUserId, [
         { kqlQuery: 'subject:test', mailbox: DELEGATED_EMAIL },
       ]);
 
-      expect(requests).toHaveLength(1);
-      expect(requests[0]?.folderId).toBe('folder-readable');
-      expect(requests[0]?.isDelegated).toBe(true);
+      expect(requests).toHaveLength(0);
+      expect(queriedMailboxesWithoutFullAccess).toContain(DELEGATED_EMAIL);
     });
 
-    it('skips non-readable ancestor directories and does not generate requests for them', async () => {
-      const ancestor = makeFolder({ id: 'ancestor-id', canReadContent: false });
-      const child1 = makeFolder({ id: 'child-1', canReadContent: true });
-      const child2 = makeFolder({ id: 'child-2', canReadContent: true });
+    it('does not report the mailbox if it is not accessible at all', async () => {
       const instance = createInstance([
-        makeMailbox({
-          email: DELEGATED_EMAIL,
-          isOwn: false,
-          hasFullAccess: false,
-          folders: [ancestor, child1, child2],
-        }),
+        makeMailbox({ email: OWN_EMAIL, id: OWN_PROFILE_ID, isOwn: true, hasFullAccess: true }),
       ]);
 
-      const { requests } = await instance.run(testUserId, [
-        { kqlQuery: 'test', mailbox: DELEGATED_EMAIL },
+      const { requests, queriedMailboxesWithoutFullAccess } = await instance.run(testUserId, [
+        { kqlQuery: 'test', mailbox: 'unknown@example.com' },
       ]);
 
-      const folderIds = requests.map((r) => r.folderId);
-      expect(folderIds).toContain('child-1');
-      expect(folderIds).toContain('child-2');
-      expect(folderIds).not.toContain('ancestor-id');
+      expect(requests).toHaveLength(0);
+      expect(queriedMailboxesWithoutFullAccess).toHaveLength(0);
     });
   });
 
