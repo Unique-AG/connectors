@@ -10,15 +10,15 @@ import type {
 } from '../../confluence-api';
 import {
   CONFLUENCE_BASE_URL,
-  PAGE_BODY_CROSS_PAGE_IMAGE,
   PAGE_BODY_EXTERNAL_URL_IMAGE,
   PAGE_BODY_IMAGE_NESTED_IN_TABLE,
   PAGE_BODY_IMAGE_WITH_ATTRS,
   PAGE_BODY_MIXED_URL_AND_ATTACHMENT,
   PAGE_BODY_MULTIPLE_CURRENT_PAGE_IMAGES,
+  PAGE_BODY_OTHER_PAGE_IMAGE,
   PAGE_BODY_SELF_CLOSING_IMAGE,
   PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE,
-  PAGE_BODY_TWO_REFERENCES_SAME_CROSS_PAGE,
+  PAGE_BODY_TWO_REFERENCES_SAME_OTHER_PAGE,
   PAGE_BODY_UNCLOSED_IMAGE,
   PAGE_BODY_WITH_CDATA_AND_IMAGE,
   sampleDiscoveredImageAttachment,
@@ -286,8 +286,8 @@ describe('PageImageInliner', () => {
     });
   });
 
-  describe('cross-page resolution', () => {
-    it('resolves a cross-page <ri:attachment> via fetchPageAttachmentsByTitle and inlines it', async () => {
+  describe('other-page attachment resolution', () => {
+    it('resolves an <ri:attachment> on another page via fetchPageAttachmentsByTitle and inlines it', async () => {
       const remoteAttachment = createConfluenceImageAttachment({
         id: 'remote-att-1',
         title: 'other.png',
@@ -300,7 +300,7 @@ describe('PageImageInliner', () => {
       apiClient.fetchPageAttachmentsByTitle.mockResolvedValue(lookup);
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
 
-      const page = basePage(PAGE_BODY_CROSS_PAGE_IMAGE);
+      const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
       const result = await inliner.inlineImages(page, []);
 
       expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledWith('OTHER', 'Other Page');
@@ -318,7 +318,7 @@ describe('PageImageInliner', () => {
       );
     });
 
-    it('caches cross-page lookups and only calls the API once per (spaceKey, title)', async () => {
+    it('caches other-page lookups and only calls the API once per (spaceKey, title)', async () => {
       const remoteA = createConfluenceImageAttachment({
         id: 'remote-a',
         title: 'a.png',
@@ -334,7 +334,7 @@ describe('PageImageInliner', () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
 
       const result = await inliner.inlineImages(
-        basePage(PAGE_BODY_TWO_REFERENCES_SAME_CROSS_PAGE),
+        basePage(PAGE_BODY_TWO_REFERENCES_SAME_OTHER_PAGE),
         [],
       );
 
@@ -347,10 +347,11 @@ describe('PageImageInliner', () => {
       );
     });
 
-    it('leaves cross-page macro untouched when the resolved attachment is an image type outside allowedMimeTypes', async () => {
-      // Cross-page lookups return raw Confluence attachment metadata that has not
-      // been filtered by discovery. A GIF/WebP/SVG on the target page must be
-      // rejected by the inliner so it doesn't end up base64-embedded into the page.
+    it('leaves an other-page macro untouched when the resolved attachment is an image type outside allowedMimeTypes', async () => {
+      // Attachment lookups against a referenced other page return raw Confluence
+      // metadata that has not been filtered by discovery. A GIF/WebP/SVG on the
+      // referenced page must be rejected by the inliner so it doesn't end up
+      // base64-embedded into the page.
       apiClient.fetchPageAttachmentsByTitle.mockResolvedValue({
         pageId: '77',
         attachments: [
@@ -362,7 +363,7 @@ describe('PageImageInliner', () => {
         ],
       });
 
-      const page = basePage(PAGE_BODY_CROSS_PAGE_IMAGE);
+      const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
       const result = await inliner.inlineImages(page, []);
 
       expect(result.page.body).toBe(page.body);
@@ -370,10 +371,10 @@ describe('PageImageInliner', () => {
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
-    it('leaves cross-page macro untouched when the target page is not found', async () => {
+    it('leaves an other-page macro untouched when the referenced page is not found', async () => {
       apiClient.fetchPageAttachmentsByTitle.mockResolvedValue(null);
 
-      const page = basePage(PAGE_BODY_CROSS_PAGE_IMAGE);
+      const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
       const result = await inliner.inlineImages(page, []);
 
       expect(result.page.body).toBe(page.body);
@@ -385,7 +386,8 @@ describe('PageImageInliner', () => {
       // A malformed <ri:page> (missing ri:space-key or ri:content-title) must NOT be
       // treated as a current-page attachment, even if the current page happens to have
       // an attachment with the same filename. The presence of <ri:page> signals
-      // cross-page intent; we'd rather skip than inline the wrong image.
+      // intent to reference an attachment on another page; we'd rather skip than
+      // inline the wrong image.
       const samePageDecoy: DiscoveredAttachment = {
         ...sampleDiscoveredImageAttachment,
         title: 'other.png',
@@ -405,20 +407,20 @@ describe('PageImageInliner', () => {
       }
     });
 
-    it('leaves cross-page macro untouched when fetchPageAttachmentsByTitle throws', async () => {
+    it('leaves an other-page macro untouched when fetchPageAttachmentsByTitle throws', async () => {
       apiClient.fetchPageAttachmentsByTitle.mockRejectedValue(new Error('lookup boom'));
 
-      const page = basePage(PAGE_BODY_CROSS_PAGE_IMAGE);
+      const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
       const result = await inliner.inlineImages(page, []);
 
       expect(result.page.body).toBe(page.body);
       expect(result.inlinedAttachmentIds.size).toBe(0);
     });
 
-    it('shares in-flight cross-page lookups across concurrent inlineImages calls', async () => {
+    it('shares in-flight other-page lookups across concurrent inlineImages calls', async () => {
       // Deferred promise: hold the first lookup open until both inlineImages calls
-      // have a chance to enter lookupCrossPage. If the cache were set after-await,
-      // the second call would issue its own API request.
+      // have a chance to enter lookupOtherPageAttachments. If the cache were set
+      // after-await, the second call would issue its own API request.
       let resolveLookup!: (v: PageAttachmentLookupResult) => void;
       apiClient.fetchPageAttachmentsByTitle.mockReturnValue(
         new Promise<PageAttachmentLookupResult>((resolve) => {
@@ -427,9 +429,9 @@ describe('PageImageInliner', () => {
       );
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
 
-      const first = inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
-      const second = inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
-      // Let microtasks run so both invocations reach lookupCrossPage.
+      const first = inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
+      const second = inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
+      // Let microtasks run so both invocations reach lookupOtherPageAttachments.
       await Promise.resolve();
       await Promise.resolve();
       expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
@@ -442,19 +444,19 @@ describe('PageImageInliner', () => {
       expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
     });
 
-    it('re-fetches the same target page after resetCrossPageCache() is called between syncs', async () => {
+    it('re-fetches the same referenced page after resetOtherPageAttachmentCache() is called between syncs', async () => {
       // First sync: lookup succeeds and is cached on the instance.
       apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce({
         pageId: '77',
         attachments: [createConfluenceImageAttachment({ id: 'remote-1', title: 'other.png' })],
       });
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
-      await inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
+      await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
       expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
 
       // Second sync after the orchestrator clears the cache: the same lookup must
-      // hit the API again so any attachment changes on the target page are picked up.
-      inliner.resetCrossPageCache();
+      // hit the API again so any attachment changes on the referenced page are picked up.
+      inliner.resetOtherPageAttachmentCache();
       apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce({
         pageId: '77',
         attachments: [
@@ -462,29 +464,29 @@ describe('PageImageInliner', () => {
           createConfluenceImageAttachment({ id: 'remote-2', title: 'new.png' }),
         ],
       });
-      await inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
+      await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
       expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(2);
     });
 
-    it('re-fetches after resetCrossPageCache() even when the previous lookup returned null', async () => {
+    it('re-fetches after resetOtherPageAttachmentCache() even when the previous lookup returned null', async () => {
       apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce(null);
-      const firstSync = await inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
+      const firstSync = await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
       expect(firstSync.inlinedAttachmentIds.size).toBe(0);
 
-      // Without resetCrossPageCache() the null result would stick. After reset, the
-      // newly-available target page should be picked up.
-      inliner.resetCrossPageCache();
+      // Without resetOtherPageAttachmentCache() the null result would stick. After reset, the
+      // newly-available referenced page should be picked up.
+      inliner.resetOtherPageAttachmentCache();
       apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce({
         pageId: '77',
         attachments: [createConfluenceImageAttachment({ id: 'remote-1', title: 'other.png' })],
       });
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
-      const secondSync = await inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
+      const secondSync = await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
       expect(secondSync.inlinedAttachmentIds.size).toBe(1);
       expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(2);
     });
 
-    it('does not permanently cache a rejected cross-page lookup; retries on next reference', async () => {
+    it('does not permanently cache a rejected other-page lookup; retries on next reference', async () => {
       apiClient.fetchPageAttachmentsByTitle
         .mockRejectedValueOnce(new Error('transient boom'))
         .mockResolvedValueOnce({
@@ -493,10 +495,10 @@ describe('PageImageInliner', () => {
         });
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
 
-      const first = await inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
+      const first = await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
       expect(first.inlinedAttachmentIds.size).toBe(0);
 
-      const second = await inliner.inlineImages(basePage(PAGE_BODY_CROSS_PAGE_IMAGE), []);
+      const second = await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
       expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(2);
       expect(second.inlinedAttachmentIds.has(buildInlinedAttachmentKey('77', 'remote-1'))).toBe(
         true,
@@ -627,7 +629,7 @@ describe('PageImageInliner', () => {
     });
 
     it('records the same attachment id under different keys when it appears on two different pages', async () => {
-      // Cross-page image lookup: lookup.pageId='99', resolved attachment id reused
+      // Other-page image lookup: lookup.pageId='99', resolved attachment id reused
       // elsewhere by coincidence. The inlined key must be pageId-scoped.
       apiClient.fetchPageAttachmentsByTitle.mockResolvedValue({
         pageId: '99',
@@ -636,7 +638,7 @@ describe('PageImageInliner', () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
 
       // Same inliner instance, two pages. First page (id='1') has a local image with the
-      // same attachment id; the second page (id='2') has a cross-page reference resolving
+      // same attachment id; the second page (id='2') has a reference to another page resolving
       // to the same id on a different page.
       const localAtt: DiscoveredAttachment = {
         ...sampleDiscoveredImageAttachment,
@@ -647,7 +649,7 @@ describe('PageImageInliner', () => {
       const localBody = '<ac:image><ri:attachment ri:filename="local.png"/></ac:image>';
       const local = await inliner.inlineImages(basePage(localBody), [localAtt]);
       const remote = await inliner.inlineImages(
-        { ...basePage(PAGE_BODY_CROSS_PAGE_IMAGE), id: '2' },
+        { ...basePage(PAGE_BODY_OTHER_PAGE_IMAGE), id: '2' },
         [],
       );
 

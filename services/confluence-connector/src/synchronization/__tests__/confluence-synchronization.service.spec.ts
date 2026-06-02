@@ -41,11 +41,13 @@ const mockScopeManagementService = {
   cleanupRemovedSpaces: vi.fn().mockResolvedValue(undefined),
 } as unknown as ScopeManagementService;
 
-const passthroughPageImageInliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> =
-  {
-    inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
-    resetCrossPageCache: vi.fn(),
-  };
+const passthroughPageImageInliner: Pick<
+  PageImageInliner,
+  'inlineImages' | 'resetOtherPageAttachmentCache'
+> = {
+  inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+  resetOtherPageAttachmentCache: vi.fn(),
+};
 
 function createService(
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
@@ -58,7 +60,7 @@ function createService(
   metrics: Metrics = createNoopMetrics(),
   pageImageInliner: Pick<
     PageImageInliner,
-    'inlineImages' | 'resetCrossPageCache'
+    'inlineImages' | 'resetOtherPageAttachmentCache'
   > = passthroughPageImageInliner,
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
@@ -726,7 +728,7 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('passes inlined page body to ingestPage and skips standalone ingestion of the inlined image', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetOtherPageAttachmentCache'> = {
         inlineImages: vi.fn(async (page) => ({
           page: {
             ...page,
@@ -736,7 +738,7 @@ describe('ConfluenceSynchronizationService', () => {
             buildInlinedAttachmentKey(imageAttachment.pageId, imageAttachment.id),
           ]),
         })),
-        resetCrossPageCache: vi.fn(),
+        resetOtherPageAttachmentCache: vi.fn(),
       };
 
       const svc = createService(
@@ -773,9 +775,9 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('falls back to standalone image ingestion when the inliner reports no successful inlines', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetOtherPageAttachmentCache'> = {
         inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
-        resetCrossPageCache: vi.fn(),
+        resetOtherPageAttachmentCache: vi.fn(),
       };
 
       const svc = createService(
@@ -800,9 +802,9 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('only passes image-type attachments (not PDFs) to the inliner', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetOtherPageAttachmentCache'> = {
         inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
-        resetCrossPageCache: vi.fn(),
+        resetOtherPageAttachmentCache: vi.fn(),
       };
 
       const svc = createService(
@@ -824,17 +826,18 @@ describe('ConfluenceSynchronizationService', () => {
       expect(passedAttachments.some((a) => a.id === pdfAttachment.id)).toBe(false);
     });
 
-    it('skips standalone ingestion of a cross-page image when the referencing page also syncs the target', async () => {
-      // Page 1 references an image attached to page 2 (cross-page). Both pages are
-      // being synced this cycle, and the cross-page image is in the diff. The inliner
-      // claims it inlined the image into page 1's body. The orchestrator must then
-      // filter the cross-page image out of the standalone attachment pass.
+    it('skips standalone ingestion of an other-page image when the referencing page also syncs the target', async () => {
+      // Page 1 references an image attached to page 2 (an attachment on another page).
+      // Both pages are being synced this cycle, and the other-page image is in the
+      // diff. The inliner claims it inlined the image into page 1's body. The
+      // orchestrator must then filter the other-page image out of the standalone
+      // attachment pass.
       const pageA = discoveredPagesFixture[0];
       if (!pageA) {
         throw new Error('expected fixture page 1');
       }
       const pageB: typeof pageA = { ...pageA, id: '2' };
-      const crossPageImage: DiscoveredAttachment = {
+      const otherPageImage: DiscoveredAttachment = {
         ...imageAttachment,
         id: 'att-on-b',
         title: 'shared.png',
@@ -845,10 +848,10 @@ describe('ConfluenceSynchronizationService', () => {
 
       vi.mocked(mockScanner.discoverPages).mockResolvedValue({
         pages: [pageA, pageB],
-        attachments: [crossPageImage],
+        attachments: [otherPageImage],
       });
       vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
-        newItemIds: ['1', '2', `2::${crossPageImage.id}`],
+        newItemIds: ['1', '2', `2::${otherPageImage.id}`],
         updatedItemIds: [],
         deletedItems: [],
         movedItemIds: [],
@@ -861,20 +864,20 @@ describe('ConfluenceSynchronizationService', () => {
         return Promise.resolve({ ...base, id: page.id });
       });
 
-      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetOtherPageAttachmentCache'> = {
         inlineImages: vi.fn(async (fetchedPage) => {
-          // Page A inlines the cross-page image; Page B has no image attachments referenced.
+          // Page A inlines the other-page image; Page B has no image attachments referenced.
           if (fetchedPage.id === '1') {
             return {
               page: fetchedPage,
               inlinedAttachmentIds: new Set([
-                buildInlinedAttachmentKey(crossPageImage.pageId, crossPageImage.id),
+                buildInlinedAttachmentKey(otherPageImage.pageId, otherPageImage.id),
               ]),
             };
           }
           return { page: fetchedPage, inlinedAttachmentIds: new Set<string>() };
         }),
-        resetCrossPageCache: vi.fn(),
+        resetOtherPageAttachmentCache: vi.fn(),
       };
 
       const svc = createService(
@@ -897,15 +900,15 @@ describe('ConfluenceSynchronizationService', () => {
         expect.objectContaining({ id: '2' }),
         expect.anything(),
       );
-      // Cross-page image inlined into page A → not standalone-ingested even though
+      // Other-page image inlined into page A → not standalone-ingested even though
       // it lives on page B which is also part of this sync.
       expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalled();
     });
 
-    it('clears the inliner cross-page cache at the start of every sync', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
+    it('clears the inliner other-page attachment cache at the start of every sync', async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetOtherPageAttachmentCache'> = {
         inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
-        resetCrossPageCache: vi.fn(),
+        resetOtherPageAttachmentCache: vi.fn(),
       };
 
       const svc = createService(
@@ -920,15 +923,15 @@ describe('ConfluenceSynchronizationService', () => {
       await tenantStorage.run(tenant, () => svc.synchronize());
       await tenantStorage.run(tenant, () => svc.synchronize());
 
-      expect(inliner.resetCrossPageCache).toHaveBeenCalledTimes(2);
+      expect(inliner.resetOtherPageAttachmentCache).toHaveBeenCalledTimes(2);
     });
 
     it('falls back to ingesting the original body when the inliner throws', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetCrossPageCache'> = {
+      const inliner: Pick<PageImageInliner, 'inlineImages' | 'resetOtherPageAttachmentCache'> = {
         inlineImages: vi.fn(async () => {
           throw new Error('inliner exploded');
         }),
-        resetCrossPageCache: vi.fn(),
+        resetOtherPageAttachmentCache: vi.fn(),
       };
 
       const svc = createService(

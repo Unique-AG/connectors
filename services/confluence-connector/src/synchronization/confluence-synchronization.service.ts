@@ -43,9 +43,10 @@ export class ConfluenceSynchronizationService {
     tenant.isScanning = true;
     const startTime = Date.now();
     let syncResult: 'success' | 'failure' = 'success';
-    // Scope cross-page attachment lookup caching to a single sync cycle so target
-    // page attachment changes are visible on the next run.
-    this.pageImageInliner.resetCrossPageCache();
+    // The inliner caches "list attachments of page X in space Y" lookups (used when
+    // an image references an attachment on a different page). Clear it each sync so
+    // attachment changes on those referenced pages are picked up next run.
+    this.pageImageInliner.resetOtherPageAttachmentCache();
 
     try {
       this.logger.log({ tenantName: tenant.name, msg: 'Starting sync' });

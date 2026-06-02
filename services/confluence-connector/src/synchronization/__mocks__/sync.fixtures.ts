@@ -51,10 +51,10 @@ export const PAGE_BODY_MULTIPLE_CURRENT_PAGE_IMAGES =
 export const PAGE_BODY_IMAGE_WITH_ATTRS =
   '<ac:image ac:alt="An alt" ac:title="A title" ac:width="320" ac:height="240" ac:align="center" ac:thumbnail="true"><ri:attachment ri:filename="diagram.png"/></ac:image>';
 
-export const PAGE_BODY_CROSS_PAGE_IMAGE =
+export const PAGE_BODY_OTHER_PAGE_IMAGE =
   '<p>see other page</p><ac:image><ri:attachment ri:filename="other.png"><ri:page ri:space-key="OTHER" ri:content-title="Other Page"/></ri:attachment></ac:image>';
 
-export const PAGE_BODY_TWO_REFERENCES_SAME_CROSS_PAGE =
+export const PAGE_BODY_TWO_REFERENCES_SAME_OTHER_PAGE =
   '<ac:image><ri:attachment ri:filename="a.png"><ri:page ri:space-key="OTHER" ri:content-title="Other Page"/></ri:attachment></ac:image><ac:image><ri:attachment ri:filename="b.png"><ri:page ri:space-key="OTHER" ri:content-title="Other Page"/></ri:attachment></ac:image>';
 
 export const PAGE_BODY_EXTERNAL_URL_IMAGE =

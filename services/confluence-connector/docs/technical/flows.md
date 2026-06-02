@@ -216,7 +216,7 @@ When `attachments.imageOcr` is `enabled` (default), each image content registrat
 During page ingestion, the connector parses each page's Confluence storage XML and replaces every `<ac:image>` macro that points to a Confluence attachment with an `<img src="data:image/...;base64,...">` element before uploading the page. Two reference shapes are resolved:
 
 - **Current-page attachment:** `<ac:image><ri:attachment ri:filename="..."/></ac:image>` is matched against the page's discovered image attachments by filename.
-- **Cross-page attachment:** `<ac:image><ri:attachment ri:filename="..."><ri:page ri:space-key="..." ri:content-title="..."/></ri:attachment></ac:image>` triggers an on-demand lookup of the target page's attachments. Results are cached for the lifetime of one sync.
+- **Other-page attachment:** `<ac:image><ri:attachment ri:filename="..."><ri:page ri:space-key="..." ri:content-title="..."/></ri:attachment></ac:image>` triggers an on-demand lookup of the referenced page's attachments. Results are cached for the lifetime of one sync.
 
 A macro is left untouched (and falls back to the standalone attachment path if the underlying attachment is otherwise queued for ingestion) when any of these conditions hold:
 
@@ -225,7 +225,7 @@ A macro is left untouched (and falls back to the standalone attachment path if t
 - The matched attachment is not an `image/*` MIME type.
 - The image size exceeds `attachments.maxFileSizeMb`.
 - The image download stream errors.
-- The cross-page lookup returns no page.
+- The referenced other-page lookup returns no page.
 
 Per-page memory is bounded by the inlined page size, the per-image `attachments.maxFileSizeMb` cap, and `processing.concurrency`. Image downloads within a single page are also concurrency-capped to keep memory usage predictable on image-heavy pages.
 

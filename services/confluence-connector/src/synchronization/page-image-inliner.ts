@@ -43,16 +43,22 @@ export function buildInlinedAttachmentKey(pageId: string, attachmentId: string):
 
 export class PageImageInliner {
   private readonly logger = new Logger(PageImageInliner.name);
-  // Per-sync cache; orchestrator calls resetCrossPageCache() at the start of each sync.
-  private readonly crossPageCache = new Map<string, Promise<PageAttachmentLookupResult | null>>();
+  // Caches "list attachments of page <title> in space <key>" lookups, used when an image
+  // macro references an attachment on a different page. Per-sync only; the orchestrator
+  // calls resetOtherPageAttachmentCache() at the start of each sync so attachment changes
+  // on referenced pages are picked up on the next run.
+  private readonly otherPageAttachmentCache = new Map<
+    string,
+    Promise<PageAttachmentLookupResult | null>
+  >();
 
   public constructor(
     private readonly config: TenantConfig,
     private readonly confluenceApiClient: ConfluenceApiClient,
   ) {}
 
-  public resetCrossPageCache(): void {
-    this.crossPageCache.clear();
+  public resetOtherPageAttachmentCache(): void {
+    this.otherPageAttachmentCache.clear();
   }
 
   public async inlineImages(
@@ -132,7 +138,7 @@ export class PageImageInliner {
       return null;
     }
 
-    // Cross-page lookups bypass discovery's allowedMimeTypes filter; re-check here.
+    // Other-page lookups bypass discovery's allowedMimeTypes filter; re-check here.
     if (!this.isAllowedMediaType(resolved.mediaType)) {
       this.logger.debug({
         pageId: page.id,
@@ -192,12 +198,12 @@ export class PageImageInliner {
       };
     }
 
-    const lookup = await this.lookupCrossPageAttachments(resource.spaceKey, resource.contentTitle);
+    const lookup = await this.lookupOtherPageAttachments(resource.spaceKey, resource.contentTitle);
     if (!lookup) {
       this.logger.debug({
         spaceKey: resource.spaceKey,
         contentTitle: resource.contentTitle,
-        msg: 'Cross-page lookup returned no page',
+        msg: 'Referenced page not found when resolving image on another page',
       });
       return null;
     }
@@ -209,7 +215,7 @@ export class PageImageInliner {
         spaceKey: resource.spaceKey,
         contentTitle: resource.contentTitle,
         filename: resource.filename,
-        msg: 'Cross-page image filename not found',
+        msg: 'Image filename not found on referenced other page',
       });
       return null;
     }
@@ -223,13 +229,13 @@ export class PageImageInliner {
     };
   }
 
-  private async lookupCrossPageAttachments(
+  private async lookupOtherPageAttachments(
     spaceKey: string,
     contentTitle: string,
   ): Promise<PageAttachmentLookupResult | null> {
     // JSON.stringify avoids separator collisions that a plain concatenation would create.
     const cacheKey = JSON.stringify([spaceKey, contentTitle]);
-    const cached = this.crossPageCache.get(cacheKey);
+    const cached = this.otherPageAttachmentCache.get(cacheKey);
     if (cached) {
       return cached;
     }
@@ -237,16 +243,16 @@ export class PageImageInliner {
       .fetchPageAttachmentsByTitle(spaceKey, contentTitle)
       .catch((err) => {
         // Don't cache errors permanently; a legitimate null (404) stays cached.
-        this.crossPageCache.delete(cacheKey);
+        this.otherPageAttachmentCache.delete(cacheKey);
         this.logger.warn({
           spaceKey,
           contentTitle,
           err,
-          msg: 'Cross-page attachment lookup failed',
+          msg: 'Attachment lookup on referenced other page failed',
         });
         return null;
       });
-    this.crossPageCache.set(cacheKey, promise);
+    this.otherPageAttachmentCache.set(cacheKey, promise);
     return promise;
   }
 

@@ -4,7 +4,7 @@ import { parseDocument } from 'htmlparser2';
 export type ResourceRef =
   | { kind: 'current-attachment'; filename: string }
   | {
-      kind: 'cross-page-attachment';
+      kind: 'other-page-attachment';
       filename: string;
       spaceKey: string;
       contentTitle: string;
@@ -97,7 +97,7 @@ function resolveResourceRefFromNodes(imageNode: Element): ResourceRef {
     const spaceKey = page.attribs['ri:space-key'];
     const contentTitle = page.attribs['ri:content-title'];
     if (spaceKey && contentTitle) {
-      return { kind: 'cross-page-attachment', filename, spaceKey, contentTitle };
+      return { kind: 'other-page-attachment', filename, spaceKey, contentTitle };
     }
     // <ri:page> is present but malformed (missing ri:space-key or ri:content-title).
     // Falling through to 'current-attachment' would risk inlining the wrong image if

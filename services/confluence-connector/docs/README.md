@@ -74,7 +74,7 @@ When attachment ingestion is enabled, images embedded in a Confluence page (PNG 
 
 Both attachments of the page itself and attachments from another page in the same instance (referenced via `<ri:attachment><ri:page/></ri:attachment>`) are resolved through the existing Confluence client. External image references (`<ac:image><ri:url ri:value="https://..."/></ac:image>`) are left untouched in the HTML and never fetched.
 
-When an image cannot be inlined it falls back to the standalone attachment ingestion path. This safety net catches: image attachments that no page references, downloads that fail, images larger than `attachments.maxFileSizeMb`, and cross-page references whose target page or filename cannot be resolved.
+When an image cannot be inlined it falls back to the standalone attachment ingestion path. This safety net catches: image attachments that no page references, downloads that fail, images larger than `attachments.maxFileSizeMb`, and references to an attachment on another page whose referenced page or filename cannot be resolved.
 
 `attachments.imageOcr` (enabled by default) only affects images that go through the standalone path. Set it to `disabled` to defer to the destination scope's own `ingestionConfig.jpgReadMode`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service and should be left out of `allowedMimeTypes`.
 
