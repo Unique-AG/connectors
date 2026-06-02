@@ -5,9 +5,10 @@ import { DataCenterConfluenceApiClient } from '../data-center-api-client';
 import type { ConfluencePage } from '../types/confluence-api.types';
 
 const MOCK_TOKEN = 'test-bearer-token';
+const MOCK_AUTH_HEADER = `Bearer ${MOCK_TOKEN}`;
 const BASE_URL = 'https://dc.example.com';
 
-const mockAuth = { acquireToken: vi.fn().mockResolvedValue(MOCK_TOKEN) };
+const mockAuth = { getAuthorizationHeader: vi.fn().mockResolvedValue(MOCK_AUTH_HEADER) };
 
 const mockHttpClient = {
   rateLimitedRequest: vi.fn(),
@@ -40,24 +41,24 @@ describe('ConfluenceApiClient (auth integration)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuth.acquireToken.mockResolvedValue(MOCK_TOKEN);
+    mockAuth.getAuthorizationHeader.mockResolvedValue(MOCK_AUTH_HEADER);
     client = new DataCenterConfluenceApiClient(mockConfig, mockAuth as never, mockHttpClient, {
       attachmentsEnabled: false,
     });
   });
 
   describe('auth header injection', () => {
-    it('includes Authorization Bearer header on every request', async () => {
+    it('includes the strategy-provided Authorization header on every request', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(makePage());
 
       await client.getPageById('1');
 
       expect(mockHttpClient.rateLimitedRequest).toHaveBeenCalledWith(expect.any(String), {
-        Authorization: `Bearer ${MOCK_TOKEN}`,
+        Authorization: MOCK_AUTH_HEADER,
       });
     });
 
-    it('acquires a fresh token before each request', async () => {
+    it('acquires a fresh authorization header before each request', async () => {
       vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(
         makePage({ id: '1', title: 'P' }),
       );
@@ -68,7 +69,7 @@ describe('ConfluenceApiClient (auth integration)', () => {
       await client.getPageById('1');
       await client.getPageById('2');
 
-      expect(mockAuth.acquireToken).toHaveBeenCalledTimes(2);
+      expect(mockAuth.getAuthorizationHeader).toHaveBeenCalledTimes(2);
     });
   });
 

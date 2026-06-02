@@ -24,6 +24,10 @@ data:
         {{- if eq $tenant.confluence.auth.mode "pat" }}
         token: {{ $tenant.confluence.auth.token | quote }}
         {{- end }}
+        {{- if eq $tenant.confluence.auth.mode "basic" }}
+        username: {{ $tenant.confluence.auth.username | quote }}
+        password: {{ $tenant.confluence.auth.password | quote }}
+        {{- end }}
       apiRateLimitPerMinute: {{ $tenant.confluence.apiRateLimitPerMinute }}
       ingestSingleLabel: {{ $tenant.confluence.ingestSingleLabel | quote }}
       ingestAllLabel: {{ $tenant.confluence.ingestAllLabel | quote }}
