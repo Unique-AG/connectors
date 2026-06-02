@@ -516,10 +516,16 @@ export const DeletedEventDto = change.DeletedEvent.schema.safeExtend({
 });
 export type DeletedEventDto = z.output<typeof DeletedEventDto>;
 
+export const IngestRequestedEventDto = change.IngestRequestedEvent.schema.safeExtend({
+  type: z.literal(change.IngestRequestedEvent.type),
+});
+export type IngestRequestedEventDto = z.output<typeof IngestRequestedEventDto>;
+
 export const ChangeEventDto = z.discriminatedUnion('type', [
   CreatedEventDto,
   UpdatedEventDto,
   DeletedEventDto,
+  IngestRequestedEventDto,
 ]);
 export type ChangeEventDto = z.output<typeof ChangeEventDto>;
 

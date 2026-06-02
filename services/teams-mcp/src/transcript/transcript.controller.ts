@@ -260,6 +260,9 @@ export class TranscriptController {
       case 'unique.teams-mcp.transcript.change-notification.created': {
         return this.transcriptCreated.created(event.subscriptionId, event.resource);
       }
+      case 'unique.teams-mcp.transcript.change-notification.ingest-requested': {
+        return this.transcriptCreated.ingestRequested(event);
+      }
 
       default:
         this.logger.warn(
