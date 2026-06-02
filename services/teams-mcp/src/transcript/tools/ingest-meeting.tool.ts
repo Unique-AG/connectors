@@ -89,9 +89,12 @@ export class IngestMeetingTool {
 
     // 1. Resolve the meeting by its join URL. Delegated lookup works for both the organizer and
     // invited attendees, so we use `/me/...` (the consumer re-auths the same way).
+    // Escape single quotes by doubling them so a crafted URL cannot break out of the OData
+    // string literal and inject filter predicates.
+    const escapedJoinUrl = input.joinUrl.replace(/'/g, "''");
     const meetingResponse = await client
       .api('/me/onlineMeetings')
-      .filter(`JoinWebUrl eq '${input.joinUrl}'`)
+      .filter(`JoinWebUrl eq '${escapedJoinUrl}'`)
       .get();
     const meetings = await MeetingCollection.parseAsync(meetingResponse);
     const meeting = meetings.value[0];
