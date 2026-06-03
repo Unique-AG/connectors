@@ -190,6 +190,7 @@ export class ProcessFullSyncBatchCommand {
           fileKey,
           filters,
           graphMessage: message,
+          graphBasePath: 'me',
         });
 
         const updateObject: InboxConfigVersionedUpdate = {};

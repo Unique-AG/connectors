@@ -51,6 +51,7 @@ export interface ProcessEmailCommandInput {
   file: Nullish<UniqueFile>;
   user: UserContext;
   filters: InboxConfigurationMailFilters;
+  graphBasePath: string;
 }
 
 interface BaseLogContext extends Record<string, string | undefined | boolean> {
@@ -96,7 +97,7 @@ export class ProcessEmailCommand {
   @Span()
   private async runProcessEmail(input: ProcessEmailCommandInput): Promise<MessageIngestionResult> {
     const logContext = createLogContext(input);
-    const { graphMessage, file, fileKey, user, filters, client } = input;
+    const { graphMessage, file, fileKey, user, filters, client, graphBasePath } = input;
     const metadata = getMetadataFromMessage(graphMessage);
 
     let parentDirectory = await this.db.query.directories.findFirst({
@@ -210,6 +211,7 @@ export class ProcessEmailCommand {
       client,
       logContext,
       filters,
+      graphBasePath,
     });
     return 'ingested';
   }
@@ -223,6 +225,7 @@ export class ProcessEmailCommand {
     fileKey,
     logContext: logContextRaw,
     filters,
+    graphBasePath,
   }: {
     client: Client;
     rootScopeId: string;
@@ -235,6 +238,7 @@ export class ProcessEmailCommand {
       userEmail: string;
     };
     filters: InboxConfigurationMailFilters;
+    graphBasePath: string;
   }): Promise<void> {
     // We will update the log context while we run.
     const logContext = clone(logContextRaw) as Record<string, string>;
@@ -271,7 +275,7 @@ export class ProcessEmailCommand {
 
     try {
       this.logger.debug({ ...logContext, msg: `File Upload: Started` });
-      const emailBuffer = await this.getEmlFile({ messageId: graphMessage.id, client });
+      const emailBuffer = await this.getEmlFile({ messageId: graphMessage.id, client, graphBasePath });
       await this.uploadFileForIngestionCommand.run({
         uploadUrl: content.writeUrl,
         content: emailBuffer,
@@ -306,12 +310,14 @@ export class ProcessEmailCommand {
   private async getEmlFile({
     messageId,
     client,
+    graphBasePath,
   }: {
     messageId: string;
     client: Client;
+    graphBasePath: string;
   }): Promise<Buffer> {
     const emlStream = (await client
-      .api(`me/messages/${messageId}/$value`)
+      .api(`${graphBasePath}/messages/${messageId}/$value`)
       .header(`Prefer`, `IdType="ImmutableId"`)
       .getStream()) as ReadableStream<Uint8Array<ArrayBuffer>>;
 

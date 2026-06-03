@@ -366,6 +366,7 @@ export class LiveCatchUpCommand {
               fileKey,
               filters,
               graphMessage,
+              graphBasePath: 'me',
             }),
           );
           const key = `totalMessages_${result}`;
