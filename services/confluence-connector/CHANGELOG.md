@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.1...confluence-connector@2.1.0) (2026-06-03)
+
+
+### Features
+
+* **confluence-connector:** add HTTP Basic auth for data-center ([#597](https://github.com/Unique-AG/connectors/issues/597)) ([75b8beb](https://github.com/Unique-AG/connectors/commit/75b8beb714f2b61ebe510c895f3a82754e705849))
+
 ## [2.0.1](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0...confluence-connector@2.0.1) (2026-06-03)
 
 
