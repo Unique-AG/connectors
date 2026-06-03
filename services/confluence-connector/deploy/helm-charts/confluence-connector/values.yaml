@@ -39,7 +39,10 @@ connector:
   #           key: PROXY_PASSWORD
   # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
   envVars: []
-  # -- List of ConfigMaps to load as environment variables
+  # -- List of ConfigMaps to load as environment variables.
+  # The default assumes releaseName=confluence-connector. For multi-instance deployments
+  # with a different release name, override to match the rendered ConfigMap name
+  # (<releaseName>-proxy-config).
   extraEnvCM:
     - confluence-connector-proxy-config
   image:
@@ -65,7 +68,10 @@ connector:
   volumes:
     - name: tmp
       emptyDir: {}
-    # -- Tenant configuration YAML file mounted from ConfigMap
+    # -- Tenant configuration YAML file mounted from ConfigMap.
+    # The default assumes releaseName=confluence-connector. For multi-instance deployments
+    # with a different release name, override to match the rendered ConfigMap name
+    # (<releaseName>-tenant-config).
     - name: tenant-config
       configMap:
         name: confluence-connector-tenant-config
