@@ -7,7 +7,7 @@ ARG APP_NAME=teams-mcp
 # Shared foundation for pruner, deps, and builder stages.
 # Using full bookworm image (not slim) because we need build tools for native modules.
 # ------------------------------------------------------------------------------
-FROM node:24-bookworm AS base
+FROM node:26-bookworm AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 # Set explicit cache location so we can copy it to runner stage
@@ -71,7 +71,7 @@ RUN --mount=type=cache,target=/root/.cache/turbo \
 # Stage 5: runner
 # Minimal production image. Only this stage is included in the final image.
 # ------------------------------------------------------------------------------
-FROM node:24-bookworm-slim AS runner
+FROM node:26-bookworm-slim AS runner
 ARG APP_NAME
 WORKDIR /app
 
