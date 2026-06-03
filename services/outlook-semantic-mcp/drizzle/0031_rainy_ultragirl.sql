@@ -1,0 +1,2 @@
+ALTER TABLE "inbox_configurations" ADD COLUMN "preferred_delegate_user_profile_id" varchar;--> statement-breakpoint
+ALTER TABLE "inbox_configurations" ADD CONSTRAINT "inbox_configurations_preferred_delegate_user_profile_id_user_profiles_id_fk" FOREIGN KEY ("preferred_delegate_user_profile_id") REFERENCES "public"."user_profiles"("id") ON DELETE set null ON UPDATE cascade;
