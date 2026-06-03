@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0...confluence-connector@2.0.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* **confluence-connector:** include release name in ConfigMap names ([#596](https://github.com/Unique-AG/connectors/issues/596)) ([722c6f6](https://github.com/Unique-AG/connectors/commit/722c6f6caa894383f18b48c06e6a60286f72379e))
+
 ## [2.0.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.8...confluence-connector@2.0.0) (2026-05-15)
 
 
