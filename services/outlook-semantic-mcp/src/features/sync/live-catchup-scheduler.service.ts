@@ -46,14 +46,12 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
 
     this.logger.log({ msg: 'LiveCatchupSchedulerService is shutting down...' });
     this.isShuttingDown = true;
-    try {
-      const job = this.schedulerRegistry.getCronJob('live-catchup-recovery');
-      job.stop();
-    } catch (err) {
-      this.logger.error({
-        msg: 'Error stopping live-catchup-recovery cron job',
-        err,
-      });
+    for (const name of ['live-catchup-recovery', 'live-catchup-recheck']) {
+      try {
+        this.schedulerRegistry.getCronJob(name).stop();
+      } catch (err) {
+        this.logger.error({ msg: `Error stopping ${name} cron job`, err });
+      }
     }
   }
 
@@ -62,13 +60,17 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
       return;
     }
 
-    const job = new CronJob(this.config.liveCatchupRecoveryCron, () => {
+    const recoveryJob = new CronJob(this.config.liveCatchupRecoveryCron, () => {
       this.runRecoveryScan();
+    });
+    this.schedulerRegistry.addCronJob('live-catchup-recovery', recoveryJob);
+    recoveryJob.start();
+
+    const recheckJob = new CronJob(this.config.liveCatchupRecheckCron, () => {
       this.runReadyLiveCatchupsWhichDidNotRunRecently();
     });
-
-    this.schedulerRegistry.addCronJob('live-catchup-recovery', job);
-    job.start();
+    this.schedulerRegistry.addCronJob('live-catchup-recheck', recheckJob);
+    recheckJob.start();
   }
 
   @NewTrace('cron.live-catchup-recovery')
