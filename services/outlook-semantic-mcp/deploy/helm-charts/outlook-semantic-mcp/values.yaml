@@ -211,6 +211,9 @@ mcpConfig:
     # -- Optional. Cron schedule for stuck live catch-up recovery scans.
     # Default: '*/5 * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECOVERY_CRON
     # liveCatchupRecoveryCron: "*/5 * * * *"
+    # -- Optional. Cron schedule for live catch-up ready-recheck runs.
+    # Default: '* * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECHECK_CRON
+    # liveCatchupRecheckCron: "* * * * *"
     # -- Optional. Cron schedule for stuck inbox deletion recovery scans.
     # Default: '*/5 * * * *'. Env var: INGESTION_DELETE_INBOX_RECOVERY_CRON
     # deleteInboxRecoveryCron: "*/5 * * * *"

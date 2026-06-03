@@ -15,6 +15,9 @@ INGESTION_FULL_SYNC_RECOVERY_CRON: {{ .ingestion.fullSyncRecoveryCron | quote }}
 {{- if .ingestion.liveCatchupRecoveryCron }}
 INGESTION_LIVE_CATCHUP_RECOVERY_CRON: {{ .ingestion.liveCatchupRecoveryCron | quote }}
 {{- end }}
+{{- if .ingestion.liveCatchupRecheckCron }}
+INGESTION_LIVE_CATCHUP_RECHECK_CRON: {{ .ingestion.liveCatchupRecheckCron | quote }}
+{{- end }}
 {{- if .ingestion.deleteInboxRecoveryCron }}
 INGESTION_DELETE_INBOX_RECOVERY_CRON: {{ .ingestion.deleteInboxRecoveryCron | quote }}
 {{- end }}
