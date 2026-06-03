@@ -2,11 +2,17 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
+import { and, eq, exists, inArray, lt, not, or, sql } from 'drizzle-orm';
 import z from 'zod';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
+import {
+  delegatedAccessAccounts,
+  DRIZZLE,
+  DrizzleDatabase,
+  inboxConfigurations,
+  userProfiles,
+} from '~/db';
 import { NewTrace, traceEvent } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
 import {
@@ -15,6 +21,7 @@ import {
   RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES,
 } from './live-catch-up/live-catch-up.command';
 import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
+import { selectUserProfileIdsWhichCanRunTheSyncProcess } from './sync-scheduler.utils';
 
 @Injectable()
 export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -107,33 +114,28 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
 
   private async recoverStuckLiveCatchUps(): Promise<void> {
     const stuckConfigs = await this.db
-      .select({
-        userProfileId: inboxConfigurations.userProfileId,
-        subscriptionId: subscriptions.subscriptionId,
-        liveCatchUpState: inboxConfigurations.liveCatchUpState,
-      })
+      .select({ userProfileId: inboxConfigurations.userProfileId })
       .from(inboxConfigurations)
-      .innerJoin(
-        subscriptions,
-        and(
-          eq(subscriptions.userProfileId, inboxConfigurations.userProfileId),
-          gt(subscriptions.expiresAt, sql`NOW()`),
-        ),
-      )
       .where(
-        or(
-          and(
-            eq(inboxConfigurations.liveCatchUpState, 'failed'),
-            lt(
-              inboxConfigurations.liveCatchUpHeartbeatAt,
-              getThreshold(FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES),
-            ),
+        and(
+          inArray(
+            inboxConfigurations.userProfileId,
+            selectUserProfileIdsWhichCanRunTheSyncProcess(this.db),
           ),
-          and(
-            eq(inboxConfigurations.liveCatchUpState, 'running'),
-            lt(
-              inboxConfigurations.liveCatchUpHeartbeatAt,
-              getThreshold(RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES),
+          or(
+            and(
+              eq(inboxConfigurations.liveCatchUpState, 'failed'),
+              lt(
+                inboxConfigurations.liveCatchUpHeartbeatAt,
+                getThreshold(FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES),
+              ),
+            ),
+            and(
+              eq(inboxConfigurations.liveCatchUpState, 'running'),
+              lt(
+                inboxConfigurations.liveCatchUpHeartbeatAt,
+                getThreshold(RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES),
+              ),
             ),
           ),
         ),
@@ -144,32 +146,27 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     }
 
     await this.rerunLiveCatchups(
-      stuckConfigs.map(({ subscriptionId }) =>
+      stuckConfigs.map(({ userProfileId }) =>
         LiveCatchUpEventDto.parse({
           type: 'unique.outlook-semantic-mcp.live-catch-up.execute',
-          payload: { subscriptionId },
+          payload: { userProfileId },
         }),
       ),
     );
+
+    await this.logSharedMailboxesWithNoDelegates();
   }
 
   private async rerunReadyLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
     const stuckConfigs = await this.db
-      .select({
-        userProfileId: inboxConfigurations.userProfileId,
-        subscriptionId: subscriptions.subscriptionId,
-        liveCatchUpState: inboxConfigurations.liveCatchUpState,
-      })
+      .select({ userProfileId: inboxConfigurations.userProfileId })
       .from(inboxConfigurations)
-      .innerJoin(
-        subscriptions,
-        and(
-          eq(subscriptions.userProfileId, inboxConfigurations.userProfileId),
-          gt(subscriptions.expiresAt, sql`NOW()`),
-        ),
-      )
       .where(
-        or(
+        and(
+          inArray(
+            inboxConfigurations.userProfileId,
+            selectUserProfileIdsWhichCanRunTheSyncProcess(this.db),
+          ),
           and(
             eq(inboxConfigurations.liveCatchUpState, 'ready'),
             lt(
@@ -185,13 +182,15 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     }
 
     await this.rerunLiveCatchups(
-      stuckConfigs.map(({ subscriptionId }) =>
+      stuckConfigs.map(({ userProfileId }) =>
         LiveCatchUpEventDto.parse({
           type: 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck',
-          payload: { subscriptionId },
+          payload: { userProfileId },
         }),
       ),
     );
+
+    await this.logSharedMailboxesWithNoDelegates();
   }
 
   private async rerunLiveCatchups(events: z.infer<typeof LiveCatchUpEventDto>[]): Promise<void> {
@@ -204,7 +203,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
 
     traceEvent('live-catch-up stuck recovery triggered', {
       count: events.length,
-      subscriptionIds: events.map((event) => event.payload.subscriptionId ?? null),
+      userProfileIds: events.map((event) => event.payload.userProfileId ?? null),
     });
 
     this.logger.log({
@@ -215,9 +214,32 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     for (const event of events) {
       this.logger.log({
         msg: `Publishing live catch-up: ${event.type}`,
-        subscriptionId: event.payload.subscriptionId ?? null,
+        userProfileId: event.payload.userProfileId ?? null,
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
+    }
+  }
+
+  private async logSharedMailboxesWithNoDelegates(): Promise<void> {
+    const configs = await this.db
+      .select({ userProfileId: inboxConfigurations.userProfileId })
+      .from(inboxConfigurations)
+      .innerJoin(userProfiles, eq(userProfiles.id, inboxConfigurations.userProfileId))
+      .where(
+        and(
+          eq(userProfiles.source, 'shared-mailbox'),
+          not(
+            exists(
+              this.db
+                .select({ one: sql`1` })
+                .from(delegatedAccessAccounts)
+                .where(eq(delegatedAccessAccounts.ownerUserId, inboxConfigurations.userProfileId)),
+            ),
+          ),
+        ),
+      );
+    for (const { userProfileId } of configs) {
+      this.logger.warn({ userProfileId, msg: 'Shared-mailbox inbox config has no delegates' });
     }
   }
 }
