@@ -204,7 +204,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
 
     traceEvent('live-catch-up stuck recovery triggered', {
       count: events.length,
-      subscriptionIds: events.map((subscription) => subscription.payload.subscriptionId),
+      subscriptionIds: events.map((event) => event.payload.subscriptionId ?? null),
     });
 
     this.logger.log({
@@ -215,7 +215,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     for (const event of events) {
       this.logger.log({
         msg: `Publishing live catch-up: ${event.type}`,
-        subscriptionId: event.payload.subscriptionId,
+        subscriptionId: event.payload.subscriptionId ?? null,
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
     }

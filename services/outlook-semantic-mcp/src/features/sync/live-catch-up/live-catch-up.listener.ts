@@ -43,20 +43,30 @@ export class LiveCatchUpListener {
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.live-catch-up.execute': {
         await this.updateLastNotificationReceivedAt(
-          event.payload.subscriptionId,
+          event.payload.subscriptionId ?? null,
           event.payload.notificationReceivedAt,
         );
-        await this.liveCatchUpCommand.run({
-          ...event.payload,
-          liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
-        });
+        if (event.payload.subscriptionId) {
+          await this.liveCatchUpCommand.run({
+            subscriptionId: event.payload.subscriptionId,
+            liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
+          });
+        } else {
+          // userProfileId-only path: wired in Task 7 (UN-21004)
+          this.logger.warn({ msg: 'execute event has no subscriptionId — not yet handled', userProfileId: event.payload.userProfileId });
+        }
         return;
       }
       case 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck': {
-        await this.liveCatchUpCommand.run({
-          ...event.payload,
-          liveCatchupOverlappingWindow: this.config.liveCatchupRecheckOverlappingWindowMinutes,
-        });
+        if (event.payload.subscriptionId) {
+          await this.liveCatchUpCommand.run({
+            subscriptionId: event.payload.subscriptionId,
+            liveCatchupOverlappingWindow: this.config.liveCatchupRecheckOverlappingWindowMinutes,
+          });
+        } else {
+          // userProfileId-only path: wired in Task 7 (UN-21004)
+          this.logger.warn({ msg: 'ready-recheck event has no subscriptionId — not yet handled', userProfileId: event.payload.userProfileId });
+        }
         return;
       }
       default: {
@@ -66,10 +76,10 @@ export class LiveCatchUpListener {
   }
 
   private async updateLastNotificationReceivedAt(
-    subscriptionId: string,
+    subscriptionId: string | null,
     notificationReceivedAt: Nullish<string>,
   ): Promise<void> {
-    if (!notificationReceivedAt) {
+    if (!subscriptionId || !notificationReceivedAt) {
       return;
     }
     const notificationTime = new Date(notificationReceivedAt);
