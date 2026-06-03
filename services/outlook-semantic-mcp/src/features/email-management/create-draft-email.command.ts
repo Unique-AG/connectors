@@ -12,14 +12,17 @@ const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string
 interface DraftEmailBase {
   subject: string;
   content: string;
-  ccRecipients?: Array<{ name?: string; email: string }>;
   attachments?: { fileName: string; data: string }[];
   chatId: string | null | undefined;
   mailbox?: string;
 }
 
 export type CreateDraftEmailInput =
-  | (DraftEmailBase & { type: 'draft'; toRecipients: Array<{ name?: string; email: string }> })
+  | (DraftEmailBase & {
+      type: 'draft';
+      toRecipients: Array<{ name?: string; email: string }>;
+      ccRecipients?: Array<{ name?: string; email: string }>;
+    })
   | (DraftEmailBase & { type: 'reply'; inReplyToMessageId: string });
 
 export type CreateDraftEmailResult =
@@ -98,7 +101,7 @@ export class CreateDraftEmailCommand {
         : {}),
     };
 
-    if (input.ccRecipients && input.ccRecipients.length > 0) {
+    if (input.type === 'draft' && input.ccRecipients && input.ccRecipients.length > 0) {
       messageFields.ccRecipients = input.ccRecipients.map((r) => ({
         emailAddress: { name: r.name, address: r.email },
       }));

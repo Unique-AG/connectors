@@ -15,17 +15,6 @@ const SharedEmailFields = z.object({
     .describe(
       'The body content of the draft email, written in Markdown. Supports paragraphs, line breaks, **bold**, *italic*, bullet and numbered lists, [links](https://example.com), blockquotes, and inline `code`. Raw HTML is not rendered (it is escaped) — use Markdown syntax instead.',
     ),
-  ccRecipients: z
-    .array(
-      z.object({
-        name: z.string().optional().describe('The display name of the CC recipient.'),
-        email: z.email().describe('The email address of the CC recipient.'),
-      }),
-    )
-    .optional()
-    .describe(
-      'The list of CC (carbon copy) recipients for the email. For reply drafts, Graph fills CC recipients from the original thread — omit this field when using type: "reply".',
-    ),
   attachments: z
     .array(
       z.object({
@@ -66,6 +55,15 @@ const FreshDraftInputSchema = SharedEmailFields.extend({
       }),
     )
     .describe('The list of primary recipients for the email.'),
+  ccRecipients: z
+    .array(
+      z.object({
+        name: z.string().optional().describe('The display name of the CC recipient.'),
+        email: z.email().describe('The email address of the CC recipient.'),
+      }),
+    )
+    .optional()
+    .describe('The list of CC (carbon copy) recipients for the email.'),
 });
 
 const ReplyDraftInputSchema = SharedEmailFields.extend({
