@@ -19,6 +19,8 @@ export interface CreateDraftEmailInput {
     data: string;
   }[];
   chatId: string | null | undefined;
+  mailbox?: string;
+  inReplyToMessageId?: string;
 }
 
 export type CreateDraftEmailResult =
@@ -60,6 +62,7 @@ export class CreateDraftEmailCommand {
       draftId: createDraftResult.draftId,
       attachments,
       chatId: input.chatId,
+      mailbox: input.mailbox,
     });
 
     if (!attachmentResult.attachmentsFailed.length) {
@@ -79,7 +82,9 @@ export class CreateDraftEmailCommand {
   ): Promise<CreateDraftEmailResult> {
     const userProfileIdString = userProfileId.toString();
 
-    const body: Record<string, unknown> = {
+    const prefix = input.mailbox ? `/users/${input.mailbox}` : '/me';
+
+    const messageFields: Record<string, unknown> = {
       subject: input.subject,
       body: {
         contentType: 'HTML',
@@ -91,23 +96,37 @@ export class CreateDraftEmailCommand {
     };
 
     if (input.ccRecipients && input.ccRecipients.length > 0) {
-      body.ccRecipients = input.ccRecipients.map((r) => ({
+      messageFields.ccRecipients = input.ccRecipients.map((r) => ({
         emailAddress: { name: r.name, address: r.email },
       }));
     }
 
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
+    let apiPath: string;
+    let body: Record<string, unknown>;
+    let successMessage: string;
+
+    if (input.inReplyToMessageId) {
+      apiPath = `${prefix}/messages/${input.inReplyToMessageId}/createReplyAll`;
+      body = { message: messageFields };
+      successMessage = 'Reply-all draft created successfully.';
+    } else {
+      apiPath = `${prefix}/messages`;
+      body = messageFields;
+      successMessage = 'Draft email created successfully.';
+    }
+
     try {
       const message = CreateMessageResponseSchema.parse(
-        await client.api('/me/messages').post(body),
+        await client.api(apiPath).post(body),
       );
 
       return {
         success: true,
         draftId: message.id,
         ...(message.webLink && { webLink: message.webLink }),
-        message: 'Draft email created successfully.',
+        message: successMessage,
       };
     } catch (err) {
       this.logger.error({

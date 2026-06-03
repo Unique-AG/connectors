@@ -15,6 +15,7 @@ export class UploadInMemoryAttachmentCommand {
     totalSize,
     mimeType,
     userProfileId,
+    mailbox,
   }: {
     client: Client;
     draftId: string;
@@ -23,7 +24,9 @@ export class UploadInMemoryAttachmentCommand {
     totalSize: number;
     mimeType: string;
     userProfileId: string;
+    mailbox?: string;
   }): Promise<{ status: 'success' }> {
+    const prefix = mailbox ? `/users/${mailbox}` : '/me';
     if (totalSize <= 3 * 1024 * 1024) {
       this.logger.log({
         msg: 'Uploading attachment via simple POST',
@@ -32,7 +35,7 @@ export class UploadInMemoryAttachmentCommand {
         fileName,
         sizeBytes: totalSize,
       });
-      await client.api(`/me/messages/${draftId}/attachments`).post({
+      await client.api(`${prefix}/messages/${draftId}/attachments`).post({
         '@odata.type': '#microsoft.graph.fileAttachment',
         name: fileName.value,
         contentBytes: data.toString('base64'),
@@ -52,7 +55,7 @@ export class UploadInMemoryAttachmentCommand {
     });
 
     const { uploadUrl } = UploadSessionSchema.parse(
-      await client.api(`/me/messages/${draftId}/attachments/createUploadSession`).post({
+      await client.api(`${prefix}/messages/${draftId}/attachments/createUploadSession`).post({
         AttachmentItem: {
           attachmentType: 'file',
           name: fileName.value,
