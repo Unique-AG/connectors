@@ -4,14 +4,14 @@ import { ConfluenceAuth } from '../confluence-auth.abstract';
 type PatAuthConfig = Extract<ConfluenceConfig['auth'], { mode: typeof AuthMode.Pat }>;
 
 export class PatAuthStrategy extends ConfluenceAuth {
-  private readonly token: string;
+  private readonly header: string;
 
   public constructor(authConfig: PatAuthConfig) {
     super();
-    this.token = authConfig.token.value;
+    this.header = `Bearer ${authConfig.token.value}`;
   }
 
-  public async acquireToken(): Promise<string> {
-    return this.token;
+  public async getAuthorizationHeader(): Promise<string> {
+    return this.header;
   }
 }
