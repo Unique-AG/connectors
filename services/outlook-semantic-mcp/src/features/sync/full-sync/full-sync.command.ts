@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Client } from '@microsoft/microsoft-graph-client';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
@@ -10,7 +11,10 @@ import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
 import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import {
+  isNoDelegatesResult,
+  MsGraphClientResolver,
+} from '~/msgraph/ms-graph-client-resolver.service';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
@@ -33,7 +37,7 @@ export class FullSyncCommand {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly graphClientFactory: GraphClientFactory,
+    private readonly msGraphClientResolver: MsGraphClientResolver,
     private readonly processFullSyncBatchCommand: ProcessFullSyncBatchCommand,
     private readonly getScopeIngestionStatsQuery: GetScopeIngestionStatsQuery,
     private readonly updateByVersionCommand: UpdateInboxConfigByVersionCommand,
@@ -114,20 +118,59 @@ export class FullSyncCommand {
       }
     }
 
-    try {
-      if (lockResult.shouldFetchCount) {
-        await this.fetchAndSaveExpectedTotal(userProfile.id, version, filters);
-      }
-      await this.metrics.measureFullSyncDirectorySync(() =>
-        this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
-      );
+    const graphBasePath =
+      userProfile.source === 'shared-mailbox' ? `users/${userProfileEmail}` : 'me';
 
-      const batchResult = await this.metrics.measureFullSyncBatch(() =>
-        this.processFullSyncBatchCommand.run({
-          userProfile: { ...userProfile, email: userProfileEmail },
-          version,
-        }),
-      );
+    try {
+      const resolverResult = await this.msGraphClientResolver.run({
+        userProfile: { ...userProfile, email: userProfileEmail },
+        fn: async ({ client, clientUserProfileId }) => {
+          if (lockResult.shouldFetchCount) {
+            await this.fetchAndSaveExpectedTotal({
+              client,
+              graphBasePath,
+              userProfileId: userProfile.id,
+              version,
+              filtersRaw: filters,
+            });
+          }
+          await this.metrics.measureFullSyncDirectorySync(() =>
+            this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
+          );
+
+          const batchResult = await this.metrics.measureFullSyncBatch(() =>
+            this.processFullSyncBatchCommand.run({
+              userProfile: { ...userProfile, email: userProfileEmail },
+              version,
+              client,
+              graphBasePath,
+            }),
+          );
+
+          if (userProfile.source === 'shared-mailbox') {
+            await this.db
+              .update(inboxConfigurations)
+              .set({ preferredDelegateUserProfileId: clientUserProfileId })
+              .where(eq(inboxConfigurations.userProfileId, userProfile.id))
+              .execute();
+          }
+
+          return batchResult;
+        },
+        sharedMailboxConfig: {
+          preferredDelegateUserId: lockResult.preferredDelegateUserProfileId ?? undefined,
+        },
+      });
+
+      if (isNoDelegatesResult(resolverResult)) {
+        this.logger.log({
+          userProfileId: userProfile.id,
+          msg: 'No delegates found for shared-mailbox, skipping full sync',
+        });
+        return { status: 'skipped', reason: 'no-delegates' };
+      }
+
+      const batchResult = resolverResult;
 
       switch (batchResult.outcome) {
         case 'version-mismatch':
@@ -202,6 +245,7 @@ export class FullSyncCommand {
           newestLastModifiedDateTime: inboxConfigurations.newestLastModifiedDateTime,
           filters: inboxConfigurations.filters,
           deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
+          preferredDelegateUserProfileId: inboxConfigurations.preferredDelegateUserProfileId,
         })
         .from(inboxConfigurations)
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
@@ -257,6 +301,7 @@ export class FullSyncCommand {
         previousState,
         filters: row.filters,
         shouldFetchCount: isFreshStart || isNullish(row.fullSyncExpectedTotal),
+        preferredDelegateUserProfileId: row.preferredDelegateUserProfileId,
       };
     });
   }
@@ -300,16 +345,23 @@ export class FullSyncCommand {
     }
   }
 
-  private async fetchAndSaveExpectedTotal(
-    userProfileId: string,
-    version: string,
-    filtersRaw: Record<string, unknown>,
-  ): Promise<void> {
+  private async fetchAndSaveExpectedTotal({
+    client,
+    graphBasePath,
+    userProfileId,
+    version,
+    filtersRaw,
+  }: {
+    client: Client;
+    graphBasePath: string;
+    userProfileId: string;
+    version: string;
+    filtersRaw: Record<string, unknown>;
+  }): Promise<void> {
     try {
-      const client = this.graphClientFactory.createClientForUser(userProfileId);
       const filters = inboxConfigurationMailFilters.parse(filtersRaw);
       const count = (await client
-        .api('me/messages/$count')
+        .api(`${graphBasePath}/messages/$count`)
         .filter(
           `receivedDateTime ge ${computeRetentionCutoffDate(filters.retentionWindowInDays).toISOString()}`,
         )

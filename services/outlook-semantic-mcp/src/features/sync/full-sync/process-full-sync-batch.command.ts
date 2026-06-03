@@ -15,7 +15,6 @@ import {
 import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { greatestFrom } from '~/utils/greatest-from';
@@ -49,7 +48,6 @@ export class ProcessFullSyncBatchCommand {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly graphClientFactory: GraphClientFactory,
     private readonly processEmailCommand: ProcessEmailCommand,
     private readonly updateByVersionCommand: UpdateInboxConfigByVersionCommand,
     private readonly findConfigByVersion: FindInboxConfigByVersionQuery,
@@ -61,9 +59,13 @@ export class ProcessFullSyncBatchCommand {
   public async run({
     userProfile,
     version,
+    client,
+    graphBasePath,
   }: {
     userProfile: NonNullishProps<UserProfile, 'email'>;
     version: string;
+    client: Client;
+    graphBasePath: string;
   }): Promise<BatchResult> {
     traceAttrs({ userProfileId: userProfile.id, version });
 
@@ -83,7 +85,6 @@ export class ProcessFullSyncBatchCommand {
 
     const { fullSyncNextLink, fullSyncBatchIndex } = config;
     const filters = inboxConfigurationMailFilters.parse(config.filters);
-    const client = this.graphClientFactory.createClientForUser(userProfile.id);
 
     this.logger.log({
       userProfileId: userProfile.id,
@@ -133,6 +134,7 @@ export class ProcessFullSyncBatchCommand {
       iterationInfo.pageNumber++;
       const fetchPageResult = await this.fetchPage({
         client,
+        graphBasePath,
         nextLink: iterationInfo.nextLink,
         filters,
         userProfileId: iterationInfo.userProfileId,
@@ -190,7 +192,7 @@ export class ProcessFullSyncBatchCommand {
           fileKey,
           filters,
           graphMessage: message,
-          graphBasePath: 'me',
+          graphBasePath,
         });
 
         const updateObject: InboxConfigVersionedUpdate = {};
@@ -291,12 +293,14 @@ export class ProcessFullSyncBatchCommand {
   @Span()
   private async fetchPage({
     client,
+    graphBasePath,
     nextLink,
     filters,
     userProfileId,
     version,
   }: {
     client: Client;
+    graphBasePath: string;
     nextLink: string;
     filters: InboxConfigurationMailFilters;
     userProfileId: string;
@@ -317,7 +321,7 @@ export class ProcessFullSyncBatchCommand {
 
     if (nextLink === START_FULL_SYNC_LINK) {
       const raw = await this.metrics.measureGraphPage(
-        () => this.fetchFirstPage(client, conditions),
+        () => this.fetchFirstPage(client, graphBasePath, conditions),
         'first',
       );
       return {
@@ -360,7 +364,7 @@ export class ProcessFullSyncBatchCommand {
     );
     conditions.push(`receivedDateTime le ${freshConfig.oldestReceivedEmailDateTime.toISOString()}`);
     const raw = await this.metrics.measureGraphPage(
-      () => this.fetchFirstPage(client, conditions),
+      () => this.fetchFirstPage(client, graphBasePath, conditions),
       'next',
     );
     return {
@@ -370,9 +374,13 @@ export class ProcessFullSyncBatchCommand {
     };
   }
 
-  private async fetchFirstPage(client: Client, conditions: string[]): Promise<unknown> {
+  private async fetchFirstPage(
+    client: Client,
+    graphBasePath: string,
+    conditions: string[],
+  ): Promise<unknown> {
     return client
-      .api('me/messages')
+      .api(`${graphBasePath}/messages`)
       .header('Prefer', 'IdType="ImmutableId"')
       .select(GraphMessageFields)
       .filter(conditions.join(' and '))

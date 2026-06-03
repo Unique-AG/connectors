@@ -73,14 +73,6 @@ function createMockGraphApi() {
   return api;
 }
 
-function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGraphApi>) {
-  return {
-    createClientForUser: vi.fn().mockReturnValue({
-      api: vi.fn().mockReturnValue(graphApi),
-    }),
-  };
-}
-
 function createMockIngestEmailCommand(shouldFail = false) {
   const run = shouldFail
     ? vi.fn().mockResolvedValue('failed')
@@ -130,6 +122,10 @@ function createMockUniqueApi() {
   };
 }
 
+function createMockClient(graphApi: ReturnType<typeof createMockGraphApi>) {
+  return { api: vi.fn().mockReturnValue(graphApi) };
+}
+
 function createCommand({
   graphApi = createMockGraphApi(),
   ingestCommand = createMockIngestEmailCommand(),
@@ -142,14 +138,13 @@ function createCommand({
   findConfig?: ReturnType<typeof createMockFindConfigByVersion>;
 } = {}) {
   const command = new ProcessFullSyncBatchCommand(
-    createMockGraphClientFactory(graphApi) as any,
     ingestCommand as any,
     updateCommand as any,
     findConfig as any,
     createMockUniqueApi() as any,
     createMockMetricService() as any,
   );
-  return command;
+  return { command, client: createMockClient(graphApi) };
 }
 
 // ---------------------------------------------------------------------------
@@ -168,9 +163,9 @@ describe('ProcessFullSyncBatchCommand', () => {
   describe('version mismatch on config load', () => {
     it('returns version-mismatch when config is not found', async () => {
       const findConfig = { run: vi.fn().mockResolvedValue(null) };
-      const command = createCommand({ findConfig });
+      const { command, client } = createCommand({ findConfig });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'version-mismatch' });
     });
@@ -185,9 +180,9 @@ describe('ProcessFullSyncBatchCommand', () => {
           ignoredContents: [],
         },
       });
-      const command = createCommand({ findConfig });
+      const { command, client } = createCommand({ findConfig });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'missing-full-sync-next-link' });
     });
@@ -213,9 +208,9 @@ describe('ProcessFullSyncBatchCommand', () => {
         },
       });
       const ingestCommand = createMockIngestEmailCommand();
-      const command = createCommand({ graphApi, findConfig, ingestCommand });
+      const { command, client } = createCommand({ graphApi, findConfig, ingestCommand });
 
-      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       // Only msg-2 (index 2) should be processed; msg-0 and msg-1 should be skipped
       expect(ingestCommand.run).toHaveBeenCalledTimes(1);
@@ -245,9 +240,9 @@ describe('ProcessFullSyncBatchCommand', () => {
       });
       const updateCommand = createMockUpdateByVersionCommand();
       const ingestCommand = createMockIngestEmailCommand();
-      const command = createCommand({ graphApi, findConfig, updateCommand, ingestCommand });
+      const { command, client } = createCommand({ graphApi, findConfig, updateCommand, ingestCommand });
 
-      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       // Both messages processed
       expect(ingestCommand.run).toHaveBeenCalledTimes(2);
@@ -289,9 +284,9 @@ describe('ProcessFullSyncBatchCommand', () => {
         },
       });
       const ingestCommand = createMockIngestEmailCommand();
-      const command = createCommand({ graphApi, findConfig, ingestCommand });
+      const { command, client } = createCommand({ graphApi, findConfig, ingestCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'completed' });
       // Page 1 fetched once then advanced — not fetched repeatedly
@@ -324,9 +319,9 @@ describe('ProcessFullSyncBatchCommand', () => {
         },
       });
       const ingestCommand = createMockIngestEmailCommand();
-      const command = createCommand({ graphApi, findConfig, ingestCommand });
+      const { command, client } = createCommand({ graphApi, findConfig, ingestCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'completed' });
       expect(ingestCommand.run).toHaveBeenCalledTimes(1);
@@ -354,9 +349,9 @@ describe('ProcessFullSyncBatchCommand', () => {
         },
       });
       const ingestCommand = createMockIngestEmailCommand();
-      const command = createCommand({ graphApi, findConfig, ingestCommand });
+      const { command, client } = createCommand({ graphApi, findConfig, ingestCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'completed' });
       expect(ingestCommand.run).not.toHaveBeenCalled();
@@ -383,9 +378,9 @@ describe('ProcessFullSyncBatchCommand', () => {
         },
       });
       const updateCommand = createMockUpdateByVersionCommand();
-      const command = createCommand({ graphApi, findConfig, updateCommand });
+      const { command, client } = createCommand({ graphApi, findConfig, updateCommand });
 
-      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       // Watermark update should save batchIndex=0 and advance nextLink
       expect(updateCommand.run).toHaveBeenCalledWith(
@@ -417,9 +412,9 @@ describe('ProcessFullSyncBatchCommand', () => {
         },
       });
       const ingestCommand = createMockIngestEmailCommand();
-      const command = createCommand({ graphApi, findConfig, ingestCommand });
+      const { command, client } = createCommand({ graphApi, findConfig, ingestCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'completed' });
       expect(ingestCommand.run).toHaveBeenCalledTimes(1);
@@ -444,9 +439,9 @@ describe('ProcessFullSyncBatchCommand', () => {
         },
       });
       const ingestCommand = createMockIngestEmailCommand();
-      const command = createCommand({ graphApi, findConfig, ingestCommand });
+      const { command, client } = createCommand({ graphApi, findConfig, ingestCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'completed' });
       expect(ingestCommand.run).not.toHaveBeenCalled();
@@ -468,9 +463,9 @@ describe('ProcessFullSyncBatchCommand', () => {
         },
       });
       const ingestCommand = createMockIngestEmailCommand();
-      const command = createCommand({ graphApi, findConfig, ingestCommand });
+      const { command, client } = createCommand({ graphApi, findConfig, ingestCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'completed' });
       expect(ingestCommand.run).toHaveBeenCalledTimes(2);
@@ -507,9 +502,9 @@ describe('ProcessFullSyncBatchCommand', () => {
           ignoredContents: [],
         },
       });
-      const command = createCommand({ graphApi, findConfig });
+      const { command, client } = createCommand({ graphApi, findConfig });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'batch-uploaded' });
     });
@@ -526,9 +521,9 @@ describe('ProcessFullSyncBatchCommand', () => {
       graphApi.get.mockResolvedValue(makeGraphResponse(messages, `NEXT_LINK`));
 
       const updateCommand = createMockUpdateByVersionCommand();
-      const command = createCommand({ graphApi, updateCommand });
+      const { command, client } = createCommand({ graphApi, updateCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'batch-uploaded' });
       // Saves batch index at position 100 (the next message to process)
@@ -546,9 +541,9 @@ describe('ProcessFullSyncBatchCommand', () => {
       graphApi.get.mockResolvedValue(makeGraphResponse(messages));
 
       const updateCommand = createMockUpdateByVersionCommand();
-      const command = createCommand({ graphApi, updateCommand });
+      const { command, client } = createCommand({ graphApi, updateCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       // Must be 'completed', NOT 'batch-uploaded'.
       // Previously this returned 'batch-uploaded' and saved fullSyncNextLink=null,
@@ -563,9 +558,9 @@ describe('ProcessFullSyncBatchCommand', () => {
 
       // Return 'skipped' to simulate filtered messages
       const ingestCommand = { run: vi.fn().mockResolvedValue('skipped') };
-      const command = createCommand({ graphApi, ingestCommand });
+      const { command, client } = createCommand({ graphApi, ingestCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       // Should complete (not hit burst limit) since skipped messages don't count
       expect(result).toEqual({ outcome: 'completed' });
@@ -583,9 +578,9 @@ describe('ProcessFullSyncBatchCommand', () => {
       graphApi.get.mockResolvedValue(makeGraphResponse([makeMessage('msg-1')]));
 
       const updateCommand = createMockUpdateByVersionCommand();
-      const command = createCommand({ graphApi, updateCommand });
+      const { command, client } = createCommand({ graphApi, updateCommand });
 
-      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(updateCommand.run).toHaveBeenCalledWith(
         USER_PROFILE_ID,
@@ -611,9 +606,9 @@ describe('ProcessFullSyncBatchCommand', () => {
 
       const ingestCommand = { run: vi.fn().mockResolvedValue('skipped') };
       const updateCommand = createMockUpdateByVersionCommand();
-      const command = createCommand({ graphApi, ingestCommand, updateCommand });
+      const { command, client } = createCommand({ graphApi, ingestCommand, updateCommand });
 
-      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(updateCommand.run).toHaveBeenCalledWith(
         USER_PROFILE_ID,
@@ -639,9 +634,9 @@ describe('ProcessFullSyncBatchCommand', () => {
 
       const ingestCommand = createMockIngestEmailCommand(true);
       const updateCommand = createMockUpdateByVersionCommand();
-      const command = createCommand({ graphApi, ingestCommand, updateCommand });
+      const { command, client } = createCommand({ graphApi, ingestCommand, updateCommand });
 
-      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       // Failed counter incremented
       expect(updateCommand.run).toHaveBeenCalledWith(
@@ -673,9 +668,9 @@ describe('ProcessFullSyncBatchCommand', () => {
       graphApi.get.mockResolvedValue(makeGraphResponse([makeMessage('msg-1')]));
 
       const ingestCommand = createMockIngestEmailCommand(true);
-      const command = createCommand({ graphApi, ingestCommand });
+      const { command, client } = createCommand({ graphApi, ingestCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'completed' });
       expect(ingestCommand.run).toHaveBeenCalledTimes(1);
@@ -687,9 +682,9 @@ describe('ProcessFullSyncBatchCommand', () => {
 
       const ingestCommand = { run: vi.fn().mockResolvedValue('ingested') };
       const updateCommand = createMockUpdateByVersionCommand();
-      const command = createCommand({ graphApi, ingestCommand, updateCommand });
+      const { command, client } = createCommand({ graphApi, ingestCommand, updateCommand });
 
-      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(ingestCommand.run).toHaveBeenCalledTimes(1);
 
@@ -713,10 +708,10 @@ describe('ProcessFullSyncBatchCommand', () => {
             new Bottleneck.default.BottleneckError('This job has been dropped by Bottleneck'),
           ),
       };
-      const command = createCommand({ graphApi, ingestCommand });
+      const { command, client } = createCommand({ graphApi, ingestCommand });
 
       await expect(
-        command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION }),
+        command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' }),
       ).rejects.toThrow(Bottleneck.default.BottleneckError);
 
       // Should NOT retry — only one call
@@ -738,9 +733,9 @@ describe('ProcessFullSyncBatchCommand', () => {
         .mockResolvedValueOnce(makeGraphResponse([makeMessage('msg-2')]));
 
       const ingestCommand = createMockIngestEmailCommand();
-      const command = createCommand({ graphApi, ingestCommand });
+      const { command, client } = createCommand({ graphApi, ingestCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'completed' });
       expect(ingestCommand.run).toHaveBeenCalledTimes(2);
@@ -751,9 +746,9 @@ describe('ProcessFullSyncBatchCommand', () => {
       graphApi.get.mockResolvedValue(makeGraphResponse([]));
 
       const ingestCommand = createMockIngestEmailCommand();
-      const command = createCommand({ graphApi, ingestCommand });
+      const { command, client } = createCommand({ graphApi, ingestCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'completed' });
       expect(ingestCommand.run).not.toHaveBeenCalled();
@@ -770,9 +765,9 @@ describe('ProcessFullSyncBatchCommand', () => {
       graphApi.get.mockResolvedValue(makeGraphResponse([makeMessage('msg-1')]));
 
       const updateCommand = createMockUpdateByVersionCommand(false);
-      const command = createCommand({ graphApi, updateCommand });
+      const { command, client } = createCommand({ graphApi, updateCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'version-mismatch' });
     });
@@ -787,9 +782,9 @@ describe('ProcessFullSyncBatchCommand', () => {
       const updateCommand = {
         run: vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false),
       };
-      const command = createCommand({ graphApi, updateCommand });
+      const { command, client } = createCommand({ graphApi, updateCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'version-mismatch' });
     });
@@ -808,9 +803,9 @@ describe('ProcessFullSyncBatchCommand', () => {
           return Promise.resolve(callCount <= 100);
         }),
       };
-      const command = createCommand({ graphApi, updateCommand });
+      const { command, client } = createCommand({ graphApi, updateCommand });
 
-      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      const result = await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(result).toEqual({ outcome: 'version-mismatch' });
     });
@@ -831,9 +826,9 @@ describe('ProcessFullSyncBatchCommand', () => {
       );
 
       const updateCommand = createMockUpdateByVersionCommand();
-      const command = createCommand({ graphApi, updateCommand });
+      const { command, client } = createCommand({ graphApi, updateCommand });
 
-      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION });
+      await command.run({ userProfile: MOCK_USER_PROFILE as any, version: VERSION, client: client as any, graphBasePath: 'me' });
 
       expect(updateCommand.run).toHaveBeenCalledWith(
         USER_PROFILE_ID,

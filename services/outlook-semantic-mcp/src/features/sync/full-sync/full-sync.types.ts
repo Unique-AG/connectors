@@ -16,6 +16,7 @@ export type LockDecision =
       previousState: InboxConfig['fullSyncState'];
       shouldFetchCount: boolean;
       filters: Record<string, unknown>;
+      preferredDelegateUserProfileId: string | null;
     };
 
 export type BatchResult =
