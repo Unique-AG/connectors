@@ -5,8 +5,9 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { and, eq, inArray, not, sql } from 'drizzle-orm';
-import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
-import { DRIZZLE, DrizzleDatabase, userProfiles } from '~/db';
+import { DelegatedAccessConfig, delegatedAccessConfig, IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
+import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
+import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { sleep } from '~/utils/sleep';
@@ -41,6 +42,8 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     @Inject(delegatedAccessConfig.KEY)
     private readonly config: DelegatedAccessConfig,
+    @Inject(ingestionConfig.KEY)
+    private readonly ingestionCfg: IngestionConfig,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly persistentCacheService: PersistentCacheService,
     private readonly schedulerRegistry: SchedulerRegistry,
@@ -247,7 +250,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       // silently strip the user's own token-based access and subject them to delegate-only
       // logic, which is the wrong behaviour for a real user who also happens to be listed
       // as a shared mailbox.
-      await this.db
+      const upsertedProfiles = await this.db
         .insert(userProfiles)
         .values(mappedProfiles)
         .onConflictDoUpdate({
@@ -257,7 +260,25 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
             username: sql.raw(`excluded.${userProfiles.username.name}`),
             displayName: sql.raw(`excluded.${userProfiles.displayName.name}`),
           },
-        });
+        })
+        .returning({ id: userProfiles.id, source: userProfiles.source });
+
+      if (this.ingestionCfg.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi) {
+        const ingestionCfg = this.ingestionCfg;
+        const sharedMailboxProfiles = upsertedProfiles.filter((p) => p.source === 'shared-mailbox');
+
+        if (sharedMailboxProfiles.length > 0) {
+          await this.db
+            .insert(inboxConfigurations)
+            .values(
+              sharedMailboxProfiles.map((profile) => ({
+                userProfileId: profile.id,
+                filters: serializeMailFilters(ingestionCfg.defaultMailFilters),
+              })),
+            )
+            .onConflictDoNothing();
+        }
+      }
     }
 
     // Only update the cache when every configured domain was successfully queried.
