@@ -104,9 +104,10 @@ export class MsGraphKqlSearchEmailsQuery {
     }
 
     const round1 = await this.executeBatchRound(allRequests, userProfile, outputTimeZone);
-    await sleep(round1.retryAfterMs);
+    if (round1.retryRequests.length > 0) {
+      await sleep(round1.retryAfterMs);
+    }
     const round2 = await this.executeBatchRound(round1.retryRequests, userProfile, outputTimeZone);
-
     const hits = [...round1.hits, ...round2.hits];
 
     const throttledMailboxes = round2.throttledMailboxes;
@@ -176,7 +177,7 @@ export class MsGraphKqlSearchEmailsQuery {
     }
     for (const mailbox of queriedMailboxesWithoutFullAccess) {
       summaryParts.push(
-        `Could search in mailbox ${mailbox} — Microsoft does not offer an api to search in shared folders from this mailbox.`,
+        `Could not search in mailbox ${mailbox} — Microsoft does not offer an api to search in shared folders from this mailbox.`,
       );
     }
     for (const { mailbox, folder } of skippedFolders) {
