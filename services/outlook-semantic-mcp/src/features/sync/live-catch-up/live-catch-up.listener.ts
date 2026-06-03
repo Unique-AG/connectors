@@ -46,27 +46,17 @@ export class LiveCatchUpListener {
           event.payload.subscriptionId ?? null,
           event.payload.notificationReceivedAt,
         );
-        if (event.payload.subscriptionId) {
-          await this.liveCatchUpCommand.run({
-            subscriptionId: event.payload.subscriptionId,
-            liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
-          });
-        } else {
-          // userProfileId-only path: wired in Task 7 (UN-21004)
-          this.logger.warn({ msg: 'execute event has no subscriptionId — not yet handled', userProfileId: event.payload.userProfileId });
-        }
+        await this.liveCatchUpCommand.run({
+          ...event.payload,
+          liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
+        });
         return;
       }
       case 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck': {
-        if (event.payload.subscriptionId) {
-          await this.liveCatchUpCommand.run({
-            subscriptionId: event.payload.subscriptionId,
-            liveCatchupOverlappingWindow: this.config.liveCatchupRecheckOverlappingWindowMinutes,
-          });
-        } else {
-          // userProfileId-only path: wired in Task 7 (UN-21004)
-          this.logger.warn({ msg: 'ready-recheck event has no subscriptionId — not yet handled', userProfileId: event.payload.userProfileId });
-        }
+        await this.liveCatchUpCommand.run({
+          ...event.payload,
+          liveCatchupOverlappingWindow: this.config.liveCatchupRecheckOverlappingWindowMinutes,
+        });
         return;
       }
       default: {

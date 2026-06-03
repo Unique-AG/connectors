@@ -61,11 +61,13 @@ export class LiveCatchUpCommand {
   ) {}
 
   @NewTrace('live-catchup')
-  public async run(input: {
-    liveCatchupOverlappingWindow: number;
-    subscriptionId: string;
-  }): Promise<LiveCatchupResult> {
-    traceAttrs({ subscriptionId: input.subscriptionId });
+  public async run(
+    input: { liveCatchupOverlappingWindow: number } & (
+      | { subscriptionId: string; userProfileId?: string }
+      | { subscriptionId?: string; userProfileId: string }
+    ),
+  ): Promise<LiveCatchupResult> {
+    traceAttrs({ subscriptionId: input.subscriptionId, userProfileId: input.userProfileId });
     return this.metrics.measureLiveCatchupRun(() =>
       withRetryAttempts<LiveCatchupResult>({
         fn: () => this.runLiveCatchup(input),
@@ -73,6 +75,7 @@ export class LiveCatchUpCommand {
           this.logger.warn({
             msg: `Live catchup failed`,
             subscriptionId: input.subscriptionId,
+            userProfileId: input.userProfileId,
             err,
           });
           return { status: 'failed', err };
@@ -84,36 +87,39 @@ export class LiveCatchUpCommand {
   @Span()
   public async runLiveCatchup({
     subscriptionId,
+    userProfileId,
     liveCatchupOverlappingWindow,
   }: {
     liveCatchupOverlappingWindow: number;
-    subscriptionId: string;
-  }): Promise<LiveCatchupResult> {
-    traceAttrs({ subscriptionId });
+  } & (
+    | { subscriptionId: string; userProfileId?: string }
+    | { subscriptionId?: string; userProfileId: string }
+  )): Promise<LiveCatchupResult> {
+    traceAttrs({ subscriptionId, userProfileId });
     this.logger.debug({
       subscriptionId,
+      userProfileId,
       msg: 'Live catch-up triggered',
     });
     if (this.config.mcpBackend === 'MicrosoftGraph') {
       return { status: 'skipped' };
     }
 
-    const userProfileRow = await this.db
-      .select({ userProfile: userProfiles })
-      .from(subscriptions)
-      .innerJoin(userProfiles, eq(subscriptions.userProfileId, userProfiles.id))
-      .where(eq(subscriptions.subscriptionId, subscriptionId))
-      .then((rows) => rows[0]);
-    if (!userProfileRow) {
+    const resolvedUserProfile: UserProfile | undefined = await this.resolveUserProfile({
+      subscriptionId,
+      userProfileId,
+    });
+
+    if (!resolvedUserProfile) {
       return { status: 'skipped' };
     }
-    if (await this.isInboxDeletingQuery.run(userProfileRow.userProfile.id)) {
+    if (await this.isInboxDeletingQuery.run(resolvedUserProfile.id)) {
       return { status: 'skipped' };
     }
 
-    const userProfileEmail = userProfileRow.userProfile.email;
-    assert.ok(userProfileEmail, `Missing email for: ${userProfileRow.userProfile.id}`);
-    const userProfile = { ...userProfileRow.userProfile, email: userProfileEmail };
+    const userProfileEmail = resolvedUserProfile.email;
+    assert.ok(userProfileEmail, `Missing email for: ${resolvedUserProfile.id}`);
+    const userProfile = { ...resolvedUserProfile, email: userProfileEmail };
 
     const lockResult = await this.acquireLock(userProfile.id);
     if (lockResult.status === 'skip') {
@@ -188,6 +194,29 @@ export class LiveCatchUpCommand {
     return finalOutput;
   }
 
+  private async resolveUserProfile({
+    subscriptionId,
+    userProfileId,
+  }: {
+    subscriptionId: string | undefined;
+    userProfileId: string | undefined;
+  }) {
+    if (subscriptionId) {
+      const row = await this.db
+        .select({ userProfile: userProfiles })
+        .from(subscriptions)
+        .innerJoin(userProfiles, eq(subscriptions.userProfileId, userProfiles.id))
+        .where(eq(subscriptions.subscriptionId, subscriptionId))
+        .then((rows) => rows[0]);
+      return row?.userProfile;
+    }
+
+    assert.ok(userProfileId, 'Either subscriptionId or userProfileId must be provided');
+    return await this.db.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userProfileId),
+    });
+  }
+
   private async acquireLock(
     userProfileId: string,
   ): Promise<
@@ -257,10 +286,13 @@ export class LiveCatchUpCommand {
     watermark: Date;
     filters: InboxConfigurationMailFilters;
     userProfile: NonNullishProps<UserProfile, 'email'>;
-    subscriptionId: string;
+    subscriptionId?: string;
     liveCatchupOverlappingWindow: number;
   }): Promise<LiveCatchupRoundResult> {
-    const logProps = Object.freeze({ userProfileId: userProfile.id, subscriptionId });
+    const logProps = Object.freeze({
+      userProfileId: userProfile.id,
+      ...(subscriptionId ? { subscriptionId } : {}),
+    });
 
     try {
       await this.metrics.measureLiveCatchupDirectorySync(() =>
