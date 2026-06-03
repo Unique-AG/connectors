@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.13](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.12...teams-mcp@0.2.13) (2026-06-03)
+
+
+### Features
+
+* **teams-mcp:** add ingest_meeting tool for on-demand transcript ingestion ([#594](https://github.com/Unique-AG/connectors/issues/594)) ([105e01c](https://github.com/Unique-AG/connectors/commit/105e01c9e850eb3bc0cb4a1e8d8ae45ab59bca84))
+* **teams-mcp:** tag Teams content with shared source + lock scopes via externalId [UN-20155] ([#592](https://github.com/Unique-AG/connectors/issues/592)) ([1cc0cda](https://github.com/Unique-AG/connectors/commit/1cc0cda55700a9b6dae1a9eb4a370efc5b11cb9b))
+
 ## [0.2.12](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.11...teams-mcp@0.2.12) (2026-06-01)
 
 
