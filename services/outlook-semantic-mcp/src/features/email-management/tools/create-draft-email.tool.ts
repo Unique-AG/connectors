@@ -54,6 +54,18 @@ const CreateDraftEmailInputSchema = z.object({
     .describe(
       'Files to attach to the draft. Each entry pairs a display file name with a URI pointing to the file content. Omit entirely when no attachments are needed.',
     ),
+  mailbox: z
+    .string()
+    .optional()
+    .describe(
+      'UPN of the shared mailbox to create the draft in (e.g. "support@company.com"). Omit to create the draft in the signed-in user\'s own mailbox.',
+    ),
+  inReplyToMessageId: z
+    .string()
+    .optional()
+    .describe(
+      'Graph message ID of the email to reply to. When provided, a reply-all draft is created with all original recipients pre-filled. Omit for a fresh draft.',
+    ),
 });
 
 const CreateDraftEmailOutputSchema = z.object({
@@ -116,9 +128,16 @@ export class CreateDraftEmailTool {
   ) {
     const userProfileId = extractUserProfileId(request);
     const chatId = _context.mcpRequest.params._meta?.chatId;
-    return this.createDraftEmailCommand.run(userProfileId, {
+    const result = await this.createDraftEmailCommand.run(userProfileId, {
       ...input,
       chatId: isString(chatId) ? chatId : null,
     });
+    if (input.inReplyToMessageId && result.success) {
+      return {
+        ...result,
+        message: `${result.message} All original recipients are pre-filled — review before sending.`,
+      };
+    }
+    return result;
   }
 }

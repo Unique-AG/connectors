@@ -103,30 +103,29 @@ export class CreateDraftEmailCommand {
 
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
-    let apiPath: string;
-    let body: Record<string, unknown>;
-    let successMessage: string;
-
-    if (input.inReplyToMessageId) {
-      apiPath = `${prefix}/messages/${input.inReplyToMessageId}/createReplyAll`;
-      body = { message: messageFields };
-      successMessage = 'Reply-all draft created successfully.';
-    } else {
-      apiPath = `${prefix}/messages`;
-      body = messageFields;
-      successMessage = 'Draft email created successfully.';
-    }
+    const apiParams = input.inReplyToMessageId
+      ? {
+          // We draft the reply to all users by default.
+          apiPath: `${prefix}/messages/${input.inReplyToMessageId}/createReplyAll`,
+          body: { message: messageFields },
+          successMessage: 'Reply-all draft created successfully.',
+        }
+      : {
+          apiPath: `${prefix}/messages`,
+          body: messageFields,
+          successMessage: 'Draft email created successfully.',
+        };
 
     try {
       const message = CreateMessageResponseSchema.parse(
-        await client.api(apiPath).post(body),
+        await client.api(apiParams.apiPath).post(apiParams.body),
       );
 
       return {
         success: true,
         draftId: message.id,
         ...(message.webLink && { webLink: message.webLink }),
-        message: successMessage,
+        message: apiParams.successMessage,
       };
     } catch (err) {
       this.logger.error({
