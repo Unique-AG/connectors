@@ -63,6 +63,16 @@ export class FakeUniqueApi implements UniqueApiClient {
     registerContent: new Map(),
     finalizeIngestion: new Map(),
   };
+  /**
+   * Item keys the next `performFileDiff` should classify as `movedFiles`.
+   *
+   * Whether a file is "moved" is decided server-side by Unique (same logical
+   * resource re-keyed to a new location), so the per-`partialKey` diff this fake
+   * reimplements cannot derive it on its own. This seam lets a test inject that
+   * server verdict, mirroring the `failOn*` injection hooks, so the connector's
+   * handling of moved files can be exercised end-to-end.
+   */
+  private readonly movedItemKeys = new Set<string>();
 
   public constructor(private readonly initial: ScenarioUnique) {
     for (const scope of initial.scopes) {
@@ -141,10 +151,22 @@ export class FakeUniqueApi implements UniqueApiClient {
     this.failures.performFileDiff = error;
   }
 
+  /**
+   * Make the next `performFileDiff` report the given item keys as `movedFiles`
+   * instead of new/updated/deleted. See {@link movedItemKeys} for why this is
+   * injected rather than derived.
+   */
+  public simulateMovedFiles(itemKeys: string[]): void {
+    for (const key of itemKeys) {
+      this.movedItemKeys.add(key);
+    }
+  }
+
   public clearFailures(): void {
     this.failures.registerContent.clear();
     this.failures.finalizeIngestion.clear();
     this.failures.performFileDiff = undefined;
+    this.movedItemKeys.clear();
   }
 
   private buildScopesFacade(): UniqueApiClient['scopes'] {
@@ -380,6 +402,7 @@ export class FakeUniqueApi implements UniqueApiClient {
 
     const newFiles: string[] = [];
     const updatedFiles: string[] = [];
+    const movedFiles: string[] = [];
     const deletedFiles: string[] = [];
 
     const existingByItemKey = new Map<string, (typeof existing)[number]>();
@@ -389,6 +412,10 @@ export class FakeUniqueApi implements UniqueApiClient {
     }
 
     for (const [key, item] of submitted) {
+      if (this.movedItemKeys.has(key)) {
+        movedFiles.push(key);
+        continue;
+      }
       const found = existingByItemKey.get(key);
       if (!found) {
         newFiles.push(key);
@@ -400,12 +427,19 @@ export class FakeUniqueApi implements UniqueApiClient {
     }
 
     for (const [key] of existingByItemKey) {
+      if (this.movedItemKeys.has(key)) {
+        // A moved file is relocated server-side, never deleted.
+        if (!submitted.has(key)) {
+          movedFiles.push(key);
+        }
+        continue;
+      }
       if (!submitted.has(key)) {
         deletedFiles.push(key);
       }
     }
 
-    return { newFiles, updatedFiles, movedFiles: [], deletedFiles };
+    return { newFiles, updatedFiles, movedFiles, deletedFiles };
   }
 
   private requireScope(scopeId: string): Scope {

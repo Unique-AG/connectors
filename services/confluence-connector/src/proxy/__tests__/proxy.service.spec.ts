@@ -1,3 +1,4 @@
+import { createMock } from '@golevelup/ts-vitest';
 import type { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,13 +23,14 @@ vi.mock('node:fs', () => ({
 }));
 
 import { ProxyAgent } from 'undici';
+import type { ProxyConfigNamespaced } from '../../config';
 import { Redacted } from '../../utils/redacted';
 import { ProxyService } from '../proxy.service';
 
 function makeConfigService(proxyConfig: Record<string, unknown>) {
-  return {
+  return createMock<ConfigService<ProxyConfigNamespaced, true>>({
     get: vi.fn().mockReturnValue(proxyConfig),
-  } as unknown as ConfigService<Record<string, unknown>, true>;
+  });
 }
 
 describe('ProxyService', () => {

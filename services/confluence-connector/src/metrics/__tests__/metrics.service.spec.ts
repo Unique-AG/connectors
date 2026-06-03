@@ -1,19 +1,10 @@
+import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import type { Counter, Histogram, ObservableGauge } from '@opentelemetry/api';
 import type { MetricService } from 'nestjs-otel';
 import { describe, expect, it, vi } from 'vitest';
 import { createMockTenant } from '../../synchronization/__mocks__/sync.fixtures';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
 import { Metrics, SyncPhase } from '../metrics.service';
-
-interface MockHistogram {
-  record: ReturnType<typeof vi.fn>;
-}
-interface MockCounter {
-  add: ReturnType<typeof vi.fn>;
-}
-interface MockGauge {
-  addCallback: ReturnType<typeof vi.fn>;
-}
 
 function getOrThrow<V>(map: Map<string, V>, key: string): V {
   const val = map.get(key);
@@ -25,31 +16,31 @@ function getOrThrow<V>(map: Map<string, V>, key: string): V {
 
 function makeMetricService(): {
   metricService: MetricService;
-  histograms: Map<string, MockHistogram>;
-  counters: Map<string, MockCounter>;
-  gauges: Map<string, MockGauge>;
+  histograms: Map<string, DeepMocked<Histogram>>;
+  counters: Map<string, DeepMocked<Counter>>;
+  gauges: Map<string, DeepMocked<ObservableGauge>>;
 } {
-  const histograms = new Map<string, MockHistogram>();
-  const counters = new Map<string, MockCounter>();
-  const gauges = new Map<string, MockGauge>();
+  const histograms = new Map<string, DeepMocked<Histogram>>();
+  const counters = new Map<string, DeepMocked<Counter>>();
+  const gauges = new Map<string, DeepMocked<ObservableGauge>>();
 
-  const metricService = {
+  const metricService = createMock<MetricService>({
     getHistogram: vi.fn((name: string) => {
-      const h: MockHistogram = { record: vi.fn() };
+      const h = createMock<Histogram>();
       histograms.set(name, h);
-      return h as unknown as Histogram;
+      return h;
     }),
     getCounter: vi.fn((name: string) => {
-      const c: MockCounter = { add: vi.fn() };
+      const c = createMock<Counter>();
       counters.set(name, c);
-      return c as unknown as Counter;
+      return c;
     }),
     getObservableGauge: vi.fn((name: string) => {
-      const g: MockGauge = { addCallback: vi.fn() };
+      const g = createMock<ObservableGauge>();
       gauges.set(name, g);
-      return g as unknown as ObservableGauge;
+      return g;
     }),
-  } as unknown as MetricService;
+  });
 
   return { metricService, histograms, counters, gauges };
 }
