@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AllDelegatesFailedError, NO_DELEGATES } from '~/msgraph/ms-graph-client-resolver.service';
 import { LiveCatchUpCommand } from './live-catch-up.command';
 
 // ---------------------------------------------------------------------------
@@ -51,11 +52,12 @@ function createMockGraphApi() {
   return api;
 }
 
-function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGraphApi>) {
+function createMockMsGraphClientResolver(graphApi: ReturnType<typeof createMockGraphApi>) {
+  const client = { api: vi.fn().mockReturnValue(graphApi) };
   return {
-    createClientForUser: vi.fn().mockReturnValue({
-      api: vi.fn().mockReturnValue(graphApi),
-    }),
+    run: vi.fn().mockImplementation(async ({ fn }: { fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown> }) =>
+      fn({ client, clientUserProfileId: 'delegate-user-profile-id' }),
+    ),
   };
 }
 
@@ -80,7 +82,7 @@ function createMockDb({
   lockResult,
   betweenRoundsRow,
 }: {
-  subscription?: { userProfileId: string; userEmail: string; providerUserId: string } | undefined;
+  subscription?: { userProfileId: string; userEmail: string; providerUserId: string; source: 'oauth' | 'shared-mailbox' } | undefined;
   lockResult?: {
     liveCatchUpState: string;
     newestLastModifiedDateTime: Date | null;
@@ -171,14 +173,16 @@ function createCommand({
   ingestEmailCommand,
   db,
   syncDirectories,
+  resolver,
 }: {
   graphApi: ReturnType<typeof createMockGraphApi>;
   ingestEmailCommand: ReturnType<typeof createMockIngestEmailCommand>;
   syncDirectories: ReturnType<typeof createMockSyncDirectoriesCommand>;
   db: ReturnType<typeof createMockDb>;
+  resolver?: { run: ReturnType<typeof vi.fn> };
 }): LiveCatchUpCommand {
   return new LiveCatchUpCommand(
-    createMockGraphClientFactory(graphApi) as any,
+    (resolver ?? createMockMsGraphClientResolver(graphApi)) as any,
     ingestEmailCommand as any,
     syncDirectories as any,
     { run: vi.fn().mockResolvedValue(false) } as any,
@@ -224,6 +228,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'running',
@@ -249,6 +254,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'running',
@@ -273,6 +279,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'ready',
@@ -296,6 +303,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'ready',
@@ -319,6 +327,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'failed',
@@ -341,6 +350,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: undefined,
     });
@@ -365,6 +375,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'ready',
@@ -408,6 +419,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'ready',
@@ -439,6 +451,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'ready',
@@ -464,6 +477,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'ready',
@@ -489,6 +503,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'ready',
@@ -516,6 +531,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'ready',
@@ -544,6 +560,7 @@ describe('LiveCatchUpCommand', () => {
         userProfileId: USER_PROFILE_ID,
         userEmail: 'user@example.com',
         providerUserId: 'provider-id',
+        source: 'oauth' as const,
       },
       lockResult: {
         liveCatchUpState: 'ready',
@@ -563,5 +580,71 @@ describe('LiveCatchUpCommand', () => {
     expect(graphApi.filter).toHaveBeenCalledWith(
       `lastModifiedDateTime ge ${expectedWatermark.toISOString()}`,
     );
+  });
+
+  describe('MsGraphClientResolver paths', () => {
+    function makeReadyDb(source: 'oauth' | 'shared-mailbox' = 'oauth', userEmail = 'user@example.com') {
+      return createMockDb({
+        subscription: {
+          userProfileId: USER_PROFILE_ID,
+          userEmail,
+          providerUserId: 'provider-id',
+          source,
+        },
+        lockResult: {
+          liveCatchUpState: 'ready',
+          newestLastModifiedDateTime: WATERMARK,
+          liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
+          filters: DEFAULT_FILTERS,
+        },
+      });
+    }
+
+    it('NO_DELEGATES → result is skipped', async () => {
+      const resolver = { run: vi.fn().mockResolvedValue(NO_DELEGATES) };
+      const db = makeReadyDb();
+      const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories, resolver });
+
+      const result = await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+      expect(result).toEqual({ status: 'skipped' });
+    });
+
+    it('AllDelegatesFailedError → result is failed', async () => {
+      const resolver = { run: vi.fn().mockRejectedValue(new AllDelegatesFailedError(USER_PROFILE_ID)) };
+      const db = makeReadyDb();
+      const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories, resolver });
+
+      const result = await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+      expect(result).toEqual(expect.objectContaining({ status: 'failed' }));
+    });
+
+    it('shared-mailbox profile → graphBasePath uses users/{email}', async () => {
+      const sharedEmail = 'shared@example.com';
+      let capturedApiArg: string | undefined;
+      graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+      const resolver = {
+        run: vi.fn().mockImplementation(
+          async ({ fn }: { fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown> }) => {
+            const client = {
+              api: vi.fn().mockImplementation((path: string) => {
+                capturedApiArg ??= path;
+                return graphApi;
+              }),
+            };
+            return fn({ client, clientUserProfileId: 'delegate-user-profile-id' });
+          },
+        ),
+      };
+
+      const db = makeReadyDb('shared-mailbox', sharedEmail);
+      const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories, resolver });
+
+      await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+      expect(capturedApiArg).toBe(`users/${sharedEmail}/messages`);
+    });
   });
 });

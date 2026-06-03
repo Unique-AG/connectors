@@ -6,7 +6,15 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { AppConfig, appConfig } from '~/config';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions, userProfiles } from '~/db';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  inboxConfigurations,
+  subscriptions,
+  UserProfile,
+  userProfiles,
+} from '~/db';
+import { NonNullishProps } from '~/utils/non-nullish-props';
 import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
@@ -16,7 +24,10 @@ import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directo
 import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { getUniqueKeyForMessage } from '~/features/process-email/utils/get-unique-key-for-message';
 import { NewTrace, traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import {
+  isNoDelegatesResult,
+  MsGraphClientResolver,
+} from '~/msgraph/ms-graph-client-resolver.service';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { greatestFrom } from '~/utils/greatest-from';
@@ -29,7 +40,7 @@ import {
   graphMessagesResponseSchema,
 } from '../../process-email/dtos/microsoft-graph.dtos';
 import { ProcessEmailCommand } from '../../process-email/process-email.command';
-import type { LiveCatchupResult } from './live-catch-up.types';
+import type { LiveCatchupResult, LiveCatchupRoundResult } from './live-catch-up.types';
 
 export const RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES = 20;
 export const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
@@ -39,7 +50,7 @@ export const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 30;
 export class LiveCatchUpCommand {
   private readonly logger = new Logger(this.constructor.name);
   public constructor(
-    private readonly graphClientFactory: GraphClientFactory,
+    private readonly msGraphClientResolver: MsGraphClientResolver,
     private readonly processEmailCommand: ProcessEmailCommand,
     private readonly syncDirectoriesCommand: SyncDirectoriesCommand,
     private readonly isInboxDeletingQuery: IsInboxDeletingQuery,
@@ -88,11 +99,7 @@ export class LiveCatchUpCommand {
     }
 
     const userProfileRow = await this.db
-      .select({
-        userProfileId: userProfiles.id,
-        userEmail: userProfiles.email,
-        providerUserId: userProfiles.providerUserId,
-      })
+      .select({ userProfile: userProfiles })
       .from(subscriptions)
       .innerJoin(userProfiles, eq(subscriptions.userProfileId, userProfiles.id))
       .where(eq(subscriptions.subscriptionId, subscriptionId))
@@ -100,15 +107,15 @@ export class LiveCatchUpCommand {
     if (!userProfileRow) {
       return { status: 'skipped' };
     }
-    if (await this.isInboxDeletingQuery.run(userProfileRow.userProfileId)) {
+    if (await this.isInboxDeletingQuery.run(userProfileRow.userProfile.id)) {
       return { status: 'skipped' };
     }
 
-    const userProfileEmail = userProfileRow.userEmail;
-    assert.ok(userProfileEmail, `Missing email for: ${userProfileRow.userProfileId}`);
-    const userProfile = { ...userProfileRow, userEmail: userProfileEmail };
+    const userProfileEmail = userProfileRow.userProfile.email;
+    assert.ok(userProfileEmail, `Missing email for: ${userProfileRow.userProfile.id}`);
+    const userProfile = { ...userProfileRow.userProfile, email: userProfileEmail };
 
-    const lockResult = await this.acquireLock(userProfile.userProfileId);
+    const lockResult = await this.acquireLock(userProfile.id);
     if (lockResult.status === 'skip') {
       return { status: 'skipped' };
     }
@@ -128,15 +135,16 @@ export class LiveCatchUpCommand {
           this.runLiveCatchupWithLock({
             watermark: lockResult.watermark,
             filters: lockResult.filters,
-            user: {
-              email: userProfile.userEmail,
-              profileId: userProfile.userProfileId,
-              providerId: userProfile.providerUserId,
-            },
+            userProfile,
             subscriptionId,
             liveCatchupOverlappingWindow: overlappingWindowInMinutes,
           }),
         );
+
+        if (runResult.status === 'no-delegates') {
+          finalOutput = { status: 'skipped' };
+          break;
+        }
 
         if (runResult.status === 'failed') {
           if (isRateLimitError(runResult.err)) {
@@ -155,7 +163,7 @@ export class LiveCatchUpCommand {
             deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
           })
           .from(inboxConfigurations)
-          .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
+          .where(eq(inboxConfigurations.userProfileId, userProfile.id))
           .then((rows) => rows[0]);
 
         if (inboxConfiguration?.deletingInboxStartedAt) {
@@ -173,7 +181,7 @@ export class LiveCatchUpCommand {
       await this.db
         .update(inboxConfigurations)
         .set({ liveCatchUpState: finalStatus, liveCatchUpHeartbeatAt: sql`NOW()` })
-        .where(eq(inboxConfigurations.userProfileId, userProfile.userProfileId))
+        .where(eq(inboxConfigurations.userProfileId, userProfile.id))
         .execute();
     }
 
@@ -241,42 +249,59 @@ export class LiveCatchUpCommand {
 
   private async runLiveCatchupWithLock({
     watermark,
-    user,
+    userProfile,
     subscriptionId,
     filters,
     liveCatchupOverlappingWindow,
   }: {
     watermark: Date;
     filters: InboxConfigurationMailFilters;
-    user: { profileId: string; providerId: string; email: string };
+    userProfile: NonNullishProps<UserProfile, 'email'>;
     subscriptionId: string;
     liveCatchupOverlappingWindow: number;
-  }): Promise<
-    { status: 'success'; batchProcessingStartedAt: Date } | { status: 'failed'; err: unknown }
-  > {
-    const logProps = Object.freeze({ userProfileId: user.profileId, subscriptionId });
+  }): Promise<LiveCatchupRoundResult> {
+    const logProps = Object.freeze({ userProfileId: userProfile.id, subscriptionId });
 
     try {
       await this.metrics.measureLiveCatchupDirectorySync(() =>
-        this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(user.profileId)),
+        this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
       );
 
-      const client = this.graphClientFactory.createClientForUser(user.profileId);
+      const graphBasePath =
+        userProfile.source === 'shared-mailbox' ? `users/${userProfile.email}` : 'me';
 
-      const { batchProcessingStartedAt } = await this.processMessages({
-        user: {
-          email: createSmeared(user.email),
-          profileId: user.profileId,
-          providerId: user.providerId,
+      const resolverResult = await this.msGraphClientResolver.run({
+        userProfile,
+        fn: async ({ client }) => {
+          const { batchProcessingStartedAt } = await this.processMessages({
+            user: {
+              email: createSmeared(userProfile.email),
+              profileId: userProfile.id,
+              providerId: userProfile.providerUserId,
+            },
+            liveCatchupOverlappingWindow,
+            client,
+            watermark,
+            filters,
+            graphBasePath,
+          });
+          return { batchProcessingStartedAt };
         },
-        liveCatchupOverlappingWindow,
-        client,
-        watermark,
-        filters,
       });
 
+      if (isNoDelegatesResult(resolverResult)) {
+        this.logger.log({
+          userProfileId: userProfile.id,
+          msg: 'No delegates found, skipping live catch-up',
+        });
+        return { status: 'no-delegates' };
+      }
+
       this.logger.log({ ...logProps, msg: 'Live catch-up completed' });
-      return { status: 'success', batchProcessingStartedAt };
+      return {
+        status: 'success',
+        batchProcessingStartedAt: resolverResult.batchProcessingStartedAt,
+      };
     } catch (error) {
       this.logger.error({ ...logProps, err: error, msg: 'Failed to execute live catch-up' });
       return { status: 'failed', err: error };
@@ -289,6 +314,7 @@ export class LiveCatchUpCommand {
     watermark,
     filters,
     liveCatchupOverlappingWindow,
+    graphBasePath,
   }: {
     user: {
       email: Smeared;
@@ -299,6 +325,7 @@ export class LiveCatchUpCommand {
     client: Client;
     watermark: Date;
     filters: InboxConfigurationMailFilters;
+    graphBasePath: string;
   }): Promise<{ batchProcessingStartedAt: Date }> {
     const processedIds = new Set<string>();
     let batchNumber = 0;
@@ -315,7 +342,7 @@ export class LiveCatchUpCommand {
 
     const batchProcessingStartedAt = new Date();
     let emailsRaw = await client
-      .api('me/messages')
+      .api(`${graphBasePath}/messages`)
       .header('Prefer', 'IdType="ImmutableId"')
       .select(GraphMessageFields)
       // We cannot combine a receivedDateTime filter with orderby on lastModifiedDateTime on the
@@ -366,7 +393,7 @@ export class LiveCatchUpCommand {
               fileKey,
               filters,
               graphMessage,
-              graphBasePath: 'me',
+              graphBasePath,
             }),
           );
           const key = `totalMessages_${result}`;
