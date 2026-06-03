@@ -1,7 +1,7 @@
 import { createSmeared } from '@unique-ag/utils';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import { groupBy } from 'remeda';
+import { groupBy, unique } from 'remeda';
 import * as z from 'zod';
 import { UserProfile } from '~/db';
 import {
@@ -96,10 +96,13 @@ export class MsGraphKqlSearchEmailsQuery {
     if (!allRequests.length) {
       return {
         results: [],
-        searchSummary: [
-          `In order to get results we need at least 1 valid query to execute. `,
-          `Your queries do not match any inbox which you can access`,
-        ].join(''),
+        searchSummary: this.buildSearchSummary({
+          queriedMailboxesWithoutFullAccess,
+          skippedFolders,
+          throttledMailboxes: new Set(),
+          lostAccessMailboxes: new Set(),
+          additionalMessages: [`Your queries do not match any inbox which you can access`],
+        }),
       };
     }
 
@@ -167,28 +170,15 @@ export class MsGraphKqlSearchEmailsQuery {
       }
     }
 
-    const summaryParts: string[] = [];
-
-    if (throttledMailboxes.size > 0) {
-      summaryParts.push('Search was throttled for some mailboxes — results may be incomplete.');
-    }
-    for (const mailbox of lostAccessMailboxes) {
-      summaryParts.push(`Could not access mailbox ${mailbox} — it was excluded from results.`);
-    }
-    for (const mailbox of queriedMailboxesWithoutFullAccess) {
-      summaryParts.push(
-        `Could not search in mailbox ${mailbox} — Microsoft does not offer an api to search in shared folders from this mailbox.`,
-      );
-    }
-    for (const { mailbox, folder } of skippedFolders) {
-      summaryParts.push(
-        `Folder '${folder}' in mailbox ${mailbox} was not recognized and was excluded.`,
-      );
-    }
-
-    const searchSummary = summaryParts.length > 0 ? summaryParts.join('\n') : undefined;
-
-    return { results, searchSummary };
+    return {
+      results,
+      searchSummary: this.buildSearchSummary({
+        skippedFolders,
+        throttledMailboxes,
+        queriedMailboxesWithoutFullAccess,
+        lostAccessMailboxes,
+      }),
+    };
   }
 
   private async executeBatchRound(
@@ -360,5 +350,55 @@ export class MsGraphKqlSearchEmailsQuery {
       }
     }
     return allResults;
+  }
+
+  private buildSearchSummary({
+    throttledMailboxes,
+    lostAccessMailboxes,
+    queriedMailboxesWithoutFullAccess,
+    skippedFolders,
+    additionalMessages,
+  }: {
+    throttledMailboxes: Set<string>;
+    lostAccessMailboxes: Set<string>;
+    queriedMailboxesWithoutFullAccess: string[];
+    skippedFolders: { mailbox: string; folder: string }[];
+    additionalMessages?: string[];
+  }): string | undefined {
+    let summaryParts: string[] = [];
+    if (throttledMailboxes.size > 0) {
+      summaryParts.push(
+        `Results from the following mailboxes ${Array.from(throttledMailboxes).sort().join(', ')} may be incomplete, search was throttled.`,
+      );
+    }
+    if (lostAccessMailboxes.size > 0) {
+      summaryParts.push(
+        `Access to the following mailboxes was revoked: ${Array.from(lostAccessMailboxes).sort().join(', ')}.`,
+      );
+    }
+    if (queriedMailboxesWithoutFullAccess.length > 0) {
+      summaryParts.push(
+        `Could not search in the following mailboxes: ${unique(queriedMailboxesWithoutFullAccess).sort().join(', ')}. Microsoft does not offer an api to search in shared folders from this mailbox.`,
+      );
+    }
+
+    const byMailbox = skippedFolders.reduce<Record<string, string[]>>(
+      (acc, { mailbox, folder }) => {
+        acc[mailbox] ??= [];
+        if (!acc[mailbox].includes(folder)) {
+          acc[mailbox].push(folder);
+        }
+        return acc;
+      },
+      {},
+    );
+    for (const [mailbox, folders] of Object.entries(byMailbox)) {
+      summaryParts.push(
+        `The following folders '${folders.sort().join(', ')}' in mailbox ${mailbox} were excluded because they were not recognized.`,
+      );
+    }
+    summaryParts = [...summaryParts, ...(additionalMessages ?? [])];
+
+    return summaryParts.length > 0 ? summaryParts.join('\n') : undefined;
   }
 }
