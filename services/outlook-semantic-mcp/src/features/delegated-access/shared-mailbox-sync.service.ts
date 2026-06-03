@@ -11,6 +11,7 @@ import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { sleep } from '~/utils/sleep';
+import { DeleteInboxDataCommand } from '../delete-inbox/delete-inbox-data.command';
 import { PersistentCacheService } from '../persistent-cache/persistent-cache.service';
 
 export const SHARED_MAILBOX_SYNC_CACHE_KEY = 'SharedMailboxSync';
@@ -47,6 +48,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     private readonly graphClientFactory: GraphClientFactory,
     private readonly persistentCacheService: PersistentCacheService,
     private readonly schedulerRegistry: SchedulerRegistry,
+    private readonly deleteInboxDataCommand: DeleteInboxDataCommand,
   ) {}
 
   public async onModuleInit(): Promise<void> {
@@ -206,19 +208,39 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       allMatchedUsers.push(...matched);
     }
 
-    await this.db.delete(userProfiles).where(
-      and(
-        eq(userProfiles.source, 'shared-mailbox'),
-        allMatchedUsers.length > 0
-          ? not(
-              inArray(
-                sql`lower(${userProfiles.email})`,
-                allMatchedUsers.map((item) => item.mail),
-              ),
-            )
-          : undefined,
-      ),
-    );
+    const profilesToRemove = await this.db
+      .select({ id: userProfiles.id })
+      .from(userProfiles)
+      .where(
+        and(
+          eq(userProfiles.source, 'shared-mailbox'),
+          allMatchedUsers.length > 0
+            ? not(
+                inArray(
+                  sql`lower(${userProfiles.email})`,
+                  allMatchedUsers.map((item) => item.mail),
+                ),
+              )
+            : undefined,
+        ),
+      );
+
+    if (profilesToRemove.length > 0) {
+      if (this.ingestionCfg.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi) {
+        for (const { id } of profilesToRemove) {
+          const result = await this.deleteInboxDataCommand.run(id);
+          this.logger.log({
+            userProfileId: id,
+            result,
+            msg: 'SharedMailboxSync: triggered deletion for removed shared-mailbox profile',
+          });
+        }
+      } else {
+        await this.db.delete(userProfiles).where(
+          inArray(userProfiles.id, profilesToRemove.map((p) => p.id)),
+        );
+      }
+    }
 
     // Upsert matched users
     if (allMatchedUsers.length > 0) {

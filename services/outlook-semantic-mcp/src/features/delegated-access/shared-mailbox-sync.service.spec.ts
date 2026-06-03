@@ -141,6 +141,10 @@ function createService(overrides?: {
     getCronJob: vi.fn().mockReturnValue({ stop: mockJobStop }),
   };
 
+  const deleteInboxDataCommand = {
+    run: vi.fn().mockResolvedValue(undefined),
+  };
+
   const service = new SharedMailboxSyncService(
     db as any,
     config as any,
@@ -148,6 +152,7 @@ function createService(overrides?: {
     graphClientFactory as any,
     persistentCacheService as any,
     schedulerRegistry as any,
+    deleteInboxDataCommand as any,
   );
 
   return { service, db, graphClientFactory, persistentCacheService, schedulerRegistry, config };
