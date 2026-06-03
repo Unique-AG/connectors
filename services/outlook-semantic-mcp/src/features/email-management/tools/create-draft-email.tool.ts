@@ -8,21 +8,13 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { CreateDraftEmailCommand } from '../create-draft-email.command';
 import { META } from './create-draft-email-tool.meta';
 
-const CreateDraftEmailInputSchema = z.object({
+const SharedEmailFields = z.object({
   subject: z.string().describe('The subject line of the draft email.'),
   content: z
     .string()
     .describe(
       'The body content of the draft email, written in Markdown. Supports paragraphs, line breaks, **bold**, *italic*, bullet and numbered lists, [links](https://example.com), blockquotes, and inline `code`. Raw HTML is not rendered (it is escaped) — use Markdown syntax instead.',
     ),
-  toRecipients: z
-    .array(
-      z.object({
-        name: z.string().optional().describe('The display name of the recipient.'),
-        email: z.email().describe('The email address of the recipient.'),
-      }),
-    )
-    .describe('The list of primary recipients for the email.'),
   ccRecipients: z
     .array(
       z.object({
@@ -31,7 +23,9 @@ const CreateDraftEmailInputSchema = z.object({
       }),
     )
     .optional()
-    .describe('The list of CC (carbon copy) recipients for the email.'),
+    .describe(
+      'The list of CC (carbon copy) recipients for the email. For reply drafts, Graph fills CC recipients from the original thread — omit this field when using type: "reply".',
+    ),
   attachments: z
     .array(
       z.object({
@@ -60,13 +54,33 @@ const CreateDraftEmailInputSchema = z.object({
     .describe(
       'UPN of the shared mailbox to create the draft in (e.g. "support@company.com"). Omit to create the draft in the signed-in user\'s own mailbox.',
     ),
+});
+
+const FreshDraftInputSchema = SharedEmailFields.extend({
+  type: z.literal('draft').describe('Create a fresh draft email.'),
+  toRecipients: z
+    .array(
+      z.object({
+        name: z.string().optional().describe('The display name of the recipient.'),
+        email: z.email().describe('The email address of the recipient.'),
+      }),
+    )
+    .describe('The list of primary recipients for the email.'),
+});
+
+const ReplyDraftInputSchema = SharedEmailFields.extend({
+  type: z.literal('reply').describe('Create a reply-all draft for an existing email.'),
   inReplyToMessageId: z
     .string()
-    .optional()
     .describe(
-      'Graph message ID of the email to reply to. When provided, a reply-all draft is created with all original recipients pre-filled. Omit for a fresh draft.',
+      'The msGraphMessageId field from search_emails or outlook_email_search results for the email being replied to. Graph pre-fills all original recipients — do not pass toRecipients or ccRecipients.',
     ),
 });
+
+const CreateDraftEmailInputSchema = z.discriminatedUnion('type', [
+  FreshDraftInputSchema,
+  ReplyDraftInputSchema,
+]);
 
 const CreateDraftEmailOutputSchema = z.object({
   success: z
@@ -108,7 +122,7 @@ export class CreateDraftEmailTool {
     name: 'draft_email',
     title: 'Draft Email',
     description:
-      'Creates a draft email in the connected Outlook mailbox with the given subject, body, recipients, and optional attachments. The draft is saved but not sent.',
+      'Creates a draft email in Outlook. Pass type: "draft" for a fresh draft (toRecipients required; optionally pass mailbox for a shared mailbox). Pass type: "reply" with inReplyToMessageId for a reply-all draft (Graph pre-fills recipients from the original thread; optionally pass mailbox for a shared mailbox). The draft is saved but not sent.',
     parameters: CreateDraftEmailInputSchema,
     outputSchema: CreateDraftEmailOutputSchema,
     annotations: {
@@ -132,7 +146,7 @@ export class CreateDraftEmailTool {
       ...input,
       chatId: isString(chatId) ? chatId : null,
     });
-    if (input.inReplyToMessageId && result.success) {
+    if (input.type === 'reply' && result.success) {
       return {
         ...result,
         message: `${result.message} All original recipients are pre-filled — review before sending.`,

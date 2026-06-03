@@ -9,19 +9,18 @@ import { markdownToHtml } from './markdown-to-html';
 
 const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string().optional() });
 
-export interface CreateDraftEmailInput {
+interface DraftEmailBase {
   subject: string;
   content: string;
-  toRecipients: Array<{ name?: string; email: string }>;
   ccRecipients?: Array<{ name?: string; email: string }>;
-  attachments?: {
-    fileName: string;
-    data: string;
-  }[];
+  attachments?: { fileName: string; data: string }[];
   chatId: string | null | undefined;
   mailbox?: string;
-  inReplyToMessageId?: string;
 }
+
+export type CreateDraftEmailInput =
+  | (DraftEmailBase & { type: 'draft'; toRecipients: Array<{ name?: string; email: string }> })
+  | (DraftEmailBase & { type: 'reply'; inReplyToMessageId: string });
 
 export type CreateDraftEmailResult =
   | { success: false; message: string }
@@ -90,9 +89,13 @@ export class CreateDraftEmailCommand {
         contentType: 'HTML',
         content: markdownToHtml(input.content),
       },
-      toRecipients: input.toRecipients.map((r) => ({
-        emailAddress: { name: r.name, address: r.email },
-      })),
+      ...(input.type === 'draft'
+        ? {
+            toRecipients: input.toRecipients.map((r) => ({
+              emailAddress: { name: r.name, address: r.email },
+            })),
+          }
+        : {}),
     };
 
     if (input.ccRecipients && input.ccRecipients.length > 0) {
@@ -103,18 +106,18 @@ export class CreateDraftEmailCommand {
 
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
-    const apiParams = input.inReplyToMessageId
-      ? {
-          // We draft the reply to all users by default.
-          apiPath: `${prefix}/messages/${input.inReplyToMessageId}/createReplyAll`,
-          body: { message: messageFields },
-          successMessage: 'Reply-all draft created successfully.',
-        }
-      : {
-          apiPath: `${prefix}/messages`,
-          body: messageFields,
-          successMessage: 'Draft email created successfully.',
-        };
+    const apiParams =
+      input.type === 'reply'
+        ? {
+            apiPath: `${prefix}/messages/${input.inReplyToMessageId}/createReplyAll`,
+            body: { message: messageFields },
+            successMessage: 'Reply-all draft created successfully.',
+          }
+        : {
+            apiPath: `${prefix}/messages`,
+            body: messageFields,
+            successMessage: 'Draft email created successfully.',
+          };
 
     try {
       const message = CreateMessageResponseSchema.parse(

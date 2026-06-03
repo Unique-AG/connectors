@@ -119,7 +119,7 @@ export class McpToolsHandler extends McpHandlerBase {
             );
           }
           // Use validated arguments to ensure defaults and transformations are applied
-          request.params.arguments = validation.data;
+          request.params.arguments = validation.data as Record<string, unknown>;
         }
 
         const contextId = ContextIdFactory.getByRequest(httpRequest);

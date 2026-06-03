@@ -133,7 +133,6 @@ export class LiveCatchUpCommand {
               profileId: userProfile.userProfileId,
               providerId: userProfile.providerUserId,
             },
-            subscriptionId,
             liveCatchupOverlappingWindow: overlappingWindowInMinutes,
           }),
         );
@@ -242,19 +241,17 @@ export class LiveCatchUpCommand {
   private async runLiveCatchupWithLock({
     watermark,
     user,
-    subscriptionId,
     filters,
     liveCatchupOverlappingWindow,
   }: {
     watermark: Date;
     filters: InboxConfigurationMailFilters;
     user: { profileId: string; providerId: string; email: string };
-    subscriptionId: string;
     liveCatchupOverlappingWindow: number;
   }): Promise<
     { status: 'success'; batchProcessingStartedAt: Date } | { status: 'failed'; err: unknown }
   > {
-    const logProps = Object.freeze({ userProfileId: user.profileId, subscriptionId });
+    const logProps = Object.freeze({ userProfileId: user.profileId });
 
     try {
       await this.metrics.measureLiveCatchupDirectorySync(() =>

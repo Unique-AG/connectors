@@ -37,6 +37,15 @@ export const META = createMeta({
     ### What \`draft_email\` Does
     Creates a draft email in the user's Outlook mailbox. Provide subject, body content (Markdown), and at least one recipient. Optionally include CC recipients and attachments. The draft is saved and can be reviewed or sent later.
 
+    ### Shared Mailbox and Reply Drafts
+    \`draft_email\` requires a \`type\` field that selects the drafting mode:
+
+    1. **\`type: "draft"\`** — fresh draft. \`toRecipients\` is required. Optionally pass \`mailbox\` to create the draft in a shared mailbox instead of the signed-in user's own mailbox.
+
+    2. **\`type: "reply"\`** — reply-all draft. Pass \`inReplyToMessageId\` with the \`msGraphMessageId\` value from \`search_emails\` or \`outlook_email_search\` results. Graph pre-fills all original recipients — do **not** pass \`toRecipients\` or \`ccRecipients\`. Optionally pass \`mailbox\` to create the reply draft in a shared mailbox.
+
+    Use \`type: "reply"\` only when explicitly replying to an identified email. Use \`type: "draft"\` for all other cases.
+
     ### Body Formatting
     The \`content\` field is **Markdown**. It is converted to HTML on the server before being sent to Outlook, so use Markdown syntax for all formatting — do **not** write raw HTML tags (\`<br>\`, \`<p>\`, \`<strong>\`, etc.); they will be shown as literal text.
 
