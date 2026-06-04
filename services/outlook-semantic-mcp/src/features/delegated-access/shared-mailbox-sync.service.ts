@@ -1,12 +1,21 @@
 import { createHash } from 'node:crypto';
 import { OAuthUserProfile } from '@unique-ag/mcp-oauth';
+import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { and, eq, inArray, not, sql } from 'drizzle-orm';
-import { DelegatedAccessConfig, delegatedAccessConfig, IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
+import {
+  DelegatedAccessConfig,
+  delegatedAccessConfig,
+  IngestionConfig,
+  ingestionConfig,
+  McpBackendType,
+} from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
+import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
+import { FullSyncEventDto } from '../sync/full-sync/full-sync-event.dto';
 import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
@@ -49,6 +58,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     private readonly persistentCacheService: PersistentCacheService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly deleteInboxDataCommand: DeleteInboxDataCommand,
+    private readonly amqp: AmqpConnection,
   ) {}
 
   public async onModuleInit(): Promise<void> {
@@ -237,7 +247,10 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
         }
       } else {
         await this.db.delete(userProfiles).where(
-          inArray(userProfiles.id, profilesToRemove.map((p) => p.id)),
+          inArray(
+            userProfiles.id,
+            profilesToRemove.map((p) => p.id),
+          ),
         );
       }
     }
@@ -290,15 +303,30 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
         const sharedMailboxProfiles = upsertedProfiles.filter((p) => p.source === 'shared-mailbox');
 
         if (sharedMailboxProfiles.length > 0) {
-          await this.db
+          // Insert new inbox configurations with fullSyncState='waiting-for-ingestion' rather than
+          // the default 'ready'. This distinguishes newly provisioned shared-mailbox inboxes (which
+          // have never run) from inboxes that completed a full sync and returned to 'ready', so the
+          // full-sync recovery scheduler can identify and retrigger them without misclassifying
+          // already-finished inboxes as stuck.
+          const insertedConfigs = await this.db
             .insert(inboxConfigurations)
             .values(
-              sharedMailboxProfiles.map((profile) => ({
+              sharedMailboxProfiles.map((profile): typeof inboxConfigurations.$inferInsert => ({
                 userProfileId: profile.id,
+                fullSyncState: 'waiting-for-ingestion',
                 filters: serializeMailFilters(ingestionCfg.defaultMailFilters),
               })),
             )
-            .onConflictDoNothing();
+            .onConflictDoNothing()
+            .returning({ userProfileId: inboxConfigurations.userProfileId });
+
+          for (const { userProfileId } of insertedConfigs) {
+            const event = FullSyncEventDto.parse({
+              type: 'unique.outlook-semantic-mcp.full-sync.retrigger',
+              payload: { userProfileId },
+            });
+            await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
+          }
         }
       }
     }
@@ -431,8 +459,8 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
   }
 
   private hashMailboxes(mailboxes: string[]): string {
-    return createHash('sha256')
+    return `${this.config.mcpBackend}_${createHash('sha256')
       .update([...mailboxes].sort().join(','))
-      .digest('hex');
+      .digest('hex')}`;
   }
 }
