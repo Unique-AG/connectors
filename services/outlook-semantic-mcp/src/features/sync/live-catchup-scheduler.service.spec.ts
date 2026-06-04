@@ -106,7 +106,7 @@ describe('LiveCatchupSchedulerService', () => {
 
       service.onModuleInit();
 
-      const recoveryCallback = vi.mocked(CronJob).mock.calls[0]![1] as () => void;
+      const recoveryCallback = vi.mocked(CronJob).mock.calls[0]?.[1] as () => void;
       await recoveryCallback();
 
       expect(service.runRecoveryScan).toHaveBeenCalledOnce();
@@ -122,7 +122,7 @@ describe('LiveCatchupSchedulerService', () => {
 
       service.onModuleInit();
 
-      const recheckCallback = vi.mocked(CronJob).mock.calls[1]![1] as () => void;
+      const recheckCallback = vi.mocked(CronJob).mock.calls[1]?.[1] as () => void;
       await recheckCallback();
 
       expect(service.runStuckLiveCatchups).toHaveBeenCalledOnce();
@@ -138,7 +138,7 @@ describe('LiveCatchupSchedulerService', () => {
 
       service.onModuleInit();
 
-      const sharedMailboxCallback = vi.mocked(CronJob).mock.calls[2]![1] as () => void;
+      const sharedMailboxCallback = vi.mocked(CronJob).mock.calls[2]?.[1] as () => void;
       await sharedMailboxCallback();
 
       expect(service.runLiveCatchupsWhichDidNotRunRecently).toHaveBeenCalledOnce();
