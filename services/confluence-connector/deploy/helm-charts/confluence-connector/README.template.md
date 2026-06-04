@@ -14,7 +14,7 @@
 
 Use OCI charts only. Prefer `getunique.azurecr.io`; `uniquecr.azurecr.io` is private and kept for consistency, and GHCR is maintained best-effort.
 
-- `oci://getunique.azurecr.io/connectors/helm/confluence-connector`
+- `oci://getunique.azurecr.io/helm/confluence-connector`
 - `oci://uniquecr.azurecr.io/connectors/helm/confluence-connector`
 - `oci://ghcr.io/unique-ag/connectors/helm/confluence-connector`
 
@@ -22,7 +22,7 @@ Use OCI charts only. Prefer `getunique.azurecr.io`; `uniquecr.azurecr.io` is pri
 
 ```bash
 helm template confluence-connector \
-  oci://getunique.azurecr.io/connectors/helm/confluence-connector \
+  oci://getunique.azurecr.io/helm/confluence-connector \
   --version <version>
 ```
 
@@ -32,7 +32,7 @@ helm template confluence-connector \
 # helmfile version v1.1.7
 releases:
   - name: confluence-connector
-    chart: oci://getunique.azurecr.io/connectors/helm/confluence-connector
+    chart: oci://getunique.azurecr.io/helm/confluence-connector
     version: <version>
 ```
 
@@ -44,7 +44,7 @@ Pin the chart by OCI digest in GitOps. Keep the version as a comment for humans.
 spec:
   name: confluence-connector
   sources:
-    - repoURL: oci://getunique.azurecr.io/connectors/helm/confluence-connector
+    - repoURL: oci://getunique.azurecr.io/helm/confluence-connector
       path: .
       targetRevision: sha256:<chart-digest> # <version>
 ```
