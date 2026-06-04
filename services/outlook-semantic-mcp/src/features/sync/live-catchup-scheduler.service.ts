@@ -66,13 +66,13 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     }
 
     const recoveryJob = new CronJob(this.config.liveCatchupRecoveryCron, () => {
-      this.runRecoveryScan();
+      this.runStuckLiveCatchUpsRecovery();
     });
     this.schedulerRegistry.addCronJob('live-catchup-recovery', recoveryJob);
     recoveryJob.start();
 
-    const recheckJob = new CronJob(this.config.liveCatchupRecheckCron, () => {
-      this.runStuckLiveCatchups();
+    const recheckJob = new CronJob(this.config.liveCatchupOauthUsersRecheckCron, () => {
+      this.runRecheckLiveCatchupsForOauthUsersWhich();
     });
     this.schedulerRegistry.addCronJob('live-catchup-recheck', recheckJob);
     recheckJob.start();
@@ -80,7 +80,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     const sharedMailboxRecheckJob = new CronJob(
       this.config.liveCatchupSharedMailboxRecheckCron,
       () => {
-        this.runLiveCatchupsWhichDidNotRunRecently();
+        this.runRecheckLiveCatchupsForSharedMailboxes();
       },
     );
     this.schedulerRegistry.addCronJob(
@@ -90,62 +90,64 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     sharedMailboxRecheckJob.start();
   }
 
-  @NewTrace('cron.live-catchup-recovery')
-  public async runRecoveryScan(): Promise<void> {
+  @NewTrace('cron.run-stuck-live-catch-ups-recovery')
+  public async runStuckLiveCatchUpsRecovery(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({
-        msg: 'Skipping live catchup recovery scan due to shutdown',
+        msg: 'Skipping stuck live catchup recovery scan due to shutdown',
       });
       return;
     }
 
     try {
-      this.logger.log({ msg: 'Live catchup recovery scan triggered' });
+      this.logger.log({ msg: 'Stuck live catchups recovery scan triggered' });
 
       await this.recoverStuckLiveCatchUps();
     } catch (err) {
       this.logger.error({
-        msg: 'An unexpected error occurred during live catchup recovery scan',
+        msg: 'An unexpected error occurred during Stuck live catchups recovery scan',
         err,
       });
     }
   }
 
-  @NewTrace('cron.run-stuck-live-catchups')
-  public async runStuckLiveCatchups(): Promise<void> {
+  @NewTrace('cron.run-recheck-live-catchups-for-oauth-users-which')
+  public async runRecheckLiveCatchupsForOauthUsersWhich(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({
-        msg: 'Skipping subscription live catchup recheck due to shutdown',
+        msg: 'Skipping subscription live catchup recheck for oauth users due to shutdown',
       });
       return;
     }
 
     try {
-      this.logger.log({ msg: 'Subscription live catchup recheck triggered' });
-      await this.rerunStuckLiveCatchups();
+      this.logger.log({ msg: 'Subscription live catchup recheck for oauth users triggered' });
+      await this.recheckLiveCatchupsForOauthUsersWhich();
     } catch (err) {
       this.logger.error({
-        msg: 'An unexpected error occurred during subscription live catchup recheck',
+        msg: 'An unexpected error occurred during subscription live catchup recheck for oauth users',
         err,
       });
     }
   }
 
-  @NewTrace('cron.run-live-catchups-which-did-not-run-recently')
-  public async runLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
+  @NewTrace('cron.run-recheck-live-catchups-for-shared-mailboxes')
+  public async runRecheckLiveCatchupsForSharedMailboxes(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({
-        msg: 'Skipping shared-mailbox live catchup recheck due to shutdown',
+        msg: 'Skipping shared-mailbox live catchup recheck for shared mailboxes due to shutdown',
       });
       return;
     }
 
     try {
-      this.logger.log({ msg: 'Shared-mailbox live catchup recheck triggered' });
-      await this.rerunLiveCatchupsWhichDidNotRunRecently();
+      this.logger.log({
+        msg: 'Shared-mailbox live catchup recheck for shared mailboxes triggered',
+      });
+      await this.recheckLiveCatchupsForSharedMailboxes();
     } catch (err) {
       this.logger.error({
-        msg: 'An unexpected error occurred during shared-mailbox live catchup recheck',
+        msg: 'An unexpected error occurred during shared-mailbox live catchup recheck for shared mailboxes',
         err,
       });
     }
@@ -196,7 +198,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     await this.logSharedMailboxesWithNoDelegates();
   }
 
-  private async rerunStuckLiveCatchups(): Promise<void> {
+  private async recheckLiveCatchupsForOauthUsersWhich(): Promise<void> {
     const stuckConfigs = await this.db
       .select({ userProfileId: inboxConfigurations.userProfileId })
       .from(inboxConfigurations)
@@ -230,7 +232,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     );
   }
 
-  private async rerunLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
+  private async recheckLiveCatchupsForSharedMailboxes(): Promise<void> {
     const stuckConfigs = await this.db
       .select({ userProfileId: inboxConfigurations.userProfileId })
       .from(inboxConfigurations)
@@ -268,19 +270,16 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
 
   private async rerunLiveCatchups(events: z.infer<typeof LiveCatchUpEventDto>[]): Promise<void> {
     if (!events.length) {
-      this.logger.log({
-        msg: 'No live catch-ups which did not run for a long time',
-      });
       return;
     }
 
-    traceEvent('live-catch-up stuck recovery triggered', {
+    traceEvent('live-catch-up rerun triggered', {
       count: events.length,
       userProfileIds: events.map((event) => event.payload.userProfileId ?? null),
     });
 
     this.logger.log({
-      msg: 'Found ready live catch-up configurations',
+      msg: 'Rerunning live catchup',
       count: events.length,
     });
 
@@ -311,8 +310,8 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
           ),
         ),
       );
-    for (const { userProfileId } of configs) {
-      this.logger.warn({ userProfileId, msg: 'Shared-mailbox inbox config has no delegates' });
-    }
+    this.logger.warn({
+      msg: `Shared-mailbox inbox config has no delegates for userProfiles: ${configs.map(({ userProfileId }) => userProfileId).join(', ')}`,
+    });
   }
 }

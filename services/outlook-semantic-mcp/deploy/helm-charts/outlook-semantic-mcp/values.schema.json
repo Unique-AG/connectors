@@ -317,9 +317,9 @@
               "type": "string",
               "description": "Cron schedule for stuck live catch-up recovery scans. Default: '*/5 * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECOVERY_CRON"
             },
-            "liveCatchupRecheckCron": {
+            "liveCatchupOauthUsersRecheckCron": {
               "type": "string",
-              "description": "Cron schedule for subscription-user live catch-up ready-recheck runs. Default: '*/10 * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECHECK_CRON"
+              "description": "Cron schedule for subscription-user live catch-up ready-recheck runs. Default: '*/10 * * * *'. Env var: INGESTION_LIVE_CATCHUP_OAUTH_USERS_RECHECK_CRON"
             },
             "liveCatchupSharedMailboxRecheckCron": {
               "type": "string",

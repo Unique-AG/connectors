@@ -80,7 +80,7 @@ function createServiceWithIngestionConfig({ amqp = createMockAmqp(), db = create
     {
       mcpBackend: 'MicrosoftGraphAndUniqueApi',
       liveCatchupRecoveryCron: '*/5 * * * *',
-      liveCatchupRecheckCron: '*/10 * * * *',
+      liveCatchupOauthUsersRecheckCron: '*/10 * * * *',
       liveCatchupSharedMailboxRecheckCron: '*/2 * * * *',
     } as any,
     db as any,
@@ -100,50 +100,50 @@ describe('LiveCatchupSchedulerService', () => {
   describe('cron job wiring', () => {
     it('recovery cron fires runRecoveryScan', async () => {
       const service = createServiceWithIngestionConfig();
-      vi.spyOn(service, 'runRecoveryScan').mockResolvedValue(undefined);
-      vi.spyOn(service, 'runStuckLiveCatchups').mockResolvedValue(undefined);
-      vi.spyOn(service, 'runLiveCatchupsWhichDidNotRunRecently').mockResolvedValue(undefined);
+      vi.spyOn(service, 'runStuckLiveCatchUpsRecovery').mockResolvedValue(undefined);
+      vi.spyOn(service, 'runRecheckLiveCatchupsForOauthUsersWhich').mockResolvedValue(undefined);
+      vi.spyOn(service, 'runRecheckLiveCatchupsForSharedMailboxes').mockResolvedValue(undefined);
 
       service.onModuleInit();
 
       const recoveryCallback = vi.mocked(CronJob).mock.calls[0]?.[1] as () => void;
       await recoveryCallback();
 
-      expect(service.runRecoveryScan).toHaveBeenCalledOnce();
-      expect(service.runStuckLiveCatchups).not.toHaveBeenCalled();
-      expect(service.runLiveCatchupsWhichDidNotRunRecently).not.toHaveBeenCalled();
+      expect(service.runStuckLiveCatchUpsRecovery).toHaveBeenCalledOnce();
+      expect(service.runRecheckLiveCatchupsForOauthUsersWhich).not.toHaveBeenCalled();
+      expect(service.runRecheckLiveCatchupsForSharedMailboxes).not.toHaveBeenCalled();
     });
 
     it('recheck cron fires runStuckLiveCatchups', async () => {
       const service = createServiceWithIngestionConfig();
-      vi.spyOn(service, 'runRecoveryScan').mockResolvedValue(undefined);
-      vi.spyOn(service, 'runStuckLiveCatchups').mockResolvedValue(undefined);
-      vi.spyOn(service, 'runLiveCatchupsWhichDidNotRunRecently').mockResolvedValue(undefined);
+      vi.spyOn(service, 'runStuckLiveCatchUpsRecovery').mockResolvedValue(undefined);
+      vi.spyOn(service, 'runRecheckLiveCatchupsForOauthUsersWhich').mockResolvedValue(undefined);
+      vi.spyOn(service, 'runRecheckLiveCatchupsForSharedMailboxes').mockResolvedValue(undefined);
 
       service.onModuleInit();
 
       const recheckCallback = vi.mocked(CronJob).mock.calls[1]?.[1] as () => void;
       await recheckCallback();
 
-      expect(service.runStuckLiveCatchups).toHaveBeenCalledOnce();
-      expect(service.runRecoveryScan).not.toHaveBeenCalled();
-      expect(service.runLiveCatchupsWhichDidNotRunRecently).not.toHaveBeenCalled();
+      expect(service.runRecheckLiveCatchupsForOauthUsersWhich).toHaveBeenCalledOnce();
+      expect(service.runStuckLiveCatchUpsRecovery).not.toHaveBeenCalled();
+      expect(service.runRecheckLiveCatchupsForSharedMailboxes).not.toHaveBeenCalled();
     });
 
     it('shared-mailbox recheck cron fires runLiveCatchupsWhichDidNotRunRecently', async () => {
       const service = createServiceWithIngestionConfig();
-      vi.spyOn(service, 'runRecoveryScan').mockResolvedValue(undefined);
-      vi.spyOn(service, 'runStuckLiveCatchups').mockResolvedValue(undefined);
-      vi.spyOn(service, 'runLiveCatchupsWhichDidNotRunRecently').mockResolvedValue(undefined);
+      vi.spyOn(service, 'runStuckLiveCatchUpsRecovery').mockResolvedValue(undefined);
+      vi.spyOn(service, 'runRecheckLiveCatchupsForOauthUsersWhich').mockResolvedValue(undefined);
+      vi.spyOn(service, 'runRecheckLiveCatchupsForSharedMailboxes').mockResolvedValue(undefined);
 
       service.onModuleInit();
 
       const sharedMailboxCallback = vi.mocked(CronJob).mock.calls[2]?.[1] as () => void;
       await sharedMailboxCallback();
 
-      expect(service.runLiveCatchupsWhichDidNotRunRecently).toHaveBeenCalledOnce();
-      expect(service.runRecoveryScan).not.toHaveBeenCalled();
-      expect(service.runStuckLiveCatchups).not.toHaveBeenCalled();
+      expect(service.runRecheckLiveCatchupsForSharedMailboxes).toHaveBeenCalledOnce();
+      expect(service.runStuckLiveCatchUpsRecovery).not.toHaveBeenCalled();
+      expect(service.runRecheckLiveCatchupsForOauthUsersWhich).not.toHaveBeenCalled();
     });
   });
 
@@ -153,7 +153,7 @@ describe('LiveCatchupSchedulerService', () => {
       const db = createMockDb({ liveCatchUpRows: [] });
       const service = createService({ amqp, db });
 
-      await service.runRecoveryScan();
+      await service.runStuckLiveCatchUpsRecovery();
 
       expect(amqp.publish).not.toHaveBeenCalled();
       expect(traceEvent).not.toHaveBeenCalled();
@@ -166,7 +166,7 @@ describe('LiveCatchupSchedulerService', () => {
       });
       const service = createService({ amqp, db });
 
-      await service.runRecoveryScan();
+      await service.runStuckLiveCatchUpsRecovery();
 
       expect(amqp.publish).toHaveBeenCalledTimes(1);
       expect(amqp.publish).toHaveBeenCalledWith(
@@ -177,7 +177,7 @@ describe('LiveCatchupSchedulerService', () => {
           payload: { userProfileId: USER_PROFILE_ID_1 },
         }),
       );
-      expect(traceEvent).toHaveBeenCalledWith('live-catch-up stuck recovery triggered', {
+      expect(traceEvent).toHaveBeenCalledWith('live-catch-up rerun triggered', {
         count: 1,
         userProfileIds: [USER_PROFILE_ID_1],
       });
@@ -193,10 +193,10 @@ describe('LiveCatchupSchedulerService', () => {
       });
       const service = createService({ amqp, db });
 
-      await service.runRecoveryScan();
+      await service.runStuckLiveCatchUpsRecovery();
 
       expect(amqp.publish).toHaveBeenCalledTimes(2);
-      expect(traceEvent).toHaveBeenCalledWith('live-catch-up stuck recovery triggered', {
+      expect(traceEvent).toHaveBeenCalledWith('live-catch-up rerun triggered', {
         count: 2,
         userProfileIds: [USER_PROFILE_ID_1, USER_PROFILE_ID_2],
       });

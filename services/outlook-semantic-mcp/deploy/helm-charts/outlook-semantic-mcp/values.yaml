@@ -212,8 +212,8 @@ mcpConfig:
     # Default: '*/5 * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECOVERY_CRON
     # liveCatchupRecoveryCron: "*/5 * * * *"
     # -- Optional. Cron schedule for subscription-user live catch-up ready-recheck runs.
-    # Default: '*/10 * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECHECK_CRON
-    # liveCatchupRecheckCron: "*/10 * * * *"
+    # Default: '*/10 * * * *'. Env var: INGESTION_LIVE_CATCHUP_OAUTH_USERS_RECHECK_CRON
+    # liveCatchupOauthUsersRecheckCron: "*/10 * * * *"
     # -- Optional. Cron schedule for shared-mailbox live catch-up ready-recheck runs.
     # Default: '*/10 * * * *'. Env var: INGESTION_LIVE_CATCHUP_SHARED_MAILBOX_RECHECK_CRON
     # liveCatchupSharedMailboxRecheckCron: "*/10 * * * *"
