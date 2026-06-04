@@ -687,7 +687,7 @@ describe('FullSyncCommand', () => {
       );
     });
 
-    it('returns skipped with reason no-delegates and does not persist when resolver returns NO_DELEGATES', async () => {
+    it('returns failed with reason no-delegates and transitions state to failed when resolver returns NO_DELEGATES', async () => {
       const { NO_DELEGATES } = await import('~/msgraph/ms-graph-client-resolver.service');
       const batchCommand = createMockProcessFullSyncBatchCommand('completed');
       const updateByVersionCommand = createMockUpdateByVersionCommand(true);
@@ -726,7 +726,12 @@ describe('FullSyncCommand', () => {
 
       const result = await command.run(USER_PROFILE_ID);
 
-      expect(result).toEqual({ status: 'skipped', reason: 'no-delegates' });
+      expect(result).toEqual({ status: 'failed-no-delegates' });
+      expect(updateByVersionCommand.run).toHaveBeenCalledWith(
+        USER_PROFILE_ID,
+        expect.any(String),
+        expect.objectContaining({ fullSyncState: 'failed' }),
+      );
       expect(db.update).not.toHaveBeenCalled();
     });
   });

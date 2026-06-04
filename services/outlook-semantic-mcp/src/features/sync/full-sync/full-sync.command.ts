@@ -173,7 +173,7 @@ export class FullSyncCommand {
         });
         // Set state to 'failed' so the next trigger can retry.
         await this.transitionState(userProfile.id, version, 'failed');
-        return { status: 'failed', reason: 'no-delegates' };
+        return { status: 'failed-no-delegates' };
       }
 
       const batchResult = resolverResult;

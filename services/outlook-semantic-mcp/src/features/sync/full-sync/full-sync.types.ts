@@ -5,7 +5,7 @@ export type FullSyncResult =
   | { status: 'waiting-for-ingestion' }
   | { status: 'completed' }
   | { status: 'failed'; error: unknown }
-  | { status: 'failed'; reason: 'no-delegates' };
+  | { status: 'failed-no-delegates' };
 
 export type InboxConfig = typeof inboxConfigurations.$inferSelect;
 
