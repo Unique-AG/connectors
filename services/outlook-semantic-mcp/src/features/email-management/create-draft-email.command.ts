@@ -6,7 +6,6 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
 import { AttachmentFailure } from './email-attachments/utils';
 import { markdownToHtml } from './markdown-to-html';
-import { pick } from 'remeda';
 
 const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string().optional() });
 
@@ -108,11 +107,13 @@ export class CreateDraftEmailCommand {
             body: {
               ...sharedBodyFields,
               subject: recipientsData.subject,
-              toRecipients: recipientsData.toRecipients.map((item) =>
-                pick(item, ['email', 'name']),
-              ),
+              toRecipients: recipientsData.toRecipients.map((item) => ({
+                emailAddress: { address: item.email, ...(item.name && { name: item.name }) },
+              })),
               ccRecipients:
-                recipientsData.ccRecipients?.map((item) => pick(item, ['email', 'name'])) ?? [],
+                recipientsData.ccRecipients?.map((item) => ({
+                  emailAddress: { address: item.email, ...(item.name && { name: item.name }) },
+                })) ?? [],
             },
             successMessage: 'Draft email created successfully.',
           };
