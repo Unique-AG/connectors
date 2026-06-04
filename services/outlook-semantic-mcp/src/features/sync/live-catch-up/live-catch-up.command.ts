@@ -142,6 +142,7 @@ export class LiveCatchUpCommand {
           this.runLiveCatchupWithLock({
             watermark: lockResult.watermark,
             filters: lockResult.filters,
+            preferredDelegateUserProfileId: lockResult.preferredDelegateUserProfileId,
             userProfile,
             subscriptionId,
             liveCatchupOverlappingWindow: overlappingWindowInMinutes,
@@ -218,10 +219,13 @@ export class LiveCatchUpCommand {
     });
   }
 
-  private async acquireLock(
-    userProfileId: string,
-  ): Promise<
-    | { status: 'proceed'; watermark: Date; filters: InboxConfigurationMailFilters }
+  private async acquireLock(userProfileId: string): Promise<
+    | {
+        status: 'proceed';
+        watermark: Date;
+        filters: InboxConfigurationMailFilters;
+        preferredDelegateUserProfileId: string | null;
+      }
     | { status: 'skip' }
   > {
     return this.db.transaction(async (tx) => {
@@ -232,6 +236,7 @@ export class LiveCatchUpCommand {
           liveCatchUpHeartbeatAt: inboxConfigurations.liveCatchUpHeartbeatAt,
           filters: inboxConfigurations.filters,
           deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
+          preferredDelegateUserProfileId: inboxConfigurations.preferredDelegateUserProfileId,
         })
         .from(inboxConfigurations)
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
@@ -273,6 +278,7 @@ export class LiveCatchUpCommand {
         status: 'proceed',
         watermark: inboxConfig.newestLastModifiedDateTime,
         filters,
+        preferredDelegateUserProfileId: inboxConfig.preferredDelegateUserProfileId,
       };
     });
   }
@@ -282,10 +288,12 @@ export class LiveCatchUpCommand {
     userProfile,
     subscriptionId,
     filters,
+    preferredDelegateUserProfileId,
     liveCatchupOverlappingWindow,
   }: {
     watermark: Date;
     filters: InboxConfigurationMailFilters;
+    preferredDelegateUserProfileId: string | null;
     userProfile: NonNullishProps<UserProfile, 'email'>;
     subscriptionId?: string;
     liveCatchupOverlappingWindow: number;
@@ -319,6 +327,9 @@ export class LiveCatchUpCommand {
             graphBasePath,
           });
           return { batchProcessingStartedAt };
+        },
+        sharedMailboxConfig: {
+          preferredDelegateUserId: preferredDelegateUserProfileId ?? undefined,
         },
       });
 

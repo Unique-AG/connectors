@@ -72,7 +72,7 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     recoveryJob.start();
 
     const recheckJob = new CronJob(this.config.liveCatchupRecheckCron, () => {
-      this.runRecoveryScan();
+      this.runStuckLiveCatchups();
     });
     this.schedulerRegistry.addCronJob('live-catchup-recheck', recheckJob);
     recheckJob.start();

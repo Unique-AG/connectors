@@ -90,8 +90,8 @@ function createMockDb({
 }: {
   subscription?:
     | {
-        userProfileId: string;
-        userEmail: string;
+        id: string;
+        email: string;
         providerUserId: string;
         source: 'oauth' | 'shared-mailbox';
       }
@@ -102,6 +102,7 @@ function createMockDb({
     liveCatchUpHeartbeatAt: Date | null;
     filters: Record<string, unknown>;
     deletingInboxStartedAt?: Date | null;
+    preferredDelegateUserProfileId?: string | null;
   };
   betweenRoundsRow?: {
     lastWebhookReceivedAt: Date | null;
@@ -143,7 +144,7 @@ function createMockDb({
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(subscription ? [subscription] : []),
+          where: vi.fn().mockResolvedValue(subscription ? [{ userProfile: subscription }] : []),
         }),
         where: vi.fn().mockResolvedValue(betweenRoundsRow ? [betweenRoundsRow] : []),
       }),
@@ -238,8 +239,8 @@ describe('LiveCatchUpCommand', () => {
   it('skips when lock is already running with recent heartbeat', async () => {
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -264,8 +265,8 @@ describe('LiveCatchUpCommand', () => {
 
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -289,8 +290,8 @@ describe('LiveCatchUpCommand', () => {
 
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -313,8 +314,8 @@ describe('LiveCatchUpCommand', () => {
 
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -337,8 +338,8 @@ describe('LiveCatchUpCommand', () => {
 
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -360,8 +361,8 @@ describe('LiveCatchUpCommand', () => {
   it('skips when inbox config row is missing inside transaction', async () => {
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -385,8 +386,8 @@ describe('LiveCatchUpCommand', () => {
 
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -429,8 +430,8 @@ describe('LiveCatchUpCommand', () => {
 
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -461,8 +462,8 @@ describe('LiveCatchUpCommand', () => {
 
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -487,8 +488,8 @@ describe('LiveCatchUpCommand', () => {
 
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -513,8 +514,8 @@ describe('LiveCatchUpCommand', () => {
   it('skips when inbox deletion is in progress at entry point', async () => {
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -541,8 +542,8 @@ describe('LiveCatchUpCommand', () => {
 
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -570,8 +571,8 @@ describe('LiveCatchUpCommand', () => {
 
     const db = createMockDb({
       subscription: {
-        userProfileId: USER_PROFILE_ID,
-        userEmail: 'user@example.com',
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
         providerUserId: 'provider-id',
         source: 'oauth' as const,
       },
@@ -598,12 +599,13 @@ describe('LiveCatchUpCommand', () => {
   describe('MsGraphClientResolver paths', () => {
     function makeReadyDb(
       source: 'oauth' | 'shared-mailbox' = 'oauth',
-      userEmail = 'user@example.com',
+      email = 'user@example.com',
+      lockOverrides: { preferredDelegateUserProfileId?: string | null } = {},
     ) {
       return createMockDb({
         subscription: {
-          userProfileId: USER_PROFILE_ID,
-          userEmail,
+          id: USER_PROFILE_ID,
+          email,
           providerUserId: 'provider-id',
           source,
         },
@@ -612,6 +614,7 @@ describe('LiveCatchUpCommand', () => {
           newestLastModifiedDateTime: WATERMARK,
           liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
           filters: DEFAULT_FILTERS,
+          ...lockOverrides,
         },
       });
     }
@@ -693,6 +696,29 @@ describe('LiveCatchUpCommand', () => {
       await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
       expect(capturedApiArg).toBe(`users/${sharedEmail}/messages`);
+    });
+
+    it('passes preferredDelegateUserProfileId from inbox config to resolver as sharedMailboxConfig', async () => {
+      const preferredDelegateId = 'delegate_01jxk5r1s2fq9att23mp4z5ef9';
+      const resolver = { run: vi.fn().mockResolvedValue(NO_DELEGATES) };
+      const db = makeReadyDb('shared-mailbox', 'shared@example.com', {
+        preferredDelegateUserProfileId: preferredDelegateId,
+      });
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
+
+      await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+      expect(resolver.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sharedMailboxConfig: { preferredDelegateUserId: preferredDelegateId },
+        }),
+      );
     });
   });
 });
