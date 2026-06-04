@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Client } from '@microsoft/microsoft-graph-client';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';

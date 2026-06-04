@@ -82,7 +82,9 @@ function createMockDb(profileIds: string[] = []) {
     .fn()
     .mockResolvedValue(profileIds.map((id) => ({ id, source: 'shared-mailbox' })));
   const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
-  const inboxConfigReturning = vi.fn().mockResolvedValue(profileIds.map((id) => ({ userProfileId: id })));
+  const inboxConfigReturning = vi
+    .fn()
+    .mockResolvedValue(profileIds.map((id) => ({ userProfileId: id })));
   const onConflictDoNothing = vi.fn().mockReturnValue({ returning: inboxConfigReturning });
   const values = vi
     .fn()
@@ -168,7 +170,15 @@ function createService(overrides?: {
     amqp as any,
   );
 
-  return { service, db, graphClientFactory, persistentCacheService, schedulerRegistry, config, amqp };
+  return {
+    service,
+    db,
+    graphClientFactory,
+    persistentCacheService,
+    schedulerRegistry,
+    config,
+    amqp,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -604,7 +614,11 @@ describe('SharedMailboxSyncService', () => {
         config: { sharedMailboxEmails: ['shared@example.com'] },
         ingestionConfig: {
           mcpBackend: McpBackendType.MicrosoftGraphAndUniqueApi,
-          defaultMailFilters: { retentionWindowInDays: 90, ignoredSenders: [], ignoredContents: [] },
+          defaultMailFilters: {
+            retentionWindowInDays: 90,
+            ignoredSenders: [],
+            ignoredContents: [],
+          },
         },
         factoryResults: [{ client: mockClient, userId: 'user1' }],
         profileIds: ['profile-uuid-1'],
@@ -631,7 +645,11 @@ describe('SharedMailboxSyncService', () => {
         config: { sharedMailboxEmails: ['shared@example.com'] },
         ingestionConfig: {
           mcpBackend: McpBackendType.MicrosoftGraphAndUniqueApi,
-          defaultMailFilters: { retentionWindowInDays: 90, ignoredSenders: [], ignoredContents: [] },
+          defaultMailFilters: {
+            retentionWindowInDays: 90,
+            ignoredSenders: [],
+            ignoredContents: [],
+          },
         },
         factoryResults: [{ client: mockClient, userId: 'user1' }],
         profileIds: ['profile-uuid-1'],
@@ -657,7 +675,11 @@ describe('SharedMailboxSyncService', () => {
         config: { sharedMailboxEmails: ['shared@example.com'] },
         ingestionConfig: {
           mcpBackend: McpBackendType.MicrosoftGraphAndUniqueApi,
-          defaultMailFilters: { retentionWindowInDays: 90, ignoredSenders: [], ignoredContents: [] },
+          defaultMailFilters: {
+            retentionWindowInDays: 90,
+            ignoredSenders: [],
+            ignoredContents: [],
+          },
         },
         factoryResults: [{ client: mockClient, userId: 'user1' }],
         profileIds: [], // onConflictDoNothing returns empty — all rows already existed

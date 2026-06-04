@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { LiveCatchUpExecutEventDto, LiveCatchUpReadyRecheckEventDto } from './live-catch-up-event.dto';
+import {
+  LiveCatchUpExecutEventDto,
+  LiveCatchUpReadyRecheckEventDto,
+} from './live-catch-up-event.dto';
 
 describe('LiveCatchUpExecutEventDto', () => {
   const type = 'unique.outlook-semantic-mcp.live-catch-up.execute';

@@ -6,9 +6,9 @@ import { and, eq, exists, inArray, lt, not, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import {
-  delegatedAccessAccounts,
   DRIZZLE,
   DrizzleDatabase,
+  delegatedAccessAccounts,
   inboxConfigurations,
   userProfiles,
 } from '~/db';

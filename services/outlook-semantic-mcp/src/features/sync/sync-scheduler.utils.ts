@@ -1,6 +1,6 @@
 import { and, eq, gt, isNotNull, sql } from 'drizzle-orm';
 import { alias, union } from 'drizzle-orm/pg-core';
-import { delegatedAccessAccounts, DrizzleDatabase, subscriptions, userProfiles } from '~/db';
+import { DrizzleDatabase, delegatedAccessAccounts, subscriptions, userProfiles } from '~/db';
 
 const delegateProfiles = alias(userProfiles, 'delegate_profiles');
 

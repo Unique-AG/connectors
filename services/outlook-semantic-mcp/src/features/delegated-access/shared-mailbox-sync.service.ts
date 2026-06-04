@@ -6,6 +6,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { and, eq, inArray, not, sql } from 'drizzle-orm';
+import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import {
   DelegatedAccessConfig,
   delegatedAccessConfig,
@@ -14,14 +15,13 @@ import {
   McpBackendType,
 } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
-import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import { FullSyncEventDto } from '../sync/full-sync/full-sync-event.dto';
 import { serializeMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { sleep } from '~/utils/sleep';
 import { DeleteInboxDataCommand } from '../delete-inbox/delete-inbox-data.command';
 import { PersistentCacheService } from '../persistent-cache/persistent-cache.service';
+import { FullSyncEventDto } from '../sync/full-sync/full-sync-event.dto';
 
 export const SHARED_MAILBOX_SYNC_CACHE_KEY = 'SharedMailboxSync';
 const CRON_JOB_NAME = 'shared-mailbox-sync';

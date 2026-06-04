@@ -275,7 +275,11 @@ export class ProcessEmailCommand {
 
     try {
       this.logger.debug({ ...logContext, msg: `File Upload: Started` });
-      const emailBuffer = await this.getEmlFile({ messageId: graphMessage.id, client, graphBasePath });
+      const emailBuffer = await this.getEmlFile({
+        messageId: graphMessage.id,
+        client,
+        graphBasePath,
+      });
       await this.uploadFileForIngestionCommand.run({
         uploadUrl: content.writeUrl,
         content: emailBuffer,

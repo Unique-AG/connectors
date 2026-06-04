@@ -2,8 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
-import { MetricsModule } from '../metrics/metrics.module';
 import { DeleteInboxModule } from '../delete-inbox/delete-inbox.module';
+import { MetricsModule } from '../metrics/metrics.module';
 import { PersistentCacheModule } from '../persistent-cache/persistent-cache.module';
 import { ReadOwnerMailboxFoldersFromMsGraphQuery } from './commands/read-owner-mailbox-folders-for-delegated-access-verification.query';
 import { TestReadAccessFromGraphEndpointQuery } from './commands/test-read-access-from-graph-endpoint.query';
@@ -18,7 +18,14 @@ import { VerifyDelegatedAccessListener } from './verification/verify-delegated-a
 import { VerifyDelegatedAccessSchedulerService } from './verification/verify-delegated-access-scheduler.service';
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule, MetricsModule, DeleteInboxModule, PersistentCacheModule, ConfigModule],
+  imports: [
+    DrizzleModule,
+    MsGraphModule,
+    MetricsModule,
+    DeleteInboxModule,
+    PersistentCacheModule,
+    ConfigModule,
+  ],
   providers: [
     TestReadAccessFromGraphEndpointQuery,
     ReadOwnerMailboxFoldersFromMsGraphQuery,

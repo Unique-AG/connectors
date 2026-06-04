@@ -14,7 +14,6 @@ import {
   UserProfile,
   userProfiles,
 } from '~/db';
-import { NonNullishProps } from '~/utils/non-nullish-props';
 import {
   InboxConfigurationMailFilters,
   inboxConfigurationMailFilters,
@@ -33,6 +32,7 @@ import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to
 import { greatestFrom } from '~/utils/greatest-from';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
+import { NonNullishProps } from '~/utils/non-nullish-props';
 import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
 import {
   GraphMessage,

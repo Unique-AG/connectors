@@ -36,10 +36,15 @@ function createMockGraphApi() {
 function createMockMsGraphClientResolver(graphApi: ReturnType<typeof createMockGraphApi>) {
   const mockClient = { api: vi.fn().mockReturnValue(graphApi) };
   return {
-    run: vi.fn().mockImplementation(
-      async ({ fn }: { fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<any> }) =>
-        fn({ client: mockClient, clientUserProfileId: 'delegate-profile-id' }),
-    ),
+    run: vi
+      .fn()
+      .mockImplementation(
+        async ({
+          fn,
+        }: {
+          fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<any>;
+        }) => fn({ client: mockClient, clientUserProfileId: 'delegate-profile-id' }),
+      ),
   };
 }
 
@@ -698,7 +703,6 @@ describe('FullSyncCommand', () => {
         providerUserId: null,
         source: 'shared-mailbox',
       });
-      const graphApi = createMockGraphApi();
       const noDelegatesResolver = {
         run: vi.fn().mockResolvedValue(NO_DELEGATES),
       };

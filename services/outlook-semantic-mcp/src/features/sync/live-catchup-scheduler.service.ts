@@ -7,9 +7,9 @@ import z from 'zod';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import {
-  delegatedAccessAccounts,
   DRIZZLE,
   DrizzleDatabase,
+  delegatedAccessAccounts,
   inboxConfigurations,
   userProfiles,
 } from '~/db';

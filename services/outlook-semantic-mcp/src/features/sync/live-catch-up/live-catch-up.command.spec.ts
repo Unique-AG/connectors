@@ -55,9 +55,15 @@ function createMockGraphApi() {
 function createMockMsGraphClientResolver(graphApi: ReturnType<typeof createMockGraphApi>) {
   const client = { api: vi.fn().mockReturnValue(graphApi) };
   return {
-    run: vi.fn().mockImplementation(async ({ fn }: { fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown> }) =>
-      fn({ client, clientUserProfileId: 'delegate-user-profile-id' }),
-    ),
+    run: vi
+      .fn()
+      .mockImplementation(
+        async ({
+          fn,
+        }: {
+          fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown>;
+        }) => fn({ client, clientUserProfileId: 'delegate-user-profile-id' }),
+      ),
   };
 }
 
@@ -82,7 +88,14 @@ function createMockDb({
   lockResult,
   betweenRoundsRow,
 }: {
-  subscription?: { userProfileId: string; userEmail: string; providerUserId: string; source: 'oauth' | 'shared-mailbox' } | undefined;
+  subscription?:
+    | {
+        userProfileId: string;
+        userEmail: string;
+        providerUserId: string;
+        source: 'oauth' | 'shared-mailbox';
+      }
+    | undefined;
   lockResult?: {
     liveCatchUpState: string;
     newestLastModifiedDateTime: Date | null;
@@ -583,7 +596,10 @@ describe('LiveCatchUpCommand', () => {
   });
 
   describe('MsGraphClientResolver paths', () => {
-    function makeReadyDb(source: 'oauth' | 'shared-mailbox' = 'oauth', userEmail = 'user@example.com') {
+    function makeReadyDb(
+      source: 'oauth' | 'shared-mailbox' = 'oauth',
+      userEmail = 'user@example.com',
+    ) {
       return createMockDb({
         subscription: {
           userProfileId: USER_PROFILE_ID,
@@ -603,19 +619,39 @@ describe('LiveCatchUpCommand', () => {
     it('NO_DELEGATES → result is skipped', async () => {
       const resolver = { run: vi.fn().mockResolvedValue(NO_DELEGATES) };
       const db = makeReadyDb();
-      const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories, resolver });
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
 
-      const result = await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+      const result = await command.run({
+        subscriptionId: SUBSCRIPTION_ID,
+        liveCatchupOverlappingWindow: 5,
+      });
 
       expect(result).toEqual({ status: 'skipped' });
     });
 
     it('AllDelegatesFailedError → result is failed', async () => {
-      const resolver = { run: vi.fn().mockRejectedValue(new AllDelegatesFailedError(USER_PROFILE_ID)) };
+      const resolver = {
+        run: vi.fn().mockRejectedValue(new AllDelegatesFailedError(USER_PROFILE_ID)),
+      };
       const db = makeReadyDb();
-      const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories, resolver });
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
 
-      const result = await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+      const result = await command.run({
+        subscriptionId: SUBSCRIPTION_ID,
+        liveCatchupOverlappingWindow: 5,
+      });
 
       expect(result).toEqual(expect.objectContaining({ status: 'failed' }));
     });
@@ -626,21 +662,33 @@ describe('LiveCatchUpCommand', () => {
       graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
 
       const resolver = {
-        run: vi.fn().mockImplementation(
-          async ({ fn }: { fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown> }) => {
-            const client = {
-              api: vi.fn().mockImplementation((path: string) => {
-                capturedApiArg ??= path;
-                return graphApi;
-              }),
-            };
-            return fn({ client, clientUserProfileId: 'delegate-user-profile-id' });
-          },
-        ),
+        run: vi
+          .fn()
+          .mockImplementation(
+            async ({
+              fn,
+            }: {
+              fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown>;
+            }) => {
+              const client = {
+                api: vi.fn().mockImplementation((path: string) => {
+                  capturedApiArg ??= path;
+                  return graphApi;
+                }),
+              };
+              return fn({ client, clientUserProfileId: 'delegate-user-profile-id' });
+            },
+          ),
       };
 
       const db = makeReadyDb('shared-mailbox', sharedEmail);
-      const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories, resolver });
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
 
       await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
 
