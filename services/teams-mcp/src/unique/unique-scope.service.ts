@@ -9,9 +9,10 @@ import {
   PublicCreateScopeRequestSchema,
   PublicCreateScopeResultSchema,
   PublicFolderUpdateRequestSchema,
+  type PublicFolderUpdateResult,
+  PublicFolderUpdateResultSchema,
   type PublicScopeAccessSchema,
   type Scope,
-  ScopeSchema,
 } from './unique.dtos';
 
 @Injectable()
@@ -107,7 +108,7 @@ export class UniqueScopeService {
   public async updateScope(
     scopeId: string,
     patch: { externalId?: string; name?: string; parentId?: string | null },
-  ): Promise<Scope> {
+  ): Promise<PublicFolderUpdateResult> {
     const span = this.trace.getSpan();
     span?.setAttribute('scope_id', scopeId);
     span?.setAttribute('has_external_id', patch.externalId !== undefined);
@@ -124,7 +125,7 @@ export class UniqueScopeService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const result = ScopeSchema.parse(await response.json());
+    const result = PublicFolderUpdateResultSchema.parse(await response.json());
 
     this.logger.log({ scopeId, externalId: result.externalId }, 'Successfully updated scope');
 

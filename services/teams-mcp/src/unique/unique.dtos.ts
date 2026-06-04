@@ -78,8 +78,15 @@ export const PublicFolderUpdateRequestSchema = z.object({
 });
 export type PublicFolderUpdateRequest = z.infer<typeof PublicFolderUpdateRequestSchema>;
 
-// The PATCH response reuses the same folder shape as create.
-export const PublicFolderUpdateResultSchema = ScopeSchema;
+// The PATCH folder/:scopeId endpoint returns a FolderInfoResultDto, which is a
+// richer shape than create's FolderDto and is tagged object="folder-info".
+export const PublicFolderUpdateResultSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  parentId: z.string().nullable().optional(),
+  externalId: z.string().nullable().optional(),
+  object: z.literal('folder-info'),
+});
 export type PublicFolderUpdateResult = z.infer<typeof PublicFolderUpdateResultSchema>;
 
 // !SECTION - FolderUpdate endpoint types
