@@ -4,7 +4,8 @@ export type FullSyncResult =
   | { status: 'skipped'; reason: string }
   | { status: 'waiting-for-ingestion' }
   | { status: 'completed' }
-  | { status: 'failed'; error: unknown };
+  | { status: 'failed'; error: unknown }
+  | { status: 'failed'; reason: 'no-delegates' };
 
 export type InboxConfig = typeof inboxConfigurations.$inferSelect;
 

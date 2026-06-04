@@ -134,6 +134,10 @@ export class FullSyncCommand {
               filtersRaw: filters,
             });
           }
+          // Directory sync uses its own delegate preference (directoriesSync.synchronizedByUserProfileId),
+          // which may differ from the delegate resolved for message processing in this callback.
+          // This is intentional: directory sync is a separate process that manages its own delta
+          // tokens and delegate identity, and self-heals on Graph 410 errors independently.
           await this.metrics.measureFullSyncDirectorySync(() =>
             this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
           );
@@ -165,9 +169,11 @@ export class FullSyncCommand {
       if (isNoDelegatesResult(resolverResult)) {
         this.logger.log({
           userProfileId: userProfile.id,
-          msg: 'No delegates found for shared-mailbox, skipping full sync',
+          msg: 'No delegates found for shared-mailbox, skipping full sync, and transition to failed',
         });
-        return { status: 'skipped', reason: 'no-delegates' };
+        // Set state to 'failed' so the next trigger can retry.
+        await this.transitionState(userProfile.id, version, 'failed');
+        return { status: 'failed', reason: 'no-delegates' };
       }
 
       const batchResult = resolverResult;

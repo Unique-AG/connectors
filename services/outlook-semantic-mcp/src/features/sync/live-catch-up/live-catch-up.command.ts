@@ -304,6 +304,11 @@ export class LiveCatchUpCommand {
     });
 
     try {
+      // Directory sync runs with its own delegate preference (directoriesSync.synchronizedByUserProfileId),
+      // which may differ from the preferredDelegateUserProfileId used for message processing below.
+      // This is intentional: directory sync is a separate process that manages its own delta tokens
+      // and delegate identity. It self-heals by clearing its delta link and delegate when the token
+      // expires (Graph 410), so its delegate choice must not be overridden here.
       await this.metrics.measureLiveCatchupDirectorySync(() =>
         this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
       );
