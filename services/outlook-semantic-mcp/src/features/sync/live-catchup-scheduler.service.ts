@@ -19,6 +19,7 @@ import {
   FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES,
   READY_LIVE_CATCHUP_THRESHOLD_MINUTES,
   RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES,
+  SHARED_MAILBOX_READY_LIVE_CATCHUP_THRESHOLD_MINUTES,
 } from './live-catch-up/live-catch-up.command';
 import { LiveCatchUpEventDto } from './live-catch-up/live-catch-up-event.dto';
 import { selectUserProfileIdsWhichCanRunTheSyncProcess } from './sync-scheduler.utils';
@@ -46,7 +47,11 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
 
     this.logger.log({ msg: 'LiveCatchupSchedulerService is shutting down...' });
     this.isShuttingDown = true;
-    for (const name of ['live-catchup-recovery', 'live-catchup-recheck']) {
+    for (const name of [
+      'live-catchup-recovery',
+      'live-catchup-recheck',
+      'live-catchup-shared-mailbox-recheck',
+    ]) {
       try {
         this.schedulerRegistry.getCronJob(name).stop();
       } catch (err) {
@@ -67,10 +72,22 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     recoveryJob.start();
 
     const recheckJob = new CronJob(this.config.liveCatchupRecheckCron, () => {
-      this.runReadyLiveCatchupsWhichDidNotRunRecently();
+      this.runStuckLiveCatchups();
     });
     this.schedulerRegistry.addCronJob('live-catchup-recheck', recheckJob);
     recheckJob.start();
+
+    const sharedMailboxRecheckJob = new CronJob(
+      this.config.liveCatchupSharedMailboxRecheckCron,
+      () => {
+        this.runLiveCatchupsWhichDidNotRunRecently();
+      },
+    );
+    this.schedulerRegistry.addCronJob(
+      'live-catchup-shared-mailbox-recheck',
+      sharedMailboxRecheckJob,
+    );
+    sharedMailboxRecheckJob.start();
   }
 
   @NewTrace('cron.live-catchup-recovery')
@@ -94,21 +111,41 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     }
   }
 
-  @NewTrace('cron.live-catchup-ready-recheck')
-  public async runReadyLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
+  @NewTrace('cron.run-stuck-live-catchups')
+  public async runStuckLiveCatchups(): Promise<void> {
     if (this.isShuttingDown) {
       this.logger.log({
-        msg: 'Skipping live catchup recovery scan due to shutdown',
+        msg: 'Skipping subscription live catchup recheck due to shutdown',
       });
       return;
     }
 
     try {
-      this.logger.log({ msg: 'Live catchup recovery scan triggered' });
-      await this.rerunReadyLiveCatchupsWhichDidNotRunRecently();
+      this.logger.log({ msg: 'Subscription live catchup recheck triggered' });
+      await this.rerunStuckLiveCatchups();
     } catch (err) {
       this.logger.error({
-        msg: 'An unexpected error occurred during live catchup recovery scan',
+        msg: 'An unexpected error occurred during subscription live catchup recheck',
+        err,
+      });
+    }
+  }
+
+  @NewTrace('cron.run-live-catchups-which-did-not-run-recently')
+  public async runLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
+    if (this.isShuttingDown) {
+      this.logger.log({
+        msg: 'Skipping shared-mailbox live catchup recheck due to shutdown',
+      });
+      return;
+    }
+
+    try {
+      this.logger.log({ msg: 'Shared-mailbox live catchup recheck triggered' });
+      await this.rerunLiveCatchupsWhichDidNotRunRecently();
+    } catch (err) {
+      this.logger.error({
+        msg: 'An unexpected error occurred during shared-mailbox live catchup recheck',
         err,
       });
     }
@@ -159,22 +196,56 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     await this.logSharedMailboxesWithNoDelegates();
   }
 
-  private async rerunReadyLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
+  private async rerunStuckLiveCatchups(): Promise<void> {
     const stuckConfigs = await this.db
       .select({ userProfileId: inboxConfigurations.userProfileId })
       .from(inboxConfigurations)
+      .innerJoin(userProfiles, eq(userProfiles.id, inboxConfigurations.userProfileId))
       .where(
         and(
           inArray(
             inboxConfigurations.userProfileId,
             selectUserProfileIdsWhichCanRunTheSyncProcess(this.db),
           ),
-          and(
-            eq(inboxConfigurations.liveCatchUpState, 'ready'),
-            lt(
-              inboxConfigurations.liveCatchUpHeartbeatAt,
-              getThreshold(READY_LIVE_CATCHUP_THRESHOLD_MINUTES),
-            ),
+          eq(userProfiles.source, 'oauth'),
+          eq(inboxConfigurations.liveCatchUpState, 'ready'),
+          lt(
+            inboxConfigurations.liveCatchUpHeartbeatAt,
+            getThreshold(READY_LIVE_CATCHUP_THRESHOLD_MINUTES),
+          ),
+        ),
+      );
+
+    if (stuckConfigs.length === 0) {
+      return;
+    }
+
+    await this.rerunLiveCatchups(
+      stuckConfigs.map(({ userProfileId }) =>
+        LiveCatchUpEventDto.parse({
+          type: 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck',
+          payload: { userProfileId },
+        }),
+      ),
+    );
+  }
+
+  private async rerunLiveCatchupsWhichDidNotRunRecently(): Promise<void> {
+    const stuckConfigs = await this.db
+      .select({ userProfileId: inboxConfigurations.userProfileId })
+      .from(inboxConfigurations)
+      .innerJoin(userProfiles, eq(userProfiles.id, inboxConfigurations.userProfileId))
+      .where(
+        and(
+          inArray(
+            inboxConfigurations.userProfileId,
+            selectUserProfileIdsWhichCanRunTheSyncProcess(this.db),
+          ),
+          eq(userProfiles.source, 'shared-mailbox'),
+          eq(inboxConfigurations.liveCatchUpState, 'ready'),
+          lt(
+            inboxConfigurations.liveCatchUpHeartbeatAt,
+            getThreshold(SHARED_MAILBOX_READY_LIVE_CATCHUP_THRESHOLD_MINUTES),
           ),
         ),
       );

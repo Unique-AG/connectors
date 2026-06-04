@@ -41,7 +41,11 @@ export const withIngestionConfig = z.object({
   liveCatchupRecheckCron: z
     .string()
     .prefault('* * * * *')
-    .describe('Cron schedule for live catch-up ready recheck. Default every minute'),
+    .describe('Cron schedule for subscription-user live catch-up ready recheck. Default every minute'),
+  liveCatchupSharedMailboxRecheckCron: z
+    .string()
+    .prefault('*/10 * * * *')
+    .describe('Cron schedule for shared-mailbox live catch-up ready recheck. Default every 10 minutes'),
   deleteInboxRecoveryCron: z
     .string()
     .prefault('*/5 * * * *')

@@ -45,6 +45,7 @@ import type { LiveCatchupResult, LiveCatchupRoundResult } from './live-catch-up.
 export const RUNNING_LIVE_CATCHUP_THRESHOLD_MINUTES = 20;
 export const FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES = 5;
 export const READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 30;
+export const SHARED_MAILBOX_READY_LIVE_CATCHUP_THRESHOLD_MINUTES = 10;
 
 @Injectable()
 export class LiveCatchUpCommand {

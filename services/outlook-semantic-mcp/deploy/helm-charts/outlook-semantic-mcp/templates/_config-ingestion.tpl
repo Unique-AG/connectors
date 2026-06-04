@@ -18,6 +18,9 @@ INGESTION_LIVE_CATCHUP_RECOVERY_CRON: {{ .ingestion.liveCatchupRecoveryCron | qu
 {{- if .ingestion.liveCatchupRecheckCron }}
 INGESTION_LIVE_CATCHUP_RECHECK_CRON: {{ .ingestion.liveCatchupRecheckCron | quote }}
 {{- end }}
+{{- if .ingestion.liveCatchupSharedMailboxRecheckCron }}
+INGESTION_LIVE_CATCHUP_SHARED_MAILBOX_RECHECK_CRON: {{ .ingestion.liveCatchupSharedMailboxRecheckCron | quote }}
+{{- end }}
 {{- if .ingestion.deleteInboxRecoveryCron }}
 INGESTION_DELETE_INBOX_RECOVERY_CRON: {{ .ingestion.deleteInboxRecoveryCron | quote }}
 {{- end }}
