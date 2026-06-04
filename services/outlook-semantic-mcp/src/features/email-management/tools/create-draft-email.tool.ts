@@ -10,6 +10,7 @@ import { META } from './create-draft-email-tool.meta';
 
 const FreshDraftInputSchema = z.object({
   type: z.literal('draft').describe('Create a fresh draft email.'),
+  subject: z.string().describe('The subject line of the draft email.'),
   toRecipients: z
     .array(
       z.object({
@@ -44,7 +45,6 @@ const DraftRecipientsData = z.discriminatedUnion('type', [
 ]);
 
 const CreateDraftEmailInputSchema = z.object({
-  subject: z.string().describe('The subject line of the draft email.'),
   content: z
     .string()
     .describe(

@@ -11,7 +11,6 @@ import { pick } from 'remeda';
 const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string().optional() });
 
 interface CreateDraftEmailInput {
-  subject: string;
   content: string;
   attachments?: { fileName: string; data: string }[];
   chatId: string | null | undefined;
@@ -19,6 +18,7 @@ interface CreateDraftEmailInput {
   recipientsData:
     | {
         type: 'draft';
+        subject: string;
         toRecipients: Array<{ name?: string; email: string }>;
         ccRecipients?: Array<{ name?: string; email: string }>;
       }
@@ -87,7 +87,6 @@ export class CreateDraftEmailCommand {
     const prefix = input.mailbox ? `/users/${input.mailbox}` : '/me';
 
     const sharedBodyFields = {
-      subject: input.subject,
       body: {
         contentType: 'HTML',
         content: markdownToHtml(input.content),
@@ -95,11 +94,12 @@ export class CreateDraftEmailCommand {
     };
 
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
+    const recipientsData = input.recipientsData;
 
     const apiParams =
-      input.recipientsData.type === 'reply'
+      recipientsData.type === 'reply'
         ? {
-            apiPath: `${prefix}/messages/${input.recipientsData.inReplyToMessageId}/createReplyAll`,
+            apiPath: `${prefix}/messages/${recipientsData.inReplyToMessageId}/createReplyAll`,
             body: { message: sharedBodyFields },
             successMessage: 'Reply-all draft created successfully.',
           }
@@ -107,12 +107,12 @@ export class CreateDraftEmailCommand {
             apiPath: `${prefix}/messages`,
             body: {
               ...sharedBodyFields,
-              toRecipients: input.recipientsData.toRecipients.map((item) =>
+              subject: recipientsData.subject,
+              toRecipients: recipientsData.toRecipients.map((item) =>
                 pick(item, ['email', 'name']),
               ),
               ccRecipients:
-                input.recipientsData.ccRecipients?.map((item) => pick(item, ['email', 'name'])) ??
-                [],
+                recipientsData.ccRecipients?.map((item) => pick(item, ['email', 'name'])) ?? [],
             },
             successMessage: 'Draft email created successfully.',
           };
