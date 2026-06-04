@@ -720,5 +720,42 @@ describe('LiveCatchUpCommand', () => {
         }),
       );
     });
+
+    it('shared-mailbox → persists working delegate to DB after successful run', async () => {
+      const sharedEmail = 'shared@example.com';
+      const delegateId = 'delegate_01jxk5r1s2fq9att23mp4z5ef9';
+      graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+      const resolver = {
+        run: vi
+          .fn()
+          .mockImplementation(
+            async ({
+              fn,
+            }: {
+              fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown>;
+            }) => {
+              const client = { api: vi.fn().mockReturnValue(graphApi) };
+              return fn({ client, clientUserProfileId: delegateId });
+            },
+          ),
+      };
+
+      const db = makeReadyDb('shared-mailbox', sharedEmail);
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
+
+      await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+      const setCalls = (db.update as any).mock.results[0].value.set.mock.calls as any[][];
+      expect(setCalls).toContainEqual([
+        expect.objectContaining({ preferredDelegateUserProfileId: delegateId }),
+      ]);
+    });
   });
 });

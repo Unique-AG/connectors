@@ -318,7 +318,7 @@ export class LiveCatchUpCommand {
 
       const resolverResult = await this.msGraphClientResolver.run({
         userProfile,
-        fn: async ({ client }) => {
+        fn: async ({ client, clientUserProfileId }) => {
           const { batchProcessingStartedAt } = await this.processMessages({
             user: {
               email: createSmeared(userProfile.email),
@@ -331,7 +331,7 @@ export class LiveCatchUpCommand {
             filters,
             graphBasePath,
           });
-          return { batchProcessingStartedAt };
+          return { batchProcessingStartedAt, clientUserProfileId };
         },
         sharedMailboxConfig: {
           preferredDelegateUserId: preferredDelegateUserProfileId ?? undefined,
@@ -344,6 +344,23 @@ export class LiveCatchUpCommand {
           msg: 'No delegates found, skipping live catch-up',
         });
         return { status: 'no-delegates' };
+      }
+
+      if (
+        userProfile.source === 'shared-mailbox' &&
+        preferredDelegateUserProfileId !== resolverResult.clientUserProfileId
+      ) {
+        this.logger.debug({
+          userProfileId: userProfile.id,
+          msg: `Switching delegated user for shared mailbox`,
+          oldPreferredDelegateUserProfileId: preferredDelegateUserProfileId,
+          newPreferredDelegateUserProfileId: resolverResult.clientUserProfileId,
+        });
+        await this.db
+          .update(inboxConfigurations)
+          .set({ preferredDelegateUserProfileId: resolverResult.clientUserProfileId })
+          .where(eq(inboxConfigurations.userProfileId, userProfile.id))
+          .execute();
       }
 
       this.logger.log({ ...logProps, msg: 'Live catch-up completed' });
