@@ -1,7 +1,5 @@
 # confluence-connector
 
-![Version: 2.0.0-alpha.0](https://img.shields.io/badge/Version-2.0.0--alpha.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.0.0-alpha.0](https://img.shields.io/badge/AppVersion-2.0.0--alpha.0-informational?style=flat-square)
-
 Take content from Confluence and send it to Unique AI for RAG ingestion.
 
 ## Requirements
@@ -12,45 +10,41 @@ Take content from Confluence and send it to Unique AI for RAG ingestion.
 
 ## Installation
 
-### Requirements
+Use OCI charts only. Prefer `getunique.azurecr.io`; `uniquecr.azurecr.io` is private and kept for consistency, and GHCR is maintained best-effort.
 
-You need to install [`aslafy-z/helm-git`](https://github.com/aslafy-z/helm-git). OCI registry based installation options will be provided in a future release.
+- `oci://getunique.azurecr.io/connectors/helm/confluence-connector`
+- `oci://uniquecr.azurecr.io/connectors/helm/confluence-connector`
+- `oci://ghcr.io/unique-ag/connectors/helm/confluence-connector`
 
 ### Helm
 
-> [!IMPORTANT]
-> `<v-less-version-only>` means just the SemVer version.
-
 ```bash
-helm repo add cfc git+https://github.com/Unique-AG/connectors@services/confluence-connector/deploy/helm-charts?ref=<release-tag>&depupdate=1
-helm template cfc/confluence-connector --version <v-less-version-only>
+helm template confluence-connector \
+  oci://getunique.azurecr.io/connectors/helm/confluence-connector \
+  --version <version>
 ```
 
 ### [`helmfile`](https://helmfile.readthedocs.io)
 
-> [!IMPORTANT]
-> `<v-less-version-only>` means just the SemVer version.
-
 ```yaml
 # helmfile version v1.1.7
-repositories:
-  - name: cfc
-    url: git+https://github.com/Unique-AG/connectors@services/confluence-connector/deploy/helm-charts?ref=<release-tag>&depupdate=1
 releases:
   - name: confluence-connector
-    chart: cfc/confluence-connector
-    version: <v-less-version-only>
+    chart: oci://getunique.azurecr.io/connectors/helm/confluence-connector
+    version: <version>
 ```
 
 ### [Argo Application](https://argo-cd.readthedocs.io/en/stable/user-guide/application-specification)
+
+Pin the chart by OCI digest in GitOps. Keep the version as a comment for humans.
+
 ```yaml
 spec:
   name: confluence-connector
-  …
   sources:
-    - repoURL: https://github.com/Unique-AG/connectors.git
-      path: services/confluence-connector/deploy/helm-charts/confluence-connector
-      targetRevision: <release-tag>
+    - repoURL: oci://getunique.azurecr.io/connectors/helm/confluence-connector
+      path: .
+      targetRevision: sha256:<chart-digest> # <version>
 ```
 
 ## Values
@@ -70,21 +64,20 @@ spec:
 | connector.env.HEALTH_SYNC_TENANT_FAILURE_THRESHOLD | string | `"0.5"` |  |
 | connector.env.LOGS_DIAGNOSTICS_DATA_POLICY | string | `"conceal"` |  |
 | connector.env.LOG_LEVEL | string | `"info"` |  |
-| connector.env.MAX_FILE_SIZE_BYTES | string | `"209715200"` |  |
-| connector.env.MAX_HEAP_MB | int | `896` |  |
+| connector.env.MAX_HEAP_MB | int | `1920` |  |
 | connector.env.NODE_ENV | string | `"production"` |  |
 | connector.env.OTEL_EXPORTER_PROMETHEUS_HOST | string | `"0.0.0.0"` |  |
 | connector.env.OTEL_EXPORTER_PROMETHEUS_PORT | string | `"51350"` |  |
 | connector.env.OTEL_METRICS_EXPORTER | string | `"prometheus"` |  |
 | connector.env.TENANT_CONFIG_PATH_PATTERN | string | `"/app/tenant-configs/*-tenant-config.yaml"` |  |
-| connector.envVars | list | `[]` | Environment variables from secrets. Example for loading secrets (uncomment and customize as needed):   envVars:     # For Zitadel authentication (required when authMode is 'external')     - name: ZITADEL_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: confluence-connector-secret           key: ZITADEL_CLIENT_SECRET     # For Confluence OAuth 2.0 (2LO) client secret     - name: CONFLUENCE_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: confluence-connector-secret           key: CONFLUENCE_CLIENT_SECRET See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options. |
-| connector.extraEnvCM | list | `[]` | List of ConfigMaps to load as environment variables |
+| connector.envVars | list | `[]` | Environment variables from secrets. Example for loading secrets (uncomment and customize as needed):   envVars:     # For Zitadel authentication (required when authMode is 'external')     - name: ZITADEL_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: confluence-connector-secret           key: ZITADEL_CLIENT_SECRET     # For Confluence OAuth 2.0 (2LO) client secret     - name: CONFLUENCE_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: confluence-connector-secret           key: CONFLUENCE_CLIENT_SECRET     # For proxy basic auth password (required when proxy.authMode is 'username_password')     - name: PROXY_PASSWORD       valueFrom:         secretKeyRef:           name: confluence-connector-secret           key: PROXY_PASSWORD See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options. |
+| connector.extraEnvCM | list | `["confluence-connector-proxy-config"]` | List of ConfigMaps to load as environment variables. The default assumes releaseName=confluence-connector. For multi-instance deployments with a different release name, override to match the rendered ConfigMap name (<releaseName>-proxy-config). |
 | connector.image.repository | string | `"ghcr.io/unique-ag/connectors/services/confluence-connector"` |  |
-| connector.image.tag | string | `"2.0.0-alpha.0"` |  |
+| connector.image.tag | string | `"2.1.0"` |  |
 | connector.ports.application | int | `51349` |  |
 | connector.ports.metrics | int | `51350` |  |
-| connector.resources.limits.memory | string | `"768Mi"` |  |
-| connector.resources.requests.cpu | string | `"500m"` |  |
+| connector.resources.limits.memory | string | `"1Gi"` |  |
+| connector.resources.requests.cpu | int | `1` |  |
 | connector.resources.requests.memory | string | `"512Mi"` |  |
 | connector.routes.paths.default.enabled | bool | `false` |  |
 | connector.service.enabled | bool | `false` |  |
@@ -94,7 +87,7 @@ spec:
 | connector.volumeMounts[1] | object | `{"mountPath":"/app/tenant-configs","name":"tenant-config","readOnly":true}` | Mount tenant configuration directory |
 | connector.volumes[0].emptyDir | object | `{}` |  |
 | connector.volumes[0].name | string | `"tmp"` |  |
-| connector.volumes[1] | object | `{"configMap":{"name":"confluence-connector-tenant-config"},"name":"tenant-config"}` | Tenant configuration YAML file mounted from ConfigMap |
+| connector.volumes[1] | object | `{"configMap":{"name":"confluence-connector-tenant-config"},"name":"tenant-config"}` | Tenant configuration YAML file mounted from ConfigMap. The default assumes releaseName=confluence-connector. For multi-instance deployments with a different release name, override to match the rendered ConfigMap name (<releaseName>-tenant-config). |
 | connectorConfig.enabled | bool | `true` | if disabled, tenant-config must be removed from the connector.volumes and connector.volumeMounts |
 | connectorConfig.tenants[0].confluence.apiRateLimitPerMinute | int | `1200` | Number of Confluence API requests allowed per minute Atlassian recommends DC admins allow at least 20 req/s (1200 RPM). Cloud uses a points-based quota. |
 | connectorConfig.tenants[0].confluence.auth.clientId | string | `"unset_default_value"` | OAuth 2.0 (2LO) application client ID |
@@ -124,6 +117,9 @@ spec:
 | grafana | object | `{"dashboard":{"enabled":false,"folder":"connectors"}}` | Grafana dashboard configuration |
 | grafana.dashboard.enabled | bool | `false` | Enable Grafana dashboard ConfigMap creation |
 | grafana.dashboard.folder | string | `"connectors"` | Grafana folder where the dashboard will be placed |
+| proxyConfig | object | `{"authMode":"none","enabled":true}` | HTTP proxy configuration for external API calls Required for environments where internet access is only available through a proxy. Users preferring setting all variables by hand disable the enabled flag and remove confluence-connector-proxy-config from connector.extraEnvCM. |
+| proxyConfig.authMode | string | `"none"` | Proxy authentication mode none: proxy disabled no_auth: proxy enabled, no authentication username_password: username/password authentication ssl_tls: TLS client certificate authentication |
+| proxyConfig.enabled | bool | `true` | if disabled, confluence-connector-proxy-config must be removed from connector.extraEnvCM. |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

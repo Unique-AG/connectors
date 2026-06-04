@@ -36,6 +36,8 @@ jobs:
       UNIQUECR_REGISTRY: uniquecr.azurecr.io
       UNIQUECR_REPO: connectors/services/${{ inputs.service-name }}
       UNIQUECR_CHART_REPO: connectors/helm
+      GETUNIQUE_REGISTRY: getunique.azurecr.io
+      GETUNIQUE_CHART_REPO: helm
 
     steps:
       - name: Checkout code
@@ -84,10 +86,25 @@ jobs:
           username: 00000000-0000-0000-0000-000000000000
           password: ${{ steps.acr-token.outputs.token }}
 
-      - name: Login to both helm registries
+      - name: Login to Azure as getunique token issuer (OIDC)
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: daa88f8d-0943-459c-890a-17b1a018d11e # acr_oidc getunique_push
+          tenant-id: 99330c76-81d2-460e-861e-35af8e2a4266
+          subscription-id: fb8bce09-908a-459f-b200-a578005bfeb2
+
+      - name: Get getunique ACR access token
+        id: acr-token-getunique
+        run: |
+          TOKEN=$(az acr login --name getunique --expose-token --output tsv --query accessToken)
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Login to helm registries
         run: |
           echo "${{ steps.acr-token.outputs.token }}" | helm registry login ${{ env.UNIQUECR_REGISTRY }} --username 00000000-0000-0000-0000-000000000000 --password-stdin
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ${{ env.GHCR_REGISTRY }} --username ${{ github.actor }} --password-stdin
+          echo "${{ steps.acr-token-getunique.outputs.token }}" | helm registry login ${{ env.GETUNIQUE_REGISTRY }} --username 00000000-0000-0000-0000-000000000000 --password-stdin
 
       - name: Build and push container
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
@@ -138,7 +155,8 @@ jobs:
           --chart services/${{ inputs.service-name }}/deploy/helm-charts/${{ inputs.service-name }} \
           --destination ${{ env.DESTINATION }} \
           --registry oci://${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_CHART_REPO }} \
-          --registry oci://${{ env.GHCR_REGISTRY }}/${{ env.GHCR_CHART_REPO }}
+          --registry oci://${{ env.GHCR_REGISTRY }}/${{ env.GHCR_CHART_REPO }} \
+          --registry oci://${{ env.GETUNIQUE_REGISTRY }}/${{ env.GETUNIQUE_CHART_REPO }}
 
   publish-docs:
     if: ${{ inputs.docs-path != '' }}
