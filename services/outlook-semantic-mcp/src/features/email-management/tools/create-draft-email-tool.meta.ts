@@ -42,7 +42,7 @@ export const META = createMeta({
 
     1. **\`type: "draft"\`** — fresh draft. \`toRecipients\` is required. Optionally pass \`mailbox\` to create the draft in a shared mailbox instead of the signed-in user's own mailbox.
 
-    2. **\`type: "reply"\`** — reply-all draft. Pass \`inReplyToMessageId\` with the \`msGraphMessageId\` value from \`search_emails\` or \`outlook_email_search\` results. Graph pre-fills all original recipients — do **not** pass \`toRecipients\` or \`ccRecipients\`. Optionally pass \`mailbox\` to create the reply draft in a shared mailbox.
+    2. **\`type: "reply"\`** — reply-all draft. Pass \`inReplyToMessageId\` with the \`msGraphMessageId\` value from \`search_emails\` or \`outlook_email_search\` results. Graph pre-fills all original recipients — do **not** pass \`toRecipients\` or \`ccRecipients\`. If the email you are replying to came from a shared or delegated mailbox (i.e. \`sourceMailbox\` is non-null in the search result), you **must** pass that same value as \`mailbox\` — otherwise Graph will look up the message under \`/me\` and return a 404. Omit \`mailbox\` only when replying to an email from the signed-in user's own mailbox (\`sourceMailbox\` is null).
 
     Use \`type: "reply"\` only when explicitly replying to an identified email. Use \`type: "draft"\` for all other cases.
 
