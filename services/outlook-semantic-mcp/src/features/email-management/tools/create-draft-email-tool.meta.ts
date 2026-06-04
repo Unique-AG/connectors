@@ -93,15 +93,15 @@ export const META = createMeta({
     The response may include an \`attachmentsFailed\` array when one or more attachments could not be added. The draft is still created in that case. Each entry has a \`fileName\` and a \`reason\`. When \`attachmentsFailed\` is non-empty, inform the user which files failed and why, for example:
     > ⚠️ The following attachments could not be added:
     > - **report.pdf**: File not found in the knowledge base.`,
-  toolFormatInformation: `## Format for Draft Emails
-  When presenting a draft email, always use the following format exactly:
-  📩 **{Subject}** [open](https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem)
-  {Date formatted as "Mon DD, YYYY at HH:MM AM/PM"}
-  > {full email text}
+  toolFormatInformation: `## Format for Draft Confirmation
+  When presenting the result of a created draft, always use the following format:
+  📩 **{subject}**[ — [Open in Outlook]({webLink})]
+  {message}
+
   Rules:
-  - **Subject**: Use the email's subject line, bold.
-  - **open link**: Construct the Outlook Web link using the email's \`emailId\`.
-  - **Date**: Format the date as \`Mon DD, YYYY at HH:MM AM/PM\` (e.g., "Mar 10, 2026 at 02:35 PM").
-  - **Email text**: Render the full body of the email as a blockquote using \`>\`. Preserve line breaks and paragraph structure within the blockquote.
+  - **subject**: Use the subject from the tool input.
+  - **Open in Outlook link**: Include only when \`webLink\` is present in the tool output. Use the \`webLink\` value directly as the href — do not construct or modify it.
+  - **message**: Display the \`message\` from the tool output (e.g. "Draft email created successfully.").
+  - If \`attachmentsFailed\` is non-empty, list each failed attachment below the message.
 `,
 });

@@ -6,24 +6,24 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
 import { AttachmentFailure } from './email-attachments/utils';
 import { markdownToHtml } from './markdown-to-html';
+import { pick } from 'remeda';
 
 const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string().optional() });
 
-interface DraftEmailBase {
+interface CreateDraftEmailInput {
   subject: string;
   content: string;
   attachments?: { fileName: string; data: string }[];
   chatId: string | null | undefined;
   mailbox?: string;
+  recipientsData:
+    | {
+        type: 'draft';
+        toRecipients: Array<{ name?: string; email: string }>;
+        ccRecipients?: Array<{ name?: string; email: string }>;
+      }
+    | { type: 'reply'; inReplyToMessageId: string };
 }
-
-export type CreateDraftEmailInput =
-  | (DraftEmailBase & {
-      type: 'draft';
-      toRecipients: Array<{ name?: string; email: string }>;
-      ccRecipients?: Array<{ name?: string; email: string }>;
-    })
-  | (DraftEmailBase & { type: 'reply'; inReplyToMessageId: string });
 
 export type CreateDraftEmailResult =
   | { success: false; message: string }
@@ -86,39 +86,34 @@ export class CreateDraftEmailCommand {
 
     const prefix = input.mailbox ? `/users/${input.mailbox}` : '/me';
 
-    const messageFields: Record<string, unknown> = {
+    const sharedBodyFields = {
       subject: input.subject,
       body: {
         contentType: 'HTML',
         content: markdownToHtml(input.content),
       },
-      ...(input.type === 'draft'
-        ? {
-            toRecipients: input.toRecipients.map((r) => ({
-              emailAddress: { name: r.name, address: r.email },
-            })),
-          }
-        : {}),
     };
-
-    if (input.type === 'draft' && input.ccRecipients && input.ccRecipients.length > 0) {
-      messageFields.ccRecipients = input.ccRecipients.map((r) => ({
-        emailAddress: { name: r.name, address: r.email },
-      }));
-    }
 
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
     const apiParams =
-      input.type === 'reply'
+      input.recipientsData.type === 'reply'
         ? {
-            apiPath: `${prefix}/messages/${input.inReplyToMessageId}/createReplyAll`,
-            body: { message: messageFields },
+            apiPath: `${prefix}/messages/${input.recipientsData.inReplyToMessageId}/createReplyAll`,
+            body: { message: sharedBodyFields },
             successMessage: 'Reply-all draft created successfully.',
           }
         : {
             apiPath: `${prefix}/messages`,
-            body: messageFields,
+            body: {
+              ...sharedBodyFields,
+              toRecipients: input.recipientsData.toRecipients.map((item) =>
+                pick(item, ['email', 'name']),
+              ),
+              ccRecipients:
+                input.recipientsData.ccRecipients?.map((item) => pick(item, ['email', 'name'])) ??
+                [],
+            },
             successMessage: 'Draft email created successfully.',
           };
 
