@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.14](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.13...teams-mcp@0.2.14) (2026-06-04)
+
+
+### Bug Fixes
+
+* **teams-mcp:** parse folder update response as folder-info ([#602](https://github.com/Unique-AG/connectors/issues/602)) ([7b96320](https://github.com/Unique-AG/connectors/commit/7b96320b56274d9e73f1a8c317e5295985e437dd))
+
 ## [0.2.13](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.12...teams-mcp@0.2.13) (2026-06-03)
 
 
