@@ -82,7 +82,7 @@ Set via `mcpConfig.ingestion` in Helm values:
 | `INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.ingestion.liveCatchupRecheckOverlappingWindowMinutes` | `10` | Minutes to overlap live catch-up ready-recheck runs. Minimum: `10` — see [INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES](#INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES) |
 | `INGESTION_FULL_SYNC_RECOVERY_CRON` | `mcpConfig.ingestion.fullSyncRecoveryCron` | `*/2 * * * *` | Cron schedule for stuck full-sync recovery scans |
 | `INGESTION_LIVE_CATCHUP_RECOVERY_CRON` | `mcpConfig.ingestion.liveCatchupRecoveryCron` | `*/5 * * * *` | Cron schedule for stuck live catch-up recovery scans |
-| `INGESTION_LIVE_CATCHUP_RECHECK_CRON` | `mcpConfig.ingestion.liveCatchupRecheckCron` | `* * * * *` | Cron schedule for subscription-user live catch-up ready-recheck runs (retriggers users with an active subscription that haven't run in 30 minutes) |
+| `INGESTION_LIVE_CATCHUP_RECHECK_CRON` | `mcpConfig.ingestion.liveCatchupRecheckCron` | `*/10 * * * *` | Cron schedule for subscription-user live catch-up ready-recheck runs (retriggers users with an active subscription that haven't run in 30 minutes) |
 | `INGESTION_LIVE_CATCHUP_SHARED_MAILBOX_RECHECK_CRON` | `mcpConfig.ingestion.liveCatchupSharedMailboxRecheckCron` | `*/10 * * * *` | Cron schedule for shared-mailbox live catch-up ready-recheck runs (retriggers shared-mailbox profiles that haven't run in 10 minutes) |
 | `INGESTION_DELETE_INBOX_RECOVERY_CRON` | `mcpConfig.ingestion.deleteInboxRecoveryCron` | `*/5 * * * *` | Cron schedule for stuck inbox deletion recovery scans |
 | `INGESTION_CONNECTIVITY_TIMEOUT_MS` | `mcpConfig.ingestion.connectivityTimeoutMs` | `3000` | Timeout in milliseconds for the Microsoft Graph connectivity check in `/health` |
@@ -215,7 +215,7 @@ mcpConfig:
       ignoredSenders: []
     # liveCatchupOverlappingWindowMinutes: 3    # optional, min 2
     # liveCatchupRecheckOverlappingWindowMinutes: 10  # optional, min 10
-    # liveCatchupRecheckCron: "* * * * *"                    # optional
+    # liveCatchupRecheckCron: "*/10 * * * *"                  # optional
     # liveCatchupSharedMailboxRecheckCron: "*/10 * * * *"   # optional
 
 ingress:
