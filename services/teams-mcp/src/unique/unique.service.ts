@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import type { UniqueConfigNamespaced } from '~/config';
+import type { SizedContent } from '~/utils/sized-content';
 import { buildMeetingExternalId, buildOccurrenceExternalId } from './scope-external-id';
 import { TEAMS_SOURCE_KIND, TEAMS_SOURCE_NAME } from './unique.consts';
 import {
@@ -43,11 +44,11 @@ export class UniqueService {
     },
     transcript: {
       id: string;
-      content: () => Promise<Response>;
+      content: () => Promise<SizedContent>;
     },
     recording?: {
       id: string;
-      content: () => Promise<Response>;
+      content: () => Promise<SizedContent>;
       startDateTime: Date;
       endDateTime: Date;
     },

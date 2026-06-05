@@ -2,13 +2,14 @@ import { ResponseType } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { readSizedContent, type SizedContent } from '~/utils/sized-content';
 import { RecordingCollection } from './transcript.dtos';
 
 export interface RecordingData {
   id: string;
-  // Opens the recording as a raw MS Graph download response. The upload layer reads the body
-  // stream and `Content-Length` from it (Azure Blob requires a known Content-Length).
-  content: () => Promise<Response>;
+  // Opens the recording for upload as a stream paired with its byte size (Azure Blob requires a
+  // known Content-Length).
+  content: () => Promise<SizedContent>;
   startDateTime: Date;
   endDateTime: Date;
 }
@@ -69,12 +70,14 @@ export class TranscriptRecordingService {
 
       return {
         id: recording.id,
-        content: () =>
-          client
-            .api(`${ownerPath}/onlineMeetings/${meetingId}/recordings/${recording.id}/content`)
-            .header('Accept', 'video/mp4')
-            .responseType(ResponseType.RAW)
-            .get(),
+        content: async () =>
+          readSizedContent(
+            await client
+              .api(`${ownerPath}/onlineMeetings/${meetingId}/recordings/${recording.id}/content`)
+              .header('Accept', 'video/mp4')
+              .responseType(ResponseType.RAW)
+              .get(),
+          ),
         startDateTime: recording.createdDateTime,
         endDateTime: recording.endDateTime,
       };
