@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.15](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.14...teams-mcp@0.2.15) (2026-06-05)
+
+
+### Bug Fixes
+
+* **teams-mcp:** route internal content upload through ingestion service ([#608](https://github.com/Unique-AG/connectors/issues/608)) ([f9db6d2](https://github.com/Unique-AG/connectors/commit/f9db6d23fd70458fab6af45501e1853baa0e675d))
+
 ## [0.2.14](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.13...teams-mcp@0.2.14) (2026-06-04)
 
 
