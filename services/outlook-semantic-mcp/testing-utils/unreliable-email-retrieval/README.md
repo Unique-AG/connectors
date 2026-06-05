@@ -33,7 +33,7 @@ The following input checks two emails known to exist in the tester2 mailbox:
             "mailbox": "tester2@example.com",
             "conditions": [
               {
-                "fromSenders": ["hr@example.com"]
+                "fromSenders": { "value": ["hr@example.com"], "operator": "in" }
               }
             ]
           }

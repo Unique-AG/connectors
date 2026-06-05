@@ -252,6 +252,13 @@ def mode_batch(
 # ---------------------------------------------------------------------------
 
 
+def _positive_int(value: str) -> int:
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"must be >= 1, got {n}")
+    return n
+
+
 def build_parser() -> argparse.ArgumentParser:
     parent = argparse.ArgumentParser(add_help=False)
     parent.add_argument(
@@ -292,14 +299,14 @@ Examples:
     )
     p_concurrent.add_argument(
         "--count",
-        type=int,
+        type=_positive_int,
         default=5,
         metavar="N",
         help="Number of emails to send in parallel (default: 5)",
     )
     p_concurrent.add_argument(
         "--max-connections",
-        type=int,
+        type=_positive_int,
         default=MAX_CONNECTIONS,
         metavar="N",
         dest="max_connections",
@@ -370,6 +377,8 @@ def main() -> None:
         )
 
     print(f"Total emails sent: {sent} / {sent + failed}")
+    if failed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
