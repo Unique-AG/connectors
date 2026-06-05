@@ -24,6 +24,7 @@ export class GetFullDelegatedAccessQuery {
         ownerUserId: delegatedAccessAccounts.ownerUserId,
         ownerProviderUserId: sql<string>`${userProfiles.providerUserId}`,
         msGraphDirectoryIds: sql<string[]>`array_agg(${directories.providerDirectoryId})`,
+        hasFullDelegatedAccess: sql<boolean>`true`,
       })
       .from(delegatedAccessAccounts)
       .innerJoin(userProfiles, eq(delegatedAccessAccounts.ownerUserId, userProfiles.id))

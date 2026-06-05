@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { DrizzleModule } from '~/db/drizzle.module';
-import { MarkAccountsNoFullAccessCommand } from './commands/mark-accounts-no-full-access.command';
+import { RemoveDelegatedAccessCommand } from './commands/remove-delegated-access.command';
 import { GetDelegatedAccessQuery } from './queries/get-delegates-access.query';
 import { GetDirectoryDelegatedAccessQuery } from './queries/get-directory-delegated-access.query';
 import { GetFullDelegatedAccessQuery } from './queries/get-full-delegated-access.query';
-import { GetMailboxesWithFullDelegatedAccessQuery } from './queries/get-mailboxes-with-full-delegated-access.query';
+import { ListMailboxesAndDirectoriesQuery } from './queries/list-mailboxes-and-directories.query';
 
 @Module({
   imports: [DrizzleModule, ConfigModule],
@@ -13,14 +13,14 @@ import { GetMailboxesWithFullDelegatedAccessQuery } from './queries/get-mailboxe
     GetFullDelegatedAccessQuery,
     GetDirectoryDelegatedAccessQuery,
     GetDelegatedAccessQuery,
-    GetMailboxesWithFullDelegatedAccessQuery,
-    MarkAccountsNoFullAccessCommand,
+    RemoveDelegatedAccessCommand,
+    ListMailboxesAndDirectoriesQuery,
   ],
   exports: [
     GetFullDelegatedAccessQuery,
     GetDelegatedAccessQuery,
-    GetMailboxesWithFullDelegatedAccessQuery,
-    MarkAccountsNoFullAccessCommand,
+    RemoveDelegatedAccessCommand,
+    ListMailboxesAndDirectoriesQuery,
   ],
 })
 export class DelegatedAccessUtilsModule {}
