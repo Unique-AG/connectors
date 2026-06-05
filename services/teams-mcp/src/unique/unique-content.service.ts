@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { FetchFn } from '@qfetch/qfetch';
 import { Span, TraceService } from 'nestjs-otel';
 import type { UniqueConfigNamespaced } from '~/config';
+import type { SizedContent } from '~/utils/sized-content';
 import { UNIQUE_FETCH } from './unique.consts';
 import {
   type ContentInfoItem,
@@ -83,7 +84,7 @@ export class UniqueContentService {
   @Span()
   public async uploadToStorage(
     writeUrl: string,
-    content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>,
+    content: () => Promise<SizedContent>,
     mime: string,
   ): Promise<void> {
     const span = this.trace.getSpan();
@@ -95,11 +96,17 @@ export class UniqueContentService {
 
     this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
 
-    const stream = await content();
+    // Azure Blob's single `PUT Blob` rejects `Transfer-Encoding: chunked` (400 UnsupportedHeader)
+    // and requires a `Content-Length`. Node's fetch only omits chunked framing for a streaming
+    // body when an explicit Content-Length is set, so we pass the pre-measured `size`.
+    const { stream, size } = await content();
+    span?.setAttribute('content_length', size);
+
     const response = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': mime,
+        'Content-Length': String(size),
         'x-ms-blob-type': 'BlockBlob',
       },
       body: stream,
