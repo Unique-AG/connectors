@@ -4,7 +4,7 @@ Sends randomly selected emails from the `drafts/` folder via Yahoo SMTP. Each em
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.10+ — no `pip install` required, the script uses only the standard library
 - A Yahoo account with SMTP access enabled
 
 ## Setup
