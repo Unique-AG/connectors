@@ -1,4 +1,4 @@
-name: "[confluence-connector] Manual Release Re-Run"
+name: "[teams-mcp] Manual Release Re-Run"
 
 permissions:
   contents: read
@@ -18,6 +18,6 @@ jobs:
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
-      service-name: confluence-connector
+      service-name: teams-mcp
       service-version: ${{ inputs.existing-version }}
-      dockerfile: services/confluence-connector/deploy/Dockerfile
+      dockerfile: services/teams-mcp/deploy/Dockerfile
