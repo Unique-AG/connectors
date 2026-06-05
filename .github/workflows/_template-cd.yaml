@@ -26,7 +26,6 @@ jobs:
     permissions:
       packages: write
       id-token: write
-    environment: uniquecr-github-oidc
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
