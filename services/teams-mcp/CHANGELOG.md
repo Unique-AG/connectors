@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.16](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.15...teams-mcp@0.2.16) (2026-06-05)
+
+
+### Bug Fixes
+
+* **teams-mcp:** send Content-Length on storage upload to avoid chunked rejection ([#614](https://github.com/Unique-AG/connectors/issues/614)) ([b6ce58b](https://github.com/Unique-AG/connectors/commit/b6ce58b1c7c4c61670b9efca3a381d5e5c3b8943))
+
 ## [0.2.15](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.14...teams-mcp@0.2.15) (2026-06-05)
 
 
