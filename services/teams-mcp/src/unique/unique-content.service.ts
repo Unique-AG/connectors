@@ -83,7 +83,7 @@ export class UniqueContentService {
   @Span()
   public async uploadToStorage(
     writeUrl: string,
-    content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>,
+    content: () => Promise<Response>,
     mime: string,
   ): Promise<void> {
     const span = this.trace.getSpan();
@@ -95,14 +95,53 @@ export class UniqueContentService {
 
     this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
 
-    const stream = await content();
+    // Azure Blob's single `PUT Blob` rejects `Transfer-Encoding: chunked` (400
+    // UnsupportedHeader) and requires a `Content-Length`. Node's fetch only omits chunked
+    // framing for a streaming body when an explicit Content-Length is set, so the byte size
+    // must be known up-front. We stream with the size advertised by the source response when
+    // it can be trusted; otherwise we buffer the body in memory purely to measure it.
+    //
+    // The advertised `Content-Length` is only trustworthy when the body is not
+    // content-encoded: undici transparently decompresses the `body` stream (e.g. gzip) while
+    // the header still reflects the *compressed* size, so streaming it with that length would
+    // truncate the upload. Large media (video/mp4) is served uncompressed and always carries a
+    // length, so it streams without buffering; compressible payloads (small transcripts) fall
+    // back to the in-memory measure, which is cheap.
+    const source = await content();
+    const advertised = source.headers.get('content-length');
+    const encoding = source.headers.get('content-encoding');
+    const isIdentityEncoding = encoding === null || encoding === '' || encoding === 'identity';
+    const canStream =
+      isIdentityEncoding &&
+      advertised !== null &&
+      advertised !== '' &&
+      Number.isFinite(Number(advertised));
+
+    let body: ReadableStream<Uint8Array<ArrayBuffer>> | Uint8Array<ArrayBuffer>;
+    let byteSize: number;
+    if (canStream) {
+      assert.ok(source.body, 'Content source response has no body to upload');
+      body = source.body as ReadableStream<Uint8Array<ArrayBuffer>>;
+      byteSize = Number(advertised);
+    } else {
+      body = new Uint8Array(await source.arrayBuffer());
+      byteSize = body.byteLength;
+      this.logger.debug(
+        { storageEndpoint, byteSize, encoding },
+        'Content length not trustable from source; buffered upload body to determine its size',
+      );
+    }
+    span?.setAttribute('content_length', byteSize);
+    span?.setAttribute('content_buffered', !canStream);
+
     const response = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': mime,
+        'Content-Length': String(byteSize),
         'x-ms-blob-type': 'BlockBlob',
       },
-      body: stream,
+      body,
       // @ts-expect-error: nodejs fetch requires `half` for streaming uploads
       duplex: 'half',
     });

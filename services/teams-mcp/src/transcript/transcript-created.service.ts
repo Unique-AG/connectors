@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
+import { ResponseType } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
@@ -278,7 +279,8 @@ export class TranscriptCreatedService {
           client
             .api(`${ownerPath}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
             .header('Accept', 'text/vtt')
-            .getStream(),
+            .responseType(ResponseType.RAW)
+            .get(),
       },
       recording ?? undefined,
     );

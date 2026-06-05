@@ -43,11 +43,11 @@ export class UniqueService {
     },
     transcript: {
       id: string;
-      content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>;
+      content: () => Promise<Response>;
     },
     recording?: {
       id: string;
-      content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>;
+      content: () => Promise<Response>;
       startDateTime: Date;
       endDateTime: Date;
     },
