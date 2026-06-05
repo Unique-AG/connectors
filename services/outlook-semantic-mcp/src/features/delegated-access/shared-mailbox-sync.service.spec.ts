@@ -91,10 +91,15 @@ function createMockDb(profileIds: string[] = []) {
     .mockReturnValueOnce({ onConflictDoUpdate })
     .mockReturnValue({ onConflictDoNothing });
   const insertMock = vi.fn().mockReturnValue({ values });
+  // profilesToRemove query: select().from().where()
+  // profilesWithoutConfig query: select().from().leftJoin().where()
+  const profilesWithoutConfigWhere = vi.fn().mockResolvedValue(profileIds.map((id) => ({ id })));
+  const leftJoinMock = vi.fn().mockReturnValue({ where: profilesWithoutConfigWhere });
   // Default returns one stale shared-mailbox profile so the profilesToRemove delete path is reachable.
   const selectMock = vi.fn().mockReturnValue({
     from: vi.fn().mockReturnValue({
       where: vi.fn().mockResolvedValue([{ id: 'stale-profile-id' }]),
+      leftJoin: leftJoinMock,
     }),
   });
   return { delete: deleteMock, insert: insertMock, select: selectMock };

@@ -5,7 +5,7 @@ import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, eq, inArray, not, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, not, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import {
   DelegatedAccessConfig,
@@ -285,7 +285,7 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
       // silently strip the user's own token-based access and subject them to delegate-only
       // logic, which is the wrong behaviour for a real user who also happens to be listed
       // as a shared mailbox.
-      const upsertedProfiles = await this.db
+      await this.db
         .insert(userProfiles)
         .values(mappedProfiles)
         .onConflictDoUpdate({
@@ -300,22 +300,33 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
 
       if (this.ingestionCfg.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi) {
         const ingestionCfg = this.ingestionCfg;
-        const sharedMailboxProfiles = upsertedProfiles.filter((p) => p.source === 'shared-mailbox');
 
-        if (sharedMailboxProfiles.length > 0) {
-          // Insert new inbox configurations with fullSyncState='waiting-for-ingestion' rather than
-          // the default 'ready'. This distinguishes newly provisioned shared-mailbox inboxes (which
-          // have never run) from inboxes that completed a full sync and returned to 'ready', so the
-          // full-sync recovery scheduler can identify and retrigger them without misclassifying
-          // already-finished inboxes as stuck.
+        // Query all shared-mailbox profiles that have no inbox configuration. This is broader than
+        // filtering upsertedProfiles: it also catches profiles whose config was removed by an async
+        // deletion triggered in a previous run. Profiles mid-deletion still have their config row
+        // so they are naturally excluded by the LEFT JOIN / IS NULL predicate.
+        const sharedMailboxesWithMissingInboxConfiguration = await this.db
+          .select({ id: userProfiles.id })
+          .from(userProfiles)
+          .leftJoin(inboxConfigurations, eq(inboxConfigurations.userProfileId, userProfiles.id))
+          .where(
+            and(
+              eq(userProfiles.source, 'shared-mailbox'),
+              isNull(inboxConfigurations.userProfileId),
+            ),
+          );
+
+        if (sharedMailboxesWithMissingInboxConfiguration.length > 0) {
           const insertedConfigs = await this.db
             .insert(inboxConfigurations)
             .values(
-              sharedMailboxProfiles.map((profile): typeof inboxConfigurations.$inferInsert => ({
-                userProfileId: profile.id,
-                fullSyncState: 'waiting-for-ingestion',
-                filters: serializeMailFilters(ingestionCfg.defaultMailFilters),
-              })),
+              sharedMailboxesWithMissingInboxConfiguration.map(
+                (profile): typeof inboxConfigurations.$inferInsert => ({
+                  userProfileId: profile.id,
+                  fullSyncState: 'waiting-for-ingestion',
+                  filters: serializeMailFilters(ingestionCfg.defaultMailFilters),
+                }),
+              ),
             )
             .onConflictDoNothing()
             .returning({ userProfileId: inboxConfigurations.userProfileId });
