@@ -1,7 +1,9 @@
 import assert from 'node:assert';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { FetchFn } from '@qfetch/qfetch';
 import { Span, TraceService } from 'nestjs-otel';
+import type { UniqueConfigNamespaced } from '~/config';
 import { UNIQUE_FETCH } from './unique.consts';
 import {
   type ContentInfoItem,
@@ -30,6 +32,7 @@ export class UniqueContentService {
   public constructor(
     @Inject(UNIQUE_FETCH) private readonly fetch: FetchFn,
     private readonly trace: TraceService,
+    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
   ) {}
 
   @Span()
@@ -85,14 +88,15 @@ export class UniqueContentService {
   ): Promise<void> {
     const span = this.trace.getSpan();
 
-    const urlObj = new URL(writeUrl);
+    const uploadUrl = this.correctWriteUrl(writeUrl);
+    const urlObj = new URL(uploadUrl);
     const storageEndpoint = urlObj.origin;
     span?.setAttribute('storage_endpoint', storageEndpoint);
 
     this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
 
     const stream = await content();
-    const response = await fetch(writeUrl, {
+    const response = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': mime,
@@ -115,6 +119,23 @@ export class UniqueContentService {
 
     span?.setAttribute('http_status', response.status);
     this.logger.debug({ storageEndpoint }, 'Successfully completed content upload to storage');
+  }
+
+  // HACK (mirrors outlook-semantic-mcp): in cluster_local mode the storeInternally
+  // writeUrl points at the public, Kong-gateway-fronted storage endpoint, which
+  // in-cluster pods cannot reach (egress is policy-denied → connect timeout). Rewrite
+  // it to route through node-ingestion's scoped upload endpoint, reachable in-cluster.
+  // In external mode the public writeUrl is used as-is.
+  private correctWriteUrl(writeUrl: string): string {
+    const config = this.config.get('unique', { infer: true });
+    if (config.serviceAuthMode === 'external') {
+      return writeUrl;
+    }
+    const key = new URL(writeUrl).searchParams.get('key');
+    assert.ok(key, 'writeUrl is missing key parameter');
+    const target = new URL('/scoped/upload', config.ingestionServiceBaseUrl);
+    target.searchParams.set('key', key);
+    return target.toString();
   }
 
   @Span()
