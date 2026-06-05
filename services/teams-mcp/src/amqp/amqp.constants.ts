@@ -20,3 +20,11 @@ export const DEAD_QUEUE = {
   routingKey: '#',
   createQueueIfNotExists: true,
 } as const satisfies RabbitMQQueueConfig;
+
+/**
+ * Dedicated channel for transcript/recording ingestion, pinned to `prefetchCount: 1`.
+ * Ingestion buffers the full recording in memory before uploading, so processing one message at a
+ * time bounds peak memory to a single recording and prevents concurrent large uploads from
+ * OOM-killing the (singleton) pod. Lifecycle/subscription events stay on the default channel.
+ */
+export const INGESTION_CHANNEL = 'unique.teams-mcp.ingestion';
