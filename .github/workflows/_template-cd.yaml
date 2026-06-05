@@ -26,7 +26,6 @@ jobs:
     permissions:
       packages: write
       id-token: write
-    environment: uniquecr-github-oidc
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -65,17 +64,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Login to Azure with OIDC
+      - name: Login to Azure as uniquecr token issuer (OIDC)
         uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # Azure Login Action v3.0.0
         with:
-          client-id: ${{ vars.CLIENT_ID }}
-          tenant-id: ${{ vars.TENANT_ID }}
-          subscription-id: ${{ vars.SUBSCRIPTION_ID }}
+          client-id: 46c63b6f-67ac-476a-9d5d-6db2d18743bb # acr_oidc uniquecr_push
+          tenant-id: 99330c76-81d2-460e-861e-35af8e2a4266
+          subscription-id: fb8bce09-908a-459f-b200-a578005bfeb2
 
       - name: Get ACR access token
         id: acr-token
         run: |
-          TOKEN=$(az acr login --name ${UNIQUECR_REGISTRY%%.*} --expose-token --output tsv --query accessToken)
+          TOKEN=$(az acr login --name uniquecr --expose-token --output tsv --query accessToken)
           echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
