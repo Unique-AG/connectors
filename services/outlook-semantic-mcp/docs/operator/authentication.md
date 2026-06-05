@@ -1,18 +1,9 @@
 <!-- confluence-page-id: 2061664301 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP - Authentication
+# Authentication
 
-## Overview
-
-The Outlook Semantic MCP Server requires a Microsoft Entra ID (formerly Azure AD) app registration with **delegated permissions** to access Microsoft Graph API on behalf of users.
-
-How the app registration is provisioned depends on your deployment model:
-
-- **Unique SaaS** — Unique provisions and manages the registration; you grant admin consent
-- **Self-Hosted** — your organization provisions the registration, manages secrets, and operates the server
-
-For technical details about the OAuth flow, see [Authentication Flows](../technical/flows.md) and [FAQ - Why do I need a client ID and client secret?](../faq.md#Why-do-I-need-a-client-ID-and-client-secret).
+How the app registration is provisioned depends on your deployment model.
 
 ## Required Permissions
 

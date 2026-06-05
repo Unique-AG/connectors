@@ -3,6 +3,21 @@
 
 # Outlook Semantic MCP - Deployment
 
+## Deployment Modes
+
+The server supports two deployment modes set via `MCP_BACKEND`. **Choose your mode before following any other step in this guide** — prerequisites, configuration, and verification differ by mode.
+
+| | `MicrosoftGraphAndUniqueApi` (default) | `MicrosoftGraph` |
+|---|---|---|
+| Search | Semantic (Unique KB) + KQL (Graph), merged | KQL (Graph) only |
+| Ingestion | Full sync + live catch-up | None |
+| Tools | 10 standard + 4 debug | 6 standard |
+| Requires Unique KB | Yes | Yes |
+| Requires RabbitMQ | Yes | Yes |
+| Folder filtering | Supported | Not supported |
+
+See [Configuration — MCP_BACKEND](./configuration.md#MCP_BACKEND) for details.
+
 ## Prerequisites
 
 Before deploying the Outlook Semantic MCP Server, ensure you have:

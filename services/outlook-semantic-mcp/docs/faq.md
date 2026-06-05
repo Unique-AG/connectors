@@ -340,7 +340,7 @@ When a colleague shares individual folders with you (but has not granted you Ful
 **Workaround options:**
 
 - **Get Full Access.** Ask your colleague (or an Exchange administrator) to grant you Full Access (Read & Manage) to their mailbox. This allows `$search` queries against the entire mailbox, including the previously shared folders.
-- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, connect it to the MCP as its own account, and grant Full Access to everyone who needs to search it. See [Shared inbox configured as a normal inbox](#3-shared-inbox-configured-as-a-normal-inbox).
+- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, connect it to the MCP as its own account, and grant Full Access to everyone who needs to search it. See [Shared inbox configured as a normal inbox](./technical/features.md#3-shared-inbox-configured-as-a-normal-inbox).
 
 **See also:** [Features — Known Limitations](./technical/features.md#known-limitations) — [Configuration — DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
 
@@ -576,7 +576,7 @@ Delegated permissions also ensure the server can only access emails the signed-i
 
 **Answer:** When reconnecting, users may see a brief "flicker" — a rapid redirect sequence through Microsoft's login pages. This is **normal** Microsoft OAuth behavior. First-time connections show the full consent screen; subsequent reconnections are automatic.
 
-**See also:** [Authentication — User Reconnection Experience](./operator/authentication.md#User-Reconnection-Experience-(The-"Login-Flicker")) for details.
+**See also:** [Authentication — User Reconnection Experience](./operator/authentication.md#Understanding-Consent-Flows) for details.
 
 ### What happens when a user's Microsoft refresh token expires?
 
@@ -642,19 +642,19 @@ This must match exactly — including protocol, domain, and path — in both the
 
 **Answer:** All stored Microsoft tokens become unreadable. All users must reconnect via `reconnect_inbox`. There is no zero-downtime rotation — plan for a maintenance window.
 
-**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
+**See also:** [Secret Management](./operator/authentication.md#Secret-Management) for the full rotation procedure
 
 ### What happens if I change the webhook secret?
 
 **Answer:** All existing Microsoft Graph subscriptions will fail validation. Notifications will be rejected until subscriptions are recreated. All users must call `reconnect_inbox` after the change.
 
-**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
+**See also:** [Secret Management](./operator/authentication.md#Secret-Management) for the full rotation procedure
 
 ### What happens if I change the client secret?
 
 **Answer:** Update the Kubernetes secret and restart the pods. Users do not need to reconnect — the server uses the new secret transparently. This supports zero-downtime rotation.
 
-**See also:** [Secret Rotation](./operator/authentication.md#Secret-Rotation) for the full rotation procedure
+**See also:** [Secret Management](./operator/authentication.md#Secret-Management) for the full rotation procedure
 
 ### What does `INGESTION_DEFAULT_MAIL_FILTERS` do?
 

@@ -358,19 +358,13 @@ After creating the service user, note the following values for configuration:
 
 ### Service Account Permissions
 
-The service account must be assigned the **`KB_Admin`** (Knowledge Base Admin) Gatekeeper role. This is the minimum role that grants all permissions the MCP server needs:
+The service account must be assigned the following Zitadel permissions:
 
-| Resource | Required Permissions | Used For |
-|----------|---------------------|----------|
-| `CONTENT` | `READ`, `WRITE`, `DELETE` | Ingesting, updating, and removing email content via the ingestion service |
-| `SCOPE` | `READ`, `WRITE` | Creating and managing Knowledge Base scopes via the scope management service |
-| `SCOPE_ACCESS` | `READ`, `WRITE` | Managing user access to scopes |
-| `FOLDER` | `READ`, `WRITE`, `DELETE` | Managing Knowledge Base folders |
-
-The `KB_Admin` role covers all of the above. Using a broader role such as `Company_Admin` also works but grants unnecessary privileges.
-
-!!! note "Gatekeeper enforcement"
-    Authorization behavior differs by mode. In `cluster_local` mode, Gatekeeper does **not** check user roles — instead, the MCP server's service ID (`outlook-semantic-mcp`) must be listed in the guards of the relevant resolvers. In `external` mode, Gatekeeper authorization is enforced against the Zitadel client credentials, which must have the `KB_Admin` role assigned.
+| Permission | Used For |
+|------------|----------|
+| `chat.admin.all` | Administrative access required for scope and folder management |
+| `chat.knowledge.read` | Reading Knowledge Base scopes and content |
+| `chat.knowledge.write` | Ingesting email content and managing scopes via the ingestion and scope management services |
 
 ## Mail Filters
 
