@@ -2,6 +2,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FullSyncSchedulerService } from './full-sync-scheduler.service';
 
+// Avoid drizzle's union() being called on mock query builders
+vi.mock('~/features/sync/sync-scheduler.utils', async () => {
+  const { sql } = await import('drizzle-orm');
+  return {
+    selectUserProfileIdsWhichCanRunTheSyncProcess: vi.fn(() => sql`NULL`),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -27,6 +35,7 @@ function createMockAmqp() {
 function createMockDb({ rows = [] as Array<{ userProfileId: string }> } = {}) {
   const makeSelectChain = (data: unknown[]) => ({
     from: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(data),
       innerJoin: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue(data),
       }),
@@ -166,15 +175,12 @@ describe('FullSyncRecoveryService', () => {
       // Verify select was called (the query was made)
       expect(db.select).toHaveBeenCalledOnce();
 
-      // The chain: select({...}).from(...).innerJoin(...).where(...)
+      // The chain: select({...}).from(...).where(...)
       const selectResult = db.select.mock.results?.[0]?.value;
       expect(selectResult?.from).toHaveBeenCalledOnce();
 
       const fromResult = selectResult.from.mock.results[0]?.value;
-      expect(fromResult?.innerJoin).toHaveBeenCalledOnce();
-
-      const innerJoinResult = fromResult.innerJoin.mock.results[0]?.value;
-      expect(innerJoinResult?.where).toHaveBeenCalledOnce();
+      expect(fromResult?.where).toHaveBeenCalledOnce();
     });
   });
 

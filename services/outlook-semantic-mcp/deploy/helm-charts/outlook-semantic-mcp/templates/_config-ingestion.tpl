@@ -15,6 +15,12 @@ INGESTION_FULL_SYNC_RECOVERY_CRON: {{ .ingestion.fullSyncRecoveryCron | quote }}
 {{- if .ingestion.liveCatchupRecoveryCron }}
 INGESTION_LIVE_CATCHUP_RECOVERY_CRON: {{ .ingestion.liveCatchupRecoveryCron | quote }}
 {{- end }}
+{{- if .ingestion.liveCatchupOauthUsersRecheckCron }}
+INGESTION_LIVE_CATCHUP_OAUTH_USERS_RECHECK_CRON: {{ .ingestion.liveCatchupOauthUsersRecheckCron | quote }}
+{{- end }}
+{{- if .ingestion.liveCatchupSharedMailboxRecheckCron }}
+INGESTION_LIVE_CATCHUP_SHARED_MAILBOX_RECHECK_CRON: {{ .ingestion.liveCatchupSharedMailboxRecheckCron | quote }}
+{{- end }}
 {{- if .ingestion.deleteInboxRecoveryCron }}
 INGESTION_DELETE_INBOX_RECOVERY_CRON: {{ .ingestion.deleteInboxRecoveryCron | quote }}
 {{- end }}

@@ -33,11 +33,18 @@ function createMockGraphApi() {
   return api;
 }
 
-function createMockGraphClientFactory(graphApi: ReturnType<typeof createMockGraphApi>) {
+function createMockMsGraphClientResolver(graphApi: ReturnType<typeof createMockGraphApi>) {
+  const mockClient = { api: vi.fn().mockReturnValue(graphApi) };
   return {
-    createClientForUser: vi.fn().mockReturnValue({
-      api: vi.fn().mockReturnValue(graphApi),
-    }),
+    run: vi
+      .fn()
+      .mockImplementation(
+        async ({
+          fn,
+        }: {
+          fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<any>;
+        }) => fn({ client: mockClient, clientUserProfileId: 'delegate-profile-id' }),
+      ),
   };
 }
 
@@ -72,6 +79,8 @@ function createMockDb({
     fullSyncExpectedTotal: number | null;
     newestLastModifiedDateTime: Date | null;
     filters: Record<string, unknown>;
+    preferredDelegateUserProfileId?: string | null;
+    deletingInboxStartedAt?: Date | null;
   };
 }) {
   const txExecuteFn = vi.fn().mockResolvedValue(undefined);
@@ -94,14 +103,24 @@ function createMockDb({
     update: vi.fn().mockReturnValue(txUpdate),
   };
 
+  const topLevelUpdate = {
+    set: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        execute: vi.fn().mockResolvedValue(undefined),
+      }),
+    }),
+  };
+
   return {
     transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(tx)),
+    update: vi.fn().mockReturnValue(topLevelUpdate),
     query: {
       userProfiles: {
         findFirst: vi.fn().mockResolvedValue({
           id: USER_PROFILE_ID,
           email: 'test@example.com',
           providerUserId: null,
+          source: 'oauth',
         }),
       },
     },
@@ -125,7 +144,7 @@ function createCommand({
   syncDirectories?: ReturnType<typeof createSyncDirectoriesVersionCommand>;
 } = {}): FullSyncCommand {
   return new FullSyncCommand(
-    createMockGraphClientFactory(graphApi) as any,
+    createMockMsGraphClientResolver(graphApi) as any,
     batchCommand as any,
     statsQuery as any,
     updateByVersionCommand as any,
@@ -154,6 +173,7 @@ function makeRow(
     newestLastModifiedDateTime: Date | null;
     filters: Record<string, unknown>;
     deletingInboxStartedAt: Date | null;
+    preferredDelegateUserProfileId: string | null;
   }> = {},
 ) {
   return {
@@ -166,6 +186,7 @@ function makeRow(
     newestLastModifiedDateTime: null as Date | null,
     filters: { retentionWindowInDays: 95 } as Record<string, unknown>,
     deletingInboxStartedAt: null as Date | null,
+    preferredDelegateUserProfileId: null as string | null,
     ...overrides,
   };
 }
@@ -631,6 +652,87 @@ describe('FullSyncCommand', () => {
       const result = await command.run(USER_PROFILE_ID);
 
       expect(result.status).toBe('completed');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Shared-mailbox delegate persistence
+  // -------------------------------------------------------------------------
+
+  describe('shared-mailbox delegate persistence', () => {
+    it('persists preferredDelegateUserProfileId after a successful resolver call', async () => {
+      const batchCommand = createMockProcessFullSyncBatchCommand('completed');
+      const updateByVersionCommand = createMockUpdateByVersionCommand(true);
+      const db = createMockDb({
+        row: makeRow({
+          fullSyncState: 'ready',
+          fullSyncNextLink: 'https://graph.microsoft.com/next',
+        }),
+      });
+      db.query.userProfiles.findFirst.mockResolvedValue({
+        id: USER_PROFILE_ID,
+        email: 'shared@example.com',
+        providerUserId: null,
+        source: 'shared-mailbox',
+      });
+      const command = createCommand({ batchCommand, updateByVersionCommand, db });
+
+      const result = await command.run(USER_PROFILE_ID);
+
+      expect(result.status).toBe('completed');
+      expect(db.update).toHaveBeenCalled();
+      const topLevelUpdate = db.update.mock.results[0]?.value;
+      expect(topLevelUpdate.set).toHaveBeenCalledWith(
+        expect.objectContaining({ preferredDelegateUserProfileId: 'delegate-profile-id' }),
+      );
+    });
+
+    it('returns failed with reason no-delegates and transitions state to failed when resolver returns NO_DELEGATES', async () => {
+      const { NO_DELEGATES } = await import('~/msgraph/ms-graph-client-resolver.service');
+      const batchCommand = createMockProcessFullSyncBatchCommand('completed');
+      const updateByVersionCommand = createMockUpdateByVersionCommand(true);
+      const db = createMockDb({
+        row: makeRow({
+          fullSyncState: 'ready',
+          fullSyncNextLink: 'https://graph.microsoft.com/next',
+        }),
+      });
+      db.query.userProfiles.findFirst.mockResolvedValue({
+        id: USER_PROFILE_ID,
+        email: 'shared@example.com',
+        providerUserId: null,
+        source: 'shared-mailbox',
+      });
+      const noDelegatesResolver = {
+        run: vi.fn().mockResolvedValue(NO_DELEGATES),
+      };
+      const command = new FullSyncCommand(
+        noDelegatesResolver as any,
+        batchCommand as any,
+        createMockGetScopeIngestionStatsQuery() as any,
+        updateByVersionCommand as any,
+        createSyncDirectoriesVersionCommand() as any,
+        { run: vi.fn().mockResolvedValue(false) } as any,
+        { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
+        db as any,
+        {
+          measureFullSyncRun: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+          measureFullSyncDirectorySync: vi
+            .fn()
+            .mockImplementation((fn: () => Promise<unknown>) => fn()),
+          measureFullSyncBatch: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+        } as any,
+      );
+
+      const result = await command.run(USER_PROFILE_ID);
+
+      expect(result).toEqual({ status: 'failed-no-delegates' });
+      expect(updateByVersionCommand.run).toHaveBeenCalledWith(
+        USER_PROFILE_ID,
+        expect.any(String),
+        expect.objectContaining({ fullSyncState: 'failed' }),
+      );
+      expect(db.update).not.toHaveBeenCalled();
     });
   });
 });

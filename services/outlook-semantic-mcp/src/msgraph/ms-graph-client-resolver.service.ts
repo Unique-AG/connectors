@@ -156,6 +156,10 @@ export class MsGraphClientResolver {
       try {
         return await fn({ client, clientUserProfileId: delegate.delegateUserId });
       } catch (error) {
+        // 401 and 403 both cycle to the next delegate. This also covers failed token refreshes:
+        // TokenRefreshMiddleware catches any refreshAccessToken() failure, swallows it, and
+        // preserves the original 401 response — so a dead refresh token surfaces here as
+        // GraphError(401) and is handled by the same branch. No separate flag needed.
         if (error instanceof GraphError && (error.statusCode === 401 || error.statusCode === 403)) {
           continue;
         }

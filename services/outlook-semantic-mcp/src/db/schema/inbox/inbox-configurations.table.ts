@@ -36,6 +36,10 @@ export const inboxConfigurations = pgTable('inbox_configurations', {
       onDelete: 'cascade',
       onUpdate: 'cascade',
     }),
+  preferredDelegateUserProfileId: varchar(`preferred_delegate_user_profile_id`).references(
+    () => userProfiles.id,
+    { onDelete: 'set null', onUpdate: 'cascade' },
+  ),
 
   filters: jsonb(`filters`).$type<Record<string, unknown>>().notNull(),
   // Full sync specific columns
@@ -75,6 +79,10 @@ export type InboxConfiguration = typeof inboxConfigurations.$inferSelect;
 export const inboxConfigurationRelations = relations(inboxConfigurations, ({ one }) => ({
   userProfile: one(userProfiles, {
     fields: [inboxConfigurations.userProfileId],
+    references: [userProfiles.id],
+  }),
+  preferredDelegateUserProfile: one(userProfiles, {
+    fields: [inboxConfigurations.preferredDelegateUserProfileId],
     references: [userProfiles.id],
   }),
 }));

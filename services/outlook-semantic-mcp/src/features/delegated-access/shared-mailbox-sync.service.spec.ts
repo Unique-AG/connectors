@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { McpBackendType } from '~/config';
 import {
   SHARED_MAILBOX_SYNC_CACHE_KEY,
   SharedMailboxSyncService,
@@ -71,33 +72,63 @@ function makeGraphClient(pages: Array<GraphPage | Error>) {
   return { api: apiMock, _getMock: getMock };
 }
 
-function hashEmails(emails: string[]): string {
-  return createHash('sha256').update(emails.sort().join(',')).digest('hex');
+function hashEmails(emails: string[], mcpBackend = McpBackendType.MicrosoftGraph): string {
+  return `${mcpBackend}_${createHash('sha256').update(emails.sort().join(',')).digest('hex')}`;
 }
 
-function createMockDb() {
+function createMockDb(profileIds: string[] = []) {
   const deleteMock = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
-  const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
-  const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+  const returning = vi
+    .fn()
+    .mockResolvedValue(profileIds.map((id) => ({ id, source: 'shared-mailbox' })));
+  const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+  const inboxConfigReturning = vi
+    .fn()
+    .mockResolvedValue(profileIds.map((id) => ({ userProfileId: id })));
+  const onConflictDoNothing = vi.fn().mockReturnValue({ returning: inboxConfigReturning });
+  const values = vi
+    .fn()
+    .mockReturnValueOnce({ onConflictDoUpdate })
+    .mockReturnValue({ onConflictDoNothing });
   const insertMock = vi.fn().mockReturnValue({ values });
-  return { delete: deleteMock, insert: insertMock };
+  // profilesToRemove query: select().from().where()
+  // profilesWithoutConfig query: select().from().leftJoin().where()
+  const profilesWithoutConfigWhere = vi.fn().mockResolvedValue(profileIds.map((id) => ({ id })));
+  const leftJoinMock = vi.fn().mockReturnValue({ where: profilesWithoutConfigWhere });
+  // Default returns one stale shared-mailbox profile so the profilesToRemove delete path is reachable.
+  const selectMock = vi.fn().mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue([{ id: 'stale-profile-id' }]),
+      leftJoin: leftJoinMock,
+    }),
+  });
+  return { delete: deleteMock, insert: insertMock, select: selectMock };
 }
 
 function createService(overrides?: {
   config?: Partial<{
     scan: 'disabled' | 'fullAccessOnly' | 'granularAccess';
+    mcpBackend: McpBackendType;
     sharedMailboxEmails: string[];
     sharedMailboxSyncCronSchedule: string;
   }>;
+  ingestionConfig?: Partial<{ mcpBackend: string; defaultMailFilters: any }>;
   factoryResults?: Array<{ client: any; userId: string } | null>;
   cacheResult?: { payload: { envarHash: string; lastSyncedAt: number } } | null;
+  profileIds?: string[];
 }) {
-  const db = createMockDb();
+  const db = createMockDb(overrides?.profileIds ?? []);
   const config = {
     scan: 'fullAccessOnly' as const,
+    mcpBackend: McpBackendType.MicrosoftGraph,
     sharedMailboxEmails: [] as string[],
     sharedMailboxSyncCronSchedule: CRON_SCHEDULE,
     ...overrides?.config,
+  };
+
+  const ingestionConfigValue = {
+    mcpBackend: McpBackendType.MicrosoftGraph,
+    ...overrides?.ingestionConfig,
   };
 
   const factoryResults = overrides?.factoryResults ?? [null];
@@ -125,15 +156,34 @@ function createService(overrides?: {
     getCronJob: vi.fn().mockReturnValue({ stop: mockJobStop }),
   };
 
+  const deleteInboxDataCommand = {
+    run: vi.fn().mockResolvedValue(undefined),
+  };
+
+  const amqp = {
+    publish: vi.fn().mockResolvedValue(undefined),
+  };
+
   const service = new SharedMailboxSyncService(
     db as any,
     config as any,
+    ingestionConfigValue as any,
     graphClientFactory as any,
     persistentCacheService as any,
     schedulerRegistry as any,
+    deleteInboxDataCommand as any,
+    amqp as any,
   );
 
-  return { service, db, graphClientFactory, persistentCacheService, schedulerRegistry, config };
+  return {
+    service,
+    db,
+    graphClientFactory,
+    persistentCacheService,
+    schedulerRegistry,
+    config,
+    amqp,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -560,6 +610,104 @@ describe('SharedMailboxSyncService', () => {
       expect(insertedValues.map((v: any) => v.email)).toEqual(
         expect.arrayContaining(['shared1@example.com', 'shared2@example.com']),
       );
+    });
+
+    it('MicrosoftGraphAndUniqueApi: inbox configurations insert called after profile upsert', async () => {
+      const graphUser = { id: 'aad-id', mail: 'shared@example.com', displayName: 'Shared Mailbox' };
+      const mockClient = makeGraphClient([{ value: [graphUser] }]);
+      const { service, db } = createService({
+        config: { sharedMailboxEmails: ['shared@example.com'] },
+        ingestionConfig: {
+          mcpBackend: McpBackendType.MicrosoftGraphAndUniqueApi,
+          defaultMailFilters: {
+            retentionWindowInDays: 90,
+            ignoredSenders: [],
+            ignoredContents: [],
+          },
+        },
+        factoryResults: [{ client: mockClient, userId: 'user1' }],
+        profileIds: ['profile-uuid-1'],
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      // insert is called twice: once for userProfiles upsert, once for inboxConfigurations
+      expect(db.insert).toHaveBeenCalledTimes(2);
+      // Both inserts share the same `values` mock (returned by insertMock), so the
+      // inbox-configurations call is the second entry in values.mock.calls.
+      const inboxInsertValues = db.insert.mock.results[0]?.value.values.mock.calls[1][0];
+      expect(inboxInsertValues).toHaveLength(1);
+      expect(inboxInsertValues[0]).toMatchObject({
+        userProfileId: 'profile-uuid-1',
+        fullSyncState: 'waiting-for-ingestion',
+      });
+    });
+
+    it('MicrosoftGraphAndUniqueApi: publishes full-sync.retrigger event for each newly inserted inbox configuration', async () => {
+      const graphUser = { id: 'aad-id', mail: 'shared@example.com', displayName: 'Shared Mailbox' };
+      const mockClient = makeGraphClient([{ value: [graphUser] }]);
+      const { service, amqp } = createService({
+        config: { sharedMailboxEmails: ['shared@example.com'] },
+        ingestionConfig: {
+          mcpBackend: McpBackendType.MicrosoftGraphAndUniqueApi,
+          defaultMailFilters: {
+            retentionWindowInDays: 90,
+            ignoredSenders: [],
+            ignoredContents: [],
+          },
+        },
+        factoryResults: [{ client: mockClient, userId: 'user1' }],
+        profileIds: ['profile-uuid-1'],
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      expect(amqp.publish).toHaveBeenCalledOnce();
+      expect(amqp.publish).toHaveBeenCalledWith(
+        expect.any(String),
+        'unique.outlook-semantic-mcp.full-sync.retrigger',
+        expect.objectContaining({
+          type: 'unique.outlook-semantic-mcp.full-sync.retrigger',
+          payload: { userProfileId: 'profile-uuid-1' },
+        }),
+      );
+    });
+
+    it('MicrosoftGraphAndUniqueApi: does not publish full-sync event when no new inbox configurations were inserted', async () => {
+      const graphUser = { id: 'aad-id', mail: 'shared@example.com', displayName: 'Shared Mailbox' };
+      const mockClient = makeGraphClient([{ value: [graphUser] }]);
+      const { service, amqp } = createService({
+        config: { sharedMailboxEmails: ['shared@example.com'] },
+        ingestionConfig: {
+          mcpBackend: McpBackendType.MicrosoftGraphAndUniqueApi,
+          defaultMailFilters: {
+            retentionWindowInDays: 90,
+            ignoredSenders: [],
+            ignoredContents: [],
+          },
+        },
+        factoryResults: [{ client: mockClient, userId: 'user1' }],
+        profileIds: [], // onConflictDoNothing returns empty — all rows already existed
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      expect(amqp.publish).not.toHaveBeenCalled();
+    });
+
+    it('MicrosoftGraph (default): inbox configurations insert is NOT called', async () => {
+      const graphUser = { id: 'aad-id', mail: 'shared@example.com', displayName: 'Shared Mailbox' };
+      const mockClient = makeGraphClient([{ value: [graphUser] }]);
+      const { service, db } = createService({
+        config: { sharedMailboxEmails: ['shared@example.com'] },
+        ingestionConfig: { mcpBackend: McpBackendType.MicrosoftGraph },
+        factoryResults: [{ client: mockClient, userId: 'user1' }],
+      });
+
+      await (service as any).runSyncWithRetries();
+
+      // Only the userProfiles upsert should occur — inboxConfigurations insert is skipped for MicrosoftGraph backend
+      expect(db.insert).toHaveBeenCalledOnce();
     });
 
     it('cache is updated with new hash after successful sync', async () => {
