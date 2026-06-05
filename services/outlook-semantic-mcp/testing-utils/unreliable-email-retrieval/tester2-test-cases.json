@@ -1,0 +1,154 @@
+{
+  "type": "search_recall_check",
+  "params": {
+    "cases": [
+      {
+        "id": "inbox_today",
+        "graphFilter": "receivedDateTime ge 2026-03-17T00:00:00Z and receivedDateTime lt 2026-03-18T00:00:00Z",
+        "search": {
+          "search": "emails received today",
+          "conditions": [
+            {
+              "directories": { "value": ["Inbox"], "operator": "in" },
+              "dateFrom": { "value": "2026-03-17T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-03-18T00:00:00Z", "operator": "lessThan" }
+            }
+          ],
+          "limit": 200
+        }
+      },
+      {
+        "id": "sent_today",
+        "graphFilter": "receivedDateTime ge 2026-04-03T00:00:00Z and receivedDateTime lt 2026-04-04T00:00:00Z",
+        "search": {
+          "search": "emails sent today",
+          "conditions": [
+            {
+              "directories": { "value": ["Sent Items"], "operator": "in" },
+              "dateFrom": { "value": "2026-04-03T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-04T00:00:00Z", "operator": "lessThan" }
+            }
+          ],
+          "limit": 200
+        }
+      },
+      {
+        "id": "inbox_this_week",
+        "graphFilter": "receivedDateTime ge 2026-03-02T00:00:00Z and receivedDateTime lt 2026-03-08T00:00:00Z",
+        "search": {
+          "search": "emails from this week",
+          "conditions": [
+            {
+              "directories": { "value": ["Inbox"], "operator": "in" },
+              "dateFrom": { "value": "2026-03-02T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-03-08T00:00:00Z", "operator": "lessThan" }
+            }
+          ],
+          "limit": 500
+        }
+      },
+      {
+        "id": "from_exact_sender",
+        "graphFilter": "from/emailAddress/address eq 'daniel.mercer@harborviewam.com' and receivedDateTime ge 2026-01-17T00:00:00Z and receivedDateTime le 2026-04-22T00:00:00Z",
+        "search": {
+          "search": "emails from daniel.mercer@harborviewam.com",
+          "conditions": [
+            {
+              "fromSenders": { "value": "daniel.mercer@harborviewam.com", "operator": "equals" },
+              "dateFrom": { "value": "2026-01-17T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-22T00:00:00Z", "operator": "lessThanOrEqual" }
+            }
+          ],
+          "limit": 500
+        }
+      },
+      {
+        "id": "from_domain",
+        "graphFilter": "contains(from/emailAddress/address, '@northbridgeadvisory.com') and receivedDateTime ge 2026-01-17T00:00:00Z and receivedDateTime le 2026-04-22T00:00:00Z",
+        "search": {
+          "search": "emails from @northbridgeadvisory.com",
+          "conditions": [
+            {
+              "fromSenders": { "value": "@northbridgeadvisory.com", "operator": "contains" },
+              "dateFrom": { "value": "2026-01-17T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-22T00:00:00Z", "operator": "lessThanOrEqual" }
+            }
+          ],
+          "limit": 200
+        }
+      },
+      {
+        "id": "from_multiple_senders",
+        "graphFilter": "(from/emailAddress/address eq 'daniel.mercer@harborviewam.com' or from/emailAddress/address eq 'evelyn.hart@northbridgeam.com') and receivedDateTime ge 2026-01-17T00:00:00Z and receivedDateTime le 2026-04-22T00:00:00Z",
+        "search": {
+          "search": "emails from daniel.mercer@harborviewam.com or evelyn.hart@northbridgeam.com",
+          "conditions": [
+            {
+              "fromSenders": {
+                "value": ["daniel.mercer@harborviewam.com", "evelyn.hart@northbridgeam.com"],
+                "operator": "in"
+              },
+              "dateFrom": { "value": "2026-01-17T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-22T00:00:00Z", "operator": "lessThanOrEqual" }
+            }
+          ],
+          "limit": 500
+        }
+      },
+      {
+        "id": "with_attachments_recent",
+        "graphFilter": "hasAttachments eq true and receivedDateTime ge 2026-03-10T00:00:00Z and receivedDateTime le 2026-04-10T00:00:00Z",
+        "search": {
+          "search": "emails with attachments",
+          "conditions": [
+            {
+              "hasAttachments": { "value": "true", "operator": "equals" },
+              "dateFrom": { "value": "2026-03-10T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-10T00:00:00Z", "operator": "lessThanOrEqual" }
+            }
+          ],
+          "limit": 200
+        }
+      },
+      {
+        "id": "from_sender_inbox_range",
+        "graphFilter": "from/emailAddress/address eq 'elena.maurer@customhousefs.com' and receivedDateTime ge 2026-03-01T00:00:00Z and receivedDateTime le 2026-04-01T00:00:00Z",
+        "search": {
+          "search": "emails from Elena Maurer in inbox this month",
+          "conditions": [
+            {
+              "directories": { "value": ["Inbox"], "operator": "in" },
+              "fromSenders": {
+                "value": "elena.maurer@customhousefs.com",
+                "operator": "equals"
+              },
+              "dateFrom": { "value": "2026-03-01T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-01T00:00:00Z", "operator": "lessThanOrEqual" }
+            }
+          ],
+          "limit": 200
+        }
+      },
+      {
+        "id": "inbox_or_sent_today",
+        "graphFilter": "(receivedDateTime ge 2026-04-16T00:00:00Z and receivedDateTime lt 2026-04-17T00:00:00Z) or (receivedDateTime ge 2026-02-24T00:00:00Z and receivedDateTime lt 2026-02-25T00:00:00Z)",
+        "search": {
+          "search": "emails from inbox or sent today",
+          "conditions": [
+            {
+              "directories": { "value": ["Sent Items", "Inbox"], "operator": "in" },
+              "dateFrom": { "value": "2026-04-16T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-04-17T00:00:00Z", "operator": "lessThan" }
+            },
+            {
+              "directories": { "value": ["Sent Items", "Inbox"], "operator": "in" },
+              "dateFrom": { "value": "2026-02-24T00:00:00Z", "operator": "greaterThanOrEqual" },
+              "dateTo": { "value": "2026-02-25T00:00:00Z", "operator": "lessThan" }
+            }
+          ],
+          "limit": 200
+        }
+      }
+    ]
+  }
+}
