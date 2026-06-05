@@ -27,6 +27,8 @@
   - [How does search_emails search?](#How-does-search_emails-search?)
   - [How do I filter search results to a specific folder?](#How-do-I-filter-search-results-to-a-specific-folder?)
   - [Can I attach files when creating a draft email?](#Can-I-attach-files-when-creating-a-draft-email?)
+  - [Can I create drafts in a shared mailbox?](#Can-I-create-drafts-in-a-shared-mailbox?)
+  - [Why does a reply draft in a shared mailbox appear in Drafts instead of in the thread in Outlook Web?](#Why-does-a-reply-draft-in-a-shared-mailbox-appear-in-Drafts-instead-of-in-the-thread-in-Outlook-Web?)
   - [What does reconnect_inbox do?](#What-does-reconnect_inbox-do?)
   - [What does delete_inbox_data do?](#What-does-delete_inbox_data-do?)
 - [Sync](#Sync)
@@ -393,6 +395,29 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 - A **Unique content URI** (`unique://content/{contentId}`) — only in cluster-local mode we expect the attachment to be in the chat or in knowledge base. In external mode this URI is unresolvable and the attachment will fail.
 
 If one or more attachments fail to upload, the draft is still created and the failed attachments are listed in the response.
+
+**See also:** [Tools — create_draft_email](./technical/tools.md#create_draft_email)
+
+### Can I create drafts in a shared mailbox?
+
+**Answer:** Yes. Pass the shared mailbox UPN as the `mailbox` parameter (e.g. `"support@company.com"`). The signed-in user must have been granted at least **Send As** or **Full Access** permissions to the shared mailbox in Microsoft 365 — the Graph API enforces this at request time.
+
+Both draft types work with shared mailboxes:
+
+- **Fresh draft** (`type: "draft"`) — pass `mailbox`, `subject`, `toRecipients`, and optionally `ccRecipients`.
+- **Reply-all draft** (`type: "reply"`) — pass `mailbox` and `inReplyToMessageId`. Graph pre-fills all original recipients automatically.
+
+Omitting `mailbox` creates the draft in the signed-in user's own mailbox.
+
+**See also:** [Tools — create_draft_email](./technical/tools.md#create_draft_email)
+
+### Why does a reply draft in a shared mailbox appear in Drafts instead of in the thread in Outlook Web?
+
+**Answer:** This is a known Outlook Web quirk, not a bug. When a reply draft is created via Microsoft Graph in a shared mailbox, Outlook Web places it in the shared mailbox **Drafts** folder rather than showing it inline within the original conversation thread. The draft is fully intact — all recipients are pre-filled and the reply chain is preserved — and it sends correctly when you open it from Drafts and click Send.
+
+**Outlook desktop** does not have this quirk: reply drafts appear and behave normally within the thread.
+
+If you are reviewing or sending the draft, open it from the shared mailbox Drafts folder in Outlook Web, or use Outlook desktop where thread placement is correct.
 
 **See also:** [Tools — create_draft_email](./technical/tools.md#create_draft_email)
 

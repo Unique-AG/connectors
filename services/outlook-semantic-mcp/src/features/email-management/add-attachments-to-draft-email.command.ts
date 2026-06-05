@@ -22,6 +22,7 @@ export interface AddAttachmentsInput {
   draftId: string;
   chatId: string | null | undefined;
   attachments: { fileName: string; data: string }[];
+  mailbox?: string;
 }
 
 export interface AddAttachmentsResult {
@@ -46,7 +47,7 @@ export class AddAttachmentsToDraftEmailCommand {
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
-    { draftId, chatId, attachments }: AddAttachmentsInput,
+    { draftId, chatId, attachments, mailbox }: AddAttachmentsInput,
   ): Promise<AddAttachmentsResult> {
     const userProfileIdString = userProfileId.toString();
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
@@ -73,6 +74,7 @@ export class AddAttachmentsToDraftEmailCommand {
           draftId,
           resolveUniqueIdentity,
           chatId,
+          mailbox,
         });
         if (processResult.status === 'failed') {
           attachmentsFailed.push(processResult.reason);
@@ -109,6 +111,7 @@ export class AddAttachmentsToDraftEmailCommand {
     chatId,
     resolveUniqueIdentity,
     fileName,
+    mailbox,
   }: {
     client: Client;
     fileName: Smeared;
@@ -117,6 +120,7 @@ export class AddAttachmentsToDraftEmailCommand {
     resolveUniqueIdentity: IdentityResolver;
     draftId: string;
     userProfileId: string;
+    mailbox?: string;
   }): Promise<AttachmentUploadResult> {
     const parsed = parseAttachmentUri(data);
 
@@ -133,6 +137,7 @@ export class AddAttachmentsToDraftEmailCommand {
           chatId,
           uniqueIdentity,
           userProfileId,
+          mailbox,
         });
         return result;
       }
@@ -145,6 +150,7 @@ export class AddAttachmentsToDraftEmailCommand {
           fileName,
           mimeType: parsed.mimeType,
           totalSize: parsed.data.length,
+          mailbox,
         });
         return { status: 'success' };
       default:

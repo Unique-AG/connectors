@@ -58,8 +58,9 @@ All permissions are delegated and require no admin consent. This includes `Mail.
 
 **Draft Creation**
 
-- Create draft emails with subject, body, recipients, and attachments via `create_draft_email`
-- Drafts are written directly to the user's Outlook Drafts folder via Microsoft Graph
+- Create fresh draft emails (subject, body, recipients, attachments) in the signed-in user's personal mailbox or in a shared mailbox via `create_draft_email`
+- Create reply-all drafts for existing emails in personal or shared mailboxes — Graph pre-fills all original recipients automatically
+- Drafts are written directly to the Outlook Drafts folder via Microsoft Graph and are not sent automatically
 
 **Contact Lookup**
 
