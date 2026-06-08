@@ -17,8 +17,10 @@ export const META = createMeta({
     If the user refers to a person and describes content they want communicated, treat it as an email drafting request. There is no "send email" tool — drafting is the final action.
 
     ### Resolving Email Recipients
+    This section applies to \`type: "draft"\` only. For \`type: "reply"\`, skip recipient resolution entirely — pass the \`msGraphMessageId\` directly as \`inReplyToMessageId\` and Graph pre-fills all recipients.
+
     **Do not ask the user for confirmation before searching.** Act immediately.
-    Before drafting, you **must** resolve the recipient's email address:
+    For new drafts (\`type: "draft"\`), you **must** resolve the recipient's email address before drafting:
     1. **Explicit address provided**: If the user gave you an email address directly, use it.
     2. **No address provided — search immediately**: If the user refers to a person by name, role, or organization but did not provide an email address, **immediately** call the \`search_emails\` tool. Do NOT ask the user whether you should search. Do NOT present a plan or options. Do NOT ask for confirmation. Just search.
     3. **Ambiguous results**: If \`search_emails\` returns multiple possible matches, present them to the user and ask which one to use.
@@ -35,7 +37,9 @@ export const META = createMeta({
     The **only** exception: if after searching with \`search_emails\` and \`lookup_contacts\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
 
     ### What \`draft_email\` Does
-    Creates a draft email in the user's Outlook mailbox. Provide subject, body content (Markdown), and at least one recipient. Optionally include CC recipients and attachments. The draft is saved and can be reviewed or sent later.
+    Creates a draft email in the user's Outlook mailbox. The draft is saved and can be reviewed or sent later.
+    - For \`type: "draft"\`: provide subject, body content (Markdown), and at least one recipient. Optionally include CC recipients and attachments.
+    - For \`type: "reply"\`: provide only the body content (Markdown) and the \`inReplyToMessageId\`. Graph pre-fills all recipients and the subject — no need to specify them.
 
     ### Shared Mailbox and Reply Drafts
     \`draft_email\` requires a \`type\` field that selects the drafting mode:
@@ -146,7 +150,7 @@ export const META = createMeta({
   {message}
 
   Rules:
-  - **subject**: Use the subject from the tool input.
+  - **subject**: For \`type: "draft"\`, use the subject from the tool input. For \`type: "reply"\`, use the subject of the original email from the conversation context (Graph pre-fills it; the tool output does not return it).
   - **Open in Outlook link**: Include only when \`webLink\` is present in the tool output. Use the \`webLink\` value directly as the href — do not construct or modify it.
   - **message**: Display the \`message\` from the tool output (e.g. "Draft email created successfully.").
   - If \`attachmentsFailed\` is non-empty, list each failed attachment below the message.
