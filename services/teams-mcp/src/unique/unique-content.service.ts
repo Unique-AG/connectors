@@ -1,10 +1,16 @@
 import assert from 'node:assert';
+import { randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { FetchFn } from '@qfetch/qfetch';
 import { Span, TraceService } from 'nestjs-otel';
 import type { UniqueConfigNamespaced } from '~/config';
-import type { SizedContent } from '~/utils/sized-content';
 import { UNIQUE_FETCH } from './unique.consts';
 import {
   type ContentInfoItem,
@@ -84,7 +90,7 @@ export class UniqueContentService {
   @Span()
   public async uploadToStorage(
     writeUrl: string,
-    content: () => Promise<SizedContent>,
+    content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>,
     mime: string,
   ): Promise<void> {
     const span = this.trace.getSpan();
@@ -97,35 +103,51 @@ export class UniqueContentService {
     this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
 
     // Azure Blob's single `PUT Blob` rejects `Transfer-Encoding: chunked` (400 UnsupportedHeader)
-    // and requires a `Content-Length`. Node's fetch only omits chunked framing for a streaming
-    // body when an explicit Content-Length is set, so we pass the pre-measured `size`.
-    const { stream, size } = await content();
-    span?.setAttribute('content_length', size);
+    // and requires a `Content-Length`. The MS Graph `/content` response header is unreliable for
+    // recordings (its `/content` 302-redirects and the response can carry the redirect hop's
+    // length, not the video's), so instead of trusting it we spool the decoded download to a temp
+    // file at constant memory, `fstat` it for an authoritative size, then stream the file back with
+    // that explicit Content-Length — undici then sends a sized, non-chunked body.
+    const tmpPath = join(tmpdir(), `teams-upload-${randomUUID()}`);
+    span?.setAttribute('spooled', true);
 
-    const response = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': mime,
-        'Content-Length': String(size),
-        'x-ms-blob-type': 'BlockBlob',
-      },
-      body: stream,
-      // @ts-expect-error: nodejs fetch requires `half` for streaming uploads
-      duplex: 'half',
-    });
+    try {
+      // The MS Graph body is a web stream; Readable.fromWeb adapts it to a Node stream so the
+      // pipeline can write it to disk with backpressure.
+      await pipeline(Readable.fromWeb(await content()), createWriteStream(tmpPath));
 
-    if (!response.ok) {
-      span?.setAttribute('error', true);
+      const { size } = await stat(tmpPath);
+      span?.setAttribute('content_length', size);
+
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': mime,
+          'Content-Length': String(size),
+          'x-ms-blob-type': 'BlockBlob',
+        },
+        // Stream the spooled file back as the request body. With an explicit Content-Length undici
+        // sends a sized, non-chunked PUT; `duplex: 'half'` is required for a streaming request body.
+        body: Readable.toWeb(createReadStream(tmpPath)),
+        duplex: 'half',
+      });
+
+      if (!response.ok) {
+        span?.setAttribute('error', true);
+        span?.setAttribute('http_status', response.status);
+        this.logger.error(
+          { status: response.status, storageEndpoint },
+          'Unique storage system rejected content upload with error',
+        );
+        assert.fail(`Unique storage upload failed: ${response.status}`);
+      }
+
       span?.setAttribute('http_status', response.status);
-      this.logger.error(
-        { status: response.status, storageEndpoint },
-        'Unique storage system rejected content upload with error',
-      );
-      assert.fail(`Unique storage upload failed: ${response.status}`);
+      this.logger.debug({ storageEndpoint }, 'Successfully completed content upload to storage');
+    } finally {
+      // Remove the spool on success, download error, and upload error (`force` no-ops if absent).
+      await rm(tmpPath, { force: true });
     }
-
-    span?.setAttribute('http_status', response.status);
-    this.logger.debug({ storageEndpoint }, 'Successfully completed content upload to storage');
   }
 
   // HACK (mirrors outlook-semantic-mcp): in cluster_local mode the storeInternally

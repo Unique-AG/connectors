@@ -28,12 +28,18 @@ server:
     application: 51345
     metrics: 51346
   resources:
-    # Resources are granted generously as the service for now is a singleton
+    # Resources are granted generously as the service for now is a singleton.
+    # ephemeral-storage covers the disk spool: recordings are uploaded by streaming
+    # the download to a temp file in /tmp (see UniqueContentService.uploadToStorage),
+    # and the ingestion consumer runs at prefetchCount: 1 so at most one ~5 GB
+    # recording is spooled at a time.
     limits:
       memory: 2048Mi
+      ephemeral-storage: 10Gi # >= the emptyDir cap; covers one ~5 GB spool + overlay/log overhead
     requests:
       cpu: 1
       memory: 1984Mi
+      ephemeral-storage: 6Gi # reserve enough to guarantee one ~5 GB recording can spool
   routes:
     paths:
       default:
@@ -41,7 +47,7 @@ server:
   volumes:
     - name: tmp
       emptyDir:
-        sizeLimit: 20Gi
+        sizeLimit: 10Gi # one ~5 GB recording at a time (prefetch:1) + headroom
   volumeMounts:
     - name: tmp
       mountPath: /tmp
