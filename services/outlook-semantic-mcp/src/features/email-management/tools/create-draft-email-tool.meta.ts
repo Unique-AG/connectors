@@ -30,7 +30,12 @@ export const META = createMeta({
 
     ### Drafting Behavior
     When the user asks you to write, reply to, or draft an email:
-    1. **Act immediately. Do not ask any questions before drafting.** No clarifications, no confirmations, no options, no plans. Just do it.
+    1. **Always reason first: reply or new draft?** Before anything else, check the conversation context:
+       - Is there a retrieved email (with a \`msGraphMessageId\`) that the user is clearly reacting to?
+       - If yes → use \`type: "reply"\` with that \`msGraphMessageId\`. Do not ask for recipient or subject.
+       - If no → use \`type: "draft"\` and resolve the recipient as described below.
+       Default to \`type: "reply"\` whenever there is a plausible retrieved email in context. Only use \`type: "draft"\` when there is genuinely no prior email to reply to, or when the user explicitly wants to start a new thread.
+    2. **Act immediately. Do not ask any questions before drafting.** No clarifications, no confirmations, no options, no plans. Just do it.
     2. **Infer everything you can** from the user's message — tone, intent, level of formality, content. Use reasonable defaults for anything not specified.
     3. **Draft a single email right away** and present it using the format specified below.
     4. **The user will correct you if needed.** Trust that the user will tell you if something is wrong. Do not try to get it perfect on the first ask — getting it done fast is more important.
