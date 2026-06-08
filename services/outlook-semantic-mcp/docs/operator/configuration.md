@@ -7,7 +7,7 @@
 
 The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose your mode before configuring anything else** — it determines which infrastructure components you need and which configuration sections apply.
 
-| | `MicrosoftGraphAndUniqueApi` (default) | `MicrosoftGraph` |
+| | `microsoft_graph_and_unique_api` (default) | `microsoft_graph` |
 |---|---|---|
 | Search | Semantic (Unique KB) + KQL (Graph), merged | KQL (Graph) only |
 | Ingestion | Full sync + live catch-up | None |
@@ -18,17 +18,17 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose y
 
 **Configuration impact:**
 
-| Section | Mode A (`MicrosoftGraphAndUniqueApi`) | Mode B (`MicrosoftGraph`) |
+| Section | Mode A (`microsoft_graph_and_unique_api`) | Mode B (`microsoft_graph`) |
 |---|---|---|
 | Required Secrets | All secrets | Same — `UNIQUE_ZITADEL_CLIENT_SECRET` only needed for `external` auth |
 | Ingestion Configuration (`mcpConfig.ingestion`) | Required | **Omit entirely** |
 
 Two values are accepted for `MCP_BACKEND`:
 
-- **`MicrosoftGraphAndUniqueApi`** (default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; all sync tools (`sync_progress`, `run_full_sync`, etc.) are registered. Requires the `mcpConfig.ingestion` section to be configured.
-- **`MicrosoftGraph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not registered. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate. The `mcpConfig.ingestion` section is not required and is ignored.
+- **`microsoft_graph_and_unique_api`** (default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; all sync tools (`sync_progress`, `run_full_sync`, etc.) are registered. Requires the `mcpConfig.ingestion` section to be configured.
+- **`microsoft_graph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not registered. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate. The `mcpConfig.ingestion` section is not required and is ignored.
 
-Existing deployments that do not set this variable are unaffected — `MicrosoftGraphAndUniqueApi` is the default.
+Existing deployments that do not set this variable are unaffected — `microsoft_graph_and_unique_api` is the default.
 
 ## Environment Variables
 
@@ -102,7 +102,7 @@ Set via `mcpConfig.logs` in Helm values:
 
 | Variable | Helm key | Default | Description |
 |----------|----------|---------|-------------|
-| `LOGS_DIAGNOSTICS_DATA_POLICY` | `diagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
+| `LOG_DIAGNOSTICS_DATA_POLICY` | `diagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
 
 ### Authentication Token Configuration
 
@@ -124,8 +124,8 @@ Set via `mcpConfig.app` in Helm values:
 | `SELF_URL` | `selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
 | `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
 | `MCP_DEBUG_MODE` | `mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
-| `MCP_BACKEND` | `mcpBackend` | `MicrosoftGraphAndUniqueApi` | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
-| `APP_BUFFER_LOGS` | `bufferLogs` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
+| `MCP_BACKEND` | `mcpBackend` | `microsoft_graph_and_unique_api` | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
+| `LOG_BUFFERING` | `log.buffering` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
 
 ### Delegated Access Configuration
 
@@ -135,15 +135,15 @@ Set via `mcpConfig.delegatedAccess` in Helm values:
 |----------|----------|---------|-------------|
 | `DELEGATED_ACCESS_SCAN` | `scan` | `disabled` | Delegated access scanning mode — see [DELEGATED_ACCESS_SCAN](#DELEGATED_ACCESS_SCAN) |
 | `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` | `discoveryCronSchedule` | `0 */12 * * *` | Cron schedule for delegated access discovery runs. Required when `DELEGATED_ACCESS_SCAN` is not `disabled` |
-| `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` | `verificationCronSchedule` | `0 */4 * * *` | Cron schedule for delegated access verification runs. Required when `DELEGATED_ACCESS_SCAN` is `granularAccess` |
+| `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` | `verificationCronSchedule` | `0 */4 * * *` | Cron schedule for delegated access verification runs. Required when `DELEGATED_ACCESS_SCAN` is `granular_access` |
 | `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE` | `recoveryCronSchedule` | `*/30 * * * *` | Cron schedule for recovering stuck delegated access discovery and verification jobs. Active when `DELEGATED_ACCESS_SCAN` is not `disabled` |
 | `DELEGATED_ACCESS_STALENESS_THRESHOLD_HOURS` | `stalenessThresholdHours` | `24` | Hours after which a delegated access account is considered stale for the `/health` check |
 | `DELEGATED_ACCESS_FAILURE_THRESHOLD` | `failureThreshold` | `0.15` | Fraction (0–1) of eligible delegated users that may be stale before the `/health` check reports down |
 
 ### Ingestion Configuration
 
-!!! warning "Mode A (`MicrosoftGraphAndUniqueApi`) only"
-    This entire section applies only when `MCP_BACKEND` is `MicrosoftGraphAndUniqueApi`. If you are deploying in `MicrosoftGraph` mode, omit all `mcpConfig.ingestion` values from your Helm configuration.
+!!! warning "Mode A (`microsoft_graph_and_unique_api`) only"
+    This entire section applies only when `MCP_BACKEND` is `microsoft_graph_and_unique_api`. If you are deploying in `microsoft_graph` mode, omit all `mcpConfig.ingestion` values from your Helm configuration.
 
 Set via `mcpConfig.ingestion` in Helm values:
 
@@ -227,12 +227,12 @@ mcpConfig:
   app:
     selfUrl: https://outlook.semantic.mcp.example.com
     mcpDebugMode: disabled
-    mcpBackend: MicrosoftGraphAndUniqueApi
+    mcpBackend: microsoft_graph_and_unique_api
 
   delegatedAccess:
     scan: disabled
     # discoveryCronSchedule: '0 */12 * * *'   # required when scan != disabled
-    # verificationCronSchedule: '0 */4 * * *'  # required when scan == granularAccess
+    # verificationCronSchedule: '0 */4 * * *'  # required when scan == granular_access
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
@@ -325,7 +325,7 @@ mcpConfig:
 
   app:
     selfUrl: https://outlook.semantic.mcp.example.com
-    mcpBackend: MicrosoftGraph
+    mcpBackend: microsoft_graph
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
@@ -339,7 +339,7 @@ mcpConfig:
       x-user-id: "<your-service-account-user-id>"
     # For external auth mode, replace serviceExtraHeaders with zitadel: — see Zitadel Service Account section below
 
-  # No mcpConfig.ingestion section — omit entirely for MicrosoftGraph mode
+  # No mcpConfig.ingestion section — omit entirely for microsoft_graph mode
 ```
 
 ### Service Auth Modes
@@ -382,7 +382,7 @@ mcpConfig:
 
 1. Rotate secrets regularly, especially `MICROSOFT_CLIENT_SECRET` and `ENCRYPTION_KEY`
 2. Use an external secret manager (e.g., AWS Secrets Manager, Azure Key Vault, HashiCorp Vault) rather than static Kubernetes secrets
-3. Keep `LOGS_DIAGNOSTICS_DATA_POLICY` set to `conceal` (the default) in production to avoid logging sensitive data
+3. Keep `LOG_DIAGNOSTICS_DATA_POLICY` set to `conceal` (the default) in production to avoid logging sensitive data
 4. Enable network policies to restrict inbound and outbound traffic to only required services
 5. Monitor deployments using the provided Grafana dashboards and alert rules (`grafana.dashboard.enabled: true`, `alerts.enabled: true`)
 
@@ -470,22 +470,22 @@ For step-by-step Microsoft 365 setup, see [Features — Delegated Access — Set
 Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for delegated mailbox access granted between users at the Microsoft Exchange level. Three values are accepted:
 
 - **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. Users only see their own mailbox.
-- **`fullAccessOnly`** — discovers users who have been granted **Full Access (Read & Manage)** on a mailbox via Exchange admin. Uses the `/users/{email}/messages` endpoint to detect access. Requires `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE`.
-- **`granularAccess`** — discovers users who have been granted **folder-level access** (e.g., only "Inbox" or "RFQ" shared, not the entire mailbox). Uses the `/users/{email}/mailFolders` endpoint for discovery, followed by a verification pass to determine which folders are actually readable (since the folder listing can include parent folders of shared subfolders that are not themselves accessible). Requires both `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` and `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE`.
+- **`full_access_only`** — discovers users who have been granted **Full Access (Read & Manage)** on a mailbox via Exchange admin. Uses the `/users/{email}/messages` endpoint to detect access. Requires `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE`.
+- **`granular_access`** — discovers users who have been granted **folder-level access** (e.g., only "Inbox" or "RFQ" shared, not the entire mailbox). Uses the `/users/{email}/mailFolders` endpoint for discovery, followed by a verification pass to determine which folders are actually readable (since the folder listing can include parent folders of shared subfolders that are not themselves accessible). Requires both `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` and `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE`.
 
 **Choosing a mode:**
 
 | Scenario | Recommended mode |
 |----------|-----------------|
 | No delegated mailbox access in your org | `disabled` |
-| Users have Full Access (Read & Manage) granted via Exchange admin | `fullAccessOnly` |
-| Users share individual folders (e.g., Inbox, RFQ) with others | `granularAccess` |
+| Users have Full Access (Read & Manage) granted via Exchange admin | `full_access_only` |
+| Users share individual folders (e.g., Inbox, RFQ) with others | `granular_access` |
 
-`granularAccess` subsumes `fullAccessOnly` — if your org uses both types of delegation, use `granularAccess`.
+`granular_access` subsumes `full_access_only` — if your org uses both types of delegation, use `granular_access`.
 
-!!! warning "`granularAccess` requires Mode A — Mode B supports full access only"
-    `granularAccess` requires `MCP_BACKEND=MicrosoftGraphAndUniqueApi` and will
-    fail to start if configured with `MicrosoftGraph`. `fullAccessOnly` is
+!!! warning "`granular_access` requires Mode A — Mode B supports full access only"
+    `granular_access` requires `MCP_BACKEND=microsoft_graph_and_unique_api` and will
+    fail to start if configured with `microsoft_graph`. `full_access_only` is
     supported in both modes, but in Mode B only delegates with **full mailbox
     access** can search delegated mailboxes — honouring folder-level delegations
     would require querying every accessible folder individually, which is not
@@ -497,11 +497,11 @@ Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for
 > also have completed the initial full sync for their emails to be available to
 > the delegate.
 
-> **`fullAccessOnly` — consider a more frequent discovery schedule.** When using
-> `fullAccessOnly`, discovery is the only revocation detection mechanism.
+> **`full_access_only` — consider a more frequent discovery schedule.** When using
+> `full_access_only`, discovery is the only revocation detection mechanism.
 > Consider setting `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` to run 4 times per
 > day (e.g. `0 */6 * * *`) to reduce the window during which a revoked delegate
-> can still search the owner's emails. In `granularAccess` mode this is less
+> can still search the owner's emails. In `granular_access` mode this is less
 > critical because the verification job already runs every 4 hours.
 
 #### Mail Filters

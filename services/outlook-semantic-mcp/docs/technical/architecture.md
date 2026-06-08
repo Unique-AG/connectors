@@ -78,11 +78,11 @@ After a user connects, the following pipelines keep the knowledge base in sync w
 
 **Delegated Access Discovery (optional, `DELEGATED_ACCESS_SCAN`)** — when not
 `disabled`, two background jobs keep delegated access state current. The
-**discovery job** (both `fullAccessOnly` and `granularAccess` modes) tests each
+**discovery job** (both `full_access_only` and `granular_access` modes) tests each
 connected user's access to other connected users' mailboxes via Microsoft Graph
-on a configurable schedule (default: every 12 hours; for `fullAccessOnly`
+on a configurable schedule (default: every 12 hours; for `full_access_only`
 consider 4× per day since discovery is the sole revocation mechanism). The
-**verification job** (`granularAccess` mode only, default: every 4 hours)
+**verification job** (`granular_access` mode only, default: every 4 hours)
 confirms which individual folders within each delegated mailbox are still
 readable. Neither job triggers email ingestion — they write permission records
 that `search_emails` reads at query time to include the owner's scope alongside
@@ -98,7 +98,7 @@ PostgreSQL stores all persistent state:
 - **Webhook subscriptions** — Active Microsoft Graph subscriptions per user
 - **Sync state** — Full sync progress, live catch-up state, mail filters per user
 - **Folder structure** — Outlook directory tree synced from Graph API for folder-based filtering
-- **Delegated access state** — `delegatedAccessAccounts` (delegate/owner pairs with access type) and `delegatedAccessDirectories` (folder-level access grants for `granularAccess` mode)
+- **Delegated access state** — `delegatedAccessAccounts` (delegate/owner pairs with access type) and `delegatedAccessDirectories` (folder-level access grants for `granular_access` mode)
 
 Microsoft tokens are encrypted at rest using AES-256-GCM. MCP tokens use 512-bit cryptographically random values with TTL-based expiration.
 

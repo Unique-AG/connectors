@@ -5,11 +5,11 @@
 
 The Outlook Semantic MCP Server exposes tools whose availability depends on the deployment mode (`MCP_BACKEND`) and debug settings.
 
-!!! warning "Mode A (`MicrosoftGraphAndUniqueApi`) only tools"
-    `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data`, and `sync_progress` are **only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi`**. They are not registered in `MicrosoftGraph` mode.
+!!! warning "Mode A (`microsoft_graph_and_unique_api`) only tools"
+    `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data`, and `sync_progress` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api`**. They are not registered in `microsoft_graph` mode.
 
 !!! warning "Debug-Mode Tools"
-    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi` AND `MCP_DEBUG_MODE=enabled`**. They do not appear for standard deployments or in `MicrosoftGraph` mode. **Note:** Debug mode exposes these tools to **all** connected MCP users, not just operators. Do not leave enabled in production.
+    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`**. They do not appear for standard deployments or in `microsoft_graph` mode. **Note:** Debug mode exposes these tools to **all** connected MCP users, not just operators. Do not leave enabled in production.
 
 ## Tool Overview
 
@@ -59,7 +59,7 @@ Search emails and return matched passages. The tool behaviour and input schema d
 
 ---
 
-#### Mode A: `MicrosoftGraphAndUniqueApi`
+#### Mode A: `microsoft_graph_and_unique_api`
 
 Runs two searches in parallel — semantic search against the Unique knowledge base and a KQL keyword search against Microsoft Graph — then merges and deduplicates the results. Both query arrays are required and must address the same user question.
 
@@ -141,7 +141,7 @@ Each object in `conditions` (applies to `uniqueSemanticSearchQueries` entries on
 
 ---
 
-#### Mode B: `MicrosoftGraph`
+#### Mode B: `microsoft_graph`
 
 Calls the Microsoft Graph Search API directly with KQL queries. No semantic search is performed. Only `msGraphKeywordSearchQueries` is accepted.
 
@@ -443,7 +443,7 @@ List all Outlook mailboxes and their folder trees available to the user.
 
 - Folder `id` values can be passed to the `directories` filter in `search_emails` to narrow results to a specific folder.
 - In Mode A, the folder tree is synced from Microsoft Graph and reflects the user's current mailbox structure. Calling this tool triggers a fresh sync of the folder tree.
-- Folder filtering via `directories` is only effective in Mode A (`MicrosoftGraphAndUniqueApi`). In Mode B, the Microsoft Graph Search API does not support folder-scoped filtering — the `directories` condition is ignored.
+- Folder filtering via `directories` is only effective in Mode A (`microsoft_graph_and_unique_api`). In Mode B, the Microsoft Graph Search API does not support folder-scoped filtering — the `directories` condition is ignored.
 - Well-known system folder names (`"Inbox"`, `"Sent Items"`, `"Drafts"`, etc.) can be used directly in `search_emails` without calling this tool first.
 - When `DELEGATED_ACCESS_SCAN` is enabled, the `mailboxes` array includes delegated mailboxes alongside the user's own mailbox. The `isOwn` field is `true` for the user's primary mailbox and `false` for delegated ones. Folder IDs from delegated mailboxes can be passed to the `directories` condition in `search_emails` to narrow results to a specific folder in a delegated mailbox (folder filtering via `directories` is only effective in Mode A).
 
@@ -451,8 +451,8 @@ List all Outlook mailboxes and their folder trees available to the user.
 
 ## Subscription Management
 
-!!! note "Mode A (`MicrosoftGraphAndUniqueApi`) only"
-    `verify_inbox_connection`, `reconnect_inbox`, and `delete_inbox_data` are only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi`. These tools are not registered in `MicrosoftGraph` mode because no webhook subscriptions are created.
+!!! note "Mode A (`microsoft_graph_and_unique_api`) only"
+    `verify_inbox_connection`, `reconnect_inbox`, and `delete_inbox_data` are only available when `MCP_BACKEND=microsoft_graph_and_unique_api`. These tools are not registered in `microsoft_graph` mode because no webhook subscriptions are created.
 
 ### `verify_inbox_connection`
 
@@ -541,8 +541,8 @@ Permanently delete all synced email data from Unique and cancel the Microsoft Gr
 
 ## Sync Monitoring
 
-!!! note "Mode A (`MicrosoftGraphAndUniqueApi`) only"
-    `sync_progress` is only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi`. There is no sync pipeline in `MicrosoftGraph` mode.
+!!! note "Mode A (`microsoft_graph_and_unique_api`) only"
+    `sync_progress` is only available when `MCP_BACKEND=microsoft_graph_and_unique_api`. There is no sync pipeline in `microsoft_graph` mode.
 
 ### `sync_progress`
 
@@ -604,8 +604,8 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
 
 The following four tools are only available when `MCP_DEBUG_MODE=enabled` is set in the server configuration. They are intended for operators diagnosing sync issues, not for end users.
 
-!!! note "Mode A (`MicrosoftGraphAndUniqueApi`) only"
-    These tools are only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi` AND `MCP_DEBUG_MODE=enabled`.
+!!! note "Mode A (`microsoft_graph_and_unique_api`) only"
+    These tools are only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`.
 
 ### `run_full_sync`
 

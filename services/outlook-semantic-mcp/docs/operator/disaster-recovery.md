@@ -12,7 +12,7 @@ Out of scope: partial database corruption, Microsoft Graph API outages, and auto
 !!! note "Deployment Mode Scope"
     The scenarios in this runbook differ by deployment mode:
 
-    | Scenario | `MicrosoftGraphAndUniqueApi` | `MicrosoftGraph` |
+    | Scenario | `microsoft_graph_and_unique_api` | `microsoft_graph` |
     |---|---|---|
     | [Scenario 1: PostgreSQL Loss](#Scenario-1:-Local-PostgreSQL-Database-Loss) | Applies | Applies (simplified — see below) |
     | [Scenario 2: RabbitMQ Loss](#Scenario-2:-RabbitMQ-Loss) | Applies | Applies (simplified — see below) |
@@ -24,7 +24,7 @@ Out of scope: partial database corruption, Microsoft Graph API outages, and auto
 
 ### Idempotent re-ingestion
 
-> This sub-section applies to **Mode A (`MicrosoftGraphAndUniqueApi`)** deployments only. In `MicrosoftGraph` mode there is no ingestion pipeline.
+> This sub-section applies to **Mode A (`microsoft_graph_and_unique_api`)** deployments only. In `microsoft_graph` mode there is no ingestion pipeline.
 
 For all recovery scenarios except Knowledge Base loss (Scenario 3), the system checks whether each email already exists in the Knowledge Base before re-ingesting it. If the file key matches and the metadata is unchanged, the email is skipped entirely. The only cost of a full re-sync in these cases is:
 
@@ -57,7 +57,7 @@ The documentation does not provide fixed RTO targets because recovery time varie
 
 ### Data loss window
 
-> This sub-section applies to **Mode A (`MicrosoftGraphAndUniqueApi`)** deployments only. In `MicrosoftGraph` mode there is no ingestion pipeline.
+> This sub-section applies to **Mode A (`microsoft_graph_and_unique_api`)** deployments only. In `microsoft_graph` mode there is no ingestion pipeline.
 
 Emails are sourced from Microsoft Graph, which retains the authoritative copy. In all three disaster scenarios, email content is not permanently lost — it can be re-fetched and re-ingested. The data loss window refers to the delay before the system catches up:
 
@@ -96,7 +96,7 @@ The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, a
 
 ### Recovery Steps
 
-#### Mode A (`MicrosoftGraphAndUniqueApi`) Recovery
+#### Mode A (`microsoft_graph_and_unique_api`) Recovery
 
 1. Restore or provision a new PostgreSQL instance and update `DATABASE_URL` in the Kubernetes secret if the connection string changed:
 
@@ -127,7 +127,7 @@ The local database stores OAuth tokens, Microsoft Graph webhook subscriptions, a
 
 **See also:** [Authentication](./authentication.md), [Deployment](./deployment.md#Database-Migration), [Security — Encryption](../technical/security.md#Microsoft-Tokens-(Encrypted-at-Rest))
 
-#### Mode B (`MicrosoftGraph`) Recovery
+#### Mode B (`microsoft_graph`) Recovery
 
 The recovery procedure is simpler in Mode B because there are no webhook subscriptions, sync state, or Knowledge Base scopes to restore.
 
@@ -160,7 +160,7 @@ RabbitMQ carries in-flight sync trigger events between the service and its inter
 
 ### Recovery Steps
 
-#### Mode A (`MicrosoftGraphAndUniqueApi`) Recovery
+#### Mode A (`microsoft_graph_and_unique_api`) Recovery
 
 1. Restore or provision a new RabbitMQ instance and update `AMQP_URL` in the Kubernetes secret if the connection string changed.
 
@@ -178,9 +178,9 @@ RabbitMQ carries in-flight sync trigger events between the service and its inter
 
 **See also:** [`reconnect_inbox`](../technical/tools.md#reconnect_inbox), [`sync_progress`](../technical/tools.md#sync_progress)
 
-#### Mode B (`MicrosoftGraph`) Recovery
+#### Mode B (`microsoft_graph`) Recovery
 
-In `MicrosoftGraph` mode, RabbitMQ is a required infrastructure component but is not used for email ingestion or sync. Service impact is limited to connectivity loss until RabbitMQ is restored.
+In `microsoft_graph` mode, RabbitMQ is a required infrastructure component but is not used for email ingestion or sync. Service impact is limited to connectivity loss until RabbitMQ is restored.
 
 **Impact:** The service cannot connect to RabbitMQ. No email data is lost — there is no ingestion pipeline.
 
@@ -211,7 +211,7 @@ The Unique Knowledge Base stores the actual ingested email content used for sema
 
 ### Recovery Steps
 
-#### Mode A (`MicrosoftGraphAndUniqueApi`) Recovery
+#### Mode A (`microsoft_graph_and_unique_api`) Recovery
 
 1. Restore or verify the Unique Knowledge Base is operational and reachable from the service. Confirm `UNIQUE_INGESTION_SERVICE_BASE_URL` and `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` are correct in the Helm values.
 
@@ -227,6 +227,6 @@ The Unique Knowledge Base stores the actual ingested email content used for sema
 
 **See also:** [`restart_full_sync`](../technical/tools.md#restart_full_sync), [`sync_progress`](../technical/tools.md#sync_progress), [Configuration](./configuration.md#Application-Configuration)
 
-#### Mode B (`MicrosoftGraph`) Impact
+#### Mode B (`microsoft_graph`) Impact
 
-In `MicrosoftGraph` mode, the Unique Knowledge Base is required infrastructure but no email content is stored there — search always queries Microsoft Graph directly. A Knowledge Base outage does not affect search results or any user-facing tool. No user action is required. Restore the Knowledge Base to restore the service's ability to connect to it.
+In `microsoft_graph` mode, the Unique Knowledge Base is required infrastructure but no email content is stored there — search always queries Microsoft Graph directly. A Knowledge Base outage does not affect search results or any user-facing tool. No user action is required. Restore the Knowledge Base to restore the service's ability to connect to it.
