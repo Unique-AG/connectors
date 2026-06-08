@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { TraceService } from 'nestjs-otel';
 import { serializeError } from 'serialize-error-cjs';
-import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
+import { DEAD_EXCHANGE, INGESTION_CHANNEL, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { normalizeError } from '~/utils/normalize-error';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
@@ -246,6 +246,9 @@ export class TranscriptController {
     createQueueIfNotExists: true,
     queueOptions: {
       deadLetterExchange: DEAD_EXCHANGE.name,
+      // Consume on the ingestion channel (prefetchCount: 1) so only one meeting — and thus one
+      // disk-spooled recording — is ingested at a time.
+      channel: INGESTION_CHANNEL,
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })

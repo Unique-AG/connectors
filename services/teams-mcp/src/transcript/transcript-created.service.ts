@@ -1,6 +1,5 @@
 import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
-import { ResponseType } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
@@ -9,7 +8,6 @@ import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UniqueService } from '~/unique/unique.service';
-import { readSizedContent } from '~/utils/sized-content';
 import {
   CreatedEventDto,
   IngestRequestedEventDto,
@@ -276,14 +274,11 @@ export class TranscriptCreatedService {
       },
       {
         id: transcript.id,
-        content: async () =>
-          readSizedContent(
-            await client
-              .api(`${ownerPath}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
-              .header('Accept', 'text/vtt')
-              .responseType(ResponseType.RAW)
-              .get(),
-          ),
+        content: () =>
+          client
+            .api(`${ownerPath}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
+            .header('Accept', 'text/vtt')
+            .getStream(),
       },
       recording ?? undefined,
     );
