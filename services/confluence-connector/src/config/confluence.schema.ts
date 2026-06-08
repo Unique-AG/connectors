@@ -9,6 +9,7 @@ import {
 export const AuthMode = {
   OAuth2Lo: 'oauth_2lo',
   Pat: 'pat',
+  Basic: 'basic',
 } as const;
 
 const oauth2loAuth = z.object({
@@ -20,6 +21,12 @@ const oauth2loAuth = z.object({
 const patAuth = z.object({
   mode: z.literal(AuthMode.Pat).describe('Personal Access Token (Data Center only)'),
   token: envRequiredSecretSchema,
+});
+
+const basicAuth = z.object({
+  mode: z.literal(AuthMode.Basic).describe('HTTP Basic username/password (Data Center only)'),
+  username: requiredStringSchema,
+  password: envRequiredSecretSchema,
 });
 
 const baseConfluenceFields = z.object({
@@ -42,7 +49,7 @@ export const ConfluenceConfigSchema = z.discriminatedUnion('instanceType', [
   }),
   baseConfluenceFields.extend({
     instanceType: z.literal('data-center'),
-    auth: z.discriminatedUnion('mode', [oauth2loAuth, patAuth]),
+    auth: z.discriminatedUnion('mode', [oauth2loAuth, patAuth, basicAuth]),
   }),
 ]);
 
