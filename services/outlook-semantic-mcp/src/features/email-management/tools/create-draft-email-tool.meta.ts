@@ -35,14 +35,15 @@ export const META = createMeta({
          - If yes → use \`type: "reply"\` with that ID immediately. Do not ask for recipient or subject.
        - Does the user refer to a specific email by subject, sender, or topic but it is **not yet in context**, or the in-context result **lacks** \`msGraphMessageId\`?
          - If yes → call \`search_emails\` to find it. Present the matching emails to the user and ask them to confirm which one to reply to. Once confirmed, use \`type: "reply"\` with the confirmed email's \`msGraphMessageId\`. This confirmation step is required because replying to the wrong email is a hard-to-recover mistake.
-       - Otherwise → use \`type: "draft"\` and resolve the recipient as described below.
+       - Otherwise → use \`type: "draft"\` and resolve the recipient following the "Resolving Email Recipients" section above.
        Use \`type: "reply"\` only when the user's current message is a clear reaction to a specific, identified email. Do not default to reply just because some email happens to be in context from an earlier search.
-    2. **Act immediately. Do not ask any questions before drafting.** No clarifications, no confirmations, no options, no plans. Just do it.
-       Exception to "act immediately": when a \`search_emails\` call is needed to identify the email to reply to, always confirm the exact email with the user before drafting — do not silently pick the first result.
+    2. **Act immediately — with two exceptions where you must pause and confirm first:**
+       - When \`search_emails\` is needed to identify the email to reply to: present the results and ask the user to confirm the exact email before drafting.
+       - When the recipient address for a new draft cannot be resolved after searching with \`search_emails\` and \`lookup_contacts\`: ask the user to provide it.
+       For everything else: no clarifications, no confirmations, no plans. Just draft.
     3. **Infer everything you can** from the user's message — tone, intent, level of formality, content. Use reasonable defaults for anything not specified.
     4. **Draft a single email right away** and present it using the format specified below.
     5. **The user will correct you if needed.** Trust that the user will tell you if something is wrong. Do not try to get it perfect on the first ask — getting it done fast is more important.
-    The **only** exception: if after searching with \`search_emails\` and \`lookup_contacts\` you still cannot determine the recipient's email address, ask the user for it. That is the only reason to pause and ask a question.
 
     ### What \`draft_email\` Does
     Creates a draft email in the user's Outlook mailbox. The draft is saved and can be reviewed or sent later.
