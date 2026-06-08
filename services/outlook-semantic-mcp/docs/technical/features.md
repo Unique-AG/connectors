@@ -26,12 +26,13 @@ Where a feature works the same in both modes, this page says so once. Where beha
 
 **Mode B (`MicrosoftGraph`)**
 
-- `search_emails` queries Microsoft Graph directly using KQL keyword search only. No knowledge base interaction occurs and folder filtering is not available (see below).
+- `search_emails` queries Microsoft Graph directly using KQL keyword search only. No knowledge base interaction occurs.
+- Folder filtering is supported via the `directories` field on each `msGraphKeywordSearchQueries` entry. Pass a well-known folder name (e.g. `Inbox`) or a folder ID from `list_mailboxes_and_directories`. This works for the user's own mailbox and for fully delegated mailboxes (Full Access).
+- Search is **not supported** for mailboxes where the user only has folder-level (partial) access — Microsoft Graph requires full mailbox access for `$search` queries. See [Known limitations](#known-limitations) below.
 
 **What's not supported (both modes)**
 
 - Calendar, task, or file data — only mail is in scope.
-- Folder filtering in Mode B — the Microsoft Graph Search API does not support folder-scoped queries.
 
 **See also:** [Tools — search_emails](./tools.md#search_emails)
 
@@ -83,11 +84,11 @@ Available in both modes. Behaviour is identical.
 
 **Mode B (`MicrosoftGraph`)**
 
-- `list_mailboxes_and_directories` is available and returns the user's own folder tree, but folder IDs **cannot** be used to filter `search_emails` results (see below).
+- `list_mailboxes_and_directories` is available and returns the user's own folder tree plus any fully delegated mailboxes. Folder IDs returned here can be passed to the `directories` field of `msGraphKeywordSearchQueries` in `search_emails` to narrow results to a specific folder.
 
 **What's not supported**
 
-- Folder filtering in Mode B — even though `list_mailboxes_and_directories` works in Mode B, the Microsoft Graph Search API does not support folder-scoped queries, so folder IDs passed to `search_emails` are ignored.
+- Searching in mailboxes where the user only has folder-level (partial) access in Mode B — Microsoft Graph does not support `$search` against such mailboxes. See [Known limitations](#known-limitations) below.
 
 **See also:** [Tools — list_mailboxes_and_directories](./tools.md#list_mailboxes_and_directories)
 
@@ -196,9 +197,26 @@ For a detailed description of how delegated access works at runtime, see the exi
 | | Mode A (`MicrosoftGraphAndUniqueApi`) | Mode B (`MicrosoftGraph`) |
 |---|---|---|
 | **Full Access delegation** | Supported — delegate searches owner's ingested emails | Supported — live keyword search against owner's mailbox |
-| **Folder-level delegation** | Supported ([`granularAccess`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) only) | Not supported |
-| **Folder filtering** | Supported in `granularAccess` | Not supported |
+| **Folder-level delegation** | Supported ([`granularAccess`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) only) | Not supported — search requires full mailbox access (see [Known limitations](#known-limitations)) |
+| **Folder filtering** | Supported in `granularAccess` | Supported for own mailbox and full-access delegated mailboxes only |
 | **Ingestion** | Owner's inbox only — delegated mailboxes are not re-ingested | No ingestion |
 | **Revocation detection** | Background scan: discovery (every 12 h), verification (every 4 h) | Immediate (live Graph query) |
 
 Configure scanning via [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
+
+---
+
+## Known Limitations
+
+### Search does not work for mailboxes where a colleague shared folders without granting Full Access (Mode B only)
+
+**Symptom:** When a colleague has shared one or more folders with you (but has not granted you Full Access to their entire mailbox), `search_emails` in Mode B returns no results from that mailbox and the response includes a message such as:
+
+> Could not search in mailbox colleague@example.com — Microsoft does not offer an API to search in shared folders from this mailbox.
+
+**Cause:** Microsoft Graph requires full mailbox access for `$search` queries. When a user shares only individual folders, Microsoft Graph returns HTTP 403 to any search request against that mailbox — regardless of whether a specific folder is targeted or not. There is no Microsoft Graph API that supports keyword search scoped to a partially-delegated mailbox.
+
+**Workaround options:**
+
+- **Get Full Access.** Ask your colleague (or an Exchange administrator) to grant you Full Access (Read & Manage) to their mailbox. This allows `$search` queries against the entire mailbox, including the previously shared folders.
+- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, connect it to the MCP as its own account, and grant Full Access to everyone who needs to search it. See [Setup — Shared inbox configured as a normal inbox](../faq.md#3-shared-inbox-configured-as-a-normal-inbox).

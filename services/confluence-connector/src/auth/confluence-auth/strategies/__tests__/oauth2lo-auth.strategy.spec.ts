@@ -73,7 +73,7 @@ describe('OAuth2LoAuthStrategy', () => {
       mockTokenResponse(200, successBody);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
-      await strategy.acquireToken();
+      await strategy.getAuthorizationHeader();
 
       expect(mockRequest).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
@@ -90,24 +90,24 @@ describe('OAuth2LoAuthStrategy', () => {
       });
     });
 
-    it('returns access token for cloud', async () => {
+    it('returns a Bearer authorization header for cloud', async () => {
       mockTokenResponse(200, successBody);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
-      const token = await strategy.acquireToken();
+      const header = await strategy.getAuthorizationHeader();
 
-      expect(token).toBe('returned-access-token');
+      expect(header).toBe('Bearer returned-access-token');
     });
 
     it('caches token across sequential calls', async () => {
       mockTokenResponse(200, successBody);
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      const tokenA = await strategy.acquireToken();
-      const tokenB = await strategy.acquireToken();
+      const headerA = await strategy.getAuthorizationHeader();
+      const headerB = await strategy.getAuthorizationHeader();
 
-      expect(tokenA).toBe('returned-access-token');
-      expect(tokenB).toBe('returned-access-token');
+      expect(headerA).toBe('Bearer returned-access-token');
+      expect(headerB).toBe('Bearer returned-access-token');
       expect(mockRequest).toHaveBeenCalledOnce();
     });
 
@@ -115,13 +115,13 @@ describe('OAuth2LoAuthStrategy', () => {
       mockTokenResponse(200, successBody);
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      const [tokenA, tokenB] = await Promise.all([
-        strategy.acquireToken(),
-        strategy.acquireToken(),
+      const [headerA, headerB] = await Promise.all([
+        strategy.getAuthorizationHeader(),
+        strategy.getAuthorizationHeader(),
       ]);
 
-      expect(tokenA).toBe('returned-access-token');
-      expect(tokenB).toBe('returned-access-token');
+      expect(headerA).toBe('Bearer returned-access-token');
+      expect(headerB).toBe('Bearer returned-access-token');
       expect(mockRequest).toHaveBeenCalledOnce();
     });
 
@@ -129,7 +129,7 @@ describe('OAuth2LoAuthStrategy', () => {
       mockTokenResponse(200, successBody);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
-      await strategy.acquireToken();
+      await strategy.getAuthorizationHeader();
 
       expect(mockLogger.log).toHaveBeenCalledWith({
         msg: 'Acquiring Confluence cloud token via OAuth 2.0 2LO',
@@ -143,7 +143,7 @@ describe('OAuth2LoAuthStrategy', () => {
       mockTokenResponse(200, successBody);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection);
-      await strategy.acquireToken();
+      await strategy.getAuthorizationHeader();
 
       expect(mockRequest).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
@@ -159,13 +159,13 @@ describe('OAuth2LoAuthStrategy', () => {
       expect(params.get('scope')).toBe('READ');
     });
 
-    it('returns access token for DC', async () => {
+    it('returns a Bearer authorization header for DC', async () => {
       mockTokenResponse(200, successBody);
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection);
-      const token = await strategy.acquireToken();
+      const header = await strategy.getAuthorizationHeader();
 
-      expect(token).toBe('returned-access-token');
+      expect(header).toBe('Bearer returned-access-token');
     });
   });
 
@@ -175,7 +175,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      await expect(strategy.acquireToken()).rejects.toThrow();
+      await expect(strategy.getAuthorizationHeader()).rejects.toThrow();
 
       expect(mockLogger.error).toHaveBeenCalledOnce();
       // biome-ignore lint/style/noNonNullAssertion: Asserted above with toHaveBeenCalledOnce
@@ -192,7 +192,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(networkError);
+      await expect(strategy.getAuthorizationHeader()).rejects.toThrow(networkError);
     });
 
     it('throws on HTTP 401 indicating invalid credentials', async () => {
@@ -200,7 +200,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(
+      await expect(strategy.getAuthorizationHeader()).rejects.toThrow(
         'Error response from https://api.atlassian.com/oauth/token: 401 Unauthorized',
       );
     });
@@ -210,7 +210,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, dcConnection);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(
+      await expect(strategy.getAuthorizationHeader()).rejects.toThrow(
         'Error response from https://confluence.corp.example.com/rest/oauth2/latest/token: 403 Forbidden',
       );
     });
@@ -220,7 +220,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(
+      await expect(strategy.getAuthorizationHeader()).rejects.toThrow(
         'Error response from https://api.atlassian.com/oauth/token: 500 Internal Server Error',
       );
     });
@@ -236,7 +236,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(
+      await expect(strategy.getAuthorizationHeader()).rejects.toThrow(
         'Error response from https://api.atlassian.com/oauth/token: 500 No response body',
       );
     });
@@ -246,7 +246,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(/access_token/);
+      await expect(strategy.getAuthorizationHeader()).rejects.toThrow(/access_token/);
     });
 
     it('throws ZodError on malformed response missing expires_in', async () => {
@@ -254,7 +254,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(/expires_in/);
+      await expect(strategy.getAuthorizationHeader()).rejects.toThrow(/expires_in/);
     });
 
     it('throws ZodError on malformed response missing both fields', async () => {
@@ -262,7 +262,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      await expect(strategy.acquireToken()).rejects.toThrow(/access_token/);
+      await expect(strategy.getAuthorizationHeader()).rejects.toThrow(/access_token/);
     });
 
     it('throws on non-JSON response body', async () => {
@@ -276,7 +276,7 @@ describe('OAuth2LoAuthStrategy', () => {
 
       const strategy = new OAuth2LoAuthStrategy(authConfig, cloudConnection);
 
-      await expect(strategy.acquireToken()).rejects.toThrow('invalid json');
+      await expect(strategy.getAuthorizationHeader()).rejects.toThrow('invalid json');
     });
   });
 });

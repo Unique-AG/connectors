@@ -229,6 +229,17 @@ export const MsGraphKqlQuerySchema = z.object({
         '  from:hr@acme.com OR from:payroll@acme.com subject:salary\n' +
         '  participants:alice@example.com kind:meetings received>=2024-01-01',
     ),
+  directories: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Folder names or IDs to restrict this query to. ' +
+        'Pass well-known names directly: "Inbox", "Sent Items", "Drafts", "Archive", "Outbox", "Clutter", "Conversation History". ' +
+        'Note: "Deleted Items", "Junk Email", and "Recoverable Items Deletions" are not synchronized and will not return results. ' +
+        'For custom folders pass the folder ID from `list_mailboxes_and_directories`. ' +
+        'NEVER encode folder filtering inside the kqlQuery string — `folder:` is not a supported KQL property and is silently stripped. ' +
+        'Use this field instead.',
+    ),
   limit: z
     .number()
     .int()

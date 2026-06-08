@@ -282,20 +282,39 @@ Retrieve the full content of an email by its ID returned from `search_emails`.
 
 Create a draft email in the connected Outlook mailbox. The draft is saved to the Drafts folder but **not sent** — the user must open it in Outlook and send manually.
 
-**Input parameters:**
+Supports two modes selected by `recipientsData.type`:
+
+- **`"draft"`** — fresh draft with explicit recipients (personal or shared mailbox)
+- **`"reply"`** — reply-all draft for an existing email; Graph pre-fills all original recipients (personal or shared mailbox)
+
+**Common input parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
+| `content` | string | Yes | Email body in Markdown. Paragraphs, bold, italic, lists, links, blockquotes, and inline code are supported. Raw HTML is escaped, not rendered. |
+| `mailbox` | string (UPN) | No | Shared mailbox to create the draft in (e.g. `"support@company.com"`). Omit to use the signed-in user's own mailbox. |
+| `attachments` | array | No | Files to attach |
+| `attachments[].fileName` | string | Yes | File name including extension (e.g. `"report.pdf"`) |
+| `attachments[].data` | string | Yes | File content URI. Two schemes supported (see below) |
+| `recipientsData` | object | Yes | Discriminated union — see below |
+
+**`recipientsData` — fresh draft (`type: "draft"`):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `"draft"` | Yes | |
 | `subject` | string | Yes | Subject line |
-| `content` | string | Yes | Email body. Must match the format declared in `contentType` |
-| `contentType` | `"html"` \| `"text"` | Yes | Body format — `"html"` for rich HTML, `"text"` for plain text |
 | `toRecipients` | array | Yes | Primary recipients |
 | `toRecipients[].email` | string (email) | Yes | Recipient email address |
 | `toRecipients[].name` | string | No | Recipient display name |
 | `ccRecipients` | array | No | CC recipients (same shape as `toRecipients`) |
-| `attachments` | array | No | Files to attach |
-| `attachments[].fileName` | string | Yes | File name including extension (e.g. `"report.pdf"`) |
-| `attachments[].data` | string | Yes | File content URI. Two schemes supported (see below) |
+
+**`recipientsData` — reply-all draft (`type: "reply"`):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `"reply"` | Yes | |
+| `inReplyToMessageId` | string | Yes | `msGraphMessageId` from `search_emails` or `open_email`. Graph pre-fills all original recipients — do not pass `toRecipients` or `ccRecipients`. |
 
 **Attachment data URI schemes:**
 
@@ -313,8 +332,8 @@ Create a draft email in the connected Outlook mailbox. The draft is saved to the
 {
   success: boolean;
   message: string;
-  draftId?: string;             // Microsoft message ID
-  webLink?: string;             // link to open draft in Outlook
+  draftId?: string;             // Microsoft message ID (present when success is true)
+  webLink?: string;             // link to open draft in Outlook (present when success is true and Graph returned one)
   attachmentsFailed?: Array<{
     fileName: string;
     reason: string;
@@ -327,6 +346,7 @@ Create a draft email in the connected Outlook mailbox. The draft is saved to the
 - Use `lookup_contacts` to resolve recipient email addresses before calling this tool.
 - If attachments partially fail, the draft is still created and `draftId` is returned alongside the `attachmentsFailed` list.
 - The `webLink` in the response opens the draft directly in Outlook Web.
+- For shared mailbox reply drafts: in Outlook Web the reply appears in the **Drafts** folder rather than inline in the thread — this is expected Outlook Web behaviour. The draft sends correctly regardless. In Outlook desktop the reply appears and sends normally.
 
 ---
 

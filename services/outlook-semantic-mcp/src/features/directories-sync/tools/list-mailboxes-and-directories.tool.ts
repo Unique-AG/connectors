@@ -4,15 +4,25 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import {
-  ListMailboxesAndDirectoriesQuery,
-  type UserDirectory,
-  type UserMailbox,
-} from '../list-mailboxes-and-directories.query';
+import { ListMailboxesAndDirectoriesQuery } from '../../delegated-access/queries/list-mailboxes-and-directories.query';
 import { SyncDirectoriesCommand } from '../sync-directories.command';
 import { META } from './list-mailboxes-and-directories-tool.meta';
 
 const InputSchema = z.object({});
+
+export interface UserDirectory {
+  id: string;
+  displayName: string;
+  canReadContent: boolean;
+  children: UserDirectory[];
+}
+
+export interface UserMailbox {
+  email: string | null;
+  displayName: string | null;
+  isOwn: boolean;
+  folders: UserDirectory[];
+}
 
 const UserDirectorySchema: z.ZodType<UserDirectory> = z.lazy(() =>
   z.object({
@@ -104,7 +114,7 @@ export class ListMailboxesAndDirectoriesTool {
     return {
       success: true,
       message: 'Directories available',
-      mailboxes,
+      mailboxes: mailboxes.map((item) => UserMailboxSchema.parse(item)),
     };
   }
 }

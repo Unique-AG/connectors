@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.2.16](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.15...teams-mcp@0.2.16) (2026-06-05)
+
+
+### Bug Fixes
+
+* **teams-mcp:** send Content-Length on storage upload to avoid chunked rejection ([#614](https://github.com/Unique-AG/connectors/issues/614)) ([b6ce58b](https://github.com/Unique-AG/connectors/commit/b6ce58b1c7c4c61670b9efca3a381d5e5c3b8943))
+
+## [0.2.15](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.14...teams-mcp@0.2.15) (2026-06-05)
+
+
+### Bug Fixes
+
+* **teams-mcp:** route internal content upload through ingestion service ([#608](https://github.com/Unique-AG/connectors/issues/608)) ([f9db6d2](https://github.com/Unique-AG/connectors/commit/f9db6d23fd70458fab6af45501e1853baa0e675d))
+
+## [0.2.14](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.13...teams-mcp@0.2.14) (2026-06-04)
+
+
+### Bug Fixes
+
+* **teams-mcp:** parse folder update response as folder-info ([#602](https://github.com/Unique-AG/connectors/issues/602)) ([7b96320](https://github.com/Unique-AG/connectors/commit/7b96320b56274d9e73f1a8c317e5295985e437dd))
+
+## [0.2.13](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.12...teams-mcp@0.2.13) (2026-06-03)
+
+
+### Features
+
+* **teams-mcp:** add ingest_meeting tool for on-demand transcript ingestion ([#594](https://github.com/Unique-AG/connectors/issues/594)) ([105e01c](https://github.com/Unique-AG/connectors/commit/105e01c9e850eb3bc0cb4a1e8d8ae45ab59bca84))
+* **teams-mcp:** tag Teams content with shared source + lock scopes via externalId [UN-20155] ([#592](https://github.com/Unique-AG/connectors/issues/592)) ([1cc0cda](https://github.com/Unique-AG/connectors/commit/1cc0cda55700a9b6dae1a9eb4a370efc5b11cb9b))
+
+## [0.2.12](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.11...teams-mcp@0.2.12) (2026-06-01)
+
+
+### Features
+
+* **charts,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** add admin consent redirect uris ([#577](https://github.com/Unique-AG/connectors/issues/577)) ([3e36a6d](https://github.com/Unique-AG/connectors/commit/3e36a6deea5e620b6e5316a7f3df0dd4fd5c74b3))
+
+
+### Bug Fixes
+
+* **teams-mcp:** remove inline networkPolicy chart defaults ([#581](https://github.com/Unique-AG/connectors/issues/581)) ([fe8c617](https://github.com/Unique-AG/connectors/commit/fe8c6172312c2be603fac26aa73f44dbe23e6140))
+
 ## [0.2.11](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.10...teams-mcp@0.2.11) (2026-05-18)
 
 

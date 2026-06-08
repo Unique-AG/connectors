@@ -37,6 +37,15 @@ export const META = createMeta({
     ### What \`draft_email\` Does
     Creates a draft email in the user's Outlook mailbox. Provide subject, body content (Markdown), and at least one recipient. Optionally include CC recipients and attachments. The draft is saved and can be reviewed or sent later.
 
+    ### Shared Mailbox and Reply Drafts
+    \`draft_email\` requires a \`type\` field that selects the drafting mode:
+
+    1. **\`type: "draft"\`** — fresh draft. \`toRecipients\` is required. Optionally pass \`mailbox\` to create the draft in a shared mailbox instead of the signed-in user's own mailbox.
+
+    2. **\`type: "reply"\`** — reply-all draft. Pass \`inReplyToMessageId\` with the \`msGraphMessageId\` value from \`search_emails\` or \`outlook_email_search\` results. Graph pre-fills all original recipients — do **not** pass \`toRecipients\` or \`ccRecipients\`. If the email you are replying to came from a shared or delegated mailbox (i.e. \`sourceMailbox\` is non-null in the search result), you **must** pass that same value as \`mailbox\` — otherwise Graph will look up the message under \`/me\` and return a 404. Omit \`mailbox\` only when replying to an email from the signed-in user's own mailbox (\`sourceMailbox\` is null).
+
+    Use \`type: "reply"\` only when explicitly replying to an identified email. Use \`type: "draft"\` for all other cases.
+
     ### Body Formatting
     The \`content\` field is **Markdown**. It is converted to HTML on the server before being sent to Outlook, so use Markdown syntax for all formatting — do **not** write raw HTML tags (\`<br>\`, \`<p>\`, \`<strong>\`, etc.); they will be shown as literal text.
 
@@ -84,15 +93,15 @@ export const META = createMeta({
     The response may include an \`attachmentsFailed\` array when one or more attachments could not be added. The draft is still created in that case. Each entry has a \`fileName\` and a \`reason\`. When \`attachmentsFailed\` is non-empty, inform the user which files failed and why, for example:
     > ⚠️ The following attachments could not be added:
     > - **report.pdf**: File not found in the knowledge base.`,
-  toolFormatInformation: `## Format for Draft Emails
-  When presenting a draft email, always use the following format exactly:
-  📩 **{Subject}** [open](https://outlook.office.com/owa/?ItemID={emailId}&exvsurl=1&viewmodel=ReadMessageItem)
-  {Date formatted as "Mon DD, YYYY at HH:MM AM/PM"}
-  > {full email text}
+  toolFormatInformation: `## Format for Draft Confirmation
+  When presenting the result of a created draft, always use the following format:
+  📩 **{subject}**[ — [Open in Outlook]({webLink})]
+  {message}
+
   Rules:
-  - **Subject**: Use the email's subject line, bold.
-  - **open link**: Construct the Outlook Web link using the email's \`emailId\`.
-  - **Date**: Format the date as \`Mon DD, YYYY at HH:MM AM/PM\` (e.g., "Mar 10, 2026 at 02:35 PM").
-  - **Email text**: Render the full body of the email as a blockquote using \`>\`. Preserve line breaks and paragraph structure within the blockquote.
+  - **subject**: Use the subject from the tool input.
+  - **Open in Outlook link**: Include only when \`webLink\` is present in the tool output. Use the \`webLink\` value directly as the href — do not construct or modify it.
+  - **message**: Display the \`message\` from the tool output (e.g. "Draft email created successfully.").
+  - If \`attachmentsFailed\` is non-empty, list each failed attachment below the message.
 `,
 });

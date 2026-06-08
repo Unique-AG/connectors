@@ -203,6 +203,25 @@
                         },
                         "required": ["mode", "token"],
                         "additionalProperties": false
+                      },
+                      {
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": ["basic"],
+                            "description": "HTTP Basic username/password (Data Center only)"
+                          },
+                          "username": {
+                            "type": "string",
+                            "description": "Confluence username for Basic auth"
+                          },
+                          "password": {
+                            "type": "string",
+                            "description": "Confluence password for Basic auth. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
+                          }
+                        },
+                        "required": ["mode", "username", "password"],
+                        "additionalProperties": false
                       }
                     ]
                   },
@@ -228,7 +247,7 @@
                           "required": ["mode"],
                           "properties": {
                             "mode": {
-                              "const": "pat"
+                              "enum": ["pat", "basic"]
                             }
                           }
                         }

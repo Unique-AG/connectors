@@ -1,9 +1,11 @@
+import assert from 'node:assert';
 import { createSmeared, smearPath } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish, unique } from 'remeda';
 import {
+  type DirectoryType,
   DRIZZLE,
   type DrizzleDatabase,
   delegatedAccessAccounts,
@@ -17,19 +19,23 @@ interface DirectoryNode {
   displayName: string;
   parentId: string | null;
   providerDirectoryId: string;
+  internalType: DirectoryType;
 }
 
 export interface UserDirectory {
   id: string;
   displayName: string;
+  internalType: DirectoryType;
   canReadContent: boolean;
   children: UserDirectory[];
 }
 
 export interface UserMailbox {
-  email: string | null;
+  id: string;
+  email: string;
   displayName: string | null;
   isOwn: boolean;
+  hasFullAccess: boolean;
   folders: UserDirectory[];
 }
 
@@ -45,6 +51,7 @@ export class ListMailboxesAndDirectoriesQuery {
     const ownProfile = await this.db.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });
+    assert.ok(ownProfile, `Profile could not be found for user: ${userProfileId}`);
 
     // Fetch own directories
     const ownDirectories = await this.db.query.directories.findMany({
@@ -66,8 +73,10 @@ export class ListMailboxesAndDirectoriesQuery {
     });
 
     const ownMailbox: UserMailbox = {
-      email: ownProfile?.email ?? null,
-      displayName: ownProfile?.displayName ?? null,
+      email: `${ownProfile.email ?? ''}`,
+      displayName: ownProfile.displayName ?? null,
+      id: ownProfile.id,
+      hasFullAccess: true,
       isOwn: true,
       folders: ownTree,
     };
@@ -83,6 +92,7 @@ export class ListMailboxesAndDirectoriesQuery {
     const dirDisplayName = sql.identifier(directories.displayName.name);
     const dirParentId = sql.identifier(directories.parentId.name);
     const dirProviderDirectoryId = sql.identifier(directories.providerDirectoryId.name);
+    const dirInternalType = sql.identifier(directories.internalType.name);
     const dirUserProfileId = sql.identifier(directories.userProfileId.name);
 
     const result = await this.db.execute<DirectoryInfoRowWithReadable>(sql`
@@ -100,11 +110,11 @@ export class ListMailboxesAndDirectoriesQuery {
           AND ${delegatedAccessAccounts.hasFullDelegatedAccess} = false
       ),
       dir_tree AS (
-        SELECT ${directories.id}, ${directories.displayName}, ${directories.parentId}, ${directories.providerDirectoryId}, ${directories.userProfileId}
+        SELECT ${directories.id}, ${directories.displayName}, ${directories.parentId}, ${directories.providerDirectoryId}, ${directories.internalType}, ${directories.userProfileId}
         FROM ${directories}
         WHERE ${directories.id} IN (SELECT dir_id FROM readable_seed)
         UNION
-        SELECT ${directories.id}, ${directories.displayName}, ${directories.parentId}, ${directories.providerDirectoryId}, ${directories.userProfileId}
+        SELECT ${directories.id}, ${directories.displayName}, ${directories.parentId}, ${directories.providerDirectoryId}, ${directories.internalType}, ${directories.userProfileId}
         FROM ${directories}
         INNER JOIN dir_tree ON dir_tree.${dirParentId} = ${directories.id}
       )
@@ -116,6 +126,7 @@ export class ListMailboxesAndDirectoriesQuery {
         dir_tree.${dirDisplayName}        AS ${sql.identifier('dirDisplayName')},
         dir_tree.${dirParentId}           AS ${sql.identifier('dirParentId')},
         dir_tree.${dirProviderDirectoryId} AS ${sql.identifier('dirProviderDirectoryId')},
+        dir_tree.${dirInternalType}       AS ${sql.identifier('dirInternalType')},
         EXISTS (
           SELECT 1 FROM readable_seed WHERE readable_seed.dir_id = dir_tree.${dirId}
         ) AS ${sql.identifier('isReadable')}
@@ -125,6 +136,7 @@ export class ListMailboxesAndDirectoriesQuery {
 
     return this.mapDirectoriesInfoToMailboses({
       directorisInfo: result.rows,
+      hasFullAccess: false,
       readableProviderDirectoryIds: new Set(
         result.rows.filter((r) => r.isReadable).map((r) => r.dirProviderDirectoryId),
       ),
@@ -142,6 +154,7 @@ export class ListMailboxesAndDirectoriesQuery {
         dirDisplayName: directories.displayName,
         dirParentId: directories.parentId,
         dirProviderDirectoryId: directories.providerDirectoryId,
+        dirInternalType: directories.internalType,
       })
       .from(delegatedAccessAccounts)
       .innerJoin(userProfiles, eq(userProfiles.id, delegatedAccessAccounts.ownerUserId))
@@ -161,6 +174,7 @@ export class ListMailboxesAndDirectoriesQuery {
 
     return this.mapDirectoriesInfoToMailboses({
       directorisInfo: fullAccessRows,
+      hasFullAccess: true,
       readableProviderDirectoryIds: new Set(
         fullAccessRows.map((item) => item.dirProviderDirectoryId),
       ),
@@ -170,7 +184,9 @@ export class ListMailboxesAndDirectoriesQuery {
   private mapDirectoriesInfoToMailboses({
     directorisInfo,
     readableProviderDirectoryIds,
+    hasFullAccess,
   }: {
+    hasFullAccess: boolean;
     readableProviderDirectoryIds: Set<string>;
     directorisInfo: DirectoryInfoRow[];
   }): UserMailbox[] {
@@ -194,16 +210,19 @@ export class ListMailboxesAndDirectoriesQuery {
         displayName: row.dirDisplayName,
         parentId: row.dirParentId,
         providerDirectoryId: row.dirProviderDirectoryId,
+        internalType: row.dirInternalType,
       });
     }
     const mailboses: UserMailbox[] = [];
-    for (const [, ownerInfo] of ownerDirs) {
+    for (const [ownerId, ownerInfo] of ownerDirs) {
       const { directoryTree } = this.buildTree({
         allDirectories: ownerInfo.dirs,
         isReadable: (item) => readableProviderDirectoryIds.has(item.providerDirectoryId),
       });
       mailboses.push({
-        email: ownerInfo.email,
+        id: ownerId,
+        hasFullAccess,
+        email: `${ownerInfo.email ?? ''}`,
         displayName: ownerInfo.displayName,
         isOwn: false,
         folders: directoryTree,
@@ -245,6 +264,7 @@ export class ListMailboxesAndDirectoriesQuery {
         return {
           id: element.providerDirectoryId,
           displayName: element.displayName,
+          internalType: element.internalType,
           canReadContent: isReadable(element),
           children: buildTreeRecursive(element.id, [...currentPath]),
         };
@@ -272,4 +292,5 @@ interface DirectoryInfoRow {
   dirDisplayName: string;
   dirParentId: string | null;
   dirProviderDirectoryId: string;
+  dirInternalType: DirectoryType;
 }

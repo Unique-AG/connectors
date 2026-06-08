@@ -1,0 +1,4 @@
+{
+  "subject": "Currency Hedging Strategy Update",
+  "body": "Treasury Team,\n\nGiven the recent EUR/USD volatility, I'm recommending we adjust our hedging strategy:\n\nCurrent exposure:\n- EUR receivables: €4.2M (next 6 months)\n- GBP receivables: £1.8M (next 6 months)\n- CHF payables: CHF 2.1M (next 6 months)\n\nProposed hedging:\n- Lock in 75% of EUR exposure via forward contracts at current spot (1.0845)\n- Use collar options for GBP (floor 1.26, cap 1.31) to maintain upside\n- Natural hedge CHF payables against EUR receivables where possible\n\nEstimated hedging cost: $85K\nPotential downside protection: $420K\n\nThe ECB's rate decision next week could move EUR significantly. I suggest we execute the EUR forwards before Wednesday.\n\nLet me know if you approve."
+}

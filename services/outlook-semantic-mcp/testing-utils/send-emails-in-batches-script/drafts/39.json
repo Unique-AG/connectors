@@ -1,0 +1,4 @@
+{
+  "subject": "Wire Transfer Authorization - Vendor Payment",
+  "body": "Treasury Team,\n\nPlease process the following wire transfers. All have been approved per our dual-authorization policy:\n\n1. AWS Inc.\n   Amount: $198,450.00\n   Account: Chase ***4521\n   Reference: INV-2026-Q1-AWS\n   Due date: March 25, 2026\n\n2. Zurich Engineering GmbH (subsidiary payroll funding)\n   Amount: EUR 285,000.00\n   Account: UBS ***7832\n   Reference: PAYROLL-ZH-MAR2026\n   Due date: March 28, 2026\n\n3. Morrison & Associates LLP (legal fees)\n   Amount: $45,000.00\n   Account: Wells Fargo ***9103\n   Reference: LEGAL-FEB2026\n   Due date: March 22, 2026\n\nTotal USD equivalent: ~$553,450\n\nBank balance after transfers: ~$8.15M\nAll supporting invoices and approvals are in the shared drive under /Finance/AP/March2026/\n\nPlease confirm execution with wire confirmation numbers."
+}

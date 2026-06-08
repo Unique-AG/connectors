@@ -9,16 +9,19 @@ import { markdownToHtml } from './markdown-to-html';
 
 const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string().optional() });
 
-export interface CreateDraftEmailInput {
-  subject: string;
+interface CreateDraftEmailInput {
   content: string;
-  toRecipients: Array<{ name?: string; email: string }>;
-  ccRecipients?: Array<{ name?: string; email: string }>;
-  attachments?: {
-    fileName: string;
-    data: string;
-  }[];
+  attachments?: { fileName: string; data: string }[];
   chatId: string | null | undefined;
+  mailbox?: string;
+  recipientsData:
+    | {
+        type: 'draft';
+        subject: string;
+        toRecipients: Array<{ name?: string; email: string }>;
+        ccRecipients?: Array<{ name?: string; email: string }>;
+      }
+    | { type: 'reply'; inReplyToMessageId: string };
 }
 
 export type CreateDraftEmailResult =
@@ -60,6 +63,7 @@ export class CreateDraftEmailCommand {
       draftId: createDraftResult.draftId,
       attachments,
       chatId: input.chatId,
+      mailbox: input.mailbox,
     });
 
     if (!attachmentResult.attachmentsFailed.length) {
@@ -79,35 +83,51 @@ export class CreateDraftEmailCommand {
   ): Promise<CreateDraftEmailResult> {
     const userProfileIdString = userProfileId.toString();
 
-    const body: Record<string, unknown> = {
-      subject: input.subject,
+    const prefix = input.mailbox ? `/users/${input.mailbox}` : '/me';
+
+    const sharedBodyFields = {
       body: {
         contentType: 'HTML',
         content: markdownToHtml(input.content),
       },
-      toRecipients: input.toRecipients.map((r) => ({
-        emailAddress: { name: r.name, address: r.email },
-      })),
     };
 
-    if (input.ccRecipients && input.ccRecipients.length > 0) {
-      body.ccRecipients = input.ccRecipients.map((r) => ({
-        emailAddress: { name: r.name, address: r.email },
-      }));
-    }
-
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
+    const recipientsData = input.recipientsData;
+
+    const apiParams =
+      recipientsData.type === 'reply'
+        ? {
+            apiPath: `${prefix}/messages/${recipientsData.inReplyToMessageId}/createReplyAll`,
+            body: { message: sharedBodyFields },
+            successMessage: 'Reply-all draft created successfully.',
+          }
+        : {
+            apiPath: `${prefix}/messages`,
+            body: {
+              ...sharedBodyFields,
+              subject: recipientsData.subject,
+              toRecipients: recipientsData.toRecipients.map((item) => ({
+                emailAddress: { address: item.email, ...(item.name && { name: item.name }) },
+              })),
+              ccRecipients:
+                recipientsData.ccRecipients?.map((item) => ({
+                  emailAddress: { address: item.email, ...(item.name && { name: item.name }) },
+                })) ?? [],
+            },
+            successMessage: 'Draft email created successfully.',
+          };
 
     try {
       const message = CreateMessageResponseSchema.parse(
-        await client.api('/me/messages').post(body),
+        await client.api(apiParams.apiPath).post(apiParams.body),
       );
 
       return {
         success: true,
         draftId: message.id,
         ...(message.webLink && { webLink: message.webLink }),
-        message: 'Draft email created successfully.',
+        message: apiParams.successMessage,
       };
     } catch (err) {
       this.logger.error({

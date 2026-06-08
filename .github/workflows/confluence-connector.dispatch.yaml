@@ -2,6 +2,8 @@ name: "[confluence-connector] Manual Release Re-Run"
 
 permissions:
   contents: read
+  packages: write
+  id-token: write
 
 on:
   workflow_dispatch:

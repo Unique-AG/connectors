@@ -141,8 +141,8 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     downloadPath: string,
   ): Promise<Readable> {
     const url = `${this.config.baseUrl}${downloadPath}`;
-    const token = await this.confluenceAuth.acquireToken();
-    return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
+    const authorization = await this.confluenceAuth.getAuthorizationHeader();
+    return this.httpClient.rateLimitedStreamRequest(url, { Authorization: authorization });
   }
 
   // Data Center does not have a v2 REST API, so we follow the v1 _links.next
@@ -171,7 +171,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
   }
 
   protected async makeAuthenticatedRequest(url: string): Promise<unknown> {
-    const token = await this.confluenceAuth.acquireToken();
-    return this.httpClient.rateLimitedRequest(url, { Authorization: `Bearer ${token}` });
+    const authorization = await this.confluenceAuth.getAuthorizationHeader();
+    return this.httpClient.rateLimitedRequest(url, { Authorization: authorization });
   }
 }
