@@ -11,7 +11,7 @@ For end-user and administrator documentation, see the [Outlook Semantic MCP Over
 
 ## Architecture
 
-The diagram below shows the full **Mode A** (`MicrosoftGraphAndUniqueApi`) topology. In Mode B (`MicrosoftGraph`), all infrastructure components are identical — the Unique Knowledge Base is still required in both modes (for scope management and search), but the ingestion arrows are inactive and no email content is written to it.
+The diagram below shows the full **Mode A** (`MicrosoftGraphAndUniqueApi`) topology. In Mode B (`MicrosoftGraph`), all infrastructure components are identical — the Unique Knowledge Base is still required in both modes (for scope management and to attach email attachments to outgoing emails), but the ingestion arrows are inactive and no email content is written to it.
 
 ```mermaid
 flowchart LR
@@ -89,9 +89,8 @@ Follow these steps to go from zero to a running deployment:
 8. **Verify** the deployment is working:
    1. Check the OAuth metadata endpoint: `curl https://<your-domain>/.well-known/oauth-authorization-server`
    2. Connect with an MCP client and complete the OAuth flow
-   3. *(Mode A only)* Call `verify_inbox_connection` to confirm the webhook subscription is `active`
-   4. *(Mode A only)* Send a test email to the connected account, wait a moment, then use `search_emails` to confirm it appears
-   5. *(Mode B only)* Call `search_emails` with a simple KQL query to confirm it returns results from Microsoft Graph
+   3. *(Mode A only)* Call `verify_inbox_connection` to confirm the webhook subscription is `active`, draft a test email to the connected account, wait a moment, then use `search_emails` to confirm it appears
+   5. *(Mode B only)* Draft a test email to the connected account, call `search_emails` with a simple KQL query to confirm it returns results from Microsoft Graph
 9. **(Optional) Enable delegated access** — If your organization uses Exchange mailbox delegation (Full Access or folder-level), set `delegatedAccessScan` to `fullAccessOnly` or `granularAccess` in your Helm values. Both users (delegate and owner) must connect their accounts for delegated search to work. See [Configuration — DELEGATED_ACCESS_SCAN](./configuration.md#DELEGATED_ACCESS_SCAN).
 
 ## Scaling Considerations
