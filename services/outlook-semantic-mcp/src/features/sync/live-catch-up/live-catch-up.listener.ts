@@ -43,7 +43,7 @@ export class LiveCatchUpListener {
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.live-catch-up.execute': {
         await this.updateLastNotificationReceivedAt(
-          event.payload.subscriptionId,
+          event.payload.subscriptionId ?? null,
           event.payload.notificationReceivedAt,
         );
         await this.liveCatchUpCommand.run({
@@ -66,10 +66,10 @@ export class LiveCatchUpListener {
   }
 
   private async updateLastNotificationReceivedAt(
-    subscriptionId: string,
+    subscriptionId: string | null,
     notificationReceivedAt: Nullish<string>,
   ): Promise<void> {
-    if (!notificationReceivedAt) {
+    if (!subscriptionId || !notificationReceivedAt) {
       return;
     }
     const notificationTime = new Date(notificationReceivedAt);

@@ -44,6 +44,7 @@ export class ExecuteInboxDeletionCommand {
       userProfileId,
       providerUserId: userProfile.providerUserId,
       userEmail: createSmeared(userProfile.email ?? '').toString(),
+      source: userProfile.source,
     });
 
     const decision = await this.acquireLockAndDecide(userProfileId);
@@ -63,18 +64,33 @@ export class ExecuteInboxDeletionCommand {
 
     await this.db.delete(directoriesSync).where(eq(directoriesSync.userProfileId, userProfile.id));
     await this.updateDeletingHeartbeatAt(userProfile.id);
-    this.logger.warn({ userProfileId, msg: 'Directories Sync deleted' });
+    this.logger.warn({ ...logContext, msg: 'Directories Sync deleted' });
 
     await this.db.delete(directories).where(eq(directories.userProfileId, userProfileId));
     await this.updateDeletingHeartbeatAt(userProfile.id);
-    this.logger.warn({ userProfileId, msg: 'Directories deleted' });
+    this.logger.warn({ ...logContext, msg: 'Directories deleted' });
 
-    await this.db
-      .delete(inboxConfigurations)
-      .where(eq(inboxConfigurations.userProfileId, userProfileId));
-    this.logger.warn({ userProfileId, msg: 'InboxConfiguration deleted' });
+    if (userProfile.source === 'shared-mailbox') {
+      // We delete the user profile only for shared-mailboxes because the delete command is accessible
+      // via a tool call, the user will call the tool, and after that he could call reconnect inbox, if
+      // we delete the user profile he will not be authenticated anymore and the Mcp will be in a weird
+      // state.
+      await this.db.delete(userProfiles).where(eq(userProfiles.id, userProfile.id));
+      this.logger.warn({
+        ...logContext,
+        msg: 'Deleted user profile and InboxConfiguration for shared-mailbox',
+      });
+    } else {
+      await this.db
+        .delete(inboxConfigurations)
+        .where(eq(inboxConfigurations.userProfileId, userProfileId));
+      this.logger.warn({
+        ...logContext,
+        msg: 'InboxConfiguration deleted',
+      });
+    }
 
-    this.logger.warn({ userProfileId, msg: 'Inbox deletion finished' });
+    this.logger.warn({ ...logContext, msg: 'Inbox deletion finished' });
   }
 
   private async acquireLockAndDecide(
