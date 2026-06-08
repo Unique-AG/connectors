@@ -12,7 +12,7 @@ const INGESTION_UNIQUEAPI = {
 } as any;
 const INGESTION_GRAPH = { mcpBackend: 'microsoft_graph', connectivityTimeoutMs: 3000 } as any;
 const DELEGATED_ENABLED = {
-  scan: 'fullAccessOnly',
+  scan: 'full_access_only',
   stalenessThresholdHours: 24,
   failureThreshold: 0.15,
 } as any;

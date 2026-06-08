@@ -126,7 +126,7 @@ function createCommand({
     new TestReadAccessFromGraphEndpointQuery(),
     new ReadOwnerMailboxFoldersFromMsGraphQuery(),
     db as any,
-    { scan: 'granularAccess' } as any,
+    { scan: 'granular_access' } as any,
     { measureSyncRun: (fn: () => Promise<unknown>) => fn() } as any,
   );
 }
