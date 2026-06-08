@@ -7,7 +7,7 @@ This page describes user-facing features of the Outlook Semantic MCP Server: wha
 
 ### Deployment modes
 
-The MCP server operates in two modes controlled by the [`MCP_BACKEND`](../operator/configuration.md#MCP_BACKEND) environment variable. Several features behave differently depending on which mode is active:
+The MCP server operates in two modes controlled by the [`MCP_BACKEND`](../operator/configuration.md#Deployment-Modes) environment variable. Several features behave differently depending on which mode is active:
 
 | Mode | `MCP_BACKEND` value | How it works |
 |------|---------------------|--------------|

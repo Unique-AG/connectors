@@ -88,7 +88,7 @@
 - 10 MCP tools available in their AI client immediately after connection (14 with debug mode enabled)
 - Search results that may be incomplete while the initial full sync is running (a `syncWarning` is returned by `search_emails`)
 
-The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `MicrosoftGraphAndUniqueApi` mode, it ingests emails into the Unique knowledge base and exposes 10 tools. In `MicrosoftGraph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 6 tools. See [Operator Configuration](./operator/configuration.md#MCP_BACKEND).
+The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `MicrosoftGraphAndUniqueApi` mode, it ingests emails into the Unique knowledge base and exposes 10 tools. In `MicrosoftGraph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 6 tools. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
 
 **See also:** [Architecture](./technical/architecture.md) — [Tools](./technical/tools.md)
 

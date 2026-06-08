@@ -40,9 +40,9 @@ The Outlook Semantic MCP Server runs as a **single pod** that handles MCP tool r
 
 ### Unique SaaS
 
-After [granting admin consent](./authentication.md#unique-saas), provide the following to Unique Support or Solution Engineering:
+After [granting admin consent](https://login.microsoftonline.com/organizations/adminconsent?client_id=ba326974-edcf-49ef-bf7a-74b3e0ea450a) (see [Authentication](./authentication.md#unique-saas) for why this is needed), provide the following to Unique Support or Solution Engineering:
 
-- [ ] **Backend mode** — controls how email search works; see [`MCP_BACKEND`](./configuration.md#MCP_BACKEND) for the full trade-offs:
+- [ ] **Backend mode** — controls how email search works; see [Deployment Modes](./configuration.md#Deployment-Modes) for the full trade-offs:
   - `MicrosoftGraph` — live KQL search directly against Microsoft Graph; no email ingestion into Unique KB; lighter deployment
   - `MicrosoftGraphAndUniqueApi` *(default)* — emails ingested into Unique KB; semantic search merged with live KQL results; heavier but richer
 
