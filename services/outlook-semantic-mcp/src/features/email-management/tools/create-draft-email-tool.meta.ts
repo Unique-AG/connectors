@@ -44,7 +44,54 @@ export const META = createMeta({
 
     2. **\`type: "reply"\`** — reply-all draft. Pass \`inReplyToMessageId\` with the \`msGraphMessageId\` value from \`search_emails\` or \`outlook_email_search\` results. Graph pre-fills all original recipients — do **not** pass \`toRecipients\` or \`ccRecipients\`. If the email you are replying to came from a shared or delegated mailbox (i.e. \`sourceMailbox\` is non-null in the search result), you **must** pass that same value as \`mailbox\` — otherwise Graph will look up the message under \`/me\` and return a 404. Omit \`mailbox\` only when replying to an email from the signed-in user's own mailbox (\`sourceMailbox\` is null).
 
-    Use \`type: "reply"\` only when explicitly replying to an identified email. Use \`type: "draft"\` for all other cases.
+    ### Replying to a Received Email (Most Common Use Case)
+    **Replying to an email the user just read or retrieved is the most frequent reason to call \`draft_email\`.** Recognise these natural language patterns as reply intent — even without the word "reply":
+    - "Reply to this email"
+    - "Draft a reply to [person]'s email"
+    - "Respond to this" / "Respond to [person]"
+    - "Get back to [person] about this"
+    - "Answer this email" / "Answer [person]"
+    - "Write back to them"
+
+    Note: "Tell [person] that…" and "Let [person] know that…" are **not** automatically reply triggers — the named person may differ from the sender. Treat them as reply intent only when the named person is clearly the sender of the retrieved email; otherwise draft a new email to that person.
+
+    When reply intent is detected and an email was recently retrieved:
+    1. **Do not ask for the recipient or subject.** Use \`type: "reply"\` and pass the \`msGraphMessageId\` of the retrieved email as \`inReplyToMessageId\` — Graph pre-fills all recipients and subject automatically.
+    2. **Draft and call \`draft_email\` immediately.** The user should not have to re-specify the recipient, subject, or thread context.
+
+    Failure to use \`type: "reply"\` with the retrieved email's \`msGraphMessageId\` is the most common mistake — avoid it.
+
+    #### Examples — when to use type: "reply"
+
+    Context: conversation contains an email with msGraphMessageId="AAMk123", from nick@example.com, subject "Payroll System Migration Plan"
+    User: "Draft a reply to this email, tell him we need to reduce ADP cost to 76k max"
+    Action: type="reply", inReplyToMessageId="AAMk123", body addresses the cost constraint (Graph fills recipient and subject)
+
+    Context: conversation contains an email with msGraphMessageId="AAMk456", from sarah@acme.com, subject "Re: Q2 Budget Review"
+    User: "Respond to this — confirm the meeting is on Thursday"
+    Action: type="reply", inReplyToMessageId="AAMk456", body confirms the meeting (Graph fills recipient and subject as-is, no duplicate "Re:")
+
+    Context: conversation contains an email with msGraphMessageId="AAMk789", from investor@fund.com, subject "Due Diligence Update"
+    User: "Get back to them — say we'll have the documents ready by Friday"
+    Action: type="reply", inReplyToMessageId="AAMk789", body states Friday deadline
+
+    Context: conversation contains an email with msGraphMessageId="AAMk321", from alex@partner.com, subject "Integration Timeline"
+    User: "Respond to this and ask for more details about the timeline"
+    Action: type="reply", inReplyToMessageId="AAMk321", body requests timeline details
+
+    #### Examples — when to use type: "draft" (new email, no prior email in context)
+
+    Context: no prior email in conversation
+    User: "Write an email to john@example.com about the upcoming product launch"
+    Action: type="draft", toRecipients=[john@example.com], subject inferred from content
+
+    Context: no prior email in conversation
+    User: "Draft a message to the finance team asking for the Q1 numbers"
+    Action: type="draft", search for finance team address first, then toRecipients=[resolved address], subject inferred
+
+    Context: no prior email in conversation
+    User: "Send a quick note to Maria letting her know the contract is signed"
+    Action: type="draft", search for Maria's email address first, then toRecipients=[resolved address], subject inferred
 
     ### Body Formatting
     The \`content\` field is **Markdown**. It is converted to HTML on the server before being sent to Outlook, so use Markdown syntax for all formatting — do **not** write raw HTML tags (\`<br>\`, \`<p>\`, \`<strong>\`, etc.); they will be shown as literal text.
