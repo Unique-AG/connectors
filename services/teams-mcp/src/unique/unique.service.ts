@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
@@ -13,7 +14,7 @@ import {
   SourceOwnerType,
   UniqueIngestionMode,
 } from './unique.dtos';
-import { UniqueContentService } from './unique-content.service';
+import { type SpooledContent, UniqueContentService } from './unique-content.service';
 import { UniqueScopeService } from './unique-scope.service';
 import { UniqueUserService } from './unique-user.service';
 
@@ -151,40 +152,47 @@ export class UniqueService {
       'Beginning transcript upload to Unique system',
     );
 
-    const transcriptUpload = await this.contentService.upsertContent({
-      storeInternally: true,
-      scopeId: childScope.id,
-      sourceKind: TEAMS_SOURCE_KIND,
-      sourceName: TEAMS_SOURCE_NAME,
-      sourceOwnerType: SourceOwnerType.Company,
-      input: {
-        key: transcript.id,
-        mimeType: 'text/vtt',
-        title: meeting.subject || 'Untitled Meeting',
-        byteSize: 1,
-        metadata: this.buildContentMetadata(meeting),
-      },
-    });
+    // Download to disk BEFORE opening a content record, so a failed download never leaves a
+    // dangling, empty record behind. The temp file is removed once the upload finishes or fails.
+    const transcriptSpool = await this.contentService.spoolContent(transcript.content);
+    try {
+      const transcriptUpload = await this.contentService.upsertContent({
+        storeInternally: true,
+        scopeId: childScope.id,
+        sourceKind: TEAMS_SOURCE_KIND,
+        sourceName: TEAMS_SOURCE_NAME,
+        sourceOwnerType: SourceOwnerType.Company,
+        input: {
+          key: transcript.id,
+          mimeType: 'text/vtt',
+          title: meeting.subject || 'Untitled Meeting',
+          byteSize: 1,
+          metadata: this.buildContentMetadata(meeting),
+        },
+      });
 
-    await this.contentService.uploadToStorage(
-      transcriptUpload.writeUrl,
-      transcript.content,
-      'text/vtt',
-    );
+      await this.contentService.uploadToStorage(
+        transcriptUpload.writeUrl,
+        transcriptSpool,
+        'text/vtt',
+      );
 
-    await this.contentService.upsertContent({
-      storeInternally: true,
-      scopeId: childScope.id,
-      sourceKind: TEAMS_SOURCE_KIND,
-      sourceName: TEAMS_SOURCE_NAME,
-      sourceOwnerType: SourceOwnerType.Company,
-      fileUrl: transcriptUpload.readUrl,
-      input: {
-        key: transcript.id,
-        mimeType: 'text/vtt',
-        title: meeting.subject || 'Untitled Meeting',
-      },
-    });
+      await this.contentService.upsertContent({
+        storeInternally: true,
+        scopeId: childScope.id,
+        sourceKind: TEAMS_SOURCE_KIND,
+        sourceName: TEAMS_SOURCE_NAME,
+        sourceOwnerType: SourceOwnerType.Company,
+        fileUrl: transcriptUpload.readUrl,
+        input: {
+          key: transcript.id,
+          mimeType: 'text/vtt',
+          title: meeting.subject || 'Untitled Meeting',
+        },
+      });
+    } finally {
+      await transcriptSpool.cleanup();
+    }
 
     span?.addEvent('transcript_ingestion_completed', {
       transcriptId: transcript.id,
@@ -192,68 +200,101 @@ export class UniqueService {
       childScopeId: childScope.id,
     });
 
-    // Upload recording if provided (with SKIP_INGESTION)
-    // Wrapped in try-catch to ensure recording upload failures don't break transcript ingestion
+    // Upload recording if provided (with SKIP_INGESTION).
     if (recording) {
+      // Download the recording to disk FIRST, before opening any content record. Teams recordings
+      // live in the meeting owner's OneDrive, so a caller who isn't the owner (e.g. an invited
+      // attendee triggering on-demand ingest) gets a 403 here. Spooling first means that failure
+      // leaves no dangling, empty content record behind — we simply skip the recording and let the
+      // transcript ingestion (already done above) stand.
+      let recordingSpool: SpooledContent | undefined;
       try {
         this.logger.log(
           { recordingId: recording.id, scopeId: childScope.id },
-          'Beginning recording upload to Unique system (skip ingestion)',
+          'Downloading meeting recording before upload',
         );
-
-        const recordingUpload = await this.contentService.upsertContent({
-          storeInternally: true,
-          scopeId: childScope.id,
-          sourceKind: TEAMS_SOURCE_KIND,
-          sourceName: TEAMS_SOURCE_NAME,
-          sourceOwnerType: SourceOwnerType.Company,
-          input: {
-            key: recording.id,
-            mimeType: 'video/mp4',
-            title: meeting.subject || 'Untitled Meeting',
-            byteSize: 1,
-            ingestionConfig: {
-              uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
-            },
-            metadata: this.buildContentMetadata(meeting, recording),
-          },
-        });
-        await this.contentService.uploadToStorage(
-          recordingUpload.writeUrl,
-          recording.content,
-          'video/mp4',
-        );
-        await this.contentService.upsertContent({
-          storeInternally: true,
-          scopeId: childScope.id,
-          sourceKind: TEAMS_SOURCE_KIND,
-          sourceName: TEAMS_SOURCE_NAME,
-          sourceOwnerType: SourceOwnerType.Company,
-          fileUrl: recordingUpload.readUrl,
-          input: {
-            key: recording.id,
-            mimeType: 'video/mp4',
-            title: meeting.subject || 'Untitled Meeting',
-            ingestionConfig: {
-              uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
-            },
-          },
-        });
-
-        span?.addEvent('recording_stored', {
-          recordingId: recording.id,
-          parentScopeId: parentScope.id,
-          childScopeId: childScope.id,
-        });
+        recordingSpool = await this.contentService.spoolContent(recording.content);
       } catch (error) {
-        span?.addEvent('recording_upload_failed', {
+        const statusCode = error instanceof GraphError ? error.statusCode : undefined;
+        span?.addEvent('recording_download_failed', {
           recordingId: recording.id,
+          statusCode: statusCode ?? 'unknown',
           error: error instanceof Error ? error.message : String(error),
         });
         this.logger.warn(
-          { error, recordingId: recording.id },
-          'Failed to upload recording, transcript ingestion will continue',
+          { recordingId: recording.id, statusCode },
+          statusCode === 403
+            ? 'Recording skipped: the caller cannot access the recording file (only the meeting owner can). Transcript ingestion completed.'
+            : 'Recording download failed; skipping recording. Transcript ingestion completed.',
         );
+      }
+
+      if (recordingSpool) {
+        try {
+          this.logger.log(
+            { recordingId: recording.id, scopeId: childScope.id },
+            'Beginning recording upload to Unique system (skip ingestion)',
+          );
+
+          const recordingUpload = await this.contentService.upsertContent({
+            storeInternally: true,
+            scopeId: childScope.id,
+            sourceKind: TEAMS_SOURCE_KIND,
+            sourceName: TEAMS_SOURCE_NAME,
+            sourceOwnerType: SourceOwnerType.Company,
+            input: {
+              key: recording.id,
+              mimeType: 'video/mp4',
+              title: meeting.subject || 'Untitled Meeting',
+              byteSize: 1,
+              ingestionConfig: {
+                uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+              },
+              metadata: this.buildContentMetadata(meeting, recording),
+            },
+          });
+          await this.contentService.uploadToStorage(
+            recordingUpload.writeUrl,
+            recordingSpool,
+            'video/mp4',
+          );
+          await this.contentService.upsertContent({
+            storeInternally: true,
+            scopeId: childScope.id,
+            sourceKind: TEAMS_SOURCE_KIND,
+            sourceName: TEAMS_SOURCE_NAME,
+            sourceOwnerType: SourceOwnerType.Company,
+            fileUrl: recordingUpload.readUrl,
+            input: {
+              key: recording.id,
+              mimeType: 'video/mp4',
+              title: meeting.subject || 'Untitled Meeting',
+              ingestionConfig: {
+                uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+              },
+            },
+          });
+
+          span?.addEvent('recording_stored', {
+            recordingId: recording.id,
+            parentScopeId: parentScope.id,
+            childScopeId: childScope.id,
+          });
+        } catch (error) {
+          // The download succeeded but opening/uploading/finalizing the record failed (rare — e.g.
+          // a node-ingestion error). The empty record may linger; teams-mcp has no delete path.
+          // Don't let it break the already-completed transcript ingestion.
+          span?.addEvent('recording_upload_failed', {
+            recordingId: recording.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          this.logger.warn(
+            { error, recordingId: recording.id },
+            'Failed to upload recording after download, transcript ingestion will continue',
+          );
+        } finally {
+          await recordingSpool.cleanup();
+        }
       }
     }
 
