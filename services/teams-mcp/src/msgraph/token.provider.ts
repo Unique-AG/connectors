@@ -7,10 +7,17 @@ import {
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
+import { z } from 'zod';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import { userProfiles } from '../drizzle/schema';
 import { MicrosoftReauthRequiredException } from '../utils/microsoft-reauth.exception';
 import { normalizeError } from '../utils/normalize-error';
+
+/** Microsoft OAuth2 token-refresh response — only the fields this provider consumes. */
+const TokenRefreshResponse = z.object({
+  access_token: z.string(),
+  refresh_token: z.string().optional(),
+});
 
 export class TokenProvider implements AuthenticationProvider {
   private readonly logger = new Logger(TokenProvider.name);
@@ -127,11 +134,7 @@ export class TokenProvider implements AuthenticationProvider {
         assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
-      // Node's fetch types `.json()` as `unknown`; narrow to the OAuth token response fields we use.
-      const tokenData = (await response.json()) as {
-        access_token: string;
-        refresh_token?: string;
-      };
+      const tokenData = TokenRefreshResponse.parse(await response.json());
 
       const encryptedAccessToken = this.encryptionService.encryptToString(tokenData.access_token);
       // Keep old refresh token if new one not provided
