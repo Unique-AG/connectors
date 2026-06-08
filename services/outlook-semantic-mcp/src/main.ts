@@ -10,7 +10,7 @@ import { AppModule } from './app.module';
 import { type AppConfig, appConfig } from './config';
 
 async function bootstrap() {
-  const bufferLogs = process.env.APP_BUFFER_LOGS !== 'disabled';
+  const bufferLogs = process.env.LOG_BUFFERING !== 'disabled';
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs });
 
   app.enableShutdownHooks();
