@@ -2,7 +2,10 @@ import { LogsDiagnosticDataPolicy } from '@unique-ag/utils';
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 
+import { enabledDisabledBoolean } from '~/utils/zod';
+
 const ConfigSchema = z.object({
+  buffering: enabledDisabledBoolean('If the nestjs app should buffer the logs on startup.'),
   diagnosticsDataPolicy: z
     .enum(LogsDiagnosticDataPolicy)
     .prefault(LogsDiagnosticDataPolicy.CONCEAL)
@@ -11,7 +14,7 @@ const ConfigSchema = z.object({
     ),
 });
 
-export const logsConfig = registerConfig('logs', ConfigSchema);
+export const logConfig = registerConfig('log', ConfigSchema);
 
-export type LogsConfigNamespaced = NamespacedConfigType<typeof logsConfig>;
-export type LogsConfig = ConfigType<typeof logsConfig>;
+export type LogConfigNamespaced = NamespacedConfigType<typeof logConfig>;
+export type LogConfig = ConfigType<typeof logConfig>;
