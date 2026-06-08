@@ -26,13 +26,16 @@ export class TokenRefreshMiddleware implements Middleware {
     try {
       // Clone the response to read the body without consuming it
       const clonedResponse = response.clone();
-      const errorBody = await clonedResponse.json();
+      // Node's fetch types `.json()` as `unknown`; narrow to the Graph error envelope we probe.
+      const errorBody = (await clonedResponse.json()) as {
+        error?: { code?: string; message?: string };
+      };
 
       // Check for specific InvalidAuthenticationToken error
-      return (
+      return Boolean(
         errorBody?.error?.code === 'InvalidAuthenticationToken' ||
-        errorBody?.error?.message?.includes('Lifetime validation failed') ||
-        errorBody?.error?.message?.includes('token is expired')
+          errorBody?.error?.message?.includes('Lifetime validation failed') ||
+          errorBody?.error?.message?.includes('token is expired'),
       );
     } catch {
       // If we can't parse the body, just check for 401 status
@@ -40,7 +43,7 @@ export class TokenRefreshMiddleware implements Middleware {
     }
   }
 
-  private cloneRequest(request: RequestInfo, _options?: RequestInit): RequestInfo {
+  private cloneRequest(request: string | Request, _options?: RequestInit): string | Request {
     if (typeof request === 'string') {
       return request;
     }

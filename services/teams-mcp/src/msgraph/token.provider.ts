@@ -127,7 +127,11 @@ export class TokenProvider implements AuthenticationProvider {
         assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
-      const tokenData = await response.json();
+      // Node's fetch types `.json()` as `unknown`; narrow to the OAuth token response fields we use.
+      const tokenData = (await response.json()) as {
+        access_token: string;
+        refresh_token?: string;
+      };
 
       const encryptedAccessToken = this.encryptionService.encryptToString(tokenData.access_token);
       // Keep old refresh token if new one not provided

@@ -112,14 +112,9 @@ export class UniqueContentService {
     span?.setAttribute('spooled', true);
 
     try {
-      await pipeline(
-        // The MS Graph body is a web stream; Readable.fromWeb adapts it to a Node stream for the
-        // pipeline-to-disk. lib.dom's global ReadableStream and node:stream/web's diverge
-        // structurally in these @types/node typings, so the runtime-correct value needs a directive.
-        // @ts-expect-error: lib.dom ReadableStream vs node:stream/web ReadableStream type divergence
-        Readable.fromWeb(await content()),
-        createWriteStream(tmpPath),
-      );
+      // The MS Graph body is a web stream; Readable.fromWeb adapts it to a Node stream so the
+      // pipeline can write it to disk with backpressure.
+      await pipeline(Readable.fromWeb(await content()), createWriteStream(tmpPath));
 
       const { size } = await stat(tmpPath);
       span?.setAttribute('content_length', size);
@@ -131,11 +126,8 @@ export class UniqueContentService {
           'Content-Length': String(size),
           'x-ms-blob-type': 'BlockBlob',
         },
-        // Readable.toWeb yields a web-stream body; with an explicit Content-Length undici sends a
-        // sized, non-chunked PUT. lib.dom's BodyInit doesn't include node:stream/web's ReadableStream
-        // (and lib.dom's RequestInit omits `duplex`), so this init needs the directive below; undici
-        // requires `duplex: 'half'` for a streaming request body at runtime.
-        // @ts-expect-error: lib.dom BodyInit/RequestInit lack node:stream/web body + `duplex`
+        // Stream the spooled file back as the request body. With an explicit Content-Length undici
+        // sends a sized, non-chunked PUT; `duplex: 'half'` is required for a streaming request body.
         body: Readable.toWeb(createReadStream(tmpPath)),
         duplex: 'half',
       });
