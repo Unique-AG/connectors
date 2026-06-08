@@ -10,7 +10,6 @@ export const mcpDebugModeSchema = enabledDisabledBoolean(
 
 const ConfigSchema = z
   .object({
-    bufferLogs: enabledDisabledBoolean('If the nestjs app should buffer the logs on startup.'),
     nodeEnv: z
       .enum(['development', 'production', 'test'])
       .prefault('production')
