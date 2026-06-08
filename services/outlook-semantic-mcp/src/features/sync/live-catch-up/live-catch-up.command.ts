@@ -5,7 +5,7 @@ import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
-import { AppConfig, appConfig } from '~/config';
+import { AppConfig, appConfig, McpBackendType } from '~/config';
 import {
   DRIZZLE,
   DrizzleDatabase,
@@ -102,7 +102,7 @@ export class LiveCatchUpCommand {
       userProfileId,
       msg: 'Live catch-up triggered',
     });
-    if (this.config.mcpBackend === 'MicrosoftGraph') {
+    if (this.config.mcpBackend === McpBackendType.MicrosoftGraph) {
       return { status: 'skipped' };
     }
 

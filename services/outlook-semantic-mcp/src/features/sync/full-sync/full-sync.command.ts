@@ -4,7 +4,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
-import { AppConfig, appConfig } from '~/config';
+import { AppConfig, appConfig, McpBackendType } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
@@ -72,7 +72,7 @@ export class FullSyncCommand {
     if (await this.isInboxDeletingQuery.run(userProfileId)) {
       return { status: 'skipped', reason: 'Inbox is in deleting process' };
     }
-    if (this.config.mcpBackend === 'MicrosoftGraph') {
+    if (this.config.mcpBackend === McpBackendType.MicrosoftGraph) {
       return { status: 'skipped', reason: 'Not required for backend "MicrosoftGraph"' };
     }
 

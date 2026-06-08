@@ -201,7 +201,7 @@ function createCommand({
     syncDirectories as any,
     { run: vi.fn().mockResolvedValue(false) } as any,
     createMockUniqueApi() as any,
-    { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
+    { mcpBackend: 'microsoft_graph_and_unique_api' } as any,
     db as any,
     createMockMetricService() as any,
   );

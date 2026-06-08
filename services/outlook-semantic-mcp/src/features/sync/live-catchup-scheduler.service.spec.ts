@@ -78,7 +78,7 @@ function createServiceWithIngestionConfig({ amqp = createMockAmqp(), db = create
     createMockSchedulerRegistry() as any,
     amqp as any,
     {
-      mcpBackend: 'MicrosoftGraphAndUniqueApi',
+      mcpBackend: 'microsoft_graph_and_unique_api',
       liveCatchupRecoveryCron: '*/5 * * * *',
       liveCatchupOauthUsersRecheckCron: '*/10 * * * *',
       liveCatchupSharedMailboxRecheckCron: '*/2 * * * *',

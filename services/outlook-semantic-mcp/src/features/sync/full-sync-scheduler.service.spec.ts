@@ -52,7 +52,7 @@ function createService({ amqp = createMockAmqp(), db = createMockDb() } = {}) {
   return new FullSyncSchedulerService(
     schedulerRegistry as any,
     amqp as any,
-    { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
+    { mcpBackend: 'microsoft_graph_and_unique_api' } as any,
     db as any,
   );
 }
@@ -191,7 +191,7 @@ describe('FullSyncRecoveryService', () => {
         schedulerRegistry as any,
         createMockAmqp() as any,
         {
-          mcpBackend: 'MicrosoftGraphAndUniqueApi',
+          mcpBackend: 'microsoft_graph_and_unique_api',
           fullSyncRecoveryCron: '*/5 * * * *',
         } as any,
         createMockDb() as any,
@@ -212,7 +212,7 @@ describe('FullSyncRecoveryService', () => {
       const service = new FullSyncSchedulerService(
         schedulerRegistry as any,
         createMockAmqp() as any,
-        { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
+        { mcpBackend: 'microsoft_graph_and_unique_api' } as any,
         createMockDb() as any,
       );
 
