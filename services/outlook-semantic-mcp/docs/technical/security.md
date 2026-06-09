@@ -341,7 +341,7 @@ For the full secrets reference (format, generation, and description), see [Confi
 
 ### Rotation Procedures
 
-For detailed secret rotation procedures, see [Authentication — Secret Rotation](../operator/authentication.md#Secret-Rotation).
+For detailed secret rotation procedures, see [Authentication — Secret Management](../operator/authentication.md#Secret-Management).
 
 Key security considerations for rotation:
 
@@ -351,7 +351,7 @@ Key security considerations for rotation:
 
 ## Security Checklist for Operators
 
-See [Operator Manual — Security Checklist](../operator/README.md#Security-Checklist) for the full pre-production checklist.
+See [Operator Manual — Self-Hosted](../operator/README.md#Self-Hosted) for the full pre-production checklist.
 
 ## Related Documentation
 

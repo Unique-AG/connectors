@@ -7,7 +7,7 @@ This page describes user-facing features of the Outlook Semantic MCP Server: wha
 
 ### Deployment modes
 
-The MCP server operates in two modes controlled by the [`MCP_BACKEND`](../operator/configuration.md#MCP_BACKEND) environment variable. Several features behave differently depending on which mode is active:
+The MCP server operates in two modes controlled by the [`MCP_BACKEND`](../operator/configuration.md#Deployment-Modes) environment variable. Several features behave differently depending on which mode is active:
 
 | Mode | `MCP_BACKEND` value | How it works |
 |------|---------------------|--------------|
@@ -219,4 +219,4 @@ Configure scanning via [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DE
 **Workaround options:**
 
 - **Get Full Access.** Ask your colleague (or an Exchange administrator) to grant you Full Access (Read & Manage) to their mailbox. This allows `$search` queries against the entire mailbox, including the previously shared folders.
-- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, connect it to the MCP as its own account, and grant Full Access to everyone who needs to search it. See [Setup — Shared inbox configured as a normal inbox](../faq.md#3-shared-inbox-configured-as-a-normal-inbox).
+- **Use a shared mailbox.** Convert the colleague's mailbox to a Microsoft 365 shared mailbox, connect it to the MCP as its own account, and grant Full Access to everyone who needs to search it. See [Setup — Shared inbox configured as a normal inbox](#3-shared-inbox-configured-as-a-normal-inbox).
