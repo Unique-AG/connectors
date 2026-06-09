@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MockDrizzleDatabase, MockEncryptionService } from '../__mocks__';
-import { TokenProvider } from './token.provider';
+import { MockDrizzleDatabase, MockEncryptionService } from '../../__mocks__';
+import { TokenProvider } from '../token.provider';
 
 // Mock fetch globally
 const mockFetch = vi.fn();

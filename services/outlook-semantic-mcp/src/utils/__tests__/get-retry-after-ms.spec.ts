@@ -1,8 +1,8 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { errors } from 'undici';
 import { describe, expect, it } from 'vitest';
-import { getRetryAfterMs } from './get-retry-after-ms';
-import { GenericRateLimitError } from './is-rate-limit-error';
+import { getRetryAfterMs } from '../get-retry-after-ms';
+import { GenericRateLimitError } from '../is-rate-limit-error';
 
 const makeGraphError = (retryAfterSeconds?: string): GraphError => {
   const error = new GraphError(429, 'Too Many Requests');

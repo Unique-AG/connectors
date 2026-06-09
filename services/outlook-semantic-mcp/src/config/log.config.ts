@@ -1,7 +1,6 @@
 import { LogsDiagnosticDataPolicy } from '@unique-ag/utils';
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-
 import { enabledDisabledBoolean } from '~/utils/zod';
 
 const ConfigSchema = z.object({

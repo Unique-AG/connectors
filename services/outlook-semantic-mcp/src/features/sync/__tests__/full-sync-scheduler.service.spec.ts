@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FullSyncSchedulerService } from './full-sync-scheduler.service';
+import { FullSyncSchedulerService } from '../full-sync-scheduler.service';
 
 // Avoid drizzle's union() being called on mock query builders
 vi.mock('~/features/sync/sync-scheduler.utils', async () => {

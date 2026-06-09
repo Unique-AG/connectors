@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampToValidDate } from './clamp-to-valid-date';
+import { clampToValidDate } from '../clamp-to-valid-date';
 
 describe('clampToValidDate', () => {
   it('passes through non-string values unchanged', () => {

@@ -2,7 +2,7 @@
 
 import { CronJob } from 'cron';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveCatchupSchedulerService } from './live-catchup-scheduler.service';
+import { LiveCatchupSchedulerService } from '../live-catchup-scheduler.service';
 
 vi.mock('~/features/tracing.utils', () => ({
   traceEvent: vi.fn(),

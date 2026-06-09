@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FullSyncCommand, START_FULL_SYNC_LINK } from './full-sync.command';
+import { FullSyncCommand, START_FULL_SYNC_LINK } from '../full-sync.command';
 
 vi.mock('~/features/tracing.utils', () => ({
   traceAttrs: vi.fn(),

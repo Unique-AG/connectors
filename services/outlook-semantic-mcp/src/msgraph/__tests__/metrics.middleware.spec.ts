@@ -1,6 +1,6 @@
 import type { MetricService } from 'nestjs-otel';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MetricsMiddleware } from './metrics.middleware';
+import { MetricsMiddleware } from '../metrics.middleware';
 
 const mockCounter = { add: vi.fn() };
 const mockHistogram = { record: vi.fn() };

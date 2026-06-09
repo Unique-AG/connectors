@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AllDelegatesFailedError, NO_DELEGATES } from '~/msgraph/ms-graph-client-resolver.service';
-import { LiveCatchUpCommand } from './live-catch-up.command';
+import { LiveCatchUpCommand } from '../live-catch-up.command';
 
 // ---------------------------------------------------------------------------
 // Helpers
