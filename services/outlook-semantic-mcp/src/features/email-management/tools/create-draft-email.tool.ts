@@ -121,7 +121,7 @@ export class CreateDraftEmailTool {
     name: 'draft_email',
     title: 'Draft Email',
     description:
-      'Creates a draft email in Outlook. Pass type: "draft" for a fresh draft (toRecipients required; optionally pass mailbox for a shared mailbox). Pass type: "reply" with inReplyToMessageId for a reply-all draft (Graph pre-fills recipients from the original thread; optionally pass mailbox for a shared mailbox). The draft is saved but not sent.',
+      'Creates a draft email in Outlook. **Replying to a received email is the most common use case** — when the user says "reply", "respond", "get back to", "answer this", "write back", or similar after reading an email, use type: "reply" with the inReplyToMessageId from the retrieved email (Graph pre-fills all recipients and subject automatically). For a new email, use type: "draft" with explicit toRecipients and subject. Optionally pass mailbox for shared mailboxes. The draft is saved but not sent.',
     parameters: CreateDraftEmailInputSchema,
     outputSchema: CreateDraftEmailOutputSchema,
     annotations: {

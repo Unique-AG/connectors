@@ -1,10 +1,16 @@
 import assert from 'node:assert';
+import { randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { FetchFn } from '@qfetch/qfetch';
 import { Span, TraceService } from 'nestjs-otel';
 import type { UniqueConfigNamespaced } from '~/config';
-import type { SizedContent } from '~/utils/sized-content';
 import { UNIQUE_FETCH } from './unique.consts';
 import {
   type ContentInfoItem,
@@ -25,6 +31,20 @@ import {
   SearchType,
 } from './unique.dtos';
 import type { UniqueIdentity } from './unique-identity.types';
+
+/**
+ * A download streamed to a local temp file, ready to upload with an authoritative `Content-Length`.
+ * Produced by {@link UniqueContentService.spoolContent}; the caller owns the file and must call
+ * {@link cleanup} once the upload has finished (or failed).
+ */
+export interface SpooledContent {
+  /** Absolute path of the temp file the content was streamed to. */
+  path: string;
+  /** Authoritative byte size from `fstat`, used as the upload `Content-Length`. */
+  size: number;
+  /** Removes the temp file. Safe to call more than once (`force` no-ops if already gone). */
+  cleanup: () => Promise<void>;
+}
 
 @Injectable()
 export class UniqueContentService {
@@ -81,36 +101,62 @@ export class UniqueContentService {
     return result;
   }
 
+  /**
+   * Streams a content download to a temp file at constant memory and returns its path plus an
+   * authoritative byte size (`fstat`). Call this *before* opening a Unique content record
+   * ({@link upsertContent}) so a failed download (e.g. a 403 on a recording the caller can't read)
+   * never leaves a dangling, empty record behind. The caller must {@link SpooledContent.cleanup}
+   * the returned file once the upload has finished or failed.
+   */
+  @Span()
+  public async spoolContent(
+    content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>,
+  ): Promise<SpooledContent> {
+    const span = this.trace.getSpan();
+    const tmpPath = join(tmpdir(), `teams-upload-${randomUUID()}`);
+
+    try {
+      // The MS Graph body is a web stream; Readable.fromWeb adapts it to a Node stream so the
+      // pipeline can write it to disk with backpressure (constant memory).
+      await pipeline(Readable.fromWeb(await content()), createWriteStream(tmpPath));
+      const { size } = await stat(tmpPath);
+      span?.setAttribute('content_length', size);
+      return { path: tmpPath, size, cleanup: () => rm(tmpPath, { force: true }) };
+    } catch (error) {
+      // Remove any partial spool before propagating, so a download failure leaves nothing behind.
+      await rm(tmpPath, { force: true });
+      throw error;
+    }
+  }
+
   @Span()
   public async uploadToStorage(
     writeUrl: string,
-    content: () => Promise<SizedContent>,
+    spooled: SpooledContent,
     mime: string,
   ): Promise<void> {
     const span = this.trace.getSpan();
 
     const uploadUrl = this.correctWriteUrl(writeUrl);
-    const urlObj = new URL(uploadUrl);
-    const storageEndpoint = urlObj.origin;
+    const storageEndpoint = new URL(uploadUrl).origin;
     span?.setAttribute('storage_endpoint', storageEndpoint);
+    span?.setAttribute('content_length', spooled.size);
 
     this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
 
     // Azure Blob's single `PUT Blob` rejects `Transfer-Encoding: chunked` (400 UnsupportedHeader)
-    // and requires a `Content-Length`. Node's fetch only omits chunked framing for a streaming
-    // body when an explicit Content-Length is set, so we pass the pre-measured `size`.
-    const { stream, size } = await content();
-    span?.setAttribute('content_length', size);
-
+    // and requires a `Content-Length`. The spooled file gives us an authoritative size, and undici
+    // sends a sized, non-chunked body when an explicit Content-Length is set.
     const response = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': mime,
-        'Content-Length': String(size),
+        'Content-Length': String(spooled.size),
         'x-ms-blob-type': 'BlockBlob',
       },
-      body: stream,
-      // @ts-expect-error: nodejs fetch requires `half` for streaming uploads
+      // Stream the spooled file back as the request body. `duplex: 'half'` is required for a
+      // streaming request body.
+      body: Readable.toWeb(createReadStream(spooled.path)),
       duplex: 'half',
     });
 

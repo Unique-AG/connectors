@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@1.0.0...outlook-semantic-mcp@1.0.1) (2026-06-09)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** fortify draft_email tool description for reply use case ([#625](https://github.com/Unique-AG/connectors/issues/625)) ([52d97ff](https://github.com/Unique-AG/connectors/commit/52d97ff8eb40a68492d3eed1170717c3864a12b2))
+
+## [1.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.11...outlook-semantic-mcp@1.0.0) (2026-06-08)
+
+
+### Features
+
+* **charts,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** add admin consent redirect uris ([#577](https://github.com/Unique-AG/connectors/issues/577)) ([3e36a6d](https://github.com/Unique-AG/connectors/commit/3e36a6deea5e620b6e5316a7f3df0dd4fd5c74b3))
+* **outlook-semantic-mcp:** add scripts for testing live catchup and email retrieval ([#610](https://github.com/Unique-AG/connectors/issues/610)) ([6702d23](https://github.com/Unique-AG/connectors/commit/6702d23a7ee536ec35171f64f35d3b49cd27b8f8))
+* **outlook-semantic-mcp:** un-21004 ingest shared mailboxes ([#605](https://github.com/Unique-AG/connectors/issues/605)) ([c93adf3](https://github.com/Unique-AG/connectors/commit/c93adf301b94006b7543432ad1a4cf49d06aa75f))
+* **outlook-semantic-mcp:** un-21028 add draft creation in shared mailboxes, add creating reply to email ([#604](https://github.com/Unique-AG/connectors/issues/604)) ([8eda155](https://github.com/Unique-AG/connectors/commit/8eda155fa6c00a9d3f39e87c04af045f581e8db8))
+* **outlook-semantic-mcp:** un-21097 add support for folder search for ms graph mode ([#595](https://github.com/Unique-AG/connectors/issues/595)) ([56e337f](https://github.com/Unique-AG/connectors/commit/56e337f115a99512344d134af9d46f8609bed0ea))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,deps:** preserve formatting in draft emails (UN-20562) ([#573](https://github.com/Unique-AG/connectors/issues/573)) ([39b3858](https://github.com/Unique-AG/connectors/commit/39b38589cf62bcd91bd0efc647070f4b3ef1d99d))
+* **outlook-semantic-mcp:** release 1.0.0 ([#622](https://github.com/Unique-AG/connectors/issues/622)) ([0674204](https://github.com/Unique-AG/connectors/commit/0674204bc9a5de9cc2dc47d98724d94871c7cf15))
+
 ## [0.4.11](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.10...outlook-semantic-mcp@0.4.11) (2026-05-22)
 
 

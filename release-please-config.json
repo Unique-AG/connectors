@@ -47,8 +47,6 @@
       ]
     },
     "services/outlook-semantic-mcp": {
-      "prerelease": true,
-      "versioning": "prerelease",
       "extra-files": [
         {
           "type": "yaml",

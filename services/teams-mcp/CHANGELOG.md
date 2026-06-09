@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.18](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.17...teams-mcp@0.2.18) (2026-06-08)
+
+
+### Bug Fixes
+
+* **teams-mcp:** skip inaccessible recordings without dangling KB records ([#623](https://github.com/Unique-AG/connectors/issues/623)) ([6be77e3](https://github.com/Unique-AG/connectors/commit/6be77e31e547dc87dc2c36968e030cf6da55128d))
+
+## [0.2.17](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.16...teams-mcp@0.2.17) (2026-06-08)
+
+
+### Bug Fixes
+
+* **teams-mcp:** stream content uploads via disk-spool ([#619](https://github.com/Unique-AG/connectors/issues/619)) ([99ed6cd](https://github.com/Unique-AG/connectors/commit/99ed6cd17221c8b7916624168dbaf3dda932e7f1))
+
 ## [0.2.16](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.15...teams-mcp@0.2.16) (2026-06-05)
 
 
