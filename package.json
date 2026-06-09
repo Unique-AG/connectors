@@ -33,7 +33,7 @@
     "turbo": "2.6.0",
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
-    "vitest": "3.2.4"
+    "vitest": "3.2.6"
   },
   "engines": {
     "node": "24"
