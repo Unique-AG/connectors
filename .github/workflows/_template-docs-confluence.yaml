@@ -30,7 +30,6 @@ jobs:
           DOCS_PATH: ${{ inputs.docs-path }}
           SERVICE_NAME: ${{ inputs.service-name }}
           MD2CONF_IMAGE: leventehunyadi/md2conf@sha256:c06844e455977be323fda0d6d709863dc84cf522ce4266ed1b68a45c45ddc6a6 # 0.6.1
-          MAX_IMAGE_WIDTH: 800
         run: |
           echo "-- Publishing $SERVICE_NAME docs to Confluence --"
           docker run --rm \
@@ -42,6 +41,5 @@ jobs:
             $MD2CONF_IMAGE \
             --no-generated-by \
             --render-mermaid \
-            --max-image-width "$MAX_IMAGE_WIDTH" \
             ./
           echo "-- Publishing complete --"
