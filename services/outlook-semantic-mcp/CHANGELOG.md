@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@1.0.0...outlook-semantic-mcp@1.0.1) (2026-06-09)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** fortify draft_email tool description for reply use case ([#625](https://github.com/Unique-AG/connectors/issues/625)) ([52d97ff](https://github.com/Unique-AG/connectors/commit/52d97ff8eb40a68492d3eed1170717c3864a12b2))
+
 ## [1.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.11...outlook-semantic-mcp@1.0.0) (2026-06-08)
 
 
