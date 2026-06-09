@@ -174,30 +174,37 @@ export class PageImageInliner {
     page: FetchedPage,
     pageImageAttachments: DiscoveredAttachment[],
   ): Promise<ResolvedAttachment | null> {
-    if (resource.kind === 'external-url' || resource.kind === 'unknown') {
+    if (resource.kind === 'current-attachment') {
+      return this.resolveCurrentPageAttachment(resource, page, pageImageAttachments);
+    }
+
+    if (resource.kind === 'other-page-attachment') {
+      return this.resolveOtherPageAttachment(resource);
+    }
+
+    return null;
+  }
+
+  private resolveCurrentPageAttachment(
+    resource: Extract<ResourceRef, { kind: 'current-attachment' }>,
+    page: FetchedPage,
+    pageImageAttachments: DiscoveredAttachment[],
+  ): ResolvedAttachment | null {
+    const match = pageImageAttachments.find((a) => a.title === resource.filename);
+    if (!match) {
+      this.logger.debug({
+        pageId: page.id,
+        filename: resource.filename,
+        msg: 'Image filename not found among page attachments',
+      });
       return null;
     }
+    return this.fromDiscoveredAttachment(match);
+  }
 
-    if (resource.kind === 'current-attachment') {
-      const match = pageImageAttachments.find((a) => a.title === resource.filename);
-      if (!match) {
-        this.logger.debug({
-          pageId: page.id,
-          filename: resource.filename,
-          msg: 'Image filename not found among page attachments',
-        });
-        return null;
-      }
-      return {
-        attachmentId: match.id,
-        pageId: match.pageId,
-        downloadPath: match.downloadPath,
-        mediaType: match.mediaType,
-        fileSize: match.fileSize,
-        filename: match.title,
-      };
-    }
-
+  private async resolveOtherPageAttachment(
+    resource: Extract<ResourceRef, { kind: 'other-page-attachment' }>,
+  ): Promise<ResolvedAttachment | null> {
     const lookup = await this.lookupOtherPageAttachments(resource.spaceKey, resource.contentTitle);
     if (!lookup) {
       this.logger.debug({
@@ -219,13 +226,31 @@ export class PageImageInliner {
       });
       return null;
     }
+    return this.fromConfluenceAttachment(match, lookup.pageId);
+  }
+
+  private fromDiscoveredAttachment(attachment: DiscoveredAttachment): ResolvedAttachment {
     return {
-      attachmentId: match.id,
-      pageId: lookup.pageId,
-      downloadPath: match._links.download,
-      mediaType: match.extensions.mediaType,
-      fileSize: match.extensions.fileSize,
-      filename: match.title,
+      attachmentId: attachment.id,
+      pageId: attachment.pageId,
+      downloadPath: attachment.downloadPath,
+      mediaType: attachment.mediaType,
+      fileSize: attachment.fileSize,
+      filename: attachment.title,
+    };
+  }
+
+  private fromConfluenceAttachment(
+    attachment: ConfluenceAttachment,
+    pageId: string,
+  ): ResolvedAttachment {
+    return {
+      attachmentId: attachment.id,
+      pageId,
+      downloadPath: attachment._links.download,
+      mediaType: attachment.extensions.mediaType,
+      fileSize: attachment.extensions.fileSize,
+      filename: attachment.title,
     };
   }
 
