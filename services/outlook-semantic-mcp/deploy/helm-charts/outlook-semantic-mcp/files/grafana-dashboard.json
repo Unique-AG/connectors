@@ -46,6 +46,7 @@
         "includeAll": false,
         "multi": false,
         "refresh": 2,
+        "regex": "outlook-semantic-mcp",
         "sort": 1,
         "current": {
           "selected": true,
