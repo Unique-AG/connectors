@@ -12,7 +12,7 @@ import {
   parseImageBlocks,
   type ResourceRef,
 } from './confluence-tags-parser';
-import { isImageMediaType } from './media-type';
+import { isImageMediaType, normalizeMediaType } from './media-type';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 // ac:image attributes forwarded onto <img>; presentational hints (align, thumbnail, etc.) are dropped.
@@ -257,8 +257,9 @@ export class PageImageInliner {
   }
 
   private isAllowedMediaType(mediaType: string): boolean {
-    const normalized = mediaType.split(';')[0]?.trim().toLowerCase() ?? '';
-    return this.config.ingestion.attachments.allowedMimeTypes.includes(normalized);
+    return this.config.ingestion.attachments.allowedMimeTypes.includes(
+      normalizeMediaType(mediaType),
+    );
   }
 
   private exceedsMaxSize(fileSize: number): boolean {
@@ -290,7 +291,7 @@ export class PageImageInliner {
     filename: string,
   ): string {
     const base64 = buffer.toString('base64');
-    const normalizedMediaType = mediaType.split(';')[0]?.trim().toLowerCase() ?? mediaType;
+    const normalizedMediaType = normalizeMediaType(mediaType);
     const altValue = imgAttrs['ac:alt'] ?? filename;
 
     const parts: string[] = [`src="data:${normalizedMediaType};base64,${base64}"`];
