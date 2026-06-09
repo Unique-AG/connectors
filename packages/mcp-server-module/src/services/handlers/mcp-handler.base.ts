@@ -1,10 +1,11 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Fork of @rekog-labs/MCP-Nest */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Progress } from '@modelcontextprotocol/sdk/types.js';
+import { ElicitRequestFormParams, ErrorCode, McpError, Progress } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
-import { Context, McpRequest, SerializableValue } from '../../interfaces';
+import { z } from 'zod';
+import { Context, FormElicitResult, McpRequest, SerializableValue, UrlElicitResult } from '../../interfaces';
 import { McpRegistryService } from '../mcp-registry.service';
 
 export abstract class McpHandlerBase {
@@ -63,6 +64,34 @@ export abstract class McpHandlerBase {
           });
         },
       },
+      elicit: async <T extends z.ZodRawShape>(
+        schema: z.ZodObject<T>,
+        message: string,
+      ): Promise<FormElicitResult<T>> => {
+        const result = await mcpServer.server.elicitInput({
+          message,
+          requestedSchema: z.toJSONSchema(schema, { io: 'input' }) as ElicitRequestFormParams['requestedSchema'],
+        });
+        return result as FormElicitResult<T>;
+      },
+      elicitUrl: async ({
+        elicitationId,
+        message,
+        url,
+      }: {
+        elicitationId: string;
+        message: string;
+        url: string;
+      }): Promise<UrlElicitResult> => {
+        const result = await mcpServer.server.elicitInput({
+          mode: 'url',
+          elicitationId,
+          message,
+          url,
+        });
+        const sendCompletionNotification = mcpServer.server.createElicitationCompletionNotifier(elicitationId);
+        return { action: result.action, sendCompletionNotification };
+      },
       mcpServer,
       mcpRequest,
     };
@@ -89,6 +118,12 @@ export abstract class McpHandlerBase {
         warn: (_message: string, _data?: SerializableValue) => {
           warn('server report logging not supported in stateless');
         },
+      },
+      elicit: async () => {
+        throw new McpError(ErrorCode.InternalError, 'elicit is not supported in stateless mode');
+      },
+      elicitUrl: async () => {
+        throw new McpError(ErrorCode.InternalError, 'elicitUrl is not supported in stateless mode');
       },
       mcpServer,
       mcpRequest,
