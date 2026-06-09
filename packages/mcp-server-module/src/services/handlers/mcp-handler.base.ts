@@ -72,6 +72,7 @@ export abstract class McpHandlerBase {
           message,
           requestedSchema: z.toJSONSchema(schema, { io: 'input' }) as ElicitRequestFormParams['requestedSchema'],
         });
+        // SDK validates content against the JSON Schema derived from schema; cast is safe.
         return result as FormElicitResult<T>;
       },
       elicitUrl: async ({
