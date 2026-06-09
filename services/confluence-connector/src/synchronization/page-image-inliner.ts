@@ -74,9 +74,10 @@ export class PageImageInliner {
       return { page, inlinedAttachmentIds: new Set() };
     }
 
+    const pageImageAttachmentsByTitle = this.buildAttachmentTitleMap(pageImageAttachments);
     const replacements = await Promise.all(
       blocks.map((block) =>
-        this.buildImageReplacement(block, page, pageImageAttachments).catch((err) => {
+        this.buildImageReplacement(block, page, pageImageAttachmentsByTitle).catch((err) => {
           this.logger.warn({
             pageId: page.id,
             resource: block.resourceRef,
@@ -117,12 +118,12 @@ export class PageImageInliner {
   private async buildImageReplacement(
     block: ParsedImageMacro,
     page: FetchedPage,
-    pageImageAttachments: DiscoveredAttachment[],
+    pageImageAttachmentsByTitle: ReadonlyMap<string, DiscoveredAttachment>,
   ): Promise<{ attachmentId: string; pageId: string; html: string } | null> {
     const resolved = await this.resolveAttachmentMetadata(
       block.resourceRef,
       page,
-      pageImageAttachments,
+      pageImageAttachmentsByTitle,
     );
     if (!resolved) {
       return null;
@@ -172,10 +173,10 @@ export class PageImageInliner {
   private async resolveAttachmentMetadata(
     resource: ResourceRef,
     page: FetchedPage,
-    pageImageAttachments: DiscoveredAttachment[],
+    pageImageAttachmentsByTitle: ReadonlyMap<string, DiscoveredAttachment>,
   ): Promise<ResolvedAttachment | null> {
     if (resource.kind === 'current-attachment') {
-      return this.resolveCurrentPageAttachment(resource, page, pageImageAttachments);
+      return this.resolveCurrentPageAttachment(resource, page, pageImageAttachmentsByTitle);
     }
 
     if (resource.kind === 'other-page-attachment') {
@@ -188,9 +189,9 @@ export class PageImageInliner {
   private resolveCurrentPageAttachment(
     resource: Extract<ResourceRef, { kind: 'current-attachment' }>,
     page: FetchedPage,
-    pageImageAttachments: DiscoveredAttachment[],
+    pageImageAttachmentsByTitle: ReadonlyMap<string, DiscoveredAttachment>,
   ): ResolvedAttachment | null {
-    const match = pageImageAttachments.find((a) => a.title === resource.filename);
+    const match = pageImageAttachmentsByTitle.get(resource.filename);
     if (!match) {
       this.logger.debug({
         pageId: page.id,
@@ -200,6 +201,18 @@ export class PageImageInliner {
       return null;
     }
     return this.fromDiscoveredAttachment(match);
+  }
+
+  private buildAttachmentTitleMap(
+    attachments: DiscoveredAttachment[],
+  ): ReadonlyMap<string, DiscoveredAttachment> {
+    const attachmentsByTitle = new Map<string, DiscoveredAttachment>();
+    for (const attachment of attachments) {
+      if (!attachmentsByTitle.has(attachment.title)) {
+        attachmentsByTitle.set(attachment.title, attachment);
+      }
+    }
+    return attachmentsByTitle;
   }
 
   private async resolveOtherPageAttachment(
