@@ -36,6 +36,14 @@ interface ResolvedAttachment {
   filename: string;
 }
 
+interface ImageReplacement {
+  start: number;
+  end: number;
+  attachmentId: string;
+  pageId: string;
+  html: string;
+}
+
 // Keyed by ${pageId}::${attachmentId} since attachment ids aren't globally unique across pages.
 export function buildInlinedAttachmentKey(pageId: string, attachmentId: string): string {
   return `${pageId}::${attachmentId}`;
@@ -90,25 +98,23 @@ export class PageImageInliner {
     );
 
     const inlinedAttachmentIds = new Set<string>();
-    const splicePoints: Array<{ start: number; end: number; html: string }> = [];
+    const successfulReplacements: ImageReplacement[] = [];
 
-    for (let i = 0; i < blocks.length; i++) {
-      const block = blocks[i];
-      const replacement = replacements[i];
-      if (!block || !replacement) {
+    for (const replacement of replacements) {
+      if (!replacement) {
         continue;
       }
-      splicePoints.push({ start: block.startIndex, end: block.endIndex, html: replacement.html });
+      successfulReplacements.push(replacement);
       inlinedAttachmentIds.add(
         buildInlinedAttachmentKey(replacement.pageId, replacement.attachmentId),
       );
     }
 
-    if (splicePoints.length === 0) {
+    if (successfulReplacements.length === 0) {
       return { page, inlinedAttachmentIds: new Set() };
     }
 
-    const newBody = this.applyReplacements(page.body, splicePoints);
+    const newBody = this.applyReplacements(page.body, successfulReplacements);
     return {
       page: { ...page, body: newBody },
       inlinedAttachmentIds,
@@ -119,7 +125,7 @@ export class PageImageInliner {
     block: ParsedImageMacro,
     page: FetchedPage,
     pageImageAttachmentsByTitle: ReadonlyMap<string, DiscoveredAttachment>,
-  ): Promise<{ attachmentId: string; pageId: string; html: string } | null> {
+  ): Promise<ImageReplacement | null> {
     const resolved = await this.resolveAttachmentMetadata(
       block.resourceRef,
       page,
@@ -167,7 +173,13 @@ export class PageImageInliner {
       resolved.downloadPath,
     );
     const html = this.buildImgTag(block.imgAttrs, resolved.mediaType, buffer, resolved.filename);
-    return { attachmentId: resolved.attachmentId, pageId: resolved.pageId, html };
+    return {
+      start: block.startIndex,
+      end: block.endIndex,
+      attachmentId: resolved.attachmentId,
+      pageId: resolved.pageId,
+      html,
+    };
   }
 
   private async resolveAttachmentMetadata(
