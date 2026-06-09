@@ -20,10 +20,10 @@ export type FormElicitResult<T extends z.ZodRawShape> =
   | { action: 'accept'; content: z.infer<z.ZodObject<T>> }
   | { action: 'decline' | 'cancel'; content?: undefined };
 
-export type UrlElicitResult = {
+export interface UrlElicitResult {
   action: 'accept' | 'decline' | 'cancel';
   sendCompletionNotification: () => Promise<void>;
-};
+}
 
 /**
  * Enhanced execution context that includes user information

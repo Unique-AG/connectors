@@ -1,11 +1,22 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Fork of @rekog-labs/MCP-Nest */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ElicitRequestFormParams, ErrorCode, McpError, Progress } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ElicitRequestFormParams,
+  ErrorCode,
+  McpError,
+  Progress,
+} from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { z } from 'zod';
-import { Context, FormElicitResult, McpRequest, SerializableValue, UrlElicitResult } from '../../interfaces';
+import {
+  Context,
+  FormElicitResult,
+  McpRequest,
+  SerializableValue,
+  UrlElicitResult,
+} from '../../interfaces';
 import { McpRegistryService } from '../mcp-registry.service';
 
 export abstract class McpHandlerBase {
@@ -70,7 +81,9 @@ export abstract class McpHandlerBase {
       ): Promise<FormElicitResult<T>> => {
         const result = await mcpServer.server.elicitInput({
           message,
-          requestedSchema: z.toJSONSchema(schema, { io: 'input' }) as ElicitRequestFormParams['requestedSchema'],
+          requestedSchema: z.toJSONSchema(schema, {
+            io: 'input',
+          }) as ElicitRequestFormParams['requestedSchema'],
         });
         // SDK validates content against the JSON Schema derived from schema; cast is safe.
         return result as FormElicitResult<T>;
@@ -90,7 +103,8 @@ export abstract class McpHandlerBase {
           message,
           url,
         });
-        const sendCompletionNotification = mcpServer.server.createElicitationCompletionNotifier(elicitationId);
+        const sendCompletionNotification =
+          mcpServer.server.createElicitationCompletionNotifier(elicitationId);
         return { action: result.action, sendCompletionNotification };
       },
       mcpServer,
