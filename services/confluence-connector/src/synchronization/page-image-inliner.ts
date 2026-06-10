@@ -75,17 +75,7 @@ export class PageImageInliner {
     const settledReplacements: Array<ImageReplacement | null> = [];
     for (const batch of chunk(macros, IMAGE_INLINE_BATCH_SIZE)) {
       const replacements = await Promise.all(
-        batch.map((macro) =>
-          this.buildImageReplacement(macro, page, pageImageAttachmentsByTitle).catch((err) => {
-            this.logger.warn({
-              pageId: page.id,
-              resource: macro.resourceRef,
-              err,
-              msg: 'Failed to inline image, leaving macro untouched',
-            });
-            return null;
-          }),
-        ),
+        batch.map((macro) => this.buildImageReplacement(macro, page, pageImageAttachmentsByTitle)),
       );
       settledReplacements.push(...replacements);
     }
@@ -112,60 +102,70 @@ export class PageImageInliner {
     page: FetchedPage,
     pageImageAttachmentsByTitle: Readonly<Record<string, DiscoveredAttachment>>,
   ): Promise<ImageReplacement | null> {
-    const resolved = await this.resolveAttachmentMetadata(
-      macro.resourceRef,
-      page,
-      pageImageAttachmentsByTitle,
-    );
-    if (!resolved) {
-      return null;
-    }
+    try {
+      const resolved = await this.resolveAttachmentMetadata(
+        macro.resourceRef,
+        page,
+        pageImageAttachmentsByTitle,
+      );
+      if (!resolved) {
+        return null;
+      }
 
-    if (!isImageMimeType(resolved.mediaType)) {
-      this.logger.debug({
-        pageId: page.id,
-        filename: resolved.filename,
-        mediaType: resolved.mediaType,
-        msg: 'Referenced attachment is not an image, leaving macro untouched',
-      });
-      return null;
-    }
+      if (!isImageMimeType(resolved.mediaType)) {
+        this.logger.debug({
+          pageId: page.id,
+          filename: resolved.filename,
+          mediaType: resolved.mediaType,
+          msg: 'Referenced attachment is not an image, leaving macro untouched',
+        });
+        return null;
+      }
 
-    // Other-page lookups bypass discovery's allowedMimeTypes filter; re-check here.
-    if (!this.isAllowedMimeType(resolved.mediaType)) {
-      this.logger.debug({
-        pageId: page.id,
-        filename: resolved.filename,
-        mediaType: resolved.mediaType,
-        msg: 'Referenced image MIME type is not in allowedMimeTypes, leaving macro untouched',
-      });
-      return null;
-    }
+      // Other-page lookups bypass discovery's allowedMimeTypes filter; re-check here.
+      if (!this.isAllowedMimeType(resolved.mediaType)) {
+        this.logger.debug({
+          pageId: page.id,
+          filename: resolved.filename,
+          mediaType: resolved.mediaType,
+          msg: 'Referenced image MIME type is not in allowedMimeTypes, leaving macro untouched',
+        });
+        return null;
+      }
 
-    if (this.exceedsMaxSize(resolved.fileSize)) {
+      if (this.exceedsMaxSize(resolved.fileSize)) {
+        this.logger.warn({
+          pageId: page.id,
+          filename: resolved.filename,
+          fileSize: resolved.fileSize,
+          maxFileSizeMb: this.config.ingestion.attachments.maxFileSizeMb,
+          msg: 'Image exceeds max file size, leaving macro untouched',
+        });
+        return null;
+      }
+
+      const buffer = await this.downloadToBuffer(
+        resolved.attachmentId,
+        resolved.pageId,
+        resolved.downloadPath,
+      );
+      const html = this.buildImgTag(macro.imgAttrs, resolved.mediaType, buffer, resolved.filename);
+      return {
+        start: macro.startIndex,
+        end: macro.endIndex,
+        attachmentId: resolved.attachmentId,
+        pageId: resolved.pageId,
+        html,
+      };
+    } catch (err) {
       this.logger.warn({
         pageId: page.id,
-        filename: resolved.filename,
-        fileSize: resolved.fileSize,
-        maxFileSizeMb: this.config.ingestion.attachments.maxFileSizeMb,
-        msg: 'Image exceeds max file size, leaving macro untouched',
+        resource: macro.resourceRef,
+        err,
+        msg: 'Failed to inline image, leaving macro untouched',
       });
       return null;
     }
-
-    const buffer = await this.downloadToBuffer(
-      resolved.attachmentId,
-      resolved.pageId,
-      resolved.downloadPath,
-    );
-    const html = this.buildImgTag(macro.imgAttrs, resolved.mediaType, buffer, resolved.filename);
-    return {
-      start: macro.startIndex,
-      end: macro.endIndex,
-      attachmentId: resolved.attachmentId,
-      pageId: resolved.pageId,
-      html,
-    };
   }
 
   private async resolveAttachmentMetadata(
@@ -276,8 +276,8 @@ export class PageImageInliner {
       downloadPath,
     );
     const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    for await (const streamChunk of stream) {
+      chunks.push(Buffer.isBuffer(streamChunk) ? streamChunk : Buffer.from(streamChunk));
     }
     return Buffer.concat(chunks);
   }
