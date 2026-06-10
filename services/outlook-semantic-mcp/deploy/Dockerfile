@@ -7,7 +7,7 @@ ARG APP_NAME=outlook-semantic-mcp
 # Shared foundation for pruner, deps, and builder stages.
 # Using full bookworm image (not slim) because we need build tools for native modules.
 # ------------------------------------------------------------------------------
-FROM node:24-bookworm@sha256:bb20cf73b3ad7212834ec48e2174cdcb5775f6550510a5336b842ae32741ce6c AS base
+FROM node:26-bookworm@sha256:076dd90a458a4baf8b8d2716f022a2c8db245dbe70c7de38bacad1708258eeab AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 # Set explicit cache location so we can copy it to runner stage
@@ -71,7 +71,7 @@ RUN --mount=type=cache,target=/root/.cache/turbo \
 # Stage 5: runner
 # Minimal production image. Only this stage is included in the final image.
 # ------------------------------------------------------------------------------
-FROM node:24-bookworm-slim@sha256:06e5c9f86bfa0aaa7163cf37a5eaa8805f16b9acb48e3f85645b09d459fc2a9f AS runner
+FROM node:26-bookworm-slim@sha256:79723b41edbedf595f62e943a9f8b0ba9af5b1e61045c5f8f59c2c02c1212a16 AS runner
 ARG APP_NAME
 WORKDIR /app
 
