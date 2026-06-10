@@ -124,14 +124,14 @@ export abstract class McpHandlerBase {
         message: string;
         url: string;
       }): Promise<UrlElicitResult> => {
+        const sendCompletionNotification =
+          mcpServer.server.createElicitationCompletionNotifier(elicitationId);
         const result = await mcpServer.server.elicitInput({
           mode: 'url',
           elicitationId,
           message,
           url,
         });
-        const sendCompletionNotification =
-          mcpServer.server.createElicitationCompletionNotifier(elicitationId);
         return { action: result.action, sendCompletionNotification };
       },
       mcpServer,
