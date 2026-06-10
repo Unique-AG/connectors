@@ -99,7 +99,7 @@ export class ConfluenceSynchronizationService {
           (a) => a.pageId,
         );
         this.metrics.setSyncPhase(SyncPhase.IngestingPages);
-        const inlinedAttachmentIds = await this.fetchAndIngestPages(
+        const inlinedAttachmentKeys = await this.fetchAndIngestPages(
           pagesToFetch,
           spaceScopes,
           concurrency,
@@ -107,7 +107,7 @@ export class ConfluenceSynchronizationService {
         );
 
         const remainingAttachments = attachmentsToIngest.filter(
-          (a) => !inlinedAttachmentIds.has(buildInlinedAttachmentKey(a.pageId, a.id)),
+          (a) => !inlinedAttachmentKeys.has(buildInlinedAttachmentKey(a.pageId, a.id)),
         );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingAttachments);
@@ -147,12 +147,12 @@ export class ConfluenceSynchronizationService {
     concurrency: number,
     imageAttachmentsByPageId: Readonly<Partial<Record<string, DiscoveredAttachment[]>>>,
   ): Promise<Set<string>> {
-    const inlinedAttachmentIds = new Set<string>();
+    const inlinedAttachmentKeys = new Set<string>();
     const limit = pLimit(concurrency);
 
     if (pages.length === 0) {
       this.logger.log({ msg: 'No pages to ingest' });
-      return inlinedAttachmentIds;
+      return inlinedAttachmentKeys;
     }
 
     let processed = 0;
@@ -177,8 +177,8 @@ export class ConfluenceSynchronizationService {
           try {
             const inlined = await this.pageImageInliner.inlineImages(fetched, pageImageAttachments);
             pageToIngest = inlined.page;
-            for (const id of inlined.inlinedAttachmentIds) {
-              inlinedAttachmentIds.add(id);
+            for (const id of inlined.inlinedAttachmentKeys) {
+              inlinedAttachmentKeys.add(id);
             }
           } catch (err) {
             // A hard failure inside the inliner must not lose the page. Fall back to ingesting the original body;
@@ -220,7 +220,7 @@ export class ConfluenceSynchronizationService {
       msg: 'Page ingestion summary',
     });
 
-    return inlinedAttachmentIds;
+    return inlinedAttachmentKeys;
   }
 
   private async ingestAttachments(

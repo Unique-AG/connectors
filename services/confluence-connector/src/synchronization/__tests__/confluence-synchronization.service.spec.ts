@@ -42,7 +42,7 @@ const mockScopeManagementService = {
 } as unknown as ScopeManagementService;
 
 const passthroughPageImageInliner: Pick<PageImageInliner, 'inlineImages'> = {
-  inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+  inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentKeys: new Set<string>() })),
 };
 
 function createService(
@@ -727,7 +727,7 @@ describe('ConfluenceSynchronizationService', () => {
             ...page,
             body: '<p>before</p><img src="data:image/png;base64,XYZ" /><p>after</p>',
           },
-          inlinedAttachmentIds: new Set([
+          inlinedAttachmentKeys: new Set([
             buildInlinedAttachmentKey(imageAttachment.pageId, imageAttachment.id),
           ]),
         })),
@@ -768,7 +768,7 @@ describe('ConfluenceSynchronizationService', () => {
 
     it('falls back to standalone image ingestion when the inliner reports no successful inlines', async () => {
       const inliner: Pick<PageImageInliner, 'inlineImages'> = {
-        inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+        inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentKeys: new Set<string>() })),
       };
 
       const svc = createService(
@@ -794,7 +794,7 @@ describe('ConfluenceSynchronizationService', () => {
 
     it('only passes image-type attachments (not PDFs) to the inliner', async () => {
       const inliner: Pick<PageImageInliner, 'inlineImages'> = {
-        inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentIds: new Set<string>() })),
+        inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentKeys: new Set<string>() })),
       };
 
       const svc = createService(
@@ -860,12 +860,12 @@ describe('ConfluenceSynchronizationService', () => {
           if (fetchedPage.id === '1') {
             return {
               page: fetchedPage,
-              inlinedAttachmentIds: new Set([
+              inlinedAttachmentKeys: new Set([
                 buildInlinedAttachmentKey(otherPageImage.pageId, otherPageImage.id),
               ]),
             };
           }
-          return { page: fetchedPage, inlinedAttachmentIds: new Set<string>() };
+          return { page: fetchedPage, inlinedAttachmentKeys: new Set<string>() };
         }),
       };
 

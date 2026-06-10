@@ -108,7 +108,7 @@ describe('PageImageInliner', () => {
       const page = basePage('');
       const result = await inliner.inlineImages(page, []);
       expect(result.page).toBe(page);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
@@ -116,7 +116,7 @@ describe('PageImageInliner', () => {
       const page = basePage('<p>just text</p>');
       const result = await inliner.inlineImages(page, []);
       expect(result.page).toBe(page);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
     });
   });
 
@@ -133,7 +133,7 @@ describe('PageImageInliner', () => {
       expect(result.page.body.startsWith('<p>before</p>')).toBe(true);
       expect(result.page.body.endsWith('<p>after</p>')).toBe(true);
       expect(
-        result.inlinedAttachmentIds.has(
+        result.inlinedAttachmentKeys.has(
           buildInlinedAttachmentKey(
             sampleDiscoveredImageAttachment.pageId,
             sampleDiscoveredImageAttachment.id,
@@ -185,7 +185,7 @@ describe('PageImageInliner', () => {
         `src="data:image/jpeg;base64,${Buffer.from('two').toString('base64')}"`,
       );
       expect(result.page.body).not.toContain('<ac:image');
-      expect(result.inlinedAttachmentIds).toEqual(
+      expect(result.inlinedAttachmentKeys).toEqual(
         new Set([
           buildInlinedAttachmentKey('1', 'att-one'),
           buildInlinedAttachmentKey('1', 'att-two'),
@@ -214,7 +214,7 @@ describe('PageImageInliner', () => {
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
       const result = await inliner.inlineImages(page, []);
       expect(result.page.body).toBe(page.body);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
@@ -222,7 +222,7 @@ describe('PageImageInliner', () => {
       const page = basePage('<ac:image><ri:attachment ri:filename="spec.pdf"/></ac:image>');
       const result = await inliner.inlineImages(page, [sampleDiscoveredPdfAttachment]);
       expect(result.page.body).toBe(page.body);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
@@ -238,7 +238,7 @@ describe('PageImageInliner', () => {
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
       const result = await smallLimitInliner.inlineImages(page, [oversize]);
       expect(result.page.body).toBe(page.body);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
@@ -254,7 +254,7 @@ describe('PageImageInliner', () => {
       const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
 
       expect(result.page.body).toBe(page.body);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
     });
 
     it('leaves <ac:image> untouched when the matching attachment is an image/* type that is not in allowedMimeTypes', async () => {
@@ -268,7 +268,7 @@ describe('PageImageInliner', () => {
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
       const result = await inliner.inlineImages(page, [gifAttachment]);
       expect(result.page.body).toBe(page.body);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
@@ -276,7 +276,7 @@ describe('PageImageInliner', () => {
       const page = basePage(PAGE_BODY_EXTERNAL_URL_IMAGE);
       const result = await inliner.inlineImages(page, []);
       expect(result.page.body).toBe(page.body);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
       expect(apiClient.fetchAttachmentsByPageTitle).not.toHaveBeenCalled();
     });
@@ -309,7 +309,7 @@ describe('PageImageInliner', () => {
       expect(result.page.body).toContain(
         `src="data:image/png;base64,${imageBuffer().toString('base64')}"`,
       );
-      expect(result.inlinedAttachmentIds.has(buildInlinedAttachmentKey('77', 'remote-att-1'))).toBe(
+      expect(result.inlinedAttachmentKeys.has(buildInlinedAttachmentKey('77', 'remote-att-1'))).toBe(
         true,
       );
     });
@@ -336,7 +336,7 @@ describe('PageImageInliner', () => {
 
       // No lookup cache: each reference fetches the referenced page's attachments independently.
       expect(apiClient.fetchAttachmentsByPageTitle).toHaveBeenCalledTimes(2);
-      expect(result.inlinedAttachmentIds).toEqual(
+      expect(result.inlinedAttachmentKeys).toEqual(
         new Set([
           buildInlinedAttachmentKey('77', 'remote-a'),
           buildInlinedAttachmentKey('77', 'remote-b'),
@@ -364,7 +364,7 @@ describe('PageImageInliner', () => {
       const result = await inliner.inlineImages(page, []);
 
       expect(result.page.body).toBe(page.body);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
@@ -375,7 +375,7 @@ describe('PageImageInliner', () => {
       const result = await inliner.inlineImages(page, []);
 
       expect(result.page.body).toBe(page.body);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
@@ -398,7 +398,7 @@ describe('PageImageInliner', () => {
         vi.clearAllMocks();
         const result = await inliner.inlineImages(basePage(body), [samePageDecoy]);
         expect(result.page.body).toBe(body);
-        expect(result.inlinedAttachmentIds.size).toBe(0);
+        expect(result.inlinedAttachmentKeys.size).toBe(0);
         expect(apiClient.fetchAttachmentsByPageTitle).not.toHaveBeenCalled();
         expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
       }
@@ -411,7 +411,7 @@ describe('PageImageInliner', () => {
       const result = await inliner.inlineImages(page, []);
 
       expect(result.page.body).toBe(page.body);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
     });
   });
 
@@ -420,7 +420,7 @@ describe('PageImageInliner', () => {
       const page = basePage(PAGE_BODY_SELF_CLOSING_IMAGE);
       const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
       expect(result.page.body).toBe(page.body);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
@@ -432,7 +432,7 @@ describe('PageImageInliner', () => {
       const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
       expect(result.page.body).toBe(page.body);
       expect(result.page.body.endsWith('<p>more</p>')).toBe(true);
-      expect(result.inlinedAttachmentIds.size).toBe(0);
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
@@ -448,7 +448,7 @@ describe('PageImageInliner', () => {
       expect(result.page.body).toContain(
         `src="data:image/png;base64,${imageBuffer().toString('base64')}"`,
       );
-      expect(result.inlinedAttachmentIds.size).toBe(1);
+      expect(result.inlinedAttachmentKeys.size).toBe(1);
       expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledTimes(1);
     });
 
@@ -467,7 +467,7 @@ describe('PageImageInliner', () => {
       // Surrounding table structure must remain intact byte-for-byte.
       expect(result.page.body.startsWith('<table><tbody><tr><td><p>cell text</p>')).toBe(true);
       expect(result.page.body.endsWith('</td></tr></tbody></table>')).toBe(true);
-      expect(result.inlinedAttachmentIds.size).toBe(1);
+      expect(result.inlinedAttachmentKeys.size).toBe(1);
     });
 
     it('inlines two adjacent <ac:image> macros with no separator between them', async () => {
@@ -531,7 +531,7 @@ describe('PageImageInliner', () => {
       expect(result.page.body).toContain(
         '<ac:image><ri:attachment ri:filename="unknown.png"/></ac:image>',
       );
-      expect(result.inlinedAttachmentIds).toEqual(
+      expect(result.inlinedAttachmentKeys).toEqual(
         new Set([buildInlinedAttachmentKey('1', 'att-known')]),
       );
       expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledTimes(1);
@@ -562,10 +562,10 @@ describe('PageImageInliner', () => {
         [],
       );
 
-      expect(local.inlinedAttachmentIds).toEqual(
+      expect(local.inlinedAttachmentKeys).toEqual(
         new Set([buildInlinedAttachmentKey('1', 'shared-id')]),
       );
-      expect(remote.inlinedAttachmentIds).toEqual(
+      expect(remote.inlinedAttachmentKeys).toEqual(
         new Set([buildInlinedAttachmentKey('99', 'shared-id')]),
       );
       // Verify the keys are not equal — same attachment id, different pages.

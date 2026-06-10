@@ -24,7 +24,7 @@ const AC_IMAGE_ATTRS_TO_KEEP: ReadonlyArray<[string, string]> = [
 
 export interface InlineImagesResult {
   page: FetchedPage;
-  inlinedAttachmentIds: Set<string>;
+  inlinedAttachmentKeys: Set<string>;
 }
 
 interface ResolvedAttachment {
@@ -62,12 +62,12 @@ export class PageImageInliner {
     pageImageAttachments: DiscoveredAttachment[],
   ): Promise<InlineImagesResult> {
     if (!page.body) {
-      return { page, inlinedAttachmentIds: new Set() };
+      return { page, inlinedAttachmentKeys: new Set() };
     }
 
     const macros = parseImageMacros(page.body);
     if (macros.length === 0) {
-      return { page, inlinedAttachmentIds: new Set() };
+      return { page, inlinedAttachmentKeys: new Set() };
     }
 
     const pageImageAttachmentsByTitle = indexBy(pageImageAttachments, (a) => a.title);
@@ -92,16 +92,18 @@ export class PageImageInliner {
 
     const successfulReplacements = filter(settledReplacements, isNonNullish);
     if (successfulReplacements.length === 0) {
-      return { page, inlinedAttachmentIds: new Set() };
+      return { page, inlinedAttachmentKeys: new Set() };
     }
 
-    const inlinedAttachmentIds = new Set(
+    // We skip these when ingesting the rest of the attachments so an inlined
+    // image isn't also ingested as its own document.
+    const inlinedAttachmentKeys = new Set(
       successfulReplacements.map((r) => buildInlinedAttachmentKey(r.pageId, r.attachmentId)),
     );
     const newBody = this.applyReplacements(page.body, successfulReplacements);
     return {
       page: { ...page, body: newBody },
-      inlinedAttachmentIds,
+      inlinedAttachmentKeys,
     };
   }
 
