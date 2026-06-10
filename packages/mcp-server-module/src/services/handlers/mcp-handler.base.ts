@@ -13,10 +13,12 @@ import { z } from 'zod';
 import {
   Context,
   FormElicitResult,
+  isDeclienOrCancelAction,
   McpRequest,
   SerializableValue,
   UrlElicitResult,
 } from '../../interfaces';
+import { formatZodError } from '../../utils/format-zod-error';
 import { McpRegistryService } from '../mcp-registry.service';
 
 export abstract class McpHandlerBase {
@@ -85,8 +87,33 @@ export abstract class McpHandlerBase {
             io: 'input',
           }) as ElicitRequestFormParams['requestedSchema'],
         });
-        // SDK validates content against the JSON Schema derived from schema; cast is safe.
-        return result as FormElicitResult<T>;
+        const action = result.action;
+        if (isDeclienOrCancelAction(action)) {
+          return { action, content: undefined };
+        }
+        // Internally the sdk uses AJV (Another JSON Validator) and will raise a McpError if z.toJSONSchema(schema, { io: 'input', })
+        // validation does not pass. Once we do The z.toJSONSchema(schema, { io: 'input', }) we lose refinements and transforms from zod,
+        // normally we would not need those in elicitation input but in case someone uses them we enforce zod validation and output the
+        // proper requested type to the elicitation caller, after validation we raise the same McpError as the sdk validation does.
+        // Examples of cases where validation would differ.
+        // Cases where safeParse agrees with the SDK's AJV validation (the common case):
+        // - z.string(), z.boolean(), z.number() — JSON Schema represents these exactly, AJV enforces them, Zod
+        // agrees
+        // - z.string().min(3) → minLength: 3 in JSON Schema — AJV enforces it, Zod agrees
+        // - z.string().email() → format: "email" — AJV enforces it (with formats), Zod agrees
+
+        // Cases where safeParse adds something AJV didn't catch:
+        // - .refine(val => val.startsWith('A')) — can't be expressed in JSON Schema, AJV skips it, Zod enforces
+        //  it
+        // - .transform(s => s.trim()) — AJV doesn't transform, Zod would apply it
+        const safeParsed = schema.safeParse(result.content);
+        if (!safeParsed.success) {
+          throw new McpError(ErrorCode.InvalidParams, formatZodError(safeParsed.error));
+        }
+        return {
+          action: 'accept',
+          content: schema.parse(result.content),
+        };
       },
       elicitUrl: async ({
         elicitationId,

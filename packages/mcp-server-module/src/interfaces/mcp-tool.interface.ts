@@ -16,6 +16,9 @@ export type SerializableValue =
 
 export type McpRequest = CallToolRequest | ReadResourceRequest | GetPromptRequest;
 
+export const isDeclienOrCancelAction = (action: string): action is 'cancel' | 'decline' =>
+  ['cancel', 'decline'].includes(action);
+
 export type FormElicitResult<T extends z.ZodRawShape> =
   | { action: 'accept'; content: z.infer<z.ZodObject<T>> }
   | { action: 'decline' | 'cancel'; content?: undefined };
