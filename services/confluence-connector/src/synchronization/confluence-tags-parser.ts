@@ -29,23 +29,19 @@ export function parseImageBlocks(body: string): ParsedImageMacro[] {
     withEndIndices: true,
   });
 
-  const blocks: ParsedImageMacro[] = [];
-  for (const node of DomUtils.getElementsByTagName('ac:image', doc)) {
+  return DomUtils.getElementsByTagName('ac:image', doc).map((node) => {
     assert.ok(
       node.startIndex != null && node.endIndex != null,
       'node positions missing — parseDocument needs withStartIndices/withEndIndices',
     );
 
-    const endIndexExclusive = node.endIndex + 1;
-    blocks.push({
+    return {
       startIndex: node.startIndex,
-      endIndex: endIndexExclusive,
+      endIndex: node.endIndex + 1,
       imgAttrs: node.attribs,
       resourceRef: resolveResourceRef(node),
-    });
-  }
-
-  return blocks;
+    };
+  });
 }
 
 // Returns the first direct child element with the given tag name. recurse=false keeps the
