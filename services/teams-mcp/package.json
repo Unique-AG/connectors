@@ -84,7 +84,7 @@
     "@types/passport-microsoft": "2.1.0",
     "@types/pg": "8.15.5",
     "@types/supertest": "6.0.3",
-    "@vitest/coverage-istanbul": "3.2.4",
+    "@vitest/coverage-istanbul": "3.2.6",
     "globals": "16.3.0",
     "istanbul-badges-readme": "1.9.0",
     "source-map-support": "0.5.21",
@@ -92,7 +92,7 @@
     "type-fest": "5.2.0",
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
-    "vitest": "3.2.4"
+    "vitest": "3.2.6"
   },
   "packageManager": "pnpm@10.28.1"
 }
