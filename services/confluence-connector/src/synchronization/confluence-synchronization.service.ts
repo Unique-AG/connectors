@@ -98,15 +98,12 @@ export class ConfluenceSynchronizationService {
           discoveredAttachments.filter((a) => isImageMimeType(a.mediaType)),
           (a) => a.pageId,
         );
-        const inlinedAttachmentIds = new Set<string>();
-
         this.metrics.setSyncPhase(SyncPhase.IngestingPages);
-        await this.fetchAndIngestPages(
+        const inlinedAttachmentIds = await this.fetchAndIngestPages(
           pagesToFetch,
           spaceScopes,
           concurrency,
           imageAttachmentsByPageId,
-          inlinedAttachmentIds,
         );
 
         const remainingAttachments = attachmentsToIngest.filter(
@@ -149,13 +146,13 @@ export class ConfluenceSynchronizationService {
     spaceScopes: Map<string, string>,
     concurrency: number,
     imageAttachmentsByPageId: Readonly<Partial<Record<string, DiscoveredAttachment[]>>>,
-    inlinedAttachmentIds: Set<string>,
-  ): Promise<void> {
+  ): Promise<Set<string>> {
+    const inlinedAttachmentIds = new Set<string>();
     const limit = pLimit(concurrency);
 
     if (pages.length === 0) {
       this.logger.log({ msg: 'No pages to ingest' });
-      return;
+      return inlinedAttachmentIds;
     }
 
     let processed = 0;
@@ -222,6 +219,8 @@ export class ConfluenceSynchronizationService {
       failed,
       msg: 'Page ingestion summary',
     });
+
+    return inlinedAttachmentIds;
   }
 
   private async ingestAttachments(
