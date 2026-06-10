@@ -12,7 +12,7 @@ import {
   parseImageBlocks,
   type ResourceRef,
 } from './confluence-tags-parser';
-import { isImageMediaType, normalizeMediaType } from './media-type';
+import { isImageMimeType, normalizeMimeType } from './mime-type';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
 // ac:image attributes forwarded onto <img>; presentational hints (align, thumbnail, etc.) are dropped.
@@ -135,7 +135,7 @@ export class PageImageInliner {
       return null;
     }
 
-    if (!isImageMediaType(resolved.mediaType)) {
+    if (!isImageMimeType(resolved.mediaType)) {
       this.logger.debug({
         pageId: page.id,
         filename: resolved.filename,
@@ -146,7 +146,7 @@ export class PageImageInliner {
     }
 
     // Other-page lookups bypass discovery's allowedMimeTypes filter; re-check here.
-    if (!this.isAllowedMediaType(resolved.mediaType)) {
+    if (!this.isAllowedMimeType(resolved.mediaType)) {
       this.logger.debug({
         pageId: page.id,
         filename: resolved.filename,
@@ -306,10 +306,8 @@ export class PageImageInliner {
     return promise;
   }
 
-  private isAllowedMediaType(mediaType: string): boolean {
-    return this.config.ingestion.attachments.allowedMimeTypes.includes(
-      normalizeMediaType(mediaType),
-    );
+  private isAllowedMimeType(mimeType: string): boolean {
+    return this.config.ingestion.attachments.allowedMimeTypes.includes(normalizeMimeType(mimeType));
   }
 
   private exceedsMaxSize(fileSize: number): boolean {
@@ -336,15 +334,15 @@ export class PageImageInliner {
 
   private buildImgTag(
     imgAttrs: Record<string, string>,
-    mediaType: string,
+    mimeType: string,
     buffer: Buffer,
     filename: string,
   ): string {
     const base64 = buffer.toString('base64');
-    const normalizedMediaType = normalizeMediaType(mediaType);
+    const normalizedMimeType = normalizeMimeType(mimeType);
     const altValue = imgAttrs['ac:alt'] ?? filename;
 
-    const parts: string[] = [`src="data:${normalizedMediaType};base64,${base64}"`];
+    const parts: string[] = [`src="data:${normalizedMimeType};base64,${base64}"`];
     if (altValue) {
       parts.push(`alt="${escapeAttr(altValue)}"`);
     }

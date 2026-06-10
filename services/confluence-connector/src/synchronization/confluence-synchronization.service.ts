@@ -9,7 +9,7 @@ import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
-import { isImageMediaType } from './media-type';
+import { isImageMimeType } from './mime-type';
 import { buildInlinedAttachmentKey, type PageImageInliner } from './page-image-inliner';
 import type { ScopeManagementService } from './scope-management.service';
 import type { DiscoveredAttachment, DiscoveredPage } from './sync.types';
@@ -281,7 +281,7 @@ export class ConfluenceSynchronizationService {
   ): Map<string, DiscoveredAttachment[]> {
     const map = new Map<string, DiscoveredAttachment[]>();
     for (const attachment of attachments) {
-      if (!isImageMediaType(attachment.mediaType)) {
+      if (!isImageMimeType(attachment.mediaType)) {
         continue;
       }
       const existing = map.get(attachment.pageId);
