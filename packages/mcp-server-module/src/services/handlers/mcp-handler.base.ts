@@ -112,7 +112,7 @@ export abstract class McpHandlerBase {
         }
         return {
           action: 'accept',
-          content: schema.parse(result.content),
+          content: safeParsed.data,
         };
       },
       elicitUrl: async ({
