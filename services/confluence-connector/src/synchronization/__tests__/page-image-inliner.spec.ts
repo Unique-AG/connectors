@@ -318,7 +318,7 @@ describe('PageImageInliner', () => {
       );
     });
 
-    it('caches other-page lookups and only calls the API once per (spaceKey, title)', async () => {
+    it('inlines both images when a page references the same other-page twice', async () => {
       const remoteA = createConfluenceImageAttachment({
         id: 'remote-a',
         title: 'a.png',
@@ -338,7 +338,8 @@ describe('PageImageInliner', () => {
         [],
       );
 
-      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
+      // No lookup cache: each reference fetches the referenced page's attachments independently.
+      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(2);
       expect(result.inlinedAttachmentIds).toEqual(
         new Set([
           buildInlinedAttachmentKey('77', 'remote-a'),
@@ -415,94 +416,6 @@ describe('PageImageInliner', () => {
 
       expect(result.page.body).toBe(page.body);
       expect(result.inlinedAttachmentIds.size).toBe(0);
-    });
-
-    it('shares in-flight other-page lookups across concurrent inlineImages calls', async () => {
-      // Deferred promise: hold the first lookup open until both inlineImages calls
-      // have a chance to enter lookupOtherPageAttachments. If the cache were set
-      // after-await, the second call would issue its own API request.
-      let resolveLookup!: (v: PageAttachmentLookupResult) => void;
-      apiClient.fetchPageAttachmentsByTitle.mockReturnValue(
-        new Promise<PageAttachmentLookupResult>((resolve) => {
-          resolveLookup = resolve;
-        }),
-      );
-      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
-
-      const first = inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
-      const second = inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
-      // Let microtasks run so both invocations reach lookupOtherPageAttachments.
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
-
-      resolveLookup({
-        pageId: '77',
-        attachments: [createConfluenceImageAttachment({ id: 'remote-1', title: 'other.png' })],
-      });
-      await Promise.all([first, second]);
-      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
-    });
-
-    it('re-fetches the same referenced page after resetOtherPageAttachmentCache() is called between syncs', async () => {
-      // First sync: lookup succeeds and is cached on the instance.
-      apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce({
-        pageId: '77',
-        attachments: [createConfluenceImageAttachment({ id: 'remote-1', title: 'other.png' })],
-      });
-      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
-      await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
-      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
-
-      // Second sync after the orchestrator clears the cache: the same lookup must
-      // hit the API again so any attachment changes on the referenced page are picked up.
-      inliner.resetOtherPageAttachmentCache();
-      apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce({
-        pageId: '77',
-        attachments: [
-          createConfluenceImageAttachment({ id: 'remote-1', title: 'other.png' }),
-          createConfluenceImageAttachment({ id: 'remote-2', title: 'new.png' }),
-        ],
-      });
-      await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
-      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(2);
-    });
-
-    it('re-fetches after resetOtherPageAttachmentCache() even when the previous lookup returned null', async () => {
-      apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce(null);
-      const firstSync = await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
-      expect(firstSync.inlinedAttachmentIds.size).toBe(0);
-
-      // Without resetOtherPageAttachmentCache() the null result would stick. After reset, the
-      // newly-available referenced page should be picked up.
-      inliner.resetOtherPageAttachmentCache();
-      apiClient.fetchPageAttachmentsByTitle.mockResolvedValueOnce({
-        pageId: '77',
-        attachments: [createConfluenceImageAttachment({ id: 'remote-1', title: 'other.png' })],
-      });
-      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
-      const secondSync = await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
-      expect(secondSync.inlinedAttachmentIds.size).toBe(1);
-      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(2);
-    });
-
-    it('does not permanently cache a rejected other-page lookup; retries on next reference', async () => {
-      apiClient.fetchPageAttachmentsByTitle
-        .mockRejectedValueOnce(new Error('transient boom'))
-        .mockResolvedValueOnce({
-          pageId: '77',
-          attachments: [createConfluenceImageAttachment({ id: 'remote-1', title: 'other.png' })],
-        });
-      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
-
-      const first = await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
-      expect(first.inlinedAttachmentIds.size).toBe(0);
-
-      const second = await inliner.inlineImages(basePage(PAGE_BODY_OTHER_PAGE_IMAGE), []);
-      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(2);
-      expect(second.inlinedAttachmentIds.has(buildInlinedAttachmentKey('77', 'remote-1'))).toBe(
-        true,
-      );
     });
   });
 

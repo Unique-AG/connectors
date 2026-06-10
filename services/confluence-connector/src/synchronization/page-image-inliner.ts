@@ -3,11 +3,7 @@ import { Logger } from '@nestjs/common';
 import { indexBy } from 'remeda';
 import type { TenantConfig } from '../config';
 import { BYTES_PER_MB } from '../config/ingestion.schema';
-import type {
-  ConfluenceApiClient,
-  ConfluenceAttachment,
-  PageAttachmentLookupResult,
-} from '../confluence-api';
+import type { ConfluenceApiClient, ConfluenceAttachment } from '../confluence-api';
 import {
   type ParsedImageMacro,
   parseImageBlocks,
@@ -52,23 +48,11 @@ export function buildInlinedAttachmentKey(pageId: string, attachmentId: string):
 
 export class PageImageInliner {
   private readonly logger = new Logger(PageImageInliner.name);
-  // Caches "list attachments of page <title> in space <key>" lookups, used when an image
-  // macro references an attachment on a different page. Per-sync only; the orchestrator
-  // calls resetOtherPageAttachmentCache() at the start of each sync so attachment changes
-  // on referenced pages are picked up on the next run.
-  private readonly otherPageAttachmentCache = new Map<
-    string,
-    Promise<PageAttachmentLookupResult | null>
-  >();
 
   public constructor(
     private readonly config: TenantConfig,
     private readonly confluenceApiClient: ConfluenceApiClient,
   ) {}
-
-  public resetOtherPageAttachmentCache(): void {
-    this.otherPageAttachmentCache.clear();
-  }
 
   public async inlineImages(
     page: FetchedPage,
@@ -219,7 +203,10 @@ export class PageImageInliner {
   private async resolveOtherPageAttachment(
     resource: Extract<ResourceRef, { kind: 'other-page-attachment' }>,
   ): Promise<ResolvedAttachment | null> {
-    const lookup = await this.lookupOtherPageAttachments(resource.spaceKey, resource.contentTitle);
+    const lookup = await this.confluenceApiClient.fetchPageAttachmentsByTitle(
+      resource.spaceKey,
+      resource.contentTitle,
+    );
     if (!lookup) {
       this.logger.debug({
         spaceKey: resource.spaceKey,
@@ -266,33 +253,6 @@ export class PageImageInliner {
       fileSize: attachment.extensions.fileSize,
       filename: attachment.title,
     };
-  }
-
-  private async lookupOtherPageAttachments(
-    spaceKey: string,
-    contentTitle: string,
-  ): Promise<PageAttachmentLookupResult | null> {
-    // JSON.stringify avoids separator collisions that a plain concatenation would create.
-    const cacheKey = JSON.stringify([spaceKey, contentTitle]);
-    const cached = this.otherPageAttachmentCache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
-    const promise = this.confluenceApiClient
-      .fetchPageAttachmentsByTitle(spaceKey, contentTitle)
-      .catch((err) => {
-        // Don't cache errors permanently; a legitimate null (404) stays cached.
-        this.otherPageAttachmentCache.delete(cacheKey);
-        this.logger.warn({
-          spaceKey,
-          contentTitle,
-          err,
-          msg: 'Attachment lookup on referenced other page failed',
-        });
-        return null;
-      });
-    this.otherPageAttachmentCache.set(cacheKey, promise);
-    return promise;
   }
 
   private isAllowedMimeType(mimeType: string): boolean {
