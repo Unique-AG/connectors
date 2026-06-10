@@ -30,15 +30,8 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Extract PNPM version from package.json
-        id: pnpm-version
-        run: |
-          PNPM_VERSION=$(jq -r '.packageManager | split("@")[1]' package.json)
-          echo "version=$PNPM_VERSION" >> $GITHUB_OUTPUT
-
-      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
         with:
-          version: ${{ steps.pnpm-version.outputs.version }}
           run_install: false
 
       - name: Get pnpm store directory
