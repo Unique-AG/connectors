@@ -113,7 +113,7 @@ sequenceDiagram
             Note over Connector: Parse storage XML, locate &lt;ac:image&gt; macros
             opt Image attachments referenced
                 opt Some references point to another page
-                    Connector->>Confluence: GET /rest/api/content?spaceKey=&amp;title=<br/>(cached per sync)
+                    Connector->>Confluence: GET /rest/api/content?spaceKey=&amp;title=
                     Confluence->>Connector: Target page + its attachments
                 end
                 Connector->>Confluence: Download each referenced image
@@ -216,7 +216,7 @@ When `attachments.imageOcr` is `enabled` (default), each image content registrat
 During page ingestion, the connector parses each page's Confluence storage XML and replaces every `<ac:image>` macro that points to a Confluence attachment with an `<img src="data:image/...;base64,...">` element before uploading the page. Two reference shapes are resolved:
 
 - **Current-page attachment:** `<ac:image><ri:attachment ri:filename="..."/></ac:image>` is matched against the page's discovered image attachments by filename.
-- **Other-page attachment:** `<ac:image><ri:attachment ri:filename="..."><ri:page ri:space-key="..." ri:content-title="..."/></ri:attachment></ac:image>` triggers an on-demand lookup of the referenced page's attachments. Results are cached for the lifetime of one sync.
+- **Other-page attachment:** `<ac:image><ri:attachment ri:filename="..."><ri:page ri:space-key="..." ri:content-title="..."/></ri:attachment></ac:image>` triggers an on-demand lookup of the referenced page's attachments.
 
 A macro is left untouched (and falls back to the standalone attachment path if the underlying attachment is otherwise queued for ingestion) when any of these conditions hold:
 
