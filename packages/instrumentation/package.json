@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.0",
-    "@opentelemetry/auto-instrumentations-node": "0.62.2",
+    "@opentelemetry/auto-instrumentations-node": "0.75.0",
     "@opentelemetry/context-async-hooks": "2.0.1",
     "@opentelemetry/core": "2.0.1",
     "@opentelemetry/exporter-metrics-otlp-proto": "0.203.0",
