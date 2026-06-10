@@ -278,12 +278,12 @@ describe('PageImageInliner', () => {
       expect(result.page.body).toBe(page.body);
       expect(result.inlinedAttachmentIds.size).toBe(0);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
-      expect(apiClient.fetchPageAttachmentsByTitle).not.toHaveBeenCalled();
+      expect(apiClient.fetchAttachmentsByPageTitle).not.toHaveBeenCalled();
     });
   });
 
   describe('other-page attachment resolution', () => {
-    it('resolves an <ri:attachment> on another page via fetchPageAttachmentsByTitle and inlines it', async () => {
+    it('resolves an <ri:attachment> on another page via fetchAttachmentsByPageTitle and inlines it', async () => {
       const remoteAttachment = createConfluenceImageAttachment({
         id: 'remote-att-1',
         title: 'other.png',
@@ -293,14 +293,14 @@ describe('PageImageInliner', () => {
         pageId: '77',
         attachments: [remoteAttachment],
       };
-      apiClient.fetchPageAttachmentsByTitle.mockResolvedValue(lookup);
+      apiClient.fetchAttachmentsByPageTitle.mockResolvedValue(lookup);
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
 
       const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
       const result = await inliner.inlineImages(page, []);
 
-      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledWith('OTHER', 'Other Page');
-      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(1);
+      expect(apiClient.fetchAttachmentsByPageTitle).toHaveBeenCalledWith('OTHER', 'Other Page');
+      expect(apiClient.fetchAttachmentsByPageTitle).toHaveBeenCalledTimes(1);
       expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledWith(
         'remote-att-1',
         '77',
@@ -323,7 +323,7 @@ describe('PageImageInliner', () => {
         id: 'remote-b',
         title: 'b.png',
       });
-      apiClient.fetchPageAttachmentsByTitle.mockResolvedValue({
+      apiClient.fetchAttachmentsByPageTitle.mockResolvedValue({
         pageId: '77',
         attachments: [remoteA, remoteB],
       });
@@ -335,7 +335,7 @@ describe('PageImageInliner', () => {
       );
 
       // No lookup cache: each reference fetches the referenced page's attachments independently.
-      expect(apiClient.fetchPageAttachmentsByTitle).toHaveBeenCalledTimes(2);
+      expect(apiClient.fetchAttachmentsByPageTitle).toHaveBeenCalledTimes(2);
       expect(result.inlinedAttachmentIds).toEqual(
         new Set([
           buildInlinedAttachmentKey('77', 'remote-a'),
@@ -349,7 +349,7 @@ describe('PageImageInliner', () => {
       // metadata that has not been filtered by discovery. A GIF/WebP/SVG on the
       // referenced page must be rejected by the inliner so it doesn't end up
       // base64-embedded into the page.
-      apiClient.fetchPageAttachmentsByTitle.mockResolvedValue({
+      apiClient.fetchAttachmentsByPageTitle.mockResolvedValue({
         pageId: '77',
         attachments: [
           createConfluenceImageAttachment({
@@ -369,7 +369,7 @@ describe('PageImageInliner', () => {
     });
 
     it('leaves an other-page macro untouched when the referenced page is not found', async () => {
-      apiClient.fetchPageAttachmentsByTitle.mockResolvedValue(null);
+      apiClient.fetchAttachmentsByPageTitle.mockResolvedValue(null);
 
       const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
       const result = await inliner.inlineImages(page, []);
@@ -399,13 +399,13 @@ describe('PageImageInliner', () => {
         const result = await inliner.inlineImages(basePage(body), [samePageDecoy]);
         expect(result.page.body).toBe(body);
         expect(result.inlinedAttachmentIds.size).toBe(0);
-        expect(apiClient.fetchPageAttachmentsByTitle).not.toHaveBeenCalled();
+        expect(apiClient.fetchAttachmentsByPageTitle).not.toHaveBeenCalled();
         expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
       }
     });
 
-    it('leaves an other-page macro untouched when fetchPageAttachmentsByTitle throws', async () => {
-      apiClient.fetchPageAttachmentsByTitle.mockRejectedValue(new Error('lookup boom'));
+    it('leaves an other-page macro untouched when fetchAttachmentsByPageTitle throws', async () => {
+      apiClient.fetchAttachmentsByPageTitle.mockRejectedValue(new Error('lookup boom'));
 
       const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
       const result = await inliner.inlineImages(page, []);
@@ -540,7 +540,7 @@ describe('PageImageInliner', () => {
     it('records the same attachment id under different keys when it appears on two different pages', async () => {
       // Other-page image lookup: lookup.pageId='99', resolved attachment id reused
       // elsewhere by coincidence. The inlined key must be pageId-scoped.
-      apiClient.fetchPageAttachmentsByTitle.mockResolvedValue({
+      apiClient.fetchAttachmentsByPageTitle.mockResolvedValue({
         pageId: '99',
         attachments: [createConfluenceImageAttachment({ id: 'shared-id', title: 'other.png' })],
       });

@@ -45,8 +45,9 @@ export abstract class ConfluenceApiClient {
     downloadPath: string,
   ): Promise<Readable>;
 
-  public abstract fetchPageAttachmentsByTitle(
+  // Page titles are unique within a space, so (spaceKey, pageTitle) identifies a single page.
+  public abstract fetchAttachmentsByPageTitle(
     spaceKey: string,
-    title: string,
+    pageTitle: string,
   ): Promise<PageAttachmentLookupResult | null>;
 }

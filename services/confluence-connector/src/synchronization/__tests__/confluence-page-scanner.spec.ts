@@ -61,7 +61,7 @@ const enabledAttachmentConfig: AttachmentConfig = {
 
 function makeAttachment(
   id: string,
-  title: string,
+  attachmentTitle: string,
   overrides: Partial<{
     fileSize: number;
     mediaType: string;
@@ -70,13 +70,13 @@ function makeAttachment(
 ): ConfluenceAttachment {
   return {
     id,
-    title,
+    title: attachmentTitle,
     extensions: {
       mediaType: overrides.mediaType ?? 'application/pdf',
       fileSize: overrides.fileSize ?? 1_000,
     },
     version: overrides.versionWhen ? { when: overrides.versionWhen } : undefined,
-    _links: { download: `/download/attachments/${id}/${title}` },
+    _links: { download: `/download/attachments/${id}/${attachmentTitle}` },
   };
 }
 

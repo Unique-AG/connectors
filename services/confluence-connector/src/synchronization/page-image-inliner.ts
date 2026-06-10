@@ -203,7 +203,7 @@ export class PageImageInliner {
   private async resolveOtherPageAttachment(
     resource: Extract<ResourceRef, { kind: 'other-page-attachment' }>,
   ): Promise<ResolvedAttachment | null> {
-    const lookup = await this.confluenceApiClient.fetchPageAttachmentsByTitle(
+    const lookup = await this.confluenceApiClient.fetchAttachmentsByPageTitle(
       resource.spaceKey,
       resource.contentTitle,
     );

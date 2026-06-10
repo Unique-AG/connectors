@@ -525,7 +525,7 @@ describe('CloudConfluenceApiClient', () => {
     });
   });
 
-  describe('fetchPageAttachmentsByTitle', () => {
+  describe('fetchAttachmentsByPageTitle', () => {
     function clientWithAttachments() {
       return new CloudConfluenceApiClient(mockConfig as never, mockAuth as never, mockHttpClient, {
         attachmentsEnabled: true,
@@ -533,7 +533,7 @@ describe('CloudConfluenceApiClient', () => {
     }
 
     it('returns null without HTTP when attachmentsEnabled is false', async () => {
-      const result = await client.fetchPageAttachmentsByTitle('SP', 'Other Page');
+      const result = await client.fetchAttachmentsByPageTitle('SP', 'Other Page');
 
       expect(result).toBeNull();
       expect(mockHttpClient.rateLimitedRequest).not.toHaveBeenCalled();
@@ -545,7 +545,7 @@ describe('CloudConfluenceApiClient', () => {
         _links: {},
       });
 
-      await clientWithAttachments().fetchPageAttachmentsByTitle(
+      await clientWithAttachments().fetchAttachmentsByPageTitle(
         'TST SPACE',
         'Page With "Quotes" & Stuff',
       );
@@ -565,7 +565,7 @@ describe('CloudConfluenceApiClient', () => {
         _links: {},
       });
 
-      const result = await clientWithAttachments().fetchPageAttachmentsByTitle('SP', 'Missing');
+      const result = await clientWithAttachments().fetchAttachmentsByPageTitle('SP', 'Missing');
 
       expect(result).toBeNull();
     });
@@ -595,7 +595,7 @@ describe('CloudConfluenceApiClient', () => {
         _links: {},
       });
 
-      const result = await clientWithAttachments().fetchPageAttachmentsByTitle('SP', 'Other Page');
+      const result = await clientWithAttachments().fetchAttachmentsByPageTitle('SP', 'Other Page');
 
       expect(result).toEqual({
         pageId: '500',
@@ -657,7 +657,7 @@ describe('CloudConfluenceApiClient', () => {
           _links: {},
         });
 
-      const result = await clientWithAttachments().fetchPageAttachmentsByTitle('SP', 'Other Page');
+      const result = await clientWithAttachments().fetchAttachmentsByPageTitle('SP', 'Other Page');
 
       const calls = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls;
       expect(calls).toHaveLength(2);

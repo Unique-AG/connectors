@@ -88,16 +88,16 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     return result.success ? result.data : null;
   }
 
-  public async fetchPageAttachmentsByTitle(
+  public async fetchAttachmentsByPageTitle(
     spaceKey: string,
-    title: string,
+    pageTitle: string,
   ): Promise<PageAttachmentLookupResult | null> {
     if (!this.options.attachmentsEnabled) {
       return null;
     }
 
     const expand = `space${this.attachmentExpand}`;
-    const url = `${this.config.baseUrl}/rest/api/content?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(title)}&type=page&expand=${expand}`;
+    const url = `${this.config.baseUrl}/rest/api/content?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(pageTitle)}&type=page&expand=${expand}`;
     const raw = await this.makeAuthenticatedRequest(url);
 
     const response = paginatedResponseSchema(confluencePageSchema).parse(raw);
