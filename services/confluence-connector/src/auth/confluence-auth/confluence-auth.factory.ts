@@ -5,6 +5,7 @@ import { AuthMode, type ConfluenceConfig } from '../../config';
 import { ProxyService } from '../../proxy';
 import { getCurrentTenant } from '../../tenant/tenant-context.storage';
 import { ConfluenceAuth } from './confluence-auth.abstract';
+import { BasicAuthStrategy } from './strategies/basic-auth.strategy';
 import { OAuth2LoAuthStrategy } from './strategies/oauth2lo-auth.strategy';
 import { PatAuthStrategy } from './strategies/pat-auth.strategy';
 
@@ -33,6 +34,13 @@ export class ConfluenceAuthFactory {
       case AuthMode.Pat: {
         this.logger.log({ tenantName, msg: 'Using PAT authentication for data-center instance' });
         return new PatAuthStrategy(config.auth);
+      }
+      case AuthMode.Basic: {
+        this.logger.log({
+          tenantName,
+          msg: 'Using HTTP Basic authentication for data-center instance',
+        });
+        return new BasicAuthStrategy(config.auth);
       }
       default: {
         assert.fail(`Unsupported Confluence auth mode`);

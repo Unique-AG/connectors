@@ -2,8 +2,8 @@ import { asAllOptions } from '@unique-ag/utils';
 import z from 'zod/v4';
 
 export enum McpBackendType {
-  MicrosoftGraphAndUniqueApi = 'MicrosoftGraphAndUniqueApi',
-  MicrosoftGraph = 'MicrosoftGraph',
+  MicrosoftGraphAndUniqueApi = 'microsoft_graph_and_unique_api',
+  MicrosoftGraph = 'microsoft_graph',
 }
 
 export const AllBackendTypes = asAllOptions<McpBackendType>()([

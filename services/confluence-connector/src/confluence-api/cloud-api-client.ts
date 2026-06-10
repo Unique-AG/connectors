@@ -161,8 +161,8 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
     _downloadPath: string,
   ): Promise<Readable> {
     const url = `${this.apiBaseUrl}/wiki/rest/api/content/${pageId}/child/attachment/${attachmentId}/download`;
-    const token = await this.confluenceAuth.acquireToken();
-    return this.httpClient.rateLimitedStreamRequest(url, { Authorization: `Bearer ${token}` });
+    const authorization = await this.confluenceAuth.getAuthorizationHeader();
+    return this.httpClient.rateLimitedStreamRequest(url, { Authorization: authorization });
   }
 
   // Confluence Cloud inlines up to 25 attachments per page via expand=children.attachment.
@@ -212,7 +212,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
   }
 
   protected async makeAuthenticatedRequest(url: string): Promise<unknown> {
-    const token = await this.confluenceAuth.acquireToken();
-    return this.httpClient.rateLimitedRequest(url, { Authorization: `Bearer ${token}` });
+    const authorization = await this.confluenceAuth.getAuthorizationHeader();
+    return this.httpClient.rateLimitedRequest(url, { Authorization: authorization });
   }
 }

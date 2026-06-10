@@ -5,7 +5,7 @@ import { ArgumentsFn, recordInHistogram } from '~/features/metrics/record-in-his
 import type { BatchResult, FullSyncResult } from '~/features/sync/full-sync/full-sync.types';
 import type {
   LiveCatchupResult,
-  LiveCathupRoundResult,
+  LiveCatchupRoundResult,
 } from '~/features/sync/live-catch-up/live-catch-up.types';
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { ProcessEmailCommandResult } from '../process-email/process-email.command';
@@ -147,7 +147,7 @@ export class SyncMetricsService {
     });
   }
 
-  public measureLiveCatchupRound<T extends LiveCathupRoundResult>(
+  public measureLiveCatchupRound<T extends LiveCatchupRoundResult>(
     fn: () => Promise<T>,
   ): Promise<T> {
     return recordInHistogram({

@@ -53,13 +53,14 @@ All permissions are delegated and require no admin consent. This includes `Mail.
 **Email Search**
 
 - Unique semantic search across the user's mailbox via the `search_emails` tool
-- Open individual emails by message ID via `open_email_by_id`
-- Search emails using the `search_emails` tool. In `MicrosoftGraphAndUniqueApi` mode, the tool runs semantic search against the Unique knowledge base and a live KQL query against Microsoft Graph in parallel, merging the results. In `MicrosoftGraph` mode, the tool queries Microsoft Graph directly using KQL — no knowledge base or ingestion is involved.
+- Open individual emails by message ID via `open_email`
+- Search emails using the `search_emails` tool. In `microsoft_graph_and_unique_api` mode, the tool runs semantic search against the Unique knowledge base and a live KQL query against Microsoft Graph in parallel, merging the results. In `microsoft_graph` mode, the tool queries Microsoft Graph directly using KQL — no knowledge base or ingestion is involved.
 
 **Draft Creation**
 
-- Create draft emails with subject, body, recipients, and attachments via `create_draft_email`
-- Drafts are written directly to the user's Outlook Drafts folder via Microsoft Graph
+- Create fresh draft emails (subject, body, recipients, attachments) in the signed-in user's personal mailbox or in a shared mailbox via `create_draft_email`
+- Create reply-all drafts for existing emails in personal or shared mailboxes — Graph pre-fills all original recipients automatically
+- Drafts are written directly to the Outlook Drafts folder via Microsoft Graph and are not sent automatically
 
 **Contact Lookup**
 
@@ -75,6 +76,7 @@ All permissions are delegated and require no admin consent. This includes `Mail.
 
 - When `DELEGATED_ACCESS_SCAN` is enabled, the server automatically discovers users who have been granted Exchange mailbox delegation by other users
 - Delegates can search and access the inboxes of users who have granted them Full Access or folder-level delegation via Exchange admin
+- See [Features — Delegated Access](./technical/features.md#Delegated-Access) for supported configurations and setup
 - See [DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN) for configuration details
 
 **Subscription Management**
@@ -182,7 +184,7 @@ See [Flows](./technical/flows.md#Full-Sync:-Historical-Email-Ingestion) for the 
 
 ### Directory Sync
 
-The server continuously syncs the user's Outlook folder structure via Microsoft Graph delta queries. This enables folder-based search filtering (`list_mailboxes_and_directories` tool; folder filtering only applies in `MicrosoftGraphAndUniqueApi` mode) and tracks email movement to handle deletions — when an email moves to an excluded folder (e.g. Deleted Items), it is removed from the knowledge base.
+The server continuously syncs the user's Outlook folder structure via Microsoft Graph delta queries. This enables folder-based search filtering (`list_mailboxes_and_directories` tool; folder filtering only applies in `microsoft_graph_and_unique_api` mode) and tracks email movement to handle deletions — when an email moves to an excluded folder (e.g. Deleted Items), it is removed from the knowledge base.
 
 See [Directory Sync Flow](./technical/flows.md#Directory-Sync-Flow) for the detailed sequence diagram.
 
@@ -212,7 +214,7 @@ See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) 
 
 4. **AI-Assisted Email Tasks** (On-demand)
    - Search emails with `search_emails`
-   - Open specific messages with `open_email_by_id`
+   - Open specific messages with `open_email`
    - Compose drafts with `create_draft_email`
    - Look up contacts with `lookup_contacts`
    - Use `list_mailboxes_and_directories` and `list_categories` to obtain folder IDs and category names for filtering searches

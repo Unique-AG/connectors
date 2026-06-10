@@ -6,6 +6,7 @@ import { DelegatedAccessUtilsModule } from '../delegated-access/delegated-access
 import { GraphUtilsModule } from '../graph-utils/graph-utils.module';
 import { FullSyncModule } from '../sync/full-sync';
 import { UserUtilsModule } from '../user-utils/user-utils.module';
+import { BuildMsGraphKqlBatchRequestsQuery } from './search/build-ms-graph-kql-batch-requests.query';
 import { CleanupSearchConditionsForUserQuery } from './search/cleanup-search-conditions-for-user.query';
 import { MsGraphKqlSearchEmailsQuery } from './search/ms-graph-kql-search-emails.query';
 import { SearchEmailsQuery } from './search/search-emails.query';
@@ -16,6 +17,7 @@ const QUERIES = [
   MsGraphKqlSearchEmailsQuery,
   SearchEmailsQuery,
   CleanupSearchConditionsForUserQuery,
+  BuildMsGraphKqlBatchRequestsQuery,
 ];
 
 @Module({

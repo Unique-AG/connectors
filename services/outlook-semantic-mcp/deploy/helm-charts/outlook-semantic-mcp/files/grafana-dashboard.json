@@ -1,5 +1,5 @@
 {
-  "title": "Outlook Semantic MCP",
+  "title": "Outlook Semantic MCP Server Monitoring",
   "uid": "outlook-semantic-mcp",
   "description": "Service metrics for outlook-semantic-mcp",
   "schemaVersion": 38,
@@ -11,7 +11,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "tags": ["outlook-semantic-mcp"],
+  "tags": ["mcp", "outlook-semantic-mcp", "monitoring"],
   "templating": {
     "list": [
       {
@@ -23,7 +23,11 @@
         "includeAll": false,
         "multi": false,
         "refresh": 1,
-        "current": {}
+        "current": {
+          "selected": true,
+          "text": "Prometheus",
+          "value": "prometheus"
+        }
       },
       {
         "name": "job",
@@ -42,8 +46,13 @@
         "includeAll": false,
         "multi": false,
         "refresh": 2,
+        "regex": "outlook-semantic-mcp",
         "sort": 1,
-        "current": {}
+        "current": {
+          "selected": true,
+          "text": "outlook-semantic-mcp",
+          "value": "outlook-semantic-mcp"
+        }
       }
     ]
   },
@@ -270,7 +279,7 @@
     },
     {
       "id": 5,
-      "title": "System",
+      "title": "System Resources & Health",
       "type": "row",
       "gridPos": {
         "x": 0,
@@ -282,79 +291,96 @@
       "panels": []
     },
     {
-      "id": 6,
-      "title": "CPU Usage",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 0,
-        "y": 5,
-        "w": 12,
-        "h": 8
-      },
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum by (state) (rate(process_cpu_time_seconds_total{job=~\"$job\"}[5m])) * 100",
-          "legendFormat": "{{state}}",
-          "refId": "A"
-        }
-      ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
-            "lineInterpolation": "smooth",
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
-            "spanNulls": false
-          }
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "id": 6,
       "options": {
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "none"
+          "sort": "desc"
         }
-      }
-    },
-    {
-      "id": 7,
-      "title": "Memory Usage",
-      "type": "timeseries",
-      "gridPos": {
-        "x": 12,
-        "y": 5,
-        "w": 12,
-        "h": 8
       },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_memory_usage_bytes{job=~\"$job\", type=\"rss\"}",
-          "legendFormat": "RSS",
+          "expr": "rate(process_cpu_time_total{job=~\"$job\", process_cpu_state=\"user\"}[5m]) * 100",
+          "legendFormat": "CPU User Time",
           "refId": "A"
         },
         {
@@ -362,8 +388,106 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_memory_usage_bytes{job=~\"$job\", type=\"heap_used\"}",
-          "legendFormat": "Heap Used",
+          "expr": "rate(process_cpu_time_total{job=~\"$job\", process_cpu_state=\"system\"}[5m]) * 100",
+          "legendFormat": "CPU System Time",
+          "refId": "B"
+        }
+      ],
+      "title": "Process CPU Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "process_memory_usage{job=~\"$job\"}",
+          "legendFormat": "Process Memory",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "v8js_memory_heap_used{job=~\"$job\"}",
+          "legendFormat": "V8 Heap Used",
           "refId": "B"
         },
         {
@@ -371,37 +495,312 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_memory_usage_bytes{job=~\"$job\", type=\"heap_total\"}",
-          "legendFormat": "Heap Total",
+          "expr": "v8js_memory_heap_limit{job=~\"$job\"}",
+          "legendFormat": "V8 Heap Limit",
           "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "v8js_memory_heap_space_physical_size{job=~\"$job\"}",
+          "legendFormat": "V8 Heap Physical Size",
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "v8js_memory_heap_space_available_size{job=~\"$job\"}",
+          "legendFormat": "V8 Heap Available",
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "system_memory_usage{job=~\"$job\"}",
+          "legendFormat": "System Memory Usage",
+          "refId": "F"
         }
       ],
+      "title": "Memory Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes",
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 13
+      },
+      "id": 34,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "text": {}
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "system_memory_utilization{job=~\"$job\"} * 100",
+          "legendFormat": "Memory Utilization",
+          "refId": "A"
+        }
+      ],
+      "title": "System Memory Utilization",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
-            "lineInterpolation": "smooth",
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
             "fillOpacity": 10,
             "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
             "showPoints": "never",
-            "spanNulls": false
-          }
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ms"
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 6,
+        "y": 13
+      },
+      "id": 35,
       "options": {
         "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "none"
+          "sort": "desc"
         }
-      }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(v8js_gc_duration_sum{job=~\"$job\"}[5m]) / rate(v8js_gc_duration_count{job=~\"$job\"}[5m]) * 1000",
+          "legendFormat": "GC Duration - {{kind}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Node.js GC Duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 13
+      },
+      "id": 36,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "nodejs_eventloop_utilization{job=~\"$job\"}",
+          "legendFormat": "Event Loop Utilization",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "nodejs_eventloop_delay_mean{job=~\"$job\"} * 1000",
+          "legendFormat": "Mean Delay (ms)",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "nodejs_eventloop_delay_p99{job=~\"$job\"} * 1000",
+          "legendFormat": "P99 Delay (ms)",
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "rate(nodejs_eventloop_time_total{job=~\"$job\",nodejs_eventloop_state=\"active\"}[5m])",
+          "legendFormat": "Active Time Rate",
+          "refId": "D"
+        }
+      ],
+      "title": "Node.js Event Loop",
+      "type": "timeseries"
     },
     {
       "id": 8,
@@ -409,7 +808,7 @@
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 13,
+        "y": 21,
         "w": 24,
         "h": 1
       },
@@ -422,7 +821,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 22,
         "w": 8,
         "h": 8
       },
@@ -505,7 +904,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 8,
-        "y": 14,
+        "y": 22,
         "w": 8,
         "h": 8
       },
@@ -575,7 +974,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 16,
-        "y": 14,
+        "y": 22,
         "w": 8,
         "h": 8
       },
@@ -627,7 +1026,7 @@
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 30,
         "w": 24,
         "h": 1
       },
@@ -640,7 +1039,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 23,
+        "y": 31,
         "w": 6,
         "h": 8
       },
@@ -708,7 +1107,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 6,
-        "y": 23,
+        "y": 31,
         "w": 6,
         "h": 8
       },
@@ -778,7 +1177,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 12,
-        "y": 23,
+        "y": 31,
         "w": 6,
         "h": 8
       },
@@ -861,7 +1260,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 18,
-        "y": 23,
+        "y": 31,
         "w": 6,
         "h": 8
       },
@@ -922,7 +1321,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 31,
+        "y": 39,
         "w": 12,
         "h": 8
       },
@@ -974,7 +1373,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 12,
-        "y": 31,
+        "y": 39,
         "w": 12,
         "h": 8
       },
@@ -1042,7 +1441,7 @@
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 39,
+        "y": 47,
         "w": 24,
         "h": 1
       },
@@ -1055,7 +1454,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 40,
+        "y": 48,
         "w": 6,
         "h": 8
       },
@@ -1123,7 +1522,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 6,
-        "y": 40,
+        "y": 48,
         "w": 6,
         "h": 8
       },
@@ -1193,7 +1592,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 12,
-        "y": 40,
+        "y": 48,
         "w": 6,
         "h": 8
       },
@@ -1276,7 +1675,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 18,
-        "y": 40,
+        "y": 48,
         "w": 6,
         "h": 8
       },
@@ -1346,7 +1745,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 56,
         "w": 12,
         "h": 8
       },
@@ -1407,7 +1806,7 @@
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 56,
+        "y": 64,
         "w": 24,
         "h": 1
       },
@@ -1420,7 +1819,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 57,
+        "y": 65,
         "w": 8,
         "h": 8
       },
@@ -1472,7 +1871,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 8,
-        "y": 57,
+        "y": 65,
         "w": 8,
         "h": 8
       },
@@ -1524,7 +1923,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 16,
-        "y": 57,
+        "y": 65,
         "w": 8,
         "h": 8
       },
@@ -1594,7 +1993,7 @@
       "type": "row",
       "gridPos": {
         "x": 0,
-        "y": 65,
+        "y": 73,
         "w": 24,
         "h": 1
       },
@@ -1607,7 +2006,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 66,
+        "y": 74,
         "w": 12,
         "h": 8
       },
@@ -1677,7 +2076,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 12,
-        "y": 66,
+        "y": 74,
         "w": 12,
         "h": 8
       },
@@ -1747,7 +2146,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 0,
-        "y": 74,
+        "y": 82,
         "w": 12,
         "h": 8
       },
@@ -1817,7 +2216,7 @@
       "type": "timeseries",
       "gridPos": {
         "x": 12,
-        "y": 74,
+        "y": 82,
         "w": 12,
         "h": 8
       },

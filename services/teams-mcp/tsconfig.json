@@ -1,6 +1,11 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    // This service runs only on Node.js. Without an explicit lib, target ES2023 defaults to
+    // lib.es2023.full, which bundles `dom` — making globals like fetch/ReadableStream/RequestInit
+    // resolve to browser types instead of Node's (e.g. RequestInit then lacks `duplex`). Pin to the
+    // non-full lib so @types/node's undici-based globals win.
+    "lib": ["ES2023"],
     "outDir": "./dist",
     "rootDir": "./src",
     "removeComments": true,

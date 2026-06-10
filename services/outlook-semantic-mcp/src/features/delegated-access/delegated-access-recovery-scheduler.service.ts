@@ -4,7 +4,10 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
-import { CacheData } from '~/db/schema/cache/cache.data';
+import {
+  DelegatedAccessDiscoveryCacheType,
+  DelegatedAccessVerificationCacheType,
+} from '~/db/schema/cache/cache.data';
 import { NewTrace } from '~/features/tracing.utils';
 import { PersistentCacheService } from '../persistent-cache/persistent-cache.service';
 import {
@@ -76,13 +79,16 @@ export class DelegatedAccessRecoverySchedulerService implements OnModuleInit, On
 
     await this.recoverDiscovery();
 
-    if (this.config.scan === 'granularAccess') {
+    if (this.config.scan === 'granular_access') {
       await this.recoverVerification();
     }
   }
 
   private async recoverDiscovery(): Promise<void> {
-    const cached = await this.persistentCacheService.get(DISCOVER_DELEGATED_ACCESS_CACHE_KEY);
+    const cached = await this.persistentCacheService.get(
+      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
+      `DelegatedAccessDiscovery`,
+    );
     if (!this.isStuck(cached, DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES)) {
       return;
     }
@@ -102,6 +108,7 @@ export class DelegatedAccessRecoverySchedulerService implements OnModuleInit, On
   private async recoverVerification(): Promise<void> {
     const cached = await this.persistentCacheService.get(
       SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_CACHE_KEY,
+      `DelegatedAccessVerification`,
     );
     if (!this.isStuck(cached, SYNC_DELEGATED_ACCESS_FOR_ALL_USERS_NO_PROGRESS_THRESHOLD_MINUTES)) {
       return;
@@ -119,7 +126,10 @@ export class DelegatedAccessRecoverySchedulerService implements OnModuleInit, On
     await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
   }
 
-  private isStuck(cached: CacheData | null, thresholdMinutes: number): boolean {
+  private isStuck(
+    cached: DelegatedAccessVerificationCacheType | DelegatedAccessDiscoveryCacheType | null,
+    thresholdMinutes: number,
+  ): boolean {
     if (!cached) {
       return false;
     }

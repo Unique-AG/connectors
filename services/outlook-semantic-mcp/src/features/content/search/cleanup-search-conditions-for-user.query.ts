@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { clone, isNonNullish } from 'remeda';
-import { Directory, DRIZZLE, DrizzleDatabase, directories, systemDirectories } from '~/db';
-import { findBestMatch } from '~/utils/find-best-match';
+import { DRIZZLE, DrizzleDatabase, directories } from '~/db';
+import { resolveDirectoryIds } from './resolve-directory-ids.util';
 import { SearchCondition } from './search-conditions.dto';
 
 @Injectable()
@@ -43,10 +43,7 @@ export class CleanupSearchConditionsForUserQuery {
         ? condition.directories.value
         : [condition.directories.value];
 
-      const { resolvedIds, unrecognized } = this.sanitizeWrongDirectoryIds(
-        rawDirectoryIds,
-        userDirectories,
-      );
+      const { resolvedIds, unrecognized } = resolveDirectoryIds(rawDirectoryIds, userDirectories);
       allUnrecognized.push(...unrecognized);
 
       if (resolvedIds.length === 0) {
@@ -73,47 +70,5 @@ export class CleanupSearchConditionsForUserQuery {
     }
 
     return { conditions: resolvedConditions, searchSummary };
-  }
-
-  private sanitizeWrongDirectoryIds(
-    rawDirectoryIds: string[],
-    userDirectories: Directory[],
-  ): { resolvedIds: string[]; unrecognized: string[] } {
-    const resolvedIds: string[] = [];
-    const unrecognized: string[] = [];
-
-    for (const rawDirectoryId of rawDirectoryIds) {
-      if (!rawDirectoryId.trim().length) {
-        continue;
-      }
-      const exactMatch = userDirectories.find(
-        ({ providerDirectoryId }) => providerDirectoryId === rawDirectoryId,
-      );
-      if (exactMatch) {
-        resolvedIds.push(rawDirectoryId);
-        continue;
-      }
-
-      const bestDirectory = findBestMatch({
-        items: userDirectories,
-        getLabel: (directory) => directory.displayName,
-        query: rawDirectoryId,
-        threshold: 0.8,
-        isNewItemBetter: (newItem, currentBestItem) => {
-          if (systemDirectories.includes(currentBestItem.internalType)) {
-            return false;
-          }
-
-          return systemDirectories.includes(newItem.internalType);
-        },
-      });
-      if (bestDirectory) {
-        resolvedIds.push(bestDirectory.providerDirectoryId);
-      } else {
-        unrecognized.push(rawDirectoryId);
-      }
-    }
-
-    return { resolvedIds, unrecognized };
   }
 }

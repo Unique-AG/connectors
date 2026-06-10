@@ -1,0 +1,4 @@
+{
+  "subject": "Accounts Payable Process Improvement",
+  "body": "Hi Operations Team,\n\nAfter reviewing our AP process, I've identified several inefficiencies:\n\n1. Average invoice processing time: 12 days (industry benchmark: 5 days)\n2. Duplicate payment rate: 0.8% ($340K in FY2025)\n3. Early payment discount capture rate: only 23% (missing ~$180K annually)\n\nProposed improvements:\n- Implement three-way matching automation (PO, receipt, invoice)\n- Deploy OCR for invoice scanning (estimated ROI: 8 months)\n- Establish payment term standardization (Net 30 for all vendors under $100K)\n- Create vendor portal for self-service invoice submission\n\nEstimated annual savings: $520K\nImplementation cost: $150K\n\nI've attached a detailed project plan. Can we discuss during next week's ops review?"
+}

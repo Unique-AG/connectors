@@ -10,6 +10,7 @@ locals {
   # Based on SCOPES in services/outlook-semantic-mcp/src/auth/microsoft.provider.ts
   graph_scopes = toset([
     "User.Read",
+    "User.Read.All",
     "Mail.ReadWrite",
     "Mail.ReadWrite.Shared",
     "MailboxSettings.Read",
@@ -33,7 +34,7 @@ resource "azuread_application" "outlook_semantic_mcp" {
     }
   }
   web {
-    redirect_uris = var.redirect_uris
+    redirect_uris = compact(concat(var.redirect_uris, [var.admin_consent_redirect_uri]))
 
     implicit_grant {
       access_token_issuance_enabled = false

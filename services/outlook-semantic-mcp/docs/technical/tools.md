@@ -5,18 +5,18 @@
 
 The Outlook Semantic MCP Server exposes tools whose availability depends on the deployment mode (`MCP_BACKEND`) and debug settings.
 
-!!! warning "Mode A (`MicrosoftGraphAndUniqueApi`) only tools"
-    `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data`, and `sync_progress` are **only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi`**. They are not registered in `MicrosoftGraph` mode.
+!!! warning "Mode A (`microsoft_graph_and_unique_api`) only tools"
+    `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data`, and `sync_progress` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api`**. They are not registered in `microsoft_graph` mode.
 
 !!! warning "Debug-Mode Tools"
-    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi` AND `MCP_DEBUG_MODE=enabled`**. They do not appear for standard deployments or in `MicrosoftGraph` mode. **Note:** Debug mode exposes these tools to **all** connected MCP users, not just operators. Do not leave enabled in production.
+    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`**. They do not appear for standard deployments or in `microsoft_graph` mode. **Note:** Debug mode exposes these tools to **all** connected MCP users, not just operators. Do not leave enabled in production.
 
 ## Tool Overview
 
 | Tool | Category | Mutating | Mode |
 |------|----------|----------|------|
 | [`search_emails`](#search_emails) | Email Search | No | Both |
-| [`open_email_by_id`](#open_email_by_id) | Email Search | No | Both |
+| [`open_email`](#open_email) | Email Search | No | Both |
 | [`create_draft_email`](#create_draft_email) | Draft Creation | Yes | Both |
 | [`lookup_contacts`](#lookup_contacts) | Contact Lookup | No | Both |
 | [`list_categories`](#list_categories) | Mailbox Utilities | No | Both |
@@ -59,7 +59,7 @@ Search emails and return matched passages. The tool behaviour and input schema d
 
 ---
 
-#### Mode A: `MicrosoftGraphAndUniqueApi`
+#### Mode A: `microsoft_graph_and_unique_api`
 
 Runs two searches in parallel — semantic search against the Unique knowledge base and a KQL keyword search against Microsoft Graph — then merges and deduplicates the results. Both query arrays are required and must address the same user question.
 
@@ -141,7 +141,7 @@ Each object in `conditions` (applies to `uniqueSemanticSearchQueries` entries on
 
 ---
 
-#### Mode B: `MicrosoftGraph`
+#### Mode B: `microsoft_graph`
 
 Calls the Microsoft Graph Search API directly with KQL queries. No semantic search is performed. Only `msGraphKeywordSearchQueries` is accepted.
 
@@ -217,7 +217,7 @@ Syntax rules:
     text: string;                  // matched passage or excerpt — not the full body
     outlookWebLink: string;        // direct URL to open in Outlook Web — use as link target when non-empty
     sourceMailbox?: string | null; // mailbox this email belongs to
-    openEmailParams: {             // pass directly to open_email_by_id without modification
+    openEmailParams: {             // pass directly to open_email without modification
       id: string;
       idType: "Unique" | "MsGraph";
       mailbox?: string;
@@ -230,7 +230,7 @@ Syntax rules:
 
 **Usage notes:**
 
-- Pass the `openEmailParams` object from a result directly to `open_email_by_id` to retrieve the full email body.
+- Pass the `openEmailParams` object from a result directly to `open_email` to retrieve the full email body.
 - If `syncWarning` is present (Mode A only), display it to the user and call `sync_progress` to check ingestion status — results may be incomplete.
 - If `searchNotes` is present, display it to the user after showing results.
 - Folder filtering via `conditions[].directories` is supported in Mode A only.
@@ -239,7 +239,7 @@ Syntax rules:
 
 ---
 
-### `open_email_by_id`
+### `open_email`
 
 Retrieve the full content of an email by its ID returned from `search_emails`.
 
@@ -282,20 +282,39 @@ Retrieve the full content of an email by its ID returned from `search_emails`.
 
 Create a draft email in the connected Outlook mailbox. The draft is saved to the Drafts folder but **not sent** — the user must open it in Outlook and send manually.
 
-**Input parameters:**
+Supports two modes selected by `recipientsData.type`:
+
+- **`"draft"`** — fresh draft with explicit recipients (personal or shared mailbox)
+- **`"reply"`** — reply-all draft for an existing email; Graph pre-fills all original recipients (personal or shared mailbox)
+
+**Common input parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
+| `content` | string | Yes | Email body in Markdown. Paragraphs, bold, italic, lists, links, blockquotes, and inline code are supported. Raw HTML is escaped, not rendered. |
+| `mailbox` | string (UPN) | No | Shared mailbox to create the draft in (e.g. `"support@company.com"`). Omit to use the signed-in user's own mailbox. |
+| `attachments` | array | No | Files to attach |
+| `attachments[].fileName` | string | Yes | File name including extension (e.g. `"report.pdf"`) |
+| `attachments[].data` | string | Yes | File content URI. Two schemes supported (see below) |
+| `recipientsData` | object | Yes | Discriminated union — see below |
+
+**`recipientsData` — fresh draft (`type: "draft"`):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `"draft"` | Yes | |
 | `subject` | string | Yes | Subject line |
-| `content` | string | Yes | Email body. Must match the format declared in `contentType` |
-| `contentType` | `"html"` \| `"text"` | Yes | Body format — `"html"` for rich HTML, `"text"` for plain text |
 | `toRecipients` | array | Yes | Primary recipients |
 | `toRecipients[].email` | string (email) | Yes | Recipient email address |
 | `toRecipients[].name` | string | No | Recipient display name |
 | `ccRecipients` | array | No | CC recipients (same shape as `toRecipients`) |
-| `attachments` | array | No | Files to attach |
-| `attachments[].fileName` | string | Yes | File name including extension (e.g. `"report.pdf"`) |
-| `attachments[].data` | string | Yes | File content URI. Two schemes supported (see below) |
+
+**`recipientsData` — reply-all draft (`type: "reply"`):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `"reply"` | Yes | |
+| `inReplyToMessageId` | string | Yes | `msGraphMessageId` from `search_emails` or `open_email`. Graph pre-fills all original recipients — do not pass `toRecipients` or `ccRecipients`. |
 
 **Attachment data URI schemes:**
 
@@ -313,8 +332,8 @@ Create a draft email in the connected Outlook mailbox. The draft is saved to the
 {
   success: boolean;
   message: string;
-  draftId?: string;             // Microsoft message ID
-  webLink?: string;             // link to open draft in Outlook
+  draftId?: string;             // Microsoft message ID (present when success is true)
+  webLink?: string;             // link to open draft in Outlook (present when success is true and Graph returned one)
   attachmentsFailed?: Array<{
     fileName: string;
     reason: string;
@@ -327,6 +346,7 @@ Create a draft email in the connected Outlook mailbox. The draft is saved to the
 - Use `lookup_contacts` to resolve recipient email addresses before calling this tool.
 - If attachments partially fail, the draft is still created and `draftId` is returned alongside the `attachmentsFailed` list.
 - The `webLink` in the response opens the draft directly in Outlook Web.
+- For shared mailbox reply drafts: in Outlook Web the reply appears in the **Drafts** folder rather than inline in the thread — this is expected Outlook Web behaviour. The draft sends correctly regardless. In Outlook desktop the reply appears and sends normally.
 
 ---
 
@@ -423,7 +443,7 @@ List all Outlook mailboxes and their folder trees available to the user.
 
 - Folder `id` values can be passed to the `directories` filter in `search_emails` to narrow results to a specific folder.
 - In Mode A, the folder tree is synced from Microsoft Graph and reflects the user's current mailbox structure. Calling this tool triggers a fresh sync of the folder tree.
-- Folder filtering via `directories` is only effective in Mode A (`MicrosoftGraphAndUniqueApi`). In Mode B, the Microsoft Graph Search API does not support folder-scoped filtering — the `directories` condition is ignored.
+- Folder filtering via `directories` is only effective in Mode A (`microsoft_graph_and_unique_api`). In Mode B, the Microsoft Graph Search API does not support folder-scoped filtering — the `directories` condition is ignored.
 - Well-known system folder names (`"Inbox"`, `"Sent Items"`, `"Drafts"`, etc.) can be used directly in `search_emails` without calling this tool first.
 - When `DELEGATED_ACCESS_SCAN` is enabled, the `mailboxes` array includes delegated mailboxes alongside the user's own mailbox. The `isOwn` field is `true` for the user's primary mailbox and `false` for delegated ones. Folder IDs from delegated mailboxes can be passed to the `directories` condition in `search_emails` to narrow results to a specific folder in a delegated mailbox (folder filtering via `directories` is only effective in Mode A).
 
@@ -431,8 +451,8 @@ List all Outlook mailboxes and their folder trees available to the user.
 
 ## Subscription Management
 
-!!! note "Mode A (`MicrosoftGraphAndUniqueApi`) only"
-    `verify_inbox_connection`, `reconnect_inbox`, and `delete_inbox_data` are only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi`. These tools are not registered in `MicrosoftGraph` mode because no webhook subscriptions are created.
+!!! note "Mode A (`microsoft_graph_and_unique_api`) only"
+    `verify_inbox_connection`, `reconnect_inbox`, and `delete_inbox_data` are only available when `MCP_BACKEND=microsoft_graph_and_unique_api`. These tools are not registered in `microsoft_graph` mode because no webhook subscriptions are created.
 
 ### `verify_inbox_connection`
 
@@ -521,8 +541,8 @@ Permanently delete all synced email data from Unique and cancel the Microsoft Gr
 
 ## Sync Monitoring
 
-!!! note "Mode A (`MicrosoftGraphAndUniqueApi`) only"
-    `sync_progress` is only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi`. There is no sync pipeline in `MicrosoftGraph` mode.
+!!! note "Mode A (`microsoft_graph_and_unique_api`) only"
+    `sync_progress` is only available when `MCP_BACKEND=microsoft_graph_and_unique_api`. There is no sync pipeline in `microsoft_graph` mode.
 
 ### `sync_progress`
 
@@ -584,8 +604,8 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
 
 The following four tools are only available when `MCP_DEBUG_MODE=enabled` is set in the server configuration. They are intended for operators diagnosing sync issues, not for end users.
 
-!!! note "Mode A (`MicrosoftGraphAndUniqueApi`) only"
-    These tools are only available when `MCP_BACKEND=MicrosoftGraphAndUniqueApi` AND `MCP_DEBUG_MODE=enabled`.
+!!! note "Mode A (`microsoft_graph_and_unique_api`) only"
+    These tools are only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`.
 
 ### `run_full_sync`
 

@@ -28,7 +28,7 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
   }
 
   public onModuleDestroy() {
-    if (this.config.mcpBackend !== 'MicrosoftGraphAndUniqueApi') {
+    if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
       return;
     }
     this.logger.log({ msg: 'DeleteInboxRecoveryService is shutting down...' });

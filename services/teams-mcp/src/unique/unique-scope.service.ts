@@ -8,6 +8,9 @@ import {
   PublicAddScopeAccessResultSchema,
   PublicCreateScopeRequestSchema,
   PublicCreateScopeResultSchema,
+  PublicFolderUpdateRequestSchema,
+  type PublicFolderUpdateResult,
+  PublicFolderUpdateResultSchema,
   type PublicScopeAccessSchema,
   type Scope,
 } from './unique.dtos';
@@ -97,6 +100,34 @@ export class UniqueScopeService {
       { scopeId, accessesAdded: accesses.length },
       'Successfully configured user access permissions for scope',
     );
+
+    return result;
+  }
+
+  @Span()
+  public async updateScope(
+    scopeId: string,
+    patch: { externalId?: string; name?: string; parentId?: string | null },
+  ): Promise<PublicFolderUpdateResult> {
+    const span = this.trace.getSpan();
+    span?.setAttribute('scope_id', scopeId);
+    span?.setAttribute('has_external_id', patch.externalId !== undefined);
+
+    const payload = PublicFolderUpdateRequestSchema.encode(patch);
+
+    this.logger.debug(
+      { scopeId, externalId: patch.externalId },
+      'Updating organizational scope in Unique API',
+    );
+
+    const response = await this.fetch(`folder/${scopeId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = PublicFolderUpdateResultSchema.parse(await response.json());
+
+    this.logger.log({ scopeId, externalId: result.externalId }, 'Successfully updated scope');
 
     return result;
   }

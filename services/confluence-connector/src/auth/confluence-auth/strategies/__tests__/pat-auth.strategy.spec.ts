@@ -18,21 +18,21 @@ describe('PatAuthStrategy', () => {
     token: new Redacted('my-personal-access-token'),
   };
 
-  it('returns the unwrapped token value as accessToken', async () => {
+  it('returns a Bearer authorization header with the unwrapped token', async () => {
     const strategy = new PatAuthStrategy(authConfig);
 
-    const result = await tenantStorage.run(mockTenant, () => strategy.acquireToken());
+    const result = await tenantStorage.run(mockTenant, () => strategy.getAuthorizationHeader());
 
-    expect(result).toBe('my-personal-access-token');
+    expect(result).toBe('Bearer my-personal-access-token');
   });
 
-  it('returns the same token on multiple calls', async () => {
+  it('returns the same header on multiple calls', async () => {
     const strategy = new PatAuthStrategy(authConfig);
 
-    const first = await tenantStorage.run(mockTenant, () => strategy.acquireToken());
-    const second = await tenantStorage.run(mockTenant, () => strategy.acquireToken());
+    const first = await tenantStorage.run(mockTenant, () => strategy.getAuthorizationHeader());
+    const second = await tenantStorage.run(mockTenant, () => strategy.getAuthorizationHeader());
 
     expect(first).toBe(second);
-    expect(first).toBe('my-personal-access-token');
+    expect(first).toBe('Bearer my-personal-access-token');
   });
 });

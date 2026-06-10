@@ -4,7 +4,8 @@ export type FullSyncResult =
   | { status: 'skipped'; reason: string }
   | { status: 'waiting-for-ingestion' }
   | { status: 'completed' }
-  | { status: 'failed'; error: unknown };
+  | { status: 'failed'; error: unknown }
+  | { status: 'failed-no-delegates' };
 
 export type InboxConfig = typeof inboxConfigurations.$inferSelect;
 
@@ -16,6 +17,7 @@ export type LockDecision =
       previousState: InboxConfig['fullSyncState'];
       shouldFetchCount: boolean;
       filters: Record<string, unknown>;
+      preferredDelegateUserProfileId: string | null;
     };
 
 export type BatchResult =

@@ -23,38 +23,23 @@ server:
     - teams-mcp-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/teams-mcp
-    tag: 0.2.11 # x-release-please-version
+    tag: 0.2.18 # x-release-please-version
   ports:
     application: 51345
     metrics: 51346
-  networkPolicy:
-    enabled: true
-    policyTypes:
-      # - Egress # We can not yet leverage egress policies as Kubernetes flavor policies do not support FQDN and MS Graph IP-Addresses are not easily deterministic
-      - Ingress
-    egress: null
-    ingress:
-      - from:
-          - podSelector:
-              matchLabels:
-                app.kubernetes.io/managed-by: prometheus-operator
-            namespaceSelector:
-              matchLabels:
-                kubernetes.io/metadata.name: system
-          - podSelector:
-              matchLabels:
-                app.kubernetes.io/name: gateway
-                app.kubernetes.io/instance: kong
-            namespaceSelector:
-              matchLabels:
-                kubernetes.io/metadata.name: system
   resources:
-    # Resources are granted generously as the service for now is a singleton
+    # Resources are granted generously as the service for now is a singleton.
+    # ephemeral-storage covers the disk spool: recordings are uploaded by streaming
+    # the download to a temp file in /tmp (see UniqueContentService.uploadToStorage),
+    # and the ingestion consumer runs at prefetchCount: 1 so at most one ~5 GB
+    # recording is spooled at a time.
     limits:
       memory: 2048Mi
+      ephemeral-storage: 10Gi # >= the emptyDir cap; covers one ~5 GB spool + overlay/log overhead
     requests:
       cpu: 1
       memory: 1984Mi
+      ephemeral-storage: 6Gi # reserve enough to guarantee one ~5 GB recording can spool
   routes:
     paths:
       default:
@@ -62,7 +47,7 @@ server:
   volumes:
     - name: tmp
       emptyDir:
-        sizeLimit: 20Gi
+        sizeLimit: 10Gi # one ~5 GB recording at a time (prefetch:1) + headroom
   volumeMounts:
     - name: tmp
       mountPath: /tmp

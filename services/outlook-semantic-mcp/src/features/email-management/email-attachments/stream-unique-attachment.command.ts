@@ -23,6 +23,7 @@ export class StreamUniqueAttachmentCommand {
     uniqueIdentity,
     chatId,
     userProfileId,
+    mailbox,
   }: {
     client: Client;
     draftId: string;
@@ -33,6 +34,7 @@ export class StreamUniqueAttachmentCommand {
     chatId: string | null | undefined;
     uniqueIdentity: ResolvedUniqueIdentity;
     userProfileId: string;
+    mailbox?: string;
   }): Promise<AttachmentUploadResult> {
     const uniqueConfig = this.configService.get('unique', { infer: true });
     if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
@@ -129,6 +131,7 @@ export class StreamUniqueAttachmentCommand {
         totalSize,
         totalChunks,
         userProfileId,
+        mailbox,
       });
     } finally {
       reader.cancel();
@@ -146,6 +149,7 @@ export class StreamUniqueAttachmentCommand {
     totalSize,
     totalChunks,
     userProfileId,
+    mailbox,
   }: {
     reader: ReadableStreamDefaultReader<Uint8Array<ArrayBufferLike>>;
     client: Client;
@@ -155,13 +159,15 @@ export class StreamUniqueAttachmentCommand {
     totalSize: number;
     totalChunks: number;
     userProfileId: string;
+    mailbox?: string;
   }): Promise<void> {
     let offset = 0;
     let chunkIndex = 0;
     let pending = Buffer.alloc(0);
+    const prefix = mailbox ? `/users/${mailbox}` : '/me';
 
     const { uploadUrl } = UploadSessionSchema.parse(
-      await client.api(`/me/messages/${draftId}/attachments/createUploadSession`).post({
+      await client.api(`${prefix}/messages/${draftId}/attachments/createUploadSession`).post({
         AttachmentItem: {
           attachmentType: 'file',
           name: fileName.value,

@@ -3,6 +3,10 @@
 
 # Outlook Semantic MCP - Deployment
 
+## Deployment Modes
+
+**Choose your mode before following any other step in this guide** — prerequisites, configuration, and verification differ by mode. See [Configuration — Deployment Modes](./configuration.md#Deployment-Modes) for the full feature and configuration comparison.
+
 ## Prerequisites
 
 Before deploying the Outlook Semantic MCP Server, ensure you have:
@@ -237,9 +241,11 @@ If your cluster enforces network policies, the following traffic must be allowed
 
 | Source | Port | Purpose |
 |--------|------|---------|
-| API Gateway (e.g. Kong) | `51345` (TCP) | Inbound HTTP traffic including Microsoft OAuth callbacks and webhook notifications |
+| API Gateway (e.g. Kong) | `51345` (TCP) | MCP tool requests from MCP clients; OAuth redirect callbacks from user browsers; Microsoft Graph webhook notifications |
 | Prometheus | `51346` (TCP) | Metrics scraping |
 | kubelet | `51345` (TCP) | Startup, liveness, and readiness probes |
+
+> **Note:** The API Gateway is the single ingress point for all external traffic. Microsoft Graph calls the service directly (via `MICROSOFT_PUBLIC_WEBHOOK_URL`) to deliver webhook notifications, and user browsers redirect to it at the end of the OAuth flow — both routes must be reachable from the public internet through the gateway.
 
 ### Egress (what the service calls)
 

@@ -1,9 +1,15 @@
 import { relations } from 'drizzle-orm';
-import { jsonb, pgTable, unique, varchar } from 'drizzle-orm/pg-core';
+import { jsonb, pgEnum, pgTable, unique, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../timestamps.columns';
 import { authorizationCodes } from './auth/authorization-codes.table';
 import { tokens } from './auth/tokens.table';
+
+const userProfileSourceValues = ['oauth', 'shared-mailbox'] as const;
+
+export type UserProfileSource = (typeof userProfileSourceValues)[number];
+
+export const userProfileSource = pgEnum('user_profile_source', userProfileSourceValues);
 
 export const userProfiles = pgTable(
   'user_profiles',
@@ -24,6 +30,7 @@ export const userProfiles = pgTable(
     raw: jsonb(`raw`),
     accessToken: varchar(`access_token`),
     refreshToken: varchar(`refresh_token`),
+    source: userProfileSource('source').notNull().default('oauth'),
     ...timestamps,
   },
   (table) => [unique().on(table.provider, table.providerUserId)],

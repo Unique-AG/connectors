@@ -168,7 +168,7 @@ The server continuously syncs the user's Outlook folder structure from Microsoft
 When `DELEGATED_ACCESS_SCAN` is not `disabled`, two background jobs maintain
 delegated access state. The **discovery job** identifies which connected users
 have access to other connected users' mailboxes. The **verification job**
-(`granularAccess` mode only) runs more frequently and confirms which specific
+(`granular_access` mode only) runs more frequently and confirms which specific
 folders within each delegated mailbox are still readable.
 
 Neither job triggers email ingestion. They write permission records that
@@ -189,9 +189,9 @@ sequenceDiagram
     Scheduler->>AMQP: Publish delegated-access.discover event
     AMQP->>Server: Consume event
     loop For each delegate × owner pair (connected users)
-        alt fullAccessOnly mode
+        alt full_access_only mode
             Server->>MSGraph: GET /users/{ownerEmail}/messages?$top=1
-        else granularAccess mode
+        else granular_access mode
             Server->>MSGraph: GET /users/{ownerEmail}/mailFolders?$top=1
         end
         alt 200 — access confirmed
@@ -203,7 +203,7 @@ sequenceDiagram
         end
     end
 
-    Note over Scheduler,DB: Verification — granularAccess only, DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE (default every 4 h)
+    Note over Scheduler,DB: Verification — granular_access only, DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE (default every 4 h)
     Scheduler->>AMQP: Publish delegated-access.sync event
     AMQP->>Server: Consume event (one message per account)
     loop For each delegatedAccessAccounts record
@@ -226,11 +226,11 @@ sequenceDiagram
 
 **Key points:**
 
-- Discovery iterates over all connected user pairs (delegate × owner). It probes one Graph endpoint per pair — `GET /users/{ownerEmail}/messages` in `fullAccessOnly` mode, `GET /users/{ownerEmail}/mailFolders` in `granularAccess` mode.
+- Discovery iterates over all connected user pairs (delegate × owner). It probes one Graph endpoint per pair — `GET /users/{ownerEmail}/messages` in `full_access_only` mode, `GET /users/{ownerEmail}/mailFolders` in `granular_access` mode.
 - A 403 or 404 response immediately deletes the access record and all associated folder grants (cascading delete). The owner's scope is excluded from the delegate's next `search_emails` call.
 - Transient errors (429, 5xx) cause the pair to be skipped; the next scheduled run retries.
-- The verification job (`granularAccess` only) tests each folder individually, rebuilds `delegatedAccessDirectories` from confirmed-accessible folders, and deletes the account record if no folders remain accessible and no transient errors occurred.
-- In Mode B (`MicrosoftGraph`), only full-access delegations are searchable — honouring folder-level grants would require querying every accessible folder individually, which is not implemented due to API rate limits. Folder-level grants detected by verification have no effect on Mode B search results.
+- The verification job (`granular_access` only) tests each folder individually, rebuilds `delegatedAccessDirectories` from confirmed-accessible folders, and deletes the account record if no folders remain accessible and no transient errors occurred.
+- In Mode B (`microsoft_graph`), only full-access delegations are searchable — honouring folder-level grants would require querying every accessible folder individually, which is not implemented due to API rate limits. Folder-level grants detected by verification have no effect on Mode B search results.
 - A recovery scheduler (configurable via `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE`, default `*/30 * * * *`) monitors both jobs. If either stalls (state `running` for > 10 minutes with no progress), it is automatically restarted.
 
 ## Email Draft Creation Flow

@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
+import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { SearchBackend } from '../search/semantic-search-emails.query';
@@ -66,17 +67,18 @@ export class OpenEmailTool {
   public constructor(
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     private readonly openEmailQuery: OpenEmailQuery,
+    private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
   ) {}
 
   @Tool({
-    name: 'open_email_by_id',
-    title: 'Open Email by ID',
+    name: 'open_email',
+    title: 'Open Email',
     description:
       'Retrieve the full body of an email. Pass the `openEmailParams` object from a `search_emails` result directly as the tool input.',
     parameters: OpenEmailByIdInputSchema,
     outputSchema: OpenEmailByIdOutputSchema,
     annotations: {
-      title: 'Open Email by ID',
+      title: 'Open Email',
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: true,
@@ -99,14 +101,16 @@ export class OpenEmailTool {
       }
     }
 
-    const emailData = await this.openEmailQuery.run(
-      userProfileTypeId.toString(),
-      input.id,
-      input.idType,
-      input.mailbox,
-      input.parentFolderId,
-      input.idIsImmutable,
-    );
+    const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileTypeId);
+    const emailData = await this.openEmailQuery.run({
+      userProfileId: userProfileTypeId.toString(),
+      id: input.id,
+      idType: input.idType,
+      mailbox: input.mailbox,
+      folderId: input.parentFolderId,
+      idIsImmutable: input.idIsImmutable,
+      outputTimeZone: outputTimeZone,
+    });
     return { success: true, emailData };
   }
 }

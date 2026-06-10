@@ -73,7 +73,7 @@
     "@types/js-yaml": "4.0.9",
     "@types/node": "22.16.5",
     "@types/supertest": "6.0.3",
-    "@vitest/coverage-istanbul": "3.2.4",
+    "@vitest/coverage-istanbul": "3.2.6",
     "globals": "16.3.0",
     "istanbul-badges-readme": "1.9.0",
     "pino-http-print": "3.1.0",
@@ -81,6 +81,6 @@
     "supertest": "7.1.4",
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
-    "vitest": "3.2.4"
+    "vitest": "3.2.6"
   }
 }

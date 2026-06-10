@@ -110,16 +110,16 @@ sharepoint:
 
 ### What columns are needed for the SharePoint configuration list?
 
-**Answer:** When using `sharepoint_list` as the sites source, create a list with these columns:
+**Answer:** When using `sharepoint_list` as the sites source, create a list with these columns. Only `siteId` must be present as a column on the list — every other column marked `Yes*` can instead be supplied via `sharepoint.siteDefaults` in the tenant config, in which case the column can be omitted from the list entirely. See [Site Defaults](./operator/configuration.md#Site-Defaults).
 
 | Column Display Name          | Type             | Required | Description                                   |
 | ---------------------------- | ---------------- | -------- | --------------------------------------------- |
 | `siteId`                     | Single line text | Yes      | SharePoint site ID (UUID)                     |
-| `syncColumnName`             | Single line text | Yes      | Column marking files for sync                 |
-| `ingestionMode`              | Choice           | Yes      | `flat` or `recursive`                         |
-| `uniqueScopeId`              | Single line text | Yes      | Unique scope ID                               |
-| `syncStatus`                 | Choice           | Yes      | `active`, `inactive`, or `deleted`            |
-| `syncMode`                   | Choice           | Yes      | `content_only` or `content_and_permissions`   |
+| `syncColumnName`             | Single line text | Yes\*    | Column marking files for sync                 |
+| `ingestionMode`              | Choice           | Yes\*    | `flat` or `recursive`                         |
+| `uniqueScopeId`              | Single line text | Yes\*    | Unique scope ID                               |
+| `syncStatus`                 | Choice           | Yes\*    | `active`, `inactive`, or `deleted`            |
+| `syncMode`                   | Choice           | Yes\*    | `content_only` or `content_and_permissions`   |
 | `maxFilesToIngest`           | Number           | No       | Optional limit                                |
 | `storeInternally`            | Choice           | No       | `enabled` or `disabled`                       |
 | `permissionsInheritanceMode` | Choice           | No       | Inheritance settings                          |
@@ -196,7 +196,7 @@ The same migration path covers transitions between the two `scopeId` variants:
 
 ### When should I use `in_parent:` instead of a fixed scope ID?
 
-**Answer:** Use `in_parent:scope_<parentId>` when you want the connector to find-or-create a per-site root scope under a shared parent automatically, instead of pre-creating one scope per site. It's useful when many sites need to be onboarded quickly and you don't want operators to materialise a scope before each ingestion request. The auto-created scope is named after the SharePoint site's URL slug. Removing the site (via `syncStatus: deleted`) removes the auto-created scope; the parent stays operator-managed and is never claimed by the connector.
+**Answer:** Use `in_parent:scope_<parentId>` when you want the connector to find-or-create a per-site root scope under a shared parent automatically, instead of pre-creating one scope per site. It's useful when many sites need to be onboarded quickly and you don't want operators to materialise a scope before each ingestion request. The auto-created scope is named after the SharePoint site's URL slug. Removing the site (via `syncStatus: deleted`) removes the auto-created scope.
 
 ### What happens if I unflag a document?
 

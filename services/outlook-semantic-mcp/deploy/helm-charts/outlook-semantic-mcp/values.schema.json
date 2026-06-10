@@ -187,14 +187,14 @@
             },
             "mcpBackend": {
               "type": "string",
-              "enum": ["MicrosoftGraphAndUniqueApi", "MicrosoftGraph"],
-              "description": "Selects the search backend. MicrosoftGraphAndUniqueApi: dual backend, KB ingestion + semantic search (default). MicrosoftGraph: direct Graph search, no ingestion.",
-              "default": "MicrosoftGraphAndUniqueApi"
+              "enum": ["microsoft_graph_and_unique_api", "microsoft_graph"],
+              "description": "Selects the search backend. microsoft_graph_and_unique_api: dual backend, KB ingestion + semantic search (default). microsoft_graph: direct Graph search, no ingestion.",
+              "default": "microsoft_graph_and_unique_api"
             },
             "delegatedAccessScan": {
               "type": "string",
-              "enum": ["disabled", "fullAccessOnly", "granularAccess"],
-              "description": "Delegated access scanning mode. disabled: off (default). fullAccessOnly: discovers Full Access delegation via /messages. granularAccess: discovers folder-level delegation via /mailFolders, also runs verification.",
+              "enum": ["disabled", "full_access_only", "granular_access"],
+              "description": "Delegated access scanning mode. disabled: off (default). full_access_only: discovers Full Access delegation via /messages. granular_access: discovers folder-level delegation via /mailFolders, also runs verification.",
               "default": "disabled"
             },
             "delegatedAccessDiscoveryCronSchedule": {
@@ -203,7 +203,7 @@
             },
             "delegatedAccessVerificationCronSchedule": {
               "type": "string",
-              "description": "Cron schedule for delegated access verification. Required when delegatedAccessScan is granularAccess. Default: '0 */4 * * *' (every 4 hours)."
+              "description": "Cron schedule for delegated access verification. Required when delegatedAccessScan is granular_access. Default: '0 */4 * * *' (every 4 hours)."
             },
             "delegatedAccessRecoveryCronSchedule": {
               "type": "string",
@@ -274,7 +274,7 @@
         },
         "ingestion": {
           "type": "object",
-          "description": "Ingestion backend configuration (applies when mcpBackend is MicrosoftGraphAndUniqueApi)",
+          "description": "Ingestion backend configuration (applies when mcpBackend is microsoft_graph_and_unique_api)",
           "properties": {
             "defaultMailFilters": {
               "type": "object",
@@ -316,6 +316,14 @@
             "liveCatchupRecoveryCron": {
               "type": "string",
               "description": "Cron schedule for stuck live catch-up recovery scans. Default: '*/5 * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECOVERY_CRON"
+            },
+            "liveCatchupOauthUsersRecheckCron": {
+              "type": "string",
+              "description": "Cron schedule for subscription-user live catch-up ready-recheck runs. Default: '*/10 * * * *'. Env var: INGESTION_LIVE_CATCHUP_OAUTH_USERS_RECHECK_CRON"
+            },
+            "liveCatchupSharedMailboxRecheckCron": {
+              "type": "string",
+              "description": "Cron schedule for shared-mailbox live catch-up ready-recheck runs. Default: '*/10 * * * *'. Env var: INGESTION_LIVE_CATCHUP_SHARED_MAILBOX_RECHECK_CRON"
             },
             "deleteInboxRecoveryCron": {
               "type": "string",

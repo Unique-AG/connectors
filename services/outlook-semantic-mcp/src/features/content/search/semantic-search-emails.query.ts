@@ -20,6 +20,7 @@ import {
 } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { concatChunks } from '~/utils/concat-chunks';
+import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
@@ -98,6 +99,7 @@ export class SemanticSearchEmailsQuery {
     userProfileId: UserProfileTypeID,
     inputs: z.infer<typeof SearchEmailsInputSchema>[],
     searchConfig: SemanticSearchConfig,
+    outputTimeZone?: string,
   ): Promise<{
     results: SearchEmailResult[];
     searchSummary: string | undefined;
@@ -188,7 +190,8 @@ export class SemanticSearchEmailsQuery {
           msGraphMessageId: metadata?.id || undefined,
           folderId: metadata?.parentFolderId ?? '',
           from: metadata?.fromEmailAddress ?? '',
-          receivedDateTime: metadata?.receivedDateTime ?? '',
+          receivedDateTime:
+            convertDateTimeToTimezone(metadata?.receivedDateTime, outputTimeZone) ?? '',
           backend: SearchBackend.Unique,
           text: concatChunks(Array.from(item.chunks.values())),
           openEmailParams: {

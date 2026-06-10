@@ -34,6 +34,7 @@ export class GetDirectoryDelegatedAccessQuery {
         ownerUserId: delegatedAccessAccounts.ownerUserId,
         ownerProviderUserId: sql<string>`${userProfiles.providerUserId}`,
         msGraphDirectoryIds: sql<string[]>`array_agg(${delegatedAccessDirectories.directoryId})`,
+        hasFullDelegatedAccess: sql<boolean>`false`,
       })
       .from(delegatedAccessAccounts)
       .innerJoin(

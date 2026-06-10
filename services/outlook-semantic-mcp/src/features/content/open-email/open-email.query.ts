@@ -7,6 +7,7 @@ import { MessageMetadata } from '~/features/process-email/utils/get-metadata-fro
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { concatChunks } from '~/utils/concat-chunks';
+import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { Nullish } from '~/utils/nullish';
 import { SearchBackend } from '../search/semantic-search-emails.query';
 
@@ -48,18 +49,34 @@ export class OpenEmailQuery {
   ) {}
 
   @Span()
-  public async run(
-    userProfileId: string,
-    id: string,
-    idType: SearchBackend,
-    mailbox?: string,
-    folderId?: string,
-    idIsImmutable?: boolean,
-  ): Promise<OpenEmailResult> {
+  public async run({
+    userProfileId,
+    id,
+    idType,
+    mailbox,
+    folderId,
+    idIsImmutable,
+    outputTimeZone,
+  }: {
+    userProfileId: string;
+    id: string;
+    idType: SearchBackend;
+    mailbox?: string;
+    folderId?: string;
+    idIsImmutable?: boolean;
+    outputTimeZone?: string;
+  }): Promise<OpenEmailResult> {
     if (idType === SearchBackend.MsGraph) {
-      return this.readMessageFromMsGraph(userProfileId, id, mailbox, folderId, idIsImmutable);
+      return this.readMessageFromMsGraph(
+        userProfileId,
+        id,
+        mailbox,
+        folderId,
+        idIsImmutable,
+        outputTimeZone,
+      );
     }
-    return this.readMessageFromUnique(id);
+    return this.readMessageFromUnique(id, outputTimeZone);
   }
 
   private async readMessageFromMsGraph(
@@ -68,6 +85,7 @@ export class OpenEmailQuery {
     mailbox?: string,
     folderId?: string,
     idIsImmutable?: boolean,
+    outputTimeZone?: string,
   ): Promise<OpenEmailResult> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const messagePath =
@@ -100,7 +118,7 @@ export class OpenEmailQuery {
           map((item) => item.emailAddress?.address),
           filter(isNonNullish),
         ),
-        receivedDateTime: message.receivedDateTime,
+        receivedDateTime: convertDateTimeToTimezone(message.receivedDateTime, outputTimeZone),
         webLink: message.webLink,
         hasAttachments: message.hasAttachments === true,
       },
@@ -108,7 +126,10 @@ export class OpenEmailQuery {
     };
   }
 
-  private async readMessageFromUnique(id: string): Promise<OpenEmailResult> {
+  private async readMessageFromUnique(
+    id: string,
+    outputTimeZone?: string,
+  ): Promise<OpenEmailResult> {
     const emailData = await this.uniqueApi.content.getContentById({ contentId: id });
     const metadata = emailData.metadata as MessageMetadata | undefined;
 
@@ -119,7 +140,7 @@ export class OpenEmailQuery {
         from: metadata?.fromEmailAddress,
         toRecipients: metadata?.toRecipientsEmailAddresses,
         ccRecipients: metadata?.ccRecipientsEmailAddresses,
-        receivedDateTime: metadata?.receivedDateTime,
+        receivedDateTime: convertDateTimeToTimezone(metadata?.receivedDateTime, outputTimeZone),
         webLink: metadata?.webLink,
         hasAttachments: metadata?.hasAttachments === 'true',
       },

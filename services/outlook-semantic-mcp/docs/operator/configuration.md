@@ -3,18 +3,32 @@
 
 # Outlook Semantic MCP - Configuration
 
-## Choose Your Deployment Mode
+## Deployment Modes
 
-Set `MCP_BACKEND` before configuring anything else — it determines which infrastructure components you need and which configuration sections apply.
+The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose your mode before configuring anything else** — it determines which infrastructure components you need and which configuration sections apply.
 
-| Section | Mode A (`MicrosoftGraphAndUniqueApi`) | Mode B (`MicrosoftGraph`) |
+| | `microsoft_graph_and_unique_api` (default) | `microsoft_graph` |
+|---|---|---|
+| Search | Semantic (Unique KB) + KQL (Graph), merged | KQL (Graph) only |
+| Ingestion | Full sync + live catch-up | None |
+| Tools | 10 standard + 4 debug | 6 standard |
+| Requires Unique KB | Yes | Yes |
+| Requires RabbitMQ | Yes | Yes |
+| Folder filtering | Supported | Not supported |
+
+**Configuration impact:**
+
+| Section | Mode A (`microsoft_graph_and_unique_api`) | Mode B (`microsoft_graph`) |
 |---|---|---|
 | Required Secrets | All secrets | Same — `UNIQUE_ZITADEL_CLIENT_SECRET` only needed for `external` auth |
 | Ingestion Configuration (`mcpConfig.ingestion`) | Required | **Omit entirely** |
-| Unique API Configuration (`mcpConfig.unique`) | Required | Required |
-| RabbitMQ Configuration | Required | Required |
 
-See [MCP_BACKEND](#MCP_BACKEND) for the full description of what each mode enables.
+Two values are accepted for `MCP_BACKEND`:
+
+- **`microsoft_graph_and_unique_api`** (default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; all sync tools (`sync_progress`, `run_full_sync`, etc.) are registered. Requires the `mcpConfig.ingestion` section to be configured.
+- **`microsoft_graph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not registered. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate. The `mcpConfig.ingestion` section is not required and is ignored.
+
+Existing deployments that do not set this variable are unaffected — `microsoft_graph_and_unique_api` is the default.
 
 ## Environment Variables
 
@@ -27,87 +41,60 @@ These must be provided via Kubernetes secrets:
 | Variable | Format | Description | Required for |
 |----------|--------|-------------|-------------|
 | `DATABASE_URL` | `postgresql://user:pass@host:5432/db` | PostgreSQL connection string | Both modes |
-| `AMQP_URL` | `amqp://user:pass@host:5672/vhost` | RabbitMQ connection string (or use individual `AMQP_*` fields) | Both modes |
+| `AMQP_URL` | `amqp://user:pass@host:5672/vhost` | RabbitMQ connection string (or use individual `AMQP_*` fields — see below) | Both modes |
 | `MICROSOFT_CLIENT_SECRET` | String from Azure portal | Entra app client secret | Both modes |
-| `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret — see [Generating Secrets](#Generating-Secrets) | Both modes |
-| `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key — see [Generating Secrets](#Generating-Secrets) | Both modes |
-| `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key — see [Generating Secrets](#Generating-Secrets) | Both modes |
-| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret (required for `external` auth mode only) | Both modes (`external` service auth only) |
+| `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret | Both modes |
+| `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key | Both modes |
+| `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key | Both modes |
+| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret | `external` service auth only |
 
-### Application Configuration
+**Connection string formats:**
 
-Set via `mcpConfig.app` in Helm values:
+- `DATABASE_URL`: `postgresql://user:password@host:5432/dbname?sslmode=require` — see [PostgreSQL connection string docs](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING)
+- `AMQP_URL`: `amqp://user:password@host:5672/vhost` — see [RabbitMQ URI specification](https://www.rabbitmq.com/docs/uri-spec). Alternatively, use individual fields instead of a connection string:
 
-| Variable | Helm Path | Default | Description |
-|----------|-----------|---------|-------------|
-| `SELF_URL` | `mcpConfig.app.selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
-| `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
-| `MCP_DEBUG_MODE` | `mcpConfig.app.mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
-| `MCP_BACKEND` | `mcpConfig.app.mcpBackend` | `MicrosoftGraphAndUniqueApi` | Selects the search backend — see [MCP_BACKEND](#MCP_BACKEND) |
-| `APP_BUFFER_LOGS` | `mcpConfig.app.bufferLogs` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
-### Delegated Access Configuration
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `AMQP_USERNAME` | RabbitMQ username | — |
+| `AMQP_PASSWORD` | RabbitMQ password | — |
+| `AMQP_HOST` | RabbitMQ hostname | — |
+| `AMQP_PORT` | RabbitMQ port | `5672` |
+| `AMQP_VHOST` | Virtual host | — |
 
-Set via `mcpConfig.delegatedAccess` in Helm values:
+#### Generating Secrets
 
-| Variable | Helm Path | Default | Description |
-|----------|-----------|---------|-------------|
-| `DELEGATED_ACCESS_SCAN` | `mcpConfig.delegatedAccess.scan` | `disabled` | Delegated access scanning mode — see [DELEGATED_ACCESS_SCAN](#DELEGATED_ACCESS_SCAN) |
-| `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` | `mcpConfig.delegatedAccess.discoveryCronSchedule` | `0 */12 * * *` | Cron schedule for delegated access discovery runs. Required when `DELEGATED_ACCESS_SCAN` is not `disabled` |
-| `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` | `mcpConfig.delegatedAccess.verificationCronSchedule` | `0 */4 * * *` | Cron schedule for delegated access verification runs. Required when `DELEGATED_ACCESS_SCAN` is `granularAccess` |
-| `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE` | `mcpConfig.delegatedAccess.recoveryCronSchedule` | `*/30 * * * *` | Cron schedule for recovering stuck delegated access discovery and verification jobs. Active when `DELEGATED_ACCESS_SCAN` is not `disabled` |
-| `DELEGATED_ACCESS_STALENESS_THRESHOLD_HOURS` | `mcpConfig.delegatedAccess.stalenessThresholdHours` | `24` | Hours after which a delegated access account is considered stale for the `/health` check |
-| `DELEGATED_ACCESS_FAILURE_THRESHOLD` | `mcpConfig.delegatedAccess.failureThreshold` | `0.15` | Fraction (0–1) of eligible delegated users that may be stale before the `/health` check reports down |
+The following secrets must be generated with a cryptographically secure random source:
+
+| Variable | Command |
+|----------|---------|
+| `MICROSOFT_WEBHOOK_SECRET` | `openssl rand -hex 64` |
+| `AUTH_HMAC_SECRET` | `openssl rand -hex 32` |
+| `ENCRYPTION_KEY` | `openssl rand -hex 32` |
 
 ### Microsoft Configuration
 
 Set via `mcpConfig.microsoft` in Helm values:
 
-| Variable | Helm Path | Default | Description |
-|----------|-----------|---------|-------------|
-| `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
-| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | defaults to `SELF_URL` | Base URL for Microsoft Graph webhook callbacks — see [MICROSOFT_PUBLIC_WEBHOOK_URL](#MICROSOFT_PUBLIC_WEBHOOK_URL) |
-| `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `mcpConfig.microsoft.subscriptionExpirationTimeHoursUTC` | `3` | UTC hour (0–23) when daily subscription renewals run |
-
-### Ingestion Configuration
-
-!!! warning "Mode A (`MicrosoftGraphAndUniqueApi`) only"
-    This entire section applies only when `MCP_BACKEND` is `MicrosoftGraphAndUniqueApi`. If you are deploying in `MicrosoftGraph` mode, omit all `mcpConfig.ingestion` values from your Helm configuration.
-
-Set via `mcpConfig.ingestion` in Helm values:
-
-| Variable | Helm Path | Default | Description |
-|----------|-----------|---------|-------------|
-| `INGESTION_DEFAULT_MAIL_FILTERS` | `mcpConfig.ingestion.defaultMailFilters` | (required) | JSON email sync filters — see [Mail Filters](#Mail-Filters) |
-| `INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.ingestion.liveCatchupOverlappingWindowMinutes` | `3` | Minutes to overlap each live catch-up sync run to account for Office 365 eventual consistency. Minimum: `2` — see [INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES](#INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES) |
-| `INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES` | `mcpConfig.ingestion.liveCatchupRecheckOverlappingWindowMinutes` | `10` | Minutes to overlap live catch-up ready-recheck runs. Minimum: `10` — see [INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES](#INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES) |
-| `INGESTION_FULL_SYNC_RECOVERY_CRON` | `mcpConfig.ingestion.fullSyncRecoveryCron` | `*/2 * * * *` | Cron schedule for stuck full-sync recovery scans |
-| `INGESTION_LIVE_CATCHUP_RECOVERY_CRON` | `mcpConfig.ingestion.liveCatchupRecoveryCron` | `*/5 * * * *` | Cron schedule for stuck live catch-up recovery scans |
-| `INGESTION_DELETE_INBOX_RECOVERY_CRON` | `mcpConfig.ingestion.deleteInboxRecoveryCron` | `*/5 * * * *` | Cron schedule for stuck inbox deletion recovery scans |
-| `INGESTION_CONNECTIVITY_TIMEOUT_MS` | `mcpConfig.ingestion.connectivityTimeoutMs` | `3000` | Timeout in milliseconds for the Microsoft Graph connectivity check in `/health` |
-| `INGESTION_SYNC_FAILURE_THRESHOLD` | `mcpConfig.ingestion.syncFailureThreshold` | `0.15` | Fraction (0–1) of eligible users that may be failing fullSync or liveCatchup before the `/health` check reports down |
+| Variable | Helm key | Default | Description |
+|----------|----------|---------|-------------|
+| `MICROSOFT_CLIENT_ID` | `clientId` | (required) | Entra app client ID |
+| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `publicWebhookUrl` | defaults to `SELF_URL` | Base URL for Microsoft Graph webhook callbacks — see [MICROSOFT_PUBLIC_WEBHOOK_URL](#MICROSOFT_PUBLIC_WEBHOOK_URL) |
+| `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `subscriptionExpirationTimeHoursUTC` | `3` | UTC hour (0–23) when daily subscription renewals run |
 
 ### Unique API Configuration
 
 Set via `mcpConfig.unique` in Helm values:
 
-| Variable | Helm Path | Default | Description |
-|----------|-----------|---------|-------------|
-| `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
-| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
-| `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `mcpConfig.unique.scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
-| `UNIQUE_STORE_INTERNALLY` | `mcpConfig.unique.storeInternally` | `enabled` | Store emails as files in the Knowledge Base — see [UNIQUE_STORE_INTERNALLY](#UNIQUE_STORE_INTERNALLY) |
-| `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required for `cluster_local`) | `x-company-id` and `x-user-id` headers for `cluster_local` mode — see [UNIQUE_SERVICE_EXTRA_HEADERS](#UNIQUE_SERVICE_EXTRA_HEADERS) |
-| `UNIQUE_ZITADEL_CLIENT_ID` | `mcpConfig.unique.zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
-| `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `mcpConfig.unique.zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
-| `UNIQUE_ZITADEL_PROJECT_ID` | `mcpConfig.unique.zitadel.projectId` | (required for `external`) | Zitadel project ID for audience validation |
-
-### Logs Configuration
-
-Set via `mcpConfig.logs` in Helm values:
-
-| Variable | Helm Path | Default | Description |
-|----------|-----------|---------|-------------|
-| `LOGS_DIAGNOSTICS_DATA_POLICY` | `mcpConfig.logs.diagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
+| Variable | Helm key | Default | Description |
+|----------|----------|---------|-------------|
+| `UNIQUE_SERVICE_AUTH_MODE` | `serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
+| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
+| `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
+| `UNIQUE_STORE_INTERNALLY` | `storeInternally` | `enabled` | Store emails as files in the Knowledge Base — see [UNIQUE_STORE_INTERNALLY](#UNIQUE_STORE_INTERNALLY) |
+| `UNIQUE_SERVICE_EXTRA_HEADERS` | `serviceExtraHeaders` | (required for `cluster_local`) | `x-company-id` and `x-user-id` headers for `cluster_local` mode — see [UNIQUE_SERVICE_EXTRA_HEADERS](#UNIQUE_SERVICE_EXTRA_HEADERS) |
+| `UNIQUE_ZITADEL_CLIENT_ID` | `zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
+| `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
+| `UNIQUE_ZITADEL_PROJECT_ID` | `zitadel.projectId` | (required for `external`) | Zitadel project ID for audience validation |
 
 ### Authentication Token Configuration
 
@@ -115,10 +102,56 @@ These tokens are issued by the MCP server to MCP clients (e.g., AI assistants) a
 
 Set via `mcpConfig.auth` in Helm values (optional — defaults are suitable for most deployments):
 
-| Variable | Helm Path | Default | Description |
-|----------|-----------|---------|-------------|
-| `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `mcpConfig.auth.accessTokenExpiresInSeconds` | `60` | TTL of the short-lived access token issued to MCP clients |
-| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `mcpConfig.auth.refreshTokenExpiresInSeconds` | `2592000` | TTL of the long-lived refresh token issued to MCP clients (30 days) |
+| Variable | Helm key | Default | Description |
+|----------|----------|---------|-------------|
+| `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `accessTokenExpiresInSeconds` | `60` | TTL of the short-lived access token issued to MCP clients |
+| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `refreshTokenExpiresInSeconds` | `2592000` | TTL of the long-lived refresh token issued to MCP clients (30 days) |
+
+### Application Configuration
+
+Set via `mcpConfig.app` in Helm values:
+
+| Variable | Helm key | Default | Description |
+|----------|----------|---------|-------------|
+| `SELF_URL` | `selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
+| `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
+| `MCP_DEBUG_MODE` | `mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
+| `MCP_BACKEND` | `mcpBackend` | `microsoft_graph_and_unique_api` | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
+| `LOGS_BUFFERING` | `app.logsBuffering` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
+| `LOGS_DIAGNOSTICS_DATA_POLICY` | `app.logsDiagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
+
+### Delegated Access Configuration
+
+Set via `mcpConfig.delegatedAccess` in Helm values:
+
+| Variable | Helm key | Default | Description |
+|----------|----------|---------|-------------|
+| `DELEGATED_ACCESS_SCAN` | `scan` | `disabled` | Delegated access scanning mode — see [DELEGATED_ACCESS_SCAN](#DELEGATED_ACCESS_SCAN) |
+| `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` | `discoveryCronSchedule` | `0 */12 * * *` | Cron schedule for delegated access discovery runs. Required when `DELEGATED_ACCESS_SCAN` is not `disabled` |
+| `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` | `verificationCronSchedule` | `0 */4 * * *` | Cron schedule for delegated access verification runs. Required when `DELEGATED_ACCESS_SCAN` is `granular_access` |
+| `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE` | `recoveryCronSchedule` | `*/30 * * * *` | Cron schedule for recovering stuck delegated access discovery and verification jobs. Active when `DELEGATED_ACCESS_SCAN` is not `disabled` |
+| `DELEGATED_ACCESS_STALENESS_THRESHOLD_HOURS` | `stalenessThresholdHours` | `24` | Hours after which a delegated access account is considered stale for the `/health` check |
+| `DELEGATED_ACCESS_FAILURE_THRESHOLD` | `failureThreshold` | `0.15` | Fraction (0–1) of eligible delegated users that may be stale before the `/health` check reports down |
+
+### Ingestion Configuration
+
+!!! warning "Mode A (`microsoft_graph_and_unique_api`) only"
+    This entire section applies only when `MCP_BACKEND` is `microsoft_graph_and_unique_api`. If you are deploying in `microsoft_graph` mode, omit all `mcpConfig.ingestion` values from your Helm configuration.
+
+Set via `mcpConfig.ingestion` in Helm values:
+
+| Variable | Helm key | Default | Description |
+|----------|----------|---------|-------------|
+| `INGESTION_DEFAULT_MAIL_FILTERS` | `defaultMailFilters` | (required) | JSON email sync filters — see [Mail Filters](#Mail-Filters) |
+| `INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES` | `liveCatchupOverlappingWindowMinutes` | `3` | Minutes to overlap each live catch-up sync run to account for Office 365 eventual consistency. Minimum: `2` — see [INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES](#INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES) |
+| `INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES` | `liveCatchupRecheckOverlappingWindowMinutes` | `10` | Minutes to overlap live catch-up ready-recheck runs. Minimum: `10` — see [INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES](#INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES) |
+| `INGESTION_FULL_SYNC_RECOVERY_CRON` | `fullSyncRecoveryCron` | `*/2 * * * *` | Cron schedule for stuck full-sync recovery scans |
+| `INGESTION_LIVE_CATCHUP_RECOVERY_CRON` | `liveCatchupRecoveryCron` | `*/5 * * * *` | Cron schedule for recovering live catch-ups stuck in `running` or `failed` state past their heartbeat threshold |
+| `INGESTION_LIVE_CATCHUP_OAUTH_USERS_RECHECK_CRON` | `liveCatchupOauthUsersRecheckCron` | `*/10 * * * *` | Cron schedule for subscription-user live catch-up ready-recheck runs (retriggers users with an active subscription that haven't run in 30 minutes) |
+| `INGESTION_LIVE_CATCHUP_SHARED_MAILBOX_RECHECK_CRON` | `liveCatchupSharedMailboxRecheckCron` | `*/10 * * * *` | Cron schedule for shared-mailbox live catch-up ready-recheck runs (retriggers shared-mailbox profiles that haven't run in 10 minutes) |
+| `INGESTION_DELETE_INBOX_RECOVERY_CRON` | `deleteInboxRecoveryCron` | `*/5 * * * *` | Cron schedule for stuck inbox deletion recovery scans |
+| `INGESTION_CONNECTIVITY_TIMEOUT_MS` | `connectivityTimeoutMs` | `3000` | Timeout in milliseconds for the Microsoft Graph connectivity check in `/health` |
+| `INGESTION_SYNC_FAILURE_THRESHOLD` | `syncFailureThreshold` | `0.15` | Fraction (0–1) of eligible users that may be failing fullSync or liveCatchup before the `/health` check reports down |
 
 ### Runtime Configuration
 
@@ -187,12 +220,12 @@ mcpConfig:
   app:
     selfUrl: https://outlook.semantic.mcp.example.com
     mcpDebugMode: disabled
-    mcpBackend: MicrosoftGraphAndUniqueApi
+    mcpBackend: microsoft_graph_and_unique_api
 
   delegatedAccess:
     scan: disabled
     # discoveryCronSchedule: '0 */12 * * *'   # required when scan != disabled
-    # verificationCronSchedule: '0 */4 * * *'  # required when scan == granularAccess
+    # verificationCronSchedule: '0 */4 * * *'  # required when scan == granular_access
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
@@ -205,6 +238,7 @@ mcpConfig:
     serviceExtraHeaders:
       x-company-id: "<your-company-id>"
       x-user-id: "<your-zitadel-service-user-id>"
+    # For external auth mode, replace serviceExtraHeaders with zitadel: — see Zitadel Service Account section below
 
   ingestion:
     defaultMailFilters:
@@ -213,6 +247,8 @@ mcpConfig:
       ignoredSenders: []
     # liveCatchupOverlappingWindowMinutes: 3    # optional, min 2
     # liveCatchupRecheckOverlappingWindowMinutes: 10  # optional, min 10
+    # liveCatchupOauthUsersRecheckCron: "*/10 * * * *"         # optional
+    # liveCatchupSharedMailboxRecheckCron: "*/10 * * * *"   # optional
 
 ingress:
   enabled: true
@@ -282,7 +318,7 @@ mcpConfig:
 
   app:
     selfUrl: https://outlook.semantic.mcp.example.com
-    mcpBackend: MicrosoftGraph
+    mcpBackend: microsoft_graph
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
@@ -294,8 +330,9 @@ mcpConfig:
     serviceExtraHeaders:
       x-company-id: "<your-company-id>"
       x-user-id: "<your-service-account-user-id>"
+    # For external auth mode, replace serviceExtraHeaders with zitadel: — see Zitadel Service Account section below
 
-  # No mcpConfig.ingestion section — omit entirely for MicrosoftGraph mode
+  # No mcpConfig.ingestion section — omit entirely for microsoft_graph mode
 ```
 
 ### Service Auth Modes
@@ -334,6 +371,14 @@ mcpConfig:
       projectId: "<zitadel-project-id>"
 ```
 
+## Security Best Practices
+
+1. Rotate secrets regularly, especially `MICROSOFT_CLIENT_SECRET` and `ENCRYPTION_KEY`
+2. Use an external secret manager (e.g., AWS Secrets Manager, Azure Key Vault, HashiCorp Vault) rather than static Kubernetes secrets
+3. Keep `LOGS_DIAGNOSTICS_DATA_POLICY` set to `conceal` (the default) in production to avoid logging sensitive data
+4. Enable network policies to restrict inbound and outbound traffic to only required services
+5. Monitor deployments using the provided Grafana dashboards and alert rules (`grafana.dashboard.enabled: true`, `alerts.enabled: true`)
+
 ## Zitadel Service Account
 
 A Zitadel service account is required for both `cluster_local` and `external` auth modes. For `cluster_local`, its user ID is passed in the `x-user-id` header. For `external`, its credentials are used for service-to-service OAuth.
@@ -354,27 +399,109 @@ After creating the service user, note the following values for configuration:
 
 ### Service Account Permissions
 
-The service account must be assigned the **`KB_Admin`** (Knowledge Base Admin) Gatekeeper role. This is the minimum role that grants all permissions the MCP server needs:
+The service account must be assigned the following Zitadel permissions:
 
-| Resource | Required Permissions | Used For |
-|----------|---------------------|----------|
-| `CONTENT` | `READ`, `WRITE`, `DELETE` | Ingesting, updating, and removing email content via the ingestion service |
-| `SCOPE` | `READ`, `WRITE` | Creating and managing Knowledge Base scopes via the scope management service |
-| `SCOPE_ACCESS` | `READ`, `WRITE` | Managing user access to scopes |
-| `FOLDER` | `READ`, `WRITE`, `DELETE` | Managing Knowledge Base folders |
+| Permission | Used For |
+|------------|----------|
+| `chat.admin.all` | Administrative access required for scope and folder management |
+| `chat.knowledge.read` | Reading Knowledge Base scopes and content |
+| `chat.knowledge.write` | Ingesting email content and managing scopes via the ingestion and scope management services |
 
-The `KB_Admin` role covers all of the above. Using a broader role such as `Company_Admin` also works but grants unnecessary privileges.
+## Configuration Reference
 
-!!! note "Gatekeeper enforcement"
-    Authorization behavior differs by mode. In `cluster_local` mode, Gatekeeper does **not** check user roles — instead, the MCP server's service ID (`outlook-semantic-mcp`) must be listed in the guards of the relevant resolvers. In `external` mode, Gatekeeper authorization is enforced against the Zitadel client credentials, which must have the `KB_Admin` role assigned.
+Detailed documentation for variables that require more context than the tables above provide.
 
-## Mail Filters
+### Runtime
+
+#### PORT
+
+The server listens on `PORT` (default `9542`). In Helm deployments, `server.ports.application` (default `51345`) overrides this value — the Helm chart injects the port via the deployment spec, so `PORT` typically does not need to be set explicitly.
+
+#### MAX_HEAP_MB
+
+Sets the Node.js `--max-old-space-size` flag. With the default of `850` MB, set the pod memory request/limit to at least ~1 GB to account for non-heap memory overhead (native modules, OS buffers, etc.).
+
+### Microsoft
+
+#### MICROSOFT_PUBLIC_WEBHOOK_URL
+
+Microsoft Graph sends webhook callbacks (change notifications and lifecycle events) to this base URL. Microsoft appends `/mail-subscription/notification` and `/mail-subscription/lifecycle` to construct the full endpoints. The URL must be publicly reachable by Microsoft Graph.
+
+This defaults to `SELF_URL`. Set it explicitly only when the externally reachable webhook URL differs from `SELF_URL` — for example, when using a dev tunnel in local development. In most production deployments the two values are identical.
+
+Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callback`, not this variable.
+
+### Unique API
+
+#### UNIQUE_STORE_INTERNALLY
+
+When `enabled` (default), emails are ingested into the Unique Knowledge Base and stored as physical files, making them available for semantic search via `search_emails`.
+
+When `disabled`, emails are ingested (metadata recorded) but not stored as files. They remain searchable via `search_emails`, but the email content is not persisted in the Knowledge Base.
+
+#### UNIQUE_SERVICE_EXTRA_HEADERS
+
+Required for `cluster_local` auth mode. Provide as a JSON object:
+
+```json
+{"x-company-id": "<your-company-id>", "x-user-id": "<your-zitadel-service-user-id>"}
+```
+
+- **`x-company-id`** — your organization's ID in the Unique platform. Find it in the Unique admin dashboard under **Settings > Organization**, or via the Unique API (`GET /api/company`).
+- **`x-user-id`** — the Zitadel service user ID. See [Zitadel Service Account](#Zitadel-Service-Account).
+
+### Application
+
+#### MCP_DEBUG_MODE
+
+When set to `enabled`, exposes four additional debug tools to all connected MCP users: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync`. These tools are intended for troubleshooting sync issues, but because MCP tools are scoped to the authenticated user there is no way to restrict them to operators only — all users can call them while debug mode is active. Enable only during active troubleshooting and disable immediately after.
+
+#### DELEGATED_ACCESS_SCAN
+
+For step-by-step Microsoft 365 setup, see [Features — Delegated Access — Setup](../technical/features.md#Setup).
+
+Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for delegated mailbox access granted between users at the Microsoft Exchange level. Three values are accepted:
+
+- **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. Users only see their own mailbox.
+- **`full_access_only`** — discovers users who have been granted **Full Access (Read & Manage)** on a mailbox via Exchange admin. Uses the `/users/{email}/messages` endpoint to detect access. Requires `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE`.
+- **`granular_access`** — discovers users who have been granted **folder-level access** (e.g., only "Inbox" or "RFQ" shared, not the entire mailbox). Uses the `/users/{email}/mailFolders` endpoint for discovery, followed by a verification pass to determine which folders are actually readable (since the folder listing can include parent folders of shared subfolders that are not themselves accessible). Requires both `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` and `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE`.
+
+**Choosing a mode:**
+
+| Scenario | Recommended mode |
+|----------|-----------------|
+| No delegated mailbox access in your org | `disabled` |
+| Users have Full Access (Read & Manage) granted via Exchange admin | `full_access_only` |
+| Users share individual folders (e.g., Inbox, RFQ) with others | `granular_access` |
+
+`granular_access` subsumes `full_access_only` — if your org uses both types of delegation, use `granular_access`.
+
+!!! warning "`granular_access` requires Mode A — Mode B supports full access only"
+    `granular_access` requires `MCP_BACKEND=microsoft_graph_and_unique_api` and will
+    fail to start if configured with `microsoft_graph`. `full_access_only` is
+    supported in both modes, but in Mode B only delegates with **full mailbox
+    access** can search delegated mailboxes — honouring folder-level delegations
+    would require querying every accessible folder individually, which is not
+    implemented due to API rate limits.
+
+> **Both users must be connected (both modes).** Discovery only considers
+> connected users — if the owner has not connected their account, there is
+> nothing to discover or search regardless of mode. In Mode A the owner must
+> also have completed the initial full sync for their emails to be available to
+> the delegate.
+
+> **`full_access_only` — consider a more frequent discovery schedule.** When using
+> `full_access_only`, discovery is the only revocation detection mechanism.
+> Consider setting `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` to run 4 times per
+> day (e.g. `0 */6 * * *`) to reduce the window during which a revoked delegate
+> can still search the owner's emails. In `granular_access` mode this is less
+> critical because the verification job already runs every 4 hours.
+
+#### Mail Filters
 
 The `INGESTION_DEFAULT_MAIL_FILTERS` value controls which emails are synced during the initial import and ongoing sync. It is configured as a dictionary under `mcpConfig.ingestion.defaultMailFilters` and serialized to JSON automatically by the Helm chart.
 
 > **Warning:** Changing `INGESTION_DEFAULT_MAIL_FILTERS` only affects newly synced emails. Emails that were already ingested under a previous filter configuration are **not** removed. To remove previously ingested emails, you must delete them manually.
-
-### Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -382,18 +509,14 @@ The `INGESTION_DEFAULT_MAIL_FILTERS` value controls which emails are synced duri
 | `ignoredSenders` | Array of regex patterns | Regex patterns in `/pattern/flags` format tested against the sender's email address. Emails matching any pattern are excluded from sync. |
 | `ignoredContents` | Array of regex patterns | Regex patterns in `/pattern/flags` format tested against both the email subject and body. Emails matching any pattern are excluded from sync. |
 
-Patterns for `ignoredSenders` and `ignoredContents` must be in `/pattern/flags` format (e.g. `/^noreply@example\.com$/i`, `/unsubscribe/i`). Patterns are validated against ReDoS attacks on ingestion — invalid or unsafe patterns are rejected.
+Patterns must be in `/pattern/flags` format (e.g. `/^noreply@example\.com$/i`, `/unsubscribe/i`). Patterns are validated against ReDoS attacks on ingestion — invalid or unsafe patterns are rejected.
 
-### Choosing a Retention Window
-
-We recommend setting `retentionWindowInDays` between **95 and 180 days** for most deployments. The right value depends on your mail volume and use-case needs:
+We recommend setting `retentionWindowInDays` between **95 and 180 days** for most deployments:
 
 - **High mail volume** (hundreds of emails per user per day): use a shorter window (closer to 95 days). A large window combined with high volume floods the Knowledge Base with content, degrades search quality, and increases ingestion costs.
 - **Low mail volume** or deep-search requirements: a longer window (up to 180 days or beyond) is viable.
 
 Values above 180 days are not recommended unless mail volume is low and the operational cost of a large Knowledge Base is acceptable.
-
-### Example
 
 ```yaml
 mcpConfig:
@@ -406,152 +529,10 @@ mcpConfig:
         - "/^noreply@example\\.com$/i"
 ```
 
-The example uses 95 days. Adjust based on your organization's mail volume and search needs.
-
-## Database Configuration
-
-### Connection String Format
-
-```
-postgresql://username:password@hostname:port/database?sslmode=require
-```
-
-No special PostgreSQL extensions are required. Database migrations run automatically on deployment and create all necessary tables and indexes.
-
-## RabbitMQ Configuration
-
-### Connection String Format
-
-```
-amqp://username:password@hostname:5672/vhost
-```
-
-### Alternative: Individual Fields
-
-Instead of `AMQP_URL`, you can provide individual connection fields:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `AMQP_USERNAME` | RabbitMQ username | — |
-| `AMQP_PASSWORD` | RabbitMQ password | — |
-| `AMQP_HOST` | RabbitMQ hostname | — |
-| `AMQP_PORT` | RabbitMQ port | `5672` |
-| `AMQP_VHOST` | Virtual host | — |
-
-## Security Best Practices
-
-1. Rotate secrets regularly, especially `MICROSOFT_CLIENT_SECRET` and `ENCRYPTION_KEY`
-2. Use an external secret manager (e.g., AWS Secrets Manager, Azure Key Vault, HashiCorp Vault) rather than static Kubernetes secrets
-3. Keep `LOGS_DIAGNOSTICS_DATA_POLICY` set to `conceal` (the default) in production to avoid logging sensitive data
-4. Enable network policies to restrict inbound and outbound traffic to only required services
-5. Monitor deployments using the provided Grafana dashboards and alert rules (`grafana.dashboard.enabled: true`, `alerts.enabled: true`)
-
-## Variable Details
-
-### Generating Secrets
-
-The following secrets must be generated with a cryptographically secure random source:
-
-| Variable | Command |
-|----------|---------|
-| `MICROSOFT_WEBHOOK_SECRET` | `openssl rand -hex 64` |
-| `AUTH_HMAC_SECRET` | `openssl rand -hex 32` |
-| `ENCRYPTION_KEY` | `openssl rand -hex 32` |
-
-### PORT
-
-The server listens on `PORT` (default `9542`). In Helm deployments, `server.ports.application` (default `51345`) overrides this value — the Helm chart injects the port via the deployment spec, so `PORT` typically does not need to be set explicitly.
-
-### MCP_BACKEND
-
-| If you want... | Use |
-|---|---|
-| Semantic search against indexed email history + live KQL | `MicrosoftGraphAndUniqueApi` |
-| Live KQL search only, no email indexing | `MicrosoftGraph` |
-
-Selects the search and email-open backend at deploy time. Two values are accepted:
-
-- **`MicrosoftGraphAndUniqueApi`** (default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; all sync tools (`sync_progress`, `run_full_sync`, etc.) are registered. Requires the `mcpConfig.ingestion` section to be configured.
-- **`MicrosoftGraph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email_by_id` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not registered. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate. The `mcpConfig.ingestion` section is not required and is ignored.
-
-Existing deployments that do not set this variable are unaffected — `MicrosoftGraphAndUniqueApi` is the default.
-
-### DELEGATED_ACCESS_SCAN
-
-Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for delegated mailbox access granted between users at the Microsoft Exchange level. Three values are accepted:
-
-- **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. Users only see their own mailbox.
-- **`fullAccessOnly`** — discovers users who have been granted **Full Access (Read & Manage)** on a mailbox via Exchange admin. Uses the `/users/{email}/messages` endpoint to detect access. Requires `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE`.
-- **`granularAccess`** — discovers users who have been granted **folder-level access** (e.g., only "Inbox" or "RFQ" shared, not the entire mailbox). Uses the `/users/{email}/mailFolders` endpoint for discovery, followed by a verification pass to determine which folders are actually readable (since the folder listing can include parent folders of shared subfolders that are not themselves accessible). Requires both `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` and `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE`.
-
-**Choosing a mode:**
-
-| Scenario | Recommended mode |
-|----------|-----------------|
-| No delegated mailbox access in your org | `disabled` |
-| Users have Full Access (Read & Manage) granted via Exchange admin | `fullAccessOnly` |
-| Users share individual folders (e.g., Inbox, RFQ) with others | `granularAccess` |
-
-`granularAccess` subsumes `fullAccessOnly` — if your org uses both types of delegation, use `granularAccess`.
-
-!!! warning "`granularAccess` requires Mode A — Mode B supports full access only"
-    `granularAccess` requires `MCP_BACKEND=MicrosoftGraphAndUniqueApi` and will
-    fail to start if configured with `MicrosoftGraph`. `fullAccessOnly` is
-    supported in both modes, but in Mode B only delegates with **full mailbox
-    access** can search delegated mailboxes — honouring folder-level delegations
-    would require querying every accessible folder individually, which is not
-    implemented due to API rate limits.
-
-> **Both users must be connected (both modes).** Discovery only considers
-> connected users — if the owner has not connected their account, there is
-> nothing to discover or search regardless of mode. In Mode A the owner must
-> also have completed the initial full sync for their emails to be available to
-> the delegate.
-
-> **`fullAccessOnly` — consider a more frequent discovery schedule.** When using
-> `fullAccessOnly`, discovery is the only revocation detection mechanism.
-> Consider setting `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` to run 4 times per
-> day (e.g. `0 */6 * * *`) to reduce the window during which a revoked delegate
-> can still search the owner's emails. In `granularAccess` mode this is less
-> critical because the verification job already runs every 4 hours.
-
-### MCP_DEBUG_MODE
-
-When set to `enabled`, exposes four additional debug tools to all connected MCP users: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync`. These tools are intended for troubleshooting sync issues, but because MCP tools are scoped to the authenticated user there is no way to restrict them to operators only — all users can call them while debug mode is active. Enable only during active troubleshooting and disable immediately after.
-
-### MICROSOFT_PUBLIC_WEBHOOK_URL
-
-Microsoft Graph sends webhook callbacks (change notifications and lifecycle events) to this base URL. Microsoft appends `/mail-subscription/notification` and `/mail-subscription/lifecycle` to construct the full endpoints. The URL must be publicly reachable by Microsoft Graph.
-
-This defaults to `SELF_URL`. Set it explicitly only when the externally reachable webhook URL differs from `SELF_URL` — for example, when using a dev tunnel in local development. In most production deployments the two values are identical.
-
-Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callback`, not this variable.
-
-### UNIQUE_STORE_INTERNALLY
-
-When `enabled` (default), emails are ingested into the Unique Knowledge Base and stored as physical files, making them available for semantic search via `search_emails`.
-
-When `disabled`, emails are indexed (metadata recorded) but not stored as files. They remain searchable via `search_emails`, but the email content is not persisted in the Knowledge Base.
-
-### UNIQUE_SERVICE_EXTRA_HEADERS
-
-Required for `cluster_local` auth mode. Provide as a JSON object:
-
-```json
-{"x-company-id": "<your-company-id>", "x-user-id": "<your-zitadel-service-user-id>"}
-```
-
-- **`x-company-id`** — your organization's ID in the Unique platform. Find it in the Unique admin dashboard under **Settings > Organization**, or via the Unique API (`GET /api/company`).
-- **`x-user-id`** — the Zitadel service user ID. See [Zitadel Service Account](#Zitadel-Service-Account).
-
-### INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES
+#### INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES
 
 Office 365 uses eventual consistency — messages can appear with a delayed `updatedAt` timestamp after the actual event. To avoid missing late-arriving messages, each live catch-up sync run re-queries an overlapping window of this many minutes. Default: `3` minutes. Minimum: `2`.
 
-### INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES
+#### INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES
 
 Overlapping window (in minutes) for live catch-up ready-recheck runs. Uses a larger window than the standard run to account for higher latency during recheck scenarios. Minimum and default: `10`.
-
-### MAX_HEAP_MB
-
-Sets the Node.js `--max-old-space-size` flag. With the default of `850` MB, set the pod memory request/limit to at least ~1 GB to account for non-heap memory overhead (native modules, OS buffers, etc.).
