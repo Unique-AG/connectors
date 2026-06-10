@@ -3,11 +3,7 @@ import { Smeared } from '@unique-ag/utils';
 import { createMock } from '@golevelup/ts-vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantConfig } from '../../config';
-import type {
-  ConfluenceApiClient,
-  ConfluenceAttachment,
-  PageAttachmentLookupResult,
-} from '../../confluence-api';
+import type { ConfluenceApiClient, ConfluenceAttachment } from '../../confluence-api';
 import {
   CONFLUENCE_BASE_URL,
   PAGE_BODY_EXTERNAL_URL_IMAGE,
@@ -293,7 +289,7 @@ describe('PageImageInliner', () => {
         title: 'other.png',
         mediaType: 'image/png',
       });
-      const lookup: PageAttachmentLookupResult = {
+      const lookup = {
         pageId: '77',
         attachments: [remoteAttachment],
       };
