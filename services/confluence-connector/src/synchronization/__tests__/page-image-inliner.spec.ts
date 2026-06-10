@@ -309,9 +309,9 @@ describe('PageImageInliner', () => {
       expect(result.page.body).toContain(
         `src="data:image/png;base64,${imageBuffer().toString('base64')}"`,
       );
-      expect(result.inlinedAttachmentKeys.has(buildInlinedAttachmentKey('77', 'remote-att-1'))).toBe(
-        true,
-      );
+      expect(
+        result.inlinedAttachmentKeys.has(buildInlinedAttachmentKey('77', 'remote-att-1')),
+      ).toBe(true);
     });
 
     it('inlines both images when a page references the same other-page twice', async () => {
@@ -425,9 +425,10 @@ describe('PageImageInliner', () => {
     });
 
     it('leaves an unclosed <ac:image> tag untouched and preserves trailing content', async () => {
-      // Malformed body where <ac:image> is opened but never closed. The parser would
-      // otherwise synthesize a close at EOF and we would splice from '<ac:image>' all
-      // the way to the end of the body, destroying everything after it.
+      // Malformed body where <ac:image> is opened but never closed, referencing a filename
+      // that DOES resolve to a discovered attachment. The parser would otherwise synthesize a
+      // close at EOF and we would splice from '<ac:image>' all the way to the end of the body,
+      // destroying everything after it. The close-tag guard must drop the macro entirely.
       const page = basePage(PAGE_BODY_UNCLOSED_IMAGE);
       const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
       expect(result.page.body).toBe(page.body);
