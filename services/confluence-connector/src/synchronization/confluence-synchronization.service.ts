@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
+import { groupBy } from 'remeda';
 import type { SyncResult } from '../health/sync-result.types';
 import { type Metrics, SyncPhase } from '../metrics';
 import { getCurrentTenant } from '../tenant';
@@ -93,8 +94,10 @@ export class ConfluenceSynchronizationService {
         );
 
         const concurrency = tenant.config.processing.concurrency;
-        const imageAttachmentsByPageId =
-          this.buildImageAttachmentsByPageIdMap(discoveredAttachments);
+        const imageAttachmentsByPageId = groupBy(
+          discoveredAttachments.filter((a) => isImageMimeType(a.mediaType)),
+          (a) => a.pageId,
+        );
         const inlinedAttachmentIds = new Set<string>();
 
         this.metrics.setSyncPhase(SyncPhase.IngestingPages);
@@ -145,7 +148,7 @@ export class ConfluenceSynchronizationService {
     pages: DiscoveredPage[],
     spaceScopes: Map<string, string>,
     concurrency: number,
-    imageAttachmentsByPageId: Map<string, DiscoveredAttachment[]>,
+    imageAttachmentsByPageId: Readonly<Partial<Record<string, DiscoveredAttachment[]>>>,
     inlinedAttachmentIds: Set<string>,
   ): Promise<void> {
     const limit = pLimit(concurrency);
@@ -172,7 +175,7 @@ export class ConfluenceSynchronizationService {
           }
           const scopeId = spaceScopes.get(page.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
-          const pageImageAttachments = imageAttachmentsByPageId.get(page.id) ?? [];
+          const pageImageAttachments = imageAttachmentsByPageId[page.id] ?? [];
           let pageToIngest = fetched;
           try {
             const inlined = await this.pageImageInliner.inlineImages(fetched, pageImageAttachments);
@@ -270,24 +273,6 @@ export class ConfluenceSynchronizationService {
       failed,
       msg: 'Attachment ingestion summary',
     });
-  }
-
-  private buildImageAttachmentsByPageIdMap(
-    attachments: DiscoveredAttachment[],
-  ): Map<string, DiscoveredAttachment[]> {
-    const map = new Map<string, DiscoveredAttachment[]>();
-    for (const attachment of attachments) {
-      if (!isImageMimeType(attachment.mediaType)) {
-        continue;
-      }
-      const existing = map.get(attachment.pageId);
-      if (existing) {
-        existing.push(attachment);
-      } else {
-        map.set(attachment.pageId, [attachment]);
-      }
-    }
-    return map;
   }
 
   private buildSpaceKeyToSpaceIdMap(
