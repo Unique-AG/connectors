@@ -1,5 +1,6 @@
-import { type Element, isTag, type ParentNode } from 'domhandler';
-import { parseDocument } from 'htmlparser2';
+import assert from 'node:assert';
+import type { Element } from 'domhandler';
+import { DomUtils, parseDocument } from 'htmlparser2';
 
 export type ResourceRef =
   | { kind: 'current-attachment'; filename: string }
@@ -19,10 +20,8 @@ export interface ParsedImageMacro {
   resourceRef: ResourceRef;
 }
 
-// Locates every <ac:image> macro in a Confluence storage-format body and returns its
-// byte range, attributes, and resolved resource reference. The byte ranges are intended
-// for surgical splicing back into the original string so content outside the macros is
-// preserved byte-for-byte.
+// Locates every <ac:image> macro in a Confluence format. htmlparser2 only knows generic XML, so stringifying
+// the whole tree back can change parts of the page we never touched. Because of this we replace the ac:image tags.
 export function parseImageBlocks(body: string): ParsedImageMacro[] {
   const doc = parseDocument(body, {
     xmlMode: true,
@@ -30,56 +29,32 @@ export function parseImageBlocks(body: string): ParsedImageMacro[] {
     withEndIndices: true,
   });
 
-  const imageNodes: Element[] = [];
-  collectImageNodes(doc, imageNodes);
-
   const blocks: ParsedImageMacro[] = [];
-  for (const node of imageNodes) {
-    if (node.startIndex == null || node.endIndex == null) {
-      continue;
-    }
-    // Element.endIndex points at the final '>' of either '</ac:image>' or self-closing
-    // '/>', so +1 is exclusive. Reject blocks whose slice does not terminate with a
-    // real close so an unclosed macro can never splice into unrelated content.
-    const endIndex = node.endIndex + 1;
-    const blockText = body.slice(node.startIndex, endIndex);
-    if (!blockText.endsWith('</ac:image>') && !blockText.endsWith('/>')) {
-      continue;
-    }
+  for (const node of DomUtils.getElementsByTagName('ac:image', doc)) {
+    assert.ok(
+      node.startIndex != null && node.endIndex != null,
+      'node positions missing — parseDocument needs withStartIndices/withEndIndices',
+    );
+
+    const endIndexExclusive = node.endIndex + 1;
     blocks.push({
       startIndex: node.startIndex,
-      endIndex,
+      endIndex: endIndexExclusive,
       imgAttrs: node.attribs,
-      resourceRef: resolveResourceRefFromNodes(node),
+      resourceRef: resolveResourceRef(node),
     });
   }
+
   return blocks;
 }
 
-function collectImageNodes(parent: ParentNode, out: Element[]): void {
-  for (const child of parent.children) {
-    if (!isTag(child)) {
-      continue;
-    }
-    if (child.name === 'ac:image') {
-      out.push(child);
-      // <ac:image> is never nested inside another <ac:image>; no need to recurse into hits.
-      continue;
-    }
-    collectImageNodes(child, out);
-  }
-}
-
+// Returns the first direct child element with the given tag name. recurse=false keeps the
+// search to immediate children so a nested <ri:page> can never satisfy a <ri:attachment> lookup.
 function firstChildElementByName(parent: Element, name: string): Element | undefined {
-  for (const child of parent.children) {
-    if (isTag(child) && child.name === name) {
-      return child;
-    }
-  }
-  return undefined;
+  return DomUtils.findOne((el) => el.name === name, parent.children, false) ?? undefined;
 }
 
-function resolveResourceRefFromNodes(imageNode: Element): ResourceRef {
+function resolveResourceRef(imageNode: Element): ResourceRef {
   const url = firstChildElementByName(imageNode, 'ri:url');
   if (url) {
     return { kind: 'external-url' };
