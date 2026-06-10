@@ -1,16 +1,19 @@
 import assert from 'node:assert';
 import { Logger } from '@nestjs/common';
-import { indexBy } from 'remeda';
+import { chunk, filter, indexBy, isNonNullish } from 'remeda';
 import type { TenantConfig } from '../config';
 import { BYTES_PER_MB } from '../config/ingestion.schema';
 import type { ConfluenceApiClient, ConfluenceAttachment } from '../confluence-api';
 import {
   type ParsedImageMacro,
-  parseImageBlocks,
+  parseImageMacros,
   type ResourceRef,
 } from './confluence-tags-parser';
 import { isImageMimeType, normalizeMimeType } from './mime-type';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
+
+// Limits how many attachment downloads run concurrently when inlining a page's images.
+const IMAGE_INLINE_BATCH_SIZE = 20;
 
 // ac:image attributes forwarded onto <img>; presentational hints (align, thumbnail, etc.) are dropped.
 const AC_IMAGE_ATTRS_TO_KEEP: ReadonlyArray<[string, string]> = [
@@ -62,43 +65,39 @@ export class PageImageInliner {
       return { page, inlinedAttachmentIds: new Set() };
     }
 
-    const blocks = parseImageBlocks(page.body);
-    if (blocks.length === 0) {
+    const macros = parseImageMacros(page.body);
+    if (macros.length === 0) {
       return { page, inlinedAttachmentIds: new Set() };
     }
 
     const pageImageAttachmentsByTitle = indexBy(pageImageAttachments, (a) => a.title);
-    const replacements = await Promise.all(
-      blocks.map((block) =>
-        this.buildImageReplacement(block, page, pageImageAttachmentsByTitle).catch((err) => {
-          this.logger.warn({
-            pageId: page.id,
-            resource: block.resourceRef,
-            err,
-            msg: 'Failed to inline image, leaving macro untouched',
-          });
-          return null;
-        }),
-      ),
-    );
 
-    const inlinedAttachmentIds = new Set<string>();
-    const successfulReplacements: ImageReplacement[] = [];
-
-    for (const replacement of replacements) {
-      if (!replacement) {
-        continue;
-      }
-      successfulReplacements.push(replacement);
-      inlinedAttachmentIds.add(
-        buildInlinedAttachmentKey(replacement.pageId, replacement.attachmentId),
+    const settledReplacements: Array<ImageReplacement | null> = [];
+    for (const batch of chunk(macros, IMAGE_INLINE_BATCH_SIZE)) {
+      const replacements = await Promise.all(
+        batch.map((macro) =>
+          this.buildImageReplacement(macro, page, pageImageAttachmentsByTitle).catch((err) => {
+            this.logger.warn({
+              pageId: page.id,
+              resource: macro.resourceRef,
+              err,
+              msg: 'Failed to inline image, leaving macro untouched',
+            });
+            return null;
+          }),
+        ),
       );
+      settledReplacements.push(...replacements);
     }
 
+    const successfulReplacements = filter(settledReplacements, isNonNullish);
     if (successfulReplacements.length === 0) {
       return { page, inlinedAttachmentIds: new Set() };
     }
 
+    const inlinedAttachmentIds = new Set(
+      successfulReplacements.map((r) => buildInlinedAttachmentKey(r.pageId, r.attachmentId)),
+    );
     const newBody = this.applyReplacements(page.body, successfulReplacements);
     return {
       page: { ...page, body: newBody },
@@ -107,12 +106,12 @@ export class PageImageInliner {
   }
 
   private async buildImageReplacement(
-    block: ParsedImageMacro,
+    macro: ParsedImageMacro,
     page: FetchedPage,
     pageImageAttachmentsByTitle: Readonly<Record<string, DiscoveredAttachment>>,
   ): Promise<ImageReplacement | null> {
     const resolved = await this.resolveAttachmentMetadata(
-      block.resourceRef,
+      macro.resourceRef,
       page,
       pageImageAttachmentsByTitle,
     );
@@ -157,10 +156,10 @@ export class PageImageInliner {
       resolved.pageId,
       resolved.downloadPath,
     );
-    const html = this.buildImgTag(block.imgAttrs, resolved.mediaType, buffer, resolved.filename);
+    const html = this.buildImgTag(macro.imgAttrs, resolved.mediaType, buffer, resolved.filename);
     return {
-      start: block.startIndex,
-      end: block.endIndex,
+      start: macro.startIndex,
+      end: macro.endIndex,
       attachmentId: resolved.attachmentId,
       pageId: resolved.pageId,
       html,
@@ -313,7 +312,7 @@ export class PageImageInliner {
     let result = '';
     let cursor = 0;
     for (const r of sorted) {
-      assert.ok(r.start >= cursor, 'image-block replacements must not overlap');
+      assert.ok(r.start >= cursor, 'image-macro replacements must not overlap');
       result += original.slice(cursor, r.start) + r.html;
       cursor = r.end;
     }
