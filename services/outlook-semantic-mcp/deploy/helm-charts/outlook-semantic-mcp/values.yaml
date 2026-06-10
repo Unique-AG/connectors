@@ -148,6 +148,10 @@ mcpConfig:
     # -- Optional. Cron schedule for syncing mail folder structure for all active subscriptions.
     # Default: '*/5 * * * *'. Env var: DIRECTORY_SYNC_CRON_SCHEDULE
     # directorySyncCronSchedule: '*/5 * * * *'
+    # -- Optional. Buffer logs before writing. Set to 'disabled' only for startup debugging. Default: 'enabled'. Env var: LOGS_BUFFERING
+    # logsBuffering: disabled
+    # -- Optional. Controls whether diagnostic data is smeared or disclosed in logs. Default: 'conceal'. Env var: LOGS_DIAGNOSTICS_DATA_POLICY
+    # logsDiagnosticsDataPolicy: conceal
 
   # -- Delegated access configuration. Controls whether the service discovers shared mailbox access.
   delegatedAccess:
@@ -178,12 +182,6 @@ mcpConfig:
     # -- Optional. Cron schedule for shared mailbox sync. Default: every 6 hours.
     # Env var: DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE
     # sharedMailboxSyncCronSchedule: "0 */6 * * *"
-
-  # -- Optional log settings. To override:
-  # -- Optional log settings. To override:
-  # log:
-  #   buffering: disabled           # Env var: LOG_BUFFERING. Set to 'disabled' only for startup debugging. Default: 'enabled'.
-  #   diagnosticsDataPolicy: conceal  # Env var: LOG_DIAGNOSTICS_DATA_POLICY
 
   # -- Ingestion backend configuration.
   # Required when mcpBackend is 'microsoft_graph_and_unique_api'. Omit entirely for 'microsoft_graph'.

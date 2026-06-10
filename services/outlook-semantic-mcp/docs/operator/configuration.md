@@ -96,14 +96,6 @@ Set via `mcpConfig.unique` in Helm values:
 | `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
 | `UNIQUE_ZITADEL_PROJECT_ID` | `zitadel.projectId` | (required for `external`) | Zitadel project ID for audience validation |
 
-### Logs Configuration
-
-Set via `mcpConfig.logs` in Helm values:
-
-| Variable | Helm key | Default | Description |
-|----------|----------|---------|-------------|
-| `LOG_DIAGNOSTICS_DATA_POLICY` | `diagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
-
 ### Authentication Token Configuration
 
 These tokens are issued by the MCP server to MCP clients (e.g., AI assistants) after a user completes OAuth. They are distinct from Microsoft tokens and control how long a client session remains valid without re-authentication.
@@ -125,7 +117,8 @@ Set via `mcpConfig.app` in Helm values:
 | `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
 | `MCP_DEBUG_MODE` | `mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
 | `MCP_BACKEND` | `mcpBackend` | `microsoft_graph_and_unique_api` | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
-| `LOG_BUFFERING` | `log.buffering` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
+| `LOGS_BUFFERING` | `app.logsBuffering` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
+| `LOGS_DIAGNOSTICS_DATA_POLICY` | `app.logsDiagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
 
 ### Delegated Access Configuration
 
@@ -382,7 +375,7 @@ mcpConfig:
 
 1. Rotate secrets regularly, especially `MICROSOFT_CLIENT_SECRET` and `ENCRYPTION_KEY`
 2. Use an external secret manager (e.g., AWS Secrets Manager, Azure Key Vault, HashiCorp Vault) rather than static Kubernetes secrets
-3. Keep `LOG_DIAGNOSTICS_DATA_POLICY` set to `conceal` (the default) in production to avoid logging sensitive data
+3. Keep `LOGS_DIAGNOSTICS_DATA_POLICY` set to `conceal` (the default) in production to avoid logging sensitive data
 4. Enable network policies to restrict inbound and outbound traffic to only required services
 5. Monitor deployments using the provided Grafana dashboards and alert rules (`grafana.dashboard.enabled: true`, `alerts.enabled: true`)
 

@@ -1,3 +1,4 @@
+import { LogsDiagnosticDataPolicy } from '@unique-ag/utils';
 import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { enabledDisabledBoolean, stringToURL } from '~/utils/zod';
@@ -34,6 +35,13 @@ const ConfigSchema = z
       .describe(
         'Cron schedule for syncing mail folder structure for all active subscriptions. Default: every 5 minutes.',
       ),
+    logsBuffering: enabledDisabledBoolean('If the nestjs app should buffer the logs on startup.'),
+    logsDiagnosticsDataPolicy: z
+      .enum(LogsDiagnosticDataPolicy)
+      .prefault(LogsDiagnosticDataPolicy.CONCEAL)
+      .describe(
+        'Controls whether diagnostic data (names, emails, paths) is smeared or disclosed in logs.',
+      ),
   })
   .transform((c) => ({
     ...c,
@@ -50,6 +58,8 @@ export const appConfig = registerConfig('app', ConfigSchema, {
     'MCP_DEBUG_MODE',
     'MCP_BACKEND',
     'DIRECTORY_SYNC_CRON_SCHEDULE',
+    'LOGS_BUFFERING',
+    'LOGS_DIAGNOSTICS_DATA_POLICY',
   ]),
 });
 
