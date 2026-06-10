@@ -29,18 +29,28 @@ export function parseImageMacros(body: string): ParsedImageMacro[] {
     withEndIndices: true,
   });
 
-  return DomUtils.getElementsByTagName('ac:image', doc).map((node) => {
+  return DomUtils.getElementsByTagName('ac:image', doc).flatMap((node) => {
     assert.ok(
       node.startIndex != null && node.endIndex != null,
       'node positions missing — parseDocument needs withStartIndices/withEndIndices',
     );
+    const endIndex = node.endIndex + 1;
 
-    return {
-      startIndex: node.startIndex,
-      endIndex: node.endIndex + 1,
-      imgAttrs: node.attribs,
-      resourceRef: resolveResourceRef(node),
-    };
+    // htmlparser2 auto-closes an unclosed <ac:image> by absorbing the following siblings, which
+    // inflates the range and would make us splice away real body content. If the source doesn't
+    // actually close the tag, skip the macro and leave the body untouched.
+    if (!/<\/ac:image\s*>$/.test(body.slice(node.startIndex, endIndex))) {
+      return [];
+    }
+
+    return [
+      {
+        startIndex: node.startIndex,
+        endIndex,
+        imgAttrs: node.attribs,
+        resourceRef: resolveResourceRef(node),
+      },
+    ];
   });
 }
 

@@ -65,10 +65,12 @@ export const PAGE_BODY_WITH_CDATA_AND_IMAGE =
 
 export const PAGE_BODY_SELF_CLOSING_IMAGE = '<p>before</p><ac:image/><p>after</p>';
 
-// Malformed: <ac:image> is opened but never closed. The inliner must leave the
-// surrounding content intact and skip the orphan macro.
+// Malformed: <ac:image> is opened but never closed. The filename intentionally matches a
+// discovered attachment, so without the parser's close-tag guard the macro would resolve,
+// download, and splice from its start to EOF — deleting the trailing <p>more</p>. The inliner
+// must leave the surrounding content intact and skip the macro.
 export const PAGE_BODY_UNCLOSED_IMAGE =
-  '<p>start</p><ac:image><ri:attachment ri:filename="x.png"/><p>more</p>';
+  '<p>start</p><ac:image><ri:attachment ri:filename="diagram.png"/><p>more</p>';
 
 export const PAGE_BODY_MIXED_URL_AND_ATTACHMENT =
   '<p>external first</p><ac:image><ri:url ri:value="https://example.com/banner.png"/></ac:image><p>then attachment</p><ac:image><ri:attachment ri:filename="diagram.png"/></ac:image>';
