@@ -2,7 +2,7 @@
 
 import { CronJob } from 'cron';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveCatchupSchedulerService } from './live-catchup-scheduler.service';
+import { LiveCatchupSchedulerService } from '../live-catchup-scheduler.service';
 
 vi.mock('~/features/tracing.utils', () => ({
   traceEvent: vi.fn(),
@@ -78,7 +78,7 @@ function createServiceWithIngestionConfig({ amqp = createMockAmqp(), db = create
     createMockSchedulerRegistry() as any,
     amqp as any,
     {
-      mcpBackend: 'MicrosoftGraphAndUniqueApi',
+      mcpBackend: 'microsoft_graph_and_unique_api',
       liveCatchupRecoveryCron: '*/5 * * * *',
       liveCatchupOauthUsersRecheckCron: '*/10 * * * *',
       liveCatchupSharedMailboxRecheckCron: '*/2 * * * *',

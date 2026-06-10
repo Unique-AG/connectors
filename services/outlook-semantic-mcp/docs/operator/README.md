@@ -5,13 +5,13 @@
 
 ## Overview
 
-The Outlook Semantic MCP Server exposes MCP tools that allow AI assistants to search and retrieve email content. In `MicrosoftGraphAndUniqueApi` mode (the default), it also runs background pipelines that ingest emails from connected Microsoft 365 accounts into the Unique knowledge base via Microsoft Graph webhooks and RabbitMQ. In `MicrosoftGraph` mode, no ingestion runs — emails are queried live from Microsoft Graph.
+The Outlook Semantic MCP Server exposes MCP tools that allow AI assistants to search and retrieve email content. In `microsoft_graph_and_unique_api` mode (the default), it also runs background pipelines that ingest emails from connected Microsoft 365 accounts into the Unique knowledge base via Microsoft Graph webhooks and RabbitMQ. In `microsoft_graph` mode, no ingestion runs — emails are queried live from Microsoft Graph.
 
 For end-user and administrator documentation, see the [Outlook Semantic MCP Overview](../README.md).
 
 ## Architecture
 
-The diagram below shows the full **Mode A** (`MicrosoftGraphAndUniqueApi`) topology. In Mode B (`MicrosoftGraph`), all infrastructure components are identical — the Unique Knowledge Base is still required in both modes (for scope management and to attach email attachments to outgoing emails), but the ingestion arrows are inactive and no email content is written to it.
+The diagram below shows the full **Mode A** (`microsoft_graph_and_unique_api`) topology. In Mode B (`microsoft_graph`), all infrastructure components are identical — the Unique Knowledge Base is still required in both modes (for scope management and to attach email attachments to outgoing emails), but the ingestion arrows are inactive and no email content is written to it.
 
 ```mermaid
 flowchart LR
@@ -43,13 +43,13 @@ The Outlook Semantic MCP Server runs as a **single pod** that handles MCP tool r
 After [granting admin consent](https://login.microsoftonline.com/organizations/adminconsent?client_id=ba326974-edcf-49ef-bf7a-74b3e0ea450a) (see [Authentication](./authentication.md#unique-saas) for why this is needed), provide the following to Unique Support or Solution Engineering:
 
 - [ ] **Backend mode** — controls how email search works; see [Deployment Modes](./configuration.md#Deployment-Modes) for the full trade-offs:
-  - `MicrosoftGraph` — live KQL search directly against Microsoft Graph; no email ingestion into Unique KB; lighter deployment
-  - `MicrosoftGraphAndUniqueApi` *(default)* — emails ingested into Unique KB; semantic search merged with live KQL results; heavier but richer
+  - `microsoft_graph` — live KQL search directly against Microsoft Graph; no email ingestion into Unique KB; lighter deployment
+  - `microsoft_graph_and_unique_api` *(default)* — emails ingested into Unique KB; semantic search merged with live KQL results; heavier but richer
 
 - [ ] **Delegated access scan** — only relevant if your organization uses Exchange mailbox delegation (i.e. users who have been granted access to another user's mailbox or folders); see [`DELEGATED_ACCESS_SCAN`](./configuration.md#DELEGATED_ACCESS_SCAN):
   - `disabled` *(default)* — no delegation scanning
-  - `fullAccessOnly` — Full Access (Read & Manage) grants via Exchange admin
-  - `granularAccess` — folder-level grants (e.g. shared Inbox or RFQ folder); subsumes `fullAccessOnly`
+  - `full_access_only` — Full Access (Read & Manage) grants via Exchange admin
+  - `granular_access` — folder-level grants (e.g. shared Inbox or RFQ folder); subsumes `full_access_only`
 
 Unique will configure your deployment using the following process:
 
@@ -91,7 +91,7 @@ Follow these steps to go from zero to a running deployment:
    2. Connect with an MCP client and complete the OAuth flow
    3. *(Mode A only)* Call `verify_inbox_connection` to confirm the webhook subscription is `active`, draft a test email to the connected account, wait a moment, then use `search_emails` to confirm it appears
    5. *(Mode B only)* Draft a test email to the connected account, call `search_emails` with a simple KQL query to confirm it returns results from Microsoft Graph
-9. **(Optional) Enable delegated access** — If your organization uses Exchange mailbox delegation (Full Access or folder-level), set `delegatedAccessScan` to `fullAccessOnly` or `granularAccess` in your Helm values. Both users (delegate and owner) must connect their accounts for delegated search to work. See [Configuration — DELEGATED_ACCESS_SCAN](./configuration.md#DELEGATED_ACCESS_SCAN).
+9. **(Optional) Enable delegated access** — If your organization uses Exchange mailbox delegation (Full Access or folder-level), set `delegatedAccessScan` to `full_access_only` or `granular_access` in your Helm values. Both users (delegate and owner) must connect their accounts for delegated search to work. See [Configuration — DELEGATED_ACCESS_SCAN](./configuration.md#DELEGATED_ACCESS_SCAN).
 
 ## Scaling Considerations
 

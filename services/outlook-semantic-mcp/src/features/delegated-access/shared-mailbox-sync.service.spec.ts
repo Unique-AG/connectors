@@ -107,7 +107,7 @@ function createMockDb(profileIds: string[] = []) {
 
 function createService(overrides?: {
   config?: Partial<{
-    scan: 'disabled' | 'fullAccessOnly' | 'granularAccess';
+    scan: 'disabled' | 'full_access_only' | 'granular_access';
     mcpBackend: McpBackendType;
     sharedMailboxEmails: string[];
     sharedMailboxSyncCronSchedule: string;
@@ -119,7 +119,7 @@ function createService(overrides?: {
 }) {
   const db = createMockDb(overrides?.profileIds ?? []);
   const config = {
-    scan: 'fullAccessOnly' as const,
+    scan: 'full_access_only' as const,
     mcpBackend: McpBackendType.MicrosoftGraph,
     sharedMailboxEmails: [] as string[],
     sharedMailboxSyncCronSchedule: CRON_SCHEDULE,

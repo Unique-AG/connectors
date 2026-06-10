@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AllDelegatesFailedError, NO_DELEGATES } from '~/msgraph/ms-graph-client-resolver.service';
-import { LiveCatchUpCommand } from './live-catch-up.command';
+import { LiveCatchUpCommand } from '../live-catch-up.command';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -201,7 +201,7 @@ function createCommand({
     syncDirectories as any,
     { run: vi.fn().mockResolvedValue(false) } as any,
     createMockUniqueApi() as any,
-    { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
+    { mcpBackend: 'microsoft_graph_and_unique_api' } as any,
     db as any,
     createMockMetricService() as any,
   );

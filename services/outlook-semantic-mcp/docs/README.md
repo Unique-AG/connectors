@@ -54,7 +54,7 @@ All permissions are delegated and require no admin consent. This includes `Mail.
 
 - Unique semantic search across the user's mailbox via the `search_emails` tool
 - Open individual emails by message ID via `open_email`
-- Search emails using the `search_emails` tool. In `MicrosoftGraphAndUniqueApi` mode, the tool runs semantic search against the Unique knowledge base and a live KQL query against Microsoft Graph in parallel, merging the results. In `MicrosoftGraph` mode, the tool queries Microsoft Graph directly using KQL — no knowledge base or ingestion is involved.
+- Search emails using the `search_emails` tool. In `microsoft_graph_and_unique_api` mode, the tool runs semantic search against the Unique knowledge base and a live KQL query against Microsoft Graph in parallel, merging the results. In `microsoft_graph` mode, the tool queries Microsoft Graph directly using KQL — no knowledge base or ingestion is involved.
 
 **Draft Creation**
 
@@ -184,7 +184,7 @@ See [Flows](./technical/flows.md#Full-Sync:-Historical-Email-Ingestion) for the 
 
 ### Directory Sync
 
-The server continuously syncs the user's Outlook folder structure via Microsoft Graph delta queries. This enables folder-based search filtering (`list_mailboxes_and_directories` tool; folder filtering only applies in `MicrosoftGraphAndUniqueApi` mode) and tracks email movement to handle deletions — when an email moves to an excluded folder (e.g. Deleted Items), it is removed from the knowledge base.
+The server continuously syncs the user's Outlook folder structure via Microsoft Graph delta queries. This enables folder-based search filtering (`list_mailboxes_and_directories` tool; folder filtering only applies in `microsoft_graph_and_unique_api` mode) and tracks email movement to handle deletions — when an email moves to an excluded folder (e.g. Deleted Items), it is removed from the knowledge base.
 
 See [Directory Sync Flow](./technical/flows.md#Directory-Sync-Flow) for the detailed sequence diagram.
 

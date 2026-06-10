@@ -18,7 +18,7 @@ function createMockAmqp() {
 }
 
 function createMockConfig() {
-  return { scan: 'fullAccessOnly', discoveryCronSchedule: '0 */6 * * *' };
+  return { scan: 'full_access_only', discoveryCronSchedule: '0 */6 * * *' };
 }
 
 function createService({ amqp = createMockAmqp() } = {}) {

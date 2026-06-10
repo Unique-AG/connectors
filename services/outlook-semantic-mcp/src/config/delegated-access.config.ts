@@ -71,9 +71,9 @@ const onlyFullDelegatedAccessScanConfig = z.object({
   // /users/{{email}}/messages
   // /users/{{email}}/mailFolders
   // /users/{{email}}/mailFolders/{{folderId}}/messages
-  // When we configure the delegated access to be fullAccessOnly we will call /users/{{email}}/messages and assume
+  // When we configure the delegated access to be full_access_only we will call /users/{{email}}/messages and assume
   // the user has full access to that inbox.
-  scan: z.literal('fullAccessOnly'),
+  scan: z.literal('full_access_only'),
   discoveryCronSchedule,
   recoveryCronSchedule,
   stalenessThresholdHours,
@@ -96,7 +96,7 @@ const granularDelegatedAccessScanConfig = z.object({
   // "Inbox" -> "RFQ" - the "RFQ" is a child of "Inbox" and she shares with Bob only the "RFQ" folder. When we call
   // /users/{{email}}/mailFolders => we can list both folders "Inbox" and "RFQ" but we can only read messages from the "RFQ"
   // folder.
-  scan: z.literal('granularAccess'),
+  scan: z.literal('granular_access'),
   mcpBackend: z
     .literal(McpBackendType.MicrosoftGraphAndUniqueApi)
     .describe(`Supported only for "MicrosoftGraphAndUniqueApi"`),

@@ -11,20 +11,20 @@ The MCP server operates in two modes controlled by the [`MCP_BACKEND`](../operat
 
 | Mode | `MCP_BACKEND` value | How it works |
 |------|---------------------|--------------|
-| **Mode A** | `MicrosoftGraphAndUniqueApi` | Emails are ingested into the Unique knowledge base after a user connects. `search_emails` runs semantic search (Unique KB) and KQL keyword search (Microsoft Graph) in parallel. |
-| **Mode B** | `MicrosoftGraph` | No email ingesting. `search_emails` queries Microsoft Graph directly using KQL keyword search only. |
+| **Mode A** | `microsoft_graph_and_unique_api` | Emails are ingested into the Unique knowledge base after a user connects. `search_emails` runs semantic search (Unique KB) and KQL keyword search (Microsoft Graph) in parallel. |
+| **Mode B** | `microsoft_graph` | No email ingesting. `search_emails` queries Microsoft Graph directly using KQL keyword search only. |
 
 Where a feature works the same in both modes, this page says so once. Where behaviour differs, Mode A and Mode B are called out separately.
 
 ## Email Search
 
-**Mode A (`MicrosoftGraphAndUniqueApi`)**
+**Mode A (`microsoft_graph_and_unique_api`)**
 
 - `search_emails` runs semantic search against the Unique knowledge base and a KQL keyword search against Microsoft Graph simultaneously, then merges and deduplicates results.
 - Folder filtering is supported: pass folder IDs (from `list_mailboxes_and_directories`) or well-known folder names (e.g. `Inbox`) to narrow results to a specific folder.
 - A `syncWarning` is returned while the initial full sync is still in progress — results may be incomplete until it finishes.
 
-**Mode B (`MicrosoftGraph`)**
+**Mode B (`microsoft_graph`)**
 
 - `search_emails` queries Microsoft Graph directly using KQL keyword search only. No knowledge base interaction occurs.
 - Folder filtering is supported via the `directories` field on each `msGraphKeywordSearchQueries` entry. Pass a well-known folder name (e.g. `Inbox`) or a folder ID from `list_mailboxes_and_directories`. This works for the user's own mailbox and for fully delegated mailboxes (Full Access).
@@ -76,13 +76,13 @@ Available in both modes. Behaviour is identical.
 
 ## Mailbox & Folder Listing
 
-**Mode A (`MicrosoftGraphAndUniqueApi`)**
+**Mode A (`microsoft_graph_and_unique_api`)**
 
 - List own mailboxes and their full folder tree via `list_mailboxes_and_directories`.
 - When [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) is enabled, delegated mailboxes also appear alongside the user's own (marked with `isOwn: false`).
 - Folder IDs returned by this tool can be passed to `search_emails` to narrow results to a specific folder.
 
-**Mode B (`MicrosoftGraph`)**
+**Mode B (`microsoft_graph`)**
 
 - `list_mailboxes_and_directories` is available and returns the user's own folder tree plus any fully delegated mailboxes. Folder IDs returned here can be passed to the `directories` field of `msGraphKeywordSearchQueries` in `search_emails` to narrow results to a specific folder.
 
@@ -102,9 +102,9 @@ Delegated access lets a user ("the delegate") search another user's mailbox ("th
 
 Three delegation configurations are supported:
 
-1. **Exchange admin grants Full Access (Read & Manage)** — an Exchange administrator grants a user Full Access to another user's mailbox via the Exchange admin center or PowerShell. The delegate can search the owner's entire mailbox. Supported in **both Mode A and Mode B** — configure [`DELEGATED_ACCESS_SCAN=fullAccessOnly`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) (or `granularAccess`) to enable scanning.
+1. **Exchange admin grants Full Access (Read & Manage)** — an Exchange administrator grants a user Full Access to another user's mailbox via the Exchange admin center or PowerShell. The delegate can search the owner's entire mailbox. Supported in **both Mode A and Mode B** — configure [`DELEGATED_ACCESS_SCAN=full_access_only`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) (or `granular_access`) to enable scanning.
 
-2. **User shares specific folders via Outlook desktop** — a user shares individual folders (e.g. Inbox, RFQ) with another user directly from Outlook desktop, without Exchange admin involvement. **Mode A only** — requires [`DELEGATED_ACCESS_SCAN=granularAccess`](../operator/configuration.md#DELEGATED_ACCESS_SCAN). See [Setup — User shares specific folders](#2-user-shares-specific-folders-no-admin-needed) for the required root-mailbox visibility step.
+2. **User shares specific folders via Outlook desktop** — a user shares individual folders (e.g. Inbox, RFQ) with another user directly from Outlook desktop, without Exchange admin involvement. **Mode A only** — requires [`DELEGATED_ACCESS_SCAN=granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN). See [Setup — User shares specific folders](#2-user-shares-specific-folders-no-admin-needed) for the required root-mailbox visibility step.
 
 3. **Shared inbox configured as a normal mailbox** — a Microsoft 365 shared mailbox configured with a sign-in-eligible password. Every user who needs access must have Full Access delegation granted, and someone must sign into the MCP using the shared-inbox account itself so its emails are ingested. See [Setup — Shared inbox as a normal inbox](#3-shared-inbox-configured-as-a-normal-inbox).
 
@@ -114,7 +114,7 @@ Three delegation configurations are supported:
 - **Application-permission based access** — the MCP uses delegated permissions only (acting on behalf of a signed-in user). It does not support application-level access to mailboxes.
 - **Access paths not visible via the Microsoft Graph API** — only access detectable via the Graph messages or mailFolders endpoints is supported. Access paths that bypass these endpoints (e.g. internal APIs used by Outlook desktop) are not visible to the MCP.
 - **Detecting access for users who have not connected the MCP** — both the owner and the delegate must be connected. The background scan only considers connected users.
-- **Folder-level access in Mode B** — [`granularAccess`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) requires Mode A. In Mode B, only delegates with full mailbox access can search delegated mailboxes.
+- **Folder-level access in Mode B** — [`granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) requires Mode A. In Mode B, only delegates with full mailbox access can search delegated mailboxes.
 
 ### Setup
 
@@ -140,13 +140,13 @@ Add-MailboxPermission `
   -InheritanceType All
 ```
 
-**Detection:** Once granted, the delegate is detected on the next `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` run (default: every 12 hours). Configure [`DELEGATED_ACCESS_SCAN=fullAccessOnly`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) (or `granularAccess`) to enable scanning.
+**Detection:** Once granted, the delegate is detected on the next `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` run (default: every 12 hours). Configure [`DELEGATED_ACCESS_SCAN=full_access_only`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) (or `granular_access`) to enable scanning.
 
 ---
 
 #### 2. User shares specific folders (no admin needed)
 
-Use this path when a user wants to share individual folders with a colleague without involving an Exchange administrator. Requires [`DELEGATED_ACCESS_SCAN=granularAccess`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) and Mode A (`MicrosoftGraphAndUniqueApi`).
+Use this path when a user wants to share individual folders with a colleague without involving an Exchange administrator. Requires [`DELEGATED_ACCESS_SCAN=granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) and Mode A (`microsoft_graph_and_unique_api`).
 
 **Step 1 — Share individual folders**
 
@@ -170,7 +170,7 @@ Use this path when a user wants to share individual folders with a colleague wit
 >
 > Without an unbroken visibility chain, Microsoft Graph cannot traverse the folder hierarchy to reach the target folder, so it remains invisible to the MCP — even though Outlook desktop may show it (Outlook uses internal shortcuts that do not require an unbroken chain). This is a silent failure mode that only surfaces in the MCP.
 
-**Detection:** Folder-level access is picked up on the next `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` run (default: every 4 hours) and only in [`granularAccess`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) mode. The `fullAccessOnly` mode does not detect folder-level shares.
+**Detection:** Folder-level access is picked up on the next `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` run (default: every 4 hours) and only in [`granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) mode. The `full_access_only` mode does not detect folder-level shares.
 
 ---
 
@@ -194,11 +194,11 @@ For a detailed description of how delegated access works at runtime, see the exi
 
 **Quick reference:**
 
-| | Mode A (`MicrosoftGraphAndUniqueApi`) | Mode B (`MicrosoftGraph`) |
+| | Mode A (`microsoft_graph_and_unique_api`) | Mode B (`microsoft_graph`) |
 |---|---|---|
 | **Full Access delegation** | Supported — delegate searches owner's ingested emails | Supported — live keyword search against owner's mailbox |
-| **Folder-level delegation** | Supported ([`granularAccess`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) only) | Not supported — search requires full mailbox access (see [Known limitations](#known-limitations)) |
-| **Folder filtering** | Supported in `granularAccess` | Supported for own mailbox and full-access delegated mailboxes only |
+| **Folder-level delegation** | Supported ([`granular_access`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) only) | Not supported — search requires full mailbox access (see [Known limitations](#known-limitations)) |
+| **Folder filtering** | Supported in `granular_access` | Supported for own mailbox and full-access delegated mailboxes only |
 | **Ingestion** | Owner's inbox only — delegated mailboxes are not re-ingested | No ingestion |
 | **Revocation detection** | Background scan: discovery (every 12 h), verification (every 4 h) | Immediate (live Graph query) |
 

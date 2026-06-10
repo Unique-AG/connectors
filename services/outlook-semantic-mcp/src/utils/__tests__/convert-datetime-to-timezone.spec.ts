@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { convertDateTimeToTimezone } from './convert-datetime-to-timezone';
+import { convertDateTimeToTimezone } from '../convert-datetime-to-timezone';
 
 describe('convertDateTimeToTimezone', () => {
   it('returns falsy inputs unchanged', () => {

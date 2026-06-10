@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findBestMatch } from './find-best-match';
+import { findBestMatch } from '../find-best-match';
 
 interface Item {
   id: string;

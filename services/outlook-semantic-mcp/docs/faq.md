@@ -73,7 +73,7 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 10 tools in `MicrosoftGraphAndUniqueApi` mode (plus 4 debug-mode tools), or 6 tools in `MicrosoftGraph` mode. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
+**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 10 tools in `microsoft_graph_and_unique_api` mode (plus 4 debug-mode tools), or 6 tools in `microsoft_graph` mode. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
 
 **What it does:**
 
@@ -88,7 +88,7 @@
 - 10 MCP tools available in their AI client immediately after connection (14 with debug mode enabled)
 - Search results that may be incomplete while the initial full sync is running (a `syncWarning` is returned by `search_emails`)
 
-The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `MicrosoftGraphAndUniqueApi` mode, it ingests emails into the Unique knowledge base and exposes 10 tools. In `MicrosoftGraph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 6 tools. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
+The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `microsoft_graph_and_unique_api` mode, it ingests emails into the Unique knowledge base and exposes 10 tools. In `microsoft_graph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 6 tools. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
 
 **See also:** [Architecture](./technical/architecture.md) — [Tools](./technical/tools.md)
 
@@ -107,7 +107,7 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. In the def
 
 An additional 4 tools are available only when the server is running in debug mode (`MCP_DEBUG_MODE=enabled`): `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`. These are intended for development and troubleshooting and are not exposed in production deployments.
 
-In `MicrosoftGraph` mode, only the first 6 categories are available (Email Search, Draft Creation, Contact Lookup, Mailbox Utilities). Subscription Management and Sync Monitoring tools are not registered.
+In `microsoft_graph` mode, only the first 6 categories are available (Email Search, Draft Creation, Contact Lookup, Mailbox Utilities). Subscription Management and Sync Monitoring tools are not registered.
 
 **See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#Debug-Mode-Tools)
 
@@ -115,7 +115,7 @@ In `MicrosoftGraph` mode, only the first 6 categories are available (Email Searc
 
 **Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [INGESTION_DEFAULT_MAIL_FILTERS](./operator/configuration.md)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
 
-**Mode B (`MicrosoftGraph`):** No. After granting consent, all 6 tools are available immediately. There is no ingestion pipeline — search results come from live Microsoft Graph queries.
+**Mode B (`microsoft_graph`):** No. After granting consent, all 6 tools are available immediately. There is no ingestion pipeline — search results come from live Microsoft Graph queries.
 
 
 ## Data Privacy & Storage
@@ -126,7 +126,7 @@ In `MicrosoftGraph` mode, only the first 6 categories are available (Email Searc
 
 The MCP server's PostgreSQL database stores only encrypted OAuth tokens, opaque MCP bearer tokens, sync state, folder metadata, and subscription IDs — no email content. See [Data Classification and Flow](./technical/security.md#Data-Classification-and-Flow) for the full breakdown of what is stored where.
 
-In `MicrosoftGraph` mode, no email content is ever fetched into memory beyond what is needed to return a single search result — no ingestion occurs and nothing is sent to the Unique knowledge base.
+In `microsoft_graph` mode, no email content is ever fetched into memory beyond what is needed to return a single search result — no ingestion occurs and nothing is sent to the Unique knowledge base.
 
 ### Where is my email content stored?
 
@@ -134,13 +134,13 @@ In `MicrosoftGraph` mode, no email content is ever fetched into memory beyond wh
 
 The Unique knowledge base organizes each user's emails into a dedicated **root scope** (a top-level isolation boundary that logically separates one user's ingested data from another's within the Unique platform).
 
-In `MicrosoftGraph` mode, email content is not stored anywhere — it is queried live from Microsoft Graph per search request and never persisted.
+In `microsoft_graph` mode, email content is not stored anywhere — it is queried live from Microsoft Graph per search request and never persisted.
 
 **See also:** [Knowledge Base Data Isolation](./technical/security.md#Knowledge-Base-Data-Isolation)
 
 ### Who can access my email data once it is ingested?
 
-**Answer:** (Applies to Mode A — `MicrosoftGraphAndUniqueApi` — only) Access to ingested email data operates at two levels:
+**Answer:** (Applies to Mode A — `microsoft_graph_and_unique_api` — only) Access to ingested email data operates at two levels:
 
 **Via the MCP server (tool layer):** The `search_emails` tool returns results from the authenticated user's own email scope. When `DELEGATED_ACCESS_SCAN` is enabled and the user has been granted delegated access to another user's mailbox in Microsoft 365, `search_emails` also returns results from that owner's scope — but only while both users are connected and the access relationship is active. Outside of an explicitly configured delegated access relationship, one user's MCP session cannot access another user's emails.
 
@@ -171,13 +171,13 @@ Access to the email content itself requires access to the Unique knowledge base,
 - Removes the per-user root scopes from the Unique knowledge base, which also removes all ingested email content for that user
 - Clears the inbox configuration and folder sync data from PostgreSQL
 
-In Mode B (`MicrosoftGraph`), there is no inbox data to delete — `delete_inbox_data` is not available in this mode.
+In Mode B (`microsoft_graph`), there is no inbox data to delete — `delete_inbox_data` is not available in this mode.
 
 **See also:** [Data Removal](./technical/security.md#Data-Removal)
 
 ### What email data is actually ingested into the knowledge base?
 
-**Answer:** (Mode A — `MicrosoftGraphAndUniqueApi` — only) The following fields from each email are ingested:
+**Answer:** (Mode A — `microsoft_graph_and_unique_api` — only) The following fields from each email are ingested:
 
 - Subject
 - Body (plain text and/or HTML)
@@ -191,7 +191,7 @@ In Mode B (`MicrosoftGraph`), there is no inbox data to delete — `delete_inbox
 
 ## Shared Inbox & Delegated Access
 
-> Ingestion never occurs in Mode B (`MicrosoftGraph`) regardless of
+> Ingestion never occurs in Mode B (`microsoft_graph`) regardless of
 > `DELEGATED_ACCESS_SCAN`. The discovery job runs in both modes when enabled.
 > In Mode B, only delegates with **full mailbox access** can search delegated
 > mailboxes — Microsoft Graph's `$search` parameter requires full mailbox
@@ -212,7 +212,7 @@ delegation configured via the Exchange admin center. The connector discovers
 these relationships automatically — no manual configuration is needed beyond
 enabling `DELEGATED_ACCESS_SCAN`.
 
-**Mode A (`MicrosoftGraphAndUniqueApi`):** A background discovery job
+**Mode A (`microsoft_graph_and_unique_api`):** A background discovery job
 periodically tests which other mailboxes each connected user can access via
 Microsoft Graph. When a delegation is detected, the owner's already-ingested
 emails become searchable by the delegate through `search_emails` — no additional
@@ -221,9 +221,9 @@ owner's emails are only available if the owner has also connected their account
 and completed ingestion. Each user's emails remain in their own isolated scope in
 the Unique knowledge base.
 
-**Mode B (`MicrosoftGraph`):** The same background discovery job runs and
-records delegated mailbox relationships (`granularAccess` is not supported in
-Mode B — use `fullAccessOnly`). When `search_emails` is called, it queries each
+**Mode B (`microsoft_graph`):** The same background discovery job runs and
+records delegated mailbox relationships (`granular_access` is not supported in
+Mode B — use `full_access_only`). When `search_emails` is called, it queries each
 discovered delegated mailbox via a live Microsoft Graph KQL search alongside the
 user's own mailbox. Only delegates with **full mailbox access** can search
 delegated mailboxes in Mode B — Microsoft Graph's `$search` parameter requires full
@@ -242,16 +242,16 @@ access in Microsoft 365, that query returns no results. No ingestion occurs.
 Microsoft 365, the connector's background jobs detect this and make the delegated
 mailbox searchable. There are two jobs:
 
-- **Discovery** (both `fullAccessOnly` and `granularAccess`) — periodically
+- **Discovery** (both `full_access_only` and `granular_access`) — periodically
   checks which connected users have delegated access to another connected user's
   mailbox and records the relationship. This is the only job that runs when
-  `DELEGATED_ACCESS_SCAN=fullAccessOnly`.
-- **Verification** (`granularAccess` only) — after discovery records a
+  `DELEGATED_ACCESS_SCAN=full_access_only`.
+- **Verification** (`granular_access` only) — after discovery records a
   delegation, the verification job runs more frequently and confirms exactly which
   folders within the delegated mailbox are currently readable. It also detects
   when folder-level access has been revoked.
 
-**Mode A (`MicrosoftGraphAndUniqueApi`):**
+**Mode A (`microsoft_graph_and_unique_api`):**
 
 - **Separate scopes, no new ingestion.** Each user's emails are stored in their
   own isolated per-user scope in the Unique knowledge base. Discovery records the
@@ -262,14 +262,14 @@ mailbox searchable. There are two jobs:
   nothing to discover or search. In Mode A the owner must also have completed
   the initial full sync for their emails to be visible to the delegate.
 - **Automatic detection.** New delegated access is picked up automatically on the
-  next discovery run — no user action is needed. In `granularAccess` mode,
+  next discovery run — no user action is needed. In `granular_access` mode,
   folder-level access details are kept up to date by the verification job.
 - **Folder filtering.** Delegated mailboxes appear in
   `list_mailboxes_and_directories` alongside the user's own mailbox (with
   `isOwn: false`). Their folder IDs can be passed to the `directories` condition
   in `search_emails` to narrow results to a specific folder.
 
-**Mode B (`MicrosoftGraph`):** Discovery runs and records delegated mailbox
+**Mode B (`microsoft_graph`):** Discovery runs and records delegated mailbox
 relationships. **Both users must be connected** to the MCP server — discovery
 only considers connected users, so if the owner has not connected their account
 there is nothing to discover or search. Each `search_emails` call queries the
@@ -286,7 +286,7 @@ at all. See [Why can't I search emails in a mailbox my colleague shared folders 
 
 ### When shared inbox access is revoked, are previously ingested emails still accessible?
 
-**Mode A (`MicrosoftGraphAndUniqueApi`):** No — but there is a detection delay
+**Mode A (`microsoft_graph_and_unique_api`):** No — but there is a detection delay
 whose length depends on which scan mode is configured.
 
 The connector runs up to two background jobs. Both can detect revocation:
@@ -294,13 +294,13 @@ The connector runs up to two background jobs. Both can detect revocation:
 - **Discovery** (both modes) — tests whether the delegate can still access the
   mailbox at all, and deletes the access record on 403/404. Scheduled via
   `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` (default: every 12 hours; if you
-  are using `fullAccessOnly`, consider setting this to 4× per day since
+  are using `full_access_only`, consider setting this to 4× per day since
   discovery is the only revocation detection mechanism in that mode).
-- **Verification** (`granularAccess` only) — tests each folder individually and
+- **Verification** (`granular_access` only) — tests each folder individually and
   deletes the access record when no folders remain accessible. Scheduled via
   `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE` (default: every 4 hours).
 
-In `granularAccess` mode, the verification job typically detects revocation
+In `granular_access` mode, the verification job typically detects revocation
 first because it runs more frequently than discovery.
 
 Once a job detects revocation, the access record is removed and the owner's
@@ -316,10 +316,10 @@ either user's scope as a result of revocation.
 
 | Scan mode | Access revoked — stale results visible until… |
 |-----------|------------------------------------------------|
-| `fullAccessOnly` | Next discovery run (default every 12 h — recommend configuring 4×/day) |
-| `granularAccess` | Next verification run (default every 4 h) |
+| `full_access_only` | Next discovery run (default every 12 h — recommend configuring 4×/day) |
+| `granular_access` | Next verification run (default every 4 h) |
 
-**Mode B (`MicrosoftGraph`):** Because `search_emails` queries Microsoft Graph
+**Mode B (`microsoft_graph`):** Because `search_emails` queries Microsoft Graph
 live, revocation takes effect immediately at query time — Microsoft Graph rejects
 the call and no results are returned from the revoked mailbox. The access record
 is removed immediately after that failed query, so subsequent calls will no
@@ -331,7 +331,7 @@ longer include the revoked mailbox.
 
 ### Why can't I search emails in a mailbox my colleague shared folders from?
 
-**Answer:** This is a known Microsoft Graph API limitation that affects **Mode B (`MicrosoftGraph`) only**.
+**Answer:** This is a known Microsoft Graph API limitation that affects **Mode B (`microsoft_graph`) only**.
 
 When a colleague shares individual folders with you (but has not granted you Full Access to their entire mailbox), Microsoft Graph returns HTTP 403 to any keyword search (`$search`) against that mailbox — regardless of whether you specify a folder or not. The `$search` parameter requires full mailbox access; there is no Microsoft Graph API that supports keyword search in a partially-delegated mailbox. The connector detects the 403, skips that mailbox entirely, and includes a notice in the search response:
 
@@ -347,7 +347,7 @@ When a colleague shares individual folders with you (but has not granted you Ful
 
 ## Supported Email Attachment Types
 
-> This section applies to Mode A (`MicrosoftGraphAndUniqueApi`) only. In `MicrosoftGraph` mode, attachments are not ingested.
+> This section applies to Mode A (`microsoft_graph_and_unique_api`) only. In `microsoft_graph` mode, attachments are not ingested.
 
 ### Documents
 - **PDF** (`.pdf`)
@@ -369,9 +369,9 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 
 ### How does `search_emails` search?
 
-**Mode A (`MicrosoftGraphAndUniqueApi`):** `search_emails` runs two searches in parallel — semantic search against the Unique knowledge base and a KQL keyword search against Microsoft Graph — then merges and deduplicates the results. It supports natural-language queries and returns semantically relevant results even when exact keywords do not match. The input requires two arrays: `uniqueSemanticSearchQueries` (semantic, 1–10 entries) and `msGraphKeywordSearchQueries` (KQL, 1–10 entries), both addressing the same user question from different angles. A `limit` parameter on each entry (100–200 for semantic, 1–100 for KQL) controls the maximum per-query results. Search results may be incomplete while full sync is in progress — a `syncWarning` is returned in that case.
+**Mode A (`microsoft_graph_and_unique_api`):** `search_emails` runs two searches in parallel — semantic search against the Unique knowledge base and a KQL keyword search against Microsoft Graph — then merges and deduplicates the results. It supports natural-language queries and returns semantically relevant results even when exact keywords do not match. The input requires two arrays: `uniqueSemanticSearchQueries` (semantic, 1–10 entries) and `msGraphKeywordSearchQueries` (KQL, 1–10 entries), both addressing the same user question from different angles. A `limit` parameter on each entry (100–200 for semantic, 1–100 for KQL) controls the maximum per-query results. Search results may be incomplete while full sync is in progress — a `syncWarning` is returned in that case.
 
-**Mode B (`MicrosoftGraph`):** `search_emails` queries Microsoft Graph directly using KQL keyword search only. Only `msGraphKeywordSearchQueries` is accepted. There is no semantic search and no Knowledge Base interaction. Folder filtering via the `directories` field is supported for your own mailbox and for mailboxes where you have Full Access delegation. Search is **not supported at all** for mailboxes where you only have folder-level (partial) access — Microsoft Graph rejects any search request against such mailboxes. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
+**Mode B (`microsoft_graph`):** `search_emails` queries Microsoft Graph directly using KQL keyword search only. Only `msGraphKeywordSearchQueries` is accepted. There is no semantic search and no Knowledge Base interaction. Folder filtering via the `directories` field is supported for your own mailbox and for mailboxes where you have Full Access delegation. Search is **not supported at all** for mailboxes where you only have folder-level (partial) access — Microsoft Graph rejects any search request against such mailboxes. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
 
 **See also:** [Tools — search_emails](./technical/tools.md#search_emails)
 
@@ -401,7 +401,7 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 }
 ```
 
-**Mode B (`MicrosoftGraph`):** Folder filtering is supported for your own mailbox and for mailboxes where you have Full Access delegation. Pass the folder ID (from `list_mailboxes_and_directories`) or a well-known name in the `directories` field of the relevant `msGraphKeywordSearchQueries` entry. Note: if you only have folder-level (partial) access to a mailbox, search does not work against it at all — not just when filtering by folder. The response will include a notice and no results are returned from that mailbox. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
+**Mode B (`microsoft_graph`):** Folder filtering is supported for your own mailbox and for mailboxes where you have Full Access delegation. Pass the folder ID (from `list_mailboxes_and_directories`) or a well-known name in the `directories` field of the relevant `msGraphKeywordSearchQueries` entry. Note: if you only have folder-level (partial) access to a mailbox, search does not work against it at all — not just when filtering by folder. The response will include a notice and no results are returned from that mailbox. See [Why can't I search emails in a mailbox my colleague shared folders from?](#Why-can't-I-search-emails-in-a-mailbox-my-colleague-shared-folders-from?)
 
 **See also:** [Tools — list_mailboxes_and_directories](./technical/tools.md#list_mailboxes_and_directories) — [Tools — search_emails](./technical/tools.md#search_emails)
 
@@ -441,7 +441,7 @@ If you are reviewing or sending the draft, open it from the shared mailbox Draft
 
 ### What does `reconnect_inbox` do?
 
-**Answer:** (Mode A — `MicrosoftGraphAndUniqueApi` — only) `reconnect_inbox` creates a new Microsoft Graph subscription only if none exists or the existing one has expired. If the subscription is within 15 minutes of expiry, it returns `expiring_soon` without making changes (renewal is automatic). If the subscription is active with more than 15 minutes remaining, it returns `already_active`. Use it when:
+**Answer:** (Mode A — `microsoft_graph_and_unique_api` — only) `reconnect_inbox` creates a new Microsoft Graph subscription only if none exists or the existing one has expired. If the subscription is within 15 minutes of expiry, it returns `expiring_soon` without making changes (renewal is automatic). If the subscription is active with more than 15 minutes remaining, it returns `already_active`. Use it when:
 
 - `verify_inbox_connection` reports the subscription as `expired` or `not_configured`
 - New emails stopped appearing in search results
@@ -451,12 +451,12 @@ If you are reviewing or sending the draft, open it from the shared mailbox Draft
 
 ### What does `delete_inbox_data` do?
 
-**Answer:** (Mode A — `MicrosoftGraphAndUniqueApi` — only) `delete_inbox_data` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Flows — Subscription Lifecycle](./technical/flows.md#Subscription-Creation-and-Renewal-Lifecycle) for details.
+**Answer:** (Mode A — `microsoft_graph_and_unique_api` — only) `delete_inbox_data` permanently removes the user's inbox connection and all associated data, including ingested email content in the Unique knowledge base. See [Flows — Subscription Lifecycle](./technical/flows.md#Subscription-Creation-and-Renewal-Lifecycle) for details.
 
 
 ## Sync
 
-> All questions in this section apply to **Mode A (`MicrosoftGraphAndUniqueApi`) only**. There is no sync pipeline in `MicrosoftGraph` mode.
+> All questions in this section apply to **Mode A (`microsoft_graph_and_unique_api`) only**. There is no sync pipeline in `microsoft_graph` mode.
 
 ### What is the difference between full sync and live catch-up?
 
@@ -634,7 +634,7 @@ This must match exactly — including protocol, domain, and path — in both the
 
 **Generate:** `openssl rand -hex 64` (128 characters)
 
-(Mode A only — in `MicrosoftGraph` mode, no webhook subscriptions are created.)
+(Mode A only — in `microsoft_graph` mode, no webhook subscriptions are created.)
 
 **See also:** [Webhook Validation](./technical/security.md#Webhook-Validation) — [Configuration](./operator/configuration.md)
 
@@ -658,7 +658,7 @@ This must match exactly — including protocol, domain, and path — in both the
 
 ### What does `INGESTION_DEFAULT_MAIL_FILTERS` do?
 
-**Answer:** (Mode A — `MicrosoftGraphAndUniqueApi` — only) `INGESTION_DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `retentionWindowInDays` (positive integer — required, the application will not start without it; all ingested emails have an expired at date which is computed using receivedDateTime + retentionWindowInDays), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
+**Answer:** (Mode A — `microsoft_graph_and_unique_api` — only) `INGESTION_DEFAULT_MAIL_FILTERS` is a JSON object that controls which emails are ingested during both full sync and live catch-up. It supports three filters: `retentionWindowInDays` (positive integer — required, the application will not start without it; all ingested emails have an expired at date which is computed using receivedDateTime + retentionWindowInDays), `ignoredSenders` (RegExp patterns matching sender addresses), and `ignoredContents` (RegExp patterns matching subject or body).
 
 When the filters are updated and the service is redeployed, all user inbox configurations are updated. Both full sync and live catch-up use the new filters. Previously ingested emails that would now be filtered are not automatically removed. See [Configuration](./operator/configuration.md) for the full filter reference.
 
@@ -681,7 +681,7 @@ Full sync relies on RabbitMQ for inter-batch orchestration — without RabbitMQ,
 
 Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, either the first notification from MsGraph or the 30-minute catch-up cron re-triggers processing, which picks up missed messages by querying from the last watermark.
 
-**Mode B (`MicrosoftGraph`):** The service loses its RabbitMQ connection and cannot function until it is restored; no email data is lost.
+**Mode B (`microsoft_graph`):** The service loses its RabbitMQ connection and cannot function until it is restored; no email data is lost.
 
 ### What happens if PostgreSQL is unavailable?
 
@@ -698,12 +698,12 @@ Live Catch-Up stalls while RabbitMQ is unavailable. Once RabbitMQ recovers, eith
 
 ### What do I do if a core infrastructure component fails?
 
-**Mode A (`MicrosoftGraphAndUniqueApi`):**
+**Mode A (`microsoft_graph_and_unique_api`):**
 - PostgreSQL loss — all stored OAuth tokens and sync state are gone; every user must re-authenticate via the standard OAuth flow in their MCP client. No tool call is needed — OAuth completion automatically recreates the subscription and triggers a full sync.
 - RabbitMQ loss — in-progress full syncs stall after the current batch; live catch-up trigger delivery is blocked but any in-progress run completes. No re-authentication needed. Live catch-up resumes automatically once RabbitMQ is restored.
 - Unique Knowledge Base loss — ingested email content must be re-ingested; each affected user must call `restart_full_sync` from their own MCP session (debug mode required).
 
-**Mode B (`MicrosoftGraph`):**
+**Mode B (`microsoft_graph`):**
 - PostgreSQL loss — all stored OAuth tokens are gone; users must reconnect via the standard OAuth flow in their MCP client. No tool call is required. No sync data exists to recover.
 - RabbitMQ loss — the service cannot connect; no email data is lost. Recovery: restore RabbitMQ, restart pods. No user action required.
 - Unique Knowledge Base loss — no email data is stored there in Mode B, so search is unaffected. Restore the KB to restore full service connectivity. No user action required.

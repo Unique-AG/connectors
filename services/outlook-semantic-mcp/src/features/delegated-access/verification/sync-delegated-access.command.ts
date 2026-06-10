@@ -51,9 +51,9 @@ export class SyncDelegatedAccessCommand {
     onProgress?: () => Promise<void>;
   }): Promise<VerificationResult> {
     traceAttrs({ accountsId: input.accountsId });
-    if (this.config.scan !== 'granularAccess') {
+    if (this.config.scan !== 'granular_access') {
       this.logger.log({
-        msg: `Skipped running delegated access verification. Reason: delegated access is not set to "granularAccess"`,
+        msg: `Skipped running delegated access verification. Reason: delegated access is not set to "granular_access"`,
       });
       return { status: 'skipped' };
     }

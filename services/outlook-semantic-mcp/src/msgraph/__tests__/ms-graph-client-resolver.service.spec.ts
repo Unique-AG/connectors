@@ -6,7 +6,7 @@ import {
   isNoDelegatesResult,
   MsGraphClientResolver,
   NoDelegatesFoundError,
-} from './ms-graph-client-resolver.service';
+} from '../ms-graph-client-resolver.service';
 
 // ---------------------------------------------------------------------------
 // Constants

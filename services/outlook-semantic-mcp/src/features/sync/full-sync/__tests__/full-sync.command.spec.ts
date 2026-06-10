@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FullSyncCommand, START_FULL_SYNC_LINK } from './full-sync.command';
+import { FullSyncCommand, START_FULL_SYNC_LINK } from '../full-sync.command';
 
 vi.mock('~/features/tracing.utils', () => ({
   traceAttrs: vi.fn(),
@@ -150,7 +150,7 @@ function createCommand({
     updateByVersionCommand as any,
     syncDirectories as any,
     { run: vi.fn().mockResolvedValue(false) } as any,
-    { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
+    { mcpBackend: 'microsoft_graph_and_unique_api' } as any,
     db as any,
     {
       measureFullSyncRun: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
@@ -713,7 +713,7 @@ describe('FullSyncCommand', () => {
         updateByVersionCommand as any,
         createSyncDirectoriesVersionCommand() as any,
         { run: vi.fn().mockResolvedValue(false) } as any,
-        { mcpBackend: 'MicrosoftGraphAndUniqueApi' } as any,
+        { mcpBackend: 'microsoft_graph_and_unique_api' } as any,
         db as any,
         {
           measureFullSyncRun: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),

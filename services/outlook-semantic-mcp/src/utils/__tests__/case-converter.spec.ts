@@ -7,7 +7,7 @@ import {
   toDrizzleAuthCodeInsert,
   toDrizzleOAuthClientInsert,
   toDrizzleSessionInsert,
-} from './case-converter';
+} from '../case-converter';
 
 describe('case-converter', () => {
   describe('OAuth Client conversion', () => {

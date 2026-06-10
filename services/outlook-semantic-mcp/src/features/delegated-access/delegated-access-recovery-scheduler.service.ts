@@ -79,7 +79,7 @@ export class DelegatedAccessRecoverySchedulerService implements OnModuleInit, On
 
     await this.recoverDiscovery();
 
-    if (this.config.scan === 'granularAccess') {
+    if (this.config.scan === 'granular_access') {
       await this.recoverVerification();
     }
   }

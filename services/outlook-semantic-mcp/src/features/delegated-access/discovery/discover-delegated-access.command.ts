@@ -401,7 +401,7 @@ export class DiscoverDelegatedAccessCommand {
 
     try {
       const apiEndpoint =
-        ownerSource === 'shared-mailbox' || this.config.scan === 'fullAccessOnly'
+        ownerSource === 'shared-mailbox' || this.config.scan === 'full_access_only'
           ? 'messages'
           : 'mailFolders';
       await client.api(`/users/${ownerEmail}/${apiEndpoint}`).top(1).select('id').get();

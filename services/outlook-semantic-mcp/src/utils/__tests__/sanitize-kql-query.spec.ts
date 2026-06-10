@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeKqlQuery } from './sanitize-kql-query';
+import { sanitizeKqlQuery } from '../sanitize-kql-query';
 
 describe('sanitizeKqlQuery', () => {
   describe('smart quote normalization', () => {

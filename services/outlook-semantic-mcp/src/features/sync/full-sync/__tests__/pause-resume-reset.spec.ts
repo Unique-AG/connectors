@@ -1,8 +1,8 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FullSyncResetCommand } from './full-sync-reset.command';
-import { PauseFullSyncCommand } from './pause-full-sync.command';
-import { ResumeFullSyncCommand } from './resume-full-sync.command';
+import { FullSyncResetCommand } from '../full-sync-reset.command';
+import { PauseFullSyncCommand } from '../pause-full-sync.command';
+import { ResumeFullSyncCommand } from '../resume-full-sync.command';
 
 // ---------------------------------------------------------------------------
 // Helpers
