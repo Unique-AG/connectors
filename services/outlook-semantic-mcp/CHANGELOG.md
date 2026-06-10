@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@1.0.1...outlook-semantic-mcp@2.0.0) (2026-06-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **outlook-semantic-mcp:** env var `APP_BUFFER_LOGS` is removed; use `LOGS_BUFFERING` instead. Enum values previously using other casing formats must be updated to `snake_lower_case`.
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** rename env vars and normalize enum values to snake_case ([#629](https://github.com/Unique-AG/connectors/issues/629)) ([23a9496](https://github.com/Unique-AG/connectors/commit/23a9496298dfd6b54deb0ee62e472403b11a3cbf))
+* **outlook-semantic-mcp:** set default Job filter on Grafana dashboard ([#632](https://github.com/Unique-AG/connectors/issues/632)) ([0b90d73](https://github.com/Unique-AG/connectors/commit/0b90d7385fe7227003c9d608f513386bed566d3a))
+
 ## [1.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@1.0.0...outlook-semantic-mcp@1.0.1) (2026-06-09)
 
 
