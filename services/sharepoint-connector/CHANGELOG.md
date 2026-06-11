@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.8.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.7.0...sharepoint-connector@2.8.0) (2026-06-11)
+
+
+### Features
+
+* **charts,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** add admin consent redirect uris ([#577](https://github.com/Unique-AG/connectors/issues/577)) ([3e36a6d](https://github.com/Unique-AG/connectors/commit/3e36a6deea5e620b6e5316a7f3df0dd4fd5c74b3))
+* **ci,sharepoint-connector,confluence-connector:** publish helm charts to getunique ([#606](https://github.com/Unique-AG/connectors/issues/606)) ([72823c7](https://github.com/Unique-AG/connectors/commit/72823c73e4916ee084e24103684c24a4e803f935))
+
 ## [2.7.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.6.1...sharepoint-connector@2.7.0) (2026-05-13)
 
 
