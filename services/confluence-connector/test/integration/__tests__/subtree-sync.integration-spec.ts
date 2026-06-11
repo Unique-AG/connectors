@@ -30,8 +30,10 @@ describe('subtree sync', () => {
         spaces: [aSpace()],
         pages: [
           aPage({ id: 'root', title: 'Handbook', labels: ['ai-ingest-all'] }),
-          aPage({ id: 'child-a', parentId: 'root', title: 'Onboarding' }),
-          aPage({ id: 'child-b', parentId: 'root', title: 'Benefits' }),
+          // Children are unlabeled, so descendant traversal is the only path to
+          // them — a regression in getDescendantPages fails this test.
+          aPage({ id: 'child-a', parentId: 'root', title: 'Onboarding', labels: [] }),
+          aPage({ id: 'child-b', parentId: 'root', title: 'Benefits', labels: [] }),
         ],
       },
     });
@@ -58,9 +60,9 @@ describe('subtree sync', () => {
         spaces: [aSpace()],
         pages: [
           aPage({ id: 'root-eng', title: 'Engineering', labels: ['ai-ingest-all'] }),
-          aPage({ id: 'eng-1', parentId: 'root-eng', title: 'On-call' }),
+          aPage({ id: 'eng-1', parentId: 'root-eng', title: 'On-call', labels: [] }),
           aPage({ id: 'root-hr', title: 'HR', labels: ['ai-ingest-all'] }),
-          aPage({ id: 'hr-1', parentId: 'root-hr', title: 'PTO Policy' }),
+          aPage({ id: 'hr-1', parentId: 'root-hr', title: 'PTO Policy', labels: [] }),
         ],
       },
     });
@@ -91,7 +93,7 @@ describe('subtree sync', () => {
         ],
         pages: [
           aPage({ id: 'eng-root', spaceKey: 'ENG', labels: ['ai-ingest-all'] }),
-          aPage({ id: 'eng-child', spaceKey: 'ENG', parentId: 'eng-root' }),
+          aPage({ id: 'eng-child', spaceKey: 'ENG', parentId: 'eng-root', labels: [] }),
           aPage({ id: 'hr-root', spaceKey: 'HR', labels: ['ai-ingest-all'] }),
         ],
       },
@@ -125,6 +127,7 @@ describe('subtree sync', () => {
         id: `child-${String(i + 1).padStart(2, '0')}`,
         parentId: 'root',
         title: `Child ${i + 1}`,
+        labels: [],
       }),
     );
 
