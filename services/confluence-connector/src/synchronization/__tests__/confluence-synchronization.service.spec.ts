@@ -1,5 +1,9 @@
+import { Readable } from 'node:stream';
 import { Smeared } from '@unique-ag/utils';
+import { createMock } from '@golevelup/ts-vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TenantConfig } from '../../config';
+import type { ConfluenceApiClient } from '../../confluence-api';
 import { type Metrics, SyncPhase } from '../../metrics';
 import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
@@ -10,13 +14,14 @@ import {
   discoveredPagesFixture,
   discoveryResultFixture,
   fetchedPagesFixture,
+  PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE,
 } from '../__mocks__/sync.fixtures';
 import type { ConfluenceContentFetcher } from '../confluence-content-fetcher';
 import type { ConfluencePageScanner } from '../confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../confluence-synchronization.service';
 import type { FileDiffService } from '../file-diff.service';
 import type { IngestionService } from '../ingestion.service';
-import { buildInlinedAttachmentKey, type PageImageInliner } from '../page-image-inliner';
+import { buildInlinedAttachmentKey, PageImageInliner } from '../page-image-inliner';
 import type { ScopeManagementService } from '../scope-management.service';
 import type { DiscoveredAttachment, FileDiffResult } from '../sync.types';
 
@@ -922,6 +927,116 @@ describe('ConfluenceSynchronizationService', () => {
         expect.objectContaining({ id: imageAttachment.id }),
         'scope-1',
       );
+    });
+
+    // These exercise the REAL PageImageInliner (not a mock) wired into the orchestrator, so the
+    // attachments.inlineImages config gate and the standalone-pass filter are tested together.
+    // The goal is to prove the standard attachment ingestion flow is intact in both states.
+    describe('inlineImages config toggle (real inliner)', () => {
+      function createRealInliner(inlineImagesEnabled: boolean): {
+        inliner: PageImageInliner;
+        apiClient: ReturnType<typeof createMock<ConfluenceApiClient>>;
+      } {
+        const apiClient = createMock<ConfluenceApiClient>();
+        apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(Buffer.from('PNG')));
+        const config = createMock<TenantConfig>({
+          ingestion: {
+            attachments: {
+              maxFileSizeMb: 200,
+              allowedMimeTypes: ['image/png', 'image/jpeg', 'application/pdf'],
+              inlineImagesEnabled,
+            },
+          },
+        });
+        return { inliner: new PageImageInliner(config, apiClient), apiClient };
+      }
+
+      beforeEach(() => {
+        // Page 1's body references diagram.png (== imageAttachment.title) so the real inliner
+        // has a macro to resolve and inline.
+        vi.mocked(mockContentFetcher.fetchPageContent).mockImplementation(
+          (page: { id: string }) => {
+            const base = fetchedPagesFixture[0];
+            if (!base) {
+              throw new Error('expected fetched fixture');
+            }
+            return Promise.resolve({
+              ...base,
+              id: page.id,
+              body: PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE,
+            });
+          },
+        );
+      });
+
+      it('ENABLED: inlines the image, keeps it out of the standalone pass, still ingests non-images', async () => {
+        const { inliner, apiClient } = createRealInliner(true);
+        const svc = createService(
+          mockScanner,
+          mockContentFetcher,
+          mockFileDiffService,
+          mockIngestionService,
+          undefined,
+          inliner,
+        );
+
+        await tenantStorage.run(tenant, () => svc.synchronize());
+
+        // Image was downloaded and embedded into the page body.
+        expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledTimes(1);
+        expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: '1',
+            body: expect.stringContaining('data:image/png;base64,'),
+          }),
+          'scope-1',
+        );
+        // Inlined image must NOT be ingested standalone.
+        expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalledWith(
+          expect.objectContaining({ id: imageAttachment.id }),
+          expect.anything(),
+        );
+        // Non-image attachment is unaffected by the toggle and still ingested standalone.
+        expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+          expect.objectContaining({ id: pdfAttachment.id }),
+          'scope-1',
+        );
+        // Exactly one standalone ingest (the PDF).
+        expect(mockIngestionService.ingestAttachment).toHaveBeenCalledTimes(1);
+      });
+
+      it('DISABLED: leaves the body untouched and routes every image through the standalone pass', async () => {
+        const { inliner, apiClient } = createRealInliner(false);
+        const svc = createService(
+          mockScanner,
+          mockContentFetcher,
+          mockFileDiffService,
+          mockIngestionService,
+          undefined,
+          inliner,
+        );
+
+        await tenantStorage.run(tenant, () => svc.synchronize());
+
+        // No image download attempted; nothing inlined.
+        expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+        // Page body ingested verbatim: <ac:image> preserved, no data URI spliced in.
+        expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+          expect.objectContaining({ id: '1', body: PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE }),
+          'scope-1',
+        );
+        // Both the image and the non-image attachment go through standalone ingestion.
+        expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+          expect.objectContaining({ id: imageAttachment.id }),
+          'scope-1',
+        );
+        expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+          expect.objectContaining({ id: pdfAttachment.id }),
+          'scope-1',
+        );
+        // Nothing dropped: exactly the image + the PDF.
+        expect(mockIngestionService.ingestAttachment).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

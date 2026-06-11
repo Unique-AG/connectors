@@ -39,7 +39,11 @@ vi.mock('@nestjs/common', async (importOriginal) => {
 });
 
 function createTestTenantConfig(
-  overrides: { maxFileSizeMb?: number; allowedMimeTypes?: string[] } = {},
+  overrides: {
+    maxFileSizeMb?: number;
+    allowedMimeTypes?: string[];
+    inlineImagesEnabled?: boolean;
+  } = {},
 ): TenantConfig {
   return createMock<TenantConfig>({
     ingestion: {
@@ -50,6 +54,7 @@ function createTestTenantConfig(
           'image/jpeg',
           'application/pdf',
         ],
+        inlineImagesEnabled: overrides.inlineImagesEnabled ?? true,
       },
     },
   });
@@ -117,6 +122,23 @@ describe('PageImageInliner', () => {
       const result = await inliner.inlineImages(page, []);
       expect(result.page).toBe(page);
       expect(result.inlinedAttachmentKeys.size).toBe(0);
+    });
+
+    it('leaves every image for the standalone pass when inlining is disabled', async () => {
+      // Escape hatch for platforms older than 2026.24.0: with inlining off, the page body is
+      // untouched and no keys are returned, so the images flow through standalone ingestion.
+      const disabledInliner = new PageImageInliner(
+        createTestTenantConfig({ inlineImagesEnabled: false }),
+        apiClient,
+      );
+      const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
+
+      const result = await disabledInliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+
+      expect(result.page).toBe(page);
+      expect(result.page.body).toContain('<ac:image');
+      expect(result.inlinedAttachmentKeys.size).toBe(0);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
   });
 

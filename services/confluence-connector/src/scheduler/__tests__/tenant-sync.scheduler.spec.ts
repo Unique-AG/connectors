@@ -61,6 +61,7 @@ const tenantConfig = {
       enabled: true,
       allowedMimeTypes: ['application/pdf'],
       imageOcrEnabled: false,
+      inlineImagesEnabled: true,
       maxFileSizeMb: 200,
     },
   },

@@ -61,6 +61,12 @@ export class PageImageInliner {
     page: FetchedPage,
     pageImageAttachments: DiscoveredAttachment[],
   ): Promise<InlineImagesResult> {
+    // Disabled on platforms older than 2026.24.0, where inline base64 images aren't extracted.
+    // Returning no inlined keys leaves every image for the standalone attachment pass instead.
+    if (!this.config.ingestion.attachments.inlineImagesEnabled) {
+      return { page, inlinedAttachmentKeys: new Set() };
+    }
+
     if (!page.body) {
       return { page, inlinedAttachmentKeys: new Set() };
     }

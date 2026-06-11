@@ -66,6 +66,7 @@ function createMockTenantConfig(): TenantConfig {
         allowedMimeTypes: [],
         maxFileSizeMb: 10,
         imageOcrEnabled: true,
+        inlineImagesEnabled: true,
       },
     },
     processing: {},
