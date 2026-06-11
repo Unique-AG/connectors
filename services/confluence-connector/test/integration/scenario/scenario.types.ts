@@ -1,4 +1,3 @@
-import type { TenantConfig } from '../../../src/config';
 import type { ContentType } from '../../../src/confluence-api';
 
 export type InstanceDescriptor =
@@ -100,6 +99,3 @@ export interface Scenario {
   confluence: ScenarioConfluence;
   unique: ScenarioUnique;
 }
-
-/** Resolved tenant config in the same shape used by the production services. */
-export type ResolvedTenantConfig = TenantConfig;
