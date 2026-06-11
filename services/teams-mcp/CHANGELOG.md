@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.19](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.18...teams-mcp@0.2.19) (2026-06-11)
+
+
+### Features
+
+* **teams-mcp:** add subject and meeting_id to ingested artifact metadata ([#638](https://github.com/Unique-AG/connectors/issues/638)) ([d6054a6](https://github.com/Unique-AG/connectors/commit/d6054a6739f2814d734b59d83375aa149b0a78aa))
+
 ## [0.2.18](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.17...teams-mcp@0.2.18) (2026-06-08)
 
 
