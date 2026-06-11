@@ -349,6 +349,8 @@ export class UniqueService {
       date: Date;
       startDateTime: Date;
       endDateTime: Date;
+      meetingId: string;
+      subject: string;
       contentCorrelationId: string;
       owner: { name: string; email: string };
       participants: { name: string; email: string }[];
@@ -361,9 +363,14 @@ export class UniqueService {
       date: meeting.date.toISOString(),
       start_datetime: startDateTime.toISOString(),
       end_datetime: endDateTime.toISOString(),
+      meeting_id: meeting.meetingId,
       content_correlation_id: meeting.contentCorrelationId,
       organizer_email: meeting.owner.email.toLowerCase(),
     };
+
+    if (meeting.subject) {
+      metadata.subject = meeting.subject;
+    }
 
     if (meeting.owner.name) {
       metadata.organizer_name = meeting.owner.name;
