@@ -38,7 +38,7 @@
     "@nestjs/platform-express": "11.1.18",
     "@nestjs/swagger": "11.2.6",
     "@opentelemetry/api": "1.9.0",
-    "@opentelemetry/instrumentation-pg": "0.58.0",
+    "@opentelemetry/instrumentation-pg": "0.70.0",
     "@proventuslabs/nestjs-zod": "2.0.0",
     "@qfetch/qfetch": "0.1.0",
     "@unique-ag/aes-gcm-encryption": "workspace:*",
