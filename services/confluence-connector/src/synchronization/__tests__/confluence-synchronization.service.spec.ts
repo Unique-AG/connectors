@@ -46,8 +46,8 @@ const mockScopeManagementService = {
   cleanupRemovedSpaces: vi.fn().mockResolvedValue(undefined),
 } as unknown as ScopeManagementService;
 
-const passthroughPageImageInliner: Pick<PageImageInliner, 'inlineImages'> = {
-  inlineImages: vi.fn(async (page) => page),
+const passthroughPageImageInliner: Pick<PageImageInliner, 'inlineImagesInPage'> = {
+  inlineImagesInPage: vi.fn(async (page) => page),
 };
 
 function createService(
@@ -59,7 +59,7 @@ function createService(
     'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'
   >,
   metrics: Metrics = createNoopMetrics(),
-  pageImageInliner: Pick<PageImageInliner, 'inlineImages'> = passthroughPageImageInliner,
+  pageImageInliner: Pick<PageImageInliner, 'inlineImagesInPage'> = passthroughPageImageInliner,
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
     scanner as ConfluencePageScanner,
@@ -726,8 +726,8 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('passes inlined page body to ingestPage and skips standalone ingestion of the inlined image', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
-        inlineImages: vi.fn(async (page) => ({
+      const inliner: Pick<PageImageInliner, 'inlineImagesInPage'> = {
+        inlineImagesInPage: vi.fn(async (page) => ({
           ...page,
           body: '<p>before</p><img src="data:image/png;base64,XYZ" /><p>after</p>',
         })),
@@ -744,7 +744,7 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => svc.synchronize());
 
-      expect(inliner.inlineImages).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }), [
+      expect(inliner.inlineImagesInPage).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }), [
         imageAttachment,
       ]);
       expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
@@ -767,8 +767,8 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('never standalone-ingests an image when inlining is enabled, even if nothing was inlined', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
-        inlineImages: vi.fn(async (page) => page),
+      const inliner: Pick<PageImageInliner, 'inlineImagesInPage'> = {
+        inlineImagesInPage: vi.fn(async (page) => page),
       };
 
       const svc = createService(
@@ -795,8 +795,8 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('only passes image-type attachments (not PDFs) to the inliner', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
-        inlineImages: vi.fn(async (page) => page),
+      const inliner: Pick<PageImageInliner, 'inlineImagesInPage'> = {
+        inlineImagesInPage: vi.fn(async (page) => page),
       };
 
       const svc = createService(
@@ -810,11 +810,11 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => svc.synchronize());
 
-      expect(inliner.inlineImages).toHaveBeenCalledWith(
+      expect(inliner.inlineImagesInPage).toHaveBeenCalledWith(
         expect.objectContaining({ id: '1' }),
         expect.arrayContaining([expect.objectContaining({ id: imageAttachment.id })]),
       );
-      const passedAttachments = vi.mocked(inliner.inlineImages).mock.calls[0]?.[1] ?? [];
+      const passedAttachments = vi.mocked(inliner.inlineImagesInPage).mock.calls[0]?.[1] ?? [];
       expect(passedAttachments.some((a) => a.id === pdfAttachment.id)).toBe(false);
     });
 
@@ -853,8 +853,8 @@ describe('ConfluenceSynchronizationService', () => {
         return Promise.resolve({ ...base, id: page.id });
       });
 
-      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
-        inlineImages: vi.fn(async (fetchedPage) => fetchedPage),
+      const inliner: Pick<PageImageInliner, 'inlineImagesInPage'> = {
+        inlineImagesInPage: vi.fn(async (fetchedPage) => fetchedPage),
       };
 
       const svc = createService(
@@ -882,8 +882,8 @@ describe('ConfluenceSynchronizationService', () => {
     });
 
     it('falls back to ingesting the original body when the inliner throws', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
-        inlineImages: vi.fn(async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImagesInPage'> = {
+        inlineImagesInPage: vi.fn(async () => {
           throw new Error('inliner exploded');
         }),
       };

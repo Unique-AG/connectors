@@ -111,14 +111,14 @@ describe('PageImageInliner', () => {
   describe('no-op cases', () => {
     it('returns the page unchanged when body is empty', async () => {
       const page = basePage('');
-      const result = await inliner.inlineImages(page, []);
+      const result = await inliner.inlineImagesInPage(page, []);
       expect(result).toBe(page);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
     it('returns the page unchanged when no <ac:image> macros are present', async () => {
       const page = basePage('<p>just text</p>');
-      const result = await inliner.inlineImages(page, []);
+      const result = await inliner.inlineImagesInPage(page, []);
       expect(result).toBe(page);
     });
 
@@ -131,7 +131,7 @@ describe('PageImageInliner', () => {
       );
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
 
-      const result = await disabledInliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+      const result = await disabledInliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
 
       expect(result).toBe(page);
       expect(result.body).toContain('<ac:image');
@@ -144,7 +144,7 @@ describe('PageImageInliner', () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
 
-      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+      const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
 
       const expectedBase64 = imageBuffer().toString('base64');
       expect(result.body).toContain(`src="data:image/png;base64,${expectedBase64}"`);
@@ -157,7 +157,7 @@ describe('PageImageInliner', () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
       const page = basePage(PAGE_BODY_WITH_CDATA_AND_IMAGE);
 
-      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+      const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
 
       expect(result.body).toContain(
         '<ac:plain-text-body><![CDATA[const x = "<not a tag>" & 1 < 2;]]></ac:plain-text-body>',
@@ -184,7 +184,7 @@ describe('PageImageInliner', () => {
         downloadPath: '/download/attachments/1/two.jpg',
       };
 
-      const result = await inliner.inlineImages(basePage(PAGE_BODY_MULTIPLE_CURRENT_PAGE_IMAGES), [
+      const result = await inliner.inlineImagesInPage(basePage(PAGE_BODY_MULTIPLE_CURRENT_PAGE_IMAGES), [
         oneAtt,
         twoAtt,
       ]);
@@ -200,7 +200,7 @@ describe('PageImageInliner', () => {
 
     it('maps ac:alt, ac:title, ac:width, ac:height onto the produced <img>', async () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
-      const result = await inliner.inlineImages(basePage(PAGE_BODY_IMAGE_WITH_ATTRS), [
+      const result = await inliner.inlineImagesInPage(basePage(PAGE_BODY_IMAGE_WITH_ATTRS), [
         sampleDiscoveredImageAttachment,
       ]);
 
@@ -217,14 +217,14 @@ describe('PageImageInliner', () => {
   describe('skip / fallback cases', () => {
     it('leaves <ac:image> untouched when the filename is not among page attachments', async () => {
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
-      const result = await inliner.inlineImages(page, []);
+      const result = await inliner.inlineImagesInPage(page, []);
       expect(result.body).toBe(page.body);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
     it('leaves <ac:image> untouched when the matching attachment is not image/*', async () => {
       const page = basePage('<ac:image><ri:attachment ri:filename="spec.pdf"/></ac:image>');
-      const result = await inliner.inlineImages(page, [sampleDiscoveredPdfAttachment]);
+      const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredPdfAttachment]);
       expect(result.body).toBe(page.body);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
@@ -239,7 +239,7 @@ describe('PageImageInliner', () => {
         apiClient,
       );
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
-      const result = await smallLimitInliner.inlineImages(page, [oversize]);
+      const result = await smallLimitInliner.inlineImagesInPage(page, [oversize]);
       expect(result.body).toBe(page.body);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
@@ -253,7 +253,7 @@ describe('PageImageInliner', () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(failingStream);
 
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
-      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+      const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
 
       expect(result.body).toBe(page.body);
     });
@@ -267,14 +267,14 @@ describe('PageImageInliner', () => {
         mediaType: 'image/gif',
       };
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
-      const result = await inliner.inlineImages(page, [gifAttachment]);
+      const result = await inliner.inlineImagesInPage(page, [gifAttachment]);
       expect(result.body).toBe(page.body);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
     it('leaves <ri:url> external images untouched and never fetches them', async () => {
       const page = basePage(PAGE_BODY_EXTERNAL_URL_IMAGE);
-      const result = await inliner.inlineImages(page, []);
+      const result = await inliner.inlineImagesInPage(page, []);
       expect(result.body).toBe(page.body);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
       expect(apiClient.fetchAttachmentsByPageTitle).not.toHaveBeenCalled();
@@ -296,7 +296,7 @@ describe('PageImageInliner', () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
 
       const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
-      const result = await inliner.inlineImages(page, []);
+      const result = await inliner.inlineImagesInPage(page, []);
 
       expect(apiClient.fetchAttachmentsByPageTitle).toHaveBeenCalledWith('OTHER', 'Other Page');
       expect(apiClient.fetchAttachmentsByPageTitle).toHaveBeenCalledTimes(1);
@@ -325,7 +325,7 @@ describe('PageImageInliner', () => {
       });
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
 
-      const result = await inliner.inlineImages(
+      const result = await inliner.inlineImagesInPage(
         basePage(PAGE_BODY_TWO_REFERENCES_SAME_OTHER_PAGE),
         [],
       );
@@ -352,7 +352,7 @@ describe('PageImageInliner', () => {
       });
 
       const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
-      const result = await inliner.inlineImages(page, []);
+      const result = await inliner.inlineImagesInPage(page, []);
 
       expect(result.body).toBe(page.body);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
@@ -362,7 +362,7 @@ describe('PageImageInliner', () => {
       apiClient.fetchAttachmentsByPageTitle.mockResolvedValue(null);
 
       const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
-      const result = await inliner.inlineImages(page, []);
+      const result = await inliner.inlineImagesInPage(page, []);
 
       expect(result.body).toBe(page.body);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
@@ -385,7 +385,7 @@ describe('PageImageInliner', () => {
 
       for (const body of [bodyMissingSpaceKey, bodyMissingContentTitle]) {
         vi.clearAllMocks();
-        const result = await inliner.inlineImages(basePage(body), [samePageDecoy]);
+        const result = await inliner.inlineImagesInPage(basePage(body), [samePageDecoy]);
         expect(result.body).toBe(body);
         expect(apiClient.fetchAttachmentsByPageTitle).not.toHaveBeenCalled();
         expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
@@ -396,7 +396,7 @@ describe('PageImageInliner', () => {
       apiClient.fetchAttachmentsByPageTitle.mockRejectedValue(new Error('lookup boom'));
 
       const page = basePage(PAGE_BODY_OTHER_PAGE_IMAGE);
-      const result = await inliner.inlineImages(page, []);
+      const result = await inliner.inlineImagesInPage(page, []);
 
       expect(result.body).toBe(page.body);
     });
@@ -405,7 +405,7 @@ describe('PageImageInliner', () => {
   describe('malformed / edge-case bodies', () => {
     it('leaves a self-closing <ac:image/> macro untouched (no resource reference)', async () => {
       const page = basePage(PAGE_BODY_SELF_CLOSING_IMAGE);
-      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+      const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
       expect(result.body).toBe(page.body);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
@@ -416,7 +416,7 @@ describe('PageImageInliner', () => {
       // close at EOF and we would splice from '<ac:image>' all the way to the end of the body,
       // destroying everything after it. The close-tag guard must drop the macro entirely.
       const page = basePage(PAGE_BODY_UNCLOSED_IMAGE);
-      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+      const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
       expect(result.body).toBe(page.body);
       expect(result.body.endsWith('<p>more</p>')).toBe(true);
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
@@ -426,7 +426,7 @@ describe('PageImageInliner', () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
       const page = basePage(PAGE_BODY_MIXED_URL_AND_ATTACHMENT);
 
-      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+      const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
 
       expect(result.body).toContain(
         '<ac:image><ri:url ri:value="https://example.com/banner.png"/></ac:image>',
@@ -443,7 +443,7 @@ describe('PageImageInliner', () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
       const page = basePage(PAGE_BODY_IMAGE_NESTED_IN_TABLE);
 
-      const result = await inliner.inlineImages(page, [sampleDiscoveredImageAttachment]);
+      const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
 
       expect(result.body).toContain(
         `src="data:image/png;base64,${imageBuffer().toString('base64')}"`,
@@ -471,7 +471,7 @@ describe('PageImageInliner', () => {
         title: 'two.png',
       };
 
-      const result = await inliner.inlineImages(basePage(body), [att1, att2]);
+      const result = await inliner.inlineImagesInPage(basePage(body), [att1, att2]);
 
       expect(result.body).not.toContain('<ac:image');
       expect(result.body).toContain(
@@ -488,7 +488,7 @@ describe('PageImageInliner', () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
       const body = '<ac:image><ri:attachment ri:filename="diagram.png"/></ac:image>';
 
-      const result = await inliner.inlineImages(basePage(body), [sampleDiscoveredImageAttachment]);
+      const result = await inliner.inlineImagesInPage(basePage(body), [sampleDiscoveredImageAttachment]);
 
       expect(result.body.startsWith('<img ')).toBe(true);
       expect(result.body.endsWith('/>')).toBe(true);
@@ -509,7 +509,7 @@ describe('PageImageInliner', () => {
       };
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
 
-      const result = await inliner.inlineImages(basePage(body), [knownAtt]);
+      const result = await inliner.inlineImagesInPage(basePage(body), [knownAtt]);
 
       expect(result.body).toContain('data:image/png;base64,');
       expect(result.body).toContain(
@@ -527,7 +527,7 @@ describe('PageImageInliner', () => {
         mediaType: 'image/PNG; charset=binary',
       };
 
-      const result = await inliner.inlineImages(basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE), [
+      const result = await inliner.inlineImagesInPage(basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE), [
         att,
       ]);
 
@@ -539,7 +539,7 @@ describe('PageImageInliner', () => {
       const stringStream = Readable.from(['PNG', 'DATA']);
       apiClient.getAttachmentDownloadStream.mockResolvedValue(stringStream);
 
-      const result = await inliner.inlineImages(basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE), [
+      const result = await inliner.inlineImagesInPage(basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE), [
         sampleDiscoveredImageAttachment,
       ]);
 
@@ -563,7 +563,7 @@ describe('PageImageInliner', () => {
       const body =
         '<ac:image><ri:attachment ri:filename="a&amp;b &quot;c&quot; &lt;d>.png"/></ac:image>';
 
-      const result = await inliner.inlineImages(basePage(body), [att]);
+      const result = await inliner.inlineImagesInPage(basePage(body), [att]);
 
       expect(result.body).toContain('alt="a&amp;b &quot;c&quot; &lt;d>.png"');
       // Must not contain a raw " inside the attribute value.

@@ -54,6 +54,7 @@ export class ConfluenceSynchronizationService {
       const scanStartTime = Date.now();
       const { pages: discoveredPages, attachments: discoveredAttachments } =
         await this.scanner.discoverPages();
+
       this.metrics.recordScanDuration(elapsedSeconds(scanStartTime));
       this.logger.log({
         count: discoveredPages.length,
@@ -66,9 +67,8 @@ export class ConfluenceSynchronizationService {
         discoveredAttachments,
       );
 
-      // When inlining is enabled, page images live inside the page (inlined into the body), never as
-      // standalone content. Excluding them from the diff keeps them out of the standalone pass and lets
-      // the diff delete any standalone copy left behind by an earlier sync that ran without inlining.
+      // we either inline images in the page, either ingest them separately with no inlining.
+      // when inlining we must exclude them from file-diff else we will ingest them twice: inlined and as attachment.
       const trackedAttachments = tenant.config.ingestion.attachments.inlineImagesEnabled
         ? discoveredAttachments.filter((a) => !isImageMimeType(a.mediaType))
         : discoveredAttachments;
@@ -81,8 +81,8 @@ export class ConfluenceSynchronizationService {
       const itemIdsToProcess = new Set([...diffResult.newItemIds, ...diffResult.updatedItemIds]);
       const pagesToFetch = discoveredPages.filter((p) => itemIdsToProcess.has(p.id));
 
-      const attachmentsToIngest = trackedAttachments.filter((a) =>
-        itemIdsToProcess.has(`${a.pageId}::${a.id}`),
+      const attachmentsToIngest = trackedAttachments.filter((discoveredAttachment) =>
+        itemIdsToProcess.has(`${discoveredAttachment.pageId}::${discoveredAttachment.id}`),
       );
 
       if (pagesToFetch.length > 0 || attachmentsToIngest.length > 0) {
@@ -101,7 +101,6 @@ export class ConfluenceSynchronizationService {
           allSpaceKeyToSpaceId,
         );
 
-        const concurrency = tenant.config.processing.concurrency;
         const imageAttachmentsByPageId = groupBy(
           discoveredAttachments.filter((a) => isImageMimeType(a.mediaType)),
           (a) => a.pageId,
@@ -111,12 +110,16 @@ export class ConfluenceSynchronizationService {
         await this.fetchAndIngestPages(
           pagesToFetch,
           spaceScopes,
-          concurrency,
+          tenant.config.processing.concurrency,
           imageAttachmentsByPageId,
         );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingAttachments);
-        await this.ingestAttachments(attachmentsToIngest, spaceScopes, concurrency);
+        await this.ingestAttachments(
+          attachmentsToIngest,
+          spaceScopes,
+          tenant.config.processing.concurrency,
+        );
       }
 
       if (diffResult.deletedItems.length > 0) {
@@ -179,8 +182,9 @@ export class ConfluenceSynchronizationService {
 
           const pageImageAttachments = imageAttachmentsByPageId[page.id] ?? [];
           let pageToIngest = fetched;
+
           try {
-            pageToIngest = await this.pageImageInliner.inlineImages(fetched, pageImageAttachments);
+            pageToIngest = await this.pageImageInliner.inlineImagesInPage(fetched, pageImageAttachments);
           } catch (err) {
             // A hard failure inside the inliner must not lose the page; ingest the original body.
             this.logger.warn({
@@ -189,9 +193,12 @@ export class ConfluenceSynchronizationService {
               msg: 'Image inliner threw, ingesting original body',
             });
           }
+
           await this.ingestionService.ingestPage(pageToIngest, scopeId);
+
           ingested++;
           this.metrics.recordPagesProcessed(1, 'success');
+
         })
           .catch((err) => {
             this.metrics.recordPagesProcessed(1, 'failure');
@@ -230,9 +237,11 @@ export class ConfluenceSynchronizationService {
       return;
     }
 
+    const total = attachments.length;
+    this.logger.log({ total, msg: 'Starting attachment ingestion' });
+
     const limit = pLimit(concurrency);
     let processed = 0;
-    const total = attachments.length;
 
     let ingested = 0;
 

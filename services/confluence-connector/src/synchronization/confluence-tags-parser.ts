@@ -22,7 +22,7 @@ export interface ParsedImageMacro {
 
 // Locates every <ac:image> macro in a Confluence format. htmlparser2 only knows generic XML, so stringifying
 // the whole tree back can change parts of the page we never touched. Because of this we replace the ac:image tags.
-export function parseImageMacros(body: string): ParsedImageMacro[] {
+export function findAllImageMacros(body: string): ParsedImageMacro[] {
   const doc = parseDocument(body, {
     xmlMode: true,
     withStartIndices: true,

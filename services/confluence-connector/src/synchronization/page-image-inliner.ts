@@ -6,13 +6,12 @@ import { BYTES_PER_MB } from '../config/ingestion.schema';
 import type { ConfluenceApiClient, ConfluenceAttachment } from '../confluence-api';
 import {
   type ParsedImageMacro,
-  parseImageMacros,
+  findAllImageMacros,
   type ResourceRef,
 } from './confluence-tags-parser';
 import { isImageMimeType, normalizeMimeType } from './mime-type';
 import type { DiscoveredAttachment, FetchedPage } from './sync.types';
 
-// Limits how many attachment downloads run concurrently when inlining a page's images.
 const IMAGE_INLINE_BATCH_SIZE = 20;
 
 // ac:image attributes forwarded onto <img>; presentational hints (align, thumbnail, etc.) are dropped.
@@ -31,7 +30,8 @@ interface ResolvedAttachment {
   filename: string;
 }
 
-interface ImageReplacement {
+// An <ac:image> macro resolved to a base64-encoded <img>, plus the body span [start, end) it patches.
+interface EncodedImagePatch {
   start: number;
   end: number;
   html: string;
@@ -45,47 +45,43 @@ export class PageImageInliner {
     private readonly confluenceApiClient: ConfluenceApiClient,
   ) {}
 
-  public async inlineImages(
+  public async inlineImagesInPage(
     page: FetchedPage,
     pageImageAttachments: DiscoveredAttachment[],
   ): Promise<FetchedPage> {
-    // Disabled on platforms older than 2026.24.0, where inline base64 images aren't extracted.
-    if (!this.config.ingestion.attachments.inlineImagesEnabled) {
+    if (!this.config.ingestion.attachments.inlineImagesEnabled || !page.body) {
       return page;
     }
 
-    if (!page.body) {
-      return page;
-    }
-
-    const macros = parseImageMacros(page.body);
-    if (macros.length === 0) {
+    const imageMacros = findAllImageMacros(page.body);
+    if (imageMacros.length === 0) {
       return page;
     }
 
     const pageImageAttachmentsByTitle = indexBy(pageImageAttachments, (a) => a.title);
 
-    const settledReplacements: Array<ImageReplacement | null> = [];
-    for (const batch of chunk(macros, IMAGE_INLINE_BATCH_SIZE)) {
-      const replacements = await Promise.all(
-        batch.map((macro) => this.buildImageReplacement(macro, page, pageImageAttachmentsByTitle)),
+    const encodedImagePatches: EncodedImagePatch[] = [];
+    // convert images to base64 in batches to cap concurrent downloads
+    for (const imagesToProcessChunk of chunk(imageMacros, IMAGE_INLINE_BATCH_SIZE)) {
+      const batchResults = await Promise.all(
+        imagesToProcessChunk.map((macro) => this.resolveBase64EncodedImagePatch(macro, page, pageImageAttachmentsByTitle)),
       );
-      settledReplacements.push(...replacements);
+      encodedImagePatches.push(...filter(batchResults, isNonNullish));
     }
 
-    const successfulReplacements = filter(settledReplacements, isNonNullish);
-    if (successfulReplacements.length === 0) {
+    if (encodedImagePatches.length === 0) {
       return page;
     }
 
-    return { ...page, body: this.applyReplacements(page.body, successfulReplacements) };
+    const replacedBody = this.applyEncodedImagePatches(page.body, encodedImagePatches);
+    return { ...page, body: replacedBody };
   }
 
-  private async buildImageReplacement(
+  private async resolveBase64EncodedImagePatch(
     macro: ParsedImageMacro,
     page: FetchedPage,
     pageImageAttachmentsByTitle: Readonly<Record<string, DiscoveredAttachment>>,
-  ): Promise<ImageReplacement | null> {
+  ): Promise<EncodedImagePatch | null> {
     try {
       const resolved = await this.resolveAttachmentMetadata(
         macro.resourceRef,
@@ -133,6 +129,7 @@ export class PageImageInliner {
         resolved.downloadPath,
       );
       const html = this.buildImgTag(macro.imgAttrs, resolved.mediaType, buffer, resolved.filename);
+
       return { start: macro.startIndex, end: macro.endIndex, html };
     } catch (err) {
       this.logger.warn({
@@ -178,6 +175,7 @@ export class PageImageInliner {
       resource.spaceKey,
       resource.contentTitle,
     );
+
     if (!lookup) {
       this.logger.debug({
         spaceKey: resource.spaceKey,
@@ -186,9 +184,11 @@ export class PageImageInliner {
       });
       return null;
     }
+
     const match = lookup.attachments.find(
       (a: ConfluenceAttachment) => a.title === resource.filename,
     );
+
     if (!match) {
       this.logger.debug({
         spaceKey: resource.spaceKey,
@@ -263,36 +263,40 @@ export class PageImageInliner {
     const altValue = imgAttrs['ac:alt'] ?? filename;
 
     const parts: string[] = [`src="data:${normalizedMimeType};base64,${base64}"`];
+
     if (altValue) {
-      parts.push(`alt="${escapeAttr(altValue)}"`);
+      parts.push(`alt="${this.escapeAttr(altValue)}"`);
     }
+
     for (const [acAttr, htmlAttr] of AC_IMAGE_ATTRS_TO_KEEP) {
       const value = imgAttrs[acAttr];
+
       if (value === undefined) {
         continue;
       }
-      parts.push(`${htmlAttr}="${escapeAttr(value)}"`);
+
+      parts.push(`${htmlAttr}="${this.escapeAttr(value)}"`);
     }
     return `<img ${parts.join(' ')} />`;
   }
 
-  private applyReplacements(
-    original: string,
-    replacements: Array<{ start: number; end: number; html: string }>,
-  ): string {
-    const sorted = [...replacements].sort((a, b) => a.start - b.start);
+  private applyEncodedImagePatches(original: string, patches: EncodedImagePatch[]): string {
+    const sorted = [...patches].sort((a, b) => a.start - b.start);
     let result = '';
     let cursor = 0;
-    for (const r of sorted) {
-      assert.ok(r.start >= cursor, 'image-macro replacements must not overlap');
-      result += original.slice(cursor, r.start) + r.html;
-      cursor = r.end;
+
+    for (const patch of sorted) {
+      assert.ok(patch.start >= cursor, 'encoded image patches must not overlap');
+      result += original.slice(cursor, patch.start) + patch.html;
+      cursor = patch.end;
     }
+
     result += original.slice(cursor);
     return result;
   }
+
+  private escapeAttr(value: string): string {
+    return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
 }
 
-function escapeAttr(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
