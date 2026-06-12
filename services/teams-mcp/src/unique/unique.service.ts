@@ -1,21 +1,12 @@
-import { createHash } from 'node:crypto';
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import type { UniqueConfigNamespaced } from '~/config';
-import { buildMeetingExternalId, buildOccurrenceExternalId } from './scope-external-id';
 import { TEAMS_SOURCE_KIND, TEAMS_SOURCE_NAME } from './unique.consts';
-import {
-  type PublicScopeAccessSchema,
-  ScopeAccessEntityType,
-  ScopeAccessType,
-  SourceOwnerType,
-  UniqueIngestionMode,
-} from './unique.dtos';
+import { SourceOwnerType, UniqueIngestionMode } from './unique.dtos';
 import { type SpooledContent, UniqueContentService } from './unique-content.service';
-import { UniqueScopeService } from './unique-scope.service';
 import { UniqueUserService } from './unique-user.service';
 
 @Injectable()
@@ -26,7 +17,6 @@ export class UniqueService {
     private readonly config: ConfigService<UniqueConfigNamespaced, true>,
     private readonly trace: TraceService,
     private readonly userService: UniqueUserService,
-    private readonly scopeService: UniqueScopeService,
     private readonly contentService: UniqueContentService,
   ) {}
 
@@ -101,54 +91,18 @@ export class UniqueService {
     );
 
     const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
-    const { subjectPath, datePath } = this.mapMeetingToRelativePaths(
-      meeting.subject,
-      meeting.meetingId,
-      meeting.date,
+
+    // Per-meeting visibility is carried by per-content fileAccess rather than by a locked
+    // scope hierarchy: participants get READ, the organizer gets READ + WRITE. The platform
+    // matches fileAccess by overlap per access type, so a WRITE token does NOT imply READ —
+    // the organizer needs both tokens to read and write their own meeting content.
+    const fileAccess = Array.from(
+      new Set([...participants.map((p) => `u:${p.id}R`), `u:${owner.id}R`, `u:${owner.id}W`]),
     );
-
-    const parentScope = await this.scopeService.createScope(rootScopeId, subjectPath, false);
-    span?.setAttribute('parent_scope_id', parentScope.id);
-
-    // Stamp the meeting (subject) scope with a deterministic externalId so it is
-    // externally managed (locked in the UI) and idempotently re-stampable.
-    await this.scopeService.updateScope(parentScope.id, {
-      externalId: buildMeetingExternalId(meeting.meetingId),
-    });
-
-    const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
-      entityId: p.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Read,
-    }));
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Write,
-    });
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Read,
-    });
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Manage,
-    });
-    await this.scopeService.addScopeAccesses(parentScope.id, accesses);
-
-    const childScope = await this.scopeService.createScope(parentScope.id, datePath, true);
-    span?.setAttribute('child_scope_id', childScope.id);
-
-    // Stamp the occurrence (session) scope, anchored on the transcript id so each
-    // recording session gets a unique externalId even for same-day meetings.
-    await this.scopeService.updateScope(childScope.id, {
-      externalId: buildOccurrenceExternalId(meeting.meetingId, transcript.id),
-    });
+    span?.setAttribute('file_access_count', fileAccess.length);
 
     this.logger.log(
-      { transcriptId: transcript.id, scopeId: childScope.id },
+      { transcriptId: transcript.id, scopeId: rootScopeId },
       'Beginning transcript upload to Unique system',
     );
 
@@ -158,7 +112,7 @@ export class UniqueService {
     try {
       const transcriptUpload = await this.contentService.upsertContent({
         storeInternally: true,
-        scopeId: childScope.id,
+        scopeId: rootScopeId,
         sourceKind: TEAMS_SOURCE_KIND,
         sourceName: TEAMS_SOURCE_NAME,
         sourceOwnerType: SourceOwnerType.Company,
@@ -168,6 +122,7 @@ export class UniqueService {
           title: meeting.subject || 'Untitled Meeting',
           byteSize: 1,
           metadata: this.buildContentMetadata(meeting),
+          fileAccess,
         },
       });
 
@@ -179,7 +134,7 @@ export class UniqueService {
 
       await this.contentService.upsertContent({
         storeInternally: true,
-        scopeId: childScope.id,
+        scopeId: rootScopeId,
         sourceKind: TEAMS_SOURCE_KIND,
         sourceName: TEAMS_SOURCE_NAME,
         sourceOwnerType: SourceOwnerType.Company,
@@ -188,6 +143,7 @@ export class UniqueService {
           key: transcript.id,
           mimeType: 'text/vtt',
           title: meeting.subject || 'Untitled Meeting',
+          fileAccess,
         },
       });
     } finally {
@@ -196,8 +152,7 @@ export class UniqueService {
 
     span?.addEvent('transcript_ingestion_completed', {
       transcriptId: transcript.id,
-      parentScopeId: parentScope.id,
-      childScopeId: childScope.id,
+      scopeId: rootScopeId,
     });
 
     // Upload recording if provided (with SKIP_INGESTION).
@@ -210,7 +165,7 @@ export class UniqueService {
       let recordingSpool: SpooledContent | undefined;
       try {
         this.logger.log(
-          { recordingId: recording.id, scopeId: childScope.id },
+          { recordingId: recording.id, scopeId: rootScopeId },
           'Downloading meeting recording before upload',
         );
         recordingSpool = await this.contentService.spoolContent(recording.content);
@@ -232,13 +187,13 @@ export class UniqueService {
       if (recordingSpool) {
         try {
           this.logger.log(
-            { recordingId: recording.id, scopeId: childScope.id },
+            { recordingId: recording.id, scopeId: rootScopeId },
             'Beginning recording upload to Unique system (skip ingestion)',
           );
 
           const recordingUpload = await this.contentService.upsertContent({
             storeInternally: true,
-            scopeId: childScope.id,
+            scopeId: rootScopeId,
             sourceKind: TEAMS_SOURCE_KIND,
             sourceName: TEAMS_SOURCE_NAME,
             sourceOwnerType: SourceOwnerType.Company,
@@ -251,6 +206,7 @@ export class UniqueService {
                 uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
               },
               metadata: this.buildContentMetadata(meeting, recording),
+              fileAccess,
             },
           });
           await this.contentService.uploadToStorage(
@@ -260,7 +216,7 @@ export class UniqueService {
           );
           await this.contentService.upsertContent({
             storeInternally: true,
-            scopeId: childScope.id,
+            scopeId: rootScopeId,
             sourceKind: TEAMS_SOURCE_KIND,
             sourceName: TEAMS_SOURCE_NAME,
             sourceOwnerType: SourceOwnerType.Company,
@@ -272,13 +228,13 @@ export class UniqueService {
               ingestionConfig: {
                 uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
               },
+              fileAccess,
             },
           });
 
           span?.addEvent('recording_stored', {
             recordingId: recording.id,
-            parentScopeId: parentScope.id,
-            childScopeId: childScope.id,
+            scopeId: rootScopeId,
           });
         } catch (error) {
           // The download succeeded but opening/uploading/finalizing the record failed (rare — e.g.
@@ -302,46 +258,10 @@ export class UniqueService {
       {
         transcriptId: transcript.id,
         recordingId: recording?.id,
-        parentScopeId: parentScope.id,
-        childScopeId: childScope.id,
+        scopeId: rootScopeId,
       },
       'Successfully completed meeting transcript ingestion process',
     );
-  }
-
-  private mapMeetingToRelativePaths(
-    subject: string,
-    meetingId: string,
-    happenedAt: Date,
-  ): { subjectPath: string; datePath: string } {
-    // Parent (subject) folder: human-readable subject plus a stable, path-safe
-    // suffix derived from the meetingId. Recurring occurrences of one series
-    // share the same meetingId (and subject) so they collapse into one folder
-    // as intended; two *different* meetings that happen to share a title get
-    // distinct folders, so their `meeting` externalIds no longer overwrite each
-    // other. e.g. "Weekly Sync (a1b2c3d4)"
-    const subjectPath = `${subject || 'Untitled Meeting'} (${this.shortHash(meetingId)})`;
-
-    // Child (session) folder: second-precision UTC timestamp (not just the
-    // calendar date) so multiple transcripts/recordings on the same day each
-    // get their own folder. `happenedAt` is the transcript's createdDateTime —
-    // the onlineMeeting startDateTime is the recurring series' master time and
-    // is identical for every occurrence, so it cannot be used here. ':' -> '-'
-    // keeps the segment path-safe (the folder API splits on '/'). e.g.
-    // "2024-01-15 14-30-45"
-    const datePath = happenedAt.toISOString().slice(0, 19).replace('T', ' ').replaceAll(':', '-');
-
-    return { subjectPath, datePath };
-  }
-
-  /**
-   * Short, stable, path-safe digest of an id — used to disambiguate folder
-   * names without leaking the raw Graph id (which can contain '/', '+', '='
-   * that would break folder paths). Deterministic, so re-ingestion re-uses the
-   * same folder.
-   */
-  private shortHash(value: string): string {
-    return createHash('sha256').update(value).digest('hex').slice(0, 8);
   }
 
   private buildContentMetadata(

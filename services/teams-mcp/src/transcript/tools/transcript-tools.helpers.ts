@@ -18,20 +18,12 @@ export interface ParsedTranscriptMetadata {
 
 /**
  * Builds the shared UniqueQL metadata filter for transcript tools.
- * Always restricts to the root scope and VTT mime type; optional filters
- * narrow by subject, date range, organizer, and participant.
+ * Restricts to the VTT mime type (transcripts, not recordings); optional filters
+ * narrow by subject, date range, organizer, and participant. Discovery is scoped to
+ * Teams content by the `sourceKind` argument on the tool calls, not by folder path.
  */
-export function buildTranscriptFilter(
-  rootScopeId: string,
-  input: TranscriptFilterInput,
-): MetadataFilter {
+export function buildTranscriptFilter(input: TranscriptFilterInput): MetadataFilter {
   const conditions: MetadataFilter[] = [
-    // Scope filter: only return content under our root scope
-    {
-      path: ['folderIdPath'],
-      operator: UniqueQLOperator.CONTAINS,
-      value: `uniquepathid://${rootScopeId}`,
-    },
     // Type filter: only return transcripts (VTT files), not recordings
     {
       path: ['mimeType'],

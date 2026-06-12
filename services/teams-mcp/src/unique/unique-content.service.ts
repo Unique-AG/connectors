@@ -228,12 +228,13 @@ export class UniqueContentService {
   @Span()
   public async findByMetadata(
     filter: MetadataFilter,
-    options?: { skip?: number; take?: number },
+    options?: { skip?: number; take?: number; sourceKind?: string },
   ): Promise<{ contents: ContentInfoItem[]; total: number }> {
     const request: PublicContentInfosRequest = {
       skip: options?.skip ?? 0,
       take: options?.take ?? 50,
       metadataFilter: filter,
+      sourceKind: options?.sourceKind,
     };
 
     const result = await this.getContentInfos(request);
@@ -251,12 +252,13 @@ export class UniqueContentService {
   public async scopedFindByMetadata(
     filter: MetadataFilter,
     scopeContext: UniqueIdentity,
-    options?: { skip?: number; take?: number },
+    options?: { skip?: number; take?: number; sourceKind?: string },
   ): Promise<{ contents: ContentInfoItem[]; total: number }> {
     const request: PublicContentInfosRequest = {
       skip: options?.skip ?? 0,
       take: options?.take ?? 50,
       metadataFilter: filter,
+      sourceKind: options?.sourceKind,
     };
 
     const payload = PublicContentInfosRequestSchema.encode(request);
