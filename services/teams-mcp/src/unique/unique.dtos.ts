@@ -188,6 +188,9 @@ export const ContentUpsertInputSchema = z.object({
   url: z.string().optional(),
   ingestionConfig: IngestionConfigSchema.optional(),
   metadata: z.json().optional(),
+  // Per-content access permissions (e.g. `u:{userId}R`, `u:{userId}W`). When set, overrides
+  // the scope-inherited default so visibility can be controlled per file rather than per scope.
+  fileAccess: z.array(z.string()).optional(),
 });
 export type ContentUpsertInput = z.infer<typeof ContentUpsertInputSchema>;
 
@@ -270,6 +273,8 @@ export const PublicContentInfosRequestSchema = z.object({
   metadataFilter: MetadataFilterSchema.optional(),
   skip: z.number().int().min(0).default(0),
   take: z.number().int().min(1).max(250).default(50),
+  // Restricts results to content whose ingestion Source has this kind (e.g. MICROSOFT_365_TEAMS).
+  sourceKind: z.string().optional(),
 });
 export type PublicContentInfosRequest = z.infer<typeof PublicContentInfosRequestSchema>;
 
@@ -332,6 +337,8 @@ export const PublicSearchRequestSchema = z.object({
   language: z.string().optional(),
   metaDataFilter: MetadataFilterSchema.optional(),
   reranker: RerankerRequestSchema.optional(),
+  // Restricts results to content whose ingestion Source has this kind (e.g. MICROSOFT_365_TEAMS).
+  sourceKind: z.string().optional(),
 });
 export type PublicSearchRequest = z.infer<typeof PublicSearchRequestSchema>;
 
