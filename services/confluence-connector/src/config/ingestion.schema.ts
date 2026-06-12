@@ -30,11 +30,18 @@ const AttachmentConfigSchema = z
       .describe(
         'Whether to request OCR-based ingestion for image attachments (jpgReadMode = DOC_INTELLIGENCE_DEFAULT). Set to disabled to defer to the destination scope ingestion config',
       ),
+    inlineImages: z
+      .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+      .prefault(EnabledDisabledMode.Enabled)
+      .describe(
+        'Whether to inline page images into the page HTML as base64 data URIs. Requires Unique platform 2026.24.0+ to extract their text. Set to disabled on older platforms so images fall back to standalone attachment ingestion',
+      ),
   })
-  .transform(({ mode, imageOcr, ...rest }) => ({
+  .transform(({ mode, imageOcr, inlineImages, ...rest }) => ({
     ...rest,
     enabled: mode === EnabledDisabledMode.Enabled,
     imageOcrEnabled: imageOcr === EnabledDisabledMode.Enabled,
+    inlineImagesEnabled: inlineImages === EnabledDisabledMode.Enabled,
   }));
 
 export const IngestionConfigSchema = z.object({

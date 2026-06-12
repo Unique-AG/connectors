@@ -42,6 +42,8 @@
     "@unique-ag/utils": "workspace:*",
     "bottleneck": "2.19.5",
     "cron": "4.3.5",
+    "domhandler": "6.0.1",
+    "htmlparser2": "12.0.0",
     "js-yaml": "4.1.1",
     "nestjs-otel": "8.0.2",
     "nestjs-pino": "4.6.1",

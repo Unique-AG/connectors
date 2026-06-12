@@ -19,6 +19,7 @@
   ```
 - When writing code focuse on consistency and follow DRY principles
 - Add export only when what you are exporting is actually used in another file
+- Never mutate function arguments. Don't push into, reassign, or otherwise modify a value the caller passed in, and don't use out-parameters. Return new data instead.
 
 ## Import Ordering
 - Follow this import order:

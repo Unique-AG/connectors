@@ -1,5 +1,9 @@
+import { Readable } from 'node:stream';
 import { Smeared } from '@unique-ag/utils';
+import { createMock } from '@golevelup/ts-vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { TenantConfig } from '../../config';
+import type { ConfluenceApiClient } from '../../confluence-api';
 import { type Metrics, SyncPhase } from '../../metrics';
 import { createNoopMetrics } from '../../metrics/__mocks__/noop-metrics';
 import type { TenantContext } from '../../tenant/tenant-context.interface';
@@ -10,12 +14,14 @@ import {
   discoveredPagesFixture,
   discoveryResultFixture,
   fetchedPagesFixture,
+  PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE,
 } from '../__mocks__/sync.fixtures';
 import type { ConfluenceContentFetcher } from '../confluence-content-fetcher';
 import type { ConfluencePageScanner } from '../confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../confluence-synchronization.service';
 import type { FileDiffService } from '../file-diff.service';
 import type { IngestionService } from '../ingestion.service';
+import { PageImageInliner } from '../page-image-inliner';
 import type { ScopeManagementService } from '../scope-management.service';
 import type { DiscoveredAttachment, FileDiffResult } from '../sync.types';
 
@@ -40,6 +46,10 @@ const mockScopeManagementService = {
   cleanupRemovedSpaces: vi.fn().mockResolvedValue(undefined),
 } as unknown as ScopeManagementService;
 
+const passthroughPageImageInliner: Pick<PageImageInliner, 'inlineImages'> = {
+  inlineImages: vi.fn(async (page) => page),
+};
+
 function createService(
   scanner: Pick<ConfluencePageScanner, 'discoverPages'>,
   contentFetcher: Pick<ConfluenceContentFetcher, 'fetchPageContent'>,
@@ -49,12 +59,14 @@ function createService(
     'ingestPage' | 'ingestAttachment' | 'deleteContentByKeys'
   >,
   metrics: Metrics = createNoopMetrics(),
+  pageImageInliner: Pick<PageImageInliner, 'inlineImages'> = passthroughPageImageInliner,
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
     scanner as ConfluencePageScanner,
     contentFetcher as ConfluenceContentFetcher,
     fileDiffService as FileDiffService,
     ingestionService as IngestionService,
+    pageImageInliner as PageImageInliner,
     mockScopeManagementService,
     metrics,
   );
@@ -669,6 +681,345 @@ describe('ConfluenceSynchronizationService', () => {
       await tenantStorage.run(tenant, () => svc.synchronize());
 
       expect(metrics.recordSyncItemTotals).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('page image inlining', () => {
+    const imageAttachment: DiscoveredAttachment = {
+      id: 'att-image-1',
+      title: 'diagram.png',
+      mediaType: 'image/png',
+      fileSize: 4096,
+      downloadPath: '/download/attachments/1/diagram.png',
+      versionTimestamp: '2026-02-01T00:00:00.000Z',
+      pageId: '1',
+      spaceId: 'space-1',
+      spaceKey: 'SP',
+      spaceName: 'Space',
+      webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/att-image-1`,
+    };
+    const pdfAttachment: DiscoveredAttachment = {
+      id: 'att-pdf-1',
+      title: 'spec.pdf',
+      mediaType: 'application/pdf',
+      fileSize: 8192,
+      downloadPath: '/download/attachments/1/spec.pdf',
+      versionTimestamp: '2026-02-01T00:00:00.000Z',
+      pageId: '1',
+      spaceId: 'space-1',
+      spaceKey: 'SP',
+      spaceName: 'Space',
+      webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/att-pdf-1`,
+    };
+
+    beforeEach(() => {
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: discoveredPagesFixture,
+        attachments: [imageAttachment, pdfAttachment],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['1', `1::${imageAttachment.id}`, `1::${pdfAttachment.id}`],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+    });
+
+    it('passes inlined page body to ingestPage and skips standalone ingestion of the inlined image', async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+        inlineImages: vi.fn(async (page) => ({
+          ...page,
+          body: '<p>before</p><img src="data:image/png;base64,XYZ" /><p>after</p>',
+        })),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(inliner.inlineImages).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }), [
+        imageAttachment,
+      ]);
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: '1',
+          body: expect.stringContaining('data:image/png;base64,'),
+        }),
+        'scope-1',
+      );
+      // image attachment was inlined → must NOT be ingested standalone
+      expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: imageAttachment.id }),
+        expect.anything(),
+      );
+      // PDF attachment is non-image → still ingested standalone
+      expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: pdfAttachment.id }),
+        'scope-1',
+      );
+    });
+
+    it('never standalone-ingests an image when inlining is enabled, even if nothing was inlined', async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+        inlineImages: vi.fn(async (page) => page),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      // Images are page-owned when inlining is enabled: excluded from the standalone pass
+      // regardless of the inlining outcome (so they can never be ingested as a second file).
+      expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: imageAttachment.id }),
+        expect.anything(),
+      );
+      expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+        expect.objectContaining({ id: pdfAttachment.id }),
+        'scope-1',
+      );
+    });
+
+    it('only passes image-type attachments (not PDFs) to the inliner', async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+        inlineImages: vi.fn(async (page) => page),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(inliner.inlineImages).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
+        expect.arrayContaining([expect.objectContaining({ id: imageAttachment.id })]),
+      );
+      const passedAttachments = vi.mocked(inliner.inlineImages).mock.calls[0]?.[1] ?? [];
+      expect(passedAttachments.some((a) => a.id === pdfAttachment.id)).toBe(false);
+    });
+
+    it('does not standalone-ingest an image attached to another synced page', async () => {
+      // An image attached to page 2 is discovered while both pages sync. With inlining enabled,
+      // every image is page-owned, so it must not be standalone-ingested.
+      const pageA = discoveredPagesFixture[0];
+      if (!pageA) {
+        throw new Error('expected fixture page 1');
+      }
+      const pageB: typeof pageA = { ...pageA, id: '2' };
+      const otherPageImage: DiscoveredAttachment = {
+        ...imageAttachment,
+        id: 'att-on-b',
+        title: 'shared.png',
+        downloadPath: '/download/attachments/2/shared.png',
+        pageId: '2',
+        webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/2/attachments/att-on-b`,
+      };
+
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: [pageA, pageB],
+        attachments: [otherPageImage],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['1', '2', `2::${otherPageImage.id}`],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+      vi.mocked(mockContentFetcher.fetchPageContent).mockImplementation((page: { id: string }) => {
+        const base = fetchedPagesFixture[0];
+        if (!base) {
+          throw new Error('expected fetched fixture');
+        }
+        return Promise.resolve({ ...base, id: page.id });
+      });
+
+      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+        inlineImages: vi.fn(async (fetchedPage) => fetchedPage),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      // Both pages ingested.
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
+        expect.anything(),
+      );
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '2' }),
+        expect.anything(),
+      );
+      // The image is never standalone-ingested.
+      expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalled();
+    });
+
+    it('falls back to ingesting the original body when the inliner throws', async () => {
+      const inliner: Pick<PageImageInliner, 'inlineImages'> = {
+        inlineImages: vi.fn(async () => {
+          throw new Error('inliner exploded');
+        }),
+      };
+
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        undefined,
+        inliner,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      // Page still gets ingested (with its original body).
+      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
+        'scope-1',
+      );
+      // Image is page-owned even when the inliner throws: it is not standalone-ingested.
+      expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: imageAttachment.id }),
+        expect.anything(),
+      );
+    });
+
+    // These exercise the REAL PageImageInliner (not a mock) wired into the orchestrator, proving
+    // the standard attachment ingestion flow is intact whether inlining is enabled or disabled.
+    describe('inlineImages config toggle (real inliner)', () => {
+      function createRealInliner(inlineImagesEnabled: boolean): {
+        inliner: PageImageInliner;
+        apiClient: ReturnType<typeof createMock<ConfluenceApiClient>>;
+      } {
+        const apiClient = createMock<ConfluenceApiClient>();
+        apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(Buffer.from('PNG')));
+        const config = createMock<TenantConfig>({
+          ingestion: {
+            attachments: {
+              maxFileSizeMb: 200,
+              allowedMimeTypes: ['image/png', 'image/jpeg', 'application/pdf'],
+              inlineImagesEnabled,
+            },
+          },
+        });
+        return { inliner: new PageImageInliner(config, apiClient), apiClient };
+      }
+
+      beforeEach(() => {
+        // Page 1's body references diagram.png (== imageAttachment.title) so the real inliner
+        // has a macro to resolve and inline.
+        vi.mocked(mockContentFetcher.fetchPageContent).mockImplementation(
+          (page: { id: string }) => {
+            const base = fetchedPagesFixture[0];
+            if (!base) {
+              throw new Error('expected fetched fixture');
+            }
+            return Promise.resolve({
+              ...base,
+              id: page.id,
+              body: PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE,
+            });
+          },
+        );
+      });
+
+      it('ENABLED: inlines the image, keeps it out of the standalone pass, still ingests non-images', async () => {
+        const { inliner, apiClient } = createRealInliner(true);
+        const svc = createService(
+          mockScanner,
+          mockContentFetcher,
+          mockFileDiffService,
+          mockIngestionService,
+          undefined,
+          inliner,
+        );
+
+        await tenantStorage.run(tenant, () => svc.synchronize());
+
+        // Image was downloaded and embedded into the page body.
+        expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledTimes(1);
+        expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: '1',
+            body: expect.stringContaining('data:image/png;base64,'),
+          }),
+          'scope-1',
+        );
+        // Inlined image must NOT be ingested standalone.
+        expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalledWith(
+          expect.objectContaining({ id: imageAttachment.id }),
+          expect.anything(),
+        );
+        // Non-image attachment is unaffected by the toggle and still ingested standalone.
+        expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+          expect.objectContaining({ id: pdfAttachment.id }),
+          'scope-1',
+        );
+        // Exactly one standalone ingest (the PDF).
+        expect(mockIngestionService.ingestAttachment).toHaveBeenCalledTimes(1);
+      });
+
+      it('DISABLED: leaves the body untouched and routes every image through the standalone pass', async () => {
+        // Orchestrator and inliner read the same flag in production; keep them consistent here.
+        tenant.config.ingestion.attachments.inlineImagesEnabled = false;
+        const { inliner, apiClient } = createRealInliner(false);
+        const svc = createService(
+          mockScanner,
+          mockContentFetcher,
+          mockFileDiffService,
+          mockIngestionService,
+          undefined,
+          inliner,
+        );
+
+        await tenantStorage.run(tenant, () => svc.synchronize());
+
+        // No image download attempted; nothing inlined.
+        expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+        // Page body ingested verbatim: <ac:image> preserved, no data URI spliced in.
+        expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
+          expect.objectContaining({ id: '1', body: PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE }),
+          'scope-1',
+        );
+        // Both the image and the non-image attachment go through standalone ingestion.
+        expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+          expect.objectContaining({ id: imageAttachment.id }),
+          'scope-1',
+        );
+        expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+          expect.objectContaining({ id: pdfAttachment.id }),
+          'scope-1',
+        );
+        // Nothing dropped: exactly the image + the PDF.
+        expect(mockIngestionService.ingestAttachment).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

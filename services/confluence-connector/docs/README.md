@@ -70,9 +70,13 @@ The connector supports OAuth 2.0 two-legged (2LO) for both Confluence Cloud and 
 
 **Image Ingestion**
 
-When attachment ingestion is enabled, images embedded in Confluence pages (PNG and JPEG) are ingested as attachments. Confluence stores editor-inserted images (drag/drop, paste, "Insert image") as regular page attachments, so they flow through the same path as PDFs and Office files. Images inserted as external URLs (rather than uploaded) are not attachments and are not ingested.
+When attachment ingestion is enabled, images embedded in a Confluence page (PNG and JPEG) are inlined as base64 data URIs inside the page HTML. The connector parses each page's Confluence storage XML and replaces every `<ac:image>` macro that points to a Confluence attachment with an `<img src="data:image/...;base64,...">` element. The result is a single self-contained page artifact per Confluence page.
 
-The connector also requests OCR-based ingestion for each image automatically (`attachments.imageOcr` is `enabled` by default), so chunks are produced without any scope-side configuration. Set `attachments.imageOcr = disabled` to defer to the destination scope's own `ingestionConfig.jpgReadMode`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service and should be left out of `allowedMimeTypes`.
+Both attachments of the page itself and attachments from another page in the same instance (referenced via `<ri:attachment><ri:page/></ri:attachment>`) are resolved through the existing Confluence client. External image references (`<ac:image><ri:url ri:value="https://..."/></ac:image>`) are left untouched in the HTML and never fetched.
+
+When an image cannot be inlined it falls back to the standalone attachment ingestion path. This safety net catches: image attachments that no page references, downloads that fail, images larger than `attachments.maxFileSizeMb`, and references to an attachment on another page whose referenced page or filename cannot be resolved.
+
+`attachments.imageOcr` (enabled by default) only affects images that go through the standalone path. Set it to `disabled` to defer to the destination scope's own `ingestionConfig.jpgReadMode`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service and should be left out of `allowedMimeTypes`.
 
 **Skipped Content Types**
 
@@ -131,8 +135,8 @@ flowchart TB
     Discover["Discover Labeled Pages & Attachments"]
     Diff["Compute File Diff"]
     EnsureScopes["Ensure Space Scopes"]
-    IngestPages["Ingest New/Updated Pages"]
-    IngestAttachments["Ingest New/Updated Attachments"]
+    IngestPages["Ingest Pages (inline images into HTML)"]
+    IngestAttachments["Ingest Remaining Attachments (non-images + orphan images)"]
     Delete["Delete Removed Items"]
     Done(("Done"))
   end
@@ -143,6 +147,7 @@ flowchart TB
   Diff --> EnsureScopes
   EnsureScopes --> IngestPages
   IngestPages --> IngestAttachments
+  IngestPages -. images already inlined into pages are skipped .-> IngestAttachments
   IngestAttachments --> Delete
   Delete --> Done
 
@@ -186,9 +191,18 @@ sequenceDiagram
 
         Connector->>Confluence: Fetch full page content
         Confluence->>Connector: Page HTML body
-        Connector->>Unique: Register, upload, finalize
+        opt Page has <ac:image> references to Confluence attachments
+            opt Some references point to another page
+                Connector->>Confluence: Look up target page by (spaceKey, title)
+                Confluence->>Connector: Target page + its attachments
+            end
+            Connector->>Confluence: Download referenced image attachments
+            Confluence->>Connector: Image streams
+            Connector->>Connector: Inline images as base64 data URIs in page HTML
+        end
+        Connector->>Unique: Register, upload, finalize (single page artifact)
 
-        Connector->>Confluence: Download attachment stream
+        Connector->>Confluence: Download remaining (non-image / orphan) attachment streams
         Confluence->>Connector: File stream
         Connector->>Unique: Register, upload, finalize
 

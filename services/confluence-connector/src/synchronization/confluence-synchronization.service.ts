@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
+import { groupBy } from 'remeda';
 import type { SyncResult } from '../health/sync-result.types';
 import { type Metrics, SyncPhase } from '../metrics';
 import { getCurrentTenant } from '../tenant';
@@ -9,6 +10,8 @@ import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
+import { isImageMimeType } from './mime-type';
+import type { PageImageInliner } from './page-image-inliner';
 import type { ScopeManagementService } from './scope-management.service';
 import type { DiscoveredAttachment, DiscoveredPage } from './sync.types';
 
@@ -22,6 +25,7 @@ export class ConfluenceSynchronizationService {
     private readonly contentFetcher: ConfluenceContentFetcher,
     private readonly fileDiffService: FileDiffService,
     private readonly ingestionService: IngestionService,
+    private readonly pageImageInliner: PageImageInliner,
     private readonly scopeManagementService: ScopeManagementService,
     private readonly metrics: Metrics,
   ) {}
@@ -62,14 +66,22 @@ export class ConfluenceSynchronizationService {
         discoveredAttachments,
       );
 
+      // When inlining is enabled, page images live inside the page (inlined into the body), never as
+      // standalone content. Excluding them from the diff keeps them out of the standalone pass and lets
+      // the diff delete any standalone copy left behind by an earlier sync that ran without inlining.
+      const trackedAttachments = tenant.config.ingestion.attachments.inlineImagesEnabled
+        ? discoveredAttachments.filter((a) => !isImageMimeType(a.mediaType))
+        : discoveredAttachments;
+
       const diffResult = await this.fileDiffService.computeDiff(
         discoveredPages,
-        discoveredAttachments,
+        trackedAttachments,
       );
 
       const itemIdsToProcess = new Set([...diffResult.newItemIds, ...diffResult.updatedItemIds]);
       const pagesToFetch = discoveredPages.filter((p) => itemIdsToProcess.has(p.id));
-      const attachmentsToIngest = discoveredAttachments.filter((a) =>
+
+      const attachmentsToIngest = trackedAttachments.filter((a) =>
         itemIdsToProcess.has(`${a.pageId}::${a.id}`),
       );
 
@@ -90,9 +102,18 @@ export class ConfluenceSynchronizationService {
         );
 
         const concurrency = tenant.config.processing.concurrency;
+        const imageAttachmentsByPageId = groupBy(
+          discoveredAttachments.filter((a) => isImageMimeType(a.mediaType)),
+          (a) => a.pageId,
+        );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingPages);
-        await this.fetchAndIngestPages(pagesToFetch, spaceScopes, concurrency);
+        await this.fetchAndIngestPages(
+          pagesToFetch,
+          spaceScopes,
+          concurrency,
+          imageAttachmentsByPageId,
+        );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingAttachments);
         await this.ingestAttachments(attachmentsToIngest, spaceScopes, concurrency);
@@ -129,6 +150,7 @@ export class ConfluenceSynchronizationService {
     pages: DiscoveredPage[],
     spaceScopes: Map<string, string>,
     concurrency: number,
+    imageAttachmentsByPageId: Readonly<Partial<Record<string, DiscoveredAttachment[]>>>,
   ): Promise<void> {
     const limit = pLimit(concurrency);
 
@@ -154,7 +176,20 @@ export class ConfluenceSynchronizationService {
           }
           const scopeId = spaceScopes.get(page.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
-          await this.ingestionService.ingestPage(fetched, scopeId);
+
+          const pageImageAttachments = imageAttachmentsByPageId[page.id] ?? [];
+          let pageToIngest = fetched;
+          try {
+            pageToIngest = await this.pageImageInliner.inlineImages(fetched, pageImageAttachments);
+          } catch (err) {
+            // A hard failure inside the inliner must not lose the page; ingest the original body.
+            this.logger.warn({
+              pageId: page.id,
+              err,
+              msg: 'Image inliner threw, ingesting original body',
+            });
+          }
+          await this.ingestionService.ingestPage(pageToIngest, scopeId);
           ingested++;
           this.metrics.recordPagesProcessed(1, 'success');
         })

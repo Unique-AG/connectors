@@ -266,11 +266,11 @@ export class IngestionService {
     };
   }
 
-  private buildAttachmentIngestionConfig(mediaType: string): IngestionConfig | undefined {
+  private buildAttachmentIngestionConfig(mimeType: string): IngestionConfig | undefined {
     if (!this.config.ingestion.attachments.imageOcrEnabled) {
       return undefined;
     }
-    const normalized = mediaType?.split(';')[0]?.trim().toLowerCase();
+    const normalized = mimeType?.split(';')[0]?.trim().toLowerCase();
     if (normalized === 'image/jpeg' || normalized === 'image/png') {
       return { jpgReadMode: 'DOC_INTELLIGENCE_DEFAULT' };
     }

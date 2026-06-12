@@ -123,6 +123,7 @@ function makeService(): {
         allowedMimeTypes: ['application/pdf', 'image/png', 'image/jpeg'],
         maxFileSizeMb: 200,
         imageOcrEnabled: true,
+        inlineImagesEnabled: true,
       },
     },
   } as unknown as TenantConfig;
@@ -505,6 +506,7 @@ describe('IngestionService', () => {
             allowedMimeTypes: ['image/png'],
             maxFileSizeMb: 200,
             imageOcrEnabled: false,
+            inlineImagesEnabled: true,
           },
         },
       } as unknown as TenantConfig;
@@ -697,6 +699,7 @@ describe('IngestionService', () => {
             allowedMimeTypes: ['application/pdf'],
             maxFileSizeMb: 200,
             imageOcrEnabled: true,
+            inlineImagesEnabled: true,
           },
         },
       } as unknown as TenantConfig;
