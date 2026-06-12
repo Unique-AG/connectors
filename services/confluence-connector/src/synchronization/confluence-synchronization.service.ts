@@ -73,6 +73,7 @@ export class ConfluenceSynchronizationService {
 
       const itemIdsToProcess = new Set([...diffResult.newItemIds, ...diffResult.updatedItemIds]);
       const pagesToFetch = discoveredPages.filter((p) => itemIdsToProcess.has(p.id));
+
       const attachmentsToIngest = discoveredAttachments.filter((a) =>
         itemIdsToProcess.has(`${a.pageId}::${a.id}`),
       );
@@ -98,6 +99,7 @@ export class ConfluenceSynchronizationService {
           discoveredAttachments.filter((a) => isImageMimeType(a.mediaType)),
           (a) => a.pageId,
         );
+
         this.metrics.setSyncPhase(SyncPhase.IngestingPages);
         const inlinedAttachmentKeys = await this.fetchAndIngestPages(
           pagesToFetch,
@@ -172,6 +174,7 @@ export class ConfluenceSynchronizationService {
           }
           const scopeId = spaceScopes.get(page.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
+
           const pageImageAttachments = imageAttachmentsByPageId[page.id] ?? [];
           let pageToIngest = fetched;
           try {
