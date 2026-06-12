@@ -11,7 +11,7 @@ import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
 import { isImageMimeType } from './mime-type';
-import { buildInlinedAttachmentKey, type PageImageInliner } from './page-image-inliner';
+import type { PageImageInliner } from './page-image-inliner';
 import type { ScopeManagementService } from './scope-management.service';
 import type { DiscoveredAttachment, DiscoveredPage } from './sync.types';
 
@@ -66,15 +66,22 @@ export class ConfluenceSynchronizationService {
         discoveredAttachments,
       );
 
+      // When inlining is enabled, page images live inside the page (inlined into the body), never as
+      // standalone content. Excluding them from the diff keeps them out of the standalone pass and lets
+      // the diff delete any standalone copy left behind by an earlier sync that ran without inlining.
+      const trackedAttachments = tenant.config.ingestion.attachments.inlineImagesEnabled
+        ? discoveredAttachments.filter((a) => !isImageMimeType(a.mediaType))
+        : discoveredAttachments;
+
       const diffResult = await this.fileDiffService.computeDiff(
         discoveredPages,
-        discoveredAttachments,
+        trackedAttachments,
       );
 
       const itemIdsToProcess = new Set([...diffResult.newItemIds, ...diffResult.updatedItemIds]);
       const pagesToFetch = discoveredPages.filter((p) => itemIdsToProcess.has(p.id));
 
-      const attachmentsToIngest = discoveredAttachments.filter((a) =>
+      const attachmentsToIngest = trackedAttachments.filter((a) =>
         itemIdsToProcess.has(`${a.pageId}::${a.id}`),
       );
 
@@ -101,19 +108,15 @@ export class ConfluenceSynchronizationService {
         );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingPages);
-        const inlinedAttachmentKeys = await this.fetchAndIngestPages(
+        await this.fetchAndIngestPages(
           pagesToFetch,
           spaceScopes,
           concurrency,
           imageAttachmentsByPageId,
         );
 
-        const remainingAttachments = attachmentsToIngest.filter(
-          (a) => !inlinedAttachmentKeys.has(buildInlinedAttachmentKey(a.pageId, a.id)),
-        );
-
         this.metrics.setSyncPhase(SyncPhase.IngestingAttachments);
-        await this.ingestAttachments(remainingAttachments, spaceScopes, concurrency);
+        await this.ingestAttachments(attachmentsToIngest, spaceScopes, concurrency);
       }
 
       if (diffResult.deletedItems.length > 0) {
@@ -148,13 +151,12 @@ export class ConfluenceSynchronizationService {
     spaceScopes: Map<string, string>,
     concurrency: number,
     imageAttachmentsByPageId: Readonly<Partial<Record<string, DiscoveredAttachment[]>>>,
-  ): Promise<Set<string>> {
-    const inlinedAttachmentKeys = new Set<string>();
+  ): Promise<void> {
     const limit = pLimit(concurrency);
 
     if (pages.length === 0) {
       this.logger.log({ msg: 'No pages to ingest' });
-      return inlinedAttachmentKeys;
+      return;
     }
 
     let processed = 0;
@@ -178,14 +180,9 @@ export class ConfluenceSynchronizationService {
           const pageImageAttachments = imageAttachmentsByPageId[page.id] ?? [];
           let pageToIngest = fetched;
           try {
-            const inlined = await this.pageImageInliner.inlineImages(fetched, pageImageAttachments);
-            pageToIngest = inlined.page;
-            for (const id of inlined.inlinedAttachmentKeys) {
-              inlinedAttachmentKeys.add(id);
-            }
+            pageToIngest = await this.pageImageInliner.inlineImages(fetched, pageImageAttachments);
           } catch (err) {
-            // A hard failure inside the inliner must not lose the page. Fall back to ingesting the original body;
-            // the standalone attachment pass will still handle the images.
+            // A hard failure inside the inliner must not lose the page; ingest the original body.
             this.logger.warn({
               pageId: page.id,
               err,
@@ -222,8 +219,6 @@ export class ConfluenceSynchronizationService {
       failed,
       msg: 'Page ingestion summary',
     });
-
-    return inlinedAttachmentKeys;
   }
 
   private async ingestAttachments(

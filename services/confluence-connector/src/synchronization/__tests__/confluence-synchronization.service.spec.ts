@@ -21,7 +21,7 @@ import type { ConfluencePageScanner } from '../confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../confluence-synchronization.service';
 import type { FileDiffService } from '../file-diff.service';
 import type { IngestionService } from '../ingestion.service';
-import { buildInlinedAttachmentKey, PageImageInliner } from '../page-image-inliner';
+import { PageImageInliner } from '../page-image-inliner';
 import type { ScopeManagementService } from '../scope-management.service';
 import type { DiscoveredAttachment, FileDiffResult } from '../sync.types';
 
@@ -47,7 +47,7 @@ const mockScopeManagementService = {
 } as unknown as ScopeManagementService;
 
 const passthroughPageImageInliner: Pick<PageImageInliner, 'inlineImages'> = {
-  inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentKeys: new Set<string>() })),
+  inlineImages: vi.fn(async (page) => page),
 };
 
 function createService(
@@ -728,13 +728,8 @@ describe('ConfluenceSynchronizationService', () => {
     it('passes inlined page body to ingestPage and skips standalone ingestion of the inlined image', async () => {
       const inliner: Pick<PageImageInliner, 'inlineImages'> = {
         inlineImages: vi.fn(async (page) => ({
-          page: {
-            ...page,
-            body: '<p>before</p><img src="data:image/png;base64,XYZ" /><p>after</p>',
-          },
-          inlinedAttachmentKeys: new Set([
-            buildInlinedAttachmentKey(imageAttachment.pageId, imageAttachment.id),
-          ]),
+          ...page,
+          body: '<p>before</p><img src="data:image/png;base64,XYZ" /><p>after</p>',
         })),
       };
 
@@ -771,9 +766,9 @@ describe('ConfluenceSynchronizationService', () => {
       );
     });
 
-    it('falls back to standalone image ingestion when the inliner reports no successful inlines', async () => {
+    it('never standalone-ingests an image when inlining is enabled, even if nothing was inlined', async () => {
       const inliner: Pick<PageImageInliner, 'inlineImages'> = {
-        inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentKeys: new Set<string>() })),
+        inlineImages: vi.fn(async (page) => page),
       };
 
       const svc = createService(
@@ -787,9 +782,11 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => svc.synchronize());
 
-      expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+      // Images are page-owned when inlining is enabled: excluded from the standalone pass
+      // regardless of the inlining outcome (so they can never be ingested as a second file).
+      expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalledWith(
         expect.objectContaining({ id: imageAttachment.id }),
-        'scope-1',
+        expect.anything(),
       );
       expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
         expect.objectContaining({ id: pdfAttachment.id }),
@@ -799,7 +796,7 @@ describe('ConfluenceSynchronizationService', () => {
 
     it('only passes image-type attachments (not PDFs) to the inliner', async () => {
       const inliner: Pick<PageImageInliner, 'inlineImages'> = {
-        inlineImages: vi.fn(async (page) => ({ page, inlinedAttachmentKeys: new Set<string>() })),
+        inlineImages: vi.fn(async (page) => page),
       };
 
       const svc = createService(
@@ -821,12 +818,9 @@ describe('ConfluenceSynchronizationService', () => {
       expect(passedAttachments.some((a) => a.id === pdfAttachment.id)).toBe(false);
     });
 
-    it('skips standalone ingestion of an other-page image when the referencing page also syncs the target', async () => {
-      // Page 1 references an image attached to page 2 (an attachment on another page).
-      // Both pages are being synced this cycle, and the other-page image is in the
-      // diff. The inliner claims it inlined the image into page 1's body. The
-      // orchestrator must then filter the other-page image out of the standalone
-      // attachment pass.
+    it('does not standalone-ingest an image attached to another synced page', async () => {
+      // An image attached to page 2 is discovered while both pages sync. With inlining enabled,
+      // every image is page-owned, so it must not be standalone-ingested.
       const pageA = discoveredPagesFixture[0];
       if (!pageA) {
         throw new Error('expected fixture page 1');
@@ -860,18 +854,7 @@ describe('ConfluenceSynchronizationService', () => {
       });
 
       const inliner: Pick<PageImageInliner, 'inlineImages'> = {
-        inlineImages: vi.fn(async (fetchedPage) => {
-          // Page A inlines the other-page image; Page B has no image attachments referenced.
-          if (fetchedPage.id === '1') {
-            return {
-              page: fetchedPage,
-              inlinedAttachmentKeys: new Set([
-                buildInlinedAttachmentKey(otherPageImage.pageId, otherPageImage.id),
-              ]),
-            };
-          }
-          return { page: fetchedPage, inlinedAttachmentKeys: new Set<string>() };
-        }),
+        inlineImages: vi.fn(async (fetchedPage) => fetchedPage),
       };
 
       const svc = createService(
@@ -894,8 +877,7 @@ describe('ConfluenceSynchronizationService', () => {
         expect.objectContaining({ id: '2' }),
         expect.anything(),
       );
-      // Other-page image inlined into page A → not standalone-ingested even though
-      // it lives on page B which is also part of this sync.
+      // The image is never standalone-ingested.
       expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalled();
     });
 
@@ -922,16 +904,15 @@ describe('ConfluenceSynchronizationService', () => {
         expect.objectContaining({ id: '1' }),
         'scope-1',
       );
-      // Image attachment was not inlined → falls through to standalone ingestion.
-      expect(mockIngestionService.ingestAttachment).toHaveBeenCalledWith(
+      // Image is page-owned even when the inliner throws: it is not standalone-ingested.
+      expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalledWith(
         expect.objectContaining({ id: imageAttachment.id }),
-        'scope-1',
+        expect.anything(),
       );
     });
 
-    // These exercise the REAL PageImageInliner (not a mock) wired into the orchestrator, so the
-    // attachments.inlineImages config gate and the standalone-pass filter are tested together.
-    // The goal is to prove the standard attachment ingestion flow is intact in both states.
+    // These exercise the REAL PageImageInliner (not a mock) wired into the orchestrator, proving
+    // the standard attachment ingestion flow is intact whether inlining is enabled or disabled.
     describe('inlineImages config toggle (real inliner)', () => {
       function createRealInliner(inlineImagesEnabled: boolean): {
         inliner: PageImageInliner;
@@ -1006,6 +987,8 @@ describe('ConfluenceSynchronizationService', () => {
       });
 
       it('DISABLED: leaves the body untouched and routes every image through the standalone pass', async () => {
+        // Orchestrator and inliner read the same flag in production; keep them consistent here.
+        tenant.config.ingestion.attachments.inlineImagesEnabled = false;
         const { inliner, apiClient } = createRealInliner(false);
         const svc = createService(
           mockScanner,

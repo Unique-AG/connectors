@@ -22,11 +22,6 @@ const AC_IMAGE_ATTRS_TO_KEEP: ReadonlyArray<[string, string]> = [
   ['ac:height', 'height'],
 ];
 
-export interface InlineImagesResult {
-  page: FetchedPage;
-  inlinedAttachmentKeys: Set<string>;
-}
-
 interface ResolvedAttachment {
   attachmentId: string;
   pageId: string;
@@ -39,14 +34,7 @@ interface ResolvedAttachment {
 interface ImageReplacement {
   start: number;
   end: number;
-  attachmentId: string;
-  pageId: string;
   html: string;
-}
-
-// Keyed by ${pageId}::${attachmentId} since attachment ids aren't globally unique across pages.
-export function buildInlinedAttachmentKey(pageId: string, attachmentId: string): string {
-  return `${pageId}::${attachmentId}`;
 }
 
 export class PageImageInliner {
@@ -60,20 +48,19 @@ export class PageImageInliner {
   public async inlineImages(
     page: FetchedPage,
     pageImageAttachments: DiscoveredAttachment[],
-  ): Promise<InlineImagesResult> {
+  ): Promise<FetchedPage> {
     // Disabled on platforms older than 2026.24.0, where inline base64 images aren't extracted.
-    // Returning no inlined keys leaves every image for the standalone attachment pass instead.
     if (!this.config.ingestion.attachments.inlineImagesEnabled) {
-      return { page, inlinedAttachmentKeys: new Set() };
+      return page;
     }
 
     if (!page.body) {
-      return { page, inlinedAttachmentKeys: new Set() };
+      return page;
     }
 
     const macros = parseImageMacros(page.body);
     if (macros.length === 0) {
-      return { page, inlinedAttachmentKeys: new Set() };
+      return page;
     }
 
     const pageImageAttachmentsByTitle = indexBy(pageImageAttachments, (a) => a.title);
@@ -88,19 +75,10 @@ export class PageImageInliner {
 
     const successfulReplacements = filter(settledReplacements, isNonNullish);
     if (successfulReplacements.length === 0) {
-      return { page, inlinedAttachmentKeys: new Set() };
+      return page;
     }
 
-    // We skip these when ingesting the rest of the attachments so an inlined
-    // image isn't also ingested as its own document.
-    const inlinedAttachmentKeys = new Set(
-      successfulReplacements.map((r) => buildInlinedAttachmentKey(r.pageId, r.attachmentId)),
-    );
-    const newBody = this.applyReplacements(page.body, successfulReplacements);
-    return {
-      page: { ...page, body: newBody },
-      inlinedAttachmentKeys,
-    };
+    return { ...page, body: this.applyReplacements(page.body, successfulReplacements) };
   }
 
   private async buildImageReplacement(
@@ -111,7 +89,6 @@ export class PageImageInliner {
     try {
       const resolved = await this.resolveAttachmentMetadata(
         macro.resourceRef,
-        page,
         pageImageAttachmentsByTitle,
       );
       if (!resolved) {
@@ -156,13 +133,7 @@ export class PageImageInliner {
         resolved.downloadPath,
       );
       const html = this.buildImgTag(macro.imgAttrs, resolved.mediaType, buffer, resolved.filename);
-      return {
-        start: macro.startIndex,
-        end: macro.endIndex,
-        attachmentId: resolved.attachmentId,
-        pageId: resolved.pageId,
-        html,
-      };
+      return { start: macro.startIndex, end: macro.endIndex, html };
     } catch (err) {
       this.logger.warn({
         pageId: page.id,
@@ -176,11 +147,10 @@ export class PageImageInliner {
 
   private async resolveAttachmentMetadata(
     resource: ResourceRef,
-    page: FetchedPage,
     pageImageAttachmentsByTitle: Readonly<Record<string, DiscoveredAttachment>>,
   ): Promise<ResolvedAttachment | null> {
     if (resource.kind === 'current-attachment') {
-      return this.resolveCurrentPageAttachment(resource, page, pageImageAttachmentsByTitle);
+      return this.resolveCurrentPageAttachment(resource, pageImageAttachmentsByTitle);
     }
 
     if (resource.kind === 'other-page-attachment') {
@@ -192,16 +162,10 @@ export class PageImageInliner {
 
   private resolveCurrentPageAttachment(
     resource: Extract<ResourceRef, { kind: 'current-attachment' }>,
-    page: FetchedPage,
     pageImageAttachmentsByTitle: Readonly<Record<string, DiscoveredAttachment>>,
   ): ResolvedAttachment | null {
     const match = pageImageAttachmentsByTitle[resource.filename];
     if (!match) {
-      this.logger.debug({
-        pageId: page.id,
-        filename: resource.filename,
-        msg: 'Image filename not found among page attachments',
-      });
       return null;
     }
     return this.fromDiscoveredAttachment(match);
