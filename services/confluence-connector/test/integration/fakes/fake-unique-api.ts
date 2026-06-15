@@ -63,7 +63,7 @@ export class FakeUniqueApi implements UniqueApiClient {
    * In real life Unique decides if a file was moved (the same file given a new
    * key). This fake cannot work that out on its own, so a test sets the answer
    * here and the fake reports those keys as moved. (Failures are different: a
-   * test just mocks the method to throw, no seam needed.)
+   * test just mocks the method to throw.)
    */
   private readonly movedItemKeys = new Set<string>();
 
