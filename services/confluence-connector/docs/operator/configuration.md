@@ -87,6 +87,11 @@ ingestion:
   ingestionMode: flat
   scopeId: your-scope-id
   storeInternally: enabled
+  pageIngestionConfig:
+    htmlConfig:
+      imageContentExtraction:
+        enabled: true
+        languageModel: your-kb-visual-llm
 ```
 
 ### Complete Example (Data Center + Cluster-Local Auth)
@@ -120,6 +125,11 @@ ingestion:
   ingestionMode: flat
   scopeId: your-scope-id
   storeInternally: enabled
+  pageIngestionConfig:
+    htmlConfig:
+      imageContentExtraction:
+        enabled: true
+        languageModel: your-kb-visual-llm
 ```
 
 ## Confluence Connection Settings
@@ -264,6 +274,11 @@ ingestion:
     maxFileSizeMb: 200
     imageOcr: enabled
     inlineImages: enabled
+  pageIngestionConfig:
+    htmlConfig:
+      imageContentExtraction:
+        enabled: true
+        languageModel: your-kb-visual-llm
 ```
 
 | Field            | Required | Default          | Description                                                                                                                                                         |
@@ -273,6 +288,7 @@ ingestion:
 | `storeInternally` | No      | `enabled`        | Whether to store content internally in Unique (`enabled` or `disabled`)                                                                                             |
 | `useV1KeyFormat` | No       | `disabled`       | Use v1-compatible ingestion key format (`spaceId_spaceKey/pageId`) without tenant prefix (`enabled` or `disabled`). Only relevant when migrating from Confluence Connector v1 |
 | `attachments`    | No       | (see sub-fields) | Configuration for file attachment ingestion                                                                                                                          |
+| `pageIngestionConfig` | Conditional | -- | Ingestion configuration applied to each ingested page. Required when `attachments.inlineImages` is enabled: must set `htmlConfig.imageContentExtraction.languageModel` to the visual LLM configured in Knowledge Base (see [Image Attachments](#image-attachments)) |
 
 ### Attachment Configuration
 
@@ -305,6 +321,8 @@ These are matched against the `mediaType` reported by the Confluence API. Operat
 #### Image Attachments
 
 Images embedded in Confluence pages (drag/drop, paste, or "Insert image") are stored as regular page attachments by Confluence. During page ingestion the connector inlines each referenced image directly into the page HTML as a base64 `data:` URI, producing a single self-contained page artifact rather than a separate image artifact. This applies to images attached to the page being ingested as well as images attached to other pages in the same Confluence instance (references to an attachment on another page). PNG and JPEG are the supported formats; both are in the default `allowedMimeTypes`.
+
+For the platform to extract searchable text from these inline images, the connector sends an image-extraction configuration with every page via `ingestion.pageIngestionConfig`. When `attachments.inlineImages` is enabled (the default), this is required: `pageIngestionConfig.htmlConfig.imageContentExtraction.languageModel` must be set to the visual LLM configured in Knowledge Base, otherwise the connector refuses to start. This replaces the previous manual step of setting the extraction config on the destination scope.
 
 > **Platform compatibility:** Inline images require Unique platform `2026.24.0` or later. The platform extracts searchable text from inline base64 images starting with that version; on earlier versions the page is still ingested but its embedded images are dropped during HTML-to-Markdown conversion and contribute no searchable content. Extraction is also gated behind two company-scoped feature flags that must be enabled (`FEATURE_FLAG_ENABLE_HTML_INLINE_IMAGE_EXTRACTION_UN_20936` and `FEATURE_FLAG_ENABLE_MULTI_FILE_IMAGE_CONTENT_EXTRACTION_UN_20936`). See [Unique Platform Compatibility](./deployment.md#unique-platform-compatibility).
 >

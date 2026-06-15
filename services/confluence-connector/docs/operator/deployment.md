@@ -185,7 +185,7 @@ See [Configuration -- Confluence Connection Settings](./configuration.md#Conflue
 | < 2.1.0 | TBD |
 | >= 2.1.0 | `node-ingestion` - `2026.24.0`+ |
 
-Connector `2.1.0` introduces inlining of page images as base64 `data:` URIs (see [Configuration -- Image Attachments](./configuration.md#image-attachments)). Extracting searchable text from those inline images is performed platform-side and only exists from Unique `2026.24.0`. On earlier platform versions the connector still ingests the page, but embedded images contribute no searchable content. The platform-side extraction is additionally gated behind two company-scoped feature flags (`FEATURE_FLAG_ENABLE_HTML_INLINE_IMAGE_EXTRACTION_UN_20936` and `FEATURE_FLAG_ENABLE_MULTI_FILE_IMAGE_CONTENT_EXTRACTION_UN_20936`), both of which must be enabled for the company. Contact Unique to confirm they are on.
+Connector `2.1.0` introduces inlining of page images as base64 `data:` URIs (see [Configuration -- Image Attachments](./configuration.md#image-attachments)). Extracting searchable text from those inline images is performed platform-side and only exists from Unique `2026.24.0`. On earlier platform versions the connector still ingests the page, but embedded images contribute no searchable content. The platform-side extraction is additionally gated behind two company-scoped feature flags (`FEATURE_FLAG_ENABLE_HTML_INLINE_IMAGE_EXTRACTION_UN_20936` and `FEATURE_FLAG_ENABLE_MULTI_FILE_IMAGE_CONTENT_EXTRACTION_UN_20936`), both of which must be enabled for the company. The connector must also be configured with the extraction model via `ingestion.pageIngestionConfig` (see [Configuration -- Image Attachments](./configuration.md#image-attachments)).
 
 ## Upgrading
 
