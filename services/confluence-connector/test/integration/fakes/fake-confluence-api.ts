@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Readable } from 'node:stream';
 import { clone } from 'remeda';
 import {
@@ -175,9 +176,7 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
 
   private getPageOrFail(pageId: string): ScenarioPage {
     const page = this.state.pages.find((p) => p.id === pageId);
-    if (!page) {
-      throw new Error(`Unknown page "${pageId}"`);
-    }
+    assert.ok(page, `Unknown page "${pageId}"`);
     return page;
   }
 
@@ -231,11 +230,10 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
 
   private getSpaceOrFail(spaceKey: string): ScenarioSpace {
     const space = this.state.spaces.find((s) => s.key === spaceKey);
-    if (!space) {
-      throw new Error(
-        `Scenario references unknown spaceKey "${spaceKey}". Add it to scenario.confluence.spaces.`,
-      );
-    }
+    assert.ok(
+      space,
+      `Scenario references unknown spaceKey "${spaceKey}". Add it to scenario.confluence.spaces.`,
+    );
     return space;
   }
 }
