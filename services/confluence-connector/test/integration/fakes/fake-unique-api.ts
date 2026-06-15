@@ -57,14 +57,12 @@ export class FakeUniqueApi implements UniqueApiClient {
   private readonly filesById = new Map<string, StoredFile>();
   private readonly pendingUploads = new Map<string, PendingUpload>();
   /**
-   * Item keys the next `performFileDiff` should classify as `movedFiles`.
+   * Item keys the next `performFileDiff` should report as `movedFiles`.
    *
-   * Whether a file is "moved" is decided server-side by Unique (same logical
-   * resource re-keyed to a new location), so the per-`partialKey` diff this fake
-   * reimplements cannot derive it on its own. This seam lets a test inject that
-   * server verdict so the connector's handling of moved files can be exercised
-   * end-to-end. (Plain failures don't need a seam: a test mocks the relevant
-   * method to throw.)
+   * In real life Unique decides if a file was moved (the same file given a new
+   * key). This fake cannot work that out on its own, so a test sets the answer
+   * here and the fake reports those keys as moved. (Failures are different: a
+   * test just mocks the method to throw, no seam needed.)
    */
   private readonly movedItemKeys = new Set<string>();
 

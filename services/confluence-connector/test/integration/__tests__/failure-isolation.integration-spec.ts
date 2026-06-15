@@ -21,9 +21,9 @@ describe('failure isolation', () => {
     ctx = undefined;
   });
 
-  // A single page failing to fetch from Confluence must not abort the whole
-  // sync. ConfluenceContentFetcher catches the error and returns null;
-  // synchronize() records the page as skipped and continues with the rest.
+  // One page failing to load from Confluence must not stop the whole sync.
+  // ConfluenceContentFetcher catches the error and returns null, so the page is
+  // skipped and the rest keep going.
   it('continues syncing other pages when one page fails to fetch from Confluence', async () => {
     ctx = buildScenarioContext(threePagesOneSpaceScenario);
     const { confluence } = ctx;
@@ -45,8 +45,8 @@ describe('failure isolation', () => {
   });
 
   // When Unique rejects registerContent for one page, IngestionService catches
-  // and continues. Because failure happens before contentId is assigned, there
-  // is nothing to clean up — the other pages must ingest cleanly.
+  // it and moves on. The failure happens before a contentId is assigned, so
+  // there is nothing to clean up and the other pages still ingest.
   it('continues syncing when Unique rejects registerContent for one page', async () => {
     ctx = buildScenarioContext(threePagesOneSpaceScenario);
     const { ingestion } = ctx.unique;
@@ -67,10 +67,10 @@ describe('failure isolation', () => {
     expect(fileKeys).toEqual(['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p3']);
   });
 
-  // When an attachment download fails *after* content was registered in Unique,
-  // IngestionService.cleanupFailedRegistration() must delete the half-registered
-  // orphan via files.deleteByIds. The HTML page still ingests; the failed
-  // attachment leaves no orphan.
+  // If an attachment download fails *after* its content was registered in
+  // Unique, IngestionService.cleanupFailedRegistration() deletes the
+  // half-registered file (via files.deleteByIds) so no orphan is left. The HTML
+  // page still ingests fine.
   it('cleans up the orphaned content when an attachment download fails mid-ingestion', async () => {
     ctx = buildScenarioContext(pageWithAttachmentScenario);
     // The scenario has a single attachment (att-1), so failing every download

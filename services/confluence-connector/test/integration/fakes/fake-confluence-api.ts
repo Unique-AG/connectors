@@ -26,8 +26,8 @@ import type {
  * if the fake drifts away from the production page shape.
  *
  * Also exposes a small mutation API (`addPage`, `removePage`, ...) for tests
- * that drive multi-step scenarios. Failures are injected per-test by mocking the
- * relevant method (e.g. `vi.spyOn(fake, 'getPageById')`).
+ * that run in more than one step. To test a failure, a test mocks the method it
+ * wants to fail (e.g. `vi.spyOn(fake, 'getPageById')`).
  */
 export class FakeConfluenceApi extends ConfluenceApiClient {
   private readonly state: ScenarioConfluence;
