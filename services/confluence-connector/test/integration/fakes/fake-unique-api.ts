@@ -13,6 +13,7 @@ import type {
   UniqueFile,
 } from '@unique-ag/unique-api';
 import { IngestionState } from '@unique-ag/unique-api';
+import { mapValues } from 'remeda';
 import type { ScenarioUnique } from '../scenario/scenario.types';
 
 const FAKE_BLOB_HOST = 'https://fake-blob.local';
@@ -375,23 +376,18 @@ export class FakeUniqueApi implements UniqueApiClient {
   }
 }
 
-// Unique stores content metadata as a flat map of string values, so we mirror
-// that here. Each value is coerced on its own: plain strings stay as-is (so a
-// test reads `spaceKey: 'SP'`, not `'"SP"'`), and structured values like the
-// `confluenceLabels` array are JSON-encoded. A single `JSON.stringify(metadata)`
-// would instead collapse the whole object into one string and lose per-key
-// access.
+// Unique stores metadata as a flat string map, so coerce each value on its own:
+// strings stay as-is, everything else (e.g. the confluenceLabels array) is
+// JSON-encoded.
 function stringifyMetadata(
   metadata: Record<string, unknown> | undefined,
 ): Record<string, string> | null {
   if (!metadata) {
     return null;
   }
-  const result: Record<string, string> = {};
-  for (const [key, value] of Object.entries(metadata)) {
-    result[key] = typeof value === 'string' ? value : JSON.stringify(value);
-  }
-  return result;
+  return mapValues(metadata, (value) =>
+    typeof value === 'string' ? value : JSON.stringify(value),
+  );
 }
 
 function notImplemented<TArgs extends unknown[], TResult>(
