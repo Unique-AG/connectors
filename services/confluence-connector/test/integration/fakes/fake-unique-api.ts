@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type {
   ContentRegistrationRequest,
-  FileAccessInput,
   FileDiffItem,
   FileDiffResponse,
   IngestionApiResponse,
@@ -156,20 +155,8 @@ export class FakeUniqueApi implements UniqueApiClient {
         return created;
       },
       getById: async (id) => this.scopesById.get(id) ?? null,
-      getByExternalId: async (externalId) => {
-        for (const scope of this.scopesById.values()) {
-          if (scope.externalId === externalId) {
-            return scope;
-          }
-        }
-        return null;
-      },
-      getByExternalIds: async (externalIds) => {
-        const set = new Set(externalIds);
-        return [...this.scopesById.values()].filter(
-          (scope) => scope.externalId !== null && set.has(scope.externalId),
-        );
-      },
+      getByExternalId: notImplemented('scopes.getByExternalId'),
+      getByExternalIds: notImplemented('scopes.getByExternalIds'),
       updateExternalId: async (scopeId, externalId) => {
         const scope = this.requireScope(scopeId);
         const conflicting = [...this.scopesById.values()].find(
@@ -183,19 +170,13 @@ export class FakeUniqueApi implements UniqueApiClient {
         scope.externalId = externalId;
         return { id: scope.id, externalId: scope.externalId };
       },
-      updateParent: async (scopeId, newParentId) => {
-        const scope = this.requireScope(scopeId);
-        scope.parentId = newParentId;
-        return { id: scope.id, parentId: scope.parentId };
-      },
+      updateParent: notImplemented('scopes.updateParent'),
       listChildren: async (parentId) =>
         [...this.scopesById.values()].filter((scope) => scope.parentId === parentId),
       createAccesses: async (_scopeId: string, _accesses: ScopeAccess[]) => {
-        // Permissions are not modeled in the fake; the call is a no-op for sync tests.
+        // Called during sync, but permissions are not modeled in the fake, so no-op.
       },
-      deleteAccesses: async (_scopeId: string, _accesses: ScopeAccess[]) => {
-        // No-op (see createAccesses).
-      },
+      deleteAccesses: notImplemented('scopes.deleteAccesses'),
       delete: async (scopeId) => {
         const scope = this.scopesById.get(scopeId);
         if (!scope) {
@@ -216,8 +197,7 @@ export class FakeUniqueApi implements UniqueApiClient {
         const set = new Set(keys);
         return [...this.filesById.values()].filter((f) => set.has(f.key));
       },
-      getByKeyPrefix: async (keyPrefix) =>
-        [...this.filesById.values()].filter((f) => f.key.startsWith(keyPrefix)),
+      getByKeyPrefix: notImplemented('files.getByKeyPrefix'),
       getCountByKeyPrefix: async (keyPrefix) =>
         [...this.filesById.values()].filter((f) => f.key.startsWith(keyPrefix)).length,
       move: notImplemented('files.move'),
@@ -240,8 +220,8 @@ export class FakeUniqueApi implements UniqueApiClient {
         }
         return matching.length;
       },
-      addAccesses: async (_scopeId: string, _accesses: FileAccessInput[]) => 0,
-      removeAccesses: async (_scopeId: string, _accesses: FileAccessInput[]) => 0,
+      addAccesses: notImplemented('files.addAccesses'),
+      removeAccesses: notImplemented('files.removeAccesses'),
       getContentIdsByScope: async (scopeId: string) =>
         [...this.filesById.values()].filter((f) => f.ownerId === scopeId).map((f) => f.id),
       getFileKeysByScopeId: notImplemented('files.getFileKeysByScopeId'),
@@ -257,7 +237,7 @@ export class FakeUniqueApi implements UniqueApiClient {
       performFileDiff: async (fileList, partialKey, _sourceKind, _sourceName) =>
         this.performFileDiff(fileList, partialKey),
       update: notImplemented('ingestion.update'),
-      getIngestionStats: async () => ({}),
+      getIngestionStats: notImplemented('ingestion.getIngestionStats'),
     };
   }
 
