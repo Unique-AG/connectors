@@ -44,12 +44,6 @@ export interface ScenarioPage {
   parentId?: string;
   versionWhen: string;
   attachments?: ScenarioAttachment[];
-  /**
-   * Confluence content type. Defaults to `page`. Use `blogpost` to test blog
-   * post ingestion, or `database` / `whiteboard` / `embed` to test that the
-   * scanner skips these types (descendants are still discoverable via
-   * `parentId`, which is exercised by `content-types.integration-spec.ts`).
-   */
   type?: ContentType;
 }
 
@@ -72,19 +66,7 @@ export interface ScenarioUniqueFile {
   mimeType: string;
   metadata?: Record<string, string>;
   body?: Buffer;
-  /**
-   * ISO timestamp the file was last updated in Unique.
-   * Compared against the page's `versionWhen` by `performFileDiff` to decide
-   * whether the file is up-to-date (no change) or older (updated). The builders
-   * default it to `DEFAULT_VERSION` so the file looks up-to-date; set an older
-   * value to test "updated Unique data" scenarios.
-   */
   updatedAt: string;
-  /**
-   * Scope the file belongs to in Unique (`SCOPE` ownerId). Used by
-   * `files.getContentIdsByScope`, which the tenant-deletion flow relies on.
-   * Set this when seeding files for delete-tenant or scope-targeted tests.
-   */
   scopeId?: string;
 }
 
