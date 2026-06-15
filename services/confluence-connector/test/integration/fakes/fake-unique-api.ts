@@ -375,6 +375,12 @@ export class FakeUniqueApi implements UniqueApiClient {
   }
 }
 
+// Unique stores content metadata as a flat map of string values, so we mirror
+// that here. Each value is coerced on its own: plain strings stay as-is (so a
+// test reads `spaceKey: 'SP'`, not `'"SP"'`), and structured values like the
+// `confluenceLabels` array are JSON-encoded. A single `JSON.stringify(metadata)`
+// would instead collapse the whole object into one string and lose per-key
+// access.
 function stringifyMetadata(
   metadata: Record<string, unknown> | undefined,
 ): Record<string, string> | null {
