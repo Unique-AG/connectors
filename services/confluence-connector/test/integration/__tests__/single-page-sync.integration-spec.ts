@@ -59,6 +59,7 @@ describe('single-page sync', () => {
     expect(state.files).toHaveLength(1);
     expect(state.files[0]).toMatchObject({
       key: 'tenant1/space-1_SP/p1',
+      scopePath: '/Confluence/SP',
       mimeType: 'text/html',
       bodyText: '<p>Hello, integration!</p>',
       metadata: expect.objectContaining({ spaceKey: 'SP', spaceName: 'Space One' }),

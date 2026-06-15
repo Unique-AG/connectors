@@ -13,6 +13,8 @@ export interface UniqueScopeState {
 export interface UniqueFileState {
   id: string;
   key: string;
+  scopeId: string;
+  scopePath: string | null;
   byteSize: number;
   mimeType: string;
   metadata: Record<string, string> | null;
@@ -56,6 +58,8 @@ export function getUniqueState(unique: FakeUniqueApi): UniqueState {
     unique.listFiles().map((file) => ({
       id: file.id,
       key: file.key,
+      scopeId: file.ownerId,
+      scopePath: scopePathById.get(file.ownerId) ?? null,
       byteSize: file.byteSize,
       mimeType: file.mimeType,
       metadata: file.metadata,
