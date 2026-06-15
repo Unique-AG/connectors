@@ -147,16 +147,16 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
   }
 
   public updatePage(pageId: string, updates: Partial<Omit<ScenarioPage, 'id'>>): void {
-    const page = this.requirePage(pageId);
+    const page = this.getPageOrFail(pageId);
     Object.assign(page, updates);
   }
 
   public bumpPageVersion(pageId: string, when: string): void {
-    this.requirePage(pageId).versionWhen = when;
+    this.getPageOrFail(pageId).versionWhen = when;
   }
 
   public addAttachment(pageId: string, attachment: ScenarioAttachment): void {
-    const page = this.requirePage(pageId);
+    const page = this.getPageOrFail(pageId);
     page.attachments ??= [];
     if (page.attachments.some((a) => a.id === attachment.id)) {
       throw new Error(`Attachment "${attachment.id}" already exists on page "${pageId}"`);
@@ -165,7 +165,7 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
   }
 
   public removeAttachment(pageId: string, attachmentId: string): void {
-    const page = this.requirePage(pageId);
+    const page = this.getPageOrFail(pageId);
     const index = page.attachments?.findIndex((a) => a.id === attachmentId) ?? -1;
     if (index === -1) {
       throw new Error(`Cannot remove unknown attachment "${attachmentId}" from page "${pageId}"`);
@@ -173,7 +173,7 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
     page.attachments?.splice(index, 1);
   }
 
-  private requirePage(pageId: string): ScenarioPage {
+  private getPageOrFail(pageId: string): ScenarioPage {
     const page = this.state.pages.find((p) => p.id === pageId);
     if (!page) {
       throw new Error(`Unknown page "${pageId}"`);
@@ -185,7 +185,7 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
     page: ScenarioPage,
     options: { includeBody?: boolean } = {},
   ): ConfluencePage {
-    const space = this.requireSpace(page.spaceKey);
+    const space = this.getSpaceOrFail(page.spaceKey);
     const includeBody = options.includeBody ?? false;
 
     const attachments: ConfluenceAttachment[] = (page.attachments ?? []).map((attachment) => ({
@@ -229,7 +229,7 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
     return confluencePageSchema.parse(raw);
   }
 
-  private requireSpace(spaceKey: string): ScenarioSpace {
+  private getSpaceOrFail(spaceKey: string): ScenarioSpace {
     const space = this.state.spaces.find((s) => s.key === spaceKey);
     if (!space) {
       throw new Error(
