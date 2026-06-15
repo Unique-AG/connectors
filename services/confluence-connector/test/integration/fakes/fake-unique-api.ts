@@ -33,10 +33,6 @@ export interface StoredFile extends UniqueFile {
   ingestionConfig: IngestionConfig | null;
 }
 
-interface FailureMap {
-  registerContent: Map<string, Error>;
-}
-
 /**
  * Stateful in-memory UniqueApiClient.
  *
@@ -60,17 +56,15 @@ export class FakeUniqueApi implements UniqueApiClient {
   private readonly scopesById = new Map<string, Scope>();
   private readonly filesById = new Map<string, StoredFile>();
   private readonly pendingUploads = new Map<string, PendingUpload>();
-  private readonly failures: FailureMap = {
-    registerContent: new Map(),
-  };
   /**
    * Item keys the next `performFileDiff` should classify as `movedFiles`.
    *
    * Whether a file is "moved" is decided server-side by Unique (same logical
    * resource re-keyed to a new location), so the per-`partialKey` diff this fake
    * reimplements cannot derive it on its own. This seam lets a test inject that
-   * server verdict, mirroring the `failOn*` injection hooks, so the connector's
-   * handling of moved files can be exercised end-to-end.
+   * server verdict so the connector's handling of moved files can be exercised
+   * end-to-end. (Plain failures don't need a seam: a test mocks the relevant
+   * method to throw.)
    */
   private readonly movedItemKeys = new Set<string>();
 
@@ -141,12 +135,6 @@ export class FakeUniqueApi implements UniqueApiClient {
 
   public listFiles(): StoredFile[] {
     return [...this.filesById.values()];
-  }
-
-  // ─── Failure-injection hooks ─────────────────────────────────────────────────
-
-  public failOnRegisterContent(key: string, error: Error): void {
-    this.failures.registerContent.set(key, error);
   }
 
   /**
@@ -306,10 +294,6 @@ export class FakeUniqueApi implements UniqueApiClient {
   }
 
   private registerContent(request: ContentRegistrationRequest): IngestionApiResponse {
-    const failure = this.failures.registerContent.get(request.key);
-    if (failure) {
-      throw failure;
-    }
     const existing = [...this.filesById.values()].find((f) => f.key === request.key);
     const id = existing?.id ?? `content-${randomUUID()}`;
     const uploadToken = randomUUID();

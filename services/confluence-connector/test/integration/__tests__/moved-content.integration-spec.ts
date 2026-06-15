@@ -10,7 +10,7 @@
  *
  * Whether a file is "moved" is decided server-side by Unique, so the in-memory
  * diff cannot derive it; the test injects that verdict via
- * `FakeUniqueApi.simulateMovedFiles`, mirroring the suite's `failOn*` hooks.
+ * `FakeUniqueApi.simulateMovedFiles`.
  *
  * The new / updated / deleted paths are covered by `single-page-sync`,
  * `update-content`, and `delete-content` respectively.

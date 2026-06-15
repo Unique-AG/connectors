@@ -8,7 +8,7 @@
  * subsequent step fails, the half-registered content is cleaned up so Unique
  * is never left with orphans.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
 import { pageWithAttachmentScenario } from '../scenarios/page-with-attachment.scenario';
@@ -26,7 +26,14 @@ describe('failure isolation', () => {
   // synchronize() records the page as skipped and continues with the rest.
   it('continues syncing other pages when one page fails to fetch from Confluence', async () => {
     ctx = buildScenarioContext(threePagesOneSpaceScenario);
-    ctx.confluence.failOnGetPageById('p2', new Error('500 from Confluence'));
+    const { confluence } = ctx;
+    const fetchPage = confluence.getPageById.bind(confluence);
+    vi.spyOn(confluence, 'getPageById').mockImplementation(async (pageId) => {
+      if (pageId === 'p2') {
+        throw new Error('500 from Confluence');
+      }
+      return fetchPage(pageId);
+    });
 
     const result = await ctx.runSync();
 
@@ -42,10 +49,14 @@ describe('failure isolation', () => {
   // is nothing to clean up — the other pages must ingest cleanly.
   it('continues syncing when Unique rejects registerContent for one page', async () => {
     ctx = buildScenarioContext(threePagesOneSpaceScenario);
-    ctx.unique.failOnRegisterContent(
-      'tenant1/space-1_SP/p2',
-      new Error('Unique ingestion is down'),
-    );
+    const { ingestion } = ctx.unique;
+    const registerContent = ingestion.registerContent.bind(ingestion);
+    vi.spyOn(ingestion, 'registerContent').mockImplementation(async (request) => {
+      if (request.key === 'tenant1/space-1_SP/p2') {
+        throw new Error('Unique ingestion is down');
+      }
+      return registerContent(request);
+    });
 
     const result = await ctx.runSync();
 
@@ -62,8 +73,9 @@ describe('failure isolation', () => {
   // attachment leaves no orphan.
   it('cleans up the orphaned content when an attachment download fails mid-ingestion', async () => {
     ctx = buildScenarioContext(pageWithAttachmentScenario);
-    ctx.confluence.failOnGetAttachmentDownloadStream(
-      'att-1',
+    // The scenario has a single attachment (att-1), so failing every download
+    // is equivalent to failing that one.
+    vi.spyOn(ctx.confluence, 'getAttachmentDownloadStream').mockRejectedValue(
       new Error('Network blip during attachment download'),
     );
 

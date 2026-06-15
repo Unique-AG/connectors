@@ -16,13 +16,6 @@ import type {
   ScenarioTenantConfig,
 } from '../scenario/scenario.types';
 
-interface FailureMap {
-  searchPagesByLabel?: Error;
-  getPageById: Map<string, Error>;
-  getDescendantPages?: Error;
-  getAttachmentDownloadStream: Map<string, Error>;
-}
-
 /**
  * In-memory ConfluenceApiClient backed by a ScenarioConfluence document.
  *
@@ -32,16 +25,11 @@ interface FailureMap {
  * Every produced page goes through `confluencePageSchema.parse()` to fail loudly
  * if the fake drifts away from the production page shape.
  *
- * Also exposes a small mutation API (`addPage`, `removePage`, ...) and
- * error-injection hooks (`failOn*`) for tests that drive multi-step or
- * failure-path scenarios.
+ * Also exposes a small mutation API (`addPage`, `removePage`, ...) for tests
+ * that drive multi-step scenarios. Failures are injected per-test by mocking the
+ * relevant method (e.g. `vi.spyOn(fake, 'getPageById')`).
  */
 export class FakeConfluenceApi extends ConfluenceApiClient {
-  private readonly failures: FailureMap = {
-    getPageById: new Map(),
-    getAttachmentDownloadStream: new Map(),
-  };
-
   private readonly state: ScenarioConfluence;
 
   public constructor(
@@ -68,9 +56,6 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
   }
 
   public async searchPagesByLabel(): Promise<ConfluencePage[]> {
-    if (this.failures.searchPagesByLabel) {
-      throw this.failures.searchPagesByLabel;
-    }
     const labels = [this.tenant.ingestSingleLabel, this.tenant.ingestAllLabel];
     const matched = this.state.pages.filter((page) =>
       page.labels.some((label) => labels.includes(label)),
@@ -79,10 +64,6 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
   }
 
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
-    const failure = this.failures.getPageById.get(pageId);
-    if (failure) {
-      throw failure;
-    }
     const page = this.state.pages.find((p) => p.id === pageId);
     if (!page) {
       return null;
@@ -91,9 +72,6 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
   }
 
   public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {
-    if (this.failures.getDescendantPages) {
-      throw this.failures.getDescendantPages;
-    }
     const descendants = new Map<string, ScenarioPage>();
     const queue = [...rootIds];
     const visited = new Set<string>(rootIds);
@@ -136,10 +114,6 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
     pageId: string,
     _downloadPath: string,
   ): Promise<Readable> {
-    const failure = this.failures.getAttachmentDownloadStream.get(attachmentId);
-    if (failure) {
-      throw failure;
-    }
     const page = this.state.pages.find((p) => p.id === pageId);
     const attachment = page?.attachments?.find((a) => a.id === attachmentId);
     if (!attachment) {
@@ -197,31 +171,6 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
       throw new Error(`Cannot remove unknown attachment "${attachmentId}" from page "${pageId}"`);
     }
     page.attachments?.splice(index, 1);
-  }
-
-  // ─── Failure-injection hooks ─────────────────────────────────────────────────
-
-  public failOnSearchPagesByLabel(error: Error): void {
-    this.failures.searchPagesByLabel = error;
-  }
-
-  public failOnGetPageById(pageId: string, error: Error): void {
-    this.failures.getPageById.set(pageId, error);
-  }
-
-  public failOnGetDescendantPages(error: Error): void {
-    this.failures.getDescendantPages = error;
-  }
-
-  public failOnGetAttachmentDownloadStream(attachmentId: string, error: Error): void {
-    this.failures.getAttachmentDownloadStream.set(attachmentId, error);
-  }
-
-  public clearFailures(): void {
-    this.failures.searchPagesByLabel = undefined;
-    this.failures.getDescendantPages = undefined;
-    this.failures.getPageById.clear();
-    this.failures.getAttachmentDownloadStream.clear();
   }
 
   private requirePage(pageId: string): ScenarioPage {
