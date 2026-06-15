@@ -370,28 +370,49 @@ describe('PageImageInliner', () => {
       expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
 
-    it('leaves macro untouched when <ri:page> is present but missing required attrs (does not silently fall back to current-page)', async () => {
-      // A malformed <ri:page> (missing ri:space-key or ri:content-title) must NOT be
-      // treated as a current-page attachment, even if the current page happens to have
-      // an attachment with the same filename. The presence of <ri:page> signals
-      // intent to reference an attachment on another page; we'd rather skip than
-      // inline the wrong image.
+    it('resolves a same-space <ri:page> reference (no ri:space-key) using the current page space', async () => {
+      // Confluence omits ri:space-key when the referenced page is in the same space. The lookup
+      // must then default to the current page's space (basePage uses 'SP') rather than be skipped.
+      apiClient.fetchAttachmentsByPageTitle.mockResolvedValue({
+        pageId: '77',
+        attachments: [
+          createConfluenceImageAttachment({ id: 'same-space-att', title: 'other.png' }),
+        ],
+      });
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+
+      const body =
+        '<ac:image><ri:attachment ri:filename="other.png"><ri:page ri:content-title="Other Page"/></ri:attachment></ac:image>';
+      const result = await inliner.inlineImagesInPage(basePage(body), []);
+
+      expect(apiClient.fetchAttachmentsByPageTitle).toHaveBeenCalledWith('SP', 'Other Page');
+      expect(result.body).toContain(
+        `src="data:image/png;base64,${imageBuffer().toString('base64')}"`,
+      );
+    });
+
+    it('leaves macro untouched when <ri:page> has no ri:content-title (does not silently fall back to current-page)', async () => {
+      // Without ri:content-title the source page can't be identified. The presence of <ri:page>
+      // signals intent to reference another page, so we skip rather than risk inlining a
+      // same-named attachment on the current page.
       const samePageDecoy: DiscoveredAttachment = {
         ...sampleDiscoveredImageAttachment,
         title: 'other.png',
       };
-      const bodyMissingSpaceKey =
-        '<ac:image><ri:attachment ri:filename="other.png"><ri:page ri:content-title="Other Page"/></ri:attachment></ac:image>';
-      const bodyMissingContentTitle =
+      const body =
         '<ac:image><ri:attachment ri:filename="other.png"><ri:page ri:space-key="OTHER"/></ri:attachment></ac:image>';
 
-      for (const body of [bodyMissingSpaceKey, bodyMissingContentTitle]) {
-        vi.clearAllMocks();
-        const result = await inliner.inlineImagesInPage(basePage(body), [samePageDecoy]);
-        expect(result.body).toBe(body);
-        expect(apiClient.fetchAttachmentsByPageTitle).not.toHaveBeenCalled();
-        expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
-      }
+      const result = await inliner.inlineImagesInPage(basePage(body), [samePageDecoy]);
+
+      expect(result.body).toBe(body);
+      expect(apiClient.fetchAttachmentsByPageTitle).not.toHaveBeenCalled();
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pageId: '1',
+          msg: 'Image macro references an unresolvable attachment, leaving macro untouched',
+        }),
+      );
     });
 
     it('leaves an other-page macro untouched when fetchAttachmentsByPageTitle throws', async () => {

@@ -97,6 +97,7 @@ export class PageImageInliner {
       const resolved = await this.resolveAttachmentMetadata(
         macro.resourceRef,
         pageImageAttachmentsByTitle,
+        page,
       );
       if (!resolved) {
         return null;
@@ -156,15 +157,24 @@ export class PageImageInliner {
   private async resolveAttachmentMetadata(
     resource: ResourceRef,
     pageImageAttachmentsByTitle: Readonly<Record<string, DiscoveredAttachment>>,
+    page: FetchedPage,
   ): Promise<ResolvedAttachment | null> {
     if (resource.kind === 'current-attachment') {
       return this.resolveCurrentPageAttachment(resource, pageImageAttachmentsByTitle);
     }
 
     if (resource.kind === 'other-page-attachment') {
-      return this.resolveOtherPageAttachment(resource);
+      return this.resolveOtherPageAttachment(resource, page.spaceKey);
     }
 
+    if (resource.kind === 'unknown') {
+      this.logger.warn({
+        pageId: page.id,
+        msg: 'Image macro references an unresolvable attachment, leaving macro untouched',
+      });
+    }
+
+    // 'external-url' images are intentionally left as-is (nothing to download/inline).
     return null;
   }
 
@@ -181,15 +191,18 @@ export class PageImageInliner {
 
   private async resolveOtherPageAttachment(
     resource: Extract<ResourceRef, { kind: 'other-page-attachment' }>,
+    currentPageSpaceKey: string,
   ): Promise<ResolvedAttachment | null> {
+    // Same-space references omit ri:space-key, so default to the current page's space.
+    const spaceKey = resource.spaceKey ?? currentPageSpaceKey;
     const lookup = await this.confluenceApiClient.fetchAttachmentsByPageTitle(
-      resource.spaceKey,
+      spaceKey,
       resource.contentTitle,
     );
 
     if (!lookup) {
       this.logger.debug({
-        spaceKey: resource.spaceKey,
+        spaceKey,
         contentTitle: resource.contentTitle,
         msg: 'Referenced page not found when resolving image on another page',
       });

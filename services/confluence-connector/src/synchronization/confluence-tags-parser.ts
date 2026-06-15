@@ -7,7 +7,7 @@ export type ResourceRef =
   | {
       kind: 'other-page-attachment';
       filename: string;
-      spaceKey: string;
+      spaceKey: string | undefined;
       contentTitle: string;
     }
   | { kind: 'external-url' }
@@ -65,25 +65,29 @@ function resolveResourceRef(imageNode: Element): ResourceRef {
   if (url) {
     return { kind: 'external-url' };
   }
+
   const attachment = firstChildElementByName(imageNode, 'ri:attachment');
   if (!attachment) {
     return { kind: 'unknown' };
   }
+
   const filename = attachment.attribs['ri:filename'];
   if (!filename) {
     return { kind: 'unknown' };
   }
+
   const page = firstChildElementByName(attachment, 'ri:page');
   if (page) {
     const spaceKey = page.attribs['ri:space-key'];
     const contentTitle = page.attribs['ri:content-title'];
-    if (spaceKey && contentTitle) {
+
+    // ri:space-key is omitted for same-space references; only ri:content-title is required.
+    if (contentTitle) {
       return { kind: 'other-page-attachment', filename, spaceKey, contentTitle };
     }
-    // <ri:page> is present but malformed (missing ri:space-key or ri:content-title).
-    // Falling through to 'current-attachment' would risk inlining the wrong image if
-    // the current page happens to have an attachment with the same filename.
+
     return { kind: 'unknown' };
   }
+
   return { kind: 'current-attachment', filename };
 }

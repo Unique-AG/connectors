@@ -86,7 +86,7 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
       return null;
     }
 
-    const expand = `space${this.attachmentExpand}`;
+    const expand = `metadata.labels,version,space${this.attachmentExpand}`;
     const url = `${this.apiBaseUrl}/wiki/rest/api/content?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(pageTitle)}&type=page&expand=${expand}`;
     const raw = await this.makeAuthenticatedRequest(url);
 

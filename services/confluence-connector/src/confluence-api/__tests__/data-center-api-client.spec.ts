@@ -531,7 +531,7 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(url).toContain('spaceKey=TST%20SPACE');
       expect(url).toContain('title=Page%20With%20%22Quotes%22%20%26%20Stuff');
       expect(url).toContain('type=page');
-      expect(url).toContain('expand=space');
+      expect(url).toContain('expand=metadata.labels,version,space');
       expect(url).toContain('children.attachment');
     });
 
