@@ -98,6 +98,7 @@ export class KyckrHttpClient {
     [/^\/companies\/[^/]+\/lite$/, '/companies/:kyckrId/lite'],
     [/^\/companies\/[^/]+\/documents$/, '/companies/:kyckrId/documents'],
     [/^\/companies$/, '/companies'],
+    [/^\/orders\/[^/]+\/download$/, '/orders/:orderId/download'],
     [/^\/orders\/[^/]+$/, '/orders/:orderId'],
     [/^\/orders$/, '/orders'],
   ];
