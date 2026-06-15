@@ -9,10 +9,24 @@
  * is never left with orphans.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { page, space } from '../scenario/confluence-builders';
+import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
 import { pageWithAttachmentScenario } from '../scenarios/page-with-attachment.scenario';
-import { threePagesOneSpaceScenario } from '../scenarios/three-pages-one-space.scenario';
+
+// Confluence has three labeled pages in one space; Unique starts empty. One
+// page is mocked to fail per test so we can verify the other two still ingest.
+const threePagesOneSpaceScenario = defineScenario({
+  confluence: {
+    spaces: [space()],
+    pages: [
+      page({ id: 'p1', title: 'Page One' }),
+      page({ id: 'p2', title: 'Page Two' }),
+      page({ id: 'p3', title: 'Page Three' }),
+    ],
+  },
+});
 
 describe('failure isolation', () => {
   let ctx: ScenarioContext | undefined;
