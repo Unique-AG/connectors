@@ -142,7 +142,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | Read full message content from Teams chats |
-| **Used For** | `get_chat_messages` tool to retrieve message history |
+| **Used For** | `get_chat_messages` tool to retrieve message history; `search_messages` tool to run keyword searches via the Microsoft Search API and hydrate chat hits |
 | **Why Not Less** | `Chat.ReadBasic` does not grant access to message content |
 | **Why Not `Chat.ReadWrite`** | We do not modify or delete chat messages |
 
@@ -169,7 +169,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | Read message content from Teams channels |
-| **Used For** | `get_channel_messages` tool to retrieve channel message history |
+| **Used For** | `get_channel_messages` tool to retrieve channel message history; `search_messages` tool to hydrate channel hits when `detail=full` |
 | **Why Not Less** | `Channel.ReadBasic.All` only covers listing channels, not reading message content |
 | **Why Not `ChannelMessage.ReadWrite`** | We do not modify or delete channel messages |
 | **Admin Consent** | Required because channel messages may contain sensitive organisational content |
