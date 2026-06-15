@@ -5,7 +5,7 @@ import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { SearchService } from '../search.service';
 
-export const SearchMessagesInputSchema = z
+const SearchMessagesInputSchema = z
   .object({
     query: z
       .string()
