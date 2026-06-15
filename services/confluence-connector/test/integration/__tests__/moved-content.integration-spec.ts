@@ -16,7 +16,7 @@
  * `update-content`, and `delete-content` respectively.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { aPage, aPageFile, aSpace, aSpaceScope } from '../scenario/builders';
+import { page, pageFile, space, spaceScope } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -35,12 +35,12 @@ describe('moved content', () => {
   it('records the moved metric and leaves a moved file untouched', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
-        pages: [aPage({ id: 'p1' })],
+        spaces: [space()],
+        pages: [page({ id: 'p1' })],
       },
       unique: {
-        scopes: [aSpaceScope({ rootScopeId: 'root-scope-id' })],
-        files: [aPageFile({ pageId: 'p1', body: '<p>Already-ingested body</p>' })],
+        scopes: [spaceScope({ rootScopeId: 'root-scope-id' })],
+        files: [pageFile({ pageId: 'p1', body: '<p>Already-ingested body</p>' })],
       },
     });
     ctx = buildScenarioContext(scenario);

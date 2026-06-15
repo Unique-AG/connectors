@@ -11,7 +11,7 @@
  * rather than individual files.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { aPage, aPageFile, aSpace, aSpaceScope } from '../scenario/builders';
+import { page, pageFile, space, spaceScope } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -32,20 +32,20 @@ describe('delete space', () => {
       confluence: {
         // HR space exists in Confluence but has no labeled pages anymore.
         spaces: [
-          aSpace({ id: 'space-eng', key: 'ENG', name: 'Engineering' }),
-          aSpace({ id: 'space-hr', key: 'HR', name: 'Human Resources' }),
+          space({ id: 'space-eng', key: 'ENG', name: 'Engineering' }),
+          space({ id: 'space-hr', key: 'HR', name: 'Human Resources' }),
         ],
-        pages: [aPage({ id: 'eng-1', spaceKey: 'ENG' })],
+        pages: [page({ id: 'eng-1', spaceKey: 'ENG' })],
       },
       unique: {
         scopes: [
-          aSpaceScope({
+          spaceScope({
             rootScopeId: 'root-scope-id',
             spaceKey: 'ENG',
             spaceId: 'space-eng',
             scopeId: 'scope-eng',
           }),
-          aSpaceScope({
+          spaceScope({
             rootScopeId: 'root-scope-id',
             spaceKey: 'HR',
             spaceId: 'space-hr',
@@ -53,9 +53,9 @@ describe('delete space', () => {
           }),
         ],
         files: [
-          aPageFile({ pageId: 'eng-1', spaceKey: 'ENG', spaceId: 'space-eng' }),
-          aPageFile({ pageId: 'hr-1', spaceKey: 'HR', spaceId: 'space-hr' }),
-          aPageFile({ pageId: 'hr-2', spaceKey: 'HR', spaceId: 'space-hr' }),
+          pageFile({ pageId: 'eng-1', spaceKey: 'ENG', spaceId: 'space-eng' }),
+          pageFile({ pageId: 'hr-1', spaceKey: 'HR', spaceId: 'space-hr' }),
+          pageFile({ pageId: 'hr-2', spaceKey: 'HR', spaceId: 'space-hr' }),
         ],
       },
     });
@@ -86,18 +86,18 @@ describe('delete space', () => {
     const scenario = defineScenario({
       confluence: {
         // HR space is no longer present in Confluence at all. Only ENG remains.
-        spaces: [aSpace({ id: 'space-eng', key: 'ENG', name: 'Engineering' })],
-        pages: [aPage({ id: 'eng-1', spaceKey: 'ENG' })],
+        spaces: [space({ id: 'space-eng', key: 'ENG', name: 'Engineering' })],
+        pages: [page({ id: 'eng-1', spaceKey: 'ENG' })],
       },
       unique: {
         scopes: [
-          aSpaceScope({
+          spaceScope({
             rootScopeId: 'root-scope-id',
             spaceKey: 'ENG',
             spaceId: 'space-eng',
             scopeId: 'scope-eng',
           }),
-          aSpaceScope({
+          spaceScope({
             rootScopeId: 'root-scope-id',
             spaceKey: 'HR',
             spaceId: 'space-hr',
@@ -105,8 +105,8 @@ describe('delete space', () => {
           }),
         ],
         files: [
-          aPageFile({ pageId: 'eng-1', spaceKey: 'ENG', spaceId: 'space-eng' }),
-          aPageFile({ pageId: 'hr-1', spaceKey: 'HR', spaceId: 'space-hr' }),
+          pageFile({ pageId: 'eng-1', spaceKey: 'ENG', spaceId: 'space-eng' }),
+          pageFile({ pageId: 'hr-1', spaceKey: 'HR', spaceId: 'space-hr' }),
         ],
       },
     });
@@ -132,12 +132,12 @@ describe('delete space', () => {
   it('preserves a space scope and its files when the space still has labeled content', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
-        pages: [aPage({ id: 'p1' })],
+        spaces: [space()],
+        pages: [page({ id: 'p1' })],
       },
       unique: {
-        scopes: [aSpaceScope({ rootScopeId: 'root-scope-id' })],
-        files: [aPageFile({ pageId: 'p1' })],
+        scopes: [spaceScope({ rootScopeId: 'root-scope-id' })],
+        files: [pageFile({ pageId: 'p1' })],
       },
     });
     ctx = buildScenarioContext(scenario);

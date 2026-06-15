@@ -20,7 +20,7 @@
  *    holds the externalId, the new sync will fail with a clear conflict.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { aPage, aPageFile, aSpace, aSpaceScope, aUniqueScope } from '../scenario/builders';
+import { page, pageFile, space, spaceScope, uniqueScope } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -46,28 +46,28 @@ describe('root scope migration', () => {
         rootScopeName: 'Confluence v2',
       },
       confluence: {
-        spaces: [aSpace()],
-        pages: [aPage({ id: 'p1', title: 'Fresh content' })],
+        spaces: [space()],
+        pages: [page({ id: 'p1', title: 'Fresh content' })],
       },
       unique: {
         scopes: [
           // The old root is still in Unique with its externalId already
           // cleared (the tenant-deletion flow ran before the operator changed
           // the config). Its leftover scope tree is also still there.
-          aUniqueScope({ id: 'old-root', name: 'Confluence', externalId: null }),
-          aSpaceScope({
+          uniqueScope({ id: 'old-root', name: 'Confluence', externalId: null }),
+          spaceScope({
             rootScopeId: 'old-root',
             spaceKey: 'LEGACY',
             spaceId: 'space-legacy',
             scopeId: 'scope-legacy',
           }),
           // The new root is fresh — no externalId yet, no children.
-          aUniqueScope({ id: 'new-root', name: 'Confluence v2', externalId: null }),
+          uniqueScope({ id: 'new-root', name: 'Confluence v2', externalId: null }),
         ],
         files: [
           // A leftover file under the old root that the operator chose not
           // to clean up. Migration must NOT touch it.
-          aPageFile({
+          pageFile({
             pageId: 'legacy-page',
             spaceKey: 'LEGACY',
             spaceId: 'space-legacy',
@@ -117,20 +117,20 @@ describe('root scope migration', () => {
         rootScopeName: 'Confluence v2',
       },
       confluence: {
-        spaces: [aSpace()],
-        pages: [aPage({ id: 'p1' })],
+        spaces: [space()],
+        pages: [page({ id: 'p1' })],
       },
       unique: {
         scopes: [
           // The old root still claims the externalId — operator forgot to
           // run cleanup before switching.
-          aUniqueScope({
+          uniqueScope({
             id: 'old-root',
             name: 'Confluence',
             externalId: 'confc:cloud:cloud-1',
           }),
           // The new (configured) root has no externalId yet.
-          aUniqueScope({ id: 'new-root', name: 'Confluence v2', externalId: null }),
+          uniqueScope({ id: 'new-root', name: 'Confluence v2', externalId: null }),
         ],
       },
     });

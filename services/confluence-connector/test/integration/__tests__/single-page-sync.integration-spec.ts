@@ -8,7 +8,7 @@
  */
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { aPage, aSpace } from '../scenario/builders';
+import { page, space } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -30,9 +30,9 @@ describe('single-page sync', () => {
   it('ingests a single labeled page', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({
+          page({
             id: 'p1',
             title: 'Page One',
             body: '<p>Hello, integration!</p>',
@@ -98,11 +98,11 @@ describe('single-page sync', () => {
   it('does not ingest unlabeled pages in the same space', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({ id: 'labeled', title: 'Will be ingested', labels: ['ai-ingest'] }),
-          aPage({ id: 'unlabeled-a', title: 'Will be ignored', labels: [] }),
-          aPage({ id: 'unlabeled-b', title: 'Will also be ignored', labels: ['draft'] }),
+          page({ id: 'labeled', title: 'Will be ingested', labels: ['ai-ingest'] }),
+          page({ id: 'unlabeled-a', title: 'Will be ignored', labels: [] }),
+          page({ id: 'unlabeled-b', title: 'Will also be ignored', labels: ['draft'] }),
         ],
       },
     });

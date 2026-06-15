@@ -14,7 +14,7 @@
  * `attachments.mode = disabled` skips the entire attachment scan.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { anAttachment, aPage, aSpace } from '../scenario/builders';
+import { attachment, page, space } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -34,18 +34,18 @@ describe('attachments', () => {
   it('ingests image attachments alongside the page', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({
+          page({
             id: 'p1',
             attachments: [
-              anAttachment({
+              attachment({
                 id: 'att-png',
                 title: 'diagram.png',
                 mediaType: 'image/png',
                 bytes: Buffer.from('PNG bytes'),
               }),
-              anAttachment({
+              attachment({
                 id: 'att-jpg',
                 title: 'photo.jpg',
                 mediaType: 'image/jpeg',
@@ -79,19 +79,19 @@ describe('attachments', () => {
     const scenario = defineScenario({
       tenant: { allowedMimeTypes: ['application/pdf'] },
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({
+          page({
             id: 'p1',
             attachments: [
-              anAttachment({ id: 'att-pdf', title: 'doc.pdf', mediaType: 'application/pdf' }),
-              anAttachment({
+              attachment({ id: 'att-pdf', title: 'doc.pdf', mediaType: 'application/pdf' }),
+              attachment({
                 id: 'att-png',
                 title: 'image.png',
                 mediaType: 'image/png',
                 bytes: Buffer.from('PNG bytes'),
               }),
-              anAttachment({
+              attachment({
                 id: 'att-svg',
                 title: 'logo.svg',
                 mediaType: 'image/svg+xml',
@@ -121,18 +121,18 @@ describe('attachments', () => {
     const scenario = defineScenario({
       tenant: { maxFileSizeMb: 1 },
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({
+          page({
             id: 'p1',
             attachments: [
-              anAttachment({
+              attachment({
                 id: 'att-small',
                 title: 'small.pdf',
                 mediaType: 'application/pdf',
                 bytes: Buffer.from('small file'),
               }),
-              anAttachment({
+              attachment({
                 id: 'att-huge',
                 title: 'huge.pdf',
                 mediaType: 'application/pdf',
@@ -164,24 +164,24 @@ describe('attachments', () => {
     const scenario = defineScenario({
       tenant: { imageOcrEnabled: true },
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({
+          page({
             id: 'p1',
             attachments: [
-              anAttachment({
+              attachment({
                 id: 'att-png',
                 title: 'diagram.png',
                 mediaType: 'image/png',
                 bytes: Buffer.from('PNG bytes'),
               }),
-              anAttachment({
+              attachment({
                 id: 'att-jpg',
                 title: 'photo.jpg',
                 mediaType: 'image/jpeg',
                 bytes: Buffer.from('JPEG bytes'),
               }),
-              anAttachment({
+              attachment({
                 id: 'att-pdf',
                 title: 'doc.pdf',
                 mediaType: 'application/pdf',
@@ -216,7 +216,7 @@ describe('attachments', () => {
   it('ingests every attachment when a page has 50 of them', async () => {
     const ATTACHMENT_COUNT = 50;
     const attachments = Array.from({ length: ATTACHMENT_COUNT }, (_, i) =>
-      anAttachment({
+      attachment({
         id: `att-${String(i + 1).padStart(2, '0')}`,
         title: `doc-${i + 1}.pdf`,
         mediaType: 'application/pdf',
@@ -226,8 +226,8 @@ describe('attachments', () => {
 
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
-        pages: [aPage({ id: 'p1', attachments })],
+        spaces: [space()],
+        pages: [page({ id: 'p1', attachments })],
       },
     });
     ctx = buildScenarioContext(scenario);
@@ -253,11 +253,11 @@ describe('attachments', () => {
     const scenario = defineScenario({
       tenant: { attachmentsEnabled: false },
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({
+          page({
             id: 'p1',
-            attachments: [anAttachment({ id: 'att-1', title: 'doc.pdf' })],
+            attachments: [attachment({ id: 'att-1', title: 'doc.pdf' })],
           }),
         ],
       },

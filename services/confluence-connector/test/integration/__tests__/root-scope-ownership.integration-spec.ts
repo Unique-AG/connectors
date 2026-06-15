@@ -13,7 +13,7 @@
  *    preventing two instances from clobbering each other's content.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { aPage, aSpace, aUniqueScope } from '../scenario/builders';
+import { page, space, uniqueScope } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -33,8 +33,8 @@ describe('root scope ownership', () => {
       // No `unique.scopes` provided — the harness seeds the root scope with
       // externalId=null, which represents an unclaimed root scope.
       confluence: {
-        spaces: [aSpace()],
-        pages: [aPage({ id: 'p1' })],
+        spaces: [space()],
+        pages: [page({ id: 'p1' })],
       },
     });
     ctx = buildScenarioContext(scenario);
@@ -54,12 +54,12 @@ describe('root scope ownership', () => {
   it('proceeds when the root scope is already owned by this instance', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
-        pages: [aPage({ id: 'p1' })],
+        spaces: [space()],
+        pages: [page({ id: 'p1' })],
       },
       unique: {
         scopes: [
-          aUniqueScope({
+          uniqueScope({
             id: 'root-scope-id',
             name: 'Confluence',
             externalId: 'confc:cloud:cloud-1',
@@ -87,12 +87,12 @@ describe('root scope ownership', () => {
   it('aborts the sync when the root scope is owned by a different instance', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
-        pages: [aPage({ id: 'p1' })],
+        spaces: [space()],
+        pages: [page({ id: 'p1' })],
       },
       unique: {
         scopes: [
-          aUniqueScope({
+          uniqueScope({
             id: 'root-scope-id',
             name: 'Confluence',
             externalId: 'confc:cloud:other-instance',

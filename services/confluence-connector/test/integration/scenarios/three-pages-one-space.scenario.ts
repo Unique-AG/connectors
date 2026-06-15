@@ -1,4 +1,4 @@
-import { aPage, aSpace } from '../scenario/builders';
+import { page, space } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 
 /**
@@ -9,11 +9,11 @@ import { defineScenario } from '../scenario/scenario.builder';
  */
 export const threePagesOneSpaceScenario = defineScenario({
   confluence: {
-    spaces: [aSpace()],
+    spaces: [space()],
     pages: [
-      aPage({ id: 'p1', title: 'Page One' }),
-      aPage({ id: 'p2', title: 'Page Two' }),
-      aPage({ id: 'p3', title: 'Page Three' }),
+      page({ id: 'p1', title: 'Page One' }),
+      page({ id: 'p2', title: 'Page Two' }),
+      page({ id: 'p3', title: 'Page Three' }),
     ],
   },
 });

@@ -25,7 +25,7 @@
  * The `deleted` path is covered by `delete-content.integration-spec.ts`.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { aPage, aPageFile, aSpace, aSpaceScope } from '../scenario/builders';
+import { page, pageFile, space, spaceScope } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -47,9 +47,9 @@ describe('update content', () => {
   it('updates a file in place when its source page version has advanced', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({
+          page({
             id: 'p1',
             body: '<p>Updated content</p>',
             versionWhen: NEW_VERSION,
@@ -57,11 +57,11 @@ describe('update content', () => {
         ],
       },
       unique: {
-        scopes: [aSpaceScope({ rootScopeId: 'root-scope-id' })],
+        scopes: [spaceScope({ rootScopeId: 'root-scope-id' })],
         // Same key, but seeded with an older updatedAt so the diff returns it
         // as `updated`.
         files: [
-          aPageFile({
+          pageFile({
             pageId: 'p1',
             body: '<p>Stale content</p>',
             updatedAt: OLD_VERSION,
@@ -91,12 +91,12 @@ describe('update content', () => {
   it('allows a full replacement when every old key is replaced by a non-overlapping new key', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
-        pages: [aPage({ id: 'p3', title: 'New page A' }), aPage({ id: 'p4', title: 'New page B' })],
+        spaces: [space()],
+        pages: [page({ id: 'p3', title: 'New page A' }), page({ id: 'p4', title: 'New page B' })],
       },
       unique: {
-        scopes: [aSpaceScope({ rootScopeId: 'root-scope-id' })],
-        files: [aPageFile({ pageId: 'p1' }), aPageFile({ pageId: 'p2' })],
+        scopes: [spaceScope({ rootScopeId: 'root-scope-id' })],
+        files: [pageFile({ pageId: 'p1' }), pageFile({ pageId: 'p2' })],
       },
     });
     ctx = buildScenarioContext(scenario);

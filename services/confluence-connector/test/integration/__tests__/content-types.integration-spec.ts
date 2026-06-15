@@ -15,7 +15,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { ContentType } from '../../../src/confluence-api';
-import { aPage, aSpace } from '../scenario/builders';
+import { page, space } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -33,10 +33,10 @@ describe('content types', () => {
   it('ingests blog posts the same as pages', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({ id: 'page-1', type: ContentType.PAGE, title: 'A page' }),
-          aPage({ id: 'blog-1', type: ContentType.BLOGPOST, title: 'A blog post' }),
+          page({ id: 'page-1', type: ContentType.PAGE, title: 'A page' }),
+          page({ id: 'blog-1', type: ContentType.BLOGPOST, title: 'A blog post' }),
         ],
       },
     });
@@ -59,12 +59,12 @@ describe('content types', () => {
   it('skips database, whiteboard, and embed content even when labeled', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({ id: 'real-page', type: ContentType.PAGE }),
-          aPage({ id: 'db', type: ContentType.DATABASE, labels: ['ai-ingest'] }),
-          aPage({ id: 'wb', type: ContentType.WHITEBOARD, labels: ['ai-ingest'] }),
-          aPage({ id: 'em', type: ContentType.EMBED, labels: ['ai-ingest'] }),
+          page({ id: 'real-page', type: ContentType.PAGE }),
+          page({ id: 'db', type: ContentType.DATABASE, labels: ['ai-ingest'] }),
+          page({ id: 'wb', type: ContentType.WHITEBOARD, labels: ['ai-ingest'] }),
+          page({ id: 'em', type: ContentType.EMBED, labels: ['ai-ingest'] }),
         ],
       },
     });
@@ -86,33 +86,33 @@ describe('content types', () => {
   it('ingests page descendants of an ai-ingest-all database/whiteboard/embed root', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
           // Three different organizational roots, each a non-page type with
           // ai-ingest-all. None of these roots themselves should appear in
           // Unique.
-          aPage({
+          page({
             id: 'db-root',
             type: ContentType.DATABASE,
             title: 'Engineering Database',
             labels: ['ai-ingest-all'],
           }),
-          aPage({
+          page({
             id: 'wb-root',
             type: ContentType.WHITEBOARD,
             title: 'Roadmap Whiteboard',
             labels: ['ai-ingest-all'],
           }),
-          aPage({
+          page({
             id: 'em-root',
             type: ContentType.EMBED,
             title: 'Embedded Dashboard',
             labels: ['ai-ingest-all'],
           }),
           // Descendants of each root — these should all be ingested.
-          aPage({ id: 'db-child', parentId: 'db-root', type: ContentType.PAGE, labels: [] }),
-          aPage({ id: 'wb-child', parentId: 'wb-root', type: ContentType.BLOGPOST, labels: [] }),
-          aPage({ id: 'em-child', parentId: 'em-root', type: ContentType.PAGE, labels: [] }),
+          page({ id: 'db-child', parentId: 'db-root', type: ContentType.PAGE, labels: [] }),
+          page({ id: 'wb-child', parentId: 'wb-root', type: ContentType.BLOGPOST, labels: [] }),
+          page({ id: 'em-child', parentId: 'em-root', type: ContentType.PAGE, labels: [] }),
         ],
       },
     });

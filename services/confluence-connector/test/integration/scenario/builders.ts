@@ -18,12 +18,12 @@ const DEFAULT_INGEST_LABEL = 'ai-ingest';
  *
  * The override parameter lets tests focus on what matters:
  *
- *     aPage({ id: 'p1', body: '<p>Custom</p>' })
+ *     page({ id: 'p1', body: '<p>Custom</p>' })
  *
  * instead of repeating spaceKey, labels, versionWhen, etc. on every page.
  */
 
-export function aSpace(overrides: Partial<ScenarioSpace> = {}): ScenarioSpace {
+export function space(overrides: Partial<ScenarioSpace> = {}): ScenarioSpace {
   return {
     id: 'space-1',
     key: DEFAULT_SPACE_KEY,
@@ -32,7 +32,7 @@ export function aSpace(overrides: Partial<ScenarioSpace> = {}): ScenarioSpace {
   };
 }
 
-export function aPage(overrides: Partial<ScenarioPage> & Pick<ScenarioPage, 'id'>): ScenarioPage {
+export function page(overrides: Partial<ScenarioPage> & Pick<ScenarioPage, 'id'>): ScenarioPage {
   return {
     spaceKey: DEFAULT_SPACE_KEY,
     title: `Page ${overrides.id}`,
@@ -43,7 +43,7 @@ export function aPage(overrides: Partial<ScenarioPage> & Pick<ScenarioPage, 'id'
   };
 }
 
-export function anAttachment(
+export function attachment(
   overrides: Partial<ScenarioAttachment> & Pick<ScenarioAttachment, 'id'>,
 ): ScenarioAttachment {
   return {
@@ -55,7 +55,7 @@ export function anAttachment(
   };
 }
 
-export function aUniqueFile(
+export function uniqueFile(
   overrides: Partial<ScenarioUniqueFile> & Pick<ScenarioUniqueFile, 'id' | 'key'>,
 ): ScenarioUniqueFile {
   return {
@@ -66,7 +66,7 @@ export function aUniqueFile(
   };
 }
 
-export function aUniqueScope(
+export function uniqueScope(
   overrides: Partial<ScenarioUniqueScope> & Pick<ScenarioUniqueScope, 'id' | 'name'>,
 ): ScenarioUniqueScope {
   return {
@@ -81,7 +81,7 @@ export function aUniqueScope(
  * Produces the proper externalId (`confc:<tenant>:<spaceId>:<spaceKey>`) so that
  * `cleanupRemovedSpaces` can identify it the same way it does in production.
  */
-export function aSpaceScope(opts: {
+export function spaceScope(opts: {
   spaceKey?: string;
   spaceId?: string;
   rootScopeId: string;
@@ -103,13 +103,13 @@ export function aSpaceScope(opts: {
  * Confluence page. Produces the same key the production code would generate
  * (`<tenant>/<spaceId>_<spaceKey>/<pageId>`).
  */
-export function aPageFile(opts: {
+export function pageFile(opts: {
   pageId: string;
   spaceKey?: string;
   spaceId?: string;
   tenantName?: string;
   body?: string;
-  /** Defaults to the same version as `aPage` so the file looks up-to-date. */
+  /** Defaults to the same version as `page` so the file looks up-to-date. */
   updatedAt?: string;
   /** Scope this file belongs to (used by tenant-deletion's getContentIdsByScope). */
   scopeId?: string;
@@ -134,7 +134,7 @@ export function aPageFile(opts: {
  * Confluence attachment. Produces the production attachment key
  * (`<tenant>/<spaceId>_<spaceKey>/<pageId>::<attachmentId>`).
  */
-export function anAttachmentFile(opts: {
+export function attachmentFile(opts: {
   pageId: string;
   attachmentId: string;
   spaceKey?: string;

@@ -10,7 +10,7 @@
  * covered by `single-page-sync.integration-spec.ts`.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { aPage, aSpace } from '../scenario/builders';
+import { page, space } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -27,13 +27,13 @@ describe('subtree sync', () => {
   it('ingests a labeled root page together with its entire descendant tree', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({ id: 'root', title: 'Handbook', labels: ['ai-ingest-all'] }),
+          page({ id: 'root', title: 'Handbook', labels: ['ai-ingest-all'] }),
           // Children are unlabeled, so descendant traversal is the only path to
           // them — a regression in getDescendantPages fails this test.
-          aPage({ id: 'child-a', parentId: 'root', title: 'Onboarding', labels: [] }),
-          aPage({ id: 'child-b', parentId: 'root', title: 'Benefits', labels: [] }),
+          page({ id: 'child-a', parentId: 'root', title: 'Onboarding', labels: [] }),
+          page({ id: 'child-b', parentId: 'root', title: 'Benefits', labels: [] }),
         ],
       },
     });
@@ -57,12 +57,12 @@ describe('subtree sync', () => {
   it('ingests multiple ai-ingest-all roots in the same space', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({ id: 'root-eng', title: 'Engineering', labels: ['ai-ingest-all'] }),
-          aPage({ id: 'eng-1', parentId: 'root-eng', title: 'On-call', labels: [] }),
-          aPage({ id: 'root-hr', title: 'HR', labels: ['ai-ingest-all'] }),
-          aPage({ id: 'hr-1', parentId: 'root-hr', title: 'PTO Policy', labels: [] }),
+          page({ id: 'root-eng', title: 'Engineering', labels: ['ai-ingest-all'] }),
+          page({ id: 'eng-1', parentId: 'root-eng', title: 'On-call', labels: [] }),
+          page({ id: 'root-hr', title: 'HR', labels: ['ai-ingest-all'] }),
+          page({ id: 'hr-1', parentId: 'root-hr', title: 'PTO Policy', labels: [] }),
         ],
       },
     });
@@ -88,13 +88,13 @@ describe('subtree sync', () => {
     const scenario = defineScenario({
       confluence: {
         spaces: [
-          aSpace({ id: 'space-eng', key: 'ENG', name: 'Engineering' }),
-          aSpace({ id: 'space-hr', key: 'HR', name: 'Human Resources' }),
+          space({ id: 'space-eng', key: 'ENG', name: 'Engineering' }),
+          space({ id: 'space-hr', key: 'HR', name: 'Human Resources' }),
         ],
         pages: [
-          aPage({ id: 'eng-root', spaceKey: 'ENG', labels: ['ai-ingest-all'] }),
-          aPage({ id: 'eng-child', spaceKey: 'ENG', parentId: 'eng-root', labels: [] }),
-          aPage({ id: 'hr-root', spaceKey: 'HR', labels: ['ai-ingest-all'] }),
+          page({ id: 'eng-root', spaceKey: 'ENG', labels: ['ai-ingest-all'] }),
+          page({ id: 'eng-child', spaceKey: 'ENG', parentId: 'eng-root', labels: [] }),
+          page({ id: 'hr-root', spaceKey: 'HR', labels: ['ai-ingest-all'] }),
         ],
       },
     });
@@ -123,7 +123,7 @@ describe('subtree sync', () => {
   it('ingests every descendant when an ai-ingest-all root has 50 of them', async () => {
     const DESCENDANT_COUNT = 50;
     const descendants = Array.from({ length: DESCENDANT_COUNT }, (_, i) =>
-      aPage({
+      page({
         id: `child-${String(i + 1).padStart(2, '0')}`,
         parentId: 'root',
         title: `Child ${i + 1}`,
@@ -133,11 +133,8 @@ describe('subtree sync', () => {
 
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
-        pages: [
-          aPage({ id: 'root', title: 'Big Tree', labels: ['ai-ingest-all'] }),
-          ...descendants,
-        ],
+        spaces: [space()],
+        pages: [page({ id: 'root', title: 'Big Tree', labels: ['ai-ingest-all'] }), ...descendants],
       },
     });
     ctx = buildScenarioContext(scenario);
@@ -160,11 +157,11 @@ describe('subtree sync', () => {
   it('combines ai-ingest and ai-ingest-all labels in the same space', async () => {
     const scenario = defineScenario({
       confluence: {
-        spaces: [aSpace()],
+        spaces: [space()],
         pages: [
-          aPage({ id: 'standalone', title: 'Release Notes', labels: ['ai-ingest'] }),
-          aPage({ id: 'root', title: 'Architecture', labels: ['ai-ingest-all'] }),
-          aPage({ id: 'child', parentId: 'root', title: 'Database Schema', labels: [] }),
+          page({ id: 'standalone', title: 'Release Notes', labels: ['ai-ingest'] }),
+          page({ id: 'root', title: 'Architecture', labels: ['ai-ingest-all'] }),
+          page({ id: 'child', parentId: 'root', title: 'Database Schema', labels: [] }),
         ],
       },
     });

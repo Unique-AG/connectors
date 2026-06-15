@@ -16,7 +16,7 @@
  * later without rebuilding its scope tree.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { aPageFile, aSpaceScope, aUniqueScope } from '../scenario/builders';
+import { pageFile, spaceScope, uniqueScope } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -36,18 +36,18 @@ describe('delete tenant', () => {
       unique: {
         scopes: [
           // Root scope is owned (externalId set), so the cleanup will run.
-          aUniqueScope({
+          uniqueScope({
             id: 'root-scope-id',
             name: 'Confluence',
             externalId: 'confc:cloud:cloud-1',
           }),
-          aSpaceScope({
+          spaceScope({
             rootScopeId: 'root-scope-id',
             spaceKey: 'ENG',
             spaceId: 'space-eng',
             scopeId: 'scope-eng',
           }),
-          aSpaceScope({
+          spaceScope({
             rootScopeId: 'root-scope-id',
             spaceKey: 'HR',
             spaceId: 'space-hr',
@@ -55,19 +55,19 @@ describe('delete tenant', () => {
           }),
         ],
         files: [
-          aPageFile({
+          pageFile({
             pageId: 'eng-1',
             spaceKey: 'ENG',
             spaceId: 'space-eng',
             scopeId: 'scope-eng',
           }),
-          aPageFile({
+          pageFile({
             pageId: 'eng-2',
             spaceKey: 'ENG',
             spaceId: 'space-eng',
             scopeId: 'scope-eng',
           }),
-          aPageFile({ pageId: 'hr-1', spaceKey: 'HR', spaceId: 'space-hr', scopeId: 'scope-hr' }),
+          pageFile({ pageId: 'hr-1', spaceKey: 'HR', spaceId: 'space-hr', scopeId: 'scope-hr' }),
         ],
       },
     });
@@ -93,7 +93,7 @@ describe('delete tenant', () => {
     const scenario = defineScenario({
       unique: {
         scopes: [
-          aUniqueScope({
+          uniqueScope({
             id: 'root-scope-id',
             name: 'Confluence',
             externalId: 'confc:cloud:cloud-1',
@@ -120,7 +120,7 @@ describe('delete tenant', () => {
       unique: {
         scopes: [
           // externalId is null, signalling a previous successful cleanup.
-          aUniqueScope({ id: 'root-scope-id', name: 'Confluence', externalId: null }),
+          uniqueScope({ id: 'root-scope-id', name: 'Confluence', externalId: null }),
         ],
       },
     });
