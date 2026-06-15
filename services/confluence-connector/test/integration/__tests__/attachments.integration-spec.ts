@@ -62,12 +62,12 @@ describe('attachments', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    const filesByKey = new Map(state.files.map((file) => [file.key, file]));
+    const findByKey = (key: string) => state.files.find((file) => file.key === key);
 
-    expect(filesByKey.get('tenant1/space-1_SP/p1::att-png')).toMatchObject({
+    expect(findByKey('tenant1/space-1_SP/p1::att-png')).toMatchObject({
       mimeType: 'image/png',
     });
-    expect(filesByKey.get('tenant1/space-1_SP/p1::att-jpg')).toMatchObject({
+    expect(findByKey('tenant1/space-1_SP/p1::att-jpg')).toMatchObject({
       mimeType: 'image/jpeg',
     });
   });
@@ -197,16 +197,16 @@ describe('attachments', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    const filesByKey = new Map(state.files.map((file) => [file.key, file]));
+    const findByKey = (key: string) => state.files.find((file) => file.key === key);
 
-    expect(filesByKey.get('tenant1/space-1_SP/p1::att-png')?.ingestionConfig).toEqual({
+    expect(findByKey('tenant1/space-1_SP/p1::att-png')?.ingestionConfig).toEqual({
       jpgReadMode: 'DOC_INTELLIGENCE_DEFAULT',
     });
-    expect(filesByKey.get('tenant1/space-1_SP/p1::att-jpg')?.ingestionConfig).toEqual({
+    expect(findByKey('tenant1/space-1_SP/p1::att-jpg')?.ingestionConfig).toEqual({
       jpgReadMode: 'DOC_INTELLIGENCE_DEFAULT',
     });
-    expect(filesByKey.get('tenant1/space-1_SP/p1::att-pdf')?.ingestionConfig).toBeNull();
-    expect(filesByKey.get('tenant1/space-1_SP/p1')?.ingestionConfig).toBeNull();
+    expect(findByKey('tenant1/space-1_SP/p1::att-pdf')?.ingestionConfig).toBeNull();
+    expect(findByKey('tenant1/space-1_SP/p1')?.ingestionConfig).toBeNull();
   });
 
   // Scale check: a page with many attachments must ingest every one of them.
