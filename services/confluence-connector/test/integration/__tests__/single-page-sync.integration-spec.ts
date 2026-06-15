@@ -8,7 +8,7 @@
  */
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
-import { page, space } from '../scenario/builders';
+import { page, space } from '../scenario/confluence-builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';

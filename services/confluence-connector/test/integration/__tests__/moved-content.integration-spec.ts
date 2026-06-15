@@ -16,8 +16,9 @@
  * `update-content`, and `delete-content` respectively.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { page, pageFile, space, spaceScope } from '../scenario/builders';
+import { page, space } from '../scenario/confluence-builders';
 import { defineScenario } from '../scenario/scenario.builder';
+import { pageFile, spaceScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
 

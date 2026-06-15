@@ -1,4 +1,4 @@
-import { attachment, page, space } from '../scenario/builders';
+import { attachment, page, space } from '../scenario/confluence-builders';
 import { defineScenario } from '../scenario/scenario.builder';
 
 const pdfBytes = Buffer.from('%PDF-1.4\n% fake pdf content for integration tests\n%%EOF\n');

@@ -12,15 +12,9 @@
  * scopes when no labeled content remains in the space at all.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  attachment,
-  attachmentFile,
-  page,
-  pageFile,
-  space,
-  spaceScope,
-} from '../scenario/builders';
+import { attachment, page, space } from '../scenario/confluence-builders';
 import { defineScenario } from '../scenario/scenario.builder';
+import { attachmentFile, pageFile, spaceScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
 

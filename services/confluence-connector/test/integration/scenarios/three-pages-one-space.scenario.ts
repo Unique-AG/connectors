@@ -1,4 +1,4 @@
-import { page, space } from '../scenario/builders';
+import { page, space } from '../scenario/confluence-builders';
 import { defineScenario } from '../scenario/scenario.builder';
 
 /**

@@ -16,8 +16,8 @@
  * later without rebuilding its scope tree.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { pageFile, spaceScope, uniqueScope } from '../scenario/builders';
 import { defineScenario } from '../scenario/scenario.builder';
+import { pageFile, spaceScope, uniqueScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
 

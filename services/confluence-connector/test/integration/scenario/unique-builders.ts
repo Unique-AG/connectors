@@ -1,59 +1,19 @@
 import { buildScopeExternalId } from '../../../src/utils/key-format';
-import type {
-  ScenarioAttachment,
-  ScenarioPage,
-  ScenarioSpace,
-  ScenarioUniqueFile,
-  ScenarioUniqueScope,
-} from './scenario.types';
-
-const DEFAULT_VERSION = '2026-05-01T10:00:00.000Z';
-const DEFAULT_SPACE_KEY = 'SP';
-const DEFAULT_SPACE_ID = 'space-1';
-const DEFAULT_TENANT_NAME = 'tenant1';
-const DEFAULT_INGEST_LABEL = 'ai-ingest';
+import {
+  DEFAULT_SPACE_ID,
+  DEFAULT_SPACE_KEY,
+  DEFAULT_TENANT_NAME,
+  DEFAULT_VERSION,
+} from './defaults';
+import type { ScenarioUniqueFile, ScenarioUniqueScope } from './scenario.types';
 
 /**
- * Entity builders that produce well-formed scenario primitives with sensible defaults.
- *
- * The override parameter lets tests focus on what matters:
- *
- *     page({ id: 'p1', body: '<p>Custom</p>' })
- *
- * instead of repeating spaceKey, labels, versionWhen, etc. on every page.
+ * Builders for Unique-side scenario primitives (the state already ingested into
+ * Unique that a sync reconciles against). The plain builders take raw overrides;
+ * the domain-flavored shorthands produce the same keys/externalIds the
+ * production code generates, so the sync logic identifies them as it would in
+ * production.
  */
-
-export function space(overrides: Partial<ScenarioSpace> = {}): ScenarioSpace {
-  return {
-    id: 'space-1',
-    key: DEFAULT_SPACE_KEY,
-    name: 'Space One',
-    ...overrides,
-  };
-}
-
-export function page(overrides: Partial<ScenarioPage> & Pick<ScenarioPage, 'id'>): ScenarioPage {
-  return {
-    spaceKey: DEFAULT_SPACE_KEY,
-    title: `Page ${overrides.id}`,
-    body: `<p>Body of ${overrides.id}</p>`,
-    labels: [DEFAULT_INGEST_LABEL],
-    versionWhen: DEFAULT_VERSION,
-    ...overrides,
-  };
-}
-
-export function attachment(
-  overrides: Partial<ScenarioAttachment> & Pick<ScenarioAttachment, 'id'>,
-): ScenarioAttachment {
-  return {
-    title: `${overrides.id}.pdf`,
-    mediaType: 'application/pdf',
-    bytes: Buffer.from(`%PDF-1.4\n% fake bytes for ${overrides.id}\n%%EOF\n`),
-    versionWhen: DEFAULT_VERSION,
-    ...overrides,
-  };
-}
 
 export function uniqueFile(
   overrides: Partial<ScenarioUniqueFile> & Pick<ScenarioUniqueFile, 'id' | 'key'>,

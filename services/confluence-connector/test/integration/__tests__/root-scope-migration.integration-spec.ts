@@ -20,8 +20,9 @@
  *    holds the externalId, the new sync will fail with a clear conflict.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { page, pageFile, space, spaceScope, uniqueScope } from '../scenario/builders';
+import { page, space } from '../scenario/confluence-builders';
 import { defineScenario } from '../scenario/scenario.builder';
+import { pageFile, spaceScope, uniqueScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
 
