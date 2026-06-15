@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { IngestionConfig } from '@unique-ag/unique-api';
+import { sortBy } from 'remeda';
 import type { FakeUniqueApi } from '../fakes/fake-unique-api';
 
 export interface UniqueScopeState {
@@ -41,18 +42,18 @@ export function getUniqueState(unique: FakeUniqueApi): UniqueState {
   const scopes = unique.listScopes();
   const scopePathById = buildScopePathIndex(scopes);
 
-  const scopeStates: UniqueScopeState[] = scopes
-    .map((scope) => ({
+  const scopeStates: UniqueScopeState[] = sortBy(
+    scopes.map((scope) => ({
       id: scope.id,
       name: scope.name,
       path: scopePathById.get(scope.id) ?? scope.name,
       externalId: scope.externalId,
-    }))
-    .sort((a, b) => a.path.localeCompare(b.path));
+    })),
+    (scope) => scope.path,
+  );
 
-  const fileStates: UniqueFileState[] = unique
-    .listFiles()
-    .map((file) => ({
+  const fileStates: UniqueFileState[] = sortBy(
+    unique.listFiles().map((file) => ({
       id: file.id,
       key: file.key,
       byteSize: file.byteSize,
@@ -62,8 +63,9 @@ export function getUniqueState(unique: FakeUniqueApi): UniqueState {
       bodySize: file.body?.byteLength ?? 0,
       bodyText: bodyTextOrNull(file.mimeType, file.body),
       ingestionConfig: file.ingestionConfig,
-    }))
-    .sort((a, b) => a.key.localeCompare(b.key));
+    })),
+    (file) => file.key,
+  );
 
   return { scopes: scopeStates, files: fileStates };
 }
