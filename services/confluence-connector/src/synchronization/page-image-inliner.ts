@@ -56,28 +56,36 @@ export class PageImageInliner {
     // Inlining must never lose a page: on any unexpected failure, fall back to the original body.
     try {
       const imageMacros = findAllImageMacros(page.body);
-      if (imageMacros.length === 0) {
+      const pageImageAttachmentsByTitle = indexBy(
+        pageImageAttachments,
+        (attachment) => attachment.title,
+      );
+
+      // Replace each in-body <ac:image> macro with the base64 <img> it resolves to.
+      const encodedImagePatches = await this.resolveInBatches(imageMacros, (macro) =>
+        this.buildImagePatch(macro, page, pageImageAttachmentsByTitle),
+      );
+
+      // Any image attachment not already shown by an in-body macro is appended at the end of the
+      // body, so every image is inlined and none falls back to standalone ingestion.
+      const filenamesReferencedByMacro = new Set(
+        imageMacros.flatMap((macro) =>
+          macro.resourceRef.kind === 'current-attachment' ? [macro.resourceRef.filename] : [],
+        ),
+      );
+      const attachmentsWithoutMacro = pageImageAttachments.filter(
+        (attachment) => !filenamesReferencedByMacro.has(attachment.title),
+      );
+      const appendedImageTags = await this.resolveInBatches(attachmentsWithoutMacro, (attachment) =>
+        this.buildAppendedImageTag(attachment, page),
+      );
+
+      if (encodedImagePatches.length === 0 && appendedImageTags.length === 0) {
         return page;
       }
 
-      const pageImageAttachmentsByTitle = indexBy(pageImageAttachments, (a) => a.title);
-
-      const encodedImagePatches: EncodedImagePatch[] = [];
-      // convert images to base64 in batches to cap concurrent downloads
-      for (const imagesToProcessChunk of chunk(imageMacros, IMAGE_INLINE_BATCH_SIZE)) {
-        const batchResults = await Promise.all(
-          imagesToProcessChunk.map((macro) =>
-            this.resolveBase64EncodedImagePatch(macro, page, pageImageAttachmentsByTitle),
-          ),
-        );
-        encodedImagePatches.push(...filter(batchResults, isNonNullish));
-      }
-
-      if (encodedImagePatches.length === 0) {
-        return page;
-      }
-
-      return { ...page, body: this.applyEncodedImagePatches(page.body, encodedImagePatches) };
+      const patchedBody = this.applyEncodedImagePatches(page.body, encodedImagePatches);
+      return { ...page, body: patchedBody + appendedImageTags.join('') };
     } catch (err) {
       this.logger.warn({
         pageId: page.id,
@@ -88,7 +96,21 @@ export class PageImageInliner {
     }
   }
 
-  private async resolveBase64EncodedImagePatch(
+  // Resolves items in fixed-size batches to cap concurrent downloads, dropping the nulls (items
+  // that were skipped or failed). Shared by the macro and append paths so both stay in lockstep.
+  private async resolveInBatches<T, R>(
+    items: T[],
+    resolveItem: (item: T) => Promise<R | null>,
+  ): Promise<R[]> {
+    const resolved: R[] = [];
+    for (const batch of chunk(items, IMAGE_INLINE_BATCH_SIZE)) {
+      const batchResults = await Promise.all(batch.map(resolveItem));
+      resolved.push(...filter(batchResults, isNonNullish));
+    }
+    return resolved;
+  }
+
+  private async buildImagePatch(
     macro: ParsedImageMacro,
     page: FetchedPage,
     pageImageAttachmentsByTitle: Readonly<Record<string, DiscoveredAttachment>>,
@@ -103,44 +125,10 @@ export class PageImageInliner {
         return null;
       }
 
-      if (!isImageMimeType(resolved.mediaType)) {
-        this.logger.debug({
-          pageId: page.id,
-          filename: resolved.filename,
-          mediaType: resolved.mediaType,
-          msg: 'Referenced attachment is not an image, leaving macro untouched',
-        });
+      const html = await this.encodeAttachmentAsImg(resolved, macro.imgAttrs, page);
+      if (!html) {
         return null;
       }
-
-      // Other-page lookups bypass discovery's allowedMimeTypes filter; re-check here.
-      if (!this.isAllowedMimeType(resolved.mediaType)) {
-        this.logger.debug({
-          pageId: page.id,
-          filename: resolved.filename,
-          mediaType: resolved.mediaType,
-          msg: 'Referenced image MIME type is not in allowedMimeTypes, leaving macro untouched',
-        });
-        return null;
-      }
-
-      if (this.exceedsMaxSize(resolved.fileSize)) {
-        this.logger.warn({
-          pageId: page.id,
-          filename: resolved.filename,
-          fileSize: resolved.fileSize,
-          maxFileSizeMb: this.config.ingestion.attachments.maxFileSizeMb,
-          msg: 'Image exceeds max file size, leaving macro untouched',
-        });
-        return null;
-      }
-
-      const buffer = await this.downloadToBuffer(
-        resolved.attachmentId,
-        resolved.pageId,
-        resolved.downloadPath,
-      );
-      const html = this.buildImgTag(macro.imgAttrs, resolved.mediaType, buffer, resolved.filename);
 
       return { start: macro.startIndex, end: macro.endIndex, html };
     } catch (err) {
@@ -149,6 +137,76 @@ export class PageImageInliner {
         resource: macro.resourceRef,
         err,
         msg: 'Failed to inline image, leaving macro untouched',
+      });
+      return null;
+    }
+  }
+
+  // Runs the image filters (type, allowlist, size) and downloads the bytes, returning a base64
+  // <img> tag. Returns null when the attachment is filtered out; download/IO errors propagate.
+  private async encodeAttachmentAsImg(
+    resolved: ResolvedAttachment,
+    imgAttrs: Record<string, string>,
+    page: FetchedPage,
+  ): Promise<string | null> {
+    if (!isImageMimeType(resolved.mediaType)) {
+      this.logger.debug({
+        pageId: page.id,
+        filename: resolved.filename,
+        mediaType: resolved.mediaType,
+        msg: 'Attachment is not an image, skipping inlining',
+      });
+      return null;
+    }
+
+    // Other-page lookups bypass discovery's allowedMimeTypes filter; re-check here.
+    if (!this.isAllowedMimeType(resolved.mediaType)) {
+      this.logger.debug({
+        pageId: page.id,
+        filename: resolved.filename,
+        mediaType: resolved.mediaType,
+        msg: 'Image MIME type is not in allowedMimeTypes, skipping inlining',
+      });
+      return null;
+    }
+
+    if (this.exceedsMaxSize(resolved.fileSize)) {
+      this.logger.warn({
+        pageId: page.id,
+        filename: resolved.filename,
+        fileSize: resolved.fileSize,
+        maxFileSizeMb: this.config.ingestion.attachments.maxFileSizeMb,
+        msg: 'Image exceeds max file size, skipping inlining',
+      });
+      return null;
+    }
+
+    const buffer = await this.downloadToBuffer(
+      resolved.attachmentId,
+      resolved.pageId,
+      resolved.downloadPath,
+    );
+    return this.buildImgTag(imgAttrs, resolved.mediaType, buffer, resolved.filename);
+  }
+
+  private async buildAppendedImageTag(
+    attachment: DiscoveredAttachment,
+    page: FetchedPage,
+  ): Promise<string | null> {
+    try {
+      const html = await this.encodeAttachmentAsImg(
+        this.fromDiscoveredAttachment(attachment),
+        {},
+        page,
+      );
+      return html ? `<p>${html}</p>` : null;
+    } catch (err) {
+      this.logger.warn({
+        pageId: page.id,
+        attachmentId: attachment.id,
+        filename: attachment.title,
+        err,
+        msg: 'Failed to append image attachment, skipping',
       });
       return null;
     }
@@ -210,7 +268,7 @@ export class PageImageInliner {
     }
 
     const match = lookup.attachments.find(
-      (a: ConfluenceAttachment) => a.title === resource.filename,
+      (attachment: ConfluenceAttachment) => attachment.title === resource.filename,
     );
 
     if (!match) {

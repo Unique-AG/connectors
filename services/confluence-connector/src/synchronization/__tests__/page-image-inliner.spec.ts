@@ -391,10 +391,12 @@ describe('PageImageInliner', () => {
       );
     });
 
-    it('leaves macro untouched when <ri:page> has no ri:content-title (does not silently fall back to current-page)', async () => {
+    it('does not fill an <ri:page> macro lacking ri:content-title with a same-named current-page attachment', async () => {
       // Without ri:content-title the source page can't be identified. The presence of <ri:page>
-      // signals intent to reference another page, so we skip rather than risk inlining a
-      // same-named attachment on the current page.
+      // signals intent to reference another page, so the macro must NOT silently fall back to a
+      // same-named attachment on the current page. (That attachment is still appended at the end
+      // like any other unreferenced image, but it never replaces the macro.)
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
       const samePageDecoy: DiscoveredAttachment = {
         ...sampleDiscoveredImageAttachment,
         title: 'other.png',
@@ -404,9 +406,11 @@ describe('PageImageInliner', () => {
 
       const result = await inliner.inlineImagesInPage(basePage(body), [samePageDecoy]);
 
-      expect(result.body).toBe(body);
+      // the macro is left untouched (not replaced by the decoy)...
+      expect(result.body.startsWith(body)).toBe(true);
       expect(apiClient.fetchAttachmentsByPageTitle).not.toHaveBeenCalled();
-      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+      // ...the decoy is instead appended at the end, like any unreferenced page image.
+      expect(result.body.endsWith('alt="other.png" /></p>')).toBe(true);
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           pageId: '1',
@@ -426,23 +430,37 @@ describe('PageImageInliner', () => {
   });
 
   describe('malformed / edge-case bodies', () => {
-    it('leaves a self-closing <ac:image/> macro untouched (no resource reference)', async () => {
+    it('leaves a self-closing <ac:image/> macro in place and appends the unreferenced attachment', async () => {
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
       const page = basePage(PAGE_BODY_SELF_CLOSING_IMAGE);
       const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
-      expect(result.body).toBe(page.body);
-      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+      // The self-closing macro carries no resource reference, so it is left untouched...
+      expect(result.body.startsWith('<p>before</p><ac:image/><p>after</p>')).toBe(true);
+      // ...and the attachment, referenced by no macro, is appended at the end of the body.
+      expect(
+        result.body.endsWith(
+          `<p><img src="data:image/png;base64,${imageBuffer().toString('base64')}" alt="diagram.png" /></p>`,
+        ),
+      ).toBe(true);
     });
 
     it('leaves an unclosed <ac:image> tag untouched and preserves trailing content', async () => {
       // Malformed body where <ac:image> is opened but never closed, referencing a filename
       // that DOES resolve to a discovered attachment. The parser would otherwise synthesize a
       // close at EOF and we would splice from '<ac:image>' all the way to the end of the body,
-      // destroying everything after it. The close-tag guard must drop the macro entirely.
+      // destroying everything after it. The close-tag guard must drop the macro entirely, so the
+      // original body (including the trailing <p>more</p>) survives byte-for-byte as a prefix.
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
       const page = basePage(PAGE_BODY_UNCLOSED_IMAGE);
       const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
-      expect(result.body).toBe(page.body);
-      expect(result.body.endsWith('<p>more</p>')).toBe(true);
-      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+      expect(result.body.startsWith(page.body)).toBe(true);
+      expect(result.body).toContain('<ri:attachment ri:filename="diagram.png"/><p>more</p>');
+      // The macro never consumed the attachment, so it is appended at the end instead.
+      expect(
+        result.body.endsWith(
+          `<p><img src="data:image/png;base64,${imageBuffer().toString('base64')}" alt="diagram.png" /></p>`,
+        ),
+      ).toBe(true);
     });
 
     it('inlines the attachment while leaving an adjacent external <ri:url> macro untouched', async () => {
@@ -595,6 +613,99 @@ describe('PageImageInliner', () => {
       expect(result.body).toContain('alt="a&amp;b &quot;c&quot; &lt;d>.png"');
       // Must not contain a raw " inside the attribute value.
       expect(result.body).not.toMatch(/alt="[^"]*"c"/);
+    });
+  });
+
+  describe('appending unreferenced attachments', () => {
+    it('appends an image attachment that no macro references to the end of the body', async () => {
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+      const page = basePage('<p>just text</p>');
+
+      const result = await inliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
+
+      const expectedBase64 = imageBuffer().toString('base64');
+      expect(result.body.startsWith('<p>just text</p>')).toBe(true);
+      expect(
+        result.body.endsWith(
+          `<p><img src="data:image/png;base64,${expectedBase64}" alt="diagram.png" /></p>`,
+        ),
+      ).toBe(true);
+      expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('inlines a referenced image in place and appends an unreferenced one after it', async () => {
+      apiClient.getAttachmentDownloadStream
+        .mockResolvedValueOnce(Readable.from(Buffer.from('PNG')))
+        .mockResolvedValueOnce(Readable.from(Buffer.from('JPG')));
+      const chart: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        id: 'att-chart',
+        title: 'chart.jpg',
+        mediaType: 'image/jpeg',
+        downloadPath: '/download/attachments/1/chart.jpg',
+      };
+
+      // body references diagram.png via a macro; chart.jpg is attached but not referenced.
+      const result = await inliner.inlineImagesInPage(
+        basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE),
+        [sampleDiscoveredImageAttachment, chart],
+      );
+
+      expect(result.body).not.toContain('<ac:image');
+      expect(result.body).toContain(
+        `src="data:image/png;base64,${Buffer.from('PNG').toString('base64')}"`,
+      );
+      expect(
+        result.body.endsWith(
+          `<p><img src="data:image/jpeg;base64,${Buffer.from('JPG').toString('base64')}" alt="chart.jpg" /></p>`,
+        ),
+      ).toBe(true);
+      // the macro-inlined image comes before the appended one.
+      expect(result.body.indexOf('alt="diagram"')).toBeLessThan(
+        result.body.indexOf('alt="chart.jpg"'),
+      );
+    });
+
+    it('does not append an image that a macro already references (no duplicate)', async () => {
+      apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
+
+      const result = await inliner.inlineImagesInPage(
+        basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE),
+        [sampleDiscoveredImageAttachment],
+      );
+
+      expect((result.body.match(/<img /g) ?? []).length).toBe(1);
+      expect(apiClient.getAttachmentDownloadStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not append an unreferenced attachment that exceeds maxFileSizeMb', async () => {
+      const oversize: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        fileSize: 5 * 1024 * 1024,
+      };
+      const smallLimitInliner = new PageImageInliner(
+        createTestTenantConfig({ maxFileSizeMb: 1 }),
+        apiClient,
+      );
+      const page = basePage('<p>just text</p>');
+
+      const result = await smallLimitInliner.inlineImagesInPage(page, [oversize]);
+
+      expect(result).toBe(page);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
+    });
+
+    it('does not append an unreferenced attachment whose image type is not in allowedMimeTypes', async () => {
+      const gifAttachment: DiscoveredAttachment = {
+        ...sampleDiscoveredImageAttachment,
+        mediaType: 'image/gif',
+      };
+      const page = basePage('<p>just text</p>');
+
+      const result = await inliner.inlineImagesInPage(page, [gifAttachment]);
+
+      expect(result).toBe(page);
+      expect(apiClient.getAttachmentDownloadStream).not.toHaveBeenCalled();
     });
   });
 });
