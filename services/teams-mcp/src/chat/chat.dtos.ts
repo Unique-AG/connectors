@@ -73,3 +73,56 @@ export const MsChatMessageSchema = z
 export type MsChatMember = z.infer<typeof MsChatMemberSchema>;
 export type MsChat = z.infer<typeof MsChatSchema>;
 export type MsChatMessage = z.infer<typeof MsChatMessageSchema>;
+
+// ─── Search (Microsoft Search API: POST /search/query) ──────────────────────────
+
+// The `resource` of a chatMessage hit. Graph omits most fields depending on the
+// message kind (1:1 chat vs channel), so almost everything is nullish.
+const MsSearchHitResourceSchema = z.object({
+  id: z.string().nullish(),
+  createdDateTime: z.string().nullish(),
+  webUrl: z.string().nullish(),
+  subject: z.string().nullish(),
+  importance: z.string().nullish(),
+  // Present for chat messages (1:1 and group chats).
+  chatId: z.string().nullish(),
+  // Present for channel messages.
+  channelIdentity: z
+    .object({
+      teamId: z.string().nullish(),
+      channelId: z.string().nullish(),
+    })
+    .nullish(),
+  from: z
+    .object({
+      user: z.object({ id: z.string().nullish(), displayName: z.string().nullish() }).nullish(),
+      application: z.object({ displayName: z.string().nullish() }).nullish(),
+    })
+    .nullish(),
+});
+
+const MsSearchHitSchema = z.object({
+  hitId: z.string().nullish(),
+  rank: z.number().nullish(),
+  summary: z.string().nullish(),
+  resource: MsSearchHitResourceSchema.nullish(),
+});
+
+const MsSearchHitsContainerSchema = z.object({
+  hits: z.array(MsSearchHitSchema).nullish(),
+  total: z.number().nullish(),
+  moreResultsAvailable: z.boolean().nullish(),
+});
+
+export const MsSearchResponseSchema = z.object({
+  value: z
+    .array(
+      z.object({
+        hitsContainers: z.array(MsSearchHitsContainerSchema).nullish(),
+      }),
+    )
+    .nullish(),
+});
+
+export type MsSearchHit = z.infer<typeof MsSearchHitSchema>;
+export type MsSearchResponse = z.infer<typeof MsSearchResponseSchema>;

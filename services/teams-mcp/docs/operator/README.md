@@ -5,9 +5,9 @@
 
 This guide provides IT operators with the technical information needed to deploy, configure, and maintain the Teams MCP Server.
 
-The Teams MCP Server exposes 11 MCP tools across two categories:
+The Teams MCP Server exposes 12 MCP tools across two categories:
 
-- **Chat tools** — `list_teams`, `list_channels`, `list_chats`, `get_channel_messages`, `get_chat_messages`, `send_channel_message`, `send_chat_message`
+- **Chat tools** — `list_teams`, `list_channels`, `list_chats`, `get_channel_messages`, `get_chat_messages`, `search_messages`, `send_channel_message`, `send_chat_message`
 - **Transcript tools** — `find_transcripts`, `verify_kb_integration_status`, `start_kb_integration`, `stop_kb_integration`
 
 Chat tools let users read and send messages in their Teams channels and chats. Transcript tools manage the Microsoft Graph subscription that ingests meeting transcripts into the Unique knowledge base, and allow users to search those transcripts.

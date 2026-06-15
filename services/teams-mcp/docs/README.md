@@ -17,7 +17,7 @@
 
 The Teams MCP Server is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
-**Note:** This is a connector-style MCP server. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base. It also exposes 6 MCP tools for Teams chat messaging: listing teams, channels, and chats; reading chat messages; and sending messages to channels or chats.
+**Note:** This is a connector-style MCP server. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base. It also exposes 8 MCP tools for Teams chat messaging: listing teams, channels, and chats; reading chat and channel messages; searching messages by keyword; and sending messages to channels or chats.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
@@ -103,6 +103,8 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 - `list_channels`: List all channels in a specific team
 - `list_chats`: List the user's recent chats (1:1, group, and meeting chats)
 - `get_chat_messages`: Retrieve recent messages from a chat
+- `get_channel_messages`: Retrieve recent messages from a channel
+- `search_messages`: Search messages by keyword across chats and channels (Microsoft Search API)
 - `send_channel_message`: Send a plain text message to a Teams channel
 - `send_chat_message`: Send a plain text message to a Teams chat
 

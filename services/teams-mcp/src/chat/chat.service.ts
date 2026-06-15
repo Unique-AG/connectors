@@ -167,6 +167,58 @@ export class ChatService {
   }
 
   @Span()
+  public async getChatMessageById(
+    userProfileId: string,
+    chatId: string,
+    messageId: string,
+  ): Promise<MsChatMessage> {
+    const span = this.traceService.getSpan();
+    span?.setAttribute('user_profile_id', userProfileId);
+    span?.setAttribute('chat_id', chatId);
+    span?.setAttribute('message_id', messageId);
+
+    this.logger.debug(
+      { userProfileId, chatId, messageId },
+      'Fetching chat message by id from Microsoft Graph',
+    );
+
+    const client = this.graphClientFactory.createClientForUser(userProfileId);
+    const response = await client
+      .api(`/chats/${chatId}/messages/${messageId}`)
+      .select('id,createdDateTime,from,body,attachments,messageType')
+      .get();
+
+    return MsChatMessageSchema.parse(response);
+  }
+
+  @Span()
+  public async getChannelMessageById(
+    userProfileId: string,
+    teamId: string,
+    channelId: string,
+    messageId: string,
+  ): Promise<MsChatMessage> {
+    const span = this.traceService.getSpan();
+    span?.setAttribute('user_profile_id', userProfileId);
+    span?.setAttribute('team_id', teamId);
+    span?.setAttribute('channel_id', channelId);
+    span?.setAttribute('message_id', messageId);
+
+    this.logger.debug(
+      { userProfileId, teamId, channelId, messageId },
+      'Fetching channel message by id from Microsoft Graph',
+    );
+
+    const client = this.graphClientFactory.createClientForUser(userProfileId);
+    const response = await client
+      .api(`/teams/${teamId}/channels/${channelId}/messages/${messageId}`)
+      .select('id,createdDateTime,from,body,attachments,messageType')
+      .get();
+
+    return MsChatMessageSchema.parse(response);
+  }
+
+  @Span()
   public async sendChatMessage(
     userProfileId: string,
     chatId: string,
