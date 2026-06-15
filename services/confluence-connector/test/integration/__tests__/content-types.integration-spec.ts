@@ -16,6 +16,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ContentType } from '../../../src/confluence-api';
 import { page, space } from '../scenario/confluence-builders';
+import { DEFAULT_INGEST_LABEL } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -61,9 +62,9 @@ describe('content types', () => {
         spaces: [space()],
         pages: [
           page({ id: 'real-page', type: ContentType.PAGE }),
-          page({ id: 'db', type: ContentType.DATABASE, labels: ['ai-ingest'] }),
-          page({ id: 'wb', type: ContentType.WHITEBOARD, labels: ['ai-ingest'] }),
-          page({ id: 'em', type: ContentType.EMBED, labels: ['ai-ingest'] }),
+          page({ id: 'db', type: ContentType.DATABASE, labels: [DEFAULT_INGEST_LABEL] }),
+          page({ id: 'wb', type: ContentType.WHITEBOARD, labels: [DEFAULT_INGEST_LABEL] }),
+          page({ id: 'em', type: ContentType.EMBED, labels: [DEFAULT_INGEST_LABEL] }),
         ],
       },
     });

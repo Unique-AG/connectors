@@ -11,6 +11,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
+import { DEFAULT_INGEST_LABEL } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -158,7 +159,7 @@ describe('subtree sync', () => {
       confluence: {
         spaces: [space()],
         pages: [
-          page({ id: 'standalone', title: 'Release Notes', labels: ['ai-ingest'] }),
+          page({ id: 'standalone', title: 'Release Notes', labels: [DEFAULT_INGEST_LABEL] }),
           page({ id: 'root', title: 'Architecture', labels: ['ai-ingest-all'] }),
           page({ id: 'child', parentId: 'root', title: 'Database Schema', labels: [] }),
         ],
