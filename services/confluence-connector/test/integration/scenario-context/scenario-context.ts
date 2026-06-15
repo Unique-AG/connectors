@@ -37,7 +37,11 @@ export interface ScenarioContext {
  */
 export function buildScenarioContext(scenario: Scenario): ScenarioContext {
   const tenantConfig = resolveTenantConfig(scenario.tenant);
-  const fakeConfluence = new FakeConfluenceApi(scenario.tenant, scenario.confluence);
+  const fakeConfluence = new FakeConfluenceApi(
+    tenantConfig.confluence,
+    tenantConfig.ingestion.attachments.enabled,
+    scenario.confluence,
+  );
   const fakeUnique = new FakeUniqueApi(scenario.unique);
   const blobStorage = new FakeBlobStorage(fakeUnique);
   const metrics = createNoopMetrics();

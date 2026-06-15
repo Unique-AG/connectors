@@ -1,116 +1,85 @@
 import assert from 'node:assert';
 import { Readable } from 'node:stream';
 import { clone } from 'remeda';
+import { ConfluenceAuth } from '../../../src/auth/confluence-auth';
+import type { ConfluenceConfig } from '../../../src/config';
 import {
-  ConfluenceApiClient,
   type ConfluenceAttachment,
   type ConfluencePage,
   ContentType,
 } from '../../../src/confluence-api';
-import type { InstanceIdentifier } from '../../../src/confluence-api/confluence-api-client';
+import { CloudConfluenceApiClient } from '../../../src/confluence-api/cloud-api-client';
 import { confluencePageSchema } from '../../../src/confluence-api/types/confluence-api.types';
+import { createNoopMetrics } from '../../../src/metrics/__mocks__/noop-metrics';
+import { RateLimitedHttpClient } from '../../../src/utils/rate-limited-http-client';
 import type {
   ScenarioAttachment,
   ScenarioConfluence,
   ScenarioPage,
   ScenarioSpace,
-  ScenarioTenantConfig,
 } from '../scenario/scenario.types';
 
+// Confluence Cloud inlines at most 25 attachments per page via
+// expand=children.attachment; the client pages the rest from the v2 endpoint.
+const INLINE_ATTACHMENT_LIMIT = 25;
+
+class FakeConfluenceAuth extends ConfluenceAuth {
+  public async acquireToken(): Promise<string> {
+    return 'fake-token';
+  }
+}
+
 /**
- * In-memory ConfluenceApiClient backed by a ScenarioConfluence document.
+ * The real Cloud client driven by an in-memory Confluence instead of the network.
  *
- * Pages are filtered by the configured ingestSingleLabel / ingestAllLabel.
- * Descendants are resolved via the scenario's parentId tree.
+ * Rather than reimplement the client's public methods, this overrides only the
+ * two seams that touch the network: `makeAuthenticatedRequest` (returns the JSON
+ * a Confluence search / v2 endpoint would) and `getAttachmentDownloadStream`.
+ * Everything above that runs for real, so CQL handling, descendant fan-out, and
+ * the >25-attachment pagination (`fetchMoreAttachments`) are exercised here.
  *
- * Every produced page goes through `confluencePageSchema.parse()` to fail loudly
- * if the fake drifts away from the production page shape.
+ * Search responses inline at most 25 attachments per page and mark the cap via
+ * `size`/`limit`, exactly like Confluence; pages with more are completed by the
+ * real client calling the v2 endpoint, which this fake also serves.
  *
  * Also exposes a small mutation API (`addPage`, `removePage`, ...) for tests
  * that run in more than one step. To test a failure, a test mocks the method it
  * wants to fail (e.g. `vi.spyOn(fake, 'getPageById')`).
  */
-export class FakeConfluenceApi extends ConfluenceApiClient {
+export class FakeConfluenceApi extends CloudConfluenceApiClient {
   private readonly state: ScenarioConfluence;
 
   public constructor(
-    private readonly tenant: ScenarioTenantConfig,
+    config: ConfluenceConfig,
+    attachmentsEnabled: boolean,
     state: ScenarioConfluence,
   ) {
-    super();
-    // Deep-copy the scenario state. The mutation API below (addPage, removePage,
-    // splice, Object.assign, ...) writes to `this.state` in place, and scenarios
-    // share default arrays/objects across tests, so without a copy one test
-    // could mutate another's fixtures. `tenant` is never mutated, so it's left
-    // as-is.
-    //
-    // Note: clone turns each attachment's `bytes` Buffer into a Uint8Array, so
-    // `getAttachmentDownloadStream` re-wraps it in a Buffer before streaming.
+    assert.ok(config.instanceType === 'cloud', 'FakeConfluenceApi models the Cloud client only');
+    super(config, new FakeConfluenceAuth(), new RateLimitedHttpClient(1000, createNoopMetrics()), {
+      attachmentsEnabled,
+    });
+    // Deep-copy so the mutation API can't reach scenarios' shared default arrays.
+    // `clone` turns each attachment's `bytes` Buffer into a Uint8Array, so the
+    // download/v2 paths re-wrap it in a Buffer.
     this.state = clone(state);
   }
 
-  public async resolveInstanceIdentifier(): Promise<InstanceIdentifier> {
-    if (this.tenant.instance.type === 'cloud') {
-      return { type: 'cloud', id: this.tenant.instance.cloudId };
-    }
-    return { type: 'data-center', id: this.tenant.instance.baseUrl };
-  }
+  protected override async makeAuthenticatedRequest(url: string): Promise<unknown> {
+    const parsed = new URL(url);
 
-  public async searchPagesByLabel(): Promise<ConfluencePage[]> {
-    const labels = [this.tenant.ingestSingleLabel, this.tenant.ingestAllLabel];
-    const matched = this.state.pages.filter((page) =>
-      page.labels.some((label) => labels.includes(label)),
-    );
-    return matched.map((page) => this.toConfluencePage(page));
-  }
-
-  public async getPageById(pageId: string): Promise<ConfluencePage | null> {
-    const page = this.state.pages.find((p) => p.id === pageId);
-    if (!page) {
-      return null;
-    }
-    return this.toConfluencePage(page, { includeBody: true });
-  }
-
-  public async getDescendantPages(rootIds: string[]): Promise<ConfluencePage[]> {
-    const descendants = new Map<string, ScenarioPage>();
-    const queue = [...rootIds];
-    const visited = new Set<string>(rootIds);
-
-    while (queue.length > 0) {
-      const currentId = queue.shift();
-      if (!currentId) {
-        continue;
-      }
-      const children = this.state.pages.filter((p) => p.parentId === currentId);
-      for (const child of children) {
-        if (visited.has(child.id)) {
-          continue;
-        }
-        visited.add(child.id);
-        descendants.set(child.id, child);
-        queue.push(child.id);
-      }
+    const v2Match = parsed.pathname.match(/\/wiki\/api\/v2\/pages\/([^/]+)\/attachments$/);
+    if (v2Match?.[1]) {
+      return this.attachmentsV2Response(v2Match[1]);
     }
 
-    return [...descendants.values()].map((page) => this.toConfluencePage(page));
+    if (parsed.pathname.endsWith('/wiki/rest/api/content/search')) {
+      return this.searchResponse(parsed.searchParams);
+    }
+
+    throw new Error(`FakeConfluenceApi received an unexpected request: ${url}`);
   }
 
-  public buildPageWebUrl(page: ConfluencePage): string {
-    return `${this.tenant.instance.baseUrl}/wiki/spaces/${page.space.key}/pages/${page.id}`;
-  }
-
-  public buildAttachmentWebUrl(
-    pageId: string,
-    attachmentId: string,
-    attachmentTitle: string,
-  ): string {
-    const numericId = attachmentId.replace(/^att/, '');
-    const preview = encodeURIComponent(`/${pageId}/${numericId}/${attachmentTitle}`);
-    return `${this.tenant.instance.baseUrl}/wiki/pages/viewpageattachments.action?pageId=${pageId}&preview=${preview}`;
-  }
-
-  public async getAttachmentDownloadStream(
+  public override async getAttachmentDownloadStream(
     attachmentId: string,
     pageId: string,
     _downloadPath: string,
@@ -171,6 +140,72 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
     page.attachments?.splice(index, 1);
   }
 
+  // ─── Request synthesis ───────────────────────────────────────────────────────
+
+  private searchResponse(params: URLSearchParams): unknown {
+    const cql = params.get('cql') ?? '';
+    const expand = params.get('expand') ?? '';
+    const includeBody = expand.includes('body.storage');
+    const includeAttachments = expand.includes('children.attachment');
+    const results = this.matchPages(cql).map((page) =>
+      this.toConfluencePage(page, { includeBody, includeAttachments }),
+    );
+    return { results, _links: {} };
+  }
+
+  private matchPages(cql: string): ScenarioPage[] {
+    const idMatch = cql.match(/^id=(.+)$/);
+    if (idMatch?.[1]) {
+      const page = this.state.pages.find((p) => p.id === idMatch[1]);
+      return page ? [page] : [];
+    }
+
+    const ancestorMatch = cql.match(/ancestor IN \(([^)]+)\)/);
+    if (ancestorMatch?.[1]) {
+      const rootIds = ancestorMatch[1].split(',').map((id) => id.trim());
+      return this.descendantsOf(rootIds);
+    }
+
+    const labels = [...cql.matchAll(/label="([^"]+)"/g)].map((m) => m[1]);
+    return this.state.pages.filter((page) => page.labels.some((label) => labels.includes(label)));
+  }
+
+  private descendantsOf(rootIds: string[]): ScenarioPage[] {
+    const found = new Map<string, ScenarioPage>();
+    const queue = [...rootIds];
+    const visited = new Set<string>(rootIds);
+
+    while (queue.length > 0) {
+      const currentId = queue.shift();
+      if (!currentId) {
+        continue;
+      }
+      for (const child of this.state.pages.filter((p) => p.parentId === currentId)) {
+        if (visited.has(child.id)) {
+          continue;
+        }
+        visited.add(child.id);
+        found.set(child.id, child);
+        queue.push(child.id);
+      }
+    }
+
+    return [...found.values()];
+  }
+
+  private attachmentsV2Response(pageId: string): unknown {
+    const page = this.state.pages.find((p) => p.id === pageId);
+    const results = (page?.attachments ?? []).map((attachment) => ({
+      id: attachment.id,
+      title: attachment.title,
+      mediaType: attachment.mediaType,
+      fileSize: attachment.bytes.byteLength,
+      downloadLink: `/download/${pageId}/${attachment.id}`,
+      ...(attachment.versionWhen ? { version: { createdAt: attachment.versionWhen } } : {}),
+    }));
+    return { results, _links: {} };
+  }
+
   private getPageOrFail(pageId: string): ScenarioPage {
     const page = this.state.pages.find((p) => p.id === pageId);
     assert.ok(page, `Unknown page "${pageId}"`);
@@ -179,23 +214,21 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
 
   private toConfluencePage(
     page: ScenarioPage,
-    options: { includeBody?: boolean } = {},
+    options: { includeBody: boolean; includeAttachments: boolean },
   ): ConfluencePage {
     const space = this.getSpaceOrFail(page.spaceKey);
-    const includeBody = options.includeBody ?? false;
-
-    const attachments: ConfluenceAttachment[] = (page.attachments ?? []).map((attachment) => ({
-      id: attachment.id,
-      title: attachment.title,
-      extensions: {
-        mediaType: attachment.mediaType,
-        fileSize: attachment.bytes.byteLength,
-      },
-      version: attachment.versionWhen ? { when: attachment.versionWhen } : undefined,
-      _links: {
-        download: `/download/attachments/${page.id}/${encodeURIComponent(attachment.title)}`,
-      },
-    }));
+    const allAttachments = page.attachments ?? [];
+    const inlined = allAttachments.slice(0, INLINE_ATTACHMENT_LIMIT).map(
+      (attachment): ConfluenceAttachment => ({
+        id: attachment.id,
+        title: attachment.title,
+        extensions: { mediaType: attachment.mediaType, fileSize: attachment.bytes.byteLength },
+        version: attachment.versionWhen ? { when: attachment.versionWhen } : undefined,
+        _links: {
+          download: `/download/attachments/${page.id}/${encodeURIComponent(attachment.title)}`,
+        },
+      }),
+    );
 
     const raw: ConfluencePage = {
       id: page.id,
@@ -207,15 +240,18 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
       metadata: {
         labels: { results: page.labels.map((name) => ({ name })) },
       },
-      ...(includeBody ? { body: { storage: { value: page.body } } } : {}),
-      ...(this.tenant.attachmentsEnabled && attachments.length > 0
+      ...(options.includeBody ? { body: { storage: { value: page.body } } } : {}),
+      ...(options.includeAttachments && allAttachments.length > 0
         ? {
-            // The fake stands in for the client's resolved output, where
-            // `results` already holds every attachment (the real client merges
-            // the >25 case via the v2 API, covered in cloud-api-client.spec.ts).
-            // So no `size`/`limit`: those describe the raw HTTP page, a layer
-            // below this fake.
-            children: { attachment: { results: attachments } },
+            // Inline at most 25 and report the cap. When there are more, the real
+            // client sees size >= limit and pages the rest from the v2 endpoint.
+            children: {
+              attachment: {
+                results: inlined,
+                size: inlined.length,
+                limit: INLINE_ATTACHMENT_LIMIT,
+              },
+            },
           }
         : {}),
     };
