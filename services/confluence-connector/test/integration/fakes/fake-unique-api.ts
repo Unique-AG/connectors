@@ -32,8 +32,6 @@ export interface StoredFile extends UniqueFile {
 
 interface FailureMap {
   registerContent: Map<string, Error>;
-  finalizeIngestion: Map<string, Error>;
-  performFileDiff?: Error;
 }
 
 /**
@@ -61,7 +59,6 @@ export class FakeUniqueApi implements UniqueApiClient {
   private readonly pendingUploads = new Map<string, PendingUpload>();
   private readonly failures: FailureMap = {
     registerContent: new Map(),
-    finalizeIngestion: new Map(),
   };
   /**
    * Item keys the next `performFileDiff` should classify as `movedFiles`.
@@ -138,14 +135,6 @@ export class FakeUniqueApi implements UniqueApiClient {
     this.failures.registerContent.set(key, error);
   }
 
-  public failOnFinalizeIngestion(key: string, error: Error): void {
-    this.failures.finalizeIngestion.set(key, error);
-  }
-
-  public failOnPerformFileDiff(error: Error): void {
-    this.failures.performFileDiff = error;
-  }
-
   /**
    * Make the next `performFileDiff` report the given item keys as `movedFiles`
    * instead of new/updated/deleted. See {@link movedItemKeys} for why this is
@@ -155,13 +144,6 @@ export class FakeUniqueApi implements UniqueApiClient {
     for (const key of itemKeys) {
       this.movedItemKeys.add(key);
     }
-  }
-
-  public clearFailures(): void {
-    this.failures.registerContent.clear();
-    this.failures.finalizeIngestion.clear();
-    this.failures.performFileDiff = undefined;
-    this.movedItemKeys.clear();
   }
 
   private buildScopesFacade(): UniqueApiClient['scopes'] {
@@ -373,10 +355,6 @@ export class FakeUniqueApi implements UniqueApiClient {
   }
 
   private finalizeIngestion(request: IngestionFinalizationRequest): { id: string } {
-    const failure = this.failures.finalizeIngestion.get(request.key);
-    if (failure) {
-      throw failure;
-    }
     const file = [...this.filesById.values()].find((f) => f.key === request.key);
     if (!file) {
       throw new Error(`Cannot finalize unknown key "${request.key}"`);
@@ -389,9 +367,6 @@ export class FakeUniqueApi implements UniqueApiClient {
   }
 
   private performFileDiff(fileList: FileDiffItem[], partialKey: string): FileDiffResponse {
-    if (this.failures.performFileDiff) {
-      throw this.failures.performFileDiff;
-    }
     const submitted = new Map(fileList.map((item) => [item.key, item]));
     const existing = [...this.filesById.values()].filter((f) => f.key.startsWith(`${partialKey}/`));
 
