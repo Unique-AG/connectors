@@ -181,4 +181,32 @@ describe('subtree sync', () => {
       'tenant1/space-1_SP/standalone',
     ]);
   });
+
+  // An ai-ingest page nested under an unlabeled parent. Label discovery is
+  // independent of hierarchy, so the labeled child must be ingested even though
+  // its parent carries no ingest label and is therefore skipped.
+  it('ingests an ai-ingest page nested under a parent that is not ingested', async () => {
+    const scenario = defineScenario({
+      confluence: {
+        spaces: [space()],
+        pages: [
+          page({ id: 'parent', title: 'Untracked Parent', labels: [] }),
+          page({
+            id: 'child',
+            parentId: 'parent',
+            title: 'Tracked Child',
+            labels: [DEFAULT_INGEST_LABEL],
+          }),
+        ],
+      },
+    });
+    ctx = buildScenarioContext(scenario);
+
+    const result = await ctx.runSync();
+
+    expect(result).toEqual({ status: 'success' });
+
+    const state = getUniqueState(ctx.unique);
+    expect(state.files.map((file) => file.key).sort()).toEqual(['tenant1/space-1_SP/child']);
+  });
 });
