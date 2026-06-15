@@ -16,6 +16,7 @@
 import { find } from 'remeda';
 import { afterEach, describe, expect, it } from 'vitest';
 import { attachment, page, space } from '../scenario/confluence-builders';
+import { DEFAULT_SPACE_KEY, DEFAULT_SPACE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -66,10 +67,20 @@ describe('attachments', () => {
     const findByKey = (key: string) => find(state.files, (file) => file.key === key);
 
     expect(findByKey('tenant1/space-1_SP/p1::att-png')).toMatchObject({
+      id: expect.stringMatching(/^content-/),
       mimeType: 'image/png',
+      metadata: expect.objectContaining({
+        spaceKey: DEFAULT_SPACE_KEY,
+        spaceName: DEFAULT_SPACE_NAME,
+      }),
     });
     expect(findByKey('tenant1/space-1_SP/p1::att-jpg')).toMatchObject({
+      id: expect.stringMatching(/^content-/),
       mimeType: 'image/jpeg',
+      metadata: expect.objectContaining({
+        spaceKey: DEFAULT_SPACE_KEY,
+        spaceName: DEFAULT_SPACE_NAME,
+      }),
     });
   });
 
