@@ -67,7 +67,7 @@ export class FakeUniqueApi implements UniqueApiClient {
    */
   private readonly movedItemKeys = new Set<string>();
 
-  public constructor(private readonly initial: ScenarioUnique) {
+  public constructor(initial: ScenarioUnique) {
     for (const scope of initial.scopes) {
       this.scopesById.set(scope.id, { ...scope });
     }
@@ -95,7 +95,7 @@ export class FakeUniqueApi implements UniqueApiClient {
     this.users = {
       listAll: notImplemented('users.listAll'),
       findByEmail: notImplemented('users.findByEmail'),
-      getCurrentId: async () => this.initial.currentUserId,
+      getCurrentId: async () => initial.currentUserId,
     };
     this.groups = this.buildUnusedGroupsFacade();
     this.ingestion = this.buildIngestionFacade();
