@@ -24,8 +24,7 @@ const ONE_MB = 1024 * 1024;
 describe('attachments', () => {
   let ctx: ScenarioContext | undefined;
 
-  afterEach(async () => {
-    await ctx?.close();
+  afterEach(() => {
     ctx = undefined;
   });
 

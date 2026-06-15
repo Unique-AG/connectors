@@ -37,10 +37,6 @@ export class FakeBlobStorage {
   public asDispatcher(): Dispatcher {
     return this.mockAgent;
   }
-
-  public async close(): Promise<void> {
-    await this.mockAgent.close();
-  }
 }
 
 function extractToken(path: string): string {

@@ -29,8 +29,7 @@ import { getUniqueState } from '../scenario-context/unique-state';
 describe('root scope migration', () => {
   let ctx: ScenarioContext | undefined;
 
-  afterEach(async () => {
-    await ctx?.close();
+  afterEach(() => {
     ctx = undefined;
   });
 

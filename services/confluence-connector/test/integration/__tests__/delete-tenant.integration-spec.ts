@@ -24,8 +24,7 @@ import { getUniqueState } from '../scenario-context/unique-state';
 describe('delete tenant', () => {
   let ctx: ScenarioContext | undefined;
 
-  afterEach(async () => {
-    await ctx?.close();
+  afterEach(() => {
     ctx = undefined;
   });
 

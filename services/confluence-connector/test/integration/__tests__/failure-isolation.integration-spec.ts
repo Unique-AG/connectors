@@ -17,8 +17,7 @@ import { threePagesOneSpaceScenario } from '../scenarios/three-pages-one-space.s
 describe('failure isolation', () => {
   let ctx: ScenarioContext | undefined;
 
-  afterEach(async () => {
-    await ctx?.close();
+  afterEach(() => {
     ctx = undefined;
   });
 

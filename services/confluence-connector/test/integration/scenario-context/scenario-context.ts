@@ -34,7 +34,6 @@ export interface ScenarioContext {
    * tenant that is no longer active at all.
    */
   runDelete(): Promise<DeleteResult>;
-  close(): Promise<void>;
 }
 
 /**
@@ -120,7 +119,6 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
     metrics,
     runSync: () => tenantStorage.run(tenant, () => syncService.synchronize()),
     runDelete: () => tenantStorage.run(tenant, () => deleteService.deleteTenantContent()),
-    close: () => blobStorage.close(),
   };
 }
 

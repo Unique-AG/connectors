@@ -20,8 +20,7 @@ import {
 describe('single-page sync', () => {
   let ctx: ScenarioContext | undefined;
 
-  afterEach(async () => {
-    await ctx?.close();
+  afterEach(() => {
     ctx = undefined;
   });
 

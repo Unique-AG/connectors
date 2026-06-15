@@ -37,8 +37,7 @@ const NEW_VERSION = '2026-05-01T10:00:00.000Z';
 describe('update content', () => {
   let ctx: ScenarioContext | undefined;
 
-  afterEach(async () => {
-    await ctx?.close();
+  afterEach(() => {
     ctx = undefined;
   });
 

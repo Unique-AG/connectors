@@ -18,8 +18,7 @@ import { getUniqueState } from '../scenario-context/unique-state';
 describe('subtree sync', () => {
   let ctx: ScenarioContext | undefined;
 
-  afterEach(async () => {
-    await ctx?.close();
+  afterEach(() => {
     ctx = undefined;
   });
 

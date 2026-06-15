@@ -21,8 +21,7 @@ import { getUniqueState } from '../scenario-context/unique-state';
 describe('delete content', () => {
   let ctx: ScenarioContext | undefined;
 
-  afterEach(async () => {
-    await ctx?.close();
+  afterEach(() => {
     ctx = undefined;
   });
 
