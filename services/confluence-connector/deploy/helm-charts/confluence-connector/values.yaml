@@ -222,6 +222,17 @@ connectorConfig:
         #   # -- registrations so chunks are produced without scope-side configuration
         #   # -- (default: enabled)
         #   imageOcr: enabled
+        #   # -- Inline page images into the page HTML as base64 data URIs (default: enabled)
+        #   inlineImages: enabled
+        # -- Ingestion configuration applied to each ingested page. Required when
+        # -- attachments.inlineImages is enabled (the default): must set
+        # -- htmlConfig.imageContentExtraction.languageModel to the visual LLM configured
+        # -- in Knowledge Base.
+        # pageIngestionConfig:
+        #   htmlConfig:
+        #     imageContentExtraction:
+        #       enabled: true
+        #       languageModel: AZURE_GPT_4o_2024_1120
 
 # -- HTTP proxy configuration for external API calls
 # Required for environments where internet access is only available through a proxy.

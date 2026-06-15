@@ -4,8 +4,19 @@ import {
   DEFAULT_MAX_FILE_SIZE_MB,
 } from '../constants/defaults.constants';
 import { EnabledDisabledMode, IngestionMode } from '../constants/ingestion.constants';
+import { requiredStringSchema } from '../utils/zod.util';
 
 const IngestionModeSchema = z.enum([IngestionMode.Flat]).prefault(IngestionMode.Flat);
+
+/**
+ * The slice of the opaque pageIngestionConfig the platform requires to extract text from
+ * inlined page images. Used only to validate presence; the config is still forwarded verbatim.
+ */
+const ImageExtractionModelSchema = z.object({
+  htmlConfig: z.object({
+    imageContentExtraction: z.object({ languageModel: requiredStringSchema }),
+  }),
+});
 
 const AttachmentConfigSchema = z
   .object({
@@ -44,25 +55,52 @@ const AttachmentConfigSchema = z
     inlineImagesEnabled: inlineImages === EnabledDisabledMode.Enabled,
   }));
 
-export const IngestionConfigSchema = z.object({
-  ingestionMode: IngestionModeSchema.describe('Ingestion traversal mode'),
-  scopeId: z.string().min(1).describe('Root scope ID for ingestion'),
-  storeInternally: z
-    .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
-    .prefault(EnabledDisabledMode.Enabled)
-    .transform((v) => v === EnabledDisabledMode.Enabled)
-    .describe('Whether to store content internally in Unique'),
-  useV1KeyFormat: z
-    .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
-    .prefault(EnabledDisabledMode.Disabled)
-    .transform((v) => v === EnabledDisabledMode.Enabled)
-    .describe(
-      'Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix',
+export const IngestionConfigSchema = z
+  .object({
+    ingestionMode: IngestionModeSchema.describe('Ingestion traversal mode'),
+    scopeId: z.string().min(1).describe('Root scope ID for ingestion'),
+    storeInternally: z
+      .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+      .prefault(EnabledDisabledMode.Enabled)
+      .transform((v) => v === EnabledDisabledMode.Enabled)
+      .describe('Whether to store content internally in Unique'),
+    useV1KeyFormat: z
+      .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
+      .prefault(EnabledDisabledMode.Disabled)
+      .transform((v) => v === EnabledDisabledMode.Enabled)
+      .describe(
+        'Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix',
+      ),
+    attachments: AttachmentConfigSchema.prefault({}).describe(
+      'Configuration for file attachment ingestion',
     ),
-  attachments: AttachmentConfigSchema.prefault({}).describe(
-    'Configuration for file attachment ingestion',
-  ),
-});
+    pageIngestionConfig: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe('Ingestion configuration applied to each ingested page'),
+  })
+  .superRefine((cfg, ctx) => {
+    if (!cfg.attachments.inlineImagesEnabled) {
+      return;
+    }
+
+    if (ImageExtractionModelSchema.safeParse(cfg.pageIngestionConfig).success) {
+      return;
+    }
+
+    const modelPath = [
+      'pageIngestionConfig',
+      'htmlConfig',
+      'imageContentExtraction',
+      'languageModel',
+    ];
+
+    ctx.addIssue({
+      code: 'custom',
+      path: modelPath,
+      message: `${modelPath.join('.')} must be a non-empty string when attachments.inlineImages is enabled`,
+    });
+  });
 
 export const BYTES_PER_MB = 1024 * 1024;
 

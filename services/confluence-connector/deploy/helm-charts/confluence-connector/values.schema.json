@@ -441,9 +441,29 @@
                         "enum": ["enabled", "disabled"],
                         "description": "Whether the connector should request OCR-based ingestion for image attachments by attaching ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT to each create-content request",
                         "default": "enabled"
+                      },
+                      "inlineImages": {
+                        "type": "string",
+                        "enum": ["enabled", "disabled"],
+                        "description": "Whether to inline page images into the page HTML as base64 data URIs",
+                        "default": "enabled"
                       }
                     },
                     "additionalProperties": false
+                  },
+                  "pageIngestionConfig": {
+                    "type": "object",
+                    "description": "Ingestion configuration applied to each ingested page. Required when attachments.inlineImages is enabled: must set htmlConfig.imageContentExtraction.languageModel to the visual LLM configured in Knowledge Base",
+                    "examples": [
+                      {
+                        "htmlConfig": {
+                          "imageContentExtraction": {
+                            "enabled": true,
+                            "languageModel": "AZURE_GPT_4o_2024_1120"
+                          }
+                        }
+                      }
+                    ]
                   }
                 },
                 "additionalProperties": false

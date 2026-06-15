@@ -237,6 +237,7 @@ export class IngestionService {
         spaceName: page.spaceName,
       },
       storeInternally: this.config.ingestion.storeInternally,
+      ingestionConfig: this.config.ingestion.pageIngestionConfig,
     };
   }
 

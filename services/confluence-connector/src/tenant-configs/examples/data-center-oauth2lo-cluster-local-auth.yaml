@@ -35,3 +35,11 @@ ingestion:
   ingestionMode: flat
   scopeId: your-scope-id
   storeInternally: enabled
+  # Ingestion configuration applied to each ingested page. Required when
+  # attachments.inlineImages is enabled (the default): must set
+  # htmlConfig.imageContentExtraction.languageModel to the visual LLM configured in Knowledge Base.
+  pageIngestionConfig:
+    htmlConfig:
+      imageContentExtraction:
+        enabled: true
+        languageModel: AZURE_GPT_4o_2024_1120
