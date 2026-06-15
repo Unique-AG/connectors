@@ -31,7 +31,6 @@ export interface StoredFile extends UniqueFile {
   mimeType: string;
   body?: Buffer;
   updatedAt: string;
-  /** Captured `ingestionConfig` from the most recent registerContent call (e.g. `jpgReadMode`). */
   ingestionConfig: IngestionConfig | null;
 }
 

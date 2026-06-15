@@ -22,17 +22,6 @@ export interface ScenarioContext {
   readonly unique: FakeUniqueApi;
   readonly metrics: Metrics;
   runSync(): Promise<SyncResult>;
-  /**
-   * Run the dedicated tenant-deletion flow. The scheduler invokes this instead
-   * of `runSync` when a tenant's status flips to `deleted` (see
-   * `TenantSyncScheduler.syncTenant`), tearing down every child scope and its
-   * content while preserving the root scope.
-   *
-   * This is distinct from the per-content and per-space deletions that happen
-   * inside `runSync` (covered by the delete-content and delete-space specs).
-   * Those reconcile a still-active tenant against its source; this wipes a
-   * tenant that is no longer active at all.
-   */
   runDelete(): Promise<DeleteResult>;
 }
 
@@ -116,6 +105,10 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
     unique: fakeUnique,
     metrics,
     runSync: () => tenantStorage.run(tenant, () => syncService.synchronize()),
+    // The dedicated tenant-deletion flow the scheduler runs instead of runSync
+    // when a tenant's status flips to deleted. It tears down every child scope
+    // and its content while keeping the root scope. This is separate from the
+    // per-content and per-space deletions that happen inside runSync.
     runDelete: () => tenantStorage.run(tenant, () => deleteService.deleteTenantContent()),
   };
 }

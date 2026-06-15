@@ -21,7 +21,6 @@ export interface UniqueFileState {
   bodyHash: string | null;
   bodySize: number;
   bodyText: string | null;
-  /** Captured `ingestionConfig` (e.g. `jpgReadMode`) from the registerContent call. */
   ingestionConfig: IngestionConfig | null;
 }
 

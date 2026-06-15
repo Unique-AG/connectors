@@ -69,9 +69,7 @@ export function pageFile(opts: {
   spaceId?: string;
   tenantName?: string;
   body?: string;
-  /** Defaults to the same version as `page` so the file looks up-to-date. */
   updatedAt?: string;
-  /** Scope this file belongs to (used by tenant-deletion's getContentIdsByScope). */
   scopeId?: string;
 }): ScenarioUniqueFile {
   const spaceKey = opts.spaceKey ?? DEFAULT_SPACE_KEY;
