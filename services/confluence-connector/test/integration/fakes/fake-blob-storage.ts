@@ -6,11 +6,16 @@ import type { FakeUniqueApi } from './fake-unique-api';
 const FAKE_BLOB_ORIGIN = 'https://fake-blob.local';
 
 /**
- * Intercepts blob upload PUTs (writeUrl) emitted by IngestionService and routes
- * the body bytes back to FakeUniqueApi.completeUpload.
+ * Fake blob store for tests.
  *
- * Powered by undici MockAgent so we can plug it into IngestionService through its
- * `dispatcher` constructor parameter.
+ * When the connector ingests a file, it PUTs the bytes to a blob storage URL.
+ * In tests there is no real blob store, so we catch that PUT here and hand the
+ * bytes back to FakeUniqueApi. Without this, uploaded files would have no body,
+ * and we could not check body, bodyHash, or bodySize.
+ *
+ * It is built on undici's MockAgent so it can be passed to IngestionService as
+ * its `dispatcher`. Network access is turned off, so any PUT we forget to catch
+ * fails loudly instead of going out to the internet.
  */
 export class FakeBlobStorage {
   private readonly mockAgent: MockAgent;
