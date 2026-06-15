@@ -57,15 +57,6 @@ export class FakeUniqueApi implements UniqueApiClient {
   private readonly scopesById = new Map<string, Scope>();
   private readonly filesById = new Map<string, StoredFile>();
   private readonly pendingUploads = new Map<string, PendingUpload>();
-  /**
-   * Item keys the next `performFileDiff` should report as `movedFiles`.
-   *
-   * In real life Unique decides if a file was moved (the same file given a new
-   * key). This fake cannot work that out on its own, so a test sets the answer
-   * here and the fake reports those keys as moved. (Failures are different: a
-   * test just mocks the method to throw.)
-   */
-  private readonly movedItemKeys = new Set<string>();
 
   public constructor(initial: ScenarioUnique) {
     for (const scope of initial.scopes) {
@@ -134,17 +125,6 @@ export class FakeUniqueApi implements UniqueApiClient {
 
   public listFiles(): StoredFile[] {
     return [...this.filesById.values()];
-  }
-
-  /**
-   * Make the next `performFileDiff` report the given item keys as `movedFiles`
-   * instead of new/updated/deleted. See {@link movedItemKeys} for why this is
-   * injected rather than derived.
-   */
-  public simulateMovedFiles(itemKeys: string[]): void {
-    for (const key of itemKeys) {
-      this.movedItemKeys.add(key);
-    }
   }
 
   private buildScopesFacade(): UniqueApiClient['scopes'] {
@@ -341,44 +321,47 @@ export class FakeUniqueApi implements UniqueApiClient {
 
   private performFileDiff(fileList: FileDiffItem[], partialKey: string): FileDiffResponse {
     const submitted = new Map(fileList.map((item) => [item.key, item]));
-    const existing = [...this.filesById.values()].filter((f) => f.key.startsWith(`${partialKey}/`));
+    const prefix = `${partialKey}/`;
+
+    // Files already stored under this partial key, indexed by item id (the key
+    // segment after the partial key, e.g. the page id).
+    const here = new Map<string, StoredFile>();
+    // Item ids of files stored under a different partial key. A submitted item
+    // that matches one of these is the same resource re-keyed to a new
+    // location, which is what Unique reports as moved.
+    const elsewhere = new Set<string>();
+    for (const file of this.filesById.values()) {
+      const itemId = file.key.slice(file.key.lastIndexOf('/') + 1);
+      if (file.key.startsWith(prefix)) {
+        here.set(itemId, file);
+      } else {
+        elsewhere.add(itemId);
+      }
+    }
 
     const newFiles: string[] = [];
     const updatedFiles: string[] = [];
     const movedFiles: string[] = [];
     const deletedFiles: string[] = [];
 
-    const existingByItemKey = new Map<string, (typeof existing)[number]>();
-    for (const file of existing) {
-      const itemKey = file.key.slice(partialKey.length + 1);
-      existingByItemKey.set(itemKey, file);
-    }
-
-    for (const [key, item] of submitted) {
-      if (this.movedItemKeys.has(key)) {
-        movedFiles.push(key);
-        continue;
-      }
-      const found = existingByItemKey.get(key);
-      if (!found) {
-        newFiles.push(key);
-        continue;
-      }
-      if (found.updatedAt < item.updatedAt) {
-        updatedFiles.push(key);
-      }
-    }
-
-    for (const [key] of existingByItemKey) {
-      if (this.movedItemKeys.has(key)) {
-        // A moved file is relocated server-side, never deleted.
-        if (!submitted.has(key)) {
-          movedFiles.push(key);
+    for (const [itemId, item] of submitted) {
+      const current = here.get(itemId);
+      if (current) {
+        if (current.updatedAt < item.updatedAt) {
+          updatedFiles.push(itemId);
         }
         continue;
       }
-      if (!submitted.has(key)) {
-        deletedFiles.push(key);
+      if (elsewhere.has(itemId)) {
+        movedFiles.push(itemId);
+        continue;
+      }
+      newFiles.push(itemId);
+    }
+
+    for (const itemId of here.keys()) {
+      if (!submitted.has(itemId)) {
+        deletedFiles.push(itemId);
       }
     }
 
