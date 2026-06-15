@@ -26,6 +26,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
+import { DEFAULT_ROOT_SCOPE_ID } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { pageFile, spaceScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
@@ -57,7 +58,7 @@ describe('update content', () => {
         ],
       },
       unique: {
-        scopes: [spaceScope({ rootScopeId: 'root-scope-id' })],
+        scopes: [spaceScope({ rootScopeId: DEFAULT_ROOT_SCOPE_ID })],
         // Same key, but seeded with an older updatedAt so the diff returns it
         // as `updated`.
         files: [
@@ -95,7 +96,7 @@ describe('update content', () => {
         pages: [page({ id: 'p3', title: 'New page A' }), page({ id: 'p4', title: 'New page B' })],
       },
       unique: {
-        scopes: [spaceScope({ rootScopeId: 'root-scope-id' })],
+        scopes: [spaceScope({ rootScopeId: DEFAULT_ROOT_SCOPE_ID })],
         files: [pageFile({ pageId: 'p1' }), pageFile({ pageId: 'p2' })],
       },
     });

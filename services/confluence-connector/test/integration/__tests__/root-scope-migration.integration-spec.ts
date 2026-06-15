@@ -21,6 +21,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
+import { DEFAULT_ROOT_SCOPE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { pageFile, spaceScope, uniqueScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
@@ -54,7 +55,7 @@ describe('root scope migration', () => {
           // The old root is still in Unique with its externalId already
           // cleared (the tenant-deletion flow ran before the operator changed
           // the config). Its leftover scope tree is also still there.
-          uniqueScope({ id: 'old-root', name: 'Confluence', externalId: null }),
+          uniqueScope({ id: 'old-root', name: DEFAULT_ROOT_SCOPE_NAME, externalId: null }),
           spaceScope({
             rootScopeId: 'old-root',
             spaceKey: 'LEGACY',
@@ -126,7 +127,7 @@ describe('root scope migration', () => {
           // run cleanup before switching.
           uniqueScope({
             id: 'old-root',
-            name: 'Confluence',
+            name: DEFAULT_ROOT_SCOPE_NAME,
             externalId: 'confc:cloud:cloud-1',
           }),
           // The new (configured) root has no externalId yet.

@@ -16,7 +16,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ContentType } from '../../../src/confluence-api';
 import { page, space } from '../scenario/confluence-builders';
-import { DEFAULT_INGEST_LABEL } from '../scenario/defaults';
+import { DEFAULT_INGEST_ALL_LABEL, DEFAULT_INGEST_LABEL } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -95,19 +95,19 @@ describe('content types', () => {
             id: 'db-root',
             type: ContentType.DATABASE,
             title: 'Engineering Database',
-            labels: ['ai-ingest-all'],
+            labels: [DEFAULT_INGEST_ALL_LABEL],
           }),
           page({
             id: 'wb-root',
             type: ContentType.WHITEBOARD,
             title: 'Roadmap Whiteboard',
-            labels: ['ai-ingest-all'],
+            labels: [DEFAULT_INGEST_ALL_LABEL],
           }),
           page({
             id: 'em-root',
             type: ContentType.EMBED,
             title: 'Embedded Dashboard',
-            labels: ['ai-ingest-all'],
+            labels: [DEFAULT_INGEST_ALL_LABEL],
           }),
           // Descendants of each root — these should all be ingested.
           page({ id: 'db-child', parentId: 'db-root', type: ContentType.PAGE, labels: [] }),

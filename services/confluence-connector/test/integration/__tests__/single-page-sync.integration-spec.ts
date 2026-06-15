@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
-import { DEFAULT_INGEST_LABEL, DEFAULT_SPACE_KEY } from '../scenario/defaults';
+import { DEFAULT_INGEST_LABEL, DEFAULT_SPACE_KEY, DEFAULT_SPACE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -63,7 +63,10 @@ describe('single-page sync', () => {
       scopePath: '/Confluence/SP',
       mimeType: 'text/html',
       bodyText: '<p>Hello, integration!</p>',
-      metadata: expect.objectContaining({ spaceKey: DEFAULT_SPACE_KEY, spaceName: 'Space One' }),
+      metadata: expect.objectContaining({
+        spaceKey: DEFAULT_SPACE_KEY,
+        spaceName: DEFAULT_SPACE_NAME,
+      }),
     });
   });
 

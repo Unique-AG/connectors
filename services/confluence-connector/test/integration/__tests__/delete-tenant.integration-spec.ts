@@ -16,6 +16,7 @@
  * later without rebuilding its scope tree.
  */
 import { afterEach, describe, expect, it } from 'vitest';
+import { DEFAULT_ROOT_SCOPE_ID, DEFAULT_ROOT_SCOPE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { pageFile, spaceScope, uniqueScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
@@ -36,18 +37,18 @@ describe('delete tenant', () => {
         scopes: [
           // Root scope is owned (externalId set), so the cleanup will run.
           uniqueScope({
-            id: 'root-scope-id',
-            name: 'Confluence',
+            id: DEFAULT_ROOT_SCOPE_ID,
+            name: DEFAULT_ROOT_SCOPE_NAME,
             externalId: 'confc:cloud:cloud-1',
           }),
           spaceScope({
-            rootScopeId: 'root-scope-id',
+            rootScopeId: DEFAULT_ROOT_SCOPE_ID,
             spaceKey: 'ENG',
             spaceId: 'space-eng',
             scopeId: 'scope-eng',
           }),
           spaceScope({
-            rootScopeId: 'root-scope-id',
+            rootScopeId: DEFAULT_ROOT_SCOPE_ID,
             spaceKey: 'HR',
             spaceId: 'space-hr',
             scopeId: 'scope-hr',
@@ -93,8 +94,8 @@ describe('delete tenant', () => {
       unique: {
         scopes: [
           uniqueScope({
-            id: 'root-scope-id',
-            name: 'Confluence',
+            id: DEFAULT_ROOT_SCOPE_ID,
+            name: DEFAULT_ROOT_SCOPE_NAME,
             externalId: 'confc:cloud:cloud-1',
           }),
         ],
@@ -119,7 +120,11 @@ describe('delete tenant', () => {
       unique: {
         scopes: [
           // externalId is null, signalling a previous successful cleanup.
-          uniqueScope({ id: 'root-scope-id', name: 'Confluence', externalId: null }),
+          uniqueScope({
+            id: DEFAULT_ROOT_SCOPE_ID,
+            name: DEFAULT_ROOT_SCOPE_NAME,
+            externalId: null,
+          }),
         ],
       },
     });

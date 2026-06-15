@@ -2,6 +2,7 @@ import {
   DEFAULT_INGEST_LABEL,
   DEFAULT_SPACE_ID,
   DEFAULT_SPACE_KEY,
+  DEFAULT_SPACE_NAME,
   DEFAULT_VERSION,
 } from './defaults';
 import type { ScenarioAttachment, ScenarioPage, ScenarioSpace } from './scenario.types';
@@ -20,7 +21,7 @@ export function space(overrides: Partial<ScenarioSpace> = {}): ScenarioSpace {
   return {
     id: DEFAULT_SPACE_ID,
     key: DEFAULT_SPACE_KEY,
-    name: 'Space One',
+    name: DEFAULT_SPACE_NAME,
     ...overrides,
   };
 }

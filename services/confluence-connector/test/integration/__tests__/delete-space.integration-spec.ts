@@ -12,6 +12,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
+import { DEFAULT_ROOT_SCOPE_ID } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { pageFile, spaceScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
@@ -40,13 +41,13 @@ describe('delete space', () => {
       unique: {
         scopes: [
           spaceScope({
-            rootScopeId: 'root-scope-id',
+            rootScopeId: DEFAULT_ROOT_SCOPE_ID,
             spaceKey: 'ENG',
             spaceId: 'space-eng',
             scopeId: 'scope-eng',
           }),
           spaceScope({
-            rootScopeId: 'root-scope-id',
+            rootScopeId: DEFAULT_ROOT_SCOPE_ID,
             spaceKey: 'HR',
             spaceId: 'space-hr',
             scopeId: 'scope-hr',
@@ -92,13 +93,13 @@ describe('delete space', () => {
       unique: {
         scopes: [
           spaceScope({
-            rootScopeId: 'root-scope-id',
+            rootScopeId: DEFAULT_ROOT_SCOPE_ID,
             spaceKey: 'ENG',
             spaceId: 'space-eng',
             scopeId: 'scope-eng',
           }),
           spaceScope({
-            rootScopeId: 'root-scope-id',
+            rootScopeId: DEFAULT_ROOT_SCOPE_ID,
             spaceKey: 'HR',
             spaceId: 'space-hr',
             scopeId: 'scope-hr',
@@ -136,7 +137,7 @@ describe('delete space', () => {
         pages: [page({ id: 'p1' })],
       },
       unique: {
-        scopes: [spaceScope({ rootScopeId: 'root-scope-id' })],
+        scopes: [spaceScope({ rootScopeId: DEFAULT_ROOT_SCOPE_ID })],
         files: [pageFile({ pageId: 'p1' })],
       },
     });

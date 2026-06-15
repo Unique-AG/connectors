@@ -14,6 +14,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
+import { DEFAULT_ROOT_SCOPE_ID, DEFAULT_ROOT_SCOPE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { uniqueScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
@@ -60,8 +61,8 @@ describe('root scope ownership', () => {
       unique: {
         scopes: [
           uniqueScope({
-            id: 'root-scope-id',
-            name: 'Confluence',
+            id: DEFAULT_ROOT_SCOPE_ID,
+            name: DEFAULT_ROOT_SCOPE_NAME,
             externalId: 'confc:cloud:cloud-1',
           }),
         ],
@@ -93,8 +94,8 @@ describe('root scope ownership', () => {
       unique: {
         scopes: [
           uniqueScope({
-            id: 'root-scope-id',
-            name: 'Confluence',
+            id: DEFAULT_ROOT_SCOPE_ID,
+            name: DEFAULT_ROOT_SCOPE_NAME,
             externalId: 'confc:cloud:other-instance',
           }),
         ],

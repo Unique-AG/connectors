@@ -11,7 +11,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
-import { DEFAULT_INGEST_LABEL } from '../scenario/defaults';
+import { DEFAULT_INGEST_ALL_LABEL, DEFAULT_INGEST_LABEL } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
 import { getUniqueState } from '../scenario-context/unique-state';
@@ -29,7 +29,7 @@ describe('subtree sync', () => {
       confluence: {
         spaces: [space()],
         pages: [
-          page({ id: 'root', title: 'Handbook', labels: ['ai-ingest-all'] }),
+          page({ id: 'root', title: 'Handbook', labels: [DEFAULT_INGEST_ALL_LABEL] }),
           // Children are unlabeled, so descendant traversal is the only path to
           // them — a regression in getDescendantPages fails this test.
           page({ id: 'child-a', parentId: 'root', title: 'Onboarding', labels: [] }),
@@ -59,9 +59,9 @@ describe('subtree sync', () => {
       confluence: {
         spaces: [space()],
         pages: [
-          page({ id: 'root-eng', title: 'Engineering', labels: ['ai-ingest-all'] }),
+          page({ id: 'root-eng', title: 'Engineering', labels: [DEFAULT_INGEST_ALL_LABEL] }),
           page({ id: 'eng-1', parentId: 'root-eng', title: 'On-call', labels: [] }),
-          page({ id: 'root-hr', title: 'HR', labels: ['ai-ingest-all'] }),
+          page({ id: 'root-hr', title: 'HR', labels: [DEFAULT_INGEST_ALL_LABEL] }),
           page({ id: 'hr-1', parentId: 'root-hr', title: 'PTO Policy', labels: [] }),
         ],
       },
@@ -92,9 +92,9 @@ describe('subtree sync', () => {
           space({ id: 'space-hr', key: 'HR', name: 'Human Resources' }),
         ],
         pages: [
-          page({ id: 'eng-root', spaceKey: 'ENG', labels: ['ai-ingest-all'] }),
+          page({ id: 'eng-root', spaceKey: 'ENG', labels: [DEFAULT_INGEST_ALL_LABEL] }),
           page({ id: 'eng-child', spaceKey: 'ENG', parentId: 'eng-root', labels: [] }),
-          page({ id: 'hr-root', spaceKey: 'HR', labels: ['ai-ingest-all'] }),
+          page({ id: 'hr-root', spaceKey: 'HR', labels: [DEFAULT_INGEST_ALL_LABEL] }),
         ],
       },
     });
@@ -134,7 +134,10 @@ describe('subtree sync', () => {
     const scenario = defineScenario({
       confluence: {
         spaces: [space()],
-        pages: [page({ id: 'root', title: 'Big Tree', labels: ['ai-ingest-all'] }), ...descendants],
+        pages: [
+          page({ id: 'root', title: 'Big Tree', labels: [DEFAULT_INGEST_ALL_LABEL] }),
+          ...descendants,
+        ],
       },
     });
     ctx = buildScenarioContext(scenario);
@@ -160,7 +163,7 @@ describe('subtree sync', () => {
         spaces: [space()],
         pages: [
           page({ id: 'standalone', title: 'Release Notes', labels: [DEFAULT_INGEST_LABEL] }),
-          page({ id: 'root', title: 'Architecture', labels: ['ai-ingest-all'] }),
+          page({ id: 'root', title: 'Architecture', labels: [DEFAULT_INGEST_ALL_LABEL] }),
           page({ id: 'child', parentId: 'root', title: 'Database Schema', labels: [] }),
         ],
       },
