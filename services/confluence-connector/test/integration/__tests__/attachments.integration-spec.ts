@@ -13,6 +13,7 @@
  *
  * `attachments.mode = disabled` skips the entire attachment scan.
  */
+import { find } from 'remeda';
 import { afterEach, describe, expect, it } from 'vitest';
 import { attachment, page, space } from '../scenario/confluence-builders';
 import { defineScenario } from '../scenario/scenario.builder';
@@ -62,7 +63,7 @@ describe('attachments', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    const findByKey = (key: string) => state.files.find((file) => file.key === key);
+    const findByKey = (key: string) => find(state.files, (file) => file.key === key);
 
     expect(findByKey('tenant1/space-1_SP/p1::att-png')).toMatchObject({
       mimeType: 'image/png',
@@ -197,7 +198,7 @@ describe('attachments', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    const findByKey = (key: string) => state.files.find((file) => file.key === key);
+    const findByKey = (key: string) => find(state.files, (file) => file.key === key);
 
     expect(findByKey('tenant1/space-1_SP/p1::att-png')?.ingestionConfig).toEqual({
       jpgReadMode: 'DOC_INTELLIGENCE_DEFAULT',
