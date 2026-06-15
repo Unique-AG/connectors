@@ -31,7 +31,6 @@ export interface UniqueState {
 }
 
 const TEXT_MIME_TYPES = new Set(['text/html', 'text/plain', 'application/json']);
-const SMALL_BODY_LIMIT_BYTES = 4 * 1024;
 
 /**
  * Returns a diff-friendly view of the FakeUniqueApi state suitable for
@@ -83,9 +82,6 @@ function bodyTextOrNull(mimeType: string, body: Buffer | undefined): string | nu
     return null;
   }
   if (!TEXT_MIME_TYPES.has(mimeType)) {
-    return null;
-  }
-  if (body.byteLength > SMALL_BODY_LIMIT_BYTES) {
     return null;
   }
   return body.toString('utf-8');
