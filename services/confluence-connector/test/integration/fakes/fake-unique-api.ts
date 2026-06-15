@@ -128,11 +128,6 @@ export class FakeUniqueApi implements UniqueApiClient {
     return [...this.scopesById.values()];
   }
 
-  /** Test-only hook to seed a scope with a fixed id (e.g. the configured root scope). */
-  public seedScope(scope: Scope): void {
-    this.scopesById.set(scope.id, { ...scope });
-  }
-
   public listFiles(): StoredFile[] {
     return [...this.filesById.values()];
   }

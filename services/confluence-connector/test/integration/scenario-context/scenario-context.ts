@@ -42,9 +42,9 @@ export interface ScenarioContext {
  * Mirrors `TenantRegistry.registerActiveTenantServices` 1:1, just substituting
  * ConfluenceApiClient and UniqueApiClient with stateful in-memory fakes.
  *
- * Also seeds the root scope and any pre-existing scopes from `scenario.unique`
- * before wiring services so that `synchronize()` can claim ownership and discover
- * existing children naturally.
+ * The pre-existing Unique scopes (including the root scope `defineScenario`
+ * seeds by default) are loaded by `FakeUniqueApi` from `scenario.unique`, so
+ * `synchronize()` can claim ownership and discover existing children naturally.
  */
 export function buildScenarioContext(scenario: Scenario): ScenarioContext {
   const tenantConfig = resolveTenantConfig(scenario.tenant);
@@ -52,8 +52,6 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
   const fakeUnique = new FakeUniqueApi(scenario.unique);
   const blobStorage = new FakeBlobStorage(fakeUnique);
   const metrics = createNoopMetrics();
-
-  seedRootScopeIfMissing(fakeUnique, scenario);
 
   const scanner = new ConfluencePageScanner(
     tenantConfig.confluence,
@@ -120,22 +118,4 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
     runSync: () => tenantStorage.run(tenant, () => syncService.synchronize()),
     runDelete: () => tenantStorage.run(tenant, () => deleteService.deleteTenantContent()),
   };
-}
-
-/**
- * ScopeManagementService.initialize() expects a pre-existing root scope at
- * `ingestion.scopeId`. If the scenario didn't seed it, create it here so tests
- * don't need to repeat that boilerplate.
- */
-function seedRootScopeIfMissing(unique: FakeUniqueApi, scenario: Scenario): void {
-  const hasRoot = unique.listScopes().some((scope) => scope.id === scenario.tenant.rootScopeId);
-  if (hasRoot) {
-    return;
-  }
-  unique.seedScope({
-    id: scenario.tenant.rootScopeId,
-    name: scenario.tenant.rootScopeName,
-    parentId: null,
-    externalId: null,
-  });
 }
