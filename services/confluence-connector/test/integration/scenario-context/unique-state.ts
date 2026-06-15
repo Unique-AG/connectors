@@ -80,12 +80,7 @@ function buildScopePathIndex(scopes: { id: string; name: string; parentId: strin
   for (const scope of scopes) {
     const segments: string[] = [];
     let current: { id: string; name: string; parentId: string | null } | undefined = scope;
-    const seen = new Set<string>();
     while (current) {
-      if (seen.has(current.id)) {
-        break;
-      }
-      seen.add(current.id);
       segments.unshift(current.name);
       current = current.parentId ? byId.get(current.parentId) : undefined;
     }
