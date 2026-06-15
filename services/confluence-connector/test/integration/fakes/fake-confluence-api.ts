@@ -117,33 +117,28 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
   ): Promise<Readable> {
     const page = this.state.pages.find((p) => p.id === pageId);
     const attachment = page?.attachments?.find((a) => a.id === attachmentId);
-    if (!attachment) {
-      throw new Error(`Attachment not found: pageId=${pageId} attachmentId=${attachmentId}`);
-    }
+    assert.ok(attachment, `Attachment not found: pageId=${pageId} attachmentId=${attachmentId}`);
     return Readable.from(Buffer.from(attachment.bytes));
   }
 
   // ─── Mutation API (for multi-step / re-sync tests) ───────────────────────────
 
   public addSpace(space: ScenarioSpace): void {
-    if (this.state.spaces.some((s) => s.key === space.key)) {
-      throw new Error(`Space "${space.key}" already exists`);
-    }
+    assert.ok(
+      !this.state.spaces.some((s) => s.key === space.key),
+      `Space "${space.key}" already exists`,
+    );
     this.state.spaces.push(space);
   }
 
   public addPage(page: ScenarioPage): void {
-    if (this.state.pages.some((p) => p.id === page.id)) {
-      throw new Error(`Page "${page.id}" already exists`);
-    }
+    assert.ok(!this.state.pages.some((p) => p.id === page.id), `Page "${page.id}" already exists`);
     this.state.pages.push(page);
   }
 
   public removePage(pageId: string): void {
     const index = this.state.pages.findIndex((p) => p.id === pageId);
-    if (index === -1) {
-      throw new Error(`Cannot remove unknown page "${pageId}"`);
-    }
+    assert.ok(index !== -1, `Cannot remove unknown page "${pageId}"`);
     this.state.pages.splice(index, 1);
   }
 
@@ -159,18 +154,20 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
   public addAttachment(pageId: string, attachment: ScenarioAttachment): void {
     const page = this.getPageOrFail(pageId);
     page.attachments ??= [];
-    if (page.attachments.some((a) => a.id === attachment.id)) {
-      throw new Error(`Attachment "${attachment.id}" already exists on page "${pageId}"`);
-    }
+    assert.ok(
+      !page.attachments.some((a) => a.id === attachment.id),
+      `Attachment "${attachment.id}" already exists on page "${pageId}"`,
+    );
     page.attachments.push(attachment);
   }
 
   public removeAttachment(pageId: string, attachmentId: string): void {
     const page = this.getPageOrFail(pageId);
     const index = page.attachments?.findIndex((a) => a.id === attachmentId) ?? -1;
-    if (index === -1) {
-      throw new Error(`Cannot remove unknown attachment "${attachmentId}" from page "${pageId}"`);
-    }
+    assert.ok(
+      index !== -1,
+      `Cannot remove unknown attachment "${attachmentId}" from page "${pageId}"`,
+    );
     page.attachments?.splice(index, 1);
   }
 

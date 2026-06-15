@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { randomUUID } from 'node:crypto';
 import type {
   ContentRegistrationRequest,
@@ -163,11 +164,10 @@ export class FakeUniqueApi implements UniqueApiClient {
         const conflicting = [...this.scopesById.values()].find(
           (s) => s.id !== scopeId && externalId !== null && s.externalId === externalId,
         );
-        if (conflicting) {
-          throw new Error(
-            `External id "${externalId}" is already taken by scope ${conflicting.id}`,
-          );
-        }
+        assert.ok(
+          !conflicting,
+          `External id "${externalId}" is already taken by scope ${conflicting?.id}`,
+        );
         scope.externalId = externalId;
         return { id: scope.id, externalId: scope.externalId };
       },
@@ -285,9 +285,7 @@ export class FakeUniqueApi implements UniqueApiClient {
       parentId = created.id;
     }
 
-    if (!current) {
-      throw new Error(`Cannot create scope from empty path "${path}"`);
-    }
+    assert.ok(current, `Cannot create scope from empty path "${path}"`);
     return current;
   }
 
@@ -333,9 +331,7 @@ export class FakeUniqueApi implements UniqueApiClient {
 
   private finalizeIngestion(request: IngestionFinalizationRequest): { id: string } {
     const file = [...this.filesById.values()].find((f) => f.key === request.key);
-    if (!file) {
-      throw new Error(`Cannot finalize unknown key "${request.key}"`);
-    }
+    assert.ok(file, `Cannot finalize unknown key "${request.key}"`);
     file.ingestionState = IngestionState.Finished;
     if (request.metadata) {
       file.metadata = stringifyMetadata(request.metadata);
@@ -391,9 +387,7 @@ export class FakeUniqueApi implements UniqueApiClient {
 
   private requireScope(scopeId: string): Scope {
     const scope = this.scopesById.get(scopeId);
-    if (!scope) {
-      throw new Error(`Unknown scope: ${scopeId}`);
-    }
+    assert.ok(scope, `Unknown scope: ${scopeId}`);
     return scope;
   }
 }

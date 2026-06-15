@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { Readable } from 'node:stream';
 import type { Dispatcher } from 'undici';
 import { MockAgent } from 'undici';
@@ -62,9 +63,7 @@ export class FakeBlobStorage {
 // slashes, so the last segment is the token.
 function extractToken(path: string): string {
   const token = path.split('/').pop();
-  if (!token) {
-    throw new Error(`Could not extract upload token from path: ${path}`);
-  }
+  assert.ok(token, `Could not extract upload token from path: ${path}`);
   return token;
 }
 
