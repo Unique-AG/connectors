@@ -188,9 +188,6 @@ export const ContentUpsertInputSchema = z.object({
   url: z.string().optional(),
   ingestionConfig: IngestionConfigSchema.optional(),
   metadata: z.json().optional(),
-  // Per-content access permissions (e.g. `u:{userId}R`, `u:{userId}W`). When set, overrides
-  // the scope-inherited default so visibility can be controlled per file rather than per scope.
-  fileAccess: z.array(z.string()).optional(),
 });
 export type ContentUpsertInput = z.infer<typeof ContentUpsertInputSchema>;
 
