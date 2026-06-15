@@ -744,9 +744,10 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => svc.synchronize());
 
-      expect(inliner.inlineImagesInPage).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }), [
-        imageAttachment,
-      ]);
+      expect(inliner.inlineImagesInPage).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '1' }),
+        [imageAttachment],
+      );
       expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
         expect.objectContaining({
           id: '1',
@@ -879,36 +880,6 @@ describe('ConfluenceSynchronizationService', () => {
       );
       // The image is never standalone-ingested.
       expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalled();
-    });
-
-    it('falls back to ingesting the original body when the inliner throws', async () => {
-      const inliner: Pick<PageImageInliner, 'inlineImagesInPage'> = {
-        inlineImagesInPage: vi.fn(async () => {
-          throw new Error('inliner exploded');
-        }),
-      };
-
-      const svc = createService(
-        mockScanner,
-        mockContentFetcher,
-        mockFileDiffService,
-        mockIngestionService,
-        undefined,
-        inliner,
-      );
-
-      await tenantStorage.run(tenant, () => svc.synchronize());
-
-      // Page still gets ingested (with its original body).
-      expect(mockIngestionService.ingestPage).toHaveBeenCalledWith(
-        expect.objectContaining({ id: '1' }),
-        'scope-1',
-      );
-      // Image is page-owned even when the inliner throws: it is not standalone-ingested.
-      expect(mockIngestionService.ingestAttachment).not.toHaveBeenCalledWith(
-        expect.objectContaining({ id: imageAttachment.id }),
-        expect.anything(),
-      );
     });
 
     // These exercise the REAL PageImageInliner (not a mock) wired into the orchestrator, proving

@@ -131,7 +131,9 @@ describe('PageImageInliner', () => {
       );
       const page = basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE);
 
-      const result = await disabledInliner.inlineImagesInPage(page, [sampleDiscoveredImageAttachment]);
+      const result = await disabledInliner.inlineImagesInPage(page, [
+        sampleDiscoveredImageAttachment,
+      ]);
 
       expect(result).toBe(page);
       expect(result.body).toContain('<ac:image');
@@ -184,10 +186,10 @@ describe('PageImageInliner', () => {
         downloadPath: '/download/attachments/1/two.jpg',
       };
 
-      const result = await inliner.inlineImagesInPage(basePage(PAGE_BODY_MULTIPLE_CURRENT_PAGE_IMAGES), [
-        oneAtt,
-        twoAtt,
-      ]);
+      const result = await inliner.inlineImagesInPage(
+        basePage(PAGE_BODY_MULTIPLE_CURRENT_PAGE_IMAGES),
+        [oneAtt, twoAtt],
+      );
 
       expect(result.body).toContain(
         `src="data:image/png;base64,${Buffer.from('one').toString('base64')}"`,
@@ -488,7 +490,9 @@ describe('PageImageInliner', () => {
       apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(imageBuffer()));
       const body = '<ac:image><ri:attachment ri:filename="diagram.png"/></ac:image>';
 
-      const result = await inliner.inlineImagesInPage(basePage(body), [sampleDiscoveredImageAttachment]);
+      const result = await inliner.inlineImagesInPage(basePage(body), [
+        sampleDiscoveredImageAttachment,
+      ]);
 
       expect(result.body.startsWith('<img ')).toBe(true);
       expect(result.body.endsWith('/>')).toBe(true);
@@ -527,9 +531,10 @@ describe('PageImageInliner', () => {
         mediaType: 'image/PNG; charset=binary',
       };
 
-      const result = await inliner.inlineImagesInPage(basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE), [
-        att,
-      ]);
+      const result = await inliner.inlineImagesInPage(
+        basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE),
+        [att],
+      );
 
       expect(result.body).toContain('data:image/png;base64,');
       expect(result.body).not.toContain('charset=binary');
@@ -539,9 +544,10 @@ describe('PageImageInliner', () => {
       const stringStream = Readable.from(['PNG', 'DATA']);
       apiClient.getAttachmentDownloadStream.mockResolvedValue(stringStream);
 
-      const result = await inliner.inlineImagesInPage(basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE), [
-        sampleDiscoveredImageAttachment,
-      ]);
+      const result = await inliner.inlineImagesInPage(
+        basePage(PAGE_BODY_SINGLE_CURRENT_PAGE_IMAGE),
+        [sampleDiscoveredImageAttachment],
+      );
 
       expect(result.body).toContain(
         `src="data:image/png;base64,${Buffer.from('PNGDATA').toString('base64')}"`,

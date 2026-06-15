@@ -5,8 +5,8 @@ import type { TenantConfig } from '../config';
 import { BYTES_PER_MB } from '../config/ingestion.schema';
 import type { ConfluenceApiClient, ConfluenceAttachment } from '../confluence-api';
 import {
-  type ParsedImageMacro,
   findAllImageMacros,
+  type ParsedImageMacro,
   type ResourceRef,
 } from './confluence-tags-parser';
 import { isImageMimeType, normalizeMimeType } from './mime-type';
@@ -53,28 +53,39 @@ export class PageImageInliner {
       return page;
     }
 
-    const imageMacros = findAllImageMacros(page.body);
-    if (imageMacros.length === 0) {
+    // Inlining must never lose a page: on any unexpected failure, fall back to the original body.
+    try {
+      const imageMacros = findAllImageMacros(page.body);
+      if (imageMacros.length === 0) {
+        return page;
+      }
+
+      const pageImageAttachmentsByTitle = indexBy(pageImageAttachments, (a) => a.title);
+
+      const encodedImagePatches: EncodedImagePatch[] = [];
+      // convert images to base64 in batches to cap concurrent downloads
+      for (const imagesToProcessChunk of chunk(imageMacros, IMAGE_INLINE_BATCH_SIZE)) {
+        const batchResults = await Promise.all(
+          imagesToProcessChunk.map((macro) =>
+            this.resolveBase64EncodedImagePatch(macro, page, pageImageAttachmentsByTitle),
+          ),
+        );
+        encodedImagePatches.push(...filter(batchResults, isNonNullish));
+      }
+
+      if (encodedImagePatches.length === 0) {
+        return page;
+      }
+
+      return { ...page, body: this.applyEncodedImagePatches(page.body, encodedImagePatches) };
+    } catch (err) {
+      this.logger.warn({
+        pageId: page.id,
+        err,
+        msg: 'Image inlining failed, leaving page body unchanged',
+      });
       return page;
     }
-
-    const pageImageAttachmentsByTitle = indexBy(pageImageAttachments, (a) => a.title);
-
-    const encodedImagePatches: EncodedImagePatch[] = [];
-    // convert images to base64 in batches to cap concurrent downloads
-    for (const imagesToProcessChunk of chunk(imageMacros, IMAGE_INLINE_BATCH_SIZE)) {
-      const batchResults = await Promise.all(
-        imagesToProcessChunk.map((macro) => this.resolveBase64EncodedImagePatch(macro, page, pageImageAttachmentsByTitle)),
-      );
-      encodedImagePatches.push(...filter(batchResults, isNonNullish));
-    }
-
-    if (encodedImagePatches.length === 0) {
-      return page;
-    }
-
-    const replacedBody = this.applyEncodedImagePatches(page.body, encodedImagePatches);
-    return { ...page, body: replacedBody };
   }
 
   private async resolveBase64EncodedImagePatch(
@@ -299,4 +310,3 @@ export class PageImageInliner {
     return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   }
 }
-

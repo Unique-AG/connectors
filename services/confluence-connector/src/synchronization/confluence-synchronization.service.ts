@@ -181,24 +181,14 @@ export class ConfluenceSynchronizationService {
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
 
           const pageImageAttachments = imageAttachmentsByPageId[page.id] ?? [];
-          let pageToIngest = fetched;
-
-          try {
-            pageToIngest = await this.pageImageInliner.inlineImagesInPage(fetched, pageImageAttachments);
-          } catch (err) {
-            // A hard failure inside the inliner must not lose the page; ingest the original body.
-            this.logger.warn({
-              pageId: page.id,
-              err,
-              msg: 'Image inliner threw, ingesting original body',
-            });
-          }
-
+          const pageToIngest = await this.pageImageInliner.inlineImagesInPage(
+            fetched,
+            pageImageAttachments,
+          );
           await this.ingestionService.ingestPage(pageToIngest, scopeId);
 
           ingested++;
           this.metrics.recordPagesProcessed(1, 'success');
-
         })
           .catch((err) => {
             this.metrics.recordPagesProcessed(1, 'failure');
