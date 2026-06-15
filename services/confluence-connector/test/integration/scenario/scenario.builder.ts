@@ -1,3 +1,4 @@
+import { DEFAULT_INGEST_LABEL, DEFAULT_TENANT_NAME } from './defaults';
 import type {
   Scenario,
   ScenarioConfluence,
@@ -13,9 +14,9 @@ export interface ScenarioInput {
 }
 
 const DEFAULT_TENANT: ScenarioTenantConfig = {
-  name: 'tenant1',
+  name: DEFAULT_TENANT_NAME,
   instance: { type: 'cloud', cloudId: 'cloud-1', baseUrl: 'https://tenant1.atlassian.net' },
-  ingestSingleLabel: 'ai-ingest',
+  ingestSingleLabel: DEFAULT_INGEST_LABEL,
   ingestAllLabel: 'ai-ingest-all',
   rootScopeId: 'root-scope-id',
   rootScopeName: 'Confluence',

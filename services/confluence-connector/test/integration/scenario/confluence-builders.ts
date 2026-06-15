@@ -1,4 +1,9 @@
-import { DEFAULT_INGEST_LABEL, DEFAULT_SPACE_KEY, DEFAULT_VERSION } from './defaults';
+import {
+  DEFAULT_INGEST_LABEL,
+  DEFAULT_SPACE_ID,
+  DEFAULT_SPACE_KEY,
+  DEFAULT_VERSION,
+} from './defaults';
 import type { ScenarioAttachment, ScenarioPage, ScenarioSpace } from './scenario.types';
 
 /**
@@ -13,7 +18,7 @@ import type { ScenarioAttachment, ScenarioPage, ScenarioSpace } from './scenario
 
 export function space(overrides: Partial<ScenarioSpace> = {}): ScenarioSpace {
   return {
-    id: 'space-1',
+    id: DEFAULT_SPACE_ID,
     key: DEFAULT_SPACE_KEY,
     name: 'Space One',
     ...overrides,
