@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream';
+import { clone } from 'remeda';
 import {
   ConfluenceApiClient,
   type ConfluenceAttachment,
@@ -41,11 +42,22 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
     getAttachmentDownloadStream: new Map(),
   };
 
+  private readonly state: ScenarioConfluence;
+
   public constructor(
     private readonly tenant: ScenarioTenantConfig,
-    private readonly state: ScenarioConfluence,
+    state: ScenarioConfluence,
   ) {
     super();
+    // Deep-copy the scenario state. The mutation API below (addPage, removePage,
+    // splice, Object.assign, ...) writes to `this.state` in place, and scenarios
+    // share default arrays/objects across tests, so without a copy one test
+    // could mutate another's fixtures. `tenant` is never mutated, so it's left
+    // as-is.
+    //
+    // Note: clone turns each attachment's `bytes` Buffer into a Uint8Array, so
+    // `getAttachmentDownloadStream` re-wraps it in a Buffer before streaming.
+    this.state = clone(state);
   }
 
   public async resolveInstanceIdentifier(): Promise<InstanceIdentifier> {
@@ -133,7 +145,7 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
     if (!attachment) {
       throw new Error(`Attachment not found: pageId=${pageId} attachmentId=${attachmentId}`);
     }
-    return Readable.from(attachment.bytes);
+    return Readable.from(Buffer.from(attachment.bytes));
   }
 
   // ─── Mutation API (for multi-step / re-sync tests) ───────────────────────────
