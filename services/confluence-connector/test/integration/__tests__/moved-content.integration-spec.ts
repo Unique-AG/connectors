@@ -67,4 +67,45 @@ describe('moved content', () => {
     expect(recordFileDiffEvents).toHaveBeenCalledWith(1, 'moved');
     expect(recordFileDiffEvents).not.toHaveBeenCalledWith(expect.anything(), 'deleted');
   });
+
+  // A move alongside a genuinely new page and a removed page in one sync. The
+  // classifier must keep them apart: the moved file is left at its old key, the
+  // new page is ingested, and only the removed page is deleted.
+  it('distinguishes a move from a new page and a deleted page in the same sync', async () => {
+    const scenario = defineScenario({
+      confluence: {
+        spaces: [space()],
+        pages: [page({ id: 'moved' }), page({ id: 'fresh' })],
+      },
+      unique: {
+        scopes: [spaceScope({ rootScopeId: DEFAULT_ROOT_SCOPE_ID })],
+        files: [
+          // 'moved' already exists under a different space key (relocated to SP).
+          pageFile({ pageId: 'moved', spaceKey: 'OLD', body: '<p>Old body</p>' }),
+          // 'stale' exists under SP but is no longer in Confluence.
+          pageFile({ pageId: 'stale' }),
+        ],
+      },
+    });
+    ctx = buildScenarioContext(scenario);
+    const recordFileDiffEvents = vi.spyOn(ctx.metrics, 'recordFileDiffEvents');
+
+    const result = await ctx.runSync();
+
+    expect(result).toEqual({ status: 'success' });
+
+    const keys = getUniqueState(ctx.unique)
+      .files.map((file) => file.key)
+      .sort();
+    expect(keys).toEqual([
+      // moved: untouched at its old key, not re-ingested under SP.
+      'tenant1/space-1_OLD/moved',
+      // new: ingested under SP. 'stale' is gone.
+      'tenant1/space-1_SP/fresh',
+    ]);
+
+    expect(recordFileDiffEvents).toHaveBeenCalledWith(1, 'moved');
+    expect(recordFileDiffEvents).toHaveBeenCalledWith(1, 'new');
+    expect(recordFileDiffEvents).toHaveBeenCalledWith(1, 'deleted');
+  });
 });
