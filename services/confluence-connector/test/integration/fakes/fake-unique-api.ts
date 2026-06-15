@@ -21,6 +21,10 @@ interface PendingUpload {
   key: string;
 }
 
+export interface ScopeWithPath extends Scope {
+  path: string;
+}
+
 export interface StoredFile extends UniqueFile {
   mimeType: string;
   body?: Buffer;
@@ -120,8 +124,19 @@ export class FakeUniqueApi implements UniqueApiClient {
     return { matched: true };
   }
 
-  public listScopes(): Scope[] {
-    return [...this.scopesById.values()];
+  public listScopes(): ScopeWithPath[] {
+    const scopes = [...this.scopesById.values()];
+    return scopes.map((scope) => ({ ...scope, path: this.resolveScopePath(scope) }));
+  }
+
+  private resolveScopePath(scope: Scope): string {
+    const segments: string[] = [];
+    let current: Scope | undefined = scope;
+    while (current) {
+      segments.unshift(current.name);
+      current = current.parentId ? this.scopesById.get(current.parentId) : undefined;
+    }
+    return `/${segments.join('/')}`;
   }
 
   public listFiles(): StoredFile[] {

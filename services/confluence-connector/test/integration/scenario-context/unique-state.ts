@@ -42,13 +42,13 @@ const SMALL_BODY_LIMIT_BYTES = 4 * 1024;
  */
 export function getUniqueState(unique: FakeUniqueApi): UniqueState {
   const scopes = unique.listScopes();
-  const scopePathById = buildScopePathIndex(scopes);
+  const scopePathById = new Map(scopes.map((scope) => [scope.id, scope.path]));
 
   const scopeStates: UniqueScopeState[] = sortBy(
     scopes.map((scope) => ({
       id: scope.id,
       name: scope.name,
-      path: scopePathById.get(scope.id) ?? scope.name,
+      path: scope.path,
       externalId: scope.externalId,
     })),
     (scope) => scope.path,
@@ -72,21 +72,6 @@ export function getUniqueState(unique: FakeUniqueApi): UniqueState {
   );
 
   return { scopes: scopeStates, files: fileStates };
-}
-
-function buildScopePathIndex(scopes: { id: string; name: string; parentId: string | null }[]) {
-  const byId = new Map(scopes.map((scope) => [scope.id, scope]));
-  const result = new Map<string, string>();
-  for (const scope of scopes) {
-    const segments: string[] = [];
-    let current: { id: string; name: string; parentId: string | null } | undefined = scope;
-    while (current) {
-      segments.unshift(current.name);
-      current = current.parentId ? byId.get(current.parentId) : undefined;
-    }
-    result.set(scope.id, `/${segments.join('/')}`);
-  }
-  return result;
 }
 
 function sha256(buf: Buffer): string {
