@@ -75,11 +75,11 @@ export interface ScenarioUniqueFile {
   /**
    * ISO timestamp the file was last updated in Unique.
    * Compared against the page's `versionWhen` by `performFileDiff` to decide
-   * whether the file is up-to-date (no change), older (updated), or missing (new).
-   * Defaults to epoch zero so any real page wins by default — set this when you
-   * want to test "no-change" or "older Unique data" scenarios.
+   * whether the file is up-to-date (no change) or older (updated). The builders
+   * default it to `DEFAULT_VERSION` so the file looks up-to-date; set an older
+   * value to test "updated Unique data" scenarios.
    */
-  updatedAt?: string;
+  updatedAt: string;
   /**
    * Scope the file belongs to in Unique (`SCOPE` ownerId). Used by
    * `files.getContentIdsByScope`, which the tenant-deletion flow relies on.

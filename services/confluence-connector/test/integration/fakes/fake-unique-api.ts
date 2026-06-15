@@ -91,7 +91,7 @@ export class FakeUniqueApi implements UniqueApiClient {
         ingestionState: IngestionState.Finished,
         metadata: file.metadata ?? null,
         body: file.body,
-        updatedAt: file.updatedAt ?? new Date(0).toISOString(),
+        updatedAt: file.updatedAt,
         ingestionConfig: null,
       });
     }
