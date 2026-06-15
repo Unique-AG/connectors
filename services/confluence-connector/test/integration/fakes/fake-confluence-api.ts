@@ -210,14 +210,12 @@ export class FakeConfluenceApi extends ConfluenceApiClient {
       ...(includeBody ? { body: { storage: { value: page.body } } } : {}),
       ...(this.tenant.attachmentsEnabled && attachments.length > 0
         ? {
-            children: {
-              attachment: {
-                results: attachments,
-                start: 0,
-                limit: attachments.length,
-                size: attachments.length,
-              },
-            },
+            // The fake stands in for the client's resolved output, where
+            // `results` already holds every attachment (the real client merges
+            // the >25 case via the v2 API, covered in cloud-api-client.spec.ts).
+            // So no `size`/`limit`: those describe the raw HTTP page, a layer
+            // below this fake.
+            children: { attachment: { results: attachments } },
           }
         : {}),
     };
