@@ -44,26 +44,24 @@ export class FakeBlobStorage {
   }
 }
 
+// The intercept matcher guarantees the path is `/blob/<token>` with no further
+// slashes, so the last segment is the token.
 function extractToken(path: string): string {
-  const match = /\/blob\/([^/?#]+)/.exec(path);
-  if (!match || !match[1]) {
+  const token = path.split('/').pop();
+  if (!token) {
     throw new Error(`Could not extract upload token from path: ${path}`);
   }
-  return match[1];
+  return token;
 }
 
+// IngestionService sends either a Buffer (uploadBuffer) or a Readable stream
+// (uploadStream); those are the only two shapes we handle.
 async function readBody(body: unknown): Promise<Buffer> {
   if (!body) {
     return Buffer.alloc(0);
   }
   if (Buffer.isBuffer(body)) {
     return body;
-  }
-  if (typeof body === 'string') {
-    return Buffer.from(body, 'utf-8');
-  }
-  if (body instanceof Uint8Array) {
-    return Buffer.from(body);
   }
   if (body instanceof Readable || isAsyncIterable(body)) {
     const chunks: Buffer[] = [];
