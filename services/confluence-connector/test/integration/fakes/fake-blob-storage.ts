@@ -8,10 +8,24 @@ const FAKE_BLOB_ORIGIN = 'https://fake-blob.local';
 /**
  * Fake blob store for tests.
  *
- * When the connector ingests a file, it PUTs the bytes to a blob storage URL.
- * In tests there is no real blob store, so we catch that PUT here and hand the
- * bytes back to FakeUniqueApi. Without this, uploaded files would have no body,
- * and we could not check body, bodyHash, or bodySize.
+ * Ingestion is two separate calls, not one. First `registerContent` tells
+ * Unique a file exists; Unique creates a record (with an id) but no bytes yet,
+ * and returns a `writeUrl`. Then the connector PUTs the bytes to that url. The
+ * PUT carries only the url and the body, not the file id, so something has to
+ * answer: which file do these bytes belong to?
+ *
+ * The token in the url is that link. When `registerContent` runs, FakeUniqueApi
+ * mints a random token, bakes it into `https://fake-blob.local/blob/<token>`,
+ * and remembers `token -> file` in its pending-uploads map. This fake catches
+ * the PUT, pulls the token back out of the path, and calls
+ * `FakeUniqueApi.completeUpload(token, bytes)`, which looks up that file and
+ * finally fills in its body. Only then can the body/bodyHash/bodySize
+ * assertions see anything. (This mirrors real pre-signed blob urls: the token
+ * in the url is the address of the destination blob.)
+ *
+ * This fake stays dumb on purpose: it just catches the PUT and forwards
+ * `(token, bytes)`. The token-to-file correlation lives in FakeUniqueApi, which
+ * owns the file records.
  *
  * It is built on undici's MockAgent so it can be passed to IngestionService as
  * its `dispatcher`. Network access is turned off, so any PUT we forget to catch
