@@ -6,7 +6,7 @@
  *
  *  - **page**: ingested as HTML.
  *  - **blogpost**: ingested as HTML, identical to page.
- *  - **database / whiteboard / embed**: skipped at ingestion time — these
+ *  - **database / whiteboard / embed**: skipped at ingestion time. These
  *    types do not have meaningful HTML bodies for the AI use case. However,
  *    when one of these is labeled `ai-ingest-all`, the scanner still
  *    traverses its descendants and ingests any page or blog post under it.
@@ -28,8 +28,8 @@ describe('content types', () => {
     ctx = undefined;
   });
 
-  // Blog posts are ingested with the same key shape and metadata as pages —
-  // the type is invisible to Unique once content has been registered.
+  // Blog posts are ingested with the same key shape and metadata as pages. The
+  // type is invisible to Unique once content has been registered.
   it('ingests blog posts the same as pages', async () => {
     const scenario = defineScenario({
       confluence: {
@@ -109,7 +109,7 @@ describe('content types', () => {
             title: 'Embedded Dashboard',
             labels: [DEFAULT_INGEST_ALL_LABEL],
           }),
-          // Descendants of each root — these should all be ingested.
+          // Descendants of each root. These should all be ingested.
           page({ id: 'db-child', parentId: 'db-root', type: ContentType.PAGE, labels: [] }),
           page({ id: 'wb-child', parentId: 'wb-root', type: ContentType.BLOGPOST, labels: [] }),
           page({ id: 'em-child', parentId: 'em-root', type: ContentType.PAGE, labels: [] }),

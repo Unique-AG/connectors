@@ -31,7 +31,7 @@ describe('subtree sync', () => {
         pages: [
           page({ id: 'root', title: 'Handbook', labels: [DEFAULT_INGEST_ALL_LABEL] }),
           // Children are unlabeled, so descendant traversal is the only path to
-          // them — a regression in getDescendantPages fails this test.
+          // them. A regression in getDescendantPages fails this test.
           page({ id: 'child-a', parentId: 'root', title: 'Onboarding', labels: [] }),
           page({ id: 'child-b', parentId: 'root', title: 'Benefits', labels: [] }),
         ],
@@ -52,7 +52,7 @@ describe('subtree sync', () => {
     ]);
   });
 
-  // Multiple ai-ingest-all roots in the same space — each tree is traversed
+  // Multiple ai-ingest-all roots in the same space. Each tree is traversed
   // independently and their results merge into one space scope.
   it('ingests multiple ai-ingest-all roots in the same space', async () => {
     const scenario = defineScenario({
@@ -156,7 +156,7 @@ describe('subtree sync', () => {
   });
 
   // `ai-ingest` (single page) and `ai-ingest-all` (full subtree) coexist in one
-  // space — their union is what gets ingested, with no double-ingestion.
+  // space. Their union is what gets ingested, with no double-ingestion.
   it('combines ai-ingest and ai-ingest-all labels in the same space', async () => {
     const scenario = defineScenario({
       confluence: {

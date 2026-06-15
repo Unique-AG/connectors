@@ -2,7 +2,7 @@
  * Behavior: root-scope migration.
  *
  * Operators sometimes need to point an active connector at a different root
- * scope in Unique — for example, when reorganizing scope hierarchy or moving
+ * scope in Unique. For example, when reorganizing scope hierarchy or moving
  * content out of a deprecated parent. Migration is performed by changing
  * `ingestion.scopeId` in tenant configuration.
  *
@@ -37,7 +37,7 @@ describe('root scope migration', () => {
   // Happy path: the operator has cleaned up the old root (its externalId is
   // null) and pointed the tenant at a new root. The connector claims the new
   // root and syncs all current Confluence content under it. Anything still
-  // sitting under the old root is left alone — migration of leftover content
+  // sitting under the old root is left alone. Migration of leftover content
   // is an operator decision, not a sync-time behavior.
   it('claims the new root scope and ingests content there after the old root has been cleared', async () => {
     const scenario = defineScenario({
@@ -62,7 +62,7 @@ describe('root scope migration', () => {
             spaceId: 'space-legacy',
             scopeId: 'scope-legacy',
           }),
-          // The new root is fresh — no externalId yet, no children.
+          // The new root is fresh. No externalId yet, no children.
           uniqueScope({ id: 'new-root', name: 'Confluence v2', externalId: null }),
         ],
         files: [
@@ -96,7 +96,7 @@ describe('root scope migration', () => {
     const newKeys = state.files.map((file) => file.key).sort();
     expect(newKeys).toContain('tenant1/space-1_SP/p1');
 
-    // Leftover content under the old root is untouched — migration does not
+    // Leftover content under the old root is untouched. Migration does not
     // auto-move it. The operator owns that decision.
     const oldRoot = state.scopes.find((scope) => scope.id === 'old-root');
     expect(oldRoot).toBeDefined();
@@ -107,7 +107,7 @@ describe('root scope migration', () => {
 
   // Conflict path: the operator pointed the tenant at a new root but forgot
   // to clear the old root's externalId. The expected externalId is therefore
-  // already taken, so the new root's claim fails — and the entire sync fails
+  // already taken, so the new root's claim fails. And the entire sync fails
   // safely without touching any data. The operator gets a clear signal that
   // they must run the tenant-deletion flow against the old root before
   // proceeding.
@@ -123,7 +123,7 @@ describe('root scope migration', () => {
       },
       unique: {
         scopes: [
-          // The old root still claims the externalId — operator forgot to
+          // The old root still claims the externalId. Operator forgot to
           // run cleanup before switching.
           uniqueScope({
             id: 'old-root',
@@ -147,7 +147,7 @@ describe('root scope migration', () => {
     expect(state.scopes.find((scope) => scope.id === 'old-root')?.externalId).toBe(
       'confc:cloud:cloud-1',
     );
-    // The new root remains unclaimed — the failed updateExternalId did not
+    // The new root remains unclaimed. The failed updateExternalId did not
     // partially apply.
     expect(state.scopes.find((scope) => scope.id === 'new-root')?.externalId).toBeNull();
 

@@ -8,7 +8,7 @@
  * full reset of the space.
  *
  * The per-item deletion path is distinct from the per-space deletion path
- * tested in `delete-space.integration-spec.ts` — that one removes whole space
+ * tested in `delete-space.integration-spec.ts`. That one removes whole space
  * scopes when no labeled content remains in the space at all.
  */
 import { afterEach, describe, expect, it } from 'vitest';

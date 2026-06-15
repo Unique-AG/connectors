@@ -31,7 +31,7 @@ describe('root scope ownership', () => {
   // claims it by writing its expected externalId.
   it('claims an unowned root scope on first sync', async () => {
     const scenario = defineScenario({
-      // No `unique.scopes` provided — the harness seeds the root scope with
+      // No `unique.scopes` provided. The harness seeds the root scope with
       // externalId=null, which represents an unclaimed root scope.
       confluence: {
         spaces: [space()],
@@ -83,7 +83,7 @@ describe('root scope ownership', () => {
   });
 
   // Cross-instance safety: another connector instance has already claimed the
-  // same root scope. The sync must abort to prevent data conflicts — no files
+  // same root scope. The sync must abort to prevent data conflicts. No files
   // should be written and the externalId must remain unchanged.
   it('aborts the sync when the root scope is owned by a different instance', async () => {
     const scenario = defineScenario({

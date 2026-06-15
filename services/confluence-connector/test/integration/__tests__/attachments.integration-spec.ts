@@ -4,9 +4,9 @@
  * The connector ingests file attachments alongside their parent page, subject
  * to three configuration knobs:
  *
- *  - `attachments.allowedMimeTypes` — only these MIME types are ingested.
- *  - `attachments.maxFileSizeMb` — anything larger is filtered out at scan time.
- *  - `attachments.imageOcrEnabled` — when on, image attachments (`image/png`,
+ *  - `attachments.allowedMimeTypes`. Only these MIME types are ingested.
+ *  - `attachments.maxFileSizeMb`. Anything larger is filtered out at scan time.
+ *  - `attachments.imageOcrEnabled`. When on, image attachments (`image/png`,
  *    `image/jpeg`) are registered with `ingestionConfig: { jpgReadMode:
  *    'DOC_INTELLIGENCE_DEFAULT' }` so Unique routes them through document
  *    intelligence OCR. Other types are unaffected.
@@ -28,7 +28,7 @@ describe('attachments', () => {
     ctx = undefined;
   });
 
-  // Image attachments (PNG, JPEG) are first-class — both are ingested with
+  // Image attachments (PNG, JPEG) are first-class. Both are ingested with
   // their original media type alongside the HTML page.
   it('ingests image attachments alongside the page', async () => {
     const scenario = defineScenario({
@@ -135,7 +135,7 @@ describe('attachments', () => {
                 id: 'att-huge',
                 title: 'huge.pdf',
                 mediaType: 'application/pdf',
-                // 2 MB — strictly larger than the 1 MB cap.
+                // 2 MB. Strictly larger than the 1 MB cap.
                 bytes: Buffer.alloc(2 * ONE_MB, 0x42),
               }),
             ],
@@ -246,7 +246,7 @@ describe('attachments', () => {
     expect(attachmentKeys[ATTACHMENT_COUNT - 1]).toBe('tenant1/space-1_SP/p1::att-50');
   });
 
-  // When attachments are disabled, the scanner skips them entirely — only the
+  // When attachments are disabled, the scanner skips them entirely. Only the
   // HTML page reaches Unique.
   it('ingests pages but no attachments when attachments are disabled', async () => {
     const scenario = defineScenario({

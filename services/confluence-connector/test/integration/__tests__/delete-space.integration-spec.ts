@@ -7,7 +7,7 @@
  * current sync?". If a child scope has no corresponding space in the discovery
  * pass, the scope and all its files are deleted by key prefix. This is the
  * heavier counterpart to per-item deletion (see
- * `delete-content.integration-spec.ts`) — it removes whole scope subtrees
+ * `delete-content.integration-spec.ts`). It removes whole scope subtrees
  * rather than individual files.
  */
 import { afterEach, describe, expect, it } from 'vitest';
@@ -78,8 +78,8 @@ describe('delete space', () => {
 
   // The HR space has been entirely deleted on the Confluence side (admin
   // removed the space). At sync time this is indistinguishable from "space
-  // exists but has no labeled content" — both produce zero discovered pages
-  // for that space — so this exercises the same `cleanupRemovedSpaces` code
+  // exists but has no labeled content". Both produce zero discovered pages
+  // for that space. So this exercises the same `cleanupRemovedSpaces` code
   // path as the previous test. It is kept as a separate test on purpose so
   // both real-world operator scenarios (label removal vs space deletion)
   // appear by name in the integration suite and the published docs.

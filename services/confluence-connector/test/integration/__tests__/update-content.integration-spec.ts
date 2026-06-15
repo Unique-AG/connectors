@@ -11,9 +11,9 @@
  *
  * This file pins down the two interesting update paths:
  *
- *  1. The simple in-place update — a page's content changed; the file in
+ *  1. The simple in-place update. A page's content changed; the file in
  *     Unique is rewritten under the same key.
- *  2. The mass-replacement carve-out — every existing key is gone and an
+ *  2. The mass-replacement carve-out. Every existing key is gone and an
  *     entirely new set of keys takes its place. Without protection this would
  *     trip the `validateNoAccidentalFullDeletion` safety net; the carve-out
  *     allows it through (with a warning) when no submitted key overlaps a
@@ -43,7 +43,7 @@ describe('update content', () => {
   });
 
   // Per-key update path: same page id, newer version. The file is rewritten
-  // in place — its key remains the same and its body changes to reflect the
+  // in place. Its key remains the same and its body changes to reflect the
   // new Confluence content.
   it('updates a file in place when its source page version has advanced', async () => {
     const scenario = defineScenario({
@@ -87,7 +87,7 @@ describe('update content', () => {
   // Full-replacement carve-out: an editor archived old pages (p1, p2) and
   // republished new ones (p3, p4) with fresh page IDs. Every existing key
   // would be deleted, but every key is also being replaced by a non-
-  // overlapping new one — a legitimate republication, not a bug. The guard
+  // overlapping new one. A legitimate republication, not a bug. The guard
   // logs a warning and lets the sync proceed.
   it('allows a full replacement when every old key is replaced by a non-overlapping new key', async () => {
     const scenario = defineScenario({

@@ -9,7 +9,7 @@ const FAKE_SCOPE_MANAGEMENT_BASE_URL = 'https://unique-fake.local/scope-manageme
  * Build a fully-typed TenantConfig from the simplified ScenarioTenantConfig.
  *
  * The unique config uses `external` auth mode so IngestionService.correctWriteUrl
- * passes through the writeUrl unchanged — the FakeBlobStorage MockAgent then
+ * passes through the writeUrl unchanged. The FakeBlobStorage MockAgent then
  * intercepts the PUT against that writeUrl host.
  */
 export function resolveTenantConfig(scenario: ScenarioTenantConfig): TenantConfig {
