@@ -1,6 +1,15 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { UnauthorizedException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// `@unique-ag/mcp-server-module` resolves to its built `dist`, which is not
+// available when tests run without building workspace deps first (the service
+// `build` is `nest build`, which does not build dependencies). Mock the `@Tool`
+// decorator to a no-op so importing the tool never touches the real package.
+vi.mock('@unique-ag/mcp-server-module', () => ({
+  Tool: () => (_target: any, _key: string, _descriptor: PropertyDescriptor) => _descriptor,
+}));
+
 import type { SearchService } from '../search.service';
 import { SearchMessagesInputSchema, SearchMessagesTool } from './search-messages.tool';
 
