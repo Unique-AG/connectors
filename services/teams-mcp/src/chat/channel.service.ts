@@ -2,44 +2,17 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { collectAllPages, GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
 import { MsChannel, MsChannelSchema, MsTeam, MsTeamSchema } from './chat.dtos';
 
 @Injectable()
 export class ChannelService {
   private readonly logger = new Logger(ChannelService.name);
 
-  // Safety cap on Graph pagination so a pathological account cannot cause an
-  // unbounded number of follow-up requests.
-  private static readonly MAX_PAGES = 20;
-
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly traceService: TraceService,
   ) {}
-
-  // Collects every item of a Graph list response, following `@odata.nextLink`
-  // up to the page cap. Teams/channels lists are normally small, but a user
-  // with more than one page of either would otherwise be silently truncated —
-  // breaking list tools and name resolution alike.
-  private async fetchAllPages<T>(
-    client: ReturnType<GraphClientFactory['createClientForUser']>,
-    firstResponse: { value: unknown; '@odata.nextLink'?: string },
-    schema: z.ZodType<T>,
-  ): Promise<T[]> {
-    const all: T[] = [];
-    let response = firstResponse;
-
-    for (let page = 0; page < ChannelService.MAX_PAGES; page++) {
-      all.push(...z.array(schema).parse(response.value));
-      const nextLink = response['@odata.nextLink'];
-      if (!nextLink) {
-        break;
-      }
-      response = await client.api(nextLink).get();
-    }
-
-    return all;
-  }
 
   @Span()
   public async listTeams(userProfileId: string): Promise<MsTeam[]> {
@@ -49,9 +22,17 @@ export class ChannelService {
     this.logger.debug({ userProfileId }, 'Fetching joined teams from Microsoft Graph');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    const response = await client.api('/me/joinedTeams').select('id,displayName,description').get();
+    const response = await client
+      .api('/me/joinedTeams')
+      .top(GRAPH_PAGE_SIZE)
+      .select('id,displayName,description')
+      .get();
 
-    const teams = await this.fetchAllPages(client, response, MsTeamSchema);
+    // Teams/channels lists are normally small, but a user with more than one
+    // page of either would otherwise be silently truncated — breaking list
+    // tools and name resolution alike.
+    const { items } = await collectAllPages(client, response, { label: 'listTeams' });
+    const teams = z.array(MsTeamSchema).parse(items);
 
     span?.setAttribute('result_count', teams.length);
     this.logger.debug({ userProfileId, count: teams.length }, 'Retrieved joined teams');
@@ -70,10 +51,12 @@ export class ChannelService {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client
       .api(`/teams/${teamId}/channels`)
+      .top(GRAPH_PAGE_SIZE)
       .select('id,displayName,description')
       .get();
 
-    const channels = await this.fetchAllPages(client, response, MsChannelSchema);
+    const { items } = await collectAllPages(client, response, { label: 'listChannels' });
+    const channels = z.array(MsChannelSchema).parse(items);
 
     span?.setAttribute('result_count', channels.length);
     this.logger.debug({ userProfileId, teamId, count: channels.length }, 'Retrieved team channels');

@@ -3,6 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
+import { GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
 import { SearchService } from '../search.service';
 
 const SearchMessagesInputSchema = z
@@ -71,7 +72,7 @@ const SearchMessagesInputSchema = z
       .number()
       .int()
       .min(1)
-      .max(50)
+      .max(GRAPH_PAGE_SIZE)
       .default(25)
       .describe('Maximum number of results to return per page. Default: 25'),
   })

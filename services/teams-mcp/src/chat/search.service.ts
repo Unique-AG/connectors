@@ -59,6 +59,15 @@ export class SearchService {
     private readonly chatService: ChatService,
   ) {}
 
+  // NOTE: this is the one paginated Graph call site that does NOT use the shared
+  // `PageIterator` helpers in `~/msgraph/graph-pagination`. The Microsoft Search
+  // API (`POST /search/query`) does not page via `@odata.nextLink`; it pages via
+  // `from`/`size` on the request and reports `moreResultsAvailable` on the
+  // response. PageIterator only understands `@odata.nextLink`, so it cannot drive
+  // this endpoint. The offset/size model is also the correct contract here — the
+  // MCP client paginates explicitly via `offset` + `moreResultsAvailable`, which
+  // is always surfaced (never silently capped). The per-page size bound is
+  // sourced from the shared `GRAPH_PAGE_SIZE` constant in the search tool.
   @Span()
   public async searchMessages(
     userProfileId: string,

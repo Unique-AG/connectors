@@ -1,16 +1,14 @@
+import { type PageCollection } from '@microsoft/microsoft-graph-client';
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { collectAllPages, collectUntil, GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
 import { MsChat, MsChatMessage, MsChatMessageSchema, MsChatSchema } from './chat.dtos';
 
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
-
-  // Safety cap on Graph pagination so a pathological account cannot cause an
-  // unbounded number of follow-up requests.
-  private static readonly MAX_PAGES = 20;
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
@@ -28,7 +26,11 @@ export class ChatService {
     this.logger.debug({ userProfileId }, 'Fetching chats from Microsoft Graph');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    const response = await client
+    // Deliberately single-page (NOT PageIterator): this is a bounded "recent
+    // chats" window that must report an accurate `hasMore`. PageIterator hides
+    // the page boundary and cannot distinguish "stopped at limit" from "no more
+    // data", so it would re-introduce the `count === limit` false positive.
+    const response: PageCollection = await client
       .api('/me/chats')
       .expand('members')
       .top(limit)
@@ -73,45 +75,19 @@ export class ChatService {
       .select('id,createdDateTime,from,body,attachments,messageType')
       .get();
 
-    const messages = await this.collectMessages(client, response, limit, excludeSystemMessages);
+    // Graph does not support a server-side messageType filter on the chat and
+    // channel message endpoints, so when excluding system messages we must page
+    // through them client-side to still return up to `limit` user messages.
+    const raw = await collectUntil(client, response, {
+      limit,
+      filter: excludeSystemMessages ? (m) => m.messageType === 'message' : undefined,
+    });
+    const messages = z.array(MsChatMessageSchema).parse(raw);
 
     span?.setAttribute('result_count', messages.length);
     this.logger.debug({ userProfileId, chatId, count: messages.length }, 'Retrieved chat messages');
 
     return messages;
-  }
-
-  // Pages through Graph `@odata.nextLink` until `limit` messages are collected
-  // (optionally excluding system messages) or the pages / page cap run out.
-  // Graph does not support a server-side messageType filter on the chat and
-  // channel message endpoints, so excluding system messages client-side
-  // without paging could return far fewer than `limit` user messages.
-  private async collectMessages(
-    client: ReturnType<GraphClientFactory['createClientForUser']>,
-    firstResponse: { value: unknown; '@odata.nextLink'?: string },
-    limit: number,
-    excludeSystemMessages: boolean,
-  ): Promise<MsChatMessage[]> {
-    const collected: MsChatMessage[] = [];
-    let response = firstResponse;
-
-    for (let page = 0; page < ChatService.MAX_PAGES; page++) {
-      const parsed = z.array(MsChatMessageSchema).parse(response.value);
-      for (const message of parsed) {
-        if (excludeSystemMessages && message.messageType !== 'message') {
-          continue;
-        }
-        collected.push(message);
-      }
-
-      const nextLink = response['@odata.nextLink'];
-      if (collected.length >= limit || !nextLink) {
-        break;
-      }
-      response = await client.api(nextLink).get();
-    }
-
-    return collected.slice(0, limit);
   }
 
   @Span()
@@ -170,31 +146,23 @@ export class ChatService {
     return chat;
   }
 
-  // Pages through all of the user's chats, following Graph `@odata.nextLink`
-  // up to the page cap, so chat resolution is not limited to the most recent
-  // window (unlike `listChats`, which is intentionally bounded for the list
-  // tool).
+  // Pages through all of the user's chats so chat resolution is not limited to
+  // the most recent window (unlike `listChats`, which is intentionally bounded
+  // for the list tool).
   private async fetchAllChats(
     client: ReturnType<GraphClientFactory['createClientForUser']>,
   ): Promise<MsChat[]> {
-    const all: MsChat[] = [];
-    let response = await client
+    const response = await client
       .api('/me/chats')
       .expand('members')
-      .top(50)
+      .top(GRAPH_PAGE_SIZE)
       .select('id,chatType,topic,members')
       .get();
 
-    for (let page = 0; page < ChatService.MAX_PAGES; page++) {
-      all.push(...z.array(MsChatSchema).parse(response.value));
-      const nextLink = response['@odata.nextLink'] as string | undefined;
-      if (!nextLink) {
-        break;
-      }
-      response = await client.api(nextLink).get();
-    }
-
-    return all;
+    const { items } = await collectAllPages(client, response, {
+      label: 'resolveChatByNameOrMember',
+    });
+    return z.array(MsChatSchema).parse(items);
   }
 
   @Span()
@@ -225,7 +193,11 @@ export class ChatService {
       .select('id,createdDateTime,from,body,attachments,messageType')
       .get();
 
-    const messages = await this.collectMessages(client, response, limit, excludeSystemMessages);
+    const raw = await collectUntil(client, response, {
+      limit,
+      filter: excludeSystemMessages ? (m) => m.messageType === 'message' : undefined,
+    });
+    const messages = z.array(MsChatMessageSchema).parse(raw);
 
     span?.setAttribute('result_count', messages.length);
     this.logger.debug(
