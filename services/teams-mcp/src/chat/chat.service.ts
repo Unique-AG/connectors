@@ -8,6 +8,10 @@ import { MsChat, MsChatMessage, MsChatMessageSchema, MsChatSchema } from './chat
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
 
+  // Safety cap on Graph pagination so a pathological account cannot cause an
+  // unbounded number of follow-up requests.
+  private static readonly MAX_PAGES = 20;
+
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly traceService: TraceService,
@@ -41,8 +45,9 @@ export class ChatService {
     userProfileId: string,
     chatId: string,
     limit: number,
-    orderBy = 'createdDateTime desc',
+    options: { orderBy?: string; excludeSystemMessages?: boolean } = {},
   ): Promise<MsChatMessage[]> {
+    const { orderBy = 'createdDateTime desc', excludeSystemMessages = false } = options;
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
     span?.setAttribute('chat_id', chatId);
@@ -61,12 +66,45 @@ export class ChatService {
       .select('id,createdDateTime,from,body,attachments,messageType')
       .get();
 
-    const messages = z.array(MsChatMessageSchema).parse(response.value);
+    const messages = await this.collectMessages(client, response, limit, excludeSystemMessages);
 
     span?.setAttribute('result_count', messages.length);
     this.logger.debug({ userProfileId, chatId, count: messages.length }, 'Retrieved chat messages');
 
     return messages;
+  }
+
+  // Pages through Graph `@odata.nextLink` until `limit` messages are collected
+  // (optionally excluding system messages) or the pages / page cap run out.
+  // Graph does not support a server-side messageType filter on the chat and
+  // channel message endpoints, so excluding system messages client-side
+  // without paging could return far fewer than `limit` user messages.
+  private async collectMessages(
+    client: ReturnType<GraphClientFactory['createClientForUser']>,
+    firstResponse: { value: unknown; '@odata.nextLink'?: string },
+    limit: number,
+    excludeSystemMessages: boolean,
+  ): Promise<MsChatMessage[]> {
+    const collected: MsChatMessage[] = [];
+    let response = firstResponse;
+
+    for (let page = 0; page < ChatService.MAX_PAGES; page++) {
+      const parsed = z.array(MsChatMessageSchema).parse(response.value);
+      for (const message of parsed) {
+        if (excludeSystemMessages && message.messageType !== 'message') {
+          continue;
+        }
+        collected.push(message);
+      }
+
+      const nextLink = response['@odata.nextLink'];
+      if (collected.length >= limit || !nextLink) {
+        break;
+      }
+      response = await client.api(nextLink).get();
+    }
+
+    return collected.slice(0, limit);
   }
 
   @Span()
@@ -76,36 +114,33 @@ export class ChatService {
   ): Promise<MsChat> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('identifier', identifier);
 
-    this.logger.debug({ userProfileId, identifier }, 'Resolving chat by topic or member name');
+    this.logger.debug({ userProfileId }, 'Resolving chat by topic or member name');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const [chats, me] = await Promise.all([
-      this.listChats(userProfileId),
+      this.fetchAllChats(client),
       client.api('/me').select('id').get() as Promise<{ id: string }>,
     ]);
     const currentUserId = me.id;
     const lowerIdentifier = identifier.toLowerCase();
 
-    // NOTE: exact case-insensitive match — topic first, then member display name for 1:1 chats.
-    // Group chats without a topic are only matchable by topic; oneOnOne chats fall back to member name.
-    // For oneOnOne chats, the current user is excluded from member matching to avoid every 1:1 chat
-    // matching when the user searches for their own name.
+    // Exact case-insensitive match on the chat topic, or on a member's display
+    // name. Member matching applies to both 1:1 and group chats — group chats
+    // are frequently topicless and only addressable by member. The current user
+    // is excluded from member matching so searching one's own name does not
+    // match every chat.
     const matches = chats.filter((c) => {
       if (c.topic?.toLowerCase() === lowerIdentifier) {
         return true;
       }
-      if (c.chatType === 'oneOnOne') {
-        return c.members.some(
-          (m) => m.userId !== currentUserId && m.displayName?.toLowerCase() === lowerIdentifier,
-        );
-      }
-      return false;
+      return c.members.some(
+        (m) => m.userId !== currentUserId && m.displayName?.toLowerCase() === lowerIdentifier,
+      );
     });
 
     if (matches.length === 0) {
-      span?.addEvent('chat not found', { identifier });
+      span?.addEvent('chat not found');
       throw new NotFoundException(`Chat "${identifier}" not found`);
     }
 
@@ -116,7 +151,7 @@ export class ChatService {
       const matchDescriptions = matches
         .map((c) => c.topic ?? c.members.map((m) => m.displayName).join(', '))
         .join('; ');
-      span?.addEvent('ambiguous chat identifier', { identifier, matchCount: matches.length });
+      span?.addEvent('ambiguous chat identifier', { matchCount: matches.length });
       throw new ConflictException(
         `Identifier "${identifier}" matches multiple chats: ${matchDescriptions}. Please be more specific.`,
       );
@@ -128,14 +163,42 @@ export class ChatService {
     return chat;
   }
 
+  // Pages through all of the user's chats, following Graph `@odata.nextLink`
+  // up to the page cap, so chat resolution is not limited to the most recent
+  // window (unlike `listChats`, which is intentionally bounded for the list
+  // tool).
+  private async fetchAllChats(
+    client: ReturnType<GraphClientFactory['createClientForUser']>,
+  ): Promise<MsChat[]> {
+    const all: MsChat[] = [];
+    let response = await client
+      .api('/me/chats')
+      .expand('members')
+      .top(50)
+      .select('id,chatType,topic,members')
+      .get();
+
+    for (let page = 0; page < ChatService.MAX_PAGES; page++) {
+      all.push(...z.array(MsChatSchema).parse(response.value));
+      const nextLink = response['@odata.nextLink'] as string | undefined;
+      if (!nextLink) {
+        break;
+      }
+      response = await client.api(nextLink).get();
+    }
+
+    return all;
+  }
+
   @Span()
   public async getChannelMessages(
     userProfileId: string,
     teamId: string,
     channelId: string,
     limit: number,
-    orderBy = 'createdDateTime desc',
+    options: { orderBy?: string; excludeSystemMessages?: boolean } = {},
   ): Promise<MsChatMessage[]> {
+    const { orderBy = 'createdDateTime desc', excludeSystemMessages = false } = options;
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
     span?.setAttribute('team_id', teamId);
@@ -155,7 +218,7 @@ export class ChatService {
       .select('id,createdDateTime,from,body,attachments,messageType')
       .get();
 
-    const messages = z.array(MsChatMessageSchema).parse(response.value);
+    const messages = await this.collectMessages(client, response, limit, excludeSystemMessages);
 
     span?.setAttribute('result_count', messages.length);
     this.logger.debug(

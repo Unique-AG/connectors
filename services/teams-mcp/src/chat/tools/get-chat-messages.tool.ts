@@ -96,30 +96,26 @@ export class GetChatMessagesTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('chat_identifier', input.chatIdentifier);
     span?.setAttribute('limit', input.limit);
 
-    this.logger.log(
-      { userProfileId, chatIdentifier: input.chatIdentifier, limit: input.limit },
-      'Getting chat messages',
-    );
+    this.logger.log({ userProfileId, limit: input.limit }, 'Getting chat messages');
 
     const chat = await this.chatService.resolveChatByNameOrMember(
       userProfileId,
       input.chatIdentifier,
     );
-    const messages = await this.chatService.getChatMessages(userProfileId, chat.id, input.limit);
+    span?.setAttribute('resolved_chat_id', chat.id);
+
+    const messages = await this.chatService.getChatMessages(userProfileId, chat.id, input.limit, {
+      excludeSystemMessages: !input.includeSystemMessages,
+    });
 
     span?.setAttribute('result_count', messages.length);
-
-    const filtered = input.includeSystemMessages
-      ? messages
-      : messages.filter((m) => m.messageType === 'message');
 
     return {
       chatId: chat.id,
       chatTopic: chat.topic ?? null,
-      messages: filtered.map((m) => this.mapMessage(m, input)),
+      messages: messages.map((m) => this.mapMessage(m, input)),
     };
   }
 

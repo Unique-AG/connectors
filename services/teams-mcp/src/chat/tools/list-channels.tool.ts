@@ -65,12 +65,12 @@ export class ListChannelsTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('team_name', input.teamName);
 
-    this.logger.log({ userProfileId, teamName: input.teamName }, 'Listing channels for team');
+    this.logger.log({ userProfileId }, 'Listing channels for team');
 
     const team = await this.channelService.resolveTeamByName(userProfileId, input.teamName);
     const channels = await this.channelService.listChannels(userProfileId, team.id);
+    span?.setAttribute('resolved_team_id', team.id);
 
     span?.setAttribute('result_count', channels.length);
 

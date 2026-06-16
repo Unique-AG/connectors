@@ -57,13 +57,9 @@ export class SendChatMessageTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('chat_identifier', input.chatIdentifier);
     span?.setAttribute('message_length', input.message.length);
 
-    this.logger.log(
-      { userProfileId, chatIdentifier: input.chatIdentifier },
-      'Sending chat message',
-    );
+    this.logger.log({ userProfileId }, 'Sending chat message');
 
     return this.resolveAndSend(userProfileId, input.chatIdentifier, input.message);
   }

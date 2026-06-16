@@ -62,14 +62,9 @@ export class SendChannelMessageTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('team_name', input.teamName);
-    span?.setAttribute('channel_name', input.channelName);
     span?.setAttribute('message_length', input.message.length);
 
-    this.logger.log(
-      { userProfileId, teamName: input.teamName, channelName: input.channelName },
-      'Sending channel message',
-    );
+    this.logger.log({ userProfileId }, 'Sending channel message');
 
     return this.resolveAndSend(
       userProfileId,

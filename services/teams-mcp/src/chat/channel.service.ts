@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -57,20 +57,30 @@ export class ChannelService {
   public async resolveTeamByName(userProfileId: string, teamName: string): Promise<MsTeam> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('team_name', teamName);
 
-    this.logger.debug({ userProfileId, teamName }, 'Resolving team by display name');
+    this.logger.debug({ userProfileId }, 'Resolving team by display name');
 
     const teams = await this.listTeams(userProfileId);
 
     // NOTE: case-insensitive match to avoid user friction when exact casing is unknown
-    const team = teams.find((t) => t.displayName.toLowerCase() === teamName.toLowerCase());
+    const lowerName = teamName.toLowerCase();
+    const matches = teams.filter((t) => t.displayName.toLowerCase() === lowerName);
 
-    if (!team) {
-      span?.addEvent('team not found', { teamName });
+    if (matches.length === 0) {
+      span?.addEvent('team not found');
       throw new NotFoundException(`Team "${teamName}" not found`);
     }
 
+    // Multiple teams can share a display name; refuse to silently pick one and
+    // risk acting on the wrong team.
+    if (matches.length > 1) {
+      span?.addEvent('ambiguous team name', { matchCount: matches.length });
+      throw new ConflictException(
+        `Team name "${teamName}" matches multiple teams (${matches.length}). Please be more specific.`,
+      );
+    }
+
+    const [team] = matches as [MsTeam];
     span?.setAttribute('resolved_team_id', team.id);
     return team;
   }
@@ -85,20 +95,28 @@ export class ChannelService {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
     span?.setAttribute('team_id', teamId);
-    span?.setAttribute('channel_name', channelName);
 
-    this.logger.debug({ userProfileId, teamId, channelName }, 'Resolving channel by display name');
+    this.logger.debug({ userProfileId, teamId }, 'Resolving channel by display name');
 
     const channels = await this.listChannels(userProfileId, teamId);
 
     // NOTE: case-insensitive match to avoid user friction when exact casing is unknown
-    const channel = channels.find((c) => c.displayName.toLowerCase() === channelName.toLowerCase());
+    const lowerName = channelName.toLowerCase();
+    const matches = channels.filter((c) => c.displayName.toLowerCase() === lowerName);
 
-    if (!channel) {
-      span?.addEvent('channel not found', { channelName, teamName });
+    if (matches.length === 0) {
+      span?.addEvent('channel not found');
       throw new NotFoundException(`Channel "${channelName}" not found in team "${teamName}"`);
     }
 
+    if (matches.length > 1) {
+      span?.addEvent('ambiguous channel name', { matchCount: matches.length });
+      throw new ConflictException(
+        `Channel name "${channelName}" matches multiple channels in team "${teamName}" (${matches.length}). Please be more specific.`,
+      );
+    }
+
+    const [channel] = matches as [MsChannel];
     span?.setAttribute('resolved_channel_id', channel.id);
     return channel;
   }

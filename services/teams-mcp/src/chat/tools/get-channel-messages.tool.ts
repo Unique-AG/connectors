@@ -92,19 +92,9 @@ export class GetChannelMessagesTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('team_name', input.teamName);
-    span?.setAttribute('channel_name', input.channelName);
     span?.setAttribute('limit', input.limit);
 
-    this.logger.log(
-      {
-        userProfileId,
-        teamName: input.teamName,
-        channelName: input.channelName,
-        limit: input.limit,
-      },
-      'Getting channel messages',
-    );
+    this.logger.log({ userProfileId, limit: input.limit }, 'Getting channel messages');
 
     const team = await this.channelService.resolveTeamByName(userProfileId, input.teamName);
 
@@ -116,24 +106,23 @@ export class GetChannelMessagesTool {
       input.channelName,
       input.teamName,
     );
+    span?.setAttribute('resolved_team_id', team.id);
+    span?.setAttribute('resolved_channel_id', channel.id);
 
     const messages = await this.chatService.getChannelMessages(
       userProfileId,
       team.id,
       channel.id,
       input.limit,
+      { excludeSystemMessages: !input.includeSystemMessages },
     );
 
     span?.setAttribute('result_count', messages.length);
 
-    const filtered = input.includeSystemMessages
-      ? messages
-      : messages.filter((m) => m.messageType === 'message');
-
     return {
       teamName: team.displayName,
       channelName: channel.displayName,
-      messages: filtered.map((m) => this.mapMessage(m, input)),
+      messages: messages.map((m) => this.mapMessage(m, input)),
     };
   }
 
