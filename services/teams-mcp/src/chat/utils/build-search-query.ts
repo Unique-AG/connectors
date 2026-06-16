@@ -22,13 +22,15 @@ export interface BuildSearchQueryParams {
 }
 
 /**
- * Wraps a value in double quotes when it contains whitespace, a colon, or a
- * quote — characters that would otherwise let a value smuggle a KQL operator
- * (e.g. `Bob sent>2020-01-01`) into the query. Embedded quotes are escaped by
- * doubling (`"` → `""`), per KQL string-literal rules.
+ * Wraps a value in double quotes when it contains any character that could let
+ * it smuggle a KQL operator into the query — whitespace, a quote, or one of the
+ * property/comparison/grouping operators `: < > = ( )`. Without this, a single
+ * token such as `sent>2020-01-01` (no whitespace, no colon) would be parsed as
+ * a `sent>` property restriction rather than a literal search term. Embedded
+ * quotes are escaped by doubling (`"` → `""`), per KQL string-literal rules.
  */
 function quoteIfNeeded(value: string): string {
-  if (/[\s:"]/.test(value)) {
+  if (/[\s:"<>=()]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
@@ -53,7 +55,10 @@ export function buildSearchQuery(params: BuildSearchQueryParams): string {
     fragments.push(`to:${quoteIfNeeded(params.to)}`);
   }
   if (params.mentions) {
-    fragments.push(`mentions:${params.mentions.replace(/-/g, '')}`);
+    // Strip dashes to match KQL identity syntax, then quote like any other
+    // value so a non-GUID value (e.g. `abc OR from:ceo`) cannot inject extra
+    // restrictions.
+    fragments.push(`mentions:${quoteIfNeeded(params.mentions.replace(/-/g, ''))}`);
   }
   if (params.sentAfter) {
     fragments.push(`sent>${params.sentAfter.slice(0, 10)}`);

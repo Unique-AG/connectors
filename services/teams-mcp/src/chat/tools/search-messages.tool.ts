@@ -17,7 +17,7 @@ const SearchMessagesInputSchema = z
       .describe('Sender name or email (KQL `from:`). Matches the message author.'),
     to: z.string().optional().describe('Recipient name or email (KQL `to:`).'),
     mentions: z
-      .string()
+      .uuid()
       .optional()
       .describe('User object id (GUID) of a mentioned user; dashes are stripped automatically.'),
     sentAfter: z.iso
