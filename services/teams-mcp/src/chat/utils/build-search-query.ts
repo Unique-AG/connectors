@@ -12,9 +12,9 @@ export interface BuildSearchQueryParams {
   to?: string;
   /** User object id; dashes are stripped to match KQL identity syntax. */
   mentions?: string;
-  /** ISO date/datetime; sliced to `YYYY-MM-DD`. */
+  /** Inclusive lower bound. ISO date/datetime; sliced to `YYYY-MM-DD`. */
   sentAfter?: string;
-  /** ISO date/datetime; sliced to `YYYY-MM-DD`. */
+  /** Inclusive upper bound. ISO date/datetime; sliced to `YYYY-MM-DD`. */
   sentBefore?: string;
   hasAttachment?: boolean;
   isRead?: boolean;
@@ -60,11 +60,13 @@ export function buildSearchQuery(params: BuildSearchQueryParams): string {
     // restrictions.
     fragments.push(`mentions:${quoteIfNeeded(params.mentions.replace(/-/g, ''))}`);
   }
+  // Inclusive bounds (>= / <=) to match the documented "on or after" / "on or
+  // before" semantics; strict > / < would drop messages on the boundary day.
   if (params.sentAfter) {
-    fragments.push(`sent>${params.sentAfter.slice(0, 10)}`);
+    fragments.push(`sent>=${params.sentAfter.slice(0, 10)}`);
   }
   if (params.sentBefore) {
-    fragments.push(`sent<${params.sentBefore.slice(0, 10)}`);
+    fragments.push(`sent<=${params.sentBefore.slice(0, 10)}`);
   }
   // Booleans use exact KQL casing and are emitted whenever defined — `false`
   // is a meaningful restriction, so only `undefined` is omitted.
