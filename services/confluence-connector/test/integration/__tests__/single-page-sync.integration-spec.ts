@@ -6,12 +6,12 @@
  * are ignored unless they too carry the label (or `ai-ingest-all`, which is
  * exercised in `subtree-sync.integration-spec.ts`).
  */
-import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
 import { DEFAULT_INGEST_LABEL, DEFAULT_SPACE_KEY, DEFAULT_SPACE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { sha256 } from '../scenario-context/hash';
 import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 import {
@@ -130,6 +130,3 @@ describe('single-page sync', () => {
   });
 });
 
-function sha256(buf: Buffer): string {
-  return createHash('sha256').update(buf).digest('hex');
-}

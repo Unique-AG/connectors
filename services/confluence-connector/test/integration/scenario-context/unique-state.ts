@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto';
 import type { IngestionConfig } from '@unique-ag/unique-api';
 import { sortBy } from 'remeda';
 import type { FakeUniqueApi } from '../fakes/fake-unique-api';
+import { sha256 } from './hash';
 
 export interface UniqueScopeState {
   id: string;
@@ -70,10 +70,6 @@ export function getUniqueState(unique: FakeUniqueApi): UniqueState {
   );
 
   return { scopes: scopeStates, files: fileStates };
-}
-
-function sha256(buf: Buffer): string {
-  return createHash('sha256').update(buf).digest('hex');
 }
 
 function bodyTextOrNull(mimeType: string, body: Buffer | undefined): string | null {
