@@ -337,40 +337,33 @@ export class FakeUniqueApi implements UniqueApiClient {
     const submitted = new Map(fileList.map((item) => [item.key, item]));
     const prefix = `${partialKey}/`;
 
-    // Files already stored under this partial key, indexed by item id (the key
-    // segment after the partial key, e.g. the page id).
+    // The diff is scoped to a single partial key, mirroring Unique's per-space
+    // file-diff: only content stored under this partial key is compared against
+    // the submitted items. Content under other partial keys is invisible here,
+    // so a page that exists under a different space is simply "new" to this
+    // space (a cross-space move surfaces as new-here plus deleted-there, not as
+    // a single move).
     const here = new Map<string, StoredFile>();
-    // Item ids of files stored under a different partial key. A submitted item
-    // that matches one of these is the same resource re-keyed to a new
-    // location, which is what Unique reports as moved.
-    const elsewhere = new Set<string>();
     for (const file of this.filesById.values()) {
-      const itemId = file.key.slice(file.key.lastIndexOf('/') + 1);
       if (file.key.startsWith(prefix)) {
+        const itemId = file.key.slice(file.key.lastIndexOf('/') + 1);
         here.set(itemId, file);
-      } else {
-        elsewhere.add(itemId);
       }
     }
 
     const newFiles: string[] = [];
     const updatedFiles: string[] = [];
-    const movedFiles: string[] = [];
     const deletedFiles: string[] = [];
 
     for (const [itemId, item] of submitted) {
       const current = here.get(itemId);
-      if (current) {
-        if (current.updatedAt < item.updatedAt) {
-          updatedFiles.push(itemId);
-        }
+      if (!current) {
+        newFiles.push(itemId);
         continue;
       }
-      if (elsewhere.has(itemId)) {
-        movedFiles.push(itemId);
-        continue;
+      if (current.updatedAt < item.updatedAt) {
+        updatedFiles.push(itemId);
       }
-      newFiles.push(itemId);
     }
 
     for (const itemId of here.keys()) {
@@ -379,7 +372,10 @@ export class FakeUniqueApi implements UniqueApiClient {
       }
     }
 
-    return { newFiles, updatedFiles, movedFiles, deletedFiles };
+    // movedFiles is always empty: Confluence keys are space-scoped, so Unique's
+    // per-space diff never reports a page as moved (it is new in one space and
+    // deleted in the other).
+    return { newFiles, updatedFiles, movedFiles: [], deletedFiles };
   }
 
   private requireScope(scopeId: string): Scope {

@@ -113,42 +113,4 @@ describe('update content', () => {
       pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p2'],
     });
   });
-
-  // The other side of the carve-out: the guard aborts when a sync would delete
-  // every file in a space without ingesting any replacement. Here the only
-  // discovered page (p1) already lives in Unique under a different space key, so
-  // the diff classifies it as a move-in rather than a new file. The space's one
-  // remaining file (stale) is no longer in Confluence and would be deleted. That
-  // is 100% of the space wiped with zero new content, which trips
-  // validateNoAccidentalFullDeletion. The whole sync fails and nothing is
-  // deleted.
-  it('aborts the sync when a diff would delete every file in a space with no new content', async () => {
-    const scenario = defineScenario({
-      confluence: {
-        spaces: [space()],
-        pages: [page({ id: 'p1' })],
-      },
-      unique: {
-        scopes: [spaceScope({ rootScopeId: DEFAULT_ROOT_SCOPE_ID })],
-        files: [
-          // p1 already exists under a different space key, so it diffs as a move.
-          pageFile({ pageId: 'p1', spaceKey: 'OLD' }),
-          // The only file under the current space (SP) is gone from Confluence,
-          // so the diff would delete it: every file in SP, with nothing new.
-          pageFile({ pageId: 'stale' }),
-        ],
-      },
-    });
-    ctx = buildScenarioContext(scenario);
-
-    const result = await ctx.runSync();
-
-    expect(result.status).toBe('failure');
-
-    // The guard aborted before the deletion phase, so both files are preserved.
-    const state = getUniqueState(ctx.unique);
-    expectIngested(state, {
-      pages: ['tenant1/space-1_OLD/p1', 'tenant1/space-1_SP/stale'],
-    });
-  });
 });
