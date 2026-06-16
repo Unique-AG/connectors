@@ -73,9 +73,8 @@ assert.ok(mcpApiKey, 'MCP_API_KEY env var is required');
       instructions: serverInstructions,
       transport: McpTransportType.STREAMABLE_HTTP,
       streamableHttp: {
-        enableJsonResponse: false,
-        sessionIdGenerator: () => typeid('session').toString(),
-        statelessMode: false,
+        enableJsonResponse: true,
+        statelessMode: true,
       },
       mcpEndpoint: `${mcpApiKey}/mcp`,
     }),
