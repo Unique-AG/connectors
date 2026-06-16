@@ -893,10 +893,10 @@ describe('ConfluenceSynchronizationService', () => {
         apiClient.getAttachmentDownloadStream.mockResolvedValue(Readable.from(Buffer.from('PNG')));
         const config = createMock<TenantConfig>({
           ingestion: {
+            inlineImagesEnabled,
             attachments: {
               maxFileSizeMb: 200,
               allowedMimeTypes: ['image/png', 'image/jpeg', 'application/pdf'],
-              inlineImagesEnabled,
             },
           },
         });
@@ -959,7 +959,7 @@ describe('ConfluenceSynchronizationService', () => {
 
       it('DISABLED: leaves the body untouched and routes every image through the standalone pass', async () => {
         // Orchestrator and inliner read the same flag in production; keep them consistent here.
-        tenant.config.ingestion.attachments.inlineImagesEnabled = false;
+        tenant.config.ingestion.inlineImagesEnabled = false;
         const { inliner, apiClient } = createRealInliner(false);
         const svc = createService(
           mockScanner,

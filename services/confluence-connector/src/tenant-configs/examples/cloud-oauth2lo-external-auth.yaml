@@ -41,9 +41,10 @@ ingestion:
   ingestionMode: flat
   scopeId: your-scope-id
   storeInternally: enabled
-  # Ingestion configuration applied to each ingested page. Required when
-  # attachments.inlineImages is enabled (the default): must set
-  # htmlConfig.imageContentExtraction.languageModel to the visual LLM configured in Knowledge Base.
+  # Ingestion configuration applied to each ingested page. Setting
+  # htmlConfig.imageContentExtraction.languageModel to the visual LLM configured in Knowledge Base
+  # turns on inlining of page images as base64 data URIs (requires Unique platform 2026.24.0+);
+  # without it, images fall back to standalone attachment ingestion.
   pageIngestionConfig:
     htmlConfig:
       imageContentExtraction:

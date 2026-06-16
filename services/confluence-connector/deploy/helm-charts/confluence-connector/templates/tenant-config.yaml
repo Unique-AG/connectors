@@ -85,9 +85,6 @@ data:
         {{- if $tenant.ingestion.attachments.imageOcr }}
         imageOcr: {{ $tenant.ingestion.attachments.imageOcr | quote }}
         {{- end }}
-        {{- if $tenant.ingestion.attachments.inlineImages }}
-        inlineImages: {{ $tenant.ingestion.attachments.inlineImages | quote }}
-        {{- end }}
       {{- end }}
       {{- if $tenant.ingestion.pageIngestionConfig }}
       pageIngestionConfig:

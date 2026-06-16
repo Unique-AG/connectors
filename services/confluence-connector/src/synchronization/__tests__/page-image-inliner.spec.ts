@@ -47,6 +47,7 @@ function createTestTenantConfig(
 ): TenantConfig {
   return createMock<TenantConfig>({
     ingestion: {
+      inlineImagesEnabled: overrides.inlineImagesEnabled ?? true,
       attachments: {
         maxFileSizeMb: overrides.maxFileSizeMb ?? 200,
         allowedMimeTypes: overrides.allowedMimeTypes ?? [
@@ -54,7 +55,6 @@ function createTestTenantConfig(
           'image/jpeg',
           'application/pdf',
         ],
-        inlineImagesEnabled: overrides.inlineImagesEnabled ?? true,
       },
     },
   });

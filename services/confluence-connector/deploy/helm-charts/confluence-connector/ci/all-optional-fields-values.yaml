@@ -41,7 +41,6 @@ connectorConfig:
             - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
           maxFileSizeMb: 100
           imageOcr: enabled
-          inlineImages: enabled
         pageIngestionConfig:
           htmlConfig:
             imageContentExtraction:

@@ -117,7 +117,7 @@ export function createMockTenant(
     config: {
       confluence: { baseUrl: CONFLUENCE_BASE_URL },
       processing: { scanIntervalCron: '*/5 * * * *', concurrency: 2 },
-      ingestion: { attachments: { inlineImagesEnabled: true } },
+      ingestion: { inlineImagesEnabled: true },
     },
     isScanning: false,
     ...overrides,

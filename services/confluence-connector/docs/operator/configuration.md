@@ -273,7 +273,6 @@ ingestion:
       - image/jpeg
     maxFileSizeMb: 200
     imageOcr: enabled
-    inlineImages: enabled
   pageIngestionConfig:
     htmlConfig:
       imageContentExtraction:
@@ -288,7 +287,7 @@ ingestion:
 | `storeInternally` | No      | `enabled`        | Whether to store content internally in Unique (`enabled` or `disabled`)                                                                                             |
 | `useV1KeyFormat` | No       | `disabled`       | Use v1-compatible ingestion key format (`spaceId_spaceKey/pageId`) without tenant prefix (`enabled` or `disabled`). Only relevant when migrating from Confluence Connector v1 |
 | `attachments`    | No       | (see sub-fields) | Configuration for file attachment ingestion                                                                                                                          |
-| `pageIngestionConfig` | Conditional | -- | Ingestion configuration applied to each ingested page. Required when `attachments.inlineImages` is enabled: must set `htmlConfig.imageContentExtraction.languageModel` to the visual LLM configured in Knowledge Base (see [Image Attachments](#image-attachments)) |
+| `pageIngestionConfig` | No | -- | Ingestion configuration applied to each ingested page. Setting `htmlConfig.imageContentExtraction.languageModel` to the visual LLM configured in Knowledge Base turns on inlining of page images as base64 `data:` URIs (see [Image Attachments](#image-attachments)). Without it, images fall back to standalone attachment ingestion |
 
 ### Attachment Configuration
 
@@ -300,7 +299,6 @@ The `attachments` sub-section controls ingestion of file attachments from Conflu
 | `attachments.allowedMimeTypes` | No       | See [Default Allowed MIME Types](#Default-Allowed-MIME-Types) | MIME types to include when ingesting attachments. Matched against the `mediaType` reported by the Confluence API, case-insensitive |
 | `attachments.maxFileSizeMb`    | No       | `200`                            | Maximum file size in megabytes. Attachments larger than this are skipped           |
 | `attachments.imageOcr`         | No       | `enabled`                        | Whether the connector should request OCR-based ingestion for image attachments by attaching `ingestionConfig.jpgReadMode = DOC_INTELLIGENCE_DEFAULT` to each create-content request. When `disabled`, the destination scope's own `jpgReadMode` is used instead |
-| `attachments.inlineImages`     | No       | `enabled`                        | Whether to inline page images into the page HTML as base64 `data:` URIs. Requires Unique platform `2026.24.0`+ to extract their text (see [Image Attachments](#image-attachments)). Set to `disabled` on older platforms so referenced images fall back to standalone attachment ingestion instead of disappearing from search |
 
 #### Default Allowed MIME Types
 
@@ -320,13 +318,13 @@ These are matched against the `mediaType` reported by the Confluence API. Operat
 
 #### Image Attachments
 
-Images embedded in Confluence pages (drag/drop, paste, or "Insert image") are stored as regular page attachments by Confluence. During page ingestion the connector inlines each referenced image directly into the page HTML as a base64 `data:` URI, producing a single self-contained page artifact rather than a separate image artifact. This applies to images attached to the page being ingested as well as images attached to other pages in the same Confluence instance (references to an attachment on another page). PNG and JPEG are the supported formats; both are in the default `allowedMimeTypes`.
+Images embedded in Confluence pages (drag/drop, paste, or "Insert image") are stored as regular page attachments by Confluence. When inlining is enabled, the connector inlines each referenced image directly into the page HTML as a base64 `data:` URI during page ingestion, producing a single self-contained page artifact rather than a separate image artifact. This applies to images attached to the page being ingested as well as images attached to other pages in the same Confluence instance (references to an attachment on another page). PNG and JPEG are the supported formats; both are in the default `allowedMimeTypes`.
 
-For the platform to extract searchable text from these inline images, the connector sends an image-extraction configuration with every page via `ingestion.pageIngestionConfig`. When `attachments.inlineImages` is enabled (the default), this is required: `pageIngestionConfig.htmlConfig.imageContentExtraction.languageModel` must be set to the visual LLM configured in Knowledge Base, otherwise the connector refuses to start. This replaces the previous manual step of setting the extraction config on the destination scope.
+Inlining is turned on by the presence of the image-extraction configuration the platform needs to extract searchable text from those inline images: set `pageIngestionConfig.htmlConfig.imageContentExtraction.languageModel` to the visual LLM configured in Knowledge Base. The connector sends this configuration with every page. When it is absent, inlining is off and referenced images fall back to standalone attachment ingestion. This replaces the previous manual step of setting the extraction config on the destination scope.
 
 > **Platform compatibility:** Inline images require Unique platform `2026.24.0` or later. The platform extracts searchable text from inline base64 images starting with that version; on earlier versions the page is still ingested but its embedded images are dropped during HTML-to-Markdown conversion and contribute no searchable content. Extraction is also gated behind two company-scoped feature flags that must be enabled (`FEATURE_FLAG_ENABLE_HTML_INLINE_IMAGE_EXTRACTION_UN_20936` and `FEATURE_FLAG_ENABLE_MULTI_FILE_IMAGE_CONTENT_EXTRACTION_UN_20936`). See [Unique Platform Compatibility](./deployment.md#unique-platform-compatibility).
 >
-> On platforms older than `2026.24.0`, set `attachments.inlineImages: disabled` so referenced images are ingested as standalone attachments (and OCR'd via `attachments.imageOcr`) instead of being inlined and lost. Switch it back to `enabled` after upgrading.
+> On platforms older than `2026.24.0`, omit `pageIngestionConfig.htmlConfig.imageContentExtraction.languageModel` so referenced images are ingested as standalone attachments (and OCR'd via `attachments.imageOcr`) instead of being inlined and lost. Add it back after upgrading.
 
 Image attachments fall back to standalone ingestion when they cannot be inlined: orphan images (attached but not referenced by any page body), images that exceed `attachments.maxFileSizeMb`, images whose download fails, and references to an attachment on another page whose referenced page cannot be resolved.
 

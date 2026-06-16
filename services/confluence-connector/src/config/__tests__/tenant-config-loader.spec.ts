@@ -29,7 +29,7 @@ const baseIngestionConfig = {
   ingestionMode: 'flat',
   scopeId: 'test-scope-id',
   storeInternally: 'enabled',
-  // inlineImages defaults to enabled, which requires the extraction model.
+  // Carrying the extraction model turns on image inlining.
   pageIngestionConfig: {
     htmlConfig: { imageContentExtraction: { enabled: true, languageModel: 'test-model' } },
   },

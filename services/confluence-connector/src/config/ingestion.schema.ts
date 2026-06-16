@@ -10,7 +10,8 @@ const IngestionModeSchema = z.enum([IngestionMode.Flat]).prefault(IngestionMode.
 
 /**
  * The slice of the opaque pageIngestionConfig the platform requires to extract text from
- * inlined page images. Used only to validate presence; the config is still forwarded verbatim.
+ * inlined page images. Its presence is what turns image inlining on; the config is still
+ * forwarded verbatim.
  */
 const ImageExtractionModelSchema = z.object({
   htmlConfig: z.object({
@@ -41,18 +42,11 @@ const AttachmentConfigSchema = z
       .describe(
         'Whether to request OCR-based ingestion for image attachments (jpgReadMode = DOC_INTELLIGENCE_DEFAULT). Set to disabled to defer to the destination scope ingestion config',
       ),
-    inlineImages: z
-      .enum([EnabledDisabledMode.Enabled, EnabledDisabledMode.Disabled])
-      .prefault(EnabledDisabledMode.Enabled)
-      .describe(
-        'Whether to inline page images into the page HTML as base64 data URIs. Requires Unique platform 2026.24.0+ to extract their text. Set to disabled on older platforms so images fall back to standalone attachment ingestion',
-      ),
   })
-  .transform(({ mode, imageOcr, inlineImages, ...rest }) => ({
+  .transform(({ mode, imageOcr, ...rest }) => ({
     ...rest,
     enabled: mode === EnabledDisabledMode.Enabled,
     imageOcrEnabled: imageOcr === EnabledDisabledMode.Enabled,
-    inlineImagesEnabled: inlineImages === EnabledDisabledMode.Enabled,
   }));
 
 export const IngestionConfigSchema = z
@@ -77,30 +71,14 @@ export const IngestionConfigSchema = z
     pageIngestionConfig: z
       .record(z.string(), z.unknown())
       .optional()
-      .describe('Ingestion configuration applied to each ingested page'),
+      .describe(
+        'Ingestion configuration applied to each ingested page. Providing htmlConfig.imageContentExtraction.languageModel turns on inlining of page images as base64 data URIs (requires Unique platform 2026.24.0+); without it, images fall back to standalone attachment ingestion',
+      ),
   })
-  .superRefine((cfg, ctx) => {
-    if (!cfg.attachments.inlineImagesEnabled) {
-      return;
-    }
-
-    if (ImageExtractionModelSchema.safeParse(cfg.pageIngestionConfig).success) {
-      return;
-    }
-
-    const modelPath = [
-      'pageIngestionConfig',
-      'htmlConfig',
-      'imageContentExtraction',
-      'languageModel',
-    ];
-
-    ctx.addIssue({
-      code: 'custom',
-      path: modelPath,
-      message: `${modelPath.join('.')} must be a non-empty string when attachments.inlineImages is enabled`,
-    });
-  });
+  .transform((cfg) => ({
+    ...cfg,
+    inlineImagesEnabled: ImageExtractionModelSchema.safeParse(cfg.pageIngestionConfig).success,
+  }));
 
 export const BYTES_PER_MB = 1024 * 1024;
 

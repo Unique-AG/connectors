@@ -49,7 +49,7 @@ export class PageImageInliner {
     page: FetchedPage,
     pageImageAttachments: DiscoveredAttachment[],
   ): Promise<FetchedPage> {
-    if (!this.config.ingestion.attachments.inlineImagesEnabled || !page.body) {
+    if (!this.config.ingestion.inlineImagesEnabled || !page.body) {
       return page;
     }
 
