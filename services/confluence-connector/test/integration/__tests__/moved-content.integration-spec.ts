@@ -1,16 +1,21 @@
 /**
- * Behavior: moved content in the file diff.
+ * Behavior: how the connector reacts to a `moved` file-diff result.
  *
- * `performFileDiff` can return a fourth category alongside new/updated/deleted:
- * `movedFiles`. Content Unique recognizes as the same logical resource that
- * has been re-keyed to a new location. The connector treats a move as a
- * no-op: it records the `moved` diff metric and otherwise leaves the file
- * exactly where it is. A moved file must never be re-ingested (no new upload)
- * nor deleted.
+ * The connector never moves content itself. The move is decided by Unique:
+ * `performFileDiff` returns `movedFiles` (a real `FileDiffResponse` category
+ * alongside new/updated/deleted) for content Unique recognizes as the same
+ * logical resource re-keyed to a new location. This happens in practice when a
+ * Confluence page is relocated between spaces, so its content key prefix changes.
  *
- * The fake derives this the same way Unique does: the page already exists in
- * Unique under a different key (a different space), and the sync now submits it
- * under the current space's key. Same page id, different location, so the diff
+ * When Unique reports a file as moved, the connector treats it as a no-op: it
+ * records the `moved` diff metric and otherwise leaves the file exactly where it
+ * is. A moved file is never re-ingested (no new upload) and never deleted. The
+ * sync pipeline enforces this by excluding moved ids from both the set of items
+ * it fetches/ingests and the set it deletes.
+ *
+ * The fake reproduces the same condition Unique detects: the page already exists
+ * in Unique under a different key (a different space), and the sync now submits
+ * it under the current space's key. Same page id, different location, so the diff
  * reports it as moved.
  *
  * The new / updated / deleted paths are covered by `single-page-sync`,
