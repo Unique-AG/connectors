@@ -19,6 +19,7 @@ import { attachment, page, space } from '../scenario/confluence-builders';
 import { DEFAULT_SPACE_KEY, DEFAULT_SPACE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 
 const ONE_MB = 1024 * 1024;
@@ -120,10 +121,13 @@ describe('attachments', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key).sort()).toEqual([
-      'tenant1/space-1_SP/p1',
-      'tenant1/space-1_SP/p1::att-pdf',
-    ]);
+    expectIngested(state, {
+      pages: ['tenant1/space-1_SP/p1'],
+      attachments: ['tenant1/space-1_SP/p1::att-pdf'],
+    });
+    expectNotIngested(state, {
+      attachments: ['tenant1/space-1_SP/p1::att-png', 'tenant1/space-1_SP/p1::att-svg'],
+    });
   });
 
   // The size limit is consulted at scan time. Oversized attachments are
@@ -162,10 +166,13 @@ describe('attachments', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key).sort()).toEqual([
-      'tenant1/space-1_SP/p1',
-      'tenant1/space-1_SP/p1::att-small',
-    ]);
+    expectIngested(state, {
+      pages: ['tenant1/space-1_SP/p1'],
+      attachments: ['tenant1/space-1_SP/p1::att-small'],
+    });
+    expectNotIngested(state, {
+      attachments: ['tenant1/space-1_SP/p1::att-huge'],
+    });
   });
 
   // OCR is opt-in per tenant. When enabled, image attachments are registered
@@ -280,6 +287,7 @@ describe('attachments', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key)).toEqual(['tenant1/space-1_SP/p1']);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/p1'] });
+    expectNotIngested(state, { attachments: ['tenant1/space-1_SP/p1::att-1'] });
   });
 });
