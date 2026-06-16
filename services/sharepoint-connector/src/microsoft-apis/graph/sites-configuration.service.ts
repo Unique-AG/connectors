@@ -1,14 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { z } from 'zod';
 import { Config } from '../../config';
-import { SiteConfigSchema } from '../../config/sharepoint.schema';
+import {
+  type PartialSiteConfig,
+  PartialSiteConfigSchema,
+  type SiteConfig,
+} from '../../config/sharepoint.schema';
+import { mergeSiteWithDefaults } from '../../config/site-config-merger';
 import { normalizeError, sanitizeError } from '../../utils/normalize-error';
 import { Smeared } from '../../utils/smeared';
 import { GraphApiService } from './graph-api.service';
 import { ListColumn, ListItem } from './types/sharepoint.types';
-
-type SiteConfig = z.infer<typeof SiteConfigSchema>;
 
 @Injectable()
 export class SitesConfigurationService {
@@ -27,7 +29,13 @@ export class SitesConfigurationService {
 
     if (sharepointConfig.sitesSource === 'config_file') {
       this.logger.log('Loading sites configuration from YAML file');
-      return sharepointConfig.sites;
+      return sharepointConfig.sites.map((site, index) =>
+        mergeSiteWithDefaults(
+          site,
+          sharepointConfig.siteDefaults,
+          `config_file row ${index + 1} (siteId: ${site.siteId})`,
+        ),
+      );
     }
 
     this.logger.debug('Loading sites configuration from SharePoint list');
@@ -38,16 +46,11 @@ export class SitesConfigurationService {
     return sites;
   }
 
-  /**
-   * Fetch site configurations from a SharePoint list.
-   * In order to fetch the sites configuration from a SharePoint list, we need to:
-   * 1. Fetch the list items
-   * 2. Transform the list items to SiteConfig and validate with Zod
-   */
-  public async fetchSitesFromSharePointList(sharepointList: {
+  private async fetchSitesFromSharePointList(sharepointList: {
     siteId: Smeared;
     listId: string;
   }): Promise<SiteConfig[]> {
+    const { siteDefaults } = this.configService.get('sharepoint', { infer: true });
     const { siteId, listId } = sharepointList;
 
     this.logger.debug(`Fetching sites configuration from site: ${siteId}, list: ${listId}`);
@@ -63,9 +66,14 @@ export class SitesConfigurationService {
 
     const displayNameToNameMap = this.createDisplayNameToNameMap(columns);
 
-    const siteConfigs = listItems.map((item, index) =>
-      this.transformListItemToSiteConfig(item, index, displayNameToNameMap),
-    );
+    const siteConfigs = listItems.map((item, index) => {
+      const partial = this.transformListItemToSiteConfig(item, index, displayNameToNameMap);
+      return mergeSiteWithDefaults(
+        partial,
+        siteDefaults,
+        `sharepoint_list row ${index + 1} (siteId: ${partial.siteId})`,
+      );
+    });
 
     this.logger.log(
       `Successfully loaded ${siteConfigs.length} site configurations from SharePoint list`,
@@ -73,6 +81,8 @@ export class SitesConfigurationService {
     return siteConfigs;
   }
 
+  // We need the mapping because in the API name stays the same, so after rename the old incorrect
+  // name will still be visible in the name field, when the displayName will change.
   private createDisplayNameToNameMap(columns: ListColumn[]): Record<string, string> {
     const map: Record<string, string> = {};
     for (const column of columns) {
@@ -85,7 +95,7 @@ export class SitesConfigurationService {
     item: ListItem,
     index: number,
     nameMap: Record<string, string>,
-  ): SiteConfig {
+  ): PartialSiteConfig {
     try {
       const fields = item.fields;
 
@@ -109,10 +119,10 @@ export class SitesConfigurationService {
         subsitesScan: getFieldValue('subsitesScan'),
       };
 
-      return SiteConfigSchema.parse(siteConfig);
+      return PartialSiteConfigSchema.parse(siteConfig);
     } catch (error) {
       this.logger.error({
-        msg: `Failed to transform list item at index ${index} to SiteConfig`,
+        msg: `Failed to transform list item at index ${index} to PartialSiteConfig`,
         itemId: item.id,
         error: sanitizeError(error),
       });

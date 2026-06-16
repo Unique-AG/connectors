@@ -9,16 +9,52 @@ import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
 // Read and manage (Full Access) (‎0‎)
 // The Full Access permission allows a delegate to open this mailbox and behave as the mailbox owner.
 
+const sharedMailboxEmails = z
+  .string()
+  .prefault('')
+  .transform((s) => {
+    return s
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+  })
+  .describe(
+    'Comma-separated list of shared mailbox email addresses to sync (DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS).',
+  );
+
 const discoveryCronSchedule = z
   .string()
   .prefault('0 */12 * * *')
   .describe('Cron schedule for delegated access discovery. Default: every 12 hours (2x/day).');
+
+const sharedMailboxSyncCronSchedule = z
+  .string()
+  .prefault('0 */6 * * *')
+  .describe(
+    'Cron schedule for shared mailbox sync. Default: every 6 hours (4x/day). Env var: DELEGATED_ACCESS_SHARED_MAILBOX_SYNC_CRON_SCHEDULE.',
+  );
 
 const recoveryCronSchedule = z
   .string()
   .prefault('*/30 * * * *')
   .describe(
     'Cron schedule for recovering stuck delegated access discovery and verification jobs. Default: every 30 minutes.',
+  );
+
+const stalenessThresholdHours = z.coerce
+  .number()
+  .int()
+  .positive()
+  .prefault(24)
+  .describe('Hours after which a delegated access account is considered stale for health checks.');
+
+const delegatedAccessFailureThreshold = z.coerce
+  .number()
+  .min(0)
+  .max(1)
+  .prefault(0.15)
+  .describe(
+    'Fraction of eligible delegated users that may be stale before the check is marked down.',
   );
 
 const disabledDelegatedAccessScan = z.object({
@@ -35,11 +71,15 @@ const onlyFullDelegatedAccessScanConfig = z.object({
   // /users/{{email}}/messages
   // /users/{{email}}/mailFolders
   // /users/{{email}}/mailFolders/{{folderId}}/messages
-  // When we configure the delegated access to be fullAccessOnly we will call /users/{{email}}/messages and assume
+  // When we configure the delegated access to be full_access_only we will call /users/{{email}}/messages and assume
   // the user has full access to that inbox.
-  scan: z.literal('fullAccessOnly'),
+  scan: z.literal('full_access_only'),
   discoveryCronSchedule,
   recoveryCronSchedule,
+  stalenessThresholdHours,
+  failureThreshold: delegatedAccessFailureThreshold,
+  sharedMailboxEmails,
+  sharedMailboxSyncCronSchedule,
 });
 
 const granularDelegatedAccessScanConfig = z.object({
@@ -56,7 +96,7 @@ const granularDelegatedAccessScanConfig = z.object({
   // "Inbox" -> "RFQ" - the "RFQ" is a child of "Inbox" and she shares with Bob only the "RFQ" folder. When we call
   // /users/{{email}}/mailFolders => we can list both folders "Inbox" and "RFQ" but we can only read messages from the "RFQ"
   // folder.
-  scan: z.literal('granularAccess'),
+  scan: z.literal('granular_access'),
   mcpBackend: z
     .literal(McpBackendType.MicrosoftGraphAndUniqueApi)
     .describe(`Supported only for "MicrosoftGraphAndUniqueApi"`),
@@ -66,6 +106,10 @@ const granularDelegatedAccessScanConfig = z.object({
     .prefault('0 */4 * * *')
     .describe('Cron schedule for delegated access verification. Default: every 4 hours (6x/day).'),
   recoveryCronSchedule,
+  stalenessThresholdHours,
+  failureThreshold: delegatedAccessFailureThreshold,
+  sharedMailboxEmails,
+  sharedMailboxSyncCronSchedule,
 });
 
 export const DelegatedAccessConfigSchema = z.discriminatedUnion('scan', [

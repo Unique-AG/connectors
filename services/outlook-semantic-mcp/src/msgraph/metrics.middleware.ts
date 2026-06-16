@@ -13,13 +13,16 @@ export class MetricsMiddleware implements Middleware {
   private readonly msgraphThrottleCounter: Counter;
 
   public constructor(metricService: MetricService) {
-    this.msgraphRequestCounter = metricService.getCounter('msgraph_requests_total', {
+    this.msgraphRequestCounter = metricService.getCounter('osm_msgraph_requests_total', {
       description: 'Total number of Microsoft Graph requests',
     });
-    this.msgraphRequestDuration = metricService.getHistogram('msgraph_request_duration_seconds', {
-      description: 'Microsoft Graph request duration in seconds',
-    });
-    this.msgraphThrottleCounter = metricService.getCounter('msgraph_throttle_events_total', {
+    this.msgraphRequestDuration = metricService.getHistogram(
+      'osm_msgraph_request_duration_seconds',
+      {
+        description: 'Microsoft Graph request duration in seconds',
+      },
+    );
+    this.msgraphThrottleCounter = metricService.getCounter('osm_msgraph_throttle_events_total', {
       description: 'Total number of Microsoft Graph throttling events',
     });
   }

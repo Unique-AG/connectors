@@ -1,0 +1,761 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AllDelegatesFailedError, NO_DELEGATES } from '~/msgraph/ms-graph-client-resolver.service';
+import { LiveCatchUpCommand } from '../live-catch-up.command';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const SUBSCRIPTION_ID = 'sub-001';
+const USER_PROFILE_ID = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
+const WATERMARK_ISO = '2024-06-01T00:00:00.000Z';
+const WATERMARK = new Date(WATERMARK_ISO);
+const DEFAULT_FILTERS = { retentionWindowInDays: 95, ignoredSenders: [], ignoredContents: [] };
+
+// A recent heartbeat (within all cooldown windows)
+const RECENT_HEARTBEAT = new Date(Date.now() - 1 * 60 * 1000); // 1 minute ago
+// A stale heartbeat (older than all cooldown thresholds)
+const STALE_HEARTBEAT = new Date(Date.now() - 999 * 60 * 1000); // ~16 hours ago
+
+function makeEmail(id: string, created: string, modified: string) {
+  return {
+    id,
+    createdDateTime: created,
+    lastModifiedDateTime: modified,
+    receivedDateTime: created,
+    parentFolderId: 'folder-id',
+    webLink: 'https://outlook.office.com/mail/id',
+  };
+}
+
+function makeGraphResponse(emails: ReturnType<typeof makeEmail>[], nextLink?: string) {
+  return {
+    value: emails,
+    ...(nextLink ? { '@odata.nextLink': nextLink } : {}),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Mock factories
+// ---------------------------------------------------------------------------
+
+function createMockGraphApi() {
+  const api: Record<string, any> = {
+    header: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
+    filter: vi.fn().mockReturnThis(),
+    orderby: vi.fn().mockReturnThis(),
+    top: vi.fn().mockReturnThis(),
+    get: vi.fn(),
+  };
+  return api;
+}
+
+function createMockMsGraphClientResolver(graphApi: ReturnType<typeof createMockGraphApi>) {
+  const client = { api: vi.fn().mockReturnValue(graphApi) };
+  return {
+    run: vi
+      .fn()
+      .mockImplementation(
+        async ({
+          fn,
+        }: {
+          fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown>;
+        }) => fn({ client, clientUserProfileId: 'delegate-user-profile-id' }),
+      ),
+  };
+}
+
+function createMockIngestEmailCommand() {
+  return { run: vi.fn().mockResolvedValue('ingested') };
+}
+
+function createMockUniqueApi() {
+  return {
+    files: { getByKeys: vi.fn().mockResolvedValue([]) },
+  };
+}
+
+/**
+ * Creates a mock DB that supports:
+ * - `db.select().from().innerJoin().then()` for user profile lookup
+ * - `db.transaction(cb)` for acquireLock
+ * - `db.update().set().where().execute()` for watermark updates and state transitions
+ */
+function createMockDb({
+  subscription,
+  lockResult,
+  betweenRoundsRow,
+}: {
+  subscription?:
+    | {
+        id: string;
+        email: string;
+        providerUserId: string;
+        source: 'oauth' | 'shared-mailbox';
+      }
+    | undefined;
+  lockResult?: {
+    liveCatchUpState: string;
+    newestLastModifiedDateTime: Date | null;
+    liveCatchUpHeartbeatAt: Date | null;
+    filters: Record<string, unknown>;
+    deletingInboxStartedAt?: Date | null;
+    preferredDelegateUserProfileId?: string | null;
+  };
+  betweenRoundsRow?: {
+    lastWebhookReceivedAt: Date | null;
+    deletingInboxStartedAt: Date | null;
+  };
+}) {
+  function createMockTx(selectRows: any[]) {
+    const txExecuteFn = vi.fn().mockResolvedValue(undefined);
+    const txSelect = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          for: vi.fn().mockResolvedValue(selectRows),
+        }),
+      }),
+    };
+    const txUpdate = {
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          execute: txExecuteFn,
+        }),
+      }),
+    };
+    return {
+      select: vi.fn().mockReturnValue(txSelect),
+      update: vi.fn().mockReturnValue(txUpdate),
+      __txExecuteFn: txExecuteFn,
+      __txUpdate: txUpdate,
+    };
+  }
+
+  const normalizedLockResult = lockResult
+    ? { deletingInboxStartedAt: null, ...lockResult }
+    : undefined;
+
+  const lockTx = createMockTx(normalizedLockResult ? [normalizedLockResult] : []);
+
+  const dbExecuteFn = vi.fn().mockResolvedValue(undefined);
+  const db = {
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(subscription ? [{ userProfile: subscription }] : []),
+        }),
+        where: vi.fn().mockResolvedValue(betweenRoundsRow ? [betweenRoundsRow] : []),
+      }),
+    }),
+    transaction: vi.fn(async (cb: (tx: any) => Promise<any>) => cb(lockTx)),
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          execute: dbExecuteFn,
+        }),
+      }),
+    }),
+    __lockTx: lockTx,
+    __dbExecuteFn: dbExecuteFn,
+  };
+
+  return db;
+}
+
+function createMockSyncDirectoriesCommand() {
+  return { run: vi.fn() };
+}
+
+function createMockMetricService() {
+  return {
+    measureLiveCatchupRun: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+    measureLiveCatchupRound: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+    measureLiveCatchupDirectorySync: vi
+      .fn()
+      .mockImplementation((fn: () => Promise<unknown>) => fn()),
+    measureLiveCatchupBatch: vi.fn().mockImplementation((fn: () => Promise<unknown>) => fn()),
+    measureLiveCatchupMessageProcessing: vi
+      .fn()
+      .mockImplementation((fn: () => Promise<unknown>) => fn()),
+  };
+}
+
+function createCommand({
+  graphApi,
+  ingestEmailCommand,
+  db,
+  syncDirectories,
+  resolver,
+}: {
+  graphApi: ReturnType<typeof createMockGraphApi>;
+  ingestEmailCommand: ReturnType<typeof createMockIngestEmailCommand>;
+  syncDirectories: ReturnType<typeof createMockSyncDirectoriesCommand>;
+  db: ReturnType<typeof createMockDb>;
+  resolver?: { run: ReturnType<typeof vi.fn> };
+}): LiveCatchUpCommand {
+  return new LiveCatchUpCommand(
+    (resolver ?? createMockMsGraphClientResolver(graphApi)) as any,
+    ingestEmailCommand as any,
+    syncDirectories as any,
+    { run: vi.fn().mockResolvedValue(false) } as any,
+    createMockUniqueApi() as any,
+    { mcpBackend: 'microsoft_graph_and_unique_api' } as any,
+    db as any,
+    createMockMetricService() as any,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe('LiveCatchUpCommand', () => {
+  let graphApi: ReturnType<typeof createMockGraphApi>;
+  let ingestEmailCommand: ReturnType<typeof createMockIngestEmailCommand>;
+  let syncDirectories: ReturnType<typeof createMockSyncDirectoriesCommand>;
+
+  beforeEach(() => {
+    graphApi = createMockGraphApi();
+    ingestEmailCommand = createMockIngestEmailCommand();
+    syncDirectories = createMockSyncDirectoriesCommand();
+    // Reset shared WATERMARK to prevent cross-test contamination from in-place mutation
+    WATERMARK.setTime(new Date(WATERMARK_ISO).getTime());
+    vi.clearAllMocks();
+  });
+
+  it('skips when subscription is not found', async () => {
+    const db = createMockDb({ subscription: undefined, lockResult: undefined });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(graphApi.get).not.toHaveBeenCalled();
+    expect(ingestEmailCommand.run).not.toHaveBeenCalled();
+  });
+
+  it('skips when lock is already running with recent heartbeat', async () => {
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'running',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: RECENT_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(db.transaction).toHaveBeenCalled();
+    expect(graphApi.get).not.toHaveBeenCalled();
+    expect(ingestEmailCommand.run).not.toHaveBeenCalled();
+  });
+
+  it('proceeds when lock is running with stale heartbeat (stuck recovery)', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'running',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    // Proceeded — graph was queried
+    expect(graphApi.get).toHaveBeenCalled();
+  });
+
+  it('runs when ready with recent heartbeat', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: RECENT_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(graphApi.get).toHaveBeenCalled();
+  });
+
+  it('proceeds when ready with stale heartbeat', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(graphApi.get).toHaveBeenCalled();
+  });
+
+  it('always proceeds when state is failed', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'failed',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: RECENT_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    // Proceeded despite recent heartbeat — failed state always proceeds
+    expect(graphApi.get).toHaveBeenCalled();
+  });
+
+  it('skips when inbox config row is missing inside transaction', async () => {
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: undefined,
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(db.transaction).toHaveBeenCalled();
+    expect(graphApi.get).not.toHaveBeenCalled();
+    expect(ingestEmailCommand.run).not.toHaveBeenCalled();
+  });
+
+  it('calls ingestEmailCommand.run for each fetched email', async () => {
+    const emails = [
+      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
+      makeEmail('msg-2', '2024-06-02T00:00:00Z', '2024-06-02T01:00:00Z'),
+    ];
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
+
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(ingestEmailCommand.run).toHaveBeenCalledTimes(2);
+    expect(ingestEmailCommand.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        graphMessage: expect.objectContaining({ id: 'msg-1' }),
+        user: expect.objectContaining({ profileId: USER_PROFILE_ID }),
+      }),
+    );
+    expect(ingestEmailCommand.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        graphMessage: expect.objectContaining({ id: 'msg-2' }),
+      }),
+    );
+
+    // State set to 'ready'
+    const setMock = db.update.mock.results[0]?.value?.set;
+    expect(setMock).toHaveBeenCalledWith(expect.objectContaining({ liveCatchUpState: 'ready' }));
+  });
+
+  it('follows nextLink to fetch multiple batches', async () => {
+    const batch1 = [makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z')];
+    const batch2 = [makeEmail('msg-2', '2024-06-02T00:00:00Z', '2024-06-02T01:00:00Z')];
+
+    graphApi.get
+      .mockResolvedValueOnce(makeGraphResponse(batch1, 'https://graph.microsoft.com/nextPage'))
+      .mockResolvedValueOnce(makeGraphResponse(batch2));
+
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(ingestEmailCommand.run).toHaveBeenCalledTimes(2);
+    expect(graphApi.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('continues processing when ingestEmailCommand.run returns failed', async () => {
+    const emails = [
+      makeEmail('msg-1', '2024-06-01T00:00:00Z', '2024-06-01T01:00:00Z'),
+      makeEmail('msg-2', '2024-06-02T00:00:00Z', '2024-06-02T01:00:00Z'),
+    ];
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse(emails));
+    ingestEmailCommand.run
+      .mockResolvedValueOnce('failed') // msg-1 fails
+      .mockResolvedValueOnce('ingested'); // msg-2 succeeds
+
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    // Should NOT throw
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    // Both emails were attempted
+    expect(ingestEmailCommand.run).toHaveBeenCalledTimes(2);
+  });
+
+  it('sets state to failed on error', async () => {
+    graphApi.get.mockRejectedValueOnce(new Error('Graph API error'));
+
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    // Should NOT throw
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    const lastUpdateSetCall = db.update.mock.results[db.update.mock.calls.length - 1]?.value.set;
+    expect(lastUpdateSetCall).toHaveBeenCalledWith(
+      expect.objectContaining({ liveCatchUpState: 'failed' }),
+    );
+  });
+
+  it('skips when inbox deletion is in progress at entry point', async () => {
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: null,
+        filters: DEFAULT_FILTERS,
+        deletingInboxStartedAt: new Date(),
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    expect(graphApi.get).not.toHaveBeenCalled();
+    expect(ingestEmailCommand.run).not.toHaveBeenCalled();
+  });
+
+  it('stops additional rounds when deletingInboxStartedAt is set between rounds', async () => {
+    // lastWebhookReceivedAt in the future so without the deletion guard another round would start
+    const futureDate = new Date(Date.now() + 60_000);
+    graphApi.get.mockResolvedValue(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: null,
+        filters: DEFAULT_FILTERS,
+      },
+      betweenRoundsRow: {
+        lastWebhookReceivedAt: futureDate,
+        deletingInboxStartedAt: new Date(),
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    // Only one round executed despite lastWebhookReceivedAt indicating more work
+    expect(graphApi.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies the overlapping window to the watermark in the filter expression', async () => {
+    graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+    const db = createMockDb({
+      subscription: {
+        id: USER_PROFILE_ID,
+        email: 'user@example.com',
+        providerUserId: 'provider-id',
+        source: 'oauth' as const,
+      },
+      lockResult: {
+        liveCatchUpState: 'ready',
+        newestLastModifiedDateTime: WATERMARK,
+        liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
+        filters: DEFAULT_FILTERS,
+      },
+    });
+    const command = createCommand({ graphApi, ingestEmailCommand, db, syncDirectories });
+
+    await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+    // Compute expected watermark independently from the original constant (not the mutated object)
+    const expectedWatermark = new Date(WATERMARK_ISO);
+    expectedWatermark.setMinutes(expectedWatermark.getMinutes() - 5);
+
+    expect(graphApi.filter).toHaveBeenCalledWith(
+      `lastModifiedDateTime ge ${expectedWatermark.toISOString()}`,
+    );
+  });
+
+  describe('MsGraphClientResolver paths', () => {
+    function makeReadyDb(
+      source: 'oauth' | 'shared-mailbox' = 'oauth',
+      email = 'user@example.com',
+      lockOverrides: { preferredDelegateUserProfileId?: string | null } = {},
+    ) {
+      return createMockDb({
+        subscription: {
+          id: USER_PROFILE_ID,
+          email,
+          providerUserId: 'provider-id',
+          source,
+        },
+        lockResult: {
+          liveCatchUpState: 'ready',
+          newestLastModifiedDateTime: WATERMARK,
+          liveCatchUpHeartbeatAt: STALE_HEARTBEAT,
+          filters: DEFAULT_FILTERS,
+          ...lockOverrides,
+        },
+      });
+    }
+
+    it('NO_DELEGATES → result is skipped', async () => {
+      const resolver = { run: vi.fn().mockResolvedValue(NO_DELEGATES) };
+      const db = makeReadyDb();
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
+
+      const result = await command.run({
+        subscriptionId: SUBSCRIPTION_ID,
+        liveCatchupOverlappingWindow: 5,
+      });
+
+      expect(result).toEqual({ status: 'skipped' });
+    });
+
+    it('AllDelegatesFailedError → result is failed', async () => {
+      const resolver = {
+        run: vi.fn().mockRejectedValue(new AllDelegatesFailedError(USER_PROFILE_ID)),
+      };
+      const db = makeReadyDb();
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
+
+      const result = await command.run({
+        subscriptionId: SUBSCRIPTION_ID,
+        liveCatchupOverlappingWindow: 5,
+      });
+
+      expect(result).toEqual(expect.objectContaining({ status: 'failed' }));
+    });
+
+    it('shared-mailbox profile → graphBasePath uses users/{email}', async () => {
+      const sharedEmail = 'shared@example.com';
+      let capturedApiArg: string | undefined;
+      graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+      const resolver = {
+        run: vi
+          .fn()
+          .mockImplementation(
+            async ({
+              fn,
+            }: {
+              fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown>;
+            }) => {
+              const client = {
+                api: vi.fn().mockImplementation((path: string) => {
+                  capturedApiArg ??= path;
+                  return graphApi;
+                }),
+              };
+              return fn({ client, clientUserProfileId: 'delegate-user-profile-id' });
+            },
+          ),
+      };
+
+      const db = makeReadyDb('shared-mailbox', sharedEmail);
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
+
+      await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+      expect(capturedApiArg).toBe(`users/${sharedEmail}/messages`);
+    });
+
+    it('passes preferredDelegateUserProfileId from inbox config to resolver as sharedMailboxConfig', async () => {
+      const preferredDelegateId = 'delegate_01jxk5r1s2fq9att23mp4z5ef9';
+      const resolver = { run: vi.fn().mockResolvedValue(NO_DELEGATES) };
+      const db = makeReadyDb('shared-mailbox', 'shared@example.com', {
+        preferredDelegateUserProfileId: preferredDelegateId,
+      });
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
+
+      await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+      expect(resolver.run).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sharedMailboxConfig: { preferredDelegateUserId: preferredDelegateId },
+        }),
+      );
+    });
+
+    it('shared-mailbox → persists working delegate to DB after successful run', async () => {
+      const sharedEmail = 'shared@example.com';
+      const delegateId = 'delegate_01jxk5r1s2fq9att23mp4z5ef9';
+      graphApi.get.mockResolvedValueOnce(makeGraphResponse([]));
+
+      const resolver = {
+        run: vi
+          .fn()
+          .mockImplementation(
+            async ({
+              fn,
+            }: {
+              fn: (ctx: { client: any; clientUserProfileId: string }) => Promise<unknown>;
+            }) => {
+              const client = { api: vi.fn().mockReturnValue(graphApi) };
+              return fn({ client, clientUserProfileId: delegateId });
+            },
+          ),
+      };
+
+      const db = makeReadyDb('shared-mailbox', sharedEmail);
+      const command = createCommand({
+        graphApi,
+        ingestEmailCommand,
+        db,
+        syncDirectories,
+        resolver,
+      });
+
+      await command.run({ subscriptionId: SUBSCRIPTION_ID, liveCatchupOverlappingWindow: 5 });
+
+      const setCalls = (db.update as any).mock.results[0].value.set.mock.calls as any[][];
+      expect(setCalls).toContainEqual([
+        expect.objectContaining({ preferredDelegateUserProfileId: delegateId }),
+      ]);
+    });
+  });
+});

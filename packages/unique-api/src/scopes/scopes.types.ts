@@ -31,3 +31,11 @@ export interface DeleteFolderResult {
     path: string;
   }>;
 }
+
+export interface BulkMoveResult {
+  scopeIds: string[];
+  asyncMetadataRebuild: boolean;
+  jobId: string | null;
+  affectedFiles: number | null;
+  message: string | null;
+}

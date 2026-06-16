@@ -43,19 +43,21 @@ export class LiveCatchUpListener {
     switch (event.type) {
       case 'unique.outlook-semantic-mcp.live-catch-up.execute': {
         await this.updateLastNotificationReceivedAt(
-          event.payload.subscriptionId,
+          event.payload.subscriptionId ?? null,
           event.payload.notificationReceivedAt,
         );
-        return await this.liveCatchUpCommand.run({
+        await this.liveCatchUpCommand.run({
           ...event.payload,
           liveCatchupOverlappingWindow: this.config.liveCatchupOverlappingWindowMinutes,
         });
+        return;
       }
       case 'unique.outlook-semantic-mcp.live-catch-up.ready-recheck': {
-        return await this.liveCatchUpCommand.run({
+        await this.liveCatchUpCommand.run({
           ...event.payload,
           liveCatchupOverlappingWindow: this.config.liveCatchupRecheckOverlappingWindowMinutes,
         });
+        return;
       }
       default: {
         this.logger.error({ msg: `Unsuported live catchup event type: ${JSON.stringify(event)}` });
@@ -64,10 +66,10 @@ export class LiveCatchUpListener {
   }
 
   private async updateLastNotificationReceivedAt(
-    subscriptionId: string,
+    subscriptionId: string | null,
     notificationReceivedAt: Nullish<string>,
   ): Promise<void> {
-    if (!notificationReceivedAt) {
+    if (!subscriptionId || !notificationReceivedAt) {
       return;
     }
     const notificationTime = new Date(notificationReceivedAt);

@@ -11,17 +11,18 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 |------------|------|---------------|----------|---------|
 | `User.Read` | Delegated | No | Yes | Resolve user identity and profile |
 | `Mail.ReadWrite` | Delegated | No | Yes | Read emails for sync and search; create draft emails in the user's mailbox |
+| `Mail.ReadWrite.Shared` | Delegated | No | Yes (requested unconditionally; only used when `DELEGATED_ACCESS_SCAN` is enabled) | Read emails and create drafts in mailboxes the user has been granted delegated access to via Exchange admin |
 | `MailboxSettings.Read` | Delegated | No | Yes | Read mailbox settings and folder structure |
 | `People.Read` | Delegated | No | Yes | Look up contacts and people for address resolution |
 | `offline_access` | Delegated | No | Yes | Obtain refresh tokens for background sync |
 
-**No permission requires admin consent.** Users can connect their own accounts without IT intervention.
+**No permission requires admin consent.** Users can connect their own accounts without IT intervention. Note that `Mail.ReadWrite.Shared` is always included in the OAuth consent screen, even when `DELEGATED_ACCESS_SCAN=disabled` — see the [least-privilege justification](#mail-readwrite-shared) for details.
 
 ## Understanding Consent Requirements
 
 **This is standard Microsoft behavior, not Outlook Semantic MCP specific.** No permission in this app requires admin consent — users can connect independently. Admins can optionally pre-grant consent organisation-wide.
 
-For the full consent flow explanation including admin consent and multi-tenant setup, see [Authentication — Understanding Microsoft Consent Flows](../operator/authentication.md#Understanding-Microsoft-Consent-Flows).
+For the full consent flow explanation including admin consent and multi-tenant setup, see [Authentication — Understanding Consent Flows](../operator/authentication.md#Understanding-Consent-Flows).
 
 ## Least-Privilege Justification
 
@@ -44,6 +45,15 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Used For** | Fetching email bodies, headers, and metadata during full sync and live catch-up; creating draft emails via the `create_draft_email` tool (POST `/me/messages`) |
 | **Why Not `Mail.Read` + `Mail.ReadWrite`** | `Mail.ReadWrite` already includes full read access, making `Mail.Read` and `Mail.ReadBasic` redundant |
 | **Why Not `Mail.Send`** | The server only creates drafts — sending is a deliberate user action in Outlook. `Mail.Send` is not requested. |
+
+### `Mail.ReadWrite.Shared`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Access delegated mailboxes the user has been granted access to via Exchange admin |
+| **Used For** | Powering delegated mailbox discovery and search via `/users/{ownerEmail}/messages` and `/users/{ownerEmail}/mailFolders` when `DELEGATED_ACCESS_SCAN` is enabled |
+| **Why Not Less** | No narrower delegated-shared permission exists for read and draft access on a delegated mailbox |
+| **Note** | This scope is requested unconditionally at OAuth time even when `DELEGATED_ACCESS_SCAN=disabled` — the consent screen always lists it, but the permission is only exercised when delegated access is configured |
 
 ### `MailboxSettings.Read`
 

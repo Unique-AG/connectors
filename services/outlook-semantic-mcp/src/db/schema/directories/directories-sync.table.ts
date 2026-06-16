@@ -21,6 +21,10 @@ export const directoriesSync = pgTable('directories_sync', {
       onDelete: 'cascade',
       onUpdate: 'cascade',
     }),
+  synchronizedByUserProfileId: varchar(`synchronized_by_user_profile_id`).references(
+    () => userProfiles.id,
+    { onDelete: 'set null', onUpdate: 'cascade' },
+  ),
 
   ...timestamps,
 });
@@ -31,5 +35,11 @@ export const directoriesSyncRelations = relations(directoriesSync, ({ one }) => 
   userProfile: one(userProfiles, {
     fields: [directoriesSync.userProfileId],
     references: [userProfiles.id],
+    relationName: 'directoriesSync_owner',
+  }),
+  synchronizedByUserProfile: one(userProfiles, {
+    fields: [directoriesSync.synchronizedByUserProfileId],
+    references: [userProfiles.id],
+    relationName: 'directoriesSync_synchronizedBy',
   }),
 }));

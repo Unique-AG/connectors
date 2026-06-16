@@ -108,7 +108,8 @@ export class FetchMessagesFromGraphQuery {
       apiCall = apiCall.search(search);
     }
 
-    // Collect all pages before processing so we can bulk-translate IDs when using $search.
+    // Collect all pages before processing so we can bulk-translate IDs when using $search
+    // with kql query.
     const allMessages: FetchMessage[] = [];
 
     let response = fetchMessagesResponseSchema.parse(await apiCall.get());

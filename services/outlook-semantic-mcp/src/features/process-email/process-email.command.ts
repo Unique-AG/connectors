@@ -24,7 +24,7 @@ import { getTimeStampWithoutMilliseconds } from '~/utils/date/get-time-stamp-wit
 import { isRateLimitError } from '~/utils/is-rate-limit-error';
 import { Nullish } from '~/utils/nullish';
 import { INGESTION_SOURCE_KIND, INGESTION_SOURCE_NAME } from '~/utils/source-kind-and-name';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { UpsertDirectoryCommand } from '../directories-sync/upsert-directory.command';
 import { GraphMessage } from './dtos/microsoft-graph.dtos';
 import { getMetadataFromMessage, MessageMetadata } from './utils/get-metadata-from-message';
@@ -51,6 +51,7 @@ export interface ProcessEmailCommandInput {
   file: Nullish<UniqueFile>;
   user: UserContext;
   filters: InboxConfigurationMailFilters;
+  graphBasePath: string;
 }
 
 interface BaseLogContext extends Record<string, string | undefined | boolean> {
@@ -60,6 +61,8 @@ interface BaseLogContext extends Record<string, string | undefined | boolean> {
   providerUserId: string;
   userEmail: string;
 }
+
+export type ProcessEmailCommandResult = MessageIngestionResult | 'failed';
 
 @Injectable()
 export class ProcessEmailCommand {
@@ -80,22 +83,21 @@ export class ProcessEmailCommand {
       fn: () => {
         return this.runProcessEmail(input);
       },
-      onError: rethrowRateLimitError,
-      getResultFailure: (error) => {
+      onError: makeDefaultOnErrorHandler((error) => {
         this.logger.warn({
           ...createLogContext(input),
           msg: `Failed to process message: ${input.graphMessage.id} ${input.file ? `with unique file key: ${input.file.key}` : `without unique file`}`,
           err: error,
         });
         return 'failed';
-      },
+      }),
     });
   }
 
   @Span()
   private async runProcessEmail(input: ProcessEmailCommandInput): Promise<MessageIngestionResult> {
     const logContext = createLogContext(input);
-    const { graphMessage, file, fileKey, user, filters, client } = input;
+    const { graphMessage, file, fileKey, user, filters, client, graphBasePath } = input;
     const metadata = getMetadataFromMessage(graphMessage);
 
     let parentDirectory = await this.db.query.directories.findFirst({
@@ -209,6 +211,7 @@ export class ProcessEmailCommand {
       client,
       logContext,
       filters,
+      graphBasePath,
     });
     return 'ingested';
   }
@@ -222,6 +225,7 @@ export class ProcessEmailCommand {
     fileKey,
     logContext: logContextRaw,
     filters,
+    graphBasePath,
   }: {
     client: Client;
     rootScopeId: string;
@@ -234,6 +238,7 @@ export class ProcessEmailCommand {
       userEmail: string;
     };
     filters: InboxConfigurationMailFilters;
+    graphBasePath: string;
   }): Promise<void> {
     // We will update the log context while we run.
     const logContext = clone(logContextRaw) as Record<string, string>;
@@ -270,7 +275,11 @@ export class ProcessEmailCommand {
 
     try {
       this.logger.debug({ ...logContext, msg: `File Upload: Started` });
-      const emailBuffer = await this.getEmlFile({ messageId: graphMessage.id, client });
+      const emailBuffer = await this.getEmlFile({
+        messageId: graphMessage.id,
+        client,
+        graphBasePath,
+      });
       await this.uploadFileForIngestionCommand.run({
         uploadUrl: content.writeUrl,
         content: emailBuffer,
@@ -305,12 +314,14 @@ export class ProcessEmailCommand {
   private async getEmlFile({
     messageId,
     client,
+    graphBasePath,
   }: {
     messageId: string;
     client: Client;
+    graphBasePath: string;
   }): Promise<Buffer> {
     const emlStream = (await client
-      .api(`me/messages/${messageId}/$value`)
+      .api(`${graphBasePath}/messages/${messageId}/$value`)
       .header(`Prefer`, `IdType="ImmutableId"`)
       .getStream()) as ReadableStream<Uint8Array<ArrayBuffer>>;
 

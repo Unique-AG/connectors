@@ -1,7 +1,16 @@
 import assert from 'node:assert';
+import { randomUUID } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
+import { rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { FetchFn } from '@qfetch/qfetch';
 import { Span, TraceService } from 'nestjs-otel';
+import type { UniqueConfigNamespaced } from '~/config';
 import { UNIQUE_FETCH } from './unique.consts';
 import {
   type ContentInfoItem,
@@ -23,6 +32,20 @@ import {
 } from './unique.dtos';
 import type { UniqueIdentity } from './unique-identity.types';
 
+/**
+ * A download streamed to a local temp file, ready to upload with an authoritative `Content-Length`.
+ * Produced by {@link UniqueContentService.spoolContent}; the caller owns the file and must call
+ * {@link cleanup} once the upload has finished (or failed).
+ */
+export interface SpooledContent {
+  /** Absolute path of the temp file the content was streamed to. */
+  path: string;
+  /** Authoritative byte size from `fstat`, used as the upload `Content-Length`. */
+  size: number;
+  /** Removes the temp file. Safe to call more than once (`force` no-ops if already gone). */
+  cleanup: () => Promise<void>;
+}
+
 @Injectable()
 export class UniqueContentService {
   private readonly logger = new Logger(UniqueContentService.name);
@@ -30,6 +53,7 @@ export class UniqueContentService {
   public constructor(
     @Inject(UNIQUE_FETCH) private readonly fetch: FetchFn,
     private readonly trace: TraceService,
+    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
   ) {}
 
   @Span()
@@ -77,28 +101,62 @@ export class UniqueContentService {
     return result;
   }
 
+  /**
+   * Streams a content download to a temp file at constant memory and returns its path plus an
+   * authoritative byte size (`fstat`). Call this *before* opening a Unique content record
+   * ({@link upsertContent}) so a failed download (e.g. a 403 on a recording the caller can't read)
+   * never leaves a dangling, empty record behind. The caller must {@link SpooledContent.cleanup}
+   * the returned file once the upload has finished or failed.
+   */
+  @Span()
+  public async spoolContent(
+    content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>,
+  ): Promise<SpooledContent> {
+    const span = this.trace.getSpan();
+    const tmpPath = join(tmpdir(), `teams-upload-${randomUUID()}`);
+
+    try {
+      // The MS Graph body is a web stream; Readable.fromWeb adapts it to a Node stream so the
+      // pipeline can write it to disk with backpressure (constant memory).
+      await pipeline(Readable.fromWeb(await content()), createWriteStream(tmpPath));
+      const { size } = await stat(tmpPath);
+      span?.setAttribute('content_length', size);
+      return { path: tmpPath, size, cleanup: () => rm(tmpPath, { force: true }) };
+    } catch (error) {
+      // Remove any partial spool before propagating, so a download failure leaves nothing behind.
+      await rm(tmpPath, { force: true });
+      throw error;
+    }
+  }
+
   @Span()
   public async uploadToStorage(
     writeUrl: string,
-    content: ReadableStream<Uint8Array<ArrayBuffer>>,
+    spooled: SpooledContent,
     mime: string,
   ): Promise<void> {
     const span = this.trace.getSpan();
 
-    const urlObj = new URL(writeUrl);
-    const storageEndpoint = urlObj.origin;
+    const uploadUrl = this.correctWriteUrl(writeUrl);
+    const storageEndpoint = new URL(uploadUrl).origin;
     span?.setAttribute('storage_endpoint', storageEndpoint);
+    span?.setAttribute('content_length', spooled.size);
 
     this.logger.debug({ storageEndpoint }, 'Beginning content upload to Unique storage system');
 
-    const response = await fetch(writeUrl, {
+    // Azure Blob's single `PUT Blob` rejects `Transfer-Encoding: chunked` (400 UnsupportedHeader)
+    // and requires a `Content-Length`. The spooled file gives us an authoritative size, and undici
+    // sends a sized, non-chunked body when an explicit Content-Length is set.
+    const response = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': mime,
+        'Content-Length': String(spooled.size),
         'x-ms-blob-type': 'BlockBlob',
       },
-      body: content,
-      // @ts-expect-error: nodejs fetch requires `half` for streaming uploads
+      // Stream the spooled file back as the request body. `duplex: 'half'` is required for a
+      // streaming request body.
+      body: Readable.toWeb(createReadStream(spooled.path)),
       duplex: 'half',
     });
 
@@ -114,6 +172,23 @@ export class UniqueContentService {
 
     span?.setAttribute('http_status', response.status);
     this.logger.debug({ storageEndpoint }, 'Successfully completed content upload to storage');
+  }
+
+  // HACK (mirrors outlook-semantic-mcp): in cluster_local mode the storeInternally
+  // writeUrl points at the public, Kong-gateway-fronted storage endpoint, which
+  // in-cluster pods cannot reach (egress is policy-denied → connect timeout). Rewrite
+  // it to route through node-ingestion's scoped upload endpoint, reachable in-cluster.
+  // In external mode the public writeUrl is used as-is.
+  private correctWriteUrl(writeUrl: string): string {
+    const config = this.config.get('unique', { infer: true });
+    if (config.serviceAuthMode === 'external') {
+      return writeUrl;
+    }
+    const key = new URL(writeUrl).searchParams.get('key');
+    assert.ok(key, 'writeUrl is missing key parameter');
+    const target = new URL('/scoped/upload', config.ingestionServiceBaseUrl);
+    target.searchParams.set('key', key);
+    return target.toString();
   }
 
   @Span()
@@ -153,12 +228,13 @@ export class UniqueContentService {
   @Span()
   public async findByMetadata(
     filter: MetadataFilter,
-    options?: { skip?: number; take?: number },
+    options?: { skip?: number; take?: number; sourceKind?: string },
   ): Promise<{ contents: ContentInfoItem[]; total: number }> {
     const request: PublicContentInfosRequest = {
       skip: options?.skip ?? 0,
       take: options?.take ?? 50,
       metadataFilter: filter,
+      sourceKind: options?.sourceKind,
     };
 
     const result = await this.getContentInfos(request);
@@ -176,12 +252,13 @@ export class UniqueContentService {
   public async scopedFindByMetadata(
     filter: MetadataFilter,
     scopeContext: UniqueIdentity,
-    options?: { skip?: number; take?: number },
+    options?: { skip?: number; take?: number; sourceKind?: string },
   ): Promise<{ contents: ContentInfoItem[]; total: number }> {
     const request: PublicContentInfosRequest = {
       skip: options?.skip ?? 0,
       take: options?.take ?? 50,
       metadataFilter: filter,
+      sourceKind: options?.sourceKind,
     };
 
     const payload = PublicContentInfosRequestSchema.encode(request);

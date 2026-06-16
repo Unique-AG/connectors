@@ -1,26 +1,82 @@
 <!-- confluence-page-id: 1953366069 -->
 <!-- confluence-space-key: PUBDOC -->
 
-
 ## Overview
 
-The SharePoint Connector authenticates with Microsoft services using Azure AD (Microsoft Entra ID) application credentials. This guide covers the setup process for authentication.
+The SharePoint Connector authenticates with Microsoft services using an Entra ID (Azure AD) app registration with **application permissions** — it authenticates as itself rather than on behalf of a user. This allows scoped, auditable, non-interactive access to exactly the SharePoint content Unique needs to sync.
 
-## Authentication Methods
+How the app registration is provisioned depends on your deployment model:
 
+- **Unique SaaS** — Unique provisions and manages the registration; you grant admin consent and provide SharePoint details
+- **Self-Hosted** — your organization provisions the registration, configures the certificate, and operates the connector
+
+## Required Permissions
+
+The app registration requests the following application permissions.
+
+**Microsoft Graph** (content sync):
+
+| Permission                          | Type        | Description                                                     |
+| ----------------------------------- | ----------- | --------------------------------------------------------------- |
+| `Sites.Selected`                    | Application | Fetch sites, folders, and content (site-specific access)        |
+| `Lists.SelectedOperations.Selected` | Application | Fetch content from specific libraries (library-specific access) |
+
+**Microsoft Graph** (permission sync — optional):
+
+| Permission             | Type        | Description        |
+| ---------------------- | ----------- | ------------------ |
+| `GroupMember.Read.All` | Application | Read group members |
+| `User.ReadBasic.All`   | Application | Read user details  |
+
+**SharePoint REST API** (permission sync — optional):
+
+| Permission       | Type        | Description                  |
+| ---------------- | ----------- | ---------------------------- |
+| `Sites.Selected` | Application | Read site groups and members |
+
+For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
+
+## Unique SaaS
+
+When Unique hosts the SharePoint Connector, Unique provisions and manages the Entra ID app registration. Granting admin consent is the only Azure-side action required from your organization. Once consent is in place, provide your SharePoint tenant and site details to Unique — see [Configuration](./configuration.md) for the required values.
+
+### Multi Tenant
+
+Grant admin consent using the shared Unique app registration:
+
+```
+https://login.microsoftonline.com/organizations/adminconsent?client_id=29a02f83-6586-429e-9a49-7af46db05f00
+```
+
+If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `29a02f83-6586-429e-9a49-7af46db05f00`.
+
+### Single Tenant
+
+For Single Tenant deployments, Unique provisions a **dedicated app registration per client**. There is no shared consent URL — contact [Unique Support or Solution Engineering](mailto:enterprise-support@unique.ch) to receive your organization-specific admin consent URL.
+
+Unique uses per-client registrations because this model:
+
+- **Segregates access** — each registration is scoped exclusively to that client's SharePoint environment; no cross-tenant access is possible
+- **Limits blast radius** — a compromised or misconfigured registration cannot affect any other client
+- **Controls permissions tightly** — the registration carries exactly the permissions required for the agreed scope, and no more
+- **Allows per-client customization** — optional capabilities such as permission sync can be added or removed per registration without touching shared infrastructure
+
+## Self-Hosted
+
+When your organization hosts the SharePoint Connector, your team manages the full setup: Entra app registration, certificate creation, site access grants, and connector configuration.
+
+### Authentication Methods
 
 | Method        | Use Case                 | Recommended |
 | ------------- | ------------------------ | ----------- |
 | Certificate   | Production environments  | Yes         |
 | Client Secret | Development/testing only | No          |
 
+**Certificate authentication** is the recommended method for production — it uses an X.509 certificate to obtain OAuth2 access tokens from Entra ID. **OIDC is currently not supported.** Client secret remains a fallback for non-production use only and is discouraged for enterprise deployments.
 
-**Certificate authentication** is the recommended method for production. It uses an X.509 certificate to obtain OAuth2 access tokens from Entra ID.
-**OIDC is currently not supported** for this connector. Client secret remains a fallback for non-production use and is discouraged for enterprise production deployments.
+### Setup Steps
 
-## Setup Steps
-
-### 1. Create a Unique Service User
+#### 1. Create a Unique Service User
 
 The connector requires a service user in Unique with the following permissions:
 
@@ -40,58 +96,26 @@ For detailed instructions, see:
 - [How To Configure A Service User](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023075)
 - [Understand Roles and Permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1411023168)
 
-### 2. Create Azure AD Application Registration
-
-**Self-hosted only:** Complete this step when your organization hosts the connector and manages the Entra app registration yourself. If [Unique hosts the connector](../technical/architecture.md#Single-Tenant:-Unique-Hosted) (see [Hosting models](../technical/architecture.md#Hosting-Models)), Unique manages the app registration—skip this step.
-
-#### Required Permissions
-
-**Microsoft Graph** (for content sync):
-
-
-| Permission                          | Type        | Description                                                        |
-| ----------------------------------- | ----------- | ------------------------------------------------------------------ |
-| `Sites.Selected`                    | Application | Fetch sites, folders, and content (if site-specific access)        |
-| `Lists.SelectedOperations.Selected` | Application | Fetch content from specific libraries (if library-specific access) |
-
-
-**Microsoft Graph** (for permission sync - optional):
-
-
-| Permission             | Type        | Description        |
-| ---------------------- | ----------- | ------------------ |
-| `GroupMember.Read.All` | Application | Read group members |
-| `User.ReadBasic.All`   | Application | Read user details  |
-
-
-**SharePoint REST API** (for permission sync - optional):
-
-
-| Permission       | Type        | Description                  |
-| ---------------- | ----------- | ---------------------------- |
-| `Sites.Selected` | Application | Read site groups and members |
-
-
-#### Registration Steps
+#### 2. Create Azure AD Application Registration
 
 1. Go to [Azure Portal](https://portal.azure.com) → **Azure Active Directory** → **App registrations**
 2. Click **New registration**:
-  - Name: `Unique SharePoint Connector`
-  - Supported account types: **Accounts in this organizational directory only**
-  - Redirect URI: Leave empty
+   - Name: `Unique SharePoint Connector`
+   - Supported account types: **Accounts in this organizational directory only**
+   - Redirect URI: Leave empty
 3. Note the **Application (client) ID** and **Directory (tenant) ID**
 4. Go to **API permissions** → **Add a permission**:
-  - Select **Microsoft Graph** → **Application permissions**:
-    - Add `Sites.Selected` (for site-specific access)
-    - Add `Lists.SelectedOperations.Selected` (for library-specific access)
-  - If permission sync is enabled, also add:
-    - `GroupMember.Read.All`
-    - `User.ReadBasic.All`
-  - Select **SharePoint** → **Application permissions**:
-    - Add `Sites.Selected` (required for permission sync to read site groups)
+   - Select **Microsoft Graph** → **Application permissions**:
+     - Add `Sites.Selected` (site-specific access)
+     - Add `Lists.SelectedOperations.Selected` (library-specific access)
+   - If permission sync is enabled, also add:
+     - `GroupMember.Read.All`
+     - `User.ReadBasic.All`
+   - Select **SharePoint** → **Application permissions**:
+     - Add `Sites.Selected` (required for permission sync to read site groups)
 5. Click **Grant admin consent for [Your Organization]**
 
-### 3. Create Azure AD Service Principal
+#### 3. Create Azure AD Service Principal
 
 The service principal enables the app registration to authenticate.
 
@@ -105,30 +129,20 @@ https://login.microsoftonline.com/{tenant-id}/v2.0/adminconsent
   &scope=https://graph.microsoft.com/.default
 ```
 
-**Note:** Because this connector is a server-side application, the app registration typically has **no redirect/reply URL** configured. After granting consent, Microsoft may show an `AADSTS500113: No reply address is registered for the application` message that looks like a sign-in error. In this flow you can ignore it and verify success in Azure Portal → **Enterprise applications** → your app → **Permissions** (or **API permissions** in the app registration) where admin consent is marked as granted.
+**Note:** Because this connector is a server-side application, the app registration typically has **no redirect/reply URL** configured. After granting consent, Microsoft may show an `AADSTS500113: No reply address is registered for the application` message. In this flow you can ignore it — verify success in Azure Portal → **Enterprise applications** → your app → **Permissions** where admin consent is marked as granted.
 
 **Option 2: Azure CLI**
 
 ```bash
-# Create the service principal
 az ad sp create --id <app-id>
-
-# Grant admin consent
-# Go to Azure Portal → Enterprise applications → Your app → Permissions
-# Click "Grant admin consent for <tenant>"
+# Then: Azure Portal → Enterprise applications → Your app → Permissions → Grant admin consent for <tenant>
 ```
 
-### 4. Grant Site-Specific Access
+#### 4. Grant Site-Specific Access
 
-The `Sites.Selected` permission requires explicit access grants for each site. This is done via PowerShell.
+The `Sites.Selected` permission requires explicit access grants per site.
 
-#### Prerequisites
-
-- PowerShell 7+
-- [PnP PowerShell](https://pnp.github.io/powershell/) module
-- SharePoint administrator rights
-
-#### Grant Access Script
+**Via PowerShell (recommended):**
 
 ```powershell
 # Install PnP PowerShell if needed
@@ -150,13 +164,11 @@ Get-PnPAzureADAppSitePermission -Site "https://<tenant>.sharepoint.com/sites/<si
 
 **Repeat for each site** that should be synced.
 
-#### Alternative: Graph Explorer
-
-Use this option if you prefer granting site permissions through Microsoft Graph directly.
+**Via Graph Explorer:**
 
 1. Open [Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer) and sign in as a SharePoint/Entra admin.
 2. In **Modify permissions**, consent to `Sites.FullControl.All` (one-time admin action needed to grant `Sites.Selected` app permissions).
-3. Grant site permission (replace placeholders):
+3. Grant site permission:
 
 ```http
 POST https://graph.microsoft.com/v1.0/sites/{site-id}/permissions
@@ -175,20 +187,15 @@ Content-Type: application/json
 }
 ```
 
-4. Verify permission grant:
+4. Verify: `GET https://graph.microsoft.com/v1.0/sites/{site-id}/permissions` — expect `200 OK` with your app ID.
 
-```http
-GET https://graph.microsoft.com/v1.0/sites/{site-id}/permissions
-```
+#### 5. Grant Library-Specific Access
 
-Expected result: grant creation returns `201 Created`; verification returns `200 OK` and includes your app ID.
+For more granular control, grant access to specific document libraries using `Lists.SelectedOperations.Selected`:
 
-### 5. Grant Library-Specific Access
-
-For more granular control, you can grant access to specific document libraries using `Lists.SelectedOperations.Selected`:
+**Via PowerShell:**
 
 ```powershell
-# Grant library-specific access
 Grant-PnPAzureADAppSitePermission `
   -AppId "<your-app-client-id>" `
   -DisplayName "Unique SharePoint Connector" `
@@ -197,7 +204,7 @@ Grant-PnPAzureADAppSitePermission `
   -List "Documents"
 ```
 
-#### Alternative: Graph Explorer
+**Via Graph Explorer:**
 
 1. Open [Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer) and sign in as admin.
 2. In **Modify permissions**, consent to `Sites.Read.All` (one-time admin action for list discovery and grant checks).
@@ -225,19 +232,11 @@ Content-Type: application/json
 }
 ```
 
-5. Verify library permissions:
+5. Verify: `GET https://graph.microsoft.com/v1.0/sites/{site-id}/lists/{list-id}/permissions` — expect `200 OK` with your app ID.
 
-```http
-GET https://graph.microsoft.com/v1.0/sites/{site-id}/lists/{list-id}/permissions
-```
+#### 6. Create Certificate
 
-Expected result: grant creation returns `201 Created`; verification returns `200 OK` and contains your app ID.
-
-### 6. Create Certificate
-
-Create a self-signed certificate for authentication:
-
-#### Using OpenSSL
+**Via OpenSSL:**
 
 ```bash
 # Generate private key
@@ -256,20 +255,15 @@ openssl pkcs12 -export -out connector.pfx \
   -inkey connector.key -in connector.crt
 ```
 
-##### CSR Field Recommendations
+CSR field recommendations when running `openssl req` interactively:
 
-If you run `openssl req` interactively, use these recommendations:
-
-- **Common Name (CN):** Use a stable, descriptive name (for example `unique-sharepoint-connector-app`).
+- **Common Name (CN):** Use a stable, descriptive name (e.g. `unique-sharepoint-connector-app`).
 - **Organization (O):** Optional, but recommended for traceability.
-- **Country/State/OU/Email:** Optional and typically not required by Entra for this flow.
+- **Country/State/OU/Email:** Optional and not required by Entra for this flow.
 
-The CN is used as certificate subject in Entra and helps operations teams identify the certificate during rotation.
-
-#### Using PowerShell
+**Via PowerShell:**
 
 ```powershell
-# Generate certificate
 $cert = New-SelfSignedCertificate `
   -Subject "CN=Unique SharePoint Connector" `
   -CertStoreLocation "Cert:\CurrentUser\My" `
@@ -280,96 +274,40 @@ $cert = New-SelfSignedCertificate `
   -HashAlgorithm SHA256 `
   -NotAfter (Get-Date).AddYears(2)
 
-# Export certificate (for Azure upload)
 Export-Certificate -Cert $cert -FilePath "connector.cer"
 
-# Export private key (for connector configuration)
 $password = ConvertTo-SecureString -String "YourPassword" -Force -AsPlainText
 Export-PfxCertificate -Cert $cert -FilePath "connector.pfx" -Password $password
 ```
 
-#### Alternative Outputs and Conversion
+**Format conversion (if needed):**
 
-Different tooling may output `.pfx`, `.p12`, `.cer`, `.crt`, or PEM files. The connector flow requires an asymmetric private key and matching certificate material.
-
-If needed, convert formats with OpenSSL:
+Different tooling may output `.pfx`, `.p12`, `.cer`, `.crt`, or PEM files. The connector requires an asymmetric private key and matching certificate material.
 
 ```bash
 # Convert PFX/P12 to PEM bundle
 openssl pkcs12 -in connector.pfx -out connector.pem -nodes
 
-# Extract private key (PEM)
+# Extract private key
 openssl pkey -in connector.pem -out connector.key
 
-# Extract certificate (PEM)
+# Extract certificate
 openssl x509 -in connector.pem -out connector.crt
 ```
 
-#### Upload Certificate to Azure AD
+**Upload to Azure AD:**
 
 1. Go to Azure Portal → **App registrations** → Your app
 2. Select **Certificates & secrets**
 3. Click **Upload certificate**
 4. Upload the `.cer` or `.crt` file
-5. Note the **Thumbprint (SHA)** displayed and store it in your connector configuration where certificate thumbprint is required.
+5. Note the **Thumbprint (SHA)** — store it in your connector configuration where the certificate thumbprint is required.
 
-## Hosting Models
+### Authentication Reference
 
-### Self-Hosted (SH)
+#### Microsoft Graph
 
-Client hosts the connector and manages Entra App registration:
-
-```mermaid
-flowchart LR
-    subgraph Client["Client Infrastructure"]
-        Connector["SharePoint Connector"]
-        EntraApp["Entra App Registration"]
-    end
-
-    subgraph Microsoft["Microsoft Cloud"]
-        MSGraph["Microsoft Graph"]
-        SharePoint["SharePoint Online"]
-    end
-
-    subgraph Unique["Unique Platform"]
-        UniqueAPI["Unique API"]
-    end
-
-    EntraApp --> Connector
-    Connector --> MSGraph
-    Connector --> SharePoint
-    Connector --> UniqueAPI
-```
-
-
-
-### Single-Tenant: Client-Hosted Connector
-
-Client hosts connector within their infrastructure, connecting to Unique Single Tenant:
-
-- Connector hosted by client
-- Entra App Registration managed by client
-- Suitable for isolated/on-premise SharePoints
-
-### Single-Tenant: Unique-Hosted Connector
-
-Unique hosts the connector on behalf of the client:
-
-- Connector hosted by Unique
-- Entra App Registration managed by Unique
-- Client provides:
-  - SharePoint URL
-  - Tenant ID
-  - Site configuration (one of):
-    - Site IDs and settings via YAML configuration, or
-    - SharePoint list location for dynamic configuration
-
-## Interacting with Microsoft Graph
-
-### Graph Principal
-
-The connector uses the app registration to obtain OAuth2 tokens:
-Only certificate-based app authentication is supported in this flow (OIDC is not available).
+The connector uses the app registration to obtain OAuth2 tokens via certificate assertion. Only certificate-based authentication is supported (OIDC is not available).
 
 ```mermaid
 sequenceDiagram
@@ -384,34 +322,25 @@ sequenceDiagram
     Graph->>Connector: Site data
 ```
 
-
-
-### Token Endpoint
+Token endpoint:
 
 ```
 https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token
 ```
 
-## Interacting with SharePoint REST API
+#### SharePoint REST API
 
-### SharePoint REST Principal
+For permission sync, the connector also authenticates with the SharePoint REST API using the same certificate. Only certificate-based authentication is supported (OIDC is not available).
 
-For permission sync, the connector also authenticates with SharePoint REST API:
-Only certificate-based app authentication is supported in this flow (OIDC is not available).
-
-**Token Endpoint:**
+Token endpoint:
 
 ```
 https://{tenant}.sharepoint.com
 ```
 
-The same certificate is used for both Graph API and SharePoint REST API authentication.
+**Site group access requirements:** When using permission sync, the app principal must be able to read site group members. If "Who can view the membership of the group?" is **not** set to **Everyone**, the connector cannot read group members.
 
-### Site Group Access Requirements
-
-When using permission sync, the app principal must be able to read site group members. If "Who can view the membership of the group?" is **not** set to **Everyone**, the connector cannot read group members.
-
-**Mitigation options:**
+Mitigation options:
 
 1. Set group visibility to "Everyone"
 2. Add the app principal as a group member/owner
@@ -424,13 +353,11 @@ When using permission sync, the app principal must be able to read site group me
 **Symptom:** `AADSTS700016: Application with identifier 'xxx' was not found`
 
 **Causes:**
-
 - App registration not found in the tenant
 - Service principal not created
 - Wrong tenant ID
 
 **Resolution:**
-
 1. Verify app registration exists
 2. Create service principal via admin consent
 3. Check tenant ID configuration
@@ -440,13 +367,11 @@ When using permission sync, the app principal must be able to read site group me
 **Symptom:** `AADSTS700027: Client assertion contains an invalid signature`
 
 **Causes:**
-
 - Wrong certificate uploaded to Azure
 - Certificate expired
 - Private key doesn't match certificate
 
 **Resolution:**
-
 1. Re-upload certificate to Azure AD
 2. Generate new certificate if expired
 3. Verify certificate and key match
@@ -455,32 +380,27 @@ When using permission sync, the app principal must be able to read site group me
 
 **Symptom:** `secretOrPrivateKey must be an asymmetric key when using RS256`
 
-**Cause:**
-
-- The connector received key material in an unsupported format (for example a plain secret string instead of file-based PEM/asymmetric key content).
+**Cause:** The connector received key material in an unsupported format (for example a plain secret string instead of file-based PEM/asymmetric key content).
 
 **Resolution:**
-
-1. Provide the private key to the connector as file content in supported PEM/asymmetric format.
+1. Provide the private key as file content in supported PEM/asymmetric format.
 2. Ensure the key matches the uploaded certificate.
-3. If using KeyVault-backed configuration, make sure the secret value contains valid key file content rather than unrelated or transformed text.
+3. If using KeyVault-backed configuration, make sure the secret value contains valid key file content.
 
 ### Permission Denied
 
 **Symptom:** `403 Forbidden` when accessing sites or libraries
 
 **Causes:**
-
-- `Sites.Selected` or `Lists.SelectedOperations.Selected` permission not granted for the site/library
+- `Sites.Selected` or `Lists.SelectedOperations.Selected` not granted for the target site/library
 - Admin consent not completed
-- **Permission scope mismatch:** The app registration has `Sites.Selected` but the admin granted **library-level** access (via `-List` parameter). Library-level grants require `Lists.SelectedOperations.Selected` on the app registration — `Sites.Selected` alone does not cover them and will return 403.
+- **Permission scope mismatch:** The app registration has `Sites.Selected` but the admin granted **library-level** access (via `-List` parameter). Library-level grants require `Lists.SelectedOperations.Selected` — `Sites.Selected` alone does not cover them and will return 403.
 
 **Resolution:**
-
 1. Verify the app registration includes the correct permission for the type of grant issued:
-  - Site-level grants → `Sites.Selected`
-  - Library-level grants → `Lists.SelectedOperations.Selected`
-  - Mixed → both permissions (recommended default)
+   - Site-level grants → `Sites.Selected`
+   - Library-level grants → `Lists.SelectedOperations.Selected`
+   - Mixed → both permissions (recommended default)
 2. Grant site or library access via PowerShell
 3. Complete admin consent in Azure Portal
 
@@ -504,14 +424,11 @@ Mount the PEM file containing the additional CA certificates into the pod and po
 **Symptom:** `Site not found` or `404` errors
 
 **Causes:**
-
 - Incorrect site ID
 - Site deleted or renamed
 - No access to site
 
 **Resolution:**
-
 1. Verify site ID using Graph Explorer
 2. Re-grant site access if renamed
 3. Check site exists in SharePoint
-

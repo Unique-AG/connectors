@@ -1,18 +1,14 @@
 import assert from 'node:assert';
 import { TestBed } from '@suites/unit';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { IngestionMode } from '../constants/ingestion.constants';
 import type {
   SharepointContentItem,
   SharepointDirectoryItem,
 } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
-import { ScopeExternalIdMigrationService } from '../scope-external-id-migration/scope-external-id-migration.service';
 import { UniqueScopesService } from '../unique-api/unique-scopes/unique-scopes.service';
 import type { Scope, ScopeWithPath } from '../unique-api/unique-scopes/unique-scopes.types';
-import { UniqueUsersService } from '../unique-api/unique-users/unique-users.service';
 import { Smeared } from '../utils/smeared';
 import { createMockSiteConfig } from '../utils/test-utils/mock-site-config';
-import { RootScopeMigrationService } from './root-scope-migration.service';
 import { ScopeManagementService } from './scope-management.service';
 import type { SharepointSyncContext } from './sharepoint-sync-context.interface';
 
@@ -113,8 +109,9 @@ describe('ScopeManagementService', () => {
     managedPath: 'sites',
     siteConfig: createMockSiteConfig({
       siteId: new Smeared('site-123', false),
-      scopeId: 'root-scope-123',
+      scopeId: { type: 'fixed', scopeId: 'scope_root123' },
     }),
+    rootScopeId: 'scope_root123',
     isInitialSync: false,
     discoveredSubsites: [],
   };
@@ -158,236 +155,6 @@ describe('ScopeManagementService', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  describe('initializeRootScope', () => {
-    let getScopeByIdMock: ReturnType<typeof vi.fn>;
-    let createScopeAccessesMock: ReturnType<typeof vi.fn>;
-    let getCurrentUserIdMock: ReturnType<typeof vi.fn>;
-    let updateScopeExternalIdMock: ReturnType<typeof vi.fn>;
-    let rootMigrationMock: ReturnType<typeof vi.fn>;
-    let externalIdMigrationMock: ReturnType<typeof vi.fn>;
-
-    beforeEach(async () => {
-      getScopeByIdMock = vi.fn();
-      createScopeAccessesMock = vi.fn();
-      getCurrentUserIdMock = vi.fn().mockResolvedValue('user-123');
-      updateScopeExternalIdMock = vi.fn().mockResolvedValue({ externalId: 'updated-external-id' });
-      rootMigrationMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
-      externalIdMigrationMock = vi.fn().mockResolvedValue({ status: 'no_migration_needed' });
-
-      const { unit } = await TestBed.solitary(ScopeManagementService)
-        .mock<UniqueScopesService>(UniqueScopesService)
-        .impl((stubFn) => ({
-          ...stubFn(),
-          getScopeById: getScopeByIdMock,
-          createScopeAccesses: createScopeAccessesMock,
-          updateScopeExternalId: updateScopeExternalIdMock,
-        }))
-        .mock<UniqueUsersService>(UniqueUsersService)
-        .impl((stubFn) => ({
-          ...stubFn(),
-          getCurrentUserId: getCurrentUserIdMock,
-        }))
-        .mock<RootScopeMigrationService>(RootScopeMigrationService)
-        .impl((stubFn) => ({
-          ...stubFn(),
-          migrateIfNeeded: rootMigrationMock,
-        }))
-        .mock<ScopeExternalIdMigrationService>(ScopeExternalIdMigrationService)
-        .impl((stubFn) => ({
-          ...stubFn(),
-          migrateIfNeeded: externalIdMigrationMock,
-        }))
-        .compile();
-
-      service = unit;
-
-      // Mock the logger property
-      Object.defineProperty(service, 'logger', {
-        value: {
-          log: vi.fn(),
-          error: vi.fn(),
-          warn: vi.fn(),
-          debug: vi.fn(),
-          verbose: vi.fn(),
-        },
-        writable: true,
-      });
-    });
-
-    it('claims the root scope if externalId is missing', async () => {
-      getScopeByIdMock.mockResolvedValueOnce({
-        id: 'root-scope-123',
-        name: 'test1',
-        externalId: null,
-        parentId: null,
-      });
-
-      const siteId = new Smeared('site-123', false);
-      // As we do not patch env variable, Smeared external id constructed inside will be active.
-      const externalId = new Smeared(`spc:${siteId.value}/site`, true);
-      await service.initializeRootScope('root-scope-123', siteId, IngestionMode.Flat);
-
-      expect(rootMigrationMock).toHaveBeenCalledWith('root-scope-123', siteId);
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-123', externalId);
-      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].debug).toHaveBeenCalledWith(
-        expect.stringMatching(/Claimed root scope root-scope-123 with externalId: .*/),
-      );
-    });
-
-    it('throws when root scope migration fails', async () => {
-      getScopeByIdMock.mockResolvedValueOnce({
-        id: 'root-scope-123',
-        name: 'test1',
-        externalId: null,
-        parentId: null,
-      });
-      rootMigrationMock.mockResolvedValueOnce({
-        status: 'migration_failed',
-        error: 'Failed to move child scopes',
-      });
-
-      await expect(
-        service.initializeRootScope(
-          'root-scope-123',
-          new Smeared('site-123', false),
-          IngestionMode.Flat,
-        ),
-      ).rejects.toThrow('Root scope migration failed: Failed to move child scopes');
-
-      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
-    });
-
-    it('skips claiming if externalId is already set to the correct site', async () => {
-      getScopeByIdMock.mockResolvedValueOnce({
-        id: 'root-scope-123',
-        name: 'test1',
-        externalId: 'spc:site:site-123',
-        parentId: null,
-      });
-
-      await service.initializeRootScope(
-        'root-scope-123',
-        new Smeared('site-123', false),
-        IngestionMode.Flat,
-      );
-
-      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
-    });
-
-    it('throws error if externalId is set to a different site', async () => {
-      getScopeByIdMock.mockResolvedValueOnce({
-        id: 'root-scope-123',
-        name: 'test1',
-        externalId: 'spc:site:different-site',
-        parentId: null,
-      });
-
-      await expect(
-        service.initializeRootScope(
-          'root-scope-123',
-          new Smeared('site-123', false),
-          IngestionMode.Flat,
-        ),
-      ).rejects.toThrow(/is owned by a different site/);
-
-      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
-    });
-
-    it('grants permissions and resolves root path', async () => {
-      getScopeByIdMock
-        .mockResolvedValueOnce({
-          id: 'root-scope-123',
-          name: 'test1',
-          externalId: 'spc:site:site-123',
-          parentId: 'parent-1',
-        })
-        .mockResolvedValueOnce({
-          id: 'parent-1',
-          name: 'Root',
-          externalId: null,
-          parentId: null,
-        });
-
-      const result = await service.initializeRootScope(
-        'root-scope-123',
-        new Smeared('site-123', false),
-        IngestionMode.Flat,
-      );
-
-      expect(result.serviceUserId).toBe('user-123');
-      expect(result.rootPath).toBeInstanceOf(Smeared);
-      expect(result.rootPath.value).toBe('/Root/test1');
-      expect(createScopeAccessesMock).toHaveBeenCalledWith('root-scope-123', [
-        { type: 'MANAGE', entityId: 'user-123', entityType: 'USER' },
-        { type: 'READ', entityId: 'user-123', entityType: 'USER' },
-        { type: 'WRITE', entityId: 'user-123', entityType: 'USER' },
-      ]);
-      expect(createScopeAccessesMock).toHaveBeenCalledWith('parent-1', [
-        { type: 'READ', entityId: 'user-123', entityType: 'USER' },
-      ]);
-    });
-
-    it('accepts new-format root externalId as valid ownership', async () => {
-      getScopeByIdMock.mockResolvedValueOnce({
-        id: 'root-scope-123',
-        name: 'test1',
-        externalId: 'spc:site-123/site',
-        parentId: null,
-      });
-
-      const result = await service.initializeRootScope(
-        'root-scope-123',
-        new Smeared('site-123', false),
-        IngestionMode.Flat,
-      );
-
-      expect(result.isInitialSync).toBe(false);
-      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
-    });
-
-    describe('scope externalId migration', () => {
-      it('delegates the migration decision to the migration service', async () => {
-        getScopeByIdMock.mockResolvedValueOnce({
-          id: 'root-scope-123',
-          name: 'test1',
-          externalId: 'spc:site:site-123',
-          parentId: null,
-        });
-
-        await service.initializeRootScope(
-          'root-scope-123',
-          new Smeared('site-123', false),
-          IngestionMode.Flat,
-        );
-
-        expect(externalIdMigrationMock).toHaveBeenCalledWith('site-123');
-      });
-
-      it('throws and aborts sync when migration reports failure', async () => {
-        getScopeByIdMock.mockResolvedValueOnce({
-          id: 'root-scope-123',
-          name: 'test1',
-          externalId: 'spc:site:site-123',
-          parentId: null,
-        });
-        externalIdMigrationMock.mockResolvedValueOnce({
-          status: 'migration_failed',
-          migratedCount: 3,
-          failedCount: 2,
-        });
-
-        await expect(
-          service.initializeRootScope(
-            'root-scope-123',
-            new Smeared('site-123', false),
-            IngestionMode.Flat,
-          ),
-        ).rejects.toThrow(/Scope externalId migration failed.*migrated=3.*failed=2/);
-      });
-    });
   });
 
   describe('extractAllParentPaths', () => {
@@ -1053,7 +820,7 @@ describe('ScopeManagementService', () => {
 
     it('never marks the configured root scope even when it is missing from current scopes', async () => {
       const rootScope: Scope = {
-        id: 'root-scope-123',
+        id: 'scope_root123',
         name: 'test1',
         parentId: null,
         externalId: 'spc:site-123/site',
@@ -1387,148 +1154,217 @@ describe('ScopeManagementService', () => {
       });
     });
 
-    it('clears externalId on root scope when there are no children', async () => {
-      listChildrenScopesMock.mockResolvedValue([]);
+    describe('fixed mode', () => {
+      it('clears externalId on root scope when there are no children', async () => {
+        listChildrenScopesMock.mockResolvedValue([]);
 
-      await service.resetRootScope('root-scope-id');
+        await service.resetRootScope('root-scope-id', 'fixed');
 
-      expect(listChildrenScopesMock).toHaveBeenCalledWith('root-scope-id');
-      expect(deleteScopeMock).not.toHaveBeenCalled();
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-id', null);
-    });
-
-    it('deletes child scopes recursively then clears externalId', async () => {
-      const children: Scope[] = [
-        { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: 'spc:folder:1' },
-        { id: 'child-2', name: 'Child2', parentId: 'root-scope-id', externalId: 'spc:folder:2' },
-      ];
-      listChildrenScopesMock.mockResolvedValue(children);
-
-      await service.resetRootScope('root-scope-id');
-
-      expect(deleteScopeMock).toHaveBeenCalledTimes(2);
-      expect(deleteScopeMock).toHaveBeenCalledWith('child-1', { recursive: true });
-      expect(deleteScopeMock).toHaveBeenCalledWith('child-2', { recursive: true });
-      expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-id', null);
-    });
-
-    it('aborts and does not clear externalId when a child deletion throws', async () => {
-      const children: Scope[] = [
-        { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
-        { id: 'child-2', name: 'Child2', parentId: 'root-scope-id', externalId: null },
-      ];
-      listChildrenScopesMock.mockResolvedValue(children);
-      deleteScopeMock.mockRejectedValueOnce(new Error('Delete failed'));
-
-      await expect(service.resetRootScope('root-scope-id')).rejects.toThrow('Delete failed');
-
-      expect(deleteScopeMock).toHaveBeenCalledTimes(1);
-      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
-      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          msg: expect.stringContaining('Failed to reset root scope'),
-        }),
-      );
-    });
-
-    it('aborts and does not clear externalId when a child has partial deletion failures', async () => {
-      const children: Scope[] = [
-        { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
-      ];
-      listChildrenScopesMock.mockResolvedValue(children);
-      deleteScopeMock.mockResolvedValue({
-        successFolders: [{ id: 'sub-1', name: 'Sub1', path: '/Sub1' }],
-        failedFolders: [{ id: 'sub-2', name: 'Sub2', path: '/Sub2', failReason: 'locked' }],
+        expect(listChildrenScopesMock).toHaveBeenCalledWith('root-scope-id');
+        expect(deleteScopeMock).not.toHaveBeenCalled();
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-id', null);
       });
 
-      await expect(service.resetRootScope('root-scope-id')).rejects.toThrow(
-        'Failed to fully delete child scope child-1',
-      );
+      it('deletes child scopes recursively then clears externalId', async () => {
+        const children: Scope[] = [
+          { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: 'spc:folder:1' },
+          { id: 'child-2', name: 'Child2', parentId: 'root-scope-id', externalId: 'spc:folder:2' },
+        ];
+        listChildrenScopesMock.mockResolvedValue(children);
 
-      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
-      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          msg: expect.stringContaining('Failed to reset root scope'),
-        }),
-      );
-    });
+        await service.resetRootScope('root-scope-id', 'fixed');
 
-    it('throws and does not delete or clear anything when listChildrenScopes fails', async () => {
-      listChildrenScopesMock.mockRejectedValue(new Error('API unavailable'));
-
-      await expect(service.resetRootScope('root-scope-id')).rejects.toThrow('API unavailable');
-
-      expect(deleteScopeMock).not.toHaveBeenCalled();
-      expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
-      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          msg: expect.stringContaining('Failed to reset root scope'),
-        }),
-      );
-    });
-
-    it('throws when clearing externalId fails after children were already deleted', async () => {
-      const children: Scope[] = [
-        { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
-      ];
-      listChildrenScopesMock.mockResolvedValue(children);
-      updateScopeExternalIdMock.mockRejectedValue(new Error('externalId update failed'));
-
-      await expect(service.resetRootScope('root-scope-id')).rejects.toThrow(
-        'externalId update failed',
-      );
-
-      expect(deleteScopeMock).toHaveBeenCalledTimes(1);
-      expect(deleteScopeMock).toHaveBeenCalledWith('child-1', { recursive: true });
-      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].error).toHaveBeenCalledWith(
-        expect.objectContaining({
-          msg: expect.stringContaining('Failed to reset root scope'),
-        }),
-      );
-    });
-
-    it('logs failed folders before aborting on partial deletion failure', async () => {
-      const children: Scope[] = [
-        { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
-      ];
-      listChildrenScopesMock.mockResolvedValue(children);
-      deleteScopeMock.mockResolvedValue({
-        successFolders: [],
-        failedFolders: [
-          { id: 'sub-1', name: 'Sub1', path: '/Sub1', failReason: 'locked' },
-          { id: 'sub-2', name: 'Sub2', path: '/Sub2', failReason: 'in use' },
-        ],
+        expect(deleteScopeMock).toHaveBeenCalledTimes(2);
+        expect(deleteScopeMock).toHaveBeenCalledWith('child-1', { recursive: true });
+        expect(deleteScopeMock).toHaveBeenCalledWith('child-2', { recursive: true });
+        expect(updateScopeExternalIdMock).toHaveBeenCalledWith('root-scope-id', null);
       });
 
-      await expect(service.resetRootScope('root-scope-id')).rejects.toThrow();
+      it('aborts and does not clear externalId when a child deletion throws', async () => {
+        const children: Scope[] = [
+          { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
+          { id: 'child-2', name: 'Child2', parentId: 'root-scope-id', externalId: null },
+        ];
+        listChildrenScopesMock.mockResolvedValue(children);
+        deleteScopeMock.mockRejectedValueOnce(new Error('Delete failed'));
 
-      // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
-      expect(service['logger'].warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          msg: expect.stringContaining('Partial deletion failure for child scope child-1'),
-          failedFolders: expect.arrayContaining([
-            expect.objectContaining({ id: 'sub-1', reason: 'locked' }),
-            expect.objectContaining({ id: 'sub-2', reason: 'in use' }),
-          ]),
-        }),
-      );
+        await expect(service.resetRootScope('root-scope-id', 'fixed')).rejects.toThrow(
+          'Delete failed',
+        );
+
+        expect(deleteScopeMock).toHaveBeenCalledTimes(1);
+        expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+        // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+        expect(service['logger'].error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            msg: expect.stringContaining('Failed to reset root scope'),
+          }),
+        );
+      });
+
+      it('aborts and does not clear externalId on partial deletion failure', async () => {
+        const children: Scope[] = [
+          { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
+        ];
+        listChildrenScopesMock.mockResolvedValue(children);
+        deleteScopeMock.mockResolvedValue({
+          successFolders: [{ id: 'sub-1', name: 'Sub1', path: '/Sub1' }],
+          failedFolders: [{ id: 'sub-2', name: 'Sub2', path: '/Sub2', failReason: 'locked' }],
+        });
+
+        await expect(service.resetRootScope('root-scope-id', 'fixed')).rejects.toThrow(
+          'Failed to fully delete child scope child-1',
+        );
+
+        expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+        // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+        expect(service['logger'].error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            msg: expect.stringContaining('Failed to reset root scope'),
+          }),
+        );
+      });
+
+      it('throws and does nothing when listChildrenScopes fails', async () => {
+        listChildrenScopesMock.mockRejectedValue(new Error('API unavailable'));
+
+        await expect(service.resetRootScope('root-scope-id', 'fixed')).rejects.toThrow(
+          'API unavailable',
+        );
+
+        expect(deleteScopeMock).not.toHaveBeenCalled();
+        expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+        // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+        expect(service['logger'].error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            msg: expect.stringContaining('Failed to reset root scope'),
+          }),
+        );
+      });
+
+      it('throws when clearing externalId fails after children were already deleted', async () => {
+        const children: Scope[] = [
+          { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
+        ];
+        listChildrenScopesMock.mockResolvedValue(children);
+        updateScopeExternalIdMock.mockRejectedValue(new Error('externalId update failed'));
+
+        await expect(service.resetRootScope('root-scope-id', 'fixed')).rejects.toThrow(
+          'externalId update failed',
+        );
+
+        expect(deleteScopeMock).toHaveBeenCalledTimes(1);
+        expect(deleteScopeMock).toHaveBeenCalledWith('child-1', { recursive: true });
+        // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+        expect(service['logger'].error).toHaveBeenCalledWith(
+          expect.objectContaining({
+            msg: expect.stringContaining('Failed to reset root scope'),
+          }),
+        );
+      });
+
+      it('logs failed folders before aborting on partial deletion failure', async () => {
+        const children: Scope[] = [
+          { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
+        ];
+        listChildrenScopesMock.mockResolvedValue(children);
+        deleteScopeMock.mockResolvedValue({
+          successFolders: [],
+          failedFolders: [
+            { id: 'sub-1', name: 'Sub1', path: '/Sub1', failReason: 'locked' },
+            { id: 'sub-2', name: 'Sub2', path: '/Sub2', failReason: 'in use' },
+          ],
+        });
+
+        await expect(service.resetRootScope('root-scope-id', 'fixed')).rejects.toThrow();
+
+        // biome-ignore lint/complexity/useLiteralKeys: Accessing private logger for testing
+        expect(service['logger'].warn).toHaveBeenCalledWith(
+          expect.objectContaining({
+            msg: expect.stringContaining('Partial deletion failure for child scope child-1'),
+            failedFolders: expect.arrayContaining([
+              expect.objectContaining({ id: 'sub-1', reason: 'locked' }),
+              expect.objectContaining({ id: 'sub-2', reason: 'in use' }),
+            ]),
+          }),
+        );
+      });
+
+      it('does not delete the root scope itself', async () => {
+        const children: Scope[] = [
+          { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
+        ];
+        listChildrenScopesMock.mockResolvedValue(children);
+
+        await service.resetRootScope('root-scope-id', 'fixed');
+
+        expect(deleteScopeMock).toHaveBeenCalledTimes(1);
+        expect(deleteScopeMock).toHaveBeenCalledWith('child-1', { recursive: true });
+        expect(deleteScopeMock).not.toHaveBeenCalledWith('root-scope-id', expect.anything());
+      });
     });
 
-    it('does not delete the root scope itself', async () => {
-      const children: Scope[] = [
-        { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
-      ];
-      listChildrenScopesMock.mockResolvedValue(children);
+    describe('auto mode', () => {
+      it('deletes the root scope after children and never clears externalId', async () => {
+        const children: Scope[] = [
+          { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: 'spc:folder:1' },
+        ];
+        listChildrenScopesMock.mockResolvedValue(children);
 
-      await service.resetRootScope('root-scope-id');
+        await service.resetRootScope('root-scope-id', 'auto');
 
-      expect(deleteScopeMock).toHaveBeenCalledTimes(1);
-      expect(deleteScopeMock).toHaveBeenCalledWith('child-1', { recursive: true });
-      expect(deleteScopeMock).not.toHaveBeenCalledWith('root-scope-id', expect.anything());
+        expect(deleteScopeMock).toHaveBeenCalledWith('child-1', { recursive: true });
+        expect(deleteScopeMock).toHaveBeenCalledWith('root-scope-id', { recursive: true });
+        expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+      });
+
+      it('deletes the root scope when there are no children', async () => {
+        listChildrenScopesMock.mockResolvedValue([]);
+
+        await service.resetRootScope('root-scope-id', 'auto');
+
+        expect(deleteScopeMock).toHaveBeenCalledTimes(1);
+        expect(deleteScopeMock).toHaveBeenCalledWith('root-scope-id', { recursive: true });
+        expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+      });
+
+      it('does not clear externalId when root deletion fails — keeps the scope discoverable on retry', async () => {
+        const children: Scope[] = [
+          { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
+        ];
+        listChildrenScopesMock.mockResolvedValue(children);
+        deleteScopeMock.mockImplementation(async (id: string) => {
+          if (id === 'root-scope-id') {
+            throw new Error('root delete failed');
+          }
+          return {
+            successFolders: [{ id: 'child', name: 'child', path: '/child' }],
+            failedFolders: [],
+          };
+        });
+
+        await expect(service.resetRootScope('root-scope-id', 'auto')).rejects.toThrow(
+          'root delete failed',
+        );
+
+        expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+      });
+
+      it('aborts before root deletion when a child deletion throws', async () => {
+        const children: Scope[] = [
+          { id: 'child-1', name: 'Child1', parentId: 'root-scope-id', externalId: null },
+        ];
+        listChildrenScopesMock.mockResolvedValue(children);
+        deleteScopeMock.mockRejectedValueOnce(new Error('Delete failed'));
+
+        await expect(service.resetRootScope('root-scope-id', 'auto')).rejects.toThrow(
+          'Delete failed',
+        );
+
+        expect(deleteScopeMock).toHaveBeenCalledTimes(1);
+        expect(deleteScopeMock).not.toHaveBeenCalledWith('root-scope-id', expect.anything());
+        expect(updateScopeExternalIdMock).not.toHaveBeenCalled();
+      });
     });
   });
 });

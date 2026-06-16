@@ -1,10 +1,9 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
-import type { UniqueConfigNamespaced } from '~/config';
+import { TEAMS_SOURCE_KIND } from '~/unique/unique.consts';
 import { UniqueContentService } from '~/unique/unique-content.service';
 import { UniqueUserMappingService } from '~/unique/unique-user-mapping.service';
 import { buildTranscriptFilter, parseTranscriptMetadata } from './transcript-tools.helpers';
@@ -61,7 +60,6 @@ export class ListMeetingsTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
     private readonly contentService: UniqueContentService,
     private readonly userMapping: UniqueUserMappingService,
     private readonly traceService: TraceService,
@@ -124,12 +122,10 @@ export class ListMeetingsTool {
       'Listing meeting transcripts',
     );
 
-    const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
-
     const result = await this.contentService.scopedFindByMetadata(
-      buildTranscriptFilter(rootScopeId, input),
+      buildTranscriptFilter(input),
       scopeContext,
-      { skip: input.skip, take: input.take },
+      { skip: input.skip, take: input.take, sourceKind: TEAMS_SOURCE_KIND },
     );
 
     const meetings = result.contents.map((item) => {

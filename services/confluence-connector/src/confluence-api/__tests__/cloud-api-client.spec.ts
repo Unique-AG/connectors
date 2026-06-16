@@ -9,7 +9,7 @@ const BASE_URL = 'https://cloud.example.com';
 const CLOUD_ID = 'test-cloud-id';
 const API_BASE_URL = `https://api.atlassian.com/ex/confluence/${CLOUD_ID}`;
 
-const mockAuth = { acquireToken: vi.fn().mockResolvedValue('cloud-token') };
+const mockAuth = { getAuthorizationHeader: vi.fn().mockResolvedValue('Bearer cloud-token') };
 
 const mockHttpClient = {
   rateLimitedRequest: vi.fn(),

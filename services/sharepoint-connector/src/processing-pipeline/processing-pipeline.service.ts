@@ -7,6 +7,7 @@ import { Config } from '../config';
 import { DEFAULT_MIME_TYPE } from '../constants/defaults.constants';
 import { SPC_INGESTION_FILE_PROCESSED_TOTAL } from '../metrics';
 import type { SharepointContentItem } from '../microsoft-apis/graph/types/sharepoint-content-item.interface';
+import { MimeTypeResolverService } from '../shared/services/mime-type-resolver.service';
 import type { SharepointSyncContext } from '../sharepoint-synchronization/sharepoint-sync-context.interface';
 import { normalizeError, sanitizeError } from '../utils/normalize-error';
 import { getItemUrl } from '../utils/sharepoint.util';
@@ -29,6 +30,7 @@ export class ProcessingPipelineService {
     private readonly contentRegistrationStep: ContentRegistrationStep,
     private readonly uploadContentStep: UploadContentStep,
     private readonly ingestionFinalizationStep: IngestionFinalizationStep,
+    private readonly mimeTypeResolverService: MimeTypeResolverService,
     @Inject(SPC_INGESTION_FILE_PROCESSED_TOTAL)
     private readonly spcIngestionFileProcessedTotal: Counter,
   ) {
@@ -57,7 +59,7 @@ export class ProcessingPipelineService {
       pipelineItem,
       startTime,
       knowledgeBaseUrl: getItemUrl(pipelineItem),
-      mimeType: this.resolveMimeType(pipelineItem),
+      mimeType: this.resolveItemMimeType(pipelineItem),
       targetScopeId: scopeId,
       fileStatus,
     };
@@ -124,10 +126,14 @@ export class ProcessingPipelineService {
     return { success: true };
   }
 
-  private resolveMimeType(pipelineItem: SharepointContentItem): string {
-    const isDriveItem = pipelineItem.itemType === 'driveItem';
-    const mimeType = isDriveItem ? pipelineItem.item.file?.mimeType : undefined;
-    return mimeType ?? DEFAULT_MIME_TYPE;
+  private resolveItemMimeType(pipelineItem: SharepointContentItem): string {
+    if (pipelineItem.itemType !== 'driveItem') {
+      return DEFAULT_MIME_TYPE;
+    }
+    return this.mimeTypeResolverService.resolve(
+      pipelineItem.item.name,
+      pipelineItem.item.file?.mimeType,
+    );
   }
 
   // Executes a pipeline step with a timeout. We use a custom Promise implementation instead of

@@ -23,6 +23,7 @@ export class StreamUniqueAttachmentCommand {
     uniqueIdentity,
     chatId,
     userProfileId,
+    mailbox,
   }: {
     client: Client;
     draftId: string;
@@ -33,18 +34,25 @@ export class StreamUniqueAttachmentCommand {
     chatId: string | null | undefined;
     uniqueIdentity: ResolvedUniqueIdentity;
     userProfileId: string;
+    mailbox?: string;
   }): Promise<AttachmentUploadResult> {
     const uniqueConfig = this.configService.get('unique', { infer: true });
     if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
       return {
         status: 'failed',
-        reason: { fileName: fileName.value, reason: 'App is not running in cluster local' },
+        reason: {
+          fileName: fileName.value,
+          reason: 'App is not running in cluster local',
+        },
       };
     }
     if (!uniqueIdentity) {
       return {
         status: 'failed',
-        reason: { fileName: fileName.value, reason: 'Could not resolve unique identity' },
+        reason: {
+          fileName: fileName.value,
+          reason: 'Could not resolve unique identity',
+        },
       };
     }
 
@@ -59,14 +67,25 @@ export class StreamUniqueAttachmentCommand {
 
     const response = await fetch(contentUrl, {
       headers: {
+        // We impersonate the unique user because the mcp user might not have access to the content
         'x-user-id': uniqueIdentity.userId,
         'x-company-id': uniqueIdentity.companyId,
-        'x-service-id': 'outlook-semantic-mcp',
+        // We do not pass the x-service-id because the content download endpoint is allowing only ingestion worker and we do not want
+        // allow outlook mcp integration there. This means that we have to explicitly pass the user roles because do in cluster
+        // communication, and this is the minimum required role which is needed by the impersonated user to be able to download the
+        // file.
+        'x-user-roles': 'chat.chat.basic',
       },
     });
 
     if (!response.ok) {
       const text = await response.text();
+      this.logger.warn({
+        msg: `Download content failed`,
+        contentId,
+        chatId,
+        status: response.status,
+      });
       return {
         status: 'failed',
         reason: {
@@ -112,6 +131,7 @@ export class StreamUniqueAttachmentCommand {
         totalSize,
         totalChunks,
         userProfileId,
+        mailbox,
       });
     } finally {
       reader.cancel();
@@ -129,6 +149,7 @@ export class StreamUniqueAttachmentCommand {
     totalSize,
     totalChunks,
     userProfileId,
+    mailbox,
   }: {
     reader: ReadableStreamDefaultReader<Uint8Array<ArrayBufferLike>>;
     client: Client;
@@ -138,13 +159,15 @@ export class StreamUniqueAttachmentCommand {
     totalSize: number;
     totalChunks: number;
     userProfileId: string;
+    mailbox?: string;
   }): Promise<void> {
     let offset = 0;
     let chunkIndex = 0;
     let pending = Buffer.alloc(0);
+    const prefix = mailbox ? `/users/${mailbox}` : '/me';
 
     const { uploadUrl } = UploadSessionSchema.parse(
-      await client.api(`/me/messages/${draftId}/attachments/createUploadSession`).post({
+      await client.api(`${prefix}/messages/${draftId}/attachments/createUploadSession`).post({
         AttachmentItem: {
           attachmentType: 'file',
           name: fileName.value,

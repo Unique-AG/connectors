@@ -25,7 +25,7 @@ export class MetricsMiddleware implements Middleware {
     });
   }
 
-  private extractEndpoint(request: RequestInfo): string {
+  private extractEndpoint(request: string | Request): string {
     try {
       const url = typeof request === 'string' ? request : request.url;
       const urlObj = new URL(url);

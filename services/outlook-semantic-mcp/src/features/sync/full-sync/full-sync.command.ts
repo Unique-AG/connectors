@@ -1,24 +1,28 @@
 import crypto from 'node:crypto';
+import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { isNullish } from 'remeda';
-import { AppConfig, appConfig } from '~/config';
+import { AppConfig, appConfig, McpBackendType } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, userProfiles } from '~/db';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
+import { SyncMetricsService } from '~/features/metrics/sync-metrics.service';
 import { traceAttrs, traceEvent } from '~/features/tracing.utils';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import {
+  isNoDelegatesResult,
+  MsGraphClientResolver,
+} from '~/msgraph/ms-graph-client-resolver.service';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { computeRetentionCutoffDate } from '~/utils/date/compute-retention-cutoff-date';
 import { isWithinCooldown } from '~/utils/is-within-cooldown';
-import { rethrowRateLimitError, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
+import type { FullSyncResult, InboxConfig, LockDecision } from './full-sync.types';
 import { GetScopeIngestionStatsQuery } from './get-scope-ingestion-stats.query';
 import { ProcessFullSyncBatchCommand } from './process-full-sync-batch.command';
 import { UpdateInboxConfigByVersionCommand } from './update-inbox-config-by-version.command';
-
-type InboxConfig = typeof inboxConfigurations.$inferSelect;
 
 export const START_FULL_SYNC_LINK = 'SYNC_STARTED:__EMPTY_DELTA__';
 
@@ -28,18 +32,12 @@ export const WAITING_FOR_INGESTION_HEARTBEAT_MINUTES = 5;
 export const FAILED_HEARTBEAT_MINUTES = 20;
 const MAX_ON_GOING_INGESTION_IN_PROGRESS = 10;
 
-export type FullSyncResult =
-  | { status: 'skipped'; reason: string }
-  | { status: 'waiting-for-ingestion' }
-  | { status: 'completed' }
-  | { status: 'failed'; error: unknown };
-
 @Injectable()
 export class FullSyncCommand {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly graphClientFactory: GraphClientFactory,
+    private readonly msGraphClientResolver: MsGraphClientResolver,
     private readonly processFullSyncBatchCommand: ProcessFullSyncBatchCommand,
     private readonly getScopeIngestionStatsQuery: GetScopeIngestionStatsQuery,
     private readonly updateByVersionCommand: UpdateInboxConfigByVersionCommand,
@@ -47,25 +45,34 @@ export class FullSyncCommand {
     private readonly isInboxDeletingQuery: IsInboxDeletingQuery,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
+    private readonly metrics: SyncMetricsService,
   ) {}
 
   @Span()
   public async run(userProfileId: string): Promise<FullSyncResult> {
-    return await withRetryAttempts({
-      fn: () => this.runFullSync(userProfileId),
-      onError: rethrowRateLimitError,
-      getResultFailure: (error) => ({ status: 'failed', error }),
-    });
+    return await this.metrics.measureFullSyncRun(() =>
+      withRetryAttempts<FullSyncResult>({
+        fn: () => this.runFullSync(userProfileId),
+        onError: makeDefaultOnErrorHandler((error) => {
+          this.logger.warn({
+            msg: `Full sync unexpectedly failed with error`,
+            userProfileId,
+            err: error,
+          });
+          return { status: 'failed', error };
+        }),
+      }),
+    );
   }
 
   @Span()
   public async runFullSync(userProfileId: string): Promise<FullSyncResult> {
     traceAttrs({ userProfileId });
-    this.logger.log({ userProfileId, msg: 'Full sync triggered' });
+    this.logger.debug({ userProfileId, msg: 'Full sync triggered' });
     if (await this.isInboxDeletingQuery.run(userProfileId)) {
       return { status: 'skipped', reason: 'Inbox is in deleting process' };
     }
-    if (this.config.mcpBackend === 'MicrosoftGraph') {
+    if (this.config.mcpBackend === McpBackendType.MicrosoftGraph) {
       return { status: 'skipped', reason: 'Not required for backend "MicrosoftGraph"' };
     }
 
@@ -87,7 +94,7 @@ export class FullSyncCommand {
 
     if (lockResult.action === 'skip') {
       traceEvent('full sync skipped', { reason: lockResult.reason });
-      this.logger.log({
+      this.logger.debug({
         userProfileId: userProfile.id,
         reason: lockResult.reason,
         msg: 'Full sync skipped',
@@ -111,27 +118,75 @@ export class FullSyncCommand {
       }
     }
 
-    try {
-      if (lockResult.shouldFetchCount) {
-        await this.fetchAndSaveExpectedTotal(userProfile.id, version, filters);
-      }
-      await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id));
+    const graphBasePath =
+      userProfile.source === 'shared-mailbox' ? `users/${userProfileEmail}` : 'me';
 
-      const batchResult = await this.processFullSyncBatchCommand.run({
+    try {
+      const resolverResult = await this.msGraphClientResolver.run({
         userProfile: { ...userProfile, email: userProfileEmail },
-        version,
+        fn: async ({ client, clientUserProfileId }) => {
+          if (lockResult.shouldFetchCount) {
+            await this.fetchAndSaveExpectedTotal({
+              client,
+              graphBasePath,
+              userProfileId: userProfile.id,
+              version,
+              filtersRaw: filters,
+            });
+          }
+          // Directory sync uses its own delegate preference (directoriesSync.synchronizedByUserProfileId),
+          // which may differ from the delegate resolved for message processing in this callback.
+          // This is intentional: directory sync is a separate process that manages its own delta
+          // tokens and delegate identity, and self-heals on Graph 410 errors independently.
+          await this.metrics.measureFullSyncDirectorySync(() =>
+            this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(userProfile.id)),
+          );
+
+          const batchResult = await this.metrics.measureFullSyncBatch(() =>
+            this.processFullSyncBatchCommand.run({
+              userProfile: { ...userProfile, email: userProfileEmail },
+              version,
+              client,
+              graphBasePath,
+            }),
+          );
+
+          if (userProfile.source === 'shared-mailbox') {
+            await this.db
+              .update(inboxConfigurations)
+              .set({ preferredDelegateUserProfileId: clientUserProfileId })
+              .where(eq(inboxConfigurations.userProfileId, userProfile.id))
+              .execute();
+          }
+
+          return batchResult;
+        },
+        sharedMailboxConfig: {
+          preferredDelegateUserId: lockResult.preferredDelegateUserProfileId ?? undefined,
+        },
       });
+
+      if (isNoDelegatesResult(resolverResult)) {
+        this.logger.log({
+          userProfileId: userProfile.id,
+          msg: 'No delegates found for shared-mailbox, skipping full sync, and transition to failed',
+        });
+        // Set state to 'failed' so the next trigger can retry.
+        await this.transitionState(userProfile.id, version, 'failed');
+        return { status: 'failed-no-delegates' };
+      }
+
+      const batchResult = resolverResult;
 
       switch (batchResult.outcome) {
         case 'version-mismatch':
         case 'missing-full-sync-next-link':
-          this.logger.log({
+          this.logger.warn({
             userProfileId: userProfile.id,
             version,
             msg: `Exiting: ${batchResult.outcome}`,
           });
           return { status: 'skipped', reason: 'version-mismatch' };
-
         case 'batch-uploaded': {
           const newStateSaved = await this.transitionState(
             userProfile.id,
@@ -153,7 +208,6 @@ export class FullSyncCommand {
           });
           return { status: 'waiting-for-ingestion' };
         }
-
         case 'completed': {
           const updated = await this.updateByVersionCommand.run(userProfile.id, version, {
             fullSyncState: 'ready',
@@ -173,7 +227,6 @@ export class FullSyncCommand {
           this.logger.log({ userProfileId: userProfile.id, version, msg: 'Full sync completed' });
           return { status: 'completed' };
         }
-
         default: {
           throw new Error(`Unhandled batch result: ${JSON.stringify(batchResult)}`);
         }
@@ -198,6 +251,7 @@ export class FullSyncCommand {
           newestLastModifiedDateTime: inboxConfigurations.newestLastModifiedDateTime,
           filters: inboxConfigurations.filters,
           deletingInboxStartedAt: inboxConfigurations.deletingInboxStartedAt,
+          preferredDelegateUserProfileId: inboxConfigurations.preferredDelegateUserProfileId,
         })
         .from(inboxConfigurations)
         .where(eq(inboxConfigurations.userProfileId, userProfileId))
@@ -212,7 +266,7 @@ export class FullSyncCommand {
         return { action: 'skip' as const, reason: 'inbox-deletion-in-progress' };
       }
 
-      const decision = this.decideAction(row);
+      const decision = this.decideAction(row, userProfileId);
       if (decision.action === 'skip') {
         return decision;
       }
@@ -253,6 +307,7 @@ export class FullSyncCommand {
         previousState,
         filters: row.filters,
         shouldFetchCount: isFreshStart || isNullish(row.fullSyncExpectedTotal),
+        preferredDelegateUserProfileId: row.preferredDelegateUserProfileId,
       };
     });
   }
@@ -267,6 +322,7 @@ export class FullSyncCommand {
       | 'fullSyncLastRunAt'
       | 'fullSyncExpectedTotal'
     >,
+    userProfileId: string,
   ): { action: 'skip'; reason: string } | { action: 'proceed' } {
     switch (row.fullSyncState) {
       case 'ready':
@@ -280,7 +336,10 @@ export class FullSyncCommand {
         if (isWithinCooldown(row.fullSyncHeartbeatAt, RUNNING_HEARTBEAT_MINUTES)) {
           return { action: 'skip', reason: 'already-running' };
         }
-        this.logger.warn({ msg: 'Recovering stale running sync (heartbeat too old)' });
+        this.logger.warn({
+          userProfileId,
+          msg: 'Recovering stale running sync (heartbeat too old)',
+        });
         return { action: 'proceed' };
       case 'failed':
         if (isWithinCooldown(row.fullSyncHeartbeatAt, FAILED_HEARTBEAT_MINUTES)) {
@@ -292,16 +351,23 @@ export class FullSyncCommand {
     }
   }
 
-  private async fetchAndSaveExpectedTotal(
-    userProfileId: string,
-    version: string,
-    filtersRaw: Record<string, unknown>,
-  ): Promise<void> {
+  private async fetchAndSaveExpectedTotal({
+    client,
+    graphBasePath,
+    userProfileId,
+    version,
+    filtersRaw,
+  }: {
+    client: Client;
+    graphBasePath: string;
+    userProfileId: string;
+    version: string;
+    filtersRaw: Record<string, unknown>;
+  }): Promise<void> {
     try {
-      const client = this.graphClientFactory.createClientForUser(userProfileId);
       const filters = inboxConfigurationMailFilters.parse(filtersRaw);
       const count = (await client
-        .api('me/messages/$count')
+        .api(`${graphBasePath}/messages/$count`)
         .filter(
           `receivedDateTime ge ${computeRetentionCutoffDate(filters.retentionWindowInDays).toISOString()}`,
         )
@@ -314,7 +380,7 @@ export class FullSyncCommand {
         fullSyncHeartbeatAt: sql`NOW()`,
       });
 
-      this.logger.log({ userProfileId, expectedTotal: count, msg: 'Expected total fetched' });
+      this.logger.debug({ userProfileId, expectedTotal: count, msg: 'Expected total fetched' });
     } catch (error) {
       this.logger.warn({
         err: error,
@@ -341,13 +407,21 @@ export class FullSyncCommand {
     }
 
     if (!result.ok) {
-      this.logger.log({ userProfileId, version, msg: 'Ingestion is not reachable, waiting again' });
+      this.logger.warn({
+        userProfileId,
+        version,
+        msg: 'Ingestion is not reachable, waiting again',
+      });
     } else {
-      this.logger.log({ userProfileId, version, msg: 'Scope still draining, waiting again' });
+      this.logger.debug({ userProfileId, version, msg: 'Scope still draining, waiting again' });
     }
     const isSaved = await this.transitionState(userProfileId, version, 'waiting-for-ingestion');
     if (!isSaved) {
-      this.logger.log({ userProfileId, version, msg: 'Skipping state transition failed' });
+      this.logger.warn({
+        userProfileId,
+        version,
+        msg: 'Version mismatch on ingestion wait transition',
+      });
       return { status: 'skipped', reason: 'version-mismatch' };
     }
 
@@ -365,13 +439,3 @@ export class FullSyncCommand {
     });
   }
 }
-
-type LockDecision =
-  | { action: 'skip'; reason: string }
-  | {
-      action: 'proceed';
-      version: string;
-      previousState: InboxConfig['fullSyncState'];
-      shouldFetchCount: boolean;
-      filters: Record<string, unknown>;
-    };

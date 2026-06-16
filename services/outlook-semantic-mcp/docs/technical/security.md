@@ -28,7 +28,7 @@ The Outlook Semantic MCP Server stores **no email content** in its own database.
 | Sync state and progress counters          | PostgreSQL `inbox_configurations` | Plaintext metadata           | No                      |
 | Outlook folder structure (names + IDs)    | PostgreSQL `directories`          | Plaintext metadata           | No                      |
 | Microsoft Graph subscription IDs          | PostgreSQL `subscriptions`        | Plaintext metadata           | No                      |
-| Email subject, body, sender, recipients   | Unique Knowledge Base             | Indexed for semantic search  | **Yes**                 |
+| Email subject, body, sender, recipients   | Unique Knowledge Base             | Ingested for semantic search  | **Yes**                 |
 
 
 ### Data Flow
@@ -341,7 +341,7 @@ For the full secrets reference (format, generation, and description), see [Confi
 
 ### Rotation Procedures
 
-For detailed secret rotation procedures, see [Authentication — Secret Rotation](../operator/authentication.md#Secret-Rotation).
+For detailed secret rotation procedures, see [Authentication — Secret Management](../operator/authentication.md#Secret-Management).
 
 Key security considerations for rotation:
 
@@ -351,7 +351,7 @@ Key security considerations for rotation:
 
 ## Security Checklist for Operators
 
-See [Operator Manual — Security Checklist](../operator/README.md#Security-Checklist) for the full pre-production checklist.
+See [Operator Manual — Self-Hosted](../operator/README.md#Self-Hosted) for the full pre-production checklist.
 
 ## Related Documentation
 

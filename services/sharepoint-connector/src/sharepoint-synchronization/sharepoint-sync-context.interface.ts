@@ -8,8 +8,11 @@ export interface SharepointSyncContext {
   siteName: Smeared;
   managedPath: ManagedPath;
   serviceUserId: string;
-  /** Resolved path of the root scope (e.g. "/Root/Project") */
+  // Resolved path of the root scope (e.g. "/Root/Project")
   rootPath: Smeared;
+  // Resolved root scope ID - for `fixed` rows this is the configured scope; for `auto` rows
+  // it's the result of resolution
+  rootScopeId: string;
   isInitialSync: boolean;
   discoveredSubsites: DiscoveredSubsite[];
 }

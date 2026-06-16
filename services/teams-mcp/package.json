@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/teams-mcp",
   "description": "",
-  "version": "0.2.9",
+  "version": "0.2.18",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -38,7 +38,7 @@
     "@nestjs/platform-express": "11.1.18",
     "@nestjs/swagger": "11.2.6",
     "@opentelemetry/api": "1.9.0",
-    "@opentelemetry/instrumentation-pg": "0.58.0",
+    "@opentelemetry/instrumentation-pg": "0.70.0",
     "@proventuslabs/nestjs-zod": "2.0.0",
     "@qfetch/qfetch": "0.1.0",
     "@unique-ag/aes-gcm-encryption": "workspace:*",
@@ -49,6 +49,7 @@
     "@unique-ag/probe": "workspace:*",
     "amqplib": "0.10.9",
     "cache-manager": "7.2.0",
+    "drizzle-kit": "0.31.4",
     "drizzle-orm": "0.45.2",
     "drizzle-zod": "0.8.3",
     "jsonwebtoken": "9.0.3",
@@ -83,8 +84,7 @@
     "@types/passport-microsoft": "2.1.0",
     "@types/pg": "8.15.5",
     "@types/supertest": "6.0.3",
-    "@vitest/coverage-istanbul": "3.2.4",
-    "drizzle-kit": "0.31.4",
+    "@vitest/coverage-istanbul": "3.2.6",
     "globals": "16.3.0",
     "istanbul-badges-readme": "1.9.0",
     "source-map-support": "0.5.21",
@@ -92,6 +92,7 @@
     "type-fest": "5.2.0",
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
-    "vitest": "3.2.4"
-  }
+    "vitest": "3.2.6"
+  },
+  "packageManager": "pnpm@10.28.1"
 }

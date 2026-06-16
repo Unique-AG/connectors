@@ -47,6 +47,69 @@ export class HelloWorldPrompt {
 }
 ```
 
+## Elicitation
+
+Use `context.elicit()` to collect structured form data from the user, or `context.elicitUrl()` to guide the user through a URL-based flow such as OAuth.
+
+### Form-based elicitation
+
+Example:
+```ts
+@Injectable()
+export class MyTool {
+  @Tool({
+    name: 'create-item',
+    description: 'Creates an item after collecting details from the user',
+  })
+  async createItem(_args: unknown, context: Context): Promise<CallToolResult> {
+    const result = await context.elicit(
+      z.object({
+        name: z.string().meta({ title: 'Name', description: 'Item name' }),
+        confirm: z.boolean().meta({ title: 'Confirm', description: 'Are you sure?' }),
+      }),
+      'Please provide the details for the new item',
+    );
+
+    if (result.action !== 'accept') {
+      return { content: [{ type: 'text', text: 'Cancelled.' }] };
+    }
+
+    // result.content is typed as { name: string; confirm: boolean }
+    return { content: [{ type: 'text', text: `Created: ${result.content.name}` }] };
+  }
+}
+```
+
+### URL-based elicitation (OAuth-style)
+
+Example:
+```ts
+@Injectable()
+export class MyTool {
+  @Tool({
+    name: 'connect-account',
+    description: 'Connects an external account via OAuth',
+  })
+  async connectAccount(_args: unknown, context: Context): Promise<CallToolResult> {
+    const elicitationId = crypto.randomUUID();
+
+    const result = await context.elicitUrl({
+      elicitationId,
+      message: 'Authorize access to your account',
+      url: `https://example.com/oauth/authorize?state=${elicitationId}`,
+    });
+
+    if (result.action !== 'accept') {
+      return { content: [{ type: 'text', text: 'Authorization cancelled.' }] };
+    }
+
+    // OAuth callback has completed server-side; notify the client
+    await result.sendCompletionNotification();
+    return { content: [{ type: 'text', text: 'Account connected.' }] };
+  }
+}
+```
+
 ## Credits
 
 - [@rekog-labs/MCP-Nest](https://github.com/rekog-labs/MCP-Nest/tree/main)

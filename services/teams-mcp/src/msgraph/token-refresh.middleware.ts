@@ -2,8 +2,19 @@ import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import { Logger } from '@nestjs/common';
 import { serializeError } from 'serialize-error-cjs';
+import { z } from 'zod';
 import { normalizeError } from '../utils/normalize-error';
 import { TokenProvider } from './token.provider';
+
+/** Microsoft Graph error envelope — only the fields this middleware probes. */
+const GraphErrorResponse = z.object({
+  error: z
+    .object({
+      code: z.string().optional(),
+      message: z.string().optional(),
+    })
+    .optional(),
+});
 
 export class TokenRefreshMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
@@ -26,13 +37,13 @@ export class TokenRefreshMiddleware implements Middleware {
     try {
       // Clone the response to read the body without consuming it
       const clonedResponse = response.clone();
-      const errorBody = await clonedResponse.json();
+      const errorBody = GraphErrorResponse.parse(await clonedResponse.json());
 
       // Check for specific InvalidAuthenticationToken error
-      return (
-        errorBody?.error?.code === 'InvalidAuthenticationToken' ||
-        errorBody?.error?.message?.includes('Lifetime validation failed') ||
-        errorBody?.error?.message?.includes('token is expired')
+      return Boolean(
+        errorBody.error?.code === 'InvalidAuthenticationToken' ||
+          errorBody.error?.message?.includes('Lifetime validation failed') ||
+          errorBody.error?.message?.includes('token is expired'),
       );
     } catch {
       // If we can't parse the body, just check for 401 status
@@ -40,7 +51,7 @@ export class TokenRefreshMiddleware implements Middleware {
     }
   }
 
-  private cloneRequest(request: RequestInfo, _options?: RequestInit): RequestInfo {
+  private cloneRequest(request: string | Request, _options?: RequestInit): string | Request {
     if (typeof request === 'string') {
       return request;
     }

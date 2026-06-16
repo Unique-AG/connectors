@@ -9,27 +9,33 @@ sharepoint:
     thumbprintSha1: your-sha1-thumbprint-here
   baseUrl: https://yourcompany.sharepoint.com
   graphApiRateLimitPerMinuteThousands: 6
+  # Deployment-level defaults applied to every site below; per-site values
+  # always win when set. Any field except siteId may be defaulted here.
+  siteDefaults:
+    syncColumnName: FinanceGPTKnowledge
+    storeInternally: enabled
+    syncStatus: active
+    syncMode: content_only
+    permissionsInheritanceMode: inherit_scopes_and_files
+    subsitesScan: disabled
   # Sites configuration
   sitesSource: config_file
   sites:
     - siteId: 12345678-1234-1234-1234-123456789abc
-      syncColumnName: FinanceGPTKnowledge
       ingestionMode: recursive
       scopeId: scope_bu4gokr0atzj0kfiuaaaaaaa
       maxFilesToIngest: 1000
-      storeInternally: enabled
-      syncStatus: active
       syncMode: content_and_permissions
-      subsitesScan: disabled
     - siteId: 87654321-4321-4321-4321-cba987654321
       syncColumnName: HRKnowledge
       ingestionMode: flat
       scopeId: scope_bu4gokr0atzj0kfiubbbbbb
-      storeInternally: enabled
-      syncStatus: active
-      syncMode: content_only
-      permissionsInheritanceMode: inherit_scopes_and_files
-      subsitesScan: disabled
+    # Auto-resolves a per-site root under the configured parent scope
+    - siteId: 11111111-2222-3333-4444-555555555555
+      syncColumnName: SalesGPTKnowledge
+      ingestionMode: recursive
+      scopeId: in_parent:scope_bu4gokr0atzj0kfiucccccc
+      maxFilesToIngest: 1000
 unique:
   serviceAuthMode: cluster_local
   serviceExtraHeaders:
@@ -47,5 +53,13 @@ processing:
     - application/vnd.openxmlformats-officedocument.wordprocessingml.document
     - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
     - application/vnd.openxmlformats-officedocument.presentationml.presentation
+    - text/plain
+    - text/html
+    - text/csv
+  # Map of file extension suffix to canonical MIME type. Overrides the SharePoint-reported
+  # mimeType before the allow-list check (e.g. SharePoint reports `.csv` files as
+  # `application/vnd.ms-excel`). User-supplied values replace the default wholesale; include
+  # `.csv` in custom maps to retain the CSV fix.
+  # mimeTypeOverridesByExtension:
+  #   .csv: text/csv
   scanIntervalCron: "*/15 * * * *"
-

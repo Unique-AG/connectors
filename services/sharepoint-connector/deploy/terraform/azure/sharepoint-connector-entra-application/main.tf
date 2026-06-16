@@ -47,6 +47,13 @@ resource "azuread_application" "sharepoint_connector" {
   sign_in_audience = var.sign_in_audience
   notes            = var.notes
 
+  dynamic "web" {
+    for_each = length(compact(concat(var.redirect_uris, [var.admin_consent_redirect_uri]))) > 0 ? [1] : []
+    content {
+      redirect_uris = compact(concat(var.redirect_uris, [var.admin_consent_redirect_uri]))
+    }
+  }
+
   # Microsoft Graph API permissions
   required_resource_access {
     resource_app_id = local.graph_app_id

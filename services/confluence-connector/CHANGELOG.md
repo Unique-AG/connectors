@@ -1,5 +1,44 @@
 # Changelog
 
+## [2.1.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.1...confluence-connector@2.1.0) (2026-06-03)
+
+
+### Features
+
+* **confluence-connector:** add HTTP Basic auth for data-center ([#597](https://github.com/Unique-AG/connectors/issues/597)) ([75b8beb](https://github.com/Unique-AG/connectors/commit/75b8beb714f2b61ebe510c895f3a82754e705849))
+
+## [2.0.1](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0...confluence-connector@2.0.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* **confluence-connector:** include release name in ConfigMap names ([#596](https://github.com/Unique-AG/connectors/issues/596)) ([722c6f6](https://github.com/Unique-AG/connectors/commit/722c6f6caa894383f18b48c06e6a60286f72379e))
+
+## [2.0.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.8...confluence-connector@2.0.0) (2026-05-15)
+
+
+### Bug Fixes
+
+* **confluence-connector:** bump to 2.0.0 ([#551](https://github.com/Unique-AG/connectors/issues/551)) ([ebe5b74](https://github.com/Unique-AG/connectors/commit/ebe5b74573106de785129b470bb795e3341b143d))
+* **confluence-connector:** release as 2.0.0 ([#553](https://github.com/Unique-AG/connectors/issues/553)) ([85d72b7](https://github.com/Unique-AG/connectors/commit/85d72b7c1b508b7a027f1e8813989a5f38d6fb3a))
+
+
+### Tests
+
+* **confluence-connector:** cover parseScopeExternalId prefix-only input ([#555](https://github.com/Unique-AG/connectors/issues/555)) ([4d2e4bf](https://github.com/Unique-AG/connectors/commit/4d2e4bf31c117981cce062b92abd6a6a44900d3d))
+
+## [2.0.0-alpha.8](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.7...confluence-connector@2.0.0-alpha.8) (2026-05-15)
+
+
+### Features
+
+* **confluence-connector,unique-api,main:** migrate child scopes when root scopeId changes ([#506](https://github.com/Unique-AG/connectors/issues/506)) ([ad4c9ac](https://github.com/Unique-AG/connectors/commit/ad4c9ac20aa6f5d40ca4d53585960e91ae6085ec))
+
+
+### Bug Fixes
+
+* **confluence-connector,unique-api,utils,logger,deps:** sanitize errors in logging ([#488](https://github.com/Unique-AG/connectors/issues/488)) ([74044db](https://github.com/Unique-AG/connectors/commit/74044db824bf0e792395502beed2e80b473e2ce7))
+
 ## [2.0.0-alpha.7](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.0-alpha.6...confluence-connector@2.0.0-alpha.7) (2026-04-29)
 
 

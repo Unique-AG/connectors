@@ -72,9 +72,22 @@ After a user connects, the following pipelines keep the knowledge base in sync w
 
 **Live Catch-Up** — webhook-driven; acknowledged immediately via RabbitMQ, processed async in the consumer; queries Graph for messages since the watermark; watermark defaults to `now()` on inbox creation so notifications are never buffered.
 
-**Directory Sync** — runs on a 5-minute delta query schedule; keeps local folder tree in sync with Outlook; powers `list_folders` and folder-based search filtering; detects email deletion by tracking moves to excluded folders (e.g. Deleted Items).
+**Directory Sync** — runs on a 5-minute delta query schedule (configurable via `DIRECTORY_SYNC_CRON_SCHEDULE`); keeps local folder tree in sync with Outlook; powers `list_mailboxes_and_directories` and folder-based search filtering; detects email deletion by tracking moves to excluded folders (e.g. Deleted Items).
 
 **Subscription Management** — Graph webhook subscription created automatically on connect; renewed via Microsoft lifecycle notifications (`reauthorizationRequired`). If `subscriptionRemoved`, user calls `reconnect_inbox`; `verify_inbox_connection` reports status (`active`, `expiring_soon`, `expired`, `not_configured`).
+
+**Delegated Access Discovery (optional, `DELEGATED_ACCESS_SCAN`)** — when not
+`disabled`, two background jobs keep delegated access state current. The
+**discovery job** (both `full_access_only` and `granular_access` modes) tests each
+connected user's access to other connected users' mailboxes via Microsoft Graph
+on a configurable schedule (default: every 12 hours; for `full_access_only`
+consider 4× per day since discovery is the sole revocation mechanism). The
+**verification job** (`granular_access` mode only, default: every 4 hours)
+confirms which individual folders within each delegated mailbox are still
+readable. Neither job triggers email ingestion — they write permission records
+that `search_emails` reads at query time to include the owner's scope alongside
+the delegate's own scope. A recovery scheduler (configurable via `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE`) automatically restarts either job
+if it stalls. See [Delegated Access Discovery Flow](./flows.md#Delegated-Access-Discovery-Flow).
 
 ### Data Storage (PostgreSQL)
 
@@ -85,6 +98,7 @@ PostgreSQL stores all persistent state:
 - **Webhook subscriptions** — Active Microsoft Graph subscriptions per user
 - **Sync state** — Full sync progress, live catch-up state, mail filters per user
 - **Folder structure** — Outlook directory tree synced from Graph API for folder-based filtering
+- **Delegated access state** — `delegatedAccessAccounts` (delegate/owner pairs with access type) and `delegatedAccessDirectories` (folder-level access grants for `granular_access` mode)
 
 Microsoft tokens are encrypted at rest using AES-256-GCM. MCP tokens use 512-bit cryptographically random values with TTL-based expiration.
 

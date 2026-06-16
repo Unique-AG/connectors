@@ -57,6 +57,7 @@ export const ScopeSchema = z.object({
   id: z.string(),
   name: z.string(),
   parentId: z.string().nullable().optional(),
+  externalId: z.string().nullable().optional(),
   object: z.literal('folder'),
 });
 export type Scope = z.infer<typeof ScopeSchema>;
@@ -67,6 +68,28 @@ export const PublicCreateScopeResultSchema = z.object({
 export type PublicCreateScopeResult = z.infer<typeof PublicCreateScopeResultSchema>;
 
 // !SECTION - CreateScope endpoint types
+
+// SECTION - FolderUpdate endpoint types
+
+export const PublicFolderUpdateRequestSchema = z.object({
+  externalId: z.string().nullable().optional(),
+  name: z.string().optional(),
+  parentId: z.string().nullable().optional(),
+});
+export type PublicFolderUpdateRequest = z.infer<typeof PublicFolderUpdateRequestSchema>;
+
+// The PATCH folder/:scopeId endpoint returns a FolderInfoResultDto, which is a
+// richer shape than create's FolderDto and is tagged object="folder-info".
+export const PublicFolderUpdateResultSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  parentId: z.string().nullable().optional(),
+  externalId: z.string().nullable().optional(),
+  object: z.literal('folder-info'),
+});
+export type PublicFolderUpdateResult = z.infer<typeof PublicFolderUpdateResultSchema>;
+
+// !SECTION - FolderUpdate endpoint types
 
 // SECTION - AddScopeAccess endpoint types
 
@@ -168,12 +191,22 @@ export const ContentUpsertInputSchema = z.object({
 });
 export type ContentUpsertInput = z.infer<typeof ContentUpsertInputSchema>;
 
+// Matches the platform's `OwnerType` (node-chat).
+export enum SourceOwnerType {
+  User = 'USER',
+  Company = 'COMPANY',
+  Chat = 'CHAT',
+}
+
 export const PublicContentUpsertRequestSchema = z.object({
   input: ContentUpsertInputSchema,
   scopeId: z.string().optional(),
   chatId: z.string().optional(),
   storeInternally: z.boolean().default(true),
   fileUrl: z.string().optional(),
+  sourceKind: z.string().optional(),
+  sourceName: z.string().optional(),
+  sourceOwnerType: z.enum(SourceOwnerType).optional(),
 });
 export type PublicContentUpsertRequest = z.infer<typeof PublicContentUpsertRequestSchema>;
 
@@ -237,6 +270,8 @@ export const PublicContentInfosRequestSchema = z.object({
   metadataFilter: MetadataFilterSchema.optional(),
   skip: z.number().int().min(0).default(0),
   take: z.number().int().min(1).max(250).default(50),
+  // Restricts results to content whose ingestion Source has this kind (e.g. MICROSOFT_365_TEAMS).
+  sourceKind: z.string().optional(),
 });
 export type PublicContentInfosRequest = z.infer<typeof PublicContentInfosRequestSchema>;
 
@@ -299,6 +334,8 @@ export const PublicSearchRequestSchema = z.object({
   language: z.string().optional(),
   metaDataFilter: MetadataFilterSchema.optional(),
   reranker: RerankerRequestSchema.optional(),
+  // Restricts results to content whose ingestion Source has this kind (e.g. MICROSOFT_365_TEAMS).
+  sourceKind: z.string().optional(),
 });
 export type PublicSearchRequest = z.infer<typeof PublicSearchRequestSchema>;
 

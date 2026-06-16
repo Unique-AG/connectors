@@ -9,6 +9,7 @@ export interface PromptMetadata {
   description: string;
   parameters?: z.ZodObject;
   _meta?: SdkPrompt['_meta'];
+  icons?: SdkPrompt['icons'];
 }
 
 export interface PromptOptions {
@@ -17,6 +18,7 @@ export interface PromptOptions {
   description: string;
   parameters?: z.ZodObject;
   _meta?: SdkPrompt['_meta'];
+  icons?: SdkPrompt['icons'];
 }
 
 /**
@@ -26,6 +28,7 @@ export interface PromptOptions {
  * @param {string} options.description - The description of the prompt
  * @param {z.ZodObject} [options.parameters] - The parameters of the prompt
  * @param {SdkPrompt['_meta']} [options._meta] - The metadata of the prompt
+ * @param {SdkPrompt['icons']} [options.icons] - The icons of the prompt
  * @returns {MethodDecorator} - The decorator
  */
 export const Prompt = (options: PromptOptions) => {

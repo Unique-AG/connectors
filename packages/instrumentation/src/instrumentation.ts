@@ -8,6 +8,7 @@ import {
 import { Instrumentation } from '@opentelemetry/instrumentation';
 import { B3InjectEncoding, B3Propagator } from '@opentelemetry/propagator-b3';
 import { resourceFromAttributes } from '@opentelemetry/resources';
+import type { ViewOptions } from '@opentelemetry/sdk-metrics';
 import { NodeSDK, NodeSDKConfiguration } from '@opentelemetry/sdk-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { addCleanupListener } from 'async-cleanup';
@@ -21,6 +22,7 @@ export interface InstrumentationOptions {
   includePgInstrumentation?: boolean;
   additionalInstrumentations?: Instrumentation[];
   configOverrides?: Partial<OtelConfig>;
+  views?: ViewOptions[];
 }
 
 /**
@@ -33,6 +35,7 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
     includePgInstrumentation = false,
     additionalInstrumentations = [],
     configOverrides = {},
+    views = [],
   } = options;
 
   const config = { ...parseOtelConfig(), ...configOverrides };
@@ -99,6 +102,9 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
   }
   if (spanProcessor) {
     sdkConfig.spanProcessor = spanProcessor;
+  }
+  if (views.length) {
+    sdkConfig.views = views;
   }
 
   const otelSDK = new NodeSDK(sdkConfig);

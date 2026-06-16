@@ -2,10 +2,16 @@ import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
+import { and, eq, exists, inArray, lt, not, or, sql } from 'drizzle-orm';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
-import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
+import {
+  DRIZZLE,
+  DrizzleDatabase,
+  delegatedAccessAccounts,
+  inboxConfigurations,
+  userProfiles,
+} from '~/db';
 import { NewTrace } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
 import {
@@ -14,6 +20,7 @@ import {
   WAITING_FOR_INGESTION_HEARTBEAT_MINUTES,
 } from './full-sync/full-sync.command';
 import { FullSyncEventDto } from './full-sync/full-sync-event.dto';
+import { selectUserProfileIdsWhichCanRunTheSyncProcess } from './sync-scheduler.utils';
 
 @Injectable()
 export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -80,26 +87,25 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
     const configs = await this.db
       .select({ userProfileId: inboxConfigurations.userProfileId })
       .from(inboxConfigurations)
-      .innerJoin(
-        subscriptions,
-        and(
-          eq(subscriptions.userProfileId, inboxConfigurations.userProfileId),
-          gt(subscriptions.expiresAt, sql`NOW()`),
-        ),
-      )
       .where(
-        or(
-          and(
-            eq(inboxConfigurations.fullSyncState, 'waiting-for-ingestion'),
-            lt(inboxConfigurations.fullSyncHeartbeatAt, waitingForIngestionThreshold),
+        and(
+          inArray(
+            inboxConfigurations.userProfileId,
+            selectUserProfileIdsWhichCanRunTheSyncProcess(this.db),
           ),
-          and(
-            eq(inboxConfigurations.fullSyncState, 'failed'),
-            lt(inboxConfigurations.fullSyncHeartbeatAt, waitingForFailedThreshold),
-          ),
-          and(
-            eq(inboxConfigurations.fullSyncState, 'running'),
-            lt(inboxConfigurations.fullSyncHeartbeatAt, runningThreshold),
+          or(
+            and(
+              eq(inboxConfigurations.fullSyncState, 'waiting-for-ingestion'),
+              lt(inboxConfigurations.fullSyncHeartbeatAt, waitingForIngestionThreshold),
+            ),
+            and(
+              eq(inboxConfigurations.fullSyncState, 'failed'),
+              lt(inboxConfigurations.fullSyncHeartbeatAt, waitingForFailedThreshold),
+            ),
+            and(
+              eq(inboxConfigurations.fullSyncState, 'running'),
+              lt(inboxConfigurations.fullSyncHeartbeatAt, runningThreshold),
+            ),
           ),
         ),
       );
@@ -119,6 +125,31 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
         payload: { userProfileId },
       });
       await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
+    }
+
+    await this.logSharedMailboxesWithNoDelegates();
+  }
+
+  private async logSharedMailboxesWithNoDelegates(): Promise<void> {
+    const configs = await this.db
+      .select({ userProfileId: inboxConfigurations.userProfileId })
+      .from(inboxConfigurations)
+      .innerJoin(userProfiles, eq(userProfiles.id, inboxConfigurations.userProfileId))
+      .where(
+        and(
+          eq(userProfiles.source, 'shared-mailbox'),
+          not(
+            exists(
+              this.db
+                .select({ one: sql`1` })
+                .from(delegatedAccessAccounts)
+                .where(eq(delegatedAccessAccounts.ownerUserId, inboxConfigurations.userProfileId)),
+            ),
+          ),
+        ),
+      );
+    for (const { userProfileId } of configs) {
+      this.logger.warn({ userProfileId, msg: 'Shared-mailbox inbox config has no delegates' });
     }
   }
 }

@@ -2,6 +2,8 @@ name: "[sharepoint-connector] Manual Release Re-Run"
 
 permissions:
   contents: read
+  packages: write
+  id-token: write
 
 on:
   workflow_dispatch:
@@ -14,6 +16,7 @@ on:
 jobs:
   manual-release:
     uses: ./.github/workflows/_template-cd.yaml
+    secrets: inherit
     with:
       service-name: sharepoint-connector
       service-version: ${{ inputs.existing-version }}

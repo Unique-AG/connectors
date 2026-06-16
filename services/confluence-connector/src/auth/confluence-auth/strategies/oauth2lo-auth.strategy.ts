@@ -49,8 +49,9 @@ export class OAuth2LoAuthStrategy extends ConfluenceAuth {
     this.dispatcher = dispatcher;
   }
 
-  public async acquireToken(): Promise<string> {
-    return this.tokenCache.getToken(() => this.fetchToken());
+  public async getAuthorizationHeader(): Promise<string> {
+    const token = await this.tokenCache.getToken(() => this.fetchToken());
+    return `Bearer ${token}`;
   }
 
   private async fetchToken(): Promise<TokenResult> {

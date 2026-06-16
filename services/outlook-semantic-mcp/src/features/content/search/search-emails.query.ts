@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { isNullish } from 'remeda';
 import * as z from 'zod';
-import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
+import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import { MsGraphKqlSearchEmailsQuery } from './ms-graph-kql-search-emails.query';
+import { SEARCH_CONFIG } from './search.config';
 import { SearchEmailsInputSchema } from './search-conditions.dto';
 import {
   SearchBackend,
@@ -23,38 +25,45 @@ export interface SearchEmailsToolInput {
 type BackendExecutor = (
   userProfileId: UserProfileTypeID,
   input: SearchEmailsToolInput,
+  outputTimeZone: string | undefined,
 ) => Promise<{
   results: SearchEmailResult[];
   searchSummary: string | undefined;
 }>;
-
-const MAX_COMBINED_RESULTS = 200;
 
 @Injectable()
 export class SearchEmailsQuery {
   public constructor(
     private readonly semanticSearchQuery: SemanticSearchEmailsQuery,
     private readonly msGraphKqlQuery: MsGraphKqlSearchEmailsQuery,
+    private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
   ) {}
 
   private readonly executors: Record<SearchBackend, BackendExecutor> = {
     [SearchBackend.Unique]: (
       userProfileId: UserProfileTypeID,
       input: SearchEmailsToolInput,
+      outputTimeZone: string | undefined,
     ): Promise<{
       results: SearchEmailResult[];
       searchSummary: string | undefined;
     }> => {
-      if (isMicrosoftGraphBackend() || !input.uniqueSemanticSearchQueries?.length) {
+      if (isNullish(SEARCH_CONFIG.semanticSearch) || !input.uniqueSemanticSearchQueries?.length) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
       return this.semanticSearchQuery
-        .run(userProfileId, input.uniqueSemanticSearchQueries)
+        .run(
+          userProfileId,
+          input.uniqueSemanticSearchQueries,
+          SEARCH_CONFIG.semanticSearch,
+          outputTimeZone,
+        )
         .then(({ results, searchSummary }) => ({ results, searchSummary }));
     },
     [SearchBackend.MsGraph]: (
       userProfileId: UserProfileTypeID,
       input: SearchEmailsToolInput,
+      outputTimeZone: string | undefined,
     ): Promise<{
       results: SearchEmailResult[];
       searchSummary: string | undefined;
@@ -62,7 +71,12 @@ export class SearchEmailsQuery {
       if (!input.msGraphKeywordSearchQueries) {
         return Promise.resolve({ results: [], searchSummary: undefined });
       }
-      return this.msGraphKqlQuery.run(userProfileId, input.msGraphKeywordSearchQueries);
+      return this.msGraphKqlQuery.run(
+        userProfileId,
+        input.msGraphKeywordSearchQueries,
+        SEARCH_CONFIG.msGraph,
+        outputTimeZone,
+      );
     },
   };
 
@@ -73,12 +87,14 @@ export class SearchEmailsQuery {
     results: SearchEmailResult[];
     searchSummary: string | undefined;
   }> {
+    const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileId);
+
     const [
       { results: semanticResults, searchSummary: semanticSummary },
       { results: graphResults, searchSummary: graphSummary },
     ] = await Promise.all([
-      this.executors[SearchBackend.Unique](userProfileId, input),
-      this.executors[SearchBackend.MsGraph](userProfileId, input),
+      this.executors[SearchBackend.Unique](userProfileId, input, outputTimeZone),
+      this.executors[SearchBackend.MsGraph](userProfileId, input, outputTimeZone),
     ]);
 
     const summaries = [semanticSummary, graphSummary].filter((s): s is string => s !== undefined);
@@ -174,7 +190,7 @@ export class SearchEmailsQuery {
 
     return [...topSemanticMatches, ...commonRemainder, ...semanticOnly, ...remainingGraph].slice(
       0,
-      MAX_COMBINED_RESULTS,
+      SEARCH_CONFIG.maxOutputEmails,
     );
   }
 }

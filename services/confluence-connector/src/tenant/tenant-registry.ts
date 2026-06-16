@@ -22,6 +22,7 @@ import { ConfluencePageScanner } from '../synchronization/confluence-page-scanne
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
 import { FileDiffService } from '../synchronization/file-diff.service';
 import { IngestionService } from '../synchronization/ingestion.service';
+import { RootScopeMigrationService } from '../synchronization/root-scope-migration.service';
 import { ScopeManagementService } from '../synchronization/scope-management.service';
 import { ServiceRegistry } from './service-registry';
 import type { TenantContext } from './tenant-context.interface';
@@ -170,12 +171,14 @@ export class TenantRegistry implements OnModuleInit {
     );
     this.serviceRegistry.register(tenantName, IngestionService, ingestionService);
 
+    const rootScopeMigrationService = new RootScopeMigrationService(uniqueClient);
     const scopeManagementService = new ScopeManagementService(
       config.ingestion,
       tenantName,
       apiClient,
       uniqueClient,
       this.metrics,
+      rootScopeMigrationService,
     );
     this.serviceRegistry.register(tenantName, ScopeManagementService, scopeManagementService);
 

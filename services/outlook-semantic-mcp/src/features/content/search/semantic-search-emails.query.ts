@@ -20,11 +20,13 @@ import {
 } from '~/unique/get-root-scope-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { concatChunks } from '~/utils/concat-chunks';
+import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
 import { buildUniqueQlSearchFilter } from './build-unique-ql-search-filter.util';
 import { CleanupSearchConditionsForUserQuery } from './cleanup-search-conditions-for-user.query';
+import { SemanticSearchConfig } from './search.config';
 import { SearchEmailsInputSchema } from './search-conditions.dto';
 
 export enum SearchBackend {
@@ -83,8 +85,6 @@ interface ValidSearchJobInput {
 
 type SearchJobInput = { isScoped: false } | ValidSearchJobInput;
 
-const MAX_OUTPUT_RESULTS = 100;
-
 @Injectable()
 export class SemanticSearchEmailsQuery {
   public constructor(
@@ -98,10 +98,13 @@ export class SemanticSearchEmailsQuery {
   public async run(
     userProfileId: UserProfileTypeID,
     inputs: z.infer<typeof SearchEmailsInputSchema>[],
+    searchConfig: SemanticSearchConfig,
+    outputTimeZone?: string,
   ): Promise<{
     results: SearchEmailResult[];
     searchSummary: string | undefined;
   }> {
+    assert.ok(searchConfig, `searchConfig cannot be nullish`);
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const context = await this.loadAccessContext(userProfile);
 
@@ -187,7 +190,8 @@ export class SemanticSearchEmailsQuery {
           msGraphMessageId: metadata?.id || undefined,
           folderId: metadata?.parentFolderId ?? '',
           from: metadata?.fromEmailAddress ?? '',
-          receivedDateTime: metadata?.receivedDateTime ?? '',
+          receivedDateTime:
+            convertDateTimeToTimezone(metadata?.receivedDateTime, outputTimeZone) ?? '',
           backend: SearchBackend.Unique,
           text: concatChunks(Array.from(item.chunks.values())),
           openEmailParams: {
@@ -199,7 +203,7 @@ export class SemanticSearchEmailsQuery {
     );
 
     return {
-      results: results.slice(0, MAX_OUTPUT_RESULTS),
+      results: results.slice(0, searchConfig.maxEmailsLimit),
       searchSummary: summaries.length > 0 ? summaries.join('\r\n') : undefined,
     };
   }

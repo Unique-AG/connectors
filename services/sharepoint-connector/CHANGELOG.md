@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.7.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.6.1...sharepoint-connector@2.7.0) (2026-05-13)
+
+
+### Features
+
+* **sharepoint-connector:** configurable site-sync defaults via Helm ([#526](https://github.com/Unique-AG/connectors/issues/526)) ([893fea0](https://github.com/Unique-AG/connectors/commit/893fea02bd33acf6eac6cf5141d7af58f76bc21f))
+* **sharepoint-connector:** support `in_parent:` scope auto-creation ([#528](https://github.com/Unique-AG/connectors/issues/528)) ([9c8f484](https://github.com/Unique-AG/connectors/commit/9c8f484ce8a95aa7ab9c111e1c00b5d39fa9b4b1))
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** log partial failures when deleting stale scopes ([#505](https://github.com/Unique-AG/connectors/issues/505)) ([307ac94](https://github.com/Unique-AG/connectors/commit/307ac94bf9995541840c06d792daf7a4534f659b))
+* **sharepoint-connector:** remap CSV mimeType from SharePoint to text/csv ([#509](https://github.com/Unique-AG/connectors/issues/509)) ([1ca7c73](https://github.com/Unique-AG/connectors/commit/1ca7c73036ddb4f06a7c6ce8026af073ee69d588))
+* **sharepoint-connector:** route scope operations through node-ingestion client ([#537](https://github.com/Unique-AG/connectors/issues/537)) ([0916bdd](https://github.com/Unique-AG/connectors/commit/0916bdd2394929df1a44dc206ecf0787af7cf80f))
+
 ## [2.6.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.6.0...sharepoint-connector@2.6.1) (2026-04-22)
 
 

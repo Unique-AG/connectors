@@ -30,7 +30,6 @@ import {
   databaseConfig,
   type EncryptionConfig,
   encryptionConfig,
-  logsConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
   uniqueConfig,
@@ -39,9 +38,10 @@ import { delegatedAccessConfig } from './config/delegated-access.config';
 import { ingestionConfig } from './config/ingestion.config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './db/drizzle.module';
 import { registerBackendModule } from './features/backend.module';
+import { HealthModule } from './health/health.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
-import { serverInstructions } from './server.instructions';
+import { buildServerInstructions } from './server.instructions';
 import { GraphErrorFilter } from './utils/graph-error.filter';
 
 @Module({
@@ -53,7 +53,6 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         amqpConfig,
         appConfig,
         authConfig,
-        logsConfig,
         databaseConfig,
         encryptionConfig,
         microsoftConfig,
@@ -158,7 +157,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     McpModule.forRoot({
       name: 'outlook-semantic-mcp',
       version: packageJson.version,
-      instructions: serverInstructions,
+      instructions: buildServerInstructions(),
       streamableHttp: {
         enableJsonResponse: false,
         sessionIdGenerator: () => typeid('session').toString(),
@@ -170,10 +169,11 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     AMQPModule,
     UniqueApiModule.forRoot({
       observability: {
-        metricPrefix: 'outlook_semantic_mcp_unique',
+        metricPrefix: 'osm_unique_api',
         loggerContext: 'UniqueApi',
       },
     }),
+    HealthModule,
     registerBackendModule(),
   ],
   controllers: [ManifestController],

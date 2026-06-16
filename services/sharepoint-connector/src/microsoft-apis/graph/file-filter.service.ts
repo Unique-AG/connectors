@@ -2,11 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Config } from '../../config';
 import { isModerationStatusApproved } from '../../constants/moderation-status.constants';
+import { MimeTypeResolverService } from '../../shared/services/mime-type-resolver.service';
 import { DriveItem, ListItem } from './types/sharepoint.types';
 
 @Injectable()
 export class FileFilterService {
-  public constructor(private readonly configService: ConfigService<Config, true>) {}
+  public constructor(
+    private readonly configService: ConfigService<Config, true>,
+    private readonly mimeTypeResolverService: MimeTypeResolverService,
+  ) {}
 
   public isListItemValidForIngestion(fields: ListItem['fields'], syncColumnName: string) {
     return Boolean(
@@ -41,7 +45,8 @@ export class FileFilterService {
     }
 
     const isAspxFile = item.name?.toLowerCase().endsWith('.aspx');
-    const isAllowedMimeType = item.file?.mimeType && allowedMimeTypes.includes(item.file.mimeType);
+    const resolvedMimeType = this.mimeTypeResolverService.resolve(item.name, item.file.mimeType);
+    const isAllowedMimeType = allowedMimeTypes.includes(resolvedMimeType);
     const hasSyncFlag = fields[syncColumnName] === true;
 
     return Boolean(hasSyncFlag && (isAllowedMimeType || isAspxFile));

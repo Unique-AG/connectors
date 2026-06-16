@@ -1,0 +1,4 @@
+{
+  "subject": "Payroll System Migration Plan",
+  "body": "HR and IT Teams,\n\nWe're migrating from ADP to Rippling. Timeline and key milestones:\n\nPhase 1 - Setup (March 15-31):\n- Configure Rippling tenant\n- Import employee master data (312 employees)\n- Set up payroll schedules (bi-weekly US, monthly EU)\n- Configure benefits integrations\n\nPhase 2 - Parallel Run (April 1-30):\n- Run payroll in both systems\n- Reconcile differences\n- Test tax withholding accuracy\n- Validate 401(k) contribution feeds\n\nPhase 3 - Cutover (May 1):\n- Disable ADP payroll processing\n- Go live on Rippling\n- Retain ADP access for historical records through December\n\nBudget Impact:\n- ADP annual cost: $156K\n- Rippling annual cost: $98K (includes HRIS + payroll)\n- Migration one-time cost: $25K\n- Annual savings: $58K + consolidation of 3 HR tools\n\nPlease assign a point person from each team for the migration working group."
+}

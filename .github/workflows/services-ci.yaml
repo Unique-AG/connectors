@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       services:
-        description: 'Services to run CI for (comma-separated, e.g., "teams-mcp,outlook-mcp" or "all")'
+        description: 'Services to run CI for (comma-separated, e.g., "teams-mcp,outlook-semantic-mcp" or "all")'
         required: true
         default: "all"
 
@@ -45,12 +45,14 @@ jobs:
               - 'services/**'
             packages:
               - 'packages/**'
+            lockfile:
+              - 'pnpm-lock.yaml'
 
       # Builds a JSON array of service names to fan out into parallel CI matrix jobs.
       # Handles three scenarios:
       #   1. workflow_dispatch: uses user input (comma-separated list or "all"), validates against existing services/
-      #   2. PR with package changes: runs all services since packages are shared dependencies
-      #   3. PR with only service changes: extracts unique service names from changed file paths
+      #   2. PR with package or lockfile changes: runs all services since these are shared dependencies
+      #   3. PR with only service changes: extracts unique service names from changed file paths, skipping removed services
       # If none of the above match, outputs an empty array so the CI job is skipped.
       - name: Build service matrix
         id: build-matrix
@@ -60,6 +62,7 @@ jobs:
           SERVICES_CHANGED: ${{ steps.filter.outputs.services }}
           SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
           PACKAGES_CHANGED: ${{ steps.filter.outputs.packages }}
+          LOCKFILE_CHANGED: ${{ steps.filter.outputs.lockfile }}
         run: |
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             available=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
@@ -81,11 +84,11 @@ jobs:
               done
               services=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             fi
-          elif [ "$PACKAGES_CHANGED" = "true" ]; then
-            # Packages are shared dependencies — run CI for all services to catch breakage
+          elif [ "$PACKAGES_CHANGED" = "true" ] || [ "$LOCKFILE_CHANGED" = "true" ]; then
+            # Packages or lockfile changed — run CI for all services to catch breakage
             services=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
           elif [ "$SERVICES_CHANGED" = "true" ]; then
-            services=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            services=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r s; do [ -d "services/$s" ] && echo "$s"; done | jq -R -s -c 'split("\n") | map(select(length > 0))')
           else
             services='[]'
           fi

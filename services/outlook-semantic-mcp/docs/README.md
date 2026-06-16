@@ -44,7 +44,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Permissions
 
-All permissions are delegated and require no admin consent. See [Permissions](./technical/permissions.md) for details.
+All permissions are delegated and require no admin consent. This includes `Mail.ReadWrite.Shared`, which is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`) and enables delegated mailbox access when configured. See [Permissions](./technical/permissions.md) for the full list and least-privilege justifications.
 
 ## Features
 
@@ -53,13 +53,14 @@ All permissions are delegated and require no admin consent. See [Permissions](./
 **Email Search**
 
 - Unique semantic search across the user's mailbox via the `search_emails` tool
-- Open individual emails by message ID via `open_email_by_id`
-- Searches are executed against the Unique knowledge base, where emails are indexed during sync — no live Microsoft Graph API call is made per query
+- Open individual emails by message ID via `open_email`
+- Search emails using the `search_emails` tool. In `microsoft_graph_and_unique_api` mode, the tool runs semantic search against the Unique knowledge base and a live KQL query against Microsoft Graph in parallel, merging the results. In `microsoft_graph` mode, the tool queries Microsoft Graph directly using KQL — no knowledge base or ingestion is involved.
 
 **Draft Creation**
 
-- Create draft emails with subject, body, recipients, and attachments via `create_draft_email`
-- Drafts are written directly to the user's Outlook Drafts folder via Microsoft Graph
+- Create fresh draft emails (subject, body, recipients, attachments) in the signed-in user's personal mailbox or in a shared mailbox via `create_draft_email`
+- Create reply-all drafts for existing emails in personal or shared mailboxes — Graph pre-fills all original recipients automatically
+- Drafts are written directly to the Outlook Drafts folder via Microsoft Graph and are not sent automatically
 
 **Contact Lookup**
 
@@ -68,13 +69,14 @@ All permissions are delegated and require no admin consent. See [Permissions](./
 
 **Mailbox Utilities**
 
-- List all mail folders and subfolders via `list_folders` to obtain folder IDs for use with `search_emails`
+- List all accessible mailboxes and their folder trees via `list_mailboxes_and_directories` — folder IDs from this tool can be passed to `search_emails` filters
 - Retrieve email categories via `list_categories` to obtain category names for filtering searches
 
 **Delegated Mailbox Access (Optional)**
 
 - When `DELEGATED_ACCESS_SCAN` is enabled, the server automatically discovers users who have been granted Exchange mailbox delegation by other users
 - Delegates can search and access the inboxes of users who have granted them Full Access or folder-level delegation via Exchange admin
+- See [Features — Delegated Access](./technical/features.md#Delegated-Access) for supported configurations and setup
 - See [DELEGATED_ACCESS_SCAN](./operator/configuration.md#DELEGATED_ACCESS_SCAN) for configuration details
 
 **Subscription Management**
@@ -182,7 +184,7 @@ See [Flows](./technical/flows.md#Full-Sync:-Historical-Email-Ingestion) for the 
 
 ### Directory Sync
 
-The server continuously syncs the user's Outlook folder structure via Microsoft Graph delta queries. This enables folder-based search filtering (`list_folders` tool) and tracks email movement to handle deletions — when an email moves to an excluded folder (e.g. Deleted Items), it is removed from the knowledge base.
+The server continuously syncs the user's Outlook folder structure via Microsoft Graph delta queries. This enables folder-based search filtering (`list_mailboxes_and_directories` tool; folder filtering only applies in `microsoft_graph_and_unique_api` mode) and tracks email movement to handle deletions — when an email moves to an excluded folder (e.g. Deleted Items), it is removed from the knowledge base.
 
 See [Directory Sync Flow](./technical/flows.md#Directory-Sync-Flow) for the detailed sequence diagram.
 
@@ -212,10 +214,10 @@ See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) 
 
 4. **AI-Assisted Email Tasks** (On-demand)
    - Search emails with `search_emails`
-   - Open specific messages with `open_email_by_id`
+   - Open specific messages with `open_email`
    - Compose drafts with `create_draft_email`
    - Look up contacts with `lookup_contacts`
-   - Use `list_folders` and `list_categories` to obtain folder IDs and category names for filtering searches
+   - Use `list_mailboxes_and_directories` and `list_categories` to obtain folder IDs and category names for filtering searches
 
 ## Limitations and Constraints
 
@@ -255,7 +257,6 @@ See [Architecture — Authentication](./technical/architecture.md#Authentication
 ### Not Supported
 
 - **Application permissions**: The server uses delegated permissions only (acting on behalf of a signed-in user). It does not support application-level permissions, so it cannot run as a background daemon accessing mailboxes without user sign-in
-- **Shared mailboxes**: Microsoft Exchange shared mailbox entities (dedicated mailboxes accessible to multiple members) are not supported. For user-to-user mailbox delegation (Full Access or folder-level access granted via Exchange admin), see `DELEGATED_ACCESS_SCAN` in [Configuration](./operator/configuration.md#DELEGATED_ACCESS_SCAN)
 - **Calendar or task data**: Only mail and contacts are in scope
 - **Token introspection**: MCP tokens validated locally with short TTLs for performance
 

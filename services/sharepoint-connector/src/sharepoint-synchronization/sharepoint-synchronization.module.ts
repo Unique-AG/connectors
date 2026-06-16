@@ -7,7 +7,12 @@ import { ProcessingPipelineModule } from '../processing-pipeline/processing-pipe
 import { ScopeExternalIdMigrationModule } from '../scope-external-id-migration/scope-external-id-migration.module';
 import { UniqueApiModule } from '../unique-api/unique-api.module';
 import { ContentSyncService } from './content-sync.service';
+import { DeduplicateSitesQuery } from './deduplicate-sites.query';
 import { FileMoveProcessor } from './file-move-processor.service';
+import { CreateRootScopeCommand } from './root-scope/create-root-scope.command';
+import { FindRootScopeQuery } from './root-scope/find-root-scope.query';
+import { InitializeRootScopeCommand } from './root-scope/initialize-root-scope.command';
+import { ResolveScopePathCommand } from './root-scope/resolve-scope-path.command';
 import { RootScopeMigrationService } from './root-scope-migration.service';
 import { ScopeManagementService } from './scope-management.service';
 import { SharepointSynchronizationService } from './sharepoint-synchronization.service';
@@ -26,7 +31,12 @@ import { SubsiteDiscoveryService } from './subsite-discovery.service';
   providers: [
     SharepointSynchronizationService,
     ContentSyncService,
+    CreateRootScopeCommand,
+    DeduplicateSitesQuery,
     FileMoveProcessor,
+    FindRootScopeQuery,
+    InitializeRootScopeCommand,
+    ResolveScopePathCommand,
     RootScopeMigrationService,
     ScopeManagementService,
     SubsiteDiscoveryService,

@@ -4,12 +4,13 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
 import { Logger, LoggerErrorInterceptor } from 'nestjs-pino';
+import { syncMetricViews } from '~/features/metrics/sync-metric-views';
 import * as packageJson from '../package.json';
 import { AppModule } from './app.module';
 import { type AppConfig, appConfig } from './config';
 
 async function bootstrap() {
-  const bufferLogs = process.env.APP_BUFFER_LOGS !== 'disabled';
+  const bufferLogs = process.env.LOGS_BUFFERING !== 'disabled';
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs });
 
   app.enableShutdownHooks();
@@ -42,5 +43,6 @@ initOpenTelemetry({
   defaultServiceName: 'outlook-semantic-mcp',
   defaultServiceVersion: packageJson.version,
   includePgInstrumentation: true,
+  views: syncMetricViews,
 });
 void runWithInstrumentation(bootstrap, 'outlook-semantic-mcp');

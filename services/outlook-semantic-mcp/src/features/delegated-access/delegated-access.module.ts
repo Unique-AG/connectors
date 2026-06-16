@@ -1,19 +1,34 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
+import { DeleteInboxModule } from '../delete-inbox/delete-inbox.module';
+import { MetricsModule } from '../metrics/metrics.module';
 import { PersistentCacheModule } from '../persistent-cache/persistent-cache.module';
+import { ReadOwnerMailboxFoldersFromMsGraphQuery } from './commands/read-owner-mailbox-folders-for-delegated-access-verification.query';
+import { TestReadAccessFromGraphEndpointQuery } from './commands/test-read-access-from-graph-endpoint.query';
 import { DelegatedAccessRecoverySchedulerService } from './delegated-access-recovery-scheduler.service';
 import { DiscoverDelegatedAccessCommand } from './discovery/discover-delegated-access.command';
 import { DiscoverDelegatedAccessListener } from './discovery/discover-delegated-access.listener';
 import { DiscoverDelegatedAccessSchedulerService } from './discovery/discover-delegated-access-scheduler.service';
+import { SharedMailboxSyncService } from './shared-mailbox-sync.service';
 import { SyncDelegatedAccessCommand } from './verification/sync-delegated-access.command';
 import { SyncDelegatedAccessForAllUsersCommand } from './verification/sync-delegated-access-for-all-users.command';
 import { VerifyDelegatedAccessListener } from './verification/verify-delegated-access.listener';
 import { VerifyDelegatedAccessSchedulerService } from './verification/verify-delegated-access-scheduler.service';
 
 @Module({
-  imports: [DrizzleModule, MsGraphModule, PersistentCacheModule],
+  imports: [
+    DrizzleModule,
+    MsGraphModule,
+    MetricsModule,
+    DeleteInboxModule,
+    PersistentCacheModule,
+    ConfigModule,
+  ],
   providers: [
+    TestReadAccessFromGraphEndpointQuery,
+    ReadOwnerMailboxFoldersFromMsGraphQuery,
     // discovery
     DiscoverDelegatedAccessCommand,
     DiscoverDelegatedAccessListener,
@@ -25,6 +40,8 @@ import { VerifyDelegatedAccessSchedulerService } from './verification/verify-del
     VerifyDelegatedAccessSchedulerService,
     // recovery
     DelegatedAccessRecoverySchedulerService,
+    // shared mailboxes
+    SharedMailboxSyncService,
   ],
 })
 export class DelegatedAccessModule {}

@@ -7,6 +7,7 @@ export type FullSyncStep = (typeof FullSyncStep)[keyof typeof FullSyncStep];
 
 export const SiteSyncStep = {
   SiteNameFetch: 'site_name_fetch',
+  RootScopeResolution: 'root_scope_resolution',
   RootScopeInit: 'root_scope_initialization',
   SubsiteDiscovery: 'subsite_discovery',
   SiteItemsFetch: 'site_items_fetch',

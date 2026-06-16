@@ -22,10 +22,6 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-slim
     outputs:
-      "services/factset-mcp--release_created": ${{ steps.release.outputs['services/factset-mcp--release_created'] }}
-      "services/factset-mcp--version": ${{ steps.release.outputs['services/factset-mcp--version'] }}
-      "services/outlook-mcp--release_created": ${{ steps.release.outputs['services/outlook-mcp--release_created'] }}
-      "services/outlook-mcp--version": ${{ steps.release.outputs['services/outlook-mcp--version'] }}
       "services/sharepoint-connector--release_created": ${{ steps.release.outputs['services/sharepoint-connector--release_created'] }}
       "services/sharepoint-connector--version": ${{ steps.release.outputs['services/sharepoint-connector--version'] }}
       "services/teams-mcp--release_created": ${{ steps.release.outputs['services/teams-mcp--release_created'] }}
@@ -36,7 +32,7 @@ jobs:
       "services/outlook-semantic-mcp--version": ${{ steps.release.outputs['services/outlook-semantic-mcp--version'] }}
 
     steps:
-      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
 
       - name: Debug release outputs
@@ -49,24 +45,6 @@ jobs:
           echo '```json' >> $GITHUB_STEP_SUMMARY
           echo "$RELEASE_OUTPUTS" | jq . >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-
-  release-factset-mcp:
-    needs: release-please
-    if: ${{ needs.release-please.outputs['services/factset-mcp--release_created'] == 'true' }}
-    uses: ./.github/workflows/_template-cd.yaml
-    with:
-      service-name: factset-mcp
-      service-version: ${{ needs.release-please.outputs['services/factset-mcp--version'] }}
-      dockerfile: services/factset-mcp/deploy/Dockerfile
-
-  release-outlook-mcp:
-    needs: release-please
-    if: ${{ needs.release-please.outputs['services/outlook-mcp--release_created'] == 'true' }}
-    uses: ./.github/workflows/_template-cd.yaml
-    with:
-      service-name: outlook-mcp
-      service-version: ${{ needs.release-please.outputs['services/outlook-mcp--version'] }}
-      dockerfile: services/outlook-mcp/deploy/Dockerfile
 
   release-sharepoint-connector:
     needs: release-please

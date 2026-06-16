@@ -1,15 +1,19 @@
+import { createHash } from 'node:crypto';
+import { GraphError } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import type { UniqueConfigNamespaced } from '~/config';
+import { TEAMS_SOURCE_KIND, TEAMS_SOURCE_NAME } from './unique.consts';
 import {
   type PublicScopeAccessSchema,
   ScopeAccessEntityType,
   ScopeAccessType,
+  SourceOwnerType,
   UniqueIngestionMode,
 } from './unique.dtos';
-import { UniqueContentService } from './unique-content.service';
+import { type SpooledContent, UniqueContentService } from './unique-content.service';
 import { UniqueScopeService } from './unique-scope.service';
 import { UniqueUserService } from './unique-user.service';
 
@@ -28,6 +32,7 @@ export class UniqueService {
   @Span()
   public async ingestTranscript(
     meeting: {
+      meetingId: string;
       subject: string;
       date: Date;
       startDateTime: Date;
@@ -36,10 +41,13 @@ export class UniqueService {
       participants: { id?: string; name: string; email: string }[];
       owner: { id: string; name: string; email: string };
     },
-    transcript: { id: string; content: ReadableStream<Uint8Array<ArrayBuffer>> },
+    transcript: {
+      id: string;
+      content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>;
+    },
     recording?: {
       id: string;
-      content: ReadableStream<Uint8Array<ArrayBuffer>>;
+      content: () => Promise<ReadableStream<Uint8Array<ArrayBuffer>>>;
       startDateTime: Date;
       endDateTime: Date;
     },
@@ -92,132 +100,180 @@ export class UniqueService {
     );
 
     const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
-    const { subjectPath, datePath } = this.mapMeetingToRelativePaths(meeting.subject, meeting.date);
 
-    const parentScope = await this.scopeService.createScope(rootScopeId, subjectPath, false);
-    span?.setAttribute('parent_scope_id', parentScope.id);
+    // A meeting is one movable folder under the recording root: artifacts are uploaded into it
+    // and inherit its grants. Created with inheritAccess=false so it is private to the
+    // participants/organizer rather than auto-visible to every root-scope grantee. The name is
+    // deterministic (subject + meetingId hash + date) so re-ingestion reuses the same folder.
+    const meetingScope = await this.scopeService.createScope(
+      rootScopeId,
+      this.buildMeetingFolderName(meeting.subject, meeting.meetingId, meeting.date),
+      false,
+    );
+    span?.setAttribute('meeting_scope_id', meetingScope.id);
 
+    // Grant on the folder BEFORE uploading so content is stamped with these grants at creation:
+    // participants get READ; the organizer gets READ + WRITE + MANAGE. Grants are matched per
+    // access type, so the organizer needs all three tokens to read, write, and manage.
     const accesses = participants.map<PublicScopeAccessSchema>((p) => ({
       entityId: p.id,
       entityType: ScopeAccessEntityType.User,
       type: ScopeAccessType.Read,
     }));
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Write,
-    });
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Read,
-    });
-    accesses.push({
-      entityId: owner.id,
-      entityType: ScopeAccessEntityType.User,
-      type: ScopeAccessType.Manage,
-    });
-    await this.scopeService.addScopeAccesses(parentScope.id, accesses);
-
-    const childScope = await this.scopeService.createScope(parentScope.id, datePath, true);
-    span?.setAttribute('child_scope_id', childScope.id);
+    accesses.push(
+      { entityId: owner.id, entityType: ScopeAccessEntityType.User, type: ScopeAccessType.Read },
+      { entityId: owner.id, entityType: ScopeAccessEntityType.User, type: ScopeAccessType.Write },
+      { entityId: owner.id, entityType: ScopeAccessEntityType.User, type: ScopeAccessType.Manage },
+    );
+    span?.setAttribute('access_count', accesses.length);
+    await this.scopeService.addScopeAccesses(meetingScope.id, accesses);
 
     this.logger.log(
-      { transcriptId: transcript.id, scopeId: childScope.id },
+      { transcriptId: transcript.id, scopeId: meetingScope.id },
       'Beginning transcript upload to Unique system',
     );
 
-    const transcriptUpload = await this.contentService.upsertContent({
-      storeInternally: true,
-      scopeId: childScope.id,
-      input: {
-        key: transcript.id,
-        mimeType: 'text/vtt',
-        title: meeting.subject || 'Untitled Meeting',
-        byteSize: 1,
-        metadata: this.buildContentMetadata(meeting),
-      },
-    });
+    // Download to disk BEFORE opening a content record, so a failed download never leaves a
+    // dangling, empty record behind. The temp file is removed once the upload finishes or fails.
+    const transcriptSpool = await this.contentService.spoolContent(transcript.content);
+    try {
+      const transcriptUpload = await this.contentService.upsertContent({
+        storeInternally: true,
+        scopeId: meetingScope.id,
+        sourceKind: TEAMS_SOURCE_KIND,
+        sourceName: TEAMS_SOURCE_NAME,
+        sourceOwnerType: SourceOwnerType.Company,
+        input: {
+          key: transcript.id,
+          mimeType: 'text/vtt',
+          title: meeting.subject || 'Untitled Meeting',
+          byteSize: 1,
+          metadata: this.buildContentMetadata(meeting),
+        },
+      });
 
-    await this.contentService.uploadToStorage(
-      transcriptUpload.writeUrl,
-      transcript.content,
-      'text/vtt',
-    );
+      await this.contentService.uploadToStorage(
+        transcriptUpload.writeUrl,
+        transcriptSpool,
+        'text/vtt',
+      );
 
-    await this.contentService.upsertContent({
-      storeInternally: true,
-      scopeId: childScope.id,
-      fileUrl: transcriptUpload.readUrl,
-      input: {
-        key: transcript.id,
-        mimeType: 'text/vtt',
-        title: meeting.subject || 'Untitled Meeting',
-      },
-    });
+      await this.contentService.upsertContent({
+        storeInternally: true,
+        scopeId: meetingScope.id,
+        sourceKind: TEAMS_SOURCE_KIND,
+        sourceName: TEAMS_SOURCE_NAME,
+        sourceOwnerType: SourceOwnerType.Company,
+        fileUrl: transcriptUpload.readUrl,
+        input: {
+          key: transcript.id,
+          mimeType: 'text/vtt',
+          title: meeting.subject || 'Untitled Meeting',
+        },
+      });
+    } finally {
+      await transcriptSpool.cleanup();
+    }
 
     span?.addEvent('transcript_ingestion_completed', {
       transcriptId: transcript.id,
-      parentScopeId: parentScope.id,
-      childScopeId: childScope.id,
+      scopeId: meetingScope.id,
     });
 
-    // Upload recording if provided (with SKIP_INGESTION)
-    // Wrapped in try-catch to ensure recording upload failures don't break transcript ingestion
+    // Upload recording if provided (with SKIP_INGESTION).
     if (recording) {
+      // Download the recording to disk FIRST, before opening any content record. Teams recordings
+      // live in the meeting owner's OneDrive, so a caller who isn't the owner (e.g. an invited
+      // attendee triggering on-demand ingest) gets a 403 here. Spooling first means that failure
+      // leaves no dangling, empty content record behind — we simply skip the recording and let the
+      // transcript ingestion (already done above) stand.
+      let recordingSpool: SpooledContent | undefined;
       try {
         this.logger.log(
-          { recordingId: recording.id, scopeId: childScope.id },
-          'Beginning recording upload to Unique system (skip ingestion)',
+          { recordingId: recording.id, scopeId: meetingScope.id },
+          'Downloading meeting recording before upload',
         );
-
-        const recordingUpload = await this.contentService.upsertContent({
-          storeInternally: true,
-          scopeId: childScope.id,
-          input: {
-            key: recording.id,
-            mimeType: 'video/mp4',
-            title: meeting.subject || 'Untitled Meeting',
-            byteSize: 1,
-            ingestionConfig: {
-              uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
-            },
-            metadata: this.buildContentMetadata(meeting, recording),
-          },
-        });
-        await this.contentService.uploadToStorage(
-          recordingUpload.writeUrl,
-          recording.content,
-          'video/mp4',
-        );
-        await this.contentService.upsertContent({
-          storeInternally: true,
-          scopeId: childScope.id,
-          fileUrl: recordingUpload.readUrl,
-          input: {
-            key: recording.id,
-            mimeType: 'video/mp4',
-            title: meeting.subject || 'Untitled Meeting',
-            ingestionConfig: {
-              uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
-            },
-          },
-        });
-
-        span?.addEvent('recording_stored', {
-          recordingId: recording.id,
-          parentScopeId: parentScope.id,
-          childScopeId: childScope.id,
-        });
+        recordingSpool = await this.contentService.spoolContent(recording.content);
       } catch (error) {
-        span?.addEvent('recording_upload_failed', {
+        const statusCode = error instanceof GraphError ? error.statusCode : undefined;
+        span?.addEvent('recording_download_failed', {
           recordingId: recording.id,
+          statusCode: statusCode ?? 'unknown',
           error: error instanceof Error ? error.message : String(error),
         });
         this.logger.warn(
-          { error, recordingId: recording.id },
-          'Failed to upload recording, transcript ingestion will continue',
+          { recordingId: recording.id, statusCode },
+          statusCode === 403
+            ? 'Recording skipped: the caller cannot access the recording file (only the meeting owner can). Transcript ingestion completed.'
+            : 'Recording download failed; skipping recording. Transcript ingestion completed.',
         );
+      }
+
+      if (recordingSpool) {
+        try {
+          this.logger.log(
+            { recordingId: recording.id, scopeId: meetingScope.id },
+            'Beginning recording upload to Unique system (skip ingestion)',
+          );
+
+          const recordingUpload = await this.contentService.upsertContent({
+            storeInternally: true,
+            scopeId: meetingScope.id,
+            sourceKind: TEAMS_SOURCE_KIND,
+            sourceName: TEAMS_SOURCE_NAME,
+            sourceOwnerType: SourceOwnerType.Company,
+            input: {
+              key: recording.id,
+              mimeType: 'video/mp4',
+              title: meeting.subject || 'Untitled Meeting',
+              byteSize: 1,
+              ingestionConfig: {
+                uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+              },
+              metadata: this.buildContentMetadata(meeting, recording),
+            },
+          });
+          await this.contentService.uploadToStorage(
+            recordingUpload.writeUrl,
+            recordingSpool,
+            'video/mp4',
+          );
+          await this.contentService.upsertContent({
+            storeInternally: true,
+            scopeId: meetingScope.id,
+            sourceKind: TEAMS_SOURCE_KIND,
+            sourceName: TEAMS_SOURCE_NAME,
+            sourceOwnerType: SourceOwnerType.Company,
+            fileUrl: recordingUpload.readUrl,
+            input: {
+              key: recording.id,
+              mimeType: 'video/mp4',
+              title: meeting.subject || 'Untitled Meeting',
+              ingestionConfig: {
+                uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
+              },
+            },
+          });
+
+          span?.addEvent('recording_stored', {
+            recordingId: recording.id,
+            scopeId: meetingScope.id,
+          });
+        } catch (error) {
+          // The download succeeded but opening/uploading/finalizing the record failed (rare — e.g.
+          // a node-ingestion error). The empty record may linger; teams-mcp has no delete path.
+          // Don't let it break the already-completed transcript ingestion.
+          span?.addEvent('recording_upload_failed', {
+            recordingId: recording.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          this.logger.warn(
+            { error, recordingId: recording.id },
+            'Failed to upload recording after download, transcript ingestion will continue',
+          );
+        } finally {
+          await recordingSpool.cleanup();
+        }
       }
     }
 
@@ -225,21 +281,31 @@ export class UniqueService {
       {
         transcriptId: transcript.id,
         recordingId: recording?.id,
-        parentScopeId: parentScope.id,
-        childScopeId: childScope.id,
+        scopeId: meetingScope.id,
       },
       'Successfully completed meeting transcript ingestion process',
     );
   }
 
-  private mapMeetingToRelativePaths(
-    subject: string,
-    happenedAt: Date,
-  ): { subjectPath: string; datePath: string } {
-    // biome-ignore lint/style/noNonNullAssertion: iso string is always with T
-    const formattedDate = happenedAt.toISOString().split('T').at(0)!;
-    const subjectPath = subject || 'Untitled Meeting';
-    return { subjectPath, datePath: formattedDate };
+  /**
+   * Deterministic, path-safe folder name for one meeting occurrence: subject plus a stable
+   * suffix from the meetingId hash plus the occurrence date. Recurring occurrences of one series
+   * share a meetingId (and subject) but differ by date, so each gets its own folder; two
+   * different meetings that share a title differ by hash. The folder API splits on '/', so the
+   * date is rendered as a path-safe segment ('T' -> ' ', ':' -> '-'). Stable across re-ingestion,
+   * so `createScope` (idempotent by parent + name) reuses the same folder.
+   */
+  private buildMeetingFolderName(subject: string, meetingId: string, happenedAt: Date): string {
+    const dateIso = happenedAt.toISOString().slice(0, 19).replace('T', ' ').replaceAll(':', '-');
+    return `${subject || 'Untitled Meeting'} (${this.shortHash(meetingId)}) — ${dateIso}`;
+  }
+
+  /**
+   * Short, stable, path-safe digest of an id — used to disambiguate folder names without leaking
+   * the raw Graph id (which can contain '/', '+', '=' that would break folder paths).
+   */
+  private shortHash(value: string): string {
+    return createHash('sha256').update(value).digest('hex').slice(0, 8);
   }
 
   private buildContentMetadata(
@@ -247,6 +313,8 @@ export class UniqueService {
       date: Date;
       startDateTime: Date;
       endDateTime: Date;
+      meetingId: string;
+      subject: string;
       contentCorrelationId: string;
       owner: { name: string; email: string };
       participants: { name: string; email: string }[];
@@ -259,9 +327,14 @@ export class UniqueService {
       date: meeting.date.toISOString(),
       start_datetime: startDateTime.toISOString(),
       end_datetime: endDateTime.toISOString(),
+      meeting_id: meeting.meetingId,
       content_correlation_id: meeting.contentCorrelationId,
       organizer_email: meeting.owner.email.toLowerCase(),
     };
+
+    if (meeting.subject) {
+      metadata.subject = meeting.subject;
+    }
 
     if (meeting.owner.name) {
       metadata.organizer_name = meeting.owner.name;

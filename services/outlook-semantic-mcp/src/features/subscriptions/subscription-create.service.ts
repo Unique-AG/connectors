@@ -201,7 +201,7 @@ export class SubscriptionCreateService {
       providerUserId: userProfile.providerUserId,
     });
 
-    assert(this.config.mcpBackend === 'MicrosoftGraphAndUniqueApi');
+    assert(this.config.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi);
     // We create the inbox configuration before we do the subscription because we do not want
     // to create a rance condition between webhook events and not having the subscription.
     await this.db

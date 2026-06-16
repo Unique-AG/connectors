@@ -3,7 +3,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { isNullish } from 'remeda';
 import { caches, DRIZZLE, DrizzleDatabase } from '~/db';
-import { CacheData, cacheData } from '~/db/schema/cache/cache.data';
+import {
+  CacheData,
+  cacheData,
+  GetCacheDataByType,
+  isCacheDataOfType,
+} from '~/db/schema/cache/cache.data';
 
 interface SetWithData {
   currentValue: CacheData | null;
@@ -73,7 +78,10 @@ export class PersistentCacheService {
     });
   }
 
-  public async get(key: string): Promise<CacheData | null> {
+  public async get<T extends CacheData['dataType']>(
+    key: string,
+    type: T,
+  ): Promise<GetCacheDataByType<T> | null> {
     const row = await this.db.query.caches.findFirst({
       where: eq(caches.key, this.getKey(key).toString()),
     });
@@ -81,7 +89,9 @@ export class PersistentCacheService {
       return null;
     }
 
-    return cacheData.parse(row.data);
+    const result = cacheData.parse(row.data);
+    assert(isCacheDataOfType(result, type));
+    return result;
   }
 
   private getKey(key: string): string {

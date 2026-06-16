@@ -49,6 +49,29 @@ export const ProcessingConfigSchema = z.object({
     .string()
     .default(CRON_EVERY_15_MINUTES)
     .describe('Cron expression for the scheduled file scan interval'),
+  mimeTypeOverridesByExtension: z
+    .record(z.string(), z.string().min(1, 'mimeType value must not be empty'))
+    .transform((map) =>
+      Object.fromEntries(Object.entries(map).map(([key, value]) => [key.toLowerCase(), value])),
+    )
+    .pipe(
+      z.record(
+        z
+          .string()
+          .regex(
+            /^(\.[a-z0-9]+)+$/,
+            'extension key must consist of one or more lowercase ".alphanumeric" segments (e.g. ".csv", ".tar.gz")',
+          ),
+        z.string().min(1, 'mimeType value must not be empty'),
+      ),
+    )
+    .prefault({ '.csv': 'text/csv' })
+    .describe(
+      'Map of file extension suffix to canonical MIME type, used to override the SharePoint-reported ' +
+        'mimeType. Keys are lowercased and must match one or more ".alphanumeric" segments ' +
+        '(e.g. ".csv", ".tar.gz"). User-supplied values replace the default wholesale (no merge); ' +
+        'include ".csv" in custom maps to retain the CSV fix.',
+    ),
 });
 
 export type ProcessingConfig = z.infer<typeof ProcessingConfigSchema>;

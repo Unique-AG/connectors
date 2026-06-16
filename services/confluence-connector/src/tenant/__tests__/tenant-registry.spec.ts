@@ -73,7 +73,7 @@ function createMockTenantConfig(): TenantConfig {
 }
 
 function createMockAuth(): ConfluenceAuth {
-  return { acquireToken: vi.fn().mockResolvedValue('mock-token') };
+  return { getAuthorizationHeader: vi.fn().mockResolvedValue('Bearer mock-token') };
 }
 
 function createMockUniqueApiClient() {

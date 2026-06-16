@@ -7,7 +7,7 @@ import { type ConfluencePage, ContentType } from '../types/confluence-api.types'
 
 const BASE_URL = 'https://dc.example.com';
 
-const mockAuth = { acquireToken: vi.fn().mockResolvedValue('dc-token') };
+const mockAuth = { getAuthorizationHeader: vi.fn().mockResolvedValue('Bearer dc-token') };
 
 const mockHttpClient = {
   rateLimitedRequest: vi.fn(),

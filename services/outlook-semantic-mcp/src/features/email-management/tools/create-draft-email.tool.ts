@@ -8,13 +8,9 @@ import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { CreateDraftEmailCommand } from '../create-draft-email.command';
 import { META } from './create-draft-email-tool.meta';
 
-const CreateDraftEmailInputSchema = z.object({
+const FreshDraftInputSchema = z.object({
+  type: z.literal('draft').describe('Create a fresh draft email.'),
   subject: z.string().describe('The subject line of the draft email.'),
-  content: z
-    .string()
-    .describe(
-      'The body content of the draft email. Must match the format declared in contentType: raw HTML markup when "html", plain text when "text".',
-    ),
   toRecipients: z
     .array(
       z.object({
@@ -32,6 +28,28 @@ const CreateDraftEmailInputSchema = z.object({
     )
     .optional()
     .describe('The list of CC (carbon copy) recipients for the email.'),
+});
+
+const ReplyDraftInputSchema = z.object({
+  type: z.literal('reply').describe('Create a reply-all draft for an existing email.'),
+  inReplyToMessageId: z
+    .string()
+    .describe(
+      'The msGraphMessageId field from search_emails or outlook_email_search results for the email being replied to. Graph pre-fills all original recipients — do not pass toRecipients or ccRecipients.',
+    ),
+});
+
+const DraftRecipientsData = z.discriminatedUnion('type', [
+  FreshDraftInputSchema,
+  ReplyDraftInputSchema,
+]);
+
+const CreateDraftEmailInputSchema = z.object({
+  content: z
+    .string()
+    .describe(
+      'The body content of the draft email, written in Markdown. Supports paragraphs, line breaks, **bold**, *italic*, bullet and numbered lists, [links](https://example.com), blockquotes, and inline `code`. Raw HTML is not rendered (it is escaped) — use Markdown syntax instead.',
+    ),
   attachments: z
     .array(
       z.object({
@@ -54,6 +72,13 @@ const CreateDraftEmailInputSchema = z.object({
     .describe(
       'Files to attach to the draft. Each entry pairs a display file name with a URI pointing to the file content. Omit entirely when no attachments are needed.',
     ),
+  mailbox: z
+    .string()
+    .optional()
+    .describe(
+      'UPN of the shared mailbox to create the draft in (e.g. "support@company.com"). Omit to create the draft in the signed-in user\'s own mailbox.',
+    ),
+  recipientsData: DraftRecipientsData,
 });
 
 const CreateDraftEmailOutputSchema = z.object({
@@ -96,7 +121,7 @@ export class CreateDraftEmailTool {
     name: 'draft_email',
     title: 'Draft Email',
     description:
-      'Creates a draft email in the connected Outlook mailbox with the given subject, body, recipients, and optional attachments. The draft is saved but not sent.',
+      'Creates a draft email in Outlook. **Replying to a received email is the most common use case** — when the user says "reply", "respond", "get back to", "answer this", "write back", or similar after reading an email, use type: "reply" with the inReplyToMessageId from the retrieved email (Graph pre-fills all recipients and subject automatically). For a new email, use type: "draft" with explicit toRecipients and subject. Optionally pass mailbox for shared mailboxes. The draft is saved but not sent.',
     parameters: CreateDraftEmailInputSchema,
     outputSchema: CreateDraftEmailOutputSchema,
     annotations: {
@@ -116,9 +141,16 @@ export class CreateDraftEmailTool {
   ) {
     const userProfileId = extractUserProfileId(request);
     const chatId = _context.mcpRequest.params._meta?.chatId;
-    return this.createDraftEmailCommand.run(userProfileId, {
+    const result = await this.createDraftEmailCommand.run(userProfileId, {
       ...input,
       chatId: isString(chatId) ? chatId : null,
     });
+    if (input.recipientsData.type === 'reply' && result.success) {
+      return {
+        ...result,
+        message: `${result.message} All original recipients are pre-filled — review before sending.`,
+      };
+    }
+    return result;
   }
 }

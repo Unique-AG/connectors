@@ -7,18 +7,25 @@ import type { TenantContext } from '../../../tenant/tenant-context.interface';
 import { tenantStorage } from '../../../tenant/tenant-context.storage';
 import { Redacted } from '../../../utils/redacted';
 import { ConfluenceAuthFactory } from '../confluence-auth.factory';
+import { BasicAuthStrategy } from '../strategies/basic-auth.strategy';
 import { OAuth2LoAuthStrategy } from '../strategies/oauth2lo-auth.strategy';
 import { PatAuthStrategy } from '../strategies/pat-auth.strategy';
 
 vi.mock('../strategies/oauth2lo-auth.strategy', () => ({
   OAuth2LoAuthStrategy: vi.fn().mockImplementation(() => ({
-    acquireToken: vi.fn().mockResolvedValue('oauth-token'),
+    getAuthorizationHeader: vi.fn().mockResolvedValue('Bearer oauth-token'),
   })),
 }));
 
 vi.mock('../strategies/pat-auth.strategy', () => ({
   PatAuthStrategy: vi.fn().mockImplementation(() => ({
-    acquireToken: vi.fn().mockResolvedValue('pat-token'),
+    getAuthorizationHeader: vi.fn().mockResolvedValue('Bearer pat-token'),
+  })),
+}));
+
+vi.mock('../strategies/basic-auth.strategy', () => ({
+  BasicAuthStrategy: vi.fn().mockImplementation(() => ({
+    getAuthorizationHeader: vi.fn().mockResolvedValue('Basic dXNlcjpwYXNz'),
   })),
 }));
 
@@ -58,9 +65,9 @@ describe('ConfluenceAuthFactory', () => {
       };
 
       const auth = tenantStorage.run(mockTenant, () => factory.createAuthStrategy(config));
-      const token = await auth.acquireToken();
+      const header = await auth.getAuthorizationHeader();
 
-      expect(token).toBe('oauth-token');
+      expect(header).toBe('Bearer oauth-token');
       expect(OAuth2LoAuthStrategy).toHaveBeenCalledWith(config.auth, config, expect.anything());
     });
 
@@ -76,10 +83,29 @@ describe('ConfluenceAuthFactory', () => {
       };
 
       const auth = tenantStorage.run(mockTenant, () => factory.createAuthStrategy(config));
-      const token = await auth.acquireToken();
+      const header = await auth.getAuthorizationHeader();
 
-      expect(token).toBe('pat-token');
+      expect(header).toBe('Bearer pat-token');
       expect(PatAuthStrategy).toHaveBeenCalledWith(config.auth);
+    });
+
+    it('creates auth for HTTP Basic data-center config', async () => {
+      const factory = createFactory();
+      const config: ConfluenceConfig = {
+        ...baseFields,
+        instanceType: 'data-center',
+        auth: {
+          mode: AuthMode.Basic,
+          username: 'alice',
+          password: new Redacted('s3cret'),
+        },
+      };
+
+      const auth = tenantStorage.run(mockTenant, () => factory.createAuthStrategy(config));
+      const header = await auth.getAuthorizationHeader();
+
+      expect(header).toBe('Basic dXNlcjpwYXNz');
+      expect(BasicAuthStrategy).toHaveBeenCalledWith(config.auth);
     });
 
     it('throws for unsupported auth mode', () => {

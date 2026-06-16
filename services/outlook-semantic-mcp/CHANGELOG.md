@@ -1,5 +1,114 @@
 # Changelog
 
+## [2.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@1.0.1...outlook-semantic-mcp@2.0.0) (2026-06-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **outlook-semantic-mcp:** env var `APP_BUFFER_LOGS` is removed; use `LOGS_BUFFERING` instead. Enum values previously using other casing formats must be updated to `snake_lower_case`.
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** rename env vars and normalize enum values to snake_case ([#629](https://github.com/Unique-AG/connectors/issues/629)) ([23a9496](https://github.com/Unique-AG/connectors/commit/23a9496298dfd6b54deb0ee62e472403b11a3cbf))
+* **outlook-semantic-mcp:** set default Job filter on Grafana dashboard ([#632](https://github.com/Unique-AG/connectors/issues/632)) ([0b90d73](https://github.com/Unique-AG/connectors/commit/0b90d7385fe7227003c9d608f513386bed566d3a))
+
+## [1.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@1.0.0...outlook-semantic-mcp@1.0.1) (2026-06-09)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** fortify draft_email tool description for reply use case ([#625](https://github.com/Unique-AG/connectors/issues/625)) ([52d97ff](https://github.com/Unique-AG/connectors/commit/52d97ff8eb40a68492d3eed1170717c3864a12b2))
+
+## [1.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.11...outlook-semantic-mcp@1.0.0) (2026-06-08)
+
+
+### Features
+
+* **charts,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** add admin consent redirect uris ([#577](https://github.com/Unique-AG/connectors/issues/577)) ([3e36a6d](https://github.com/Unique-AG/connectors/commit/3e36a6deea5e620b6e5316a7f3df0dd4fd5c74b3))
+* **outlook-semantic-mcp:** add scripts for testing live catchup and email retrieval ([#610](https://github.com/Unique-AG/connectors/issues/610)) ([6702d23](https://github.com/Unique-AG/connectors/commit/6702d23a7ee536ec35171f64f35d3b49cd27b8f8))
+* **outlook-semantic-mcp:** un-21004 ingest shared mailboxes ([#605](https://github.com/Unique-AG/connectors/issues/605)) ([c93adf3](https://github.com/Unique-AG/connectors/commit/c93adf301b94006b7543432ad1a4cf49d06aa75f))
+* **outlook-semantic-mcp:** un-21028 add draft creation in shared mailboxes, add creating reply to email ([#604](https://github.com/Unique-AG/connectors/issues/604)) ([8eda155](https://github.com/Unique-AG/connectors/commit/8eda155fa6c00a9d3f39e87c04af045f581e8db8))
+* **outlook-semantic-mcp:** un-21097 add support for folder search for ms graph mode ([#595](https://github.com/Unique-AG/connectors/issues/595)) ([56e337f](https://github.com/Unique-AG/connectors/commit/56e337f115a99512344d134af9d46f8609bed0ea))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,deps:** preserve formatting in draft emails (UN-20562) ([#573](https://github.com/Unique-AG/connectors/issues/573)) ([39b3858](https://github.com/Unique-AG/connectors/commit/39b38589cf62bcd91bd0efc647070f4b3ef1d99d))
+* **outlook-semantic-mcp:** release 1.0.0 ([#622](https://github.com/Unique-AG/connectors/issues/622)) ([0674204](https://github.com/Unique-AG/connectors/commit/0674204bc9a5de9cc2dc47d98724d94871c7cf15))
+
+## [0.4.11](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.10...outlook-semantic-mcp@0.4.11) (2026-05-22)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** handle MailboxInfoStale as no-access in delegated access flows ([#571](https://github.com/Unique-AG/connectors/issues/571)) ([6ba4f6d](https://github.com/Unique-AG/connectors/commit/6ba4f6d429b3020d2b4ffeeba3083c4d81f449e4))
+
+## [0.4.10](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.9...outlook-semantic-mcp@0.4.10) (2026-05-21)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp,deps:** bug bash improvements and bug fixes ([#569](https://github.com/Unique-AG/connectors/issues/569)) ([8855ffb](https://github.com/Unique-AG/connectors/commit/8855ffba8fa865fabd789dd198366104bd88072c))
+
+## [0.4.9](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.8...outlook-semantic-mcp@0.4.9) (2026-05-20)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** load users from the same tenant ([#566](https://github.com/Unique-AG/connectors/issues/566)) ([bd848a1](https://github.com/Unique-AG/connectors/commit/bd848a12dcd32b5411da9e88497f295c289b9385))
+
+## [0.4.8](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.7...outlook-semantic-mcp@0.4.8) (2026-05-20)
+
+
+### Features
+
+* **outlook-semantic-mcp:** un-20852 add support for shared mailboxes for microsoft graph backend ([#561](https://github.com/Unique-AG/connectors/issues/561)) ([e322231](https://github.com/Unique-AG/connectors/commit/e322231a92c55dca5abd3d56039c7899eca9e322))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** update grafana dashboard, preselect data source and job ([#549](https://github.com/Unique-AG/connectors/issues/549)) ([56ebf4f](https://github.com/Unique-AG/connectors/commit/56ebf4fef2078c77e4fa7e5ba45f5c52ab76b577))
+
+## [0.4.7](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.6...outlook-semantic-mcp@0.4.7) (2026-05-18)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** ensure kql queries are sanitized properly, fallback to body if unique body is empty for forwarded emails. ([#557](https://github.com/Unique-AG/connectors/issues/557)) ([9d394af](https://github.com/Unique-AG/connectors/commit/9d394af790342d708a37ddb799d8dddd93db2534))
+
+## [0.4.6](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.5...outlook-semantic-mcp@0.4.6) (2026-05-15)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** list mailboxes for delegated access allowed only on folders  ([#547](https://github.com/Unique-AG/connectors/issues/547)) ([9a0ab75](https://github.com/Unique-AG/connectors/commit/9a0ab752ce3ded00b3abbafd4b20e7ce9323948d))
+
+## [0.4.5](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.4...outlook-semantic-mcp@0.4.5) (2026-05-14)
+
+
+### Features
+
+* **outlook-semantic-mcp,instrumentation,unique-api,deps:** un-19378, un-20248 add health endpoint, add more metrics, update logs and fix small mcp config issues ([#541](https://github.com/Unique-AG/connectors/issues/541)) ([052fcbc](https://github.com/Unique-AG/connectors/commit/052fcbcd918be0350fa4b6ccf8fdc5960b5e15ce))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** un-20047 add missing icons ([#544](https://github.com/Unique-AG/connectors/issues/544)) ([4d40342](https://github.com/Unique-AG/connectors/commit/4d4034289a65da9d7c3d8b6b56e7bad07f3a09f9))
+
+## [0.4.4](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.3...outlook-semantic-mcp@0.4.4) (2026-05-13)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** update headers for downloading attachments ([#538](https://github.com/Unique-AG/connectors/issues/538)) ([f821c50](https://github.com/Unique-AG/connectors/commit/f821c508e47e4e28733340aa88eb2d9757f7916c))
+
+## [0.4.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.2...outlook-semantic-mcp@0.4.3) (2026-05-11)
+
+
+### Bug Fixes
+
+* **deps,outlook-semantic-mcp:** argo sync ([#529](https://github.com/Unique-AG/connectors/issues/529)) ([8cb6650](https://github.com/Unique-AG/connectors/commit/8cb66500cb1a06e20ecc9dec8dfae097c7125f1f))
+
 ## [0.4.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@0.4.1...outlook-semantic-mcp@0.4.2) (2026-05-08)
 
 

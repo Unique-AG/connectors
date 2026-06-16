@@ -23,7 +23,7 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
   }
 
   public onModuleDestroy() {
-    if (this.config.scan === 'disabled' || this.config.scan === 'fullAccessOnly') {
+    if (this.config.scan === 'disabled' || this.config.scan === 'full_access_only') {
       return;
     }
     this.logger.log({ msg: 'VerifyDelegatedAccessSchedulerService is shutting down...' });
@@ -36,7 +36,7 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
   }
 
   private setupCronJob(): void {
-    if (this.config.scan === 'disabled' || this.config.scan === 'fullAccessOnly') {
+    if (this.config.scan === 'disabled' || this.config.scan === 'full_access_only') {
       return;
     }
     const job = new CronJob(this.config.verificationCronSchedule, async () => {
