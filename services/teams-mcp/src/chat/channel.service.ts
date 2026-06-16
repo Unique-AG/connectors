@@ -8,10 +8,38 @@ import { MsChannel, MsChannelSchema, MsTeam, MsTeamSchema } from './chat.dtos';
 export class ChannelService {
   private readonly logger = new Logger(ChannelService.name);
 
+  // Safety cap on Graph pagination so a pathological account cannot cause an
+  // unbounded number of follow-up requests.
+  private static readonly MAX_PAGES = 20;
+
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly traceService: TraceService,
   ) {}
+
+  // Collects every item of a Graph list response, following `@odata.nextLink`
+  // up to the page cap. Teams/channels lists are normally small, but a user
+  // with more than one page of either would otherwise be silently truncated —
+  // breaking list tools and name resolution alike.
+  private async fetchAllPages<T>(
+    client: ReturnType<GraphClientFactory['createClientForUser']>,
+    firstResponse: { value: unknown; '@odata.nextLink'?: string },
+    schema: z.ZodType<T>,
+  ): Promise<T[]> {
+    const all: T[] = [];
+    let response = firstResponse;
+
+    for (let page = 0; page < ChannelService.MAX_PAGES; page++) {
+      all.push(...z.array(schema).parse(response.value));
+      const nextLink = response['@odata.nextLink'];
+      if (!nextLink) {
+        break;
+      }
+      response = await client.api(nextLink).get();
+    }
+
+    return all;
+  }
 
   @Span()
   public async listTeams(userProfileId: string): Promise<MsTeam[]> {
@@ -23,7 +51,7 @@ export class ChannelService {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client.api('/me/joinedTeams').select('id,displayName,description').get();
 
-    const teams = z.array(MsTeamSchema).parse(response.value);
+    const teams = await this.fetchAllPages(client, response, MsTeamSchema);
 
     span?.setAttribute('result_count', teams.length);
     this.logger.debug({ userProfileId, count: teams.length }, 'Retrieved joined teams');
@@ -45,7 +73,7 @@ export class ChannelService {
       .select('id,displayName,description')
       .get();
 
-    const channels = z.array(MsChannelSchema).parse(response.value);
+    const channels = await this.fetchAllPages(client, response, MsChannelSchema);
 
     span?.setAttribute('result_count', channels.length);
     this.logger.debug({ userProfileId, teamId, count: channels.length }, 'Retrieved team channels');

@@ -18,7 +18,10 @@ export class ChatService {
   ) {}
 
   @Span()
-  public async listChats(userProfileId: string, limit = 50): Promise<MsChat[]> {
+  public async listChats(
+    userProfileId: string,
+    limit = 50,
+  ): Promise<{ chats: MsChat[]; hasMore: boolean }> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
 
@@ -33,11 +36,15 @@ export class ChatService {
       .get();
 
     const chats = z.array(MsChatSchema).parse(response.value);
+    // Report the real "more results" signal from Graph rather than inferring
+    // truncation from `count === limit`, which is wrong when the user has
+    // exactly `limit` chats and no further pages.
+    const hasMore = Boolean(response['@odata.nextLink']);
 
     span?.setAttribute('result_count', chats.length);
     this.logger.debug({ userProfileId, count: chats.length }, 'Retrieved chats');
 
-    return chats;
+    return { chats, hasMore };
   }
 
   @Span()

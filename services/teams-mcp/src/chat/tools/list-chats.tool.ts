@@ -86,13 +86,13 @@ export class ListChatsTool {
     this.logger.log({ userProfileId }, 'Listing chats for user');
 
     const effectiveLimit = input.limit ?? LIMIT;
-    const chats = await this.chatService.listChats(userProfileId, effectiveLimit);
+    const { chats, hasMore } = await this.chatService.listChats(userProfileId, effectiveLimit);
 
     span?.setAttribute('result_count', chats.length);
 
     return {
       chats: chats.map((c) => this.mapChat(c, input.includeMemberEmails)),
-      truncated: chats.length === effectiveLimit,
+      truncated: hasMore,
     };
   }
 
