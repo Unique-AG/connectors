@@ -18,6 +18,7 @@ import { DEFAULT_ROOT_SCOPE_ID, DEFAULT_ROOT_SCOPE_NAME } from '../scenario/defa
 import { defineScenario } from '../scenario/scenario.builder';
 import { uniqueScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 
 describe('root scope ownership', () => {
@@ -79,7 +80,7 @@ describe('root scope ownership', () => {
       'confc:cloud:cloud-1',
     );
     // The page was still ingested; the ownership check did not block the sync.
-    expect(state.files.map((file) => file.key)).toEqual(['tenant1/space-1_SP/p1']);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/p1'] });
   });
 
   // Cross-instance safety: another connector instance has already claimed the

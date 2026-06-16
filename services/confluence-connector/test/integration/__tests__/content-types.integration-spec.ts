@@ -19,6 +19,7 @@ import { page, space } from '../scenario/confluence-builders';
 import { DEFAULT_INGEST_ALL_LABEL, DEFAULT_INGEST_LABEL } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 
 describe('content types', () => {
@@ -47,10 +48,7 @@ describe('content types', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key).sort()).toEqual([
-      'tenant1/space-1_SP/blog-1',
-      'tenant1/space-1_SP/page-1',
-    ]);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/blog-1', 'tenant1/space-1_SP/page-1'] });
   });
 
   // Database, whiteboard, and embed pages are skipped even when directly
@@ -75,7 +73,10 @@ describe('content types', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key)).toEqual(['tenant1/space-1_SP/real-page']);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/real-page'] });
+    expectNotIngested(state, {
+      pages: ['tenant1/space-1_SP/db', 'tenant1/space-1_SP/wb', 'tenant1/space-1_SP/em'],
+    });
   });
 
   // The interesting case: an editor uses a database (or whiteboard, or embed)
@@ -123,10 +124,19 @@ describe('content types', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key).sort()).toEqual([
-      'tenant1/space-1_SP/db-child',
-      'tenant1/space-1_SP/em-child',
-      'tenant1/space-1_SP/wb-child',
-    ]);
+    expectIngested(state, {
+      pages: [
+        'tenant1/space-1_SP/db-child',
+        'tenant1/space-1_SP/em-child',
+        'tenant1/space-1_SP/wb-child',
+      ],
+    });
+    expectNotIngested(state, {
+      pages: [
+        'tenant1/space-1_SP/db-root',
+        'tenant1/space-1_SP/wb-root',
+        'tenant1/space-1_SP/em-root',
+      ],
+    });
   });
 });

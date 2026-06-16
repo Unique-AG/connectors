@@ -14,6 +14,7 @@ import { page, space } from '../scenario/confluence-builders';
 import { DEFAULT_INGEST_ALL_LABEL, DEFAULT_INGEST_LABEL } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 
 describe('subtree sync', () => {
@@ -45,11 +46,13 @@ describe('subtree sync', () => {
 
     const state = getUniqueState(ctx.unique);
     expect(state.scopes.map((scope) => scope.path)).toEqual(['/Confluence', '/Confluence/SP']);
-    expect(state.files.map((file) => file.key).sort()).toEqual([
-      'tenant1/space-1_SP/child-a',
-      'tenant1/space-1_SP/child-b',
-      'tenant1/space-1_SP/root',
-    ]);
+    expectIngested(state, {
+      pages: [
+        'tenant1/space-1_SP/child-a',
+        'tenant1/space-1_SP/child-b',
+        'tenant1/space-1_SP/root',
+      ],
+    });
   });
 
   // Multiple ai-ingest-all roots in the same space. Each tree is traversed
@@ -74,12 +77,14 @@ describe('subtree sync', () => {
 
     const state = getUniqueState(ctx.unique);
     expect(state.scopes.map((scope) => scope.path)).toEqual(['/Confluence', '/Confluence/SP']);
-    expect(state.files.map((file) => file.key).sort()).toEqual([
-      'tenant1/space-1_SP/eng-1',
-      'tenant1/space-1_SP/hr-1',
-      'tenant1/space-1_SP/root-eng',
-      'tenant1/space-1_SP/root-hr',
-    ]);
+    expectIngested(state, {
+      pages: [
+        'tenant1/space-1_SP/eng-1',
+        'tenant1/space-1_SP/hr-1',
+        'tenant1/space-1_SP/root-eng',
+        'tenant1/space-1_SP/root-hr',
+      ],
+    });
   });
 
   // Each space gets its own scope and partial-key namespace, so a multi-space
@@ -110,11 +115,13 @@ describe('subtree sync', () => {
       '/Confluence/ENG',
       '/Confluence/HR',
     ]);
-    expect(state.files.map((file) => file.key).sort()).toEqual([
-      'tenant1/space-eng_ENG/eng-child',
-      'tenant1/space-eng_ENG/eng-root',
-      'tenant1/space-hr_HR/hr-root',
-    ]);
+    expectIngested(state, {
+      pages: [
+        'tenant1/space-eng_ENG/eng-child',
+        'tenant1/space-eng_ENG/eng-root',
+        'tenant1/space-hr_HR/hr-root',
+      ],
+    });
   });
 
   // Scale check: an ai-ingest-all root with many descendants must ingest every
@@ -147,12 +154,15 @@ describe('subtree sync', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    const fileKeys = state.files.map((file) => file.key).sort();
 
-    expect(fileKeys).toHaveLength(DESCENDANT_COUNT + 1);
-    expect(fileKeys).toContain('tenant1/space-1_SP/root');
-    expect(fileKeys).toContain('tenant1/space-1_SP/child-01');
-    expect(fileKeys).toContain('tenant1/space-1_SP/child-50');
+    expect(state.files).toHaveLength(DESCENDANT_COUNT + 1);
+    expectIngested(state, {
+      pages: [
+        'tenant1/space-1_SP/root',
+        'tenant1/space-1_SP/child-01',
+        'tenant1/space-1_SP/child-50',
+      ],
+    });
   });
 
   // `ai-ingest` (single page) and `ai-ingest-all` (full subtree) coexist in one
@@ -175,11 +185,13 @@ describe('subtree sync', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key).sort()).toEqual([
-      'tenant1/space-1_SP/child',
-      'tenant1/space-1_SP/root',
-      'tenant1/space-1_SP/standalone',
-    ]);
+    expectIngested(state, {
+      pages: [
+        'tenant1/space-1_SP/child',
+        'tenant1/space-1_SP/root',
+        'tenant1/space-1_SP/standalone',
+      ],
+    });
   });
 
   // An ai-ingest page nested under an unlabeled parent. Label discovery is
@@ -207,6 +219,7 @@ describe('subtree sync', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key).sort()).toEqual(['tenant1/space-1_SP/child']);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/child'] });
+    expectNotIngested(state, { pages: ['tenant1/space-1_SP/parent'] });
   });
 });

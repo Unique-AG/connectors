@@ -25,6 +25,7 @@ import { DEFAULT_ROOT_SCOPE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { pageFile, spaceScope, uniqueScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 
 describe('root scope migration', () => {
@@ -92,17 +93,18 @@ describe('root scope migration', () => {
     // The space scope was created under the new root.
     expect(state.scopes.find((scope) => scope.path === '/Confluence v2/SP')).toBeDefined();
 
-    // Fresh content was ingested under the new root's space.
-    const newKeys = state.files.map((file) => file.key).sort();
-    expect(newKeys).toContain('tenant1/space-1_SP/p1');
+    // Fresh content was ingested under the new root's space, and the leftover
+    // file under the old root is left in place (migration does not move it).
+    expectIngested(state, {
+      pages: ['tenant1/space-1_SP/p1', 'tenant1/space-legacy_LEGACY/legacy-page'],
+    });
 
-    // Leftover content under the old root is untouched. Migration does not
-    // auto-move it. The operator owns that decision.
+    // Leftover scopes under the old root are untouched. Migration does not
+    // auto-move them. The operator owns that decision.
     const oldRoot = state.scopes.find((scope) => scope.id === 'old-root');
     expect(oldRoot).toBeDefined();
     expect(oldRoot?.externalId).toBeNull();
     expect(state.scopes.find((scope) => scope.id === 'scope-legacy')).toBeDefined();
-    expect(newKeys).toContain('tenant1/space-legacy_LEGACY/legacy-page');
   });
 
   // Conflict path: the operator pointed the tenant at a new root but forgot

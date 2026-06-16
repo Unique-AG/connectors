@@ -22,6 +22,7 @@ import { DEFAULT_ROOT_SCOPE_ID } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { pageFile, spaceScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 
 describe('moved content', () => {
@@ -57,11 +58,10 @@ describe('moved content', () => {
 
     // The file is preserved verbatim. Not re-ingested under the new key, not deleted.
     const state = getUniqueState(ctx.unique);
+    expectIngested(state, { pages: ['tenant1/space-1_OLD/p1'] });
+    expectNotIngested(state, { pages: ['tenant1/space-1_SP/p1'] });
     expect(state.files).toHaveLength(1);
-    expect(state.files[0]).toMatchObject({
-      key: 'tenant1/space-1_OLD/p1',
-      bodyText: '<p>Already-ingested body</p>',
-    });
+    expect(state.files[0]?.bodyText).toBe('<p>Already-ingested body</p>');
 
     // The move is counted, and nothing was classified as deleted.
     expect(recordFileDiffEvents).toHaveBeenCalledWith(1, 'moved');
@@ -94,15 +94,15 @@ describe('moved content', () => {
 
     expect(result).toEqual({ status: 'success' });
 
-    const keys = getUniqueState(ctx.unique)
-      .files.map((file) => file.key)
-      .sort();
-    expect(keys).toEqual([
-      // moved: untouched at its old key, not re-ingested under SP.
-      'tenant1/space-1_OLD/moved',
-      // new: ingested under SP. 'stale' is gone.
-      'tenant1/space-1_SP/fresh',
-    ]);
+    const state = getUniqueState(ctx.unique);
+    expectIngested(state, {
+      // moved: untouched at its old key. new: ingested under SP.
+      pages: ['tenant1/space-1_OLD/moved', 'tenant1/space-1_SP/fresh'],
+    });
+    expectNotIngested(state, {
+      // moved is not re-ingested under SP, and the stale page is deleted.
+      pages: ['tenant1/space-1_SP/moved', 'tenant1/space-1_SP/stale'],
+    });
 
     expect(recordFileDiffEvents).toHaveBeenCalledWith(1, 'moved');
     expect(recordFileDiffEvents).toHaveBeenCalledWith(1, 'new');

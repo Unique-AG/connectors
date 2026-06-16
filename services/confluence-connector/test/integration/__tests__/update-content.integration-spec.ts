@@ -30,6 +30,7 @@ import { DEFAULT_ROOT_SCOPE_ID } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { pageFile, spaceScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 
 const OLD_VERSION = '2026-01-01T00:00:00.000Z';
@@ -77,11 +78,9 @@ describe('update content', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/p1'] });
     expect(state.files).toHaveLength(1);
-    expect(state.files[0]).toMatchObject({
-      key: 'tenant1/space-1_SP/p1',
-      bodyText: '<p>Updated content</p>',
-    });
+    expect(state.files[0]?.bodyText).toBe('<p>Updated content</p>');
   });
 
   // Full-replacement carve-out: an editor archived old pages (p1, p2) and
@@ -107,9 +106,11 @@ describe('update content', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key).sort()).toEqual([
-      'tenant1/space-1_SP/p3',
-      'tenant1/space-1_SP/p4',
-    ]);
+    expectIngested(state, {
+      pages: ['tenant1/space-1_SP/p3', 'tenant1/space-1_SP/p4'],
+    });
+    expectNotIngested(state, {
+      pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p2'],
+    });
   });
 });

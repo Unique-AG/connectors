@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 import { pageWithAttachmentScenario } from '../scenarios/page-with-attachment.scenario';
 
@@ -54,8 +55,8 @@ describe('failure isolation', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    const fileKeys = state.files.map((file) => file.key).sort();
-    expect(fileKeys).toEqual(['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p3']);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p3'] });
+    expectNotIngested(state, { pages: ['tenant1/space-1_SP/p2'] });
   });
 
   // When Unique rejects registerContent for one page, IngestionService catches
@@ -77,8 +78,8 @@ describe('failure isolation', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    const fileKeys = state.files.map((file) => file.key).sort();
-    expect(fileKeys).toEqual(['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p3']);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p3'] });
+    expectNotIngested(state, { pages: ['tenant1/space-1_SP/p2'] });
   });
 
   // If an attachment download fails *after* its content was registered in
@@ -98,7 +99,7 @@ describe('failure isolation', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    const fileKeys = state.files.map((file) => file.key).sort();
-    expect(fileKeys).toEqual(['tenant1/space-1_SP/p1']);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/p1'] });
+    expectNotIngested(state, { attachments: ['tenant1/space-1_SP/p1::att-1'] });
   });
 });

@@ -12,6 +12,7 @@ import { page, space } from '../scenario/confluence-builders';
 import { DEFAULT_INGEST_LABEL, DEFAULT_SPACE_KEY, DEFAULT_SPACE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 import {
   pageWithAttachmentBytes,
@@ -57,6 +58,7 @@ describe('single-page sync', () => {
       }),
     ]);
 
+    expectIngested(state, { pages: ['tenant1/space-1_SP/p1'] });
     expect(state.files).toHaveLength(1);
     expect(state.files[0]).toMatchObject({
       key: 'tenant1/space-1_SP/p1',
@@ -80,8 +82,12 @@ describe('single-page sync', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    const filesByKey = new Map(state.files.map((file) => [file.key, file]));
+    expectIngested(state, {
+      pages: ['tenant1/space-1_SP/p1'],
+      attachments: ['tenant1/space-1_SP/p1::att-1'],
+    });
 
+    const filesByKey = new Map(state.files.map((file) => [file.key, file]));
     expect(filesByKey.size).toBe(2);
 
     expect(filesByKey.get('tenant1/space-1_SP/p1')).toMatchObject({
@@ -117,7 +123,10 @@ describe('single-page sync', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key)).toEqual(['tenant1/space-1_SP/labeled']);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/labeled'] });
+    expectNotIngested(state, {
+      pages: ['tenant1/space-1_SP/unlabeled-a', 'tenant1/space-1_SP/unlabeled-b'],
+    });
   });
 });
 

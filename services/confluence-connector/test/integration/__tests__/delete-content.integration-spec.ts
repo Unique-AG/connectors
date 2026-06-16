@@ -17,6 +17,7 @@ import { DEFAULT_ROOT_SCOPE_ID } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { attachmentFile, pageFile, spaceScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 
 describe('delete content', () => {
@@ -50,7 +51,8 @@ describe('delete content', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key)).toEqual(['tenant1/space-1_SP/keeper']);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/keeper'] });
+    expectNotIngested(state, { pages: ['tenant1/space-1_SP/removed'] });
   });
 
   // A page is still in Confluence but one of its attachments has been removed.
@@ -85,9 +87,10 @@ describe('delete content', () => {
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
-    expect(state.files.map((file) => file.key).sort()).toEqual([
-      'tenant1/space-1_SP/p1',
-      'tenant1/space-1_SP/p1::att-keeper',
-    ]);
+    expectIngested(state, {
+      pages: ['tenant1/space-1_SP/p1'],
+      attachments: ['tenant1/space-1_SP/p1::att-keeper'],
+    });
+    expectNotIngested(state, { attachments: ['tenant1/space-1_SP/p1::att-removed'] });
   });
 });

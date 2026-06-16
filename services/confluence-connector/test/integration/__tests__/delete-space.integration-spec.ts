@@ -16,6 +16,7 @@ import { DEFAULT_ROOT_SCOPE_ID } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { pageFile, spaceScope } from '../scenario/unique-builders';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
+import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 
 describe('delete space', () => {
@@ -73,7 +74,10 @@ describe('delete space', () => {
       '/Confluence/ENG',
     ]);
 
-    expect(state.files.map((file) => file.key)).toEqual(['tenant1/space-eng_ENG/eng-1']);
+    expectIngested(state, { pages: ['tenant1/space-eng_ENG/eng-1'] });
+    expectNotIngested(state, {
+      pages: ['tenant1/space-hr_HR/hr-1', 'tenant1/space-hr_HR/hr-2'],
+    });
   });
 
   // The HR space has been entirely deleted on the Confluence side (admin
@@ -123,7 +127,8 @@ describe('delete space', () => {
       '/Confluence',
       '/Confluence/ENG',
     ]);
-    expect(state.files.map((file) => file.key)).toEqual(['tenant1/space-eng_ENG/eng-1']);
+    expectIngested(state, { pages: ['tenant1/space-eng_ENG/eng-1'] });
+    expectNotIngested(state, { pages: ['tenant1/space-hr_HR/hr-1'] });
   });
 
   // No-change baseline: the seeded scope and file already match the current
@@ -156,6 +161,6 @@ describe('delete space', () => {
     expect(state.scopes.find((scope) => scope.path === '/Confluence/SP')?.externalId).toBe(
       'confc:tenant1:space-1:SP',
     );
-    expect(state.files.map((file) => file.key)).toEqual(['tenant1/space-1_SP/p1']);
+    expectIngested(state, { pages: ['tenant1/space-1_SP/p1'] });
   });
 });
