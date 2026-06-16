@@ -6,6 +6,7 @@ import { ConfluencePageScanner } from '../../../src/synchronization/confluence-p
 import { ConfluenceSynchronizationService } from '../../../src/synchronization/confluence-synchronization.service';
 import { FileDiffService } from '../../../src/synchronization/file-diff.service';
 import { IngestionService } from '../../../src/synchronization/ingestion.service';
+import { RootScopeMigrationService } from '../../../src/synchronization/root-scope-migration.service';
 import { ScopeManagementService } from '../../../src/synchronization/scope-management.service';
 import type { TenantContext } from '../../../src/tenant';
 import { TenantDeleteService, tenantStorage } from '../../../src/tenant';
@@ -78,6 +79,7 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
     fakeConfluence,
     fakeUnique,
     metrics,
+    new RootScopeMigrationService(fakeUnique),
   );
 
   const syncService = new ConfluenceSynchronizationService(

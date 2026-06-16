@@ -137,7 +137,8 @@ export class FakeUniqueApi implements UniqueApiClient {
         return created;
       },
       getById: async (id) => this.scopesById.get(id) ?? null,
-      getByExternalId: notImplemented('scopes.getByExternalId'),
+      getByExternalId: async (externalId) =>
+        [...this.scopesById.values()].find((scope) => scope.externalId === externalId) ?? null,
       getByExternalIds: notImplemented('scopes.getByExternalIds'),
       updateExternalId: async (scopeId, externalId) => {
         const scope = this.requireScope(scopeId);
@@ -152,6 +153,19 @@ export class FakeUniqueApi implements UniqueApiClient {
         return { id: scope.id, externalId: scope.externalId };
       },
       updateParent: notImplemented('scopes.updateParent'),
+      bulkMove: async (scopeIds, targetScopeId) => {
+        for (const scopeId of scopeIds) {
+          const scope = this.requireScope(scopeId);
+          scope.parentId = targetScopeId;
+        }
+        return {
+          scopeIds,
+          asyncMetadataRebuild: false,
+          jobId: null,
+          affectedFiles: null,
+          message: null,
+        };
+      },
       listChildren: async (parentId) =>
         [...this.scopesById.values()].filter((scope) => scope.parentId === parentId),
       createAccesses: async (_scopeId: string, _accesses: ScopeAccess[]) => {
