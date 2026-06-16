@@ -70,9 +70,15 @@ export class SearchService {
     span?.setAttribute('detail', params.detail);
 
     const queryString = buildSearchQuery(params);
-    span?.setAttribute('query_string', queryString);
+    // The assembled KQL contains user free-text and identity filters
+    // (from/to/mentions) and is treated as sensitive: it is never written to
+    // spans or logs. Record only its length for debugging.
+    span?.setAttribute('query_length', queryString.length);
 
-    this.logger.debug({ userProfileId, queryString, source: params.source }, 'Searching messages');
+    this.logger.debug(
+      { userProfileId, queryLength: queryString.length, source: params.source },
+      'Searching messages',
+    );
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const body = {
