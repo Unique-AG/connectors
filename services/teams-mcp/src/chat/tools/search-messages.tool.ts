@@ -9,13 +9,17 @@ const SearchMessagesInputSchema = z
   .object({
     query: z
       .string()
+      .trim()
+      .min(1)
       .optional()
       .describe('Free-text keywords to match in message content. Multi-word terms are quoted.'),
     from: z
       .string()
+      .trim()
+      .min(1)
       .optional()
       .describe('Sender name or email (KQL `from:`). Matches the message author.'),
-    to: z.string().optional().describe('Recipient name or email (KQL `to:`).'),
+    to: z.string().trim().min(1).optional().describe('Recipient name or email (KQL `to:`).'),
     mentions: z
       .uuid()
       .optional()
