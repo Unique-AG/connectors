@@ -16,9 +16,10 @@ function toKeys(content: ExpectedContent): string[] {
  * is present.
  */
 export function expectIngested(state: UniqueState, content: ExpectedContent): void {
-  const present = new Set(state.files.map((file) => file.key));
-  const missing = toKeys(content).filter((key) => !present.has(key));
-  expect(missing).toEqual([]);
+  const present = state.files.map((file) => file.key);
+  for (const key of toKeys(content)) {
+    expect(present).toContain(key);
+  }
 }
 
 /**
@@ -26,7 +27,8 @@ export function expectIngested(state: UniqueState, content: ExpectedContent): vo
  * content the sync should have filtered out or deleted.
  */
 export function expectNotIngested(state: UniqueState, content: ExpectedContent): void {
-  const present = new Set(state.files.map((file) => file.key));
-  const unexpected = toKeys(content).filter((key) => present.has(key));
-  expect(unexpected).toEqual([]);
+  const present = state.files.map((file) => file.key);
+  for (const key of toKeys(content)) {
+    expect(present).not.toContain(key);
+  }
 }
