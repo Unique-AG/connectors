@@ -11,7 +11,6 @@ import { page, space } from '../scenario/confluence-builders';
 import { DEFAULT_INGEST_LABEL, DEFAULT_SPACE_KEY, DEFAULT_SPACE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
 import { buildScenarioContext, type ScenarioContext } from '../scenario-context/scenario-context';
-import { sha256 } from '../scenario-context/hash';
 import { expectIngested, expectNotIngested } from '../scenario-context/unique-expecter';
 import { getUniqueState } from '../scenario-context/unique-state';
 import {
@@ -98,8 +97,7 @@ describe('single-page sync', () => {
     expect(filesByKey.get('tenant1/space-1_SP/p1::att-1')).toMatchObject({
       mimeType: 'application/pdf',
       byteSize: pageWithAttachmentBytes.byteLength,
-      bodySize: pageWithAttachmentBytes.byteLength,
-      bodyHash: sha256(pageWithAttachmentBytes),
+      body: pageWithAttachmentBytes,
     });
   });
 
@@ -129,4 +127,3 @@ describe('single-page sync', () => {
     });
   });
 });
-

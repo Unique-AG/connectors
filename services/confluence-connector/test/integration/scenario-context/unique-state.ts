@@ -1,7 +1,6 @@
 import type { IngestionConfig } from '@unique-ag/unique-api';
 import { sortBy } from 'remeda';
 import type { FakeUniqueApi } from '../fakes/fake-unique-api';
-import { sha256 } from './hash';
 
 export interface UniqueScopeState {
   id: string;
@@ -18,8 +17,7 @@ export interface UniqueFileState {
   byteSize: number;
   mimeType: string;
   metadata: Record<string, string> | null;
-  bodyHash: string | null;
-  bodySize: number;
+  body: Buffer | null;
   bodyText: string | null;
   ingestionConfig: IngestionConfig | null;
 }
@@ -61,8 +59,7 @@ export function getUniqueState(unique: FakeUniqueApi): UniqueState {
       byteSize: file.byteSize,
       mimeType: file.mimeType,
       metadata: file.metadata,
-      bodyHash: file.body ? sha256(file.body) : null,
-      bodySize: file.body?.byteLength ?? 0,
+      body: file.body ?? null,
       bodyText: bodyTextOrNull(file.mimeType, file.body),
       ingestionConfig: file.ingestionConfig,
     })),
