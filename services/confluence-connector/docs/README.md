@@ -74,9 +74,9 @@ When attachment ingestion is enabled, images embedded in a Confluence page (PNG 
 
 Both attachments of the page itself and attachments from another page in the same instance (referenced via `<ri:attachment><ri:page/></ri:attachment>`) are resolved through the existing Confluence client. External image references (`<ac:image><ri:url ri:value="https://..."/></ac:image>`) are left untouched in the HTML and never fetched.
 
-When an image cannot be inlined it falls back to the standalone attachment ingestion path. This safety net catches: image attachments that no page references, downloads that fail, images larger than `attachments.maxFileSizeMb`, and references to an attachment on another page whose referenced page or filename cannot be resolved.
+When inlining is enabled, image attachments are not ingested as standalone artifacts. Orphan images (attached to the page but not referenced by an in-body macro) are appended to the end of the page body so their content is still inlined. A macro-referenced image that cannot be inlined (download failure, larger than `attachments.maxFileSizeMb`, a MIME type not in `allowedMimeTypes`, or a cross-page reference whose page or filename cannot be resolved) keeps its original macro and is not ingested elsewhere.
 
-`attachments.imageOcr` (enabled by default) only affects images that go through the standalone path. Set it to `disabled` to defer to the destination scope's own `ingestionConfig.jpgReadMode`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service and should be left out of `allowedMimeTypes`.
+`attachments.imageOcr` (enabled by default) only applies when inlining is off and images go through the standalone path. Set it to `disabled` to defer to the destination scope's own `ingestionConfig.jpgReadMode`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service and should be left out of `allowedMimeTypes`.
 
 **Skipped Content Types**
 
@@ -136,7 +136,7 @@ flowchart TB
     Diff["Compute File Diff"]
     EnsureScopes["Ensure Space Scopes"]
     IngestPages["Ingest Pages (inline images into HTML)"]
-    IngestAttachments["Ingest Remaining Attachments (non-images + orphan images)"]
+    IngestAttachments["Ingest Remaining Attachments (non-images; images are inlined)"]
     Delete["Delete Removed Items"]
     Done(("Done"))
   end
@@ -202,7 +202,7 @@ sequenceDiagram
         end
         Connector->>Unique: Register, upload, finalize (single page artifact)
 
-        Connector->>Confluence: Download remaining (non-image / orphan) attachment streams
+        Connector->>Confluence: Download remaining (non-image) attachment streams
         Confluence->>Connector: File stream
         Connector->>Unique: Register, upload, finalize
 
