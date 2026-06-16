@@ -19,7 +19,7 @@
  *    first (typically via the tenant-deletion flow). If the old root still
  *    holds the externalId, the new sync will fail with a clear conflict.
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
 import { DEFAULT_ROOT_SCOPE_NAME } from '../scenario/defaults';
 import { defineScenario } from '../scenario/scenario.builder';
@@ -78,12 +78,19 @@ describe('root scope migration', () => {
       },
     });
     ctx = buildScenarioContext(scenario);
+    const registerContent = vi.spyOn(ctx.unique.ingestion, 'registerContent');
 
     const result = await ctx.runSync();
 
     expect(result).toEqual({ status: 'success' });
 
     const state = getUniqueState(ctx.unique);
+
+    // Only the genuinely new page is ingested. The leftover content under the
+    // old root is never re-ingested: migration does not move or rewrite it, so
+    // no ingestion call is made for it.
+    const ingestedKeys = registerContent.mock.calls.map((call) => call[0].key);
+    expect(ingestedKeys).toEqual(['tenant1/space-1_SP/p1']);
 
     // The new root has been claimed and now hosts the freshly ingested page.
     const newRoot = state.scopes.find((scope) => scope.id === 'new-root');
