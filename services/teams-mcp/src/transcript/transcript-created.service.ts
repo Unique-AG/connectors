@@ -7,6 +7,7 @@ import type { TypeID } from 'typeid-js';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { TRANSCRIPT_MIME_TYPE } from '~/unique/unique.consts';
 import { UniqueService } from '~/unique/unique.service';
 import {
   CreatedEventDto,
@@ -277,7 +278,7 @@ export class TranscriptCreatedService {
         content: () =>
           client
             .api(`${ownerPath}/onlineMeetings/${meetingId}/transcripts/${transcriptId}/content`)
-            .header('Accept', 'text/vtt')
+            .header('Accept', TRANSCRIPT_MIME_TYPE)
             .getStream(),
       },
       recording ?? undefined,

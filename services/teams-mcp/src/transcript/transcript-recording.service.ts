@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { RECORDING_MIME_TYPE } from '~/unique/unique.consts';
 import { RecordingCollection } from './transcript.dtos';
 
 export interface RecordingData {
@@ -71,7 +72,7 @@ export class TranscriptRecordingService {
         content: () =>
           client
             .api(`${ownerPath}/onlineMeetings/${meetingId}/recordings/${recording.id}/content`)
-            .header('Accept', 'video/mp4')
+            .header('Accept', RECORDING_MIME_TYPE)
             .getStream(),
         startDateTime: recording.createdDateTime,
         endDateTime: recording.endDateTime,

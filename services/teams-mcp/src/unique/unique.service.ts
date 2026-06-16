@@ -5,7 +5,12 @@ import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import type { UniqueConfigNamespaced } from '~/config';
-import { TEAMS_SOURCE_KIND, TEAMS_SOURCE_NAME } from './unique.consts';
+import {
+  RECORDING_MIME_TYPE,
+  TEAMS_SOURCE_KIND,
+  TEAMS_SOURCE_NAME,
+  TRANSCRIPT_MIME_TYPE,
+} from './unique.consts';
 import {
   type PublicScopeAccessSchema,
   ScopeAccessEntityType,
@@ -145,7 +150,7 @@ export class UniqueService {
         sourceOwnerType: SourceOwnerType.Company,
         input: {
           key: transcript.id,
-          mimeType: 'text/vtt',
+          mimeType: TRANSCRIPT_MIME_TYPE,
           title: meeting.subject || 'Untitled Meeting',
           byteSize: 1,
           metadata: this.buildContentMetadata(meeting),
@@ -155,7 +160,7 @@ export class UniqueService {
       await this.contentService.uploadToStorage(
         transcriptUpload.writeUrl,
         transcriptSpool,
-        'text/vtt',
+        TRANSCRIPT_MIME_TYPE,
       );
 
       await this.contentService.upsertContent({
@@ -167,7 +172,7 @@ export class UniqueService {
         fileUrl: transcriptUpload.readUrl,
         input: {
           key: transcript.id,
-          mimeType: 'text/vtt',
+          mimeType: TRANSCRIPT_MIME_TYPE,
           title: meeting.subject || 'Untitled Meeting',
         },
       });
@@ -224,7 +229,7 @@ export class UniqueService {
             sourceOwnerType: SourceOwnerType.Company,
             input: {
               key: recording.id,
-              mimeType: 'video/mp4',
+              mimeType: RECORDING_MIME_TYPE,
               title: meeting.subject || 'Untitled Meeting',
               byteSize: 1,
               ingestionConfig: {
@@ -236,7 +241,7 @@ export class UniqueService {
           await this.contentService.uploadToStorage(
             recordingUpload.writeUrl,
             recordingSpool,
-            'video/mp4',
+            RECORDING_MIME_TYPE,
           );
           await this.contentService.upsertContent({
             storeInternally: true,
@@ -247,7 +252,7 @@ export class UniqueService {
             fileUrl: recordingUpload.readUrl,
             input: {
               key: recording.id,
-              mimeType: 'video/mp4',
+              mimeType: RECORDING_MIME_TYPE,
               title: meeting.subject || 'Untitled Meeting',
               ingestionConfig: {
                 uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,

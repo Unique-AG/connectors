@@ -1,3 +1,4 @@
+import { TRANSCRIPT_MIME_TYPE } from '~/unique/unique.consts';
 import { type MetadataFilter, UniqueQLOperator } from '~/unique/unique.dtos';
 
 export interface TranscriptFilterInput {
@@ -28,7 +29,7 @@ export function buildTranscriptFilter(input: TranscriptFilterInput): MetadataFil
     {
       path: ['mimeType'],
       operator: UniqueQLOperator.EQUALS,
-      value: 'text/vtt',
+      value: TRANSCRIPT_MIME_TYPE,
     },
   ];
 
