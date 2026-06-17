@@ -9,6 +9,10 @@ const REQUIRED_FIELDS = {
   scopeId: 'scope-abc',
 };
 
+const validPageIngestionConfig = {
+  htmlConfig: { imageContentExtraction: { enabled: true, languageModel: 'a-model' } },
+};
+
 describe('IngestionConfigSchema', () => {
   describe('defaults', () => {
     it('applies enabled default to storeInternally', () => {
@@ -116,5 +120,84 @@ describe('IngestionConfigSchema', () => {
         IngestionConfigSchema.parse({ ...REQUIRED_FIELDS, attachments: { maxFileSizeMb: 0 } }),
       ).toThrow();
     });
+  });
+});
+
+describe('IngestionConfigSchema inlineImagesEnabled', () => {
+  it('enables inlining when pageIngestionConfig carries the image extraction model', () => {
+    const config = IngestionConfigSchema.parse({
+      ...REQUIRED_FIELDS,
+      pageIngestionConfig: validPageIngestionConfig,
+    });
+    expect(config.inlineImagesEnabled).toBe(true);
+  });
+
+  it('disables inlining when pageIngestionConfig is absent', () => {
+    const config = IngestionConfigSchema.parse(REQUIRED_FIELDS);
+    expect(config.inlineImagesEnabled).toBe(false);
+  });
+
+  it('disables inlining when imageContentExtraction.enabled is missing', () => {
+    const config = IngestionConfigSchema.parse({
+      ...REQUIRED_FIELDS,
+      pageIngestionConfig: { htmlConfig: { imageContentExtraction: { languageModel: 'a-model' } } },
+    });
+    expect(config.inlineImagesEnabled).toBe(false);
+  });
+
+  it('disables inlining when imageContentExtraction.enabled is false', () => {
+    const config = IngestionConfigSchema.parse({
+      ...REQUIRED_FIELDS,
+      pageIngestionConfig: {
+        htmlConfig: { imageContentExtraction: { enabled: false, languageModel: 'a-model' } },
+      },
+    });
+    expect(config.inlineImagesEnabled).toBe(false);
+  });
+
+  it('leaves attachment flags independent of inlining', () => {
+    const config = IngestionConfigSchema.parse({
+      ...REQUIRED_FIELDS,
+      attachments: { imageOcr: 'enabled' },
+    });
+    expect(config.inlineImagesEnabled).toBe(false);
+    expect(config.attachments.imageOcrEnabled).toBe(true);
+  });
+});
+
+describe('IngestionConfigSchema image extraction validation', () => {
+  it('rejects imageContentExtraction.enabled true with the model missing', () => {
+    expect(() =>
+      IngestionConfigSchema.parse({
+        ...REQUIRED_FIELDS,
+        pageIngestionConfig: { htmlConfig: { imageContentExtraction: { enabled: true } } },
+      }),
+    ).toThrow(/languageModel is missing or empty/);
+  });
+
+  it('rejects imageContentExtraction.enabled true with an empty model', () => {
+    expect(() =>
+      IngestionConfigSchema.parse({
+        ...REQUIRED_FIELDS,
+        pageIngestionConfig: {
+          htmlConfig: { imageContentExtraction: { enabled: true, languageModel: '   ' } },
+        },
+      }),
+    ).toThrow(/languageModel is missing or empty/);
+  });
+});
+
+describe('IngestionConfigSchema pageIngestionConfig', () => {
+  it('is forwarded verbatim as an opaque object', () => {
+    const config = IngestionConfigSchema.parse({
+      ...REQUIRED_FIELDS,
+      pageIngestionConfig: validPageIngestionConfig,
+    });
+    expect(config.pageIngestionConfig).toEqual(validPageIngestionConfig);
+  });
+
+  it('is optional and undefined when omitted', () => {
+    const config = IngestionConfigSchema.parse(REQUIRED_FIELDS);
+    expect(config.pageIngestionConfig).toBeUndefined();
   });
 });

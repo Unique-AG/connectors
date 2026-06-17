@@ -41,6 +41,11 @@ connectorConfig:
             - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
           maxFileSizeMb: 100
           imageOcr: enabled
+        pageIngestionConfig:
+          htmlConfig:
+            imageContentExtraction:
+              enabled: true
+              languageModel: AZURE_GPT_4o_2024_1120
 
 proxyConfig:
   enabled: true

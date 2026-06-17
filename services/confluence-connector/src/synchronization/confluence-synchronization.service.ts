@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { elapsedSeconds } from '@unique-ag/utils';
 import { Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
+import { groupBy } from 'remeda';
 import type { SyncResult } from '../health/sync-result.types';
 import { type Metrics, SyncPhase } from '../metrics';
 import { getCurrentTenant } from '../tenant';
@@ -9,6 +10,8 @@ import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
+import { isImageMimeType } from './mime-type';
+import type { PageImageInliner } from './page-image-inliner';
 import type { ScopeManagementService } from './scope-management.service';
 import type { DiscoveredAttachment, DiscoveredPage } from './sync.types';
 
@@ -22,6 +25,7 @@ export class ConfluenceSynchronizationService {
     private readonly contentFetcher: ConfluenceContentFetcher,
     private readonly fileDiffService: FileDiffService,
     private readonly ingestionService: IngestionService,
+    private readonly pageImageInliner: PageImageInliner,
     private readonly scopeManagementService: ScopeManagementService,
     private readonly metrics: Metrics,
   ) {}
@@ -50,6 +54,7 @@ export class ConfluenceSynchronizationService {
       const scanStartTime = Date.now();
       const { pages: discoveredPages, attachments: discoveredAttachments } =
         await this.scanner.discoverPages();
+
       this.metrics.recordScanDuration(elapsedSeconds(scanStartTime));
       this.logger.log({
         count: discoveredPages.length,
@@ -62,15 +67,22 @@ export class ConfluenceSynchronizationService {
         discoveredAttachments,
       );
 
+      // we either inline images in the page, or ingest them separately with no inlining.
+      // when inlining we must exclude them from file-diff else we will ingest them twice: inlined and as attachment.
+      const trackedAttachments = tenant.config.ingestion.inlineImagesEnabled
+        ? discoveredAttachments.filter((a) => !isImageMimeType(a.mediaType))
+        : discoveredAttachments;
+
       const diffResult = await this.fileDiffService.computeDiff(
         discoveredPages,
-        discoveredAttachments,
+        trackedAttachments,
       );
 
       const itemIdsToProcess = new Set([...diffResult.newItemIds, ...diffResult.updatedItemIds]);
       const pagesToFetch = discoveredPages.filter((p) => itemIdsToProcess.has(p.id));
-      const attachmentsToIngest = discoveredAttachments.filter((a) =>
-        itemIdsToProcess.has(`${a.pageId}::${a.id}`),
+
+      const attachmentsToIngest = trackedAttachments.filter((discoveredAttachment) =>
+        itemIdsToProcess.has(`${discoveredAttachment.pageId}::${discoveredAttachment.id}`),
       );
 
       if (pagesToFetch.length > 0 || attachmentsToIngest.length > 0) {
@@ -89,13 +101,25 @@ export class ConfluenceSynchronizationService {
           allSpaceKeyToSpaceId,
         );
 
-        const concurrency = tenant.config.processing.concurrency;
+        const imageAttachmentsByPageId = groupBy(
+          discoveredAttachments.filter((a) => isImageMimeType(a.mediaType)),
+          (a) => a.pageId,
+        );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingPages);
-        await this.fetchAndIngestPages(pagesToFetch, spaceScopes, concurrency);
+        await this.fetchAndIngestPages(
+          pagesToFetch,
+          spaceScopes,
+          tenant.config.processing.concurrency,
+          imageAttachmentsByPageId,
+        );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingAttachments);
-        await this.ingestAttachments(attachmentsToIngest, spaceScopes, concurrency);
+        await this.ingestAttachments(
+          attachmentsToIngest,
+          spaceScopes,
+          tenant.config.processing.concurrency,
+        );
       }
 
       if (diffResult.deletedItems.length > 0) {
@@ -129,6 +153,7 @@ export class ConfluenceSynchronizationService {
     pages: DiscoveredPage[],
     spaceScopes: Map<string, string>,
     concurrency: number,
+    imageAttachmentsByPageId: Readonly<Partial<Record<string, DiscoveredAttachment[]>>>,
   ): Promise<void> {
     const limit = pLimit(concurrency);
 
@@ -154,7 +179,14 @@ export class ConfluenceSynchronizationService {
           }
           const scopeId = spaceScopes.get(page.spaceKey);
           assert.ok(scopeId, `No scope resolved for space: ${page.spaceKey}`);
-          await this.ingestionService.ingestPage(fetched, scopeId);
+
+          const pageImageAttachments = imageAttachmentsByPageId[page.id] ?? [];
+          const pageToIngest = await this.pageImageInliner.inlineImagesInPage(
+            fetched,
+            pageImageAttachments,
+          );
+          await this.ingestionService.ingestPage(pageToIngest, scopeId);
+
           ingested++;
           this.metrics.recordPagesProcessed(1, 'success');
         })
@@ -195,9 +227,11 @@ export class ConfluenceSynchronizationService {
       return;
     }
 
+    const total = attachments.length;
+    this.logger.log({ total, msg: 'Starting attachment ingestion' });
+
     const limit = pLimit(concurrency);
     let processed = 0;
-    const total = attachments.length;
 
     let ingested = 0;
 
