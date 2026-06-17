@@ -339,15 +339,15 @@ export class FakeUniqueApi implements UniqueApiClient {
 
     // The diff is scoped to a single partial key, mirroring Unique's per-space
     // file-diff: only content stored under this partial key is compared against
-    // the submitted items. Content under other partial keys is invisible here,
+    // the submitted items. Content under other partial keys is not considered,
     // so a page that exists under a different space is simply "new" to this
     // space (a cross-space move surfaces as new-here plus deleted-there, not as
     // a single move).
-    const here = new Map<string, StoredFile>();
+    const existingByItemId = new Map<string, StoredFile>();
     for (const file of this.filesById.values()) {
       if (file.key.startsWith(prefix)) {
         const itemId = file.key.slice(file.key.lastIndexOf('/') + 1);
-        here.set(itemId, file);
+        existingByItemId.set(itemId, file);
       }
     }
 
@@ -356,17 +356,17 @@ export class FakeUniqueApi implements UniqueApiClient {
     const deletedFiles: string[] = [];
 
     for (const [itemId, item] of submitted) {
-      const current = here.get(itemId);
-      if (!current) {
+      const existing = existingByItemId.get(itemId);
+      if (!existing) {
         newFiles.push(itemId);
         continue;
       }
-      if (current.updatedAt < item.updatedAt) {
+      if (existing.updatedAt < item.updatedAt) {
         updatedFiles.push(itemId);
       }
     }
 
-    for (const itemId of here.keys()) {
+    for (const itemId of existingByItemId.keys()) {
       if (!submitted.has(itemId)) {
         deletedFiles.push(itemId);
       }
