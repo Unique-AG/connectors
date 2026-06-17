@@ -24,6 +24,8 @@
     "check-all": "pnpm style:fix && pnpm check-types",
     "test": "vitest run",
     "test:watch": "vitest watch",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:watch": "vitest watch --config vitest.integration.config.ts",
     "test:coverage": "vitest run --config vitest.coverage.config.ts && istanbul-badges-readme --style='square-flat'"
   },
   "dependencies": {
@@ -82,5 +84,6 @@
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
     "vitest": "3.2.6"
-  }
+  },
+  "packageManager": "pnpm@10.28.1"
 }
