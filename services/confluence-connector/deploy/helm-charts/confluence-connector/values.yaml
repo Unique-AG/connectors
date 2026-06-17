@@ -223,9 +223,10 @@ connectorConfig:
         #   # -- (default: enabled)
         #   imageOcr: enabled
         # -- Ingestion configuration applied to each ingested page. Setting
+        # -- htmlConfig.imageContentExtraction.enabled to true and
         # -- htmlConfig.imageContentExtraction.languageModel to the visual LLM configured
         # -- in Knowledge Base turns on inlining of page images as base64 data URIs
-        # -- (requires Unique platform 2026.24.0+); without it, images fall back to
+        # -- (requires Unique platform 2026.24.0+); without both, images fall back to
         # -- standalone attachment ingestion.
         # pageIngestionConfig:
         #   htmlConfig:

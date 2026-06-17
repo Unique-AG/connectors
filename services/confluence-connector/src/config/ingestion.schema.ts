@@ -10,12 +10,16 @@ const IngestionModeSchema = z.enum([IngestionMode.Flat]).prefault(IngestionMode.
 
 /**
  * The slice of the opaque pageIngestionConfig the platform requires to extract text from
- * inlined page images. Its presence is what turns image inlining on; the config is still
- * forwarded verbatim.
+ * inlined page images: imageContentExtraction must be enabled and name a visual language model.
+ * Both are forwarded verbatim to the ingestion request; their presence is also what turns image
+ * inlining on, so the connector never inlines images the platform cannot extract.
  */
 const ImageExtractionModelSchema = z.object({
   htmlConfig: z.object({
-    imageContentExtraction: z.object({ languageModel: requiredStringSchema }),
+    imageContentExtraction: z.object({
+      enabled: z.literal(true),
+      languageModel: requiredStringSchema,
+    }),
   }),
 });
 
@@ -72,7 +76,7 @@ export const IngestionConfigSchema = z
       .record(z.string(), z.unknown())
       .optional()
       .describe(
-        'Ingestion configuration applied to each ingested page. Providing htmlConfig.imageContentExtraction.languageModel turns on inlining of page images as base64 data URIs (requires Unique platform 2026.24.0+); without it, images fall back to standalone attachment ingestion',
+        'Ingestion configuration applied to each ingested page. Setting htmlConfig.imageContentExtraction.enabled to true and htmlConfig.imageContentExtraction.languageModel to a visual LLM turns on inlining of page images as base64 data URIs (requires Unique platform 2026.24.0+); without both, images fall back to standalone attachment ingestion',
       ),
   })
   .transform((cfg) => ({

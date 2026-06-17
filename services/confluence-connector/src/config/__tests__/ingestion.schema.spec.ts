@@ -37,6 +37,24 @@ describe('IngestionConfigSchema inlineImagesEnabled', () => {
     expect(config.inlineImagesEnabled).toBe(false);
   });
 
+  it('disables inlining when imageContentExtraction.enabled is missing', () => {
+    const config = IngestionConfigSchema.parse({
+      scopeId: 'root-scope',
+      pageIngestionConfig: { htmlConfig: { imageContentExtraction: { languageModel: 'a-model' } } },
+    });
+    expect(config.inlineImagesEnabled).toBe(false);
+  });
+
+  it('disables inlining when imageContentExtraction.enabled is false', () => {
+    const config = IngestionConfigSchema.parse({
+      scopeId: 'root-scope',
+      pageIngestionConfig: {
+        htmlConfig: { imageContentExtraction: { enabled: false, languageModel: 'a-model' } },
+      },
+    });
+    expect(config.inlineImagesEnabled).toBe(false);
+  });
+
   it('leaves attachment flags independent of inlining', () => {
     const config = IngestionConfigSchema.parse({
       scopeId: 'root-scope',
