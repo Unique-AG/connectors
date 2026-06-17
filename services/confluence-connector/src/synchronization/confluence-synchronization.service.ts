@@ -67,7 +67,7 @@ export class ConfluenceSynchronizationService {
         discoveredAttachments,
       );
 
-      // we either inline images in the page, either ingest them separately with no inlining.
+      // we either inline images in the page, or ingest them separately with no inlining.
       // when inlining we must exclude them from file-diff else we will ingest them twice: inlined and as attachment.
       const trackedAttachments = tenant.config.ingestion.inlineImagesEnabled
         ? discoveredAttachments.filter((a) => !isImageMimeType(a.mediaType))
