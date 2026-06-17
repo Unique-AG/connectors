@@ -137,24 +137,6 @@ describe('IngestionConfigSchema inlineImagesEnabled', () => {
     expect(config.inlineImagesEnabled).toBe(false);
   });
 
-  it('disables inlining when the image extraction model is missing', () => {
-    const config = IngestionConfigSchema.parse({
-      ...REQUIRED_FIELDS,
-      pageIngestionConfig: { htmlConfig: { imageContentExtraction: { enabled: true } } },
-    });
-    expect(config.inlineImagesEnabled).toBe(false);
-  });
-
-  it('disables inlining when the image extraction model is an empty string', () => {
-    const config = IngestionConfigSchema.parse({
-      ...REQUIRED_FIELDS,
-      pageIngestionConfig: {
-        htmlConfig: { imageContentExtraction: { enabled: true, languageModel: '   ' } },
-      },
-    });
-    expect(config.inlineImagesEnabled).toBe(false);
-  });
-
   it('disables inlining when imageContentExtraction.enabled is missing', () => {
     const config = IngestionConfigSchema.parse({
       ...REQUIRED_FIELDS,
@@ -180,6 +162,28 @@ describe('IngestionConfigSchema inlineImagesEnabled', () => {
     });
     expect(config.inlineImagesEnabled).toBe(false);
     expect(config.attachments.imageOcrEnabled).toBe(true);
+  });
+});
+
+describe('IngestionConfigSchema image extraction validation', () => {
+  it('rejects imageContentExtraction.enabled true with the model missing', () => {
+    expect(() =>
+      IngestionConfigSchema.parse({
+        ...REQUIRED_FIELDS,
+        pageIngestionConfig: { htmlConfig: { imageContentExtraction: { enabled: true } } },
+      }),
+    ).toThrow(/languageModel is missing or empty/);
+  });
+
+  it('rejects imageContentExtraction.enabled true with an empty model', () => {
+    expect(() =>
+      IngestionConfigSchema.parse({
+        ...REQUIRED_FIELDS,
+        pageIngestionConfig: {
+          htmlConfig: { imageContentExtraction: { enabled: true, languageModel: '   ' } },
+        },
+      }),
+    ).toThrow(/languageModel is missing or empty/);
   });
 });
 

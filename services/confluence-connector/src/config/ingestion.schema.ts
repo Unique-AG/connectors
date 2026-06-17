@@ -23,6 +23,15 @@ const ImageExtractionModelSchema = z.object({
   }),
 });
 
+// Detects only that extraction was switched on (enabled: true), regardless of the model. Used to
+// tell an intentional "extraction on" apart from an absent/disabled block, so we can reject the
+// broken case (on but no usable model) instead of silently skipping it.
+const ImageExtractionEnabledProbe = z.object({
+  htmlConfig: z.object({
+    imageContentExtraction: z.object({ enabled: z.literal(true) }),
+  }),
+});
+
 const AttachmentConfigSchema = z
   .object({
     mode: z
@@ -78,6 +87,23 @@ export const IngestionConfigSchema = z
       .describe(
         'Ingestion configuration applied to each ingested page. Setting htmlConfig.imageContentExtraction.enabled to true and htmlConfig.imageContentExtraction.languageModel to a visual LLM turns on inlining of page images as base64 data URIs (requires Unique platform 2026.24.0+); without both, images fall back to standalone attachment ingestion',
       ),
+  })
+  .superRefine((cfg, ctx) => {
+    const extractionSwitchedOn = ImageExtractionEnabledProbe.safeParse(
+      cfg.pageIngestionConfig,
+    ).success;
+    const fullyConfigured = ImageExtractionModelSchema.safeParse(cfg.pageIngestionConfig).success;
+
+    // enabled: true but no usable languageModel would inline images the platform cannot extract,
+    // silently losing their content. Reject at load instead. An absent or disabled block is fine.
+    if (extractionSwitchedOn && !fullyConfigured) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['pageIngestionConfig', 'htmlConfig', 'imageContentExtraction', 'languageModel'],
+        message:
+          'imageContentExtraction.enabled is true but languageModel is missing or empty; set a visual LLM or remove the imageContentExtraction block',
+      });
+    }
   })
   .transform((cfg) => ({
     ...cfg,
