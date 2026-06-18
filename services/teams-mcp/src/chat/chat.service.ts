@@ -3,7 +3,12 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { collectAllPages, collectUntil, GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
+import {
+  collectAllPages,
+  collectUntil,
+  GRAPH_MAX_ITEMS,
+  GRAPH_PAGE_SIZE,
+} from '~/msgraph/graph-pagination';
 import { MsChat, MsChatMessage, MsChatMessageSchema, MsChatSchema } from './chat.dtos';
 
 @Injectable()
@@ -80,7 +85,10 @@ export class ChatService {
     // through them client-side to still return up to `limit` user messages.
     const raw = await collectUntil(client, response, {
       limit,
-      filter: excludeSystemMessages ? (m) => m.messageType === 'message' : undefined,
+      // Mirror MsChatMessageSchema's `messageType` default: Graph occasionally
+      // omits the field, and the schema treats a missing type as a normal
+      // 'message', so a raw `=== 'message'` check would wrongly drop those.
+      filter: excludeSystemMessages ? (m) => (m.messageType ?? 'message') === 'message' : undefined,
     });
     const messages = z.array(MsChatMessageSchema).parse(raw);
 
@@ -101,7 +109,7 @@ export class ChatService {
     this.logger.debug({ userProfileId }, 'Resolving chat by topic or member name');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    const [chats, me] = await Promise.all([
+    const [{ chats, truncated }, me] = await Promise.all([
       this.fetchAllChats(client),
       client.api('/me').select('id').get() as Promise<{ id: string }>,
     ]);
@@ -123,8 +131,14 @@ export class ChatService {
     });
 
     if (matches.length === 0) {
-      span?.addEvent('chat not found');
-      throw new NotFoundException(`Chat "${identifier}" not found`);
+      span?.addEvent('chat not found', { truncated });
+      // When the chat list was capped, the target may simply be beyond the cap
+      // rather than non-existent — say so instead of a flat "not found".
+      throw new NotFoundException(
+        truncated
+          ? `Chat "${identifier}" not found in your ${GRAPH_MAX_ITEMS} most recent chats. If it is an older chat, open it in Teams first or use a more specific identifier.`
+          : `Chat "${identifier}" not found`,
+      );
     }
 
     // TODO: replace with context.elicitInput() once exposed on Context interface
@@ -151,7 +165,7 @@ export class ChatService {
   // for the list tool).
   private async fetchAllChats(
     client: ReturnType<GraphClientFactory['createClientForUser']>,
-  ): Promise<MsChat[]> {
+  ): Promise<{ chats: MsChat[]; truncated: boolean }> {
     const response = await client
       .api('/me/chats')
       .expand('members')
@@ -159,10 +173,10 @@ export class ChatService {
       .select('id,chatType,topic,members')
       .get();
 
-    const { items } = await collectAllPages(client, response, {
+    const { items, truncated } = await collectAllPages(client, response, {
       label: 'resolveChatByNameOrMember',
     });
-    return z.array(MsChatSchema).parse(items);
+    return { chats: z.array(MsChatSchema).parse(items), truncated };
   }
 
   @Span()
@@ -195,7 +209,10 @@ export class ChatService {
 
     const raw = await collectUntil(client, response, {
       limit,
-      filter: excludeSystemMessages ? (m) => m.messageType === 'message' : undefined,
+      // Mirror MsChatMessageSchema's `messageType` default: Graph occasionally
+      // omits the field, and the schema treats a missing type as a normal
+      // 'message', so a raw `=== 'message'` check would wrongly drop those.
+      filter: excludeSystemMessages ? (m) => (m.messageType ?? 'message') === 'message' : undefined,
     });
     const messages = z.array(MsChatMessageSchema).parse(raw);
 
