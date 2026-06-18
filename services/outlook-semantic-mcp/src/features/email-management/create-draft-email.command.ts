@@ -90,12 +90,7 @@ export class CreateDraftEmailCommand {
     const recipientsData = input.recipientsData;
     const prefix = input.mailbox ? `/users/${input.mailbox}` : '/me';
 
-    const sharedBodyFields = {
-      body: {
-        contentType: 'HTML',
-        content: markdownToHtml(input.content),
-      },
-    };
+    const htmlContent = markdownToHtml(input.content);
 
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
@@ -103,14 +98,17 @@ export class CreateDraftEmailCommand {
       recipientsData.type === 'reply'
         ? {
             apiPath: `${prefix}/messages/${encodeGraphItemIdForUrlPath(recipientsData.inReplyToMessageId)}/createReplyAll`,
-            body: { message: sharedBodyFields },
+            body: { comment: htmlContent },
             successMessage: 'Reply-all draft created successfully.',
             idIsImmutable: recipientsData.idIsImmutable === true,
           }
         : {
             apiPath: `${prefix}/messages`,
             body: {
-              ...sharedBodyFields,
+              body: {
+                contentType: 'HTML',
+                content: htmlContent,
+              },
               subject: recipientsData.subject,
               toRecipients: recipientsData.toRecipients.map((item) => ({
                 emailAddress: { address: item.email, ...(item.name && { name: item.name }) },

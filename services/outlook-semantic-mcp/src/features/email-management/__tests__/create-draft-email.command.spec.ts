@@ -45,6 +45,24 @@ describe('CreateDraftEmailCommand.createDraft', () => {
     expect(graphRequest.header).toHaveBeenCalledWith('Prefer', 'IdType="ImmutableId"');
   });
 
+  it('sends reply content as comment so the quoted thread is preserved', async () => {
+    const { command, graphRequest } = makeCommand();
+
+    await command.createDraft(USER_PROFILE_ID, {
+      content: 'Thanks for the update.',
+      chatId: null,
+      recipientsData: {
+        type: 'reply',
+        inReplyToMessageId: 'immutable-id-1',
+        idIsImmutable: true,
+      },
+    });
+
+    expect(graphRequest.post).toHaveBeenCalledWith({
+      comment: '<p>Thanks for the update.</p>\n',
+    });
+  });
+
   it('uses top-level mailbox for shared mailbox replies', async () => {
     const api = vi.fn().mockReturnValue({
       header: vi.fn().mockReturnThis(),
