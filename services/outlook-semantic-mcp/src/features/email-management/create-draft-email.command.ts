@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { z } from 'zod';
+import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
@@ -101,7 +102,7 @@ export class CreateDraftEmailCommand {
     const apiParams =
       recipientsData.type === 'reply'
         ? {
-            apiPath: `${prefix}/messages/${recipientsData.inReplyToMessageId}/createReplyAll`,
+            apiPath: `${prefix}/messages/${encodeGraphItemIdForUrlPath(recipientsData.inReplyToMessageId)}/createReplyAll`,
             body: { message: sharedBodyFields },
             successMessage: 'Reply-all draft created successfully.',
             idIsImmutable: recipientsData.idIsImmutable === true,

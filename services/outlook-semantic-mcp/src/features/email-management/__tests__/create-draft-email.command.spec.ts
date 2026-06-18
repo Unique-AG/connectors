@@ -70,4 +70,27 @@ describe('CreateDraftEmailCommand.createDraft', () => {
       '/users/shared@example.com/messages/immutable-id-1/createReplyAll',
     );
   });
+
+  it('replaces slashes in reply message IDs for Graph URL paths', async () => {
+    const api = vi.fn().mockReturnValue({
+      header: vi.fn().mockReturnThis(),
+      post: vi.fn().mockResolvedValue({ id: 'draft-1' }),
+    });
+    const command = new CreateDraftEmailCommand(
+      { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
+      { run: vi.fn() } as never,
+    );
+
+    await command.createDraft(USER_PROFILE_ID, {
+      content: 'Thanks for the update.',
+      chatId: null,
+      recipientsData: {
+        type: 'reply',
+        inReplyToMessageId: 'abc/def',
+        idIsImmutable: true,
+      },
+    });
+
+    expect(api).toHaveBeenCalledWith('/me/messages/abc-def/createReplyAll');
+  });
 });
