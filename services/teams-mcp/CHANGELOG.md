@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.19](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.18...teams-mcp@0.2.19) (2026-06-18)
+
+
+### Features
+
+* **teams-mcp:** add subject and meeting_id to ingested artifact metadata ([#638](https://github.com/Unique-AG/connectors/issues/638)) ([d6054a6](https://github.com/Unique-AG/connectors/commit/d6054a6739f2814d734b59d83375aa149b0a78aa))
+* **teams-mcp:** folder-per-meeting ingestion + folder ACL + source-based discovery ([#640](https://github.com/Unique-AG/connectors/issues/640)) ([64238f0](https://github.com/Unique-AG/connectors/commit/64238f0b32f411e1fe56da0d3c18f0a053327b38))
+
+
+### Bug Fixes
+
+* **deps:** resolve dependency vulnerabilities ([#637](https://github.com/Unique-AG/connectors/issues/637)) ([a91efe6](https://github.com/Unique-AG/connectors/commit/a91efe65c7595ab0ab75523edac3481499ed6866))
+
+
+### Reverts
+
+* **teams-mcp:** restore nested + locked meeting folder ingestion ([#646](https://github.com/Unique-AG/connectors/issues/646)) ([4d9805b](https://github.com/Unique-AG/connectors/commit/4d9805ba7f0bfcf2b3fa0f237d6e82b654f29616))
+
 ## [0.2.18](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.17...teams-mcp@0.2.18) (2026-06-08)
 
 
