@@ -173,6 +173,7 @@ export class SearchEmailsQuery {
             semanticText: semanticResult.text,
             graphText: graphResult.text,
           }),
+          replyToParams: graphResult.replyToParams ?? semanticResult.replyToParams,
         },
         hadGraphMatch: true,
       };

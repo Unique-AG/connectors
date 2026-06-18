@@ -42,6 +42,12 @@ export interface OpenEmailParams {
   idIsImmutable?: boolean;
 }
 
+export interface ReplyToParams {
+  inReplyToMessageId?: string;
+  idIsImmutable?: boolean;
+  isReplyable: boolean;
+}
+
 export interface SearchEmailResult {
   uniqueContentId?: string;
   msGraphMessageId?: string;
@@ -55,6 +61,7 @@ export interface SearchEmailResult {
   uniqueContentUrl: string | undefined;
   backend: SearchBackend;
   openEmailParams: OpenEmailParams;
+  replyToParams: ReplyToParams;
 }
 
 interface DelegatedAccess {
@@ -178,6 +185,8 @@ export class SemanticSearchEmailsQuery {
             return metadata?.folderIdPath?.startsWith(uniqueFolderIdPath);
           })?.ownerEmail ?? null;
 
+        const msGraphMessageId = metadata?.id || undefined;
+
         return {
           title: item.content.title ?? '',
           uniqueContentId: item.content.id,
@@ -187,7 +196,7 @@ export class SemanticSearchEmailsQuery {
           // folder-level access at query time, we suppress the link for all delegated mailboxes.
           outlookWebLink: userProfile.email === sourceMailbox ? (metadata?.webLink ?? '') : '',
           sourceMailbox,
-          msGraphMessageId: metadata?.id || undefined,
+          msGraphMessageId,
           folderId: metadata?.parentFolderId ?? '',
           from: metadata?.fromEmailAddress ?? '',
           receivedDateTime:
@@ -197,6 +206,12 @@ export class SemanticSearchEmailsQuery {
           openEmailParams: {
             id: item.content.id,
             idType: SearchBackend.Unique,
+          },
+          replyToParams: {
+            ...(msGraphMessageId
+              ? { inReplyToMessageId: msGraphMessageId, idIsImmutable: true }
+              : {}),
+            isReplyable: !!msGraphMessageId && metadata?.isDraft !== 'true',
           },
         };
       }),

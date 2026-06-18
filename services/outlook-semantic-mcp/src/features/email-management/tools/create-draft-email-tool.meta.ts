@@ -17,7 +17,7 @@ export const META = createMeta({
     If the user refers to a person and describes content they want communicated, treat it as an email drafting request. There is no "send email" tool — drafting is the final action.
 
     ### Resolving Email Recipients
-    This section applies to \`type: "draft"\` only. For \`type: "reply"\`, skip recipient resolution entirely — pass the \`msGraphMessageId\` directly as \`inReplyToMessageId\` and Graph pre-fills all recipients.
+    This section applies to \`type: "draft"\` only. For \`type: "reply"\`, skip recipient resolution entirely — copy \`inReplyToMessageId\` and \`idIsImmutable\` from the search result's \`replyToParams\` into \`recipientsData\` when \`replyToParams.isReplyable\` is true.
 
     **Do not ask the user for confirmation before searching.** Act immediately.
     For new drafts (\`type: "draft"\`), you **must** resolve the recipient's email address before drafting:
@@ -31,10 +31,10 @@ export const META = createMeta({
     ### Drafting Behavior
     When the user asks you to write, reply to, or draft an email:
     1. **Always reason first: reply or new draft?** Before anything else, check the conversation context:
-       - Is there a retrieved email that the user is **directly reacting to** in this message, and does it have a \`msGraphMessageId\`?
-         - If yes → use \`type: "reply"\` with that ID immediately. Do not ask for recipient or subject.
-       - Does the user refer to a specific email by subject, sender, or topic but it is **not yet in context**, or the in-context result **lacks** \`msGraphMessageId\`?
-         - If yes → call \`search_emails\` to find it. Present the matching emails to the user and ask them to confirm which one to reply to. Once confirmed, use \`type: "reply"\` with the confirmed email's \`msGraphMessageId\`. This confirmation step is required because replying to the wrong email is a hard-to-recover mistake.
+       - Is there a retrieved email that the user is **directly reacting to** in this message, and is \`replyToParams.isReplyable\` true with a non-empty \`replyToParams.inReplyToMessageId\`?
+         - If yes → use \`type: "reply"\` and copy \`inReplyToMessageId\` and \`idIsImmutable\` from \`replyToParams\` into \`recipientsData\` immediately. Do not ask for recipient or subject.
+       - Does the user refer to a specific email by subject, sender, or topic but it is **not yet in context**, or the in-context result has \`replyToParams.isReplyable: false\` or no \`replyToParams.inReplyToMessageId\`?
+         - If yes → call \`search_emails\` to find it. Present the matching emails to the user and ask them to confirm which one to reply to. Once confirmed, use \`type: "reply"\` only if that result's \`replyToParams.isReplyable\` is true. This confirmation step is required because replying to the wrong email is a hard-to-recover mistake.
        - Otherwise → use \`type: "draft"\` and resolve the recipient following the "Resolving Email Recipients" section above.
        Use \`type: "reply"\` only when the user's current message is a clear reaction to a specific, identified email. Do not default to reply just because some email happens to be in context from an earlier search.
     2. **Act immediately — with two exceptions where you must pause and confirm first:**
@@ -48,14 +48,14 @@ export const META = createMeta({
     ### What \`draft_email\` Does
     Creates a draft email in the user's Outlook mailbox. The draft is saved and can be reviewed or sent later.
     - For \`type: "draft"\`: provide subject, body content (Markdown), and at least one recipient. Optionally include CC recipients and attachments.
-    - For \`type: "reply"\`: provide only the body content (Markdown) and the \`inReplyToMessageId\`. Graph pre-fills all recipients and the subject — no need to specify them.
+    - For \`type: "reply"\`: provide body content (Markdown) plus \`inReplyToMessageId\` and \`idIsImmutable\` copied from \`replyToParams\` in \`search_emails\`. Only call when \`replyToParams.isReplyable\` is true. Graph pre-fills all recipients and the subject — no need to specify them.
 
     ### Shared Mailbox and Reply Drafts
     \`draft_email\` requires a \`type\` field that selects the drafting mode:
 
     1. **\`type: "draft"\`** — fresh draft. \`toRecipients\` is required. Optionally pass \`mailbox\` to create the draft in a shared mailbox instead of the signed-in user's own mailbox.
 
-    2. **\`type: "reply"\`** — reply-all draft. Pass \`inReplyToMessageId\` with the \`msGraphMessageId\` value from \`search_emails\` or \`outlook_email_search\` results. Graph pre-fills all original recipients — do **not** pass \`toRecipients\` or \`ccRecipients\`. If the email you are replying to came from a shared or delegated mailbox (i.e. \`sourceMailbox\` is non-null in the search result), you **must** pass that same value as \`mailbox\` — otherwise Graph will look up the message under \`/me\` and return a 404. Omit \`mailbox\` only when replying to an email from the signed-in user's own mailbox (\`sourceMailbox\` is null).
+    2. **\`type: "reply"\`** — reply-all draft. Copy \`inReplyToMessageId\` and \`idIsImmutable\` from \`replyToParams\` in \`search_emails\` or \`outlook_email_search\` results into \`recipientsData\`. Only use when \`replyToParams.isReplyable\` is true. Graph pre-fills all original recipients — do **not** pass \`toRecipients\` or \`ccRecipients\`. If the email came from a shared or delegated mailbox (\`sourceMailbox\` is non-null), pass that value as the top-level \`mailbox\` parameter — otherwise omit \`mailbox\`.
 
     ### Replying to a Received Email (Most Common Use Case)
     **Replying to an email the user just read or retrieved is the most frequent reason to call \`draft_email\`.** Recognise these natural language patterns as reply intent — even without the word "reply":
@@ -69,28 +69,28 @@ export const META = createMeta({
     Note: "Tell [person] that…" and "Let [person] know that…" are **not** automatically reply triggers — the named person may differ from the sender. Treat them as reply intent only when the named person is clearly the sender of the retrieved email; otherwise draft a new email to that person.
 
     When reply intent is detected and an email was recently retrieved:
-    1. **Do not ask for the recipient or subject.** Use \`type: "reply"\` and pass the \`msGraphMessageId\` of the retrieved email as \`inReplyToMessageId\` — Graph pre-fills all recipients and subject automatically.
+    1. **Do not ask for the recipient or subject.** Use \`type: "reply"\` and copy \`inReplyToMessageId\` and \`idIsImmutable\` from \`replyToParams\` — Graph pre-fills all recipients and subject automatically.
     2. **Draft and call \`draft_email\` immediately.** The user should not have to re-specify the recipient, subject, or thread context.
 
-    Failure to use \`type: "reply"\` with the retrieved email's \`msGraphMessageId\` is the most common mistake — avoid it.
+    Do not call \`draft_email\` with \`type: "reply"\` when \`replyToParams.isReplyable\` is false — pick a different email or explain that a reply is not possible.
 
     #### Examples — when to use type: "reply"
 
-    Context: conversation contains an email with msGraphMessageId="AAMk123", from nick@example.com, subject "Payroll System Migration Plan"
+    Context: conversation contains search result replyToParams={ inReplyToMessageId: "AAMk123", idIsImmutable: false, isReplyable: true }, from nick@example.com, subject "Payroll System Migration Plan"
     User: "Draft a reply to this email, tell him we need to reduce ADP cost to 76k max"
-    Action: recipientsData={ type="reply", inReplyToMessageId="AAMk123" }, body addresses the cost constraint (Graph fills recipient and subject)
+    Action: recipientsData={ type="reply", inReplyToMessageId="AAMk123", idIsImmutable=false }, body addresses the cost constraint (Graph fills recipient and subject)
 
-    Context: conversation contains an email with msGraphMessageId="AAMk456", from sarah@acme.com, subject "Re: Q2 Budget Review"
+    Context: conversation contains search result replyToParams={ inReplyToMessageId: "AAMk456", idIsImmutable: false, isReplyable: true }, from sarah@acme.com, subject "Re: Q2 Budget Review"
     User: "Respond to this — confirm the meeting is on Thursday"
-    Action: recipientsData={ type="reply", inReplyToMessageId="AAMk456" }, body confirms the meeting (Graph fills recipient and subject as-is, no duplicate "Re:")
+    Action: recipientsData={ type="reply", inReplyToMessageId="AAMk456", idIsImmutable=false }, body confirms the meeting (Graph fills recipient and subject as-is, no duplicate "Re:")
 
-    Context: conversation contains an email with msGraphMessageId="AAMk789", from investor@fund.com, subject "Due Diligence Update"
+    Context: conversation contains search result replyToParams={ inReplyToMessageId: "AAMk789", idIsImmutable: false, isReplyable: true }, from investor@fund.com, subject "Due Diligence Update"
     User: "Get back to them — say we'll have the documents ready by Friday"
-    Action: recipientsData={ type="reply", inReplyToMessageId="AAMk789" }, body states Friday deadline
+    Action: recipientsData={ type="reply", inReplyToMessageId="AAMk789", idIsImmutable=false }, body states Friday deadline
 
-    Context: conversation contains an email with msGraphMessageId="AAMk321", from alex@partner.com, subject "Integration Timeline"
+    Context: conversation contains search result replyToParams={ inReplyToMessageId: "AAMk321", idIsImmutable: false, isReplyable: true }, from alex@partner.com, subject "Integration Timeline"
     User: "Respond to this and ask for more details about the timeline"
-    Action: recipientsData={ type="reply", inReplyToMessageId="AAMk321" }, body requests timeline details
+    Action: recipientsData={ type="reply", inReplyToMessageId="AAMk321", idIsImmutable=false }, body requests timeline details
 
     #### Examples — when to use type: "draft" (new email, no prior email in context)
 
