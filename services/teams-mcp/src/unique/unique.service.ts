@@ -136,6 +136,12 @@ export class UniqueService {
       entityType: ScopeAccessEntityType.User,
       type: ScopeAccessType.Manage,
     });
+    // NOTE: The subject scope is shared across all occurrences of a recurring series (same
+    // meetingId), and add-access is additive, so the parent accumulates the union of every
+    // occurrence's participants — which the inheritAccess=true children below pick up. This means
+    // a participant from one occurrence can read later occurrences they did not attend. Known and
+    // accepted: locking + grouping recurring sessions under one folder is worth more to us than
+    // per-occurrence roster isolation.
     await this.scopeService.addScopeAccesses(parentScope.id, accesses);
 
     const childScope = await this.scopeService.createScope(parentScope.id, datePath, true);
@@ -143,6 +149,9 @@ export class UniqueService {
 
     // Stamp the occurrence (session) scope, anchored on the transcript id so each
     // recording session gets a unique externalId even for same-day meetings.
+    // NOTE: datePath is second-precision, so two transcripts in the same second under the same
+    // parent would collide onto one child scope and overwrite its externalId. Not reachable in
+    // practice: Teams cannot produce two transcripts for the same meeting in the same second.
     await this.scopeService.updateScope(childScope.id, {
       externalId: buildOccurrenceExternalId(meeting.meetingId, transcript.id),
     });
