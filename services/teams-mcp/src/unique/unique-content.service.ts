@@ -191,13 +191,7 @@ export class UniqueContentService {
     return target.toString();
   }
 
-  // Single request, intentionally NOT auto-paginated. The Unique content API
-  // pages via skip/take + `total` (not Graph `@odata.nextLink`, so the shared
-  // PageIterator helpers do not apply). Every current caller is a bounded
-  // lookup that paginates explicitly from user input (e.g. `list_meetings`'
-  // skip/take) and surfaces `total`, so collecting all pages here would be
-  // wrong. A future "collect every match" caller should add a skip/take loop
-  // (modeled on `packages/unique-api`'s pattern) at that call site.
+  // One skip/take page; callers paginate explicitly (e.g. `list_meetings`).
   @Span()
   public async getContentInfos(
     request: PublicContentInfosRequest,
@@ -292,9 +286,7 @@ export class UniqueContentService {
    *   to scope the search to the given user's permissions. When `undefined`, the search
    *   runs unscoped with service-level credentials — this is intentional for admin/ingestion flows.
    *
-   * Single request, intentionally NOT auto-paginated: Unique search pages via
-   * `page`/`limit` (not Graph `@odata.nextLink`), and every caller is a bounded
-   * relevance-ranked lookup where collecting all pages would be meaningless.
+   * One page/limit request; relevance-ranked, so callers don't collect all pages.
    */
   @Span()
   public async search(

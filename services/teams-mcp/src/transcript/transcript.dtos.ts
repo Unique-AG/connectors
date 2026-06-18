@@ -254,8 +254,6 @@ export const Transcript = z.object({
 });
 export type Transcript = z.infer<typeof Transcript>;
 
-export const TranscriptCollection = Collection(Transcript);
-
 const extractThreadId = (url: URL): string | null => {
   const match = url.pathname.match(/\/meetup-join\/([^/]+)/);
   const threadId = match?.[1];

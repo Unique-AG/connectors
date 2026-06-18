@@ -22,10 +22,7 @@ export class ChannelService {
     this.logger.debug({ userProfileId }, 'Fetching joined teams from Microsoft Graph');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    // `/me/joinedTeams` supports no OData query parameters ($top/$select/$filter
-    // are all ignored) and returns every joined team in a single response with
-    // no `@odata.nextLink`. We still route it through collectAllPages for a
-    // uniform return shape (and to stay correct if Graph ever adds paging).
+    // /me/joinedTeams takes no OData query params and returns all teams in one page.
     const response = await client.api('/me/joinedTeams').get();
 
     const { items } = await collectAllPages(client, response, { label: 'listTeams' });
@@ -46,10 +43,7 @@ export class ChannelService {
     this.logger.debug({ userProfileId, teamId }, 'Fetching channels from Microsoft Graph');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    // `/teams/{id}/channels` supports $select (recommended — excluding `email`
-    // avoids an expensive lookup) and paginates via `@odata.nextLink`, but it
-    // does NOT support $top, so we omit it and let collectAllPages follow the
-    // pages.
+    // /teams/{id}/channels supports $select but not $top; it pages via @odata.nextLink.
     const response = await client
       .api(`/teams/${teamId}/channels`)
       .select('id,displayName,description')

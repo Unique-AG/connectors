@@ -1,39 +1,15 @@
 import { type Client, type PageCollection, PageIterator } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 
-// Single home for the Graph pagination knobs. Every exhaustive collect pages in
-// `GRAPH_PAGE_SIZE`-sized requests and is bounded by `GRAPH_MAX_ITEMS` so a
-// pathological account cannot trigger an unbounded number of follow-up requests.
-export const GRAPH_PAGE_SIZE = 50;
+export const GRAPH_PAGE_SIZE = 50; // default $top for exhaustive collects
+export const GRAPH_MAX_ITEMS = 1000; // safety cap on items collected/scanned
 
-// Safety cap on the number of items collected/scanned across all pages. Replaces
-// the previous "20 pages" cap; at the default page size this is functionally
-// equivalent (~20 × 50) but expressed in items rather than pages.
-export const GRAPH_MAX_ITEMS = 1000;
-
-// Both helpers drive the Microsoft Graph SDK's `PageIterator` with the same
-// `Client` the rest of the service uses, so every follow-up request flows
-// through the existing middleware chain (auth, retry, metrics).
 const logger = new Logger('GraphPagination');
 
-// The helpers are deliberately schema-agnostic: they only page, returning the
-// raw Graph items. Each call site validates the shape it expects once, with its
-// own concrete Zod schema, after collection. Threading a generic Zod schema
-// through these helpers is what we are avoiding — besides keeping pagination and
-// validation as separate concerns, inferring through a `z.codec` schema (e.g.
-// the transcript DTO) trips a TypeScript depth/heap blow-up.
 type GraphRawItem = Record<string, unknown>;
 
-/**
- * Exhaustively iterates every page of a Graph `@odata.nextLink` collection,
- * bounded by `maxItems`, returning the raw items. Use this whenever the call
- * site needs *all* items (list tools, name resolution) rather than a recent
- * window; validate the result with `z.array(schema).parse(items)`.
- *
- * `truncated` is `true` when the cap was hit before Graph ran out of pages
- * (`PageIterator.isComplete() === false`); a warning is logged so a silently
- * capped result is never mistaken for a complete one.
- */
+// Page through every `@odata.nextLink` (up to maxItems) and return the raw items;
+// validate them at the call site. `truncated` is true when the cap was hit first.
 export async function collectAllPages(
   client: Client,
   firstPage: PageCollection,
@@ -44,9 +20,7 @@ export async function collectAllPages(
 
   const iterator = new PageIterator(client, firstPage, (item) => {
     items.push(item);
-    // Returning false stops the iterator; do so once the cap is reached so we
-    // never page past it.
-    return items.length < maxItems;
+    return items.length < maxItems; // false stops the iterator at the cap
   });
   await iterator.iterate();
 
@@ -61,15 +35,8 @@ export async function collectAllPages(
   return { items, truncated };
 }
 
-/**
- * Collects up to `limit` raw items passing `filter`, paging through intervening
- * noise (e.g. system messages Graph cannot filter server-side) as needed. A
- * `maxScanned` safety cap bounds how many raw items are inspected so a thread
- * that is almost entirely noise cannot page forever.
- *
- * `filter` runs against the raw Graph item (validate the returned slice with
- * `z.array(schema).parse(...)` at the call site).
- */
+// Collect up to `limit` raw items passing `filter`, paging through noise (e.g.
+// system messages) up to a `maxScanned` cap. Validate the slice at the call site.
 export async function collectUntil(
   client: Client,
   firstPage: PageCollection,
@@ -84,7 +51,6 @@ export async function collectUntil(
     if (!opts.filter || opts.filter(item)) {
       collected.push(item);
     }
-    // Stop once we have enough matches or we have scanned past the safety cap.
     return collected.length < opts.limit && scanned < maxScanned;
   });
   await iterator.iterate();

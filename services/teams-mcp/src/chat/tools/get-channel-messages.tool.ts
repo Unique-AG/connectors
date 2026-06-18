@@ -73,7 +73,7 @@ export class GetChannelMessagesTool {
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: false,
-      openWorldHint: true,
+      openWorldHint: false,
     },
     _meta: {
       'unique.app/icon': 'message-square',

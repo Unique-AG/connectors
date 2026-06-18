@@ -91,37 +91,37 @@ export class ListChatsTool {
     span?.setAttribute('result_count', chats.length);
 
     return {
-      chats: chats.map((c) => this.mapChat(c, input.includeMemberEmails)),
+      chats: chats.map((chat) => this.mapChat(chat, input.includeMemberEmails)),
       truncated: hasMore,
     };
   }
 
   private mapChat(
-    c: MsChat,
+    chat: MsChat,
     includeMemberEmails: boolean,
   ): z.output<typeof ListChatsOutputSchema>['chats'][number] {
-    const chat: {
+    const mapped: {
       chatType: string;
       topic: string | null;
       members?: { displayName: string | null; email?: string | null }[];
     } = {
-      chatType: c.chatType,
-      topic: c.topic ?? null,
+      chatType: chat.chatType,
+      topic: chat.topic ?? null,
     };
 
     // Only include members for chats without a topic (1:1 chats need member names as their identifier)
-    if (!c.topic) {
-      chat.members = c.members.map((m) => {
-        const member: { displayName: string | null; email?: string | null } = {
-          displayName: m.displayName ?? null,
+    if (!chat.topic) {
+      mapped.members = chat.members.map((member) => {
+        const entry: { displayName: string | null; email?: string | null } = {
+          displayName: member.displayName ?? null,
         };
         if (includeMemberEmails) {
-          member.email = m.email ?? null;
+          entry.email = member.email ?? null;
         }
-        return member;
+        return entry;
       });
     }
 
-    return chat;
+    return mapped;
   }
 }

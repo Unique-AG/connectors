@@ -31,21 +31,18 @@ export class ChatService {
     this.logger.debug({ userProfileId }, 'Fetching chats from Microsoft Graph');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    // Deliberately single-page (NOT PageIterator): this is a bounded "recent
-    // chats" window that must report an accurate `hasMore`. PageIterator hides
-    // the page boundary and cannot distinguish "stopped at limit" from "no more
-    // data", so it would re-introduce the `count === limit` false positive.
+    // Single-page by design (not collectAllPages): a bounded "recent chats"
+    // window with an accurate `hasMore`. $orderby is required for "most recent"
+    // — /me/chats is not sorted by activity by default.
     const response: PageCollection = await client
       .api('/me/chats')
       .expand('members')
       .top(limit)
+      .orderby('lastMessagePreview/createdDateTime desc')
       .select('id,chatType,topic,members')
       .get();
 
     const chats = z.array(MsChatSchema).parse(response.value);
-    // Report the real "more results" signal from Graph rather than inferring
-    // truncation from `count === limit`, which is wrong when the user has
-    // exactly `limit` chats and no further pages.
     const hasMore = Boolean(response['@odata.nextLink']);
 
     span?.setAttribute('result_count', chats.length);
