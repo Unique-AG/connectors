@@ -2,7 +2,7 @@ import { ConflictException, Injectable, Logger, NotFoundException } from '@nestj
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { collectAllPages, GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
+import { collectAllPages } from '~/msgraph/graph-pagination';
 import { MsChannel, MsChannelSchema, MsTeam, MsTeamSchema } from './chat.dtos';
 
 @Injectable()
@@ -22,15 +22,12 @@ export class ChannelService {
     this.logger.debug({ userProfileId }, 'Fetching joined teams from Microsoft Graph');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    const response = await client
-      .api('/me/joinedTeams')
-      .top(GRAPH_PAGE_SIZE)
-      .select('id,displayName,description')
-      .get();
+    // `/me/joinedTeams` supports no OData query parameters ($top/$select/$filter
+    // are all ignored) and returns every joined team in a single response with
+    // no `@odata.nextLink`. We still route it through collectAllPages for a
+    // uniform return shape (and to stay correct if Graph ever adds paging).
+    const response = await client.api('/me/joinedTeams').get();
 
-    // Teams/channels lists are normally small, but a user with more than one
-    // page of either would otherwise be silently truncated — breaking list
-    // tools and name resolution alike.
     const { items } = await collectAllPages(client, response, { label: 'listTeams' });
     const teams = z.array(MsTeamSchema).parse(items);
 
@@ -49,9 +46,12 @@ export class ChannelService {
     this.logger.debug({ userProfileId, teamId }, 'Fetching channels from Microsoft Graph');
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
+    // `/teams/{id}/channels` supports $select (recommended — excluding `email`
+    // avoids an expensive lookup) and paginates via `@odata.nextLink`, but it
+    // does NOT support $top, so we omit it and let collectAllPages follow the
+    // pages.
     const response = await client
       .api(`/teams/${teamId}/channels`)
-      .top(GRAPH_PAGE_SIZE)
       .select('id,displayName,description')
       .get();
 
