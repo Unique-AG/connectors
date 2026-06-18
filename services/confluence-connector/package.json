@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/confluence-connector",
   "description": "Take content from Confluence and send it to Unique AI for RAG ingestion.",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -24,6 +24,8 @@
     "check-all": "pnpm style:fix && pnpm check-types",
     "test": "vitest run",
     "test:watch": "vitest watch",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:watch": "vitest watch --config vitest.integration.config.ts",
     "test:coverage": "vitest run --config vitest.coverage.config.ts && istanbul-badges-readme --style='square-flat'"
   },
   "dependencies": {
@@ -42,6 +44,8 @@
     "@unique-ag/utils": "workspace:*",
     "bottleneck": "2.19.5",
     "cron": "4.3.5",
+    "domhandler": "6.0.1",
+    "htmlparser2": "12.0.0",
     "js-yaml": "4.1.1",
     "nestjs-otel": "8.0.2",
     "nestjs-pino": "4.6.1",
@@ -80,5 +84,6 @@
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
     "vitest": "3.2.6"
-  }
+  },
+  "packageManager": "pnpm@10.28.1"
 }

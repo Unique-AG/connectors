@@ -29,6 +29,10 @@ const baseIngestionConfig = {
   ingestionMode: 'flat',
   scopeId: 'test-scope-id',
   storeInternally: 'enabled',
+  // Carrying the extraction model turns on image inlining.
+  pageIngestionConfig: {
+    htmlConfig: { imageContentExtraction: { enabled: true, languageModel: 'test-model' } },
+  },
 };
 
 const clusterLocalUniqueConfig = {

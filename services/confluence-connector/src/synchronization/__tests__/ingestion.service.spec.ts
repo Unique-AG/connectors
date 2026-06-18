@@ -124,6 +124,14 @@ function makeService(): {
         maxFileSizeMb: 200,
         imageOcrEnabled: true,
       },
+      pageIngestionConfig: {
+        htmlConfig: {
+          imageContentExtraction: {
+            enabled: true,
+            languageModel: 'AZURE_GPT_4o_2024_1120',
+          },
+        },
+      },
     },
   } as unknown as TenantConfig;
 
@@ -425,6 +433,61 @@ describe('IngestionService', () => {
       'https://blob.example.com/write',
       expect.objectContaining({ method: 'PUT' }),
     );
+  });
+
+  describe('page ingestionConfig', () => {
+    const expectedConfig = {
+      htmlConfig: {
+        imageContentExtraction: { enabled: true, languageModel: 'AZURE_GPT_4o_2024_1120' },
+      },
+    };
+
+    it('forwards pageIngestionConfig verbatim on registration and finalization', async () => {
+      const { service, uniqueApiClient } = makeService();
+      mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+
+      await service.ingestPage(pageFixture, 'space-scope-1');
+
+      expect(uniqueApiClient.ingestion.registerContent).toHaveBeenCalledWith(
+        expect.objectContaining({ ingestionConfig: expectedConfig }),
+      );
+      expect(uniqueApiClient.ingestion.finalizeIngestion).toHaveBeenCalledWith(
+        expect.objectContaining({ ingestionConfig: expectedConfig }),
+      );
+    });
+
+    it('omits ingestionConfig on pages when pageIngestionConfig is not configured', async () => {
+      const tenantConfig = {
+        confluence: { instanceType: 'cloud', baseUrl: CONFLUENCE_BASE_URL },
+        unique: {
+          serviceAuthMode: 'external',
+          ingestionServiceBaseUrl: 'http://node-ingestion:8091',
+        },
+        ingestion: { storeInternally: true, useV1KeyFormat: false },
+      } as unknown as TenantConfig;
+
+      const uniqueApiClient = {
+        ingestion: {
+          registerContent: vi.fn().mockResolvedValue(makeRegistrationResponse()),
+          finalizeIngestion: vi.fn().mockResolvedValue({ id: 'id-1' }),
+        },
+        files: { getByKeys: vi.fn(), deleteByIds: vi.fn() },
+      } as unknown as UniqueApiClient;
+
+      const service = new IngestionService(
+        tenantConfig,
+        TENANT_NAME,
+        uniqueApiClient,
+        { getAttachmentDownloadStream: vi.fn() } as unknown as ConfluenceApiClient,
+        createNoopMetrics(),
+      );
+      mockRequest.mockResolvedValueOnce({ statusCode: 201 });
+
+      await service.ingestPage(pageFixture, 'space-scope-1');
+
+      const registerCall = vi.mocked(uniqueApiClient.ingestion.registerContent).mock.calls[0]?.[0];
+      expect(registerCall?.ingestionConfig).toBeUndefined();
+    });
   });
 
   describe('ingestAttachment', () => {

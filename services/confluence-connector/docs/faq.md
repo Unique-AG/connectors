@@ -22,7 +22,7 @@
 | Aspect | v1 | v2 |
 |---|---|---|
 | Multi-tenancy | Not supported | Multiple Confluence instances in a single connector pod |
-| Attachment ingestion | Not supported | Supported with configurable MIME types and size limits (includes embedded images) |
+| Attachment ingestion | Not supported | Supported with configurable MIME types and size limits; embedded images are inlined into their page artifact |
 | Change detection | File-diff mechanism (pages only) | File-diff mechanism (pages and attachments) |
 | Safety guards | None | Full-deletion prevention, concurrent sync prevention |
 | Key format | `spaceId_spaceKey/pageId` | `tenantName/spaceId_spaceKey/pageId` (v1 format available via `useV1KeyFormat`) |
@@ -118,7 +118,19 @@ See the [Configuration Guide](./operator/configuration.md) for all available opt
 
 ### Are embedded images ingested?
 
-**Answer:** Yes. Images embedded in a Confluence page (drag/drop, paste, or "Insert image") are stored by Confluence as regular page attachments, so they flow through the same path as PDFs and Office files. With attachment ingestion enabled, PNG and JPEG images are ingested out of the box because both MIME types are in the default `allowedMimeTypes` list. The connector also requests OCR-based processing for each image (`jpgReadMode = DOC_INTELLIGENCE_DEFAULT`) by default, so chunks are produced without further scope-side configuration; this can be turned off via `attachments.imageOcr = disabled`. Other image formats (GIF, WebP, SVG, HEIC, BMP, TIFF) are not currently supported by the Unique ingestion service. Images inserted as external URLs (rather than uploaded) are not attachments and are not ingested.
+**Answer:** Yes. Each referenced PNG or JPEG attachment is inlined into the page HTML as a base64 data URI, so a page with images becomes a single self-contained ingestion artifact rather than one page plus N separate image artifacts. Images attached to another page in the same Confluence instance are resolved through the same path. Images inserted as external URLs are left in the HTML as-is and are never fetched by the connector.
+
+### What happens if an image cannot be inlined into its page?
+
+**Answer:** When inlining is enabled, image attachments are not ingested as standalone artifacts. Orphan images (attached to the page but not referenced by an in-body macro) are appended to the end of the page body, so their content is still inlined. A macro-referenced image that cannot be inlined (download failure, larger than `attachments.maxFileSizeMb`, a MIME type not in `allowedMimeTypes`, or a cross-page reference whose target page or filename cannot be resolved) keeps its original `<ac:image>` macro and is not ingested elsewhere. On a transient download failure it is inlined on a later sync once the page re-ingests. Inlining failures are logged at `warn` level with the page id and the referenced filename. The download itself uses the same rate-limited Confluence client as the standalone path, so a failure here means the attachment is unreachable, not that a separate attempt would have succeeded.
+
+### What happens to image attachments that were ingested as separate artifacts before inlining was introduced?
+
+**Answer:** They are not automatically removed. The file-diff mechanism only deletes content whose discovery key disappears from Confluence, and these artifacts still correspond to real attachments on real pages. The first sync after upgrading therefore produces an enriched page artifact alongside the pre-existing standalone image artifact, leaving duplicates in the destination scope. Operators who want a clean state should bulk-delete image attachments from the destination scope manually before or after the upgrade. Subsequent syncs will not re-create them.
+
+### How do I verify that page image inlining is working after a deployment?
+
+**Answer:** Pick a Confluence page known to contain an inline image, run a sync, and inspect the ingested page artifact in the destination scope. The page body should contain `data:image/png;base64,` or `data:image/jpeg;base64,` and no `<ac:image>` macros. The attachment ingestion summary in the connector logs should report a count that excludes the inlined images. If the same image appears both inside a page artifact and as a separate attachment artifact in the same sync, double-check that `attachments.mode` is `enabled` in the tenant config.
 
 ### How do I find my Atlassian Cloud ID?
 

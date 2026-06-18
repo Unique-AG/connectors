@@ -1,5 +1,5 @@
 import type { Readable } from 'node:stream';
-import type { ConfluencePage } from './types/confluence-api.types';
+import type { ConfluenceAttachment, ConfluencePage } from './types/confluence-api.types';
 
 export interface InstanceIdentifier {
   type: 'cloud' | 'data-center';
@@ -8,6 +8,18 @@ export interface InstanceIdentifier {
 
 export interface ApiClientOptions {
   attachmentsEnabled: boolean;
+}
+
+export interface PageAttachmentLookupResult {
+  pageId: string;
+  attachments: ConfluenceAttachment[];
+}
+
+export function buildPageAttachmentLookupResult(page: ConfluencePage): PageAttachmentLookupResult {
+  return {
+    pageId: page.id,
+    attachments: page.children?.attachment?.results ?? [],
+  };
 }
 
 export abstract class ConfluenceApiClient {
@@ -32,4 +44,10 @@ export abstract class ConfluenceApiClient {
     pageId: string,
     downloadPath: string,
   ): Promise<Readable>;
+
+  // Page titles are unique within a space, so (spaceKey, pageTitle) identifies a single page.
+  public abstract fetchAttachmentsByPageTitle(
+    spaceKey: string,
+    pageTitle: string,
+  ): Promise<PageAttachmentLookupResult | null>;
 }
