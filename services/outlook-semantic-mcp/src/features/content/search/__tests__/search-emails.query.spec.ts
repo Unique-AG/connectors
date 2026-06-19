@@ -31,6 +31,7 @@ function makeGraphResult(
     uniqueContentUrl: undefined,
     backend: SearchBackend.MsGraph,
     openEmailParams: { id: emailId, idType: SearchBackend.MsGraph, idIsImmutable: false },
+    replyToParams: { inReplyToMessageId: emailId, idIsImmutable: false, isReplyable: true },
     ...overrides,
   };
 }
@@ -52,6 +53,7 @@ function makeUniqueResult(
     uniqueContentUrl: 'https://unique.example.com/doc/1',
     backend: SearchBackend.Unique,
     openEmailParams: { id: `content-${emailId}`, idType: SearchBackend.Unique },
+    replyToParams: { inReplyToMessageId: emailId, idIsImmutable: true, isReplyable: true },
     ...overrides,
   };
 }

@@ -51,6 +51,7 @@ const messageSchema = z.object({
       uniqueBody: z.object({ content: z.string() }).optional().nullish(),
       body: z.object({ content: z.string() }).optional().nullish(),
       bodyPreview: z.string().optional().nullish(),
+      isDraft: z.boolean().optional().nullish(),
     }),
   ),
 });
@@ -65,6 +66,7 @@ interface Hit {
   parentFolderId: string;
   webLink: string;
   text: string;
+  isDraft: boolean;
 }
 
 @Injectable()
@@ -144,6 +146,8 @@ export class MsGraphKqlSearchEmailsQuery {
       const translatedId = translationMap?.get(hit.restId);
       const idIsImmutable = translatedId !== undefined;
       const id = translatedId ?? hit.restId;
+      const mailbox = hit.isDelegated ? hit.mailbox : undefined;
+      const parentFolderId = hit.isDelegated ? hit.parentFolderId : undefined;
 
       results.push({
         msGraphMessageId: id,
@@ -159,9 +163,14 @@ export class MsGraphKqlSearchEmailsQuery {
         openEmailParams: {
           id,
           idType: SearchBackend.MsGraph,
-          mailbox: hit.isDelegated ? hit.mailbox : undefined,
-          parentFolderId: hit.isDelegated ? hit.parentFolderId : undefined,
+          mailbox,
+          parentFolderId,
           idIsImmutable,
+        },
+        replyToParams: {
+          inReplyToMessageId: id,
+          idIsImmutable,
+          isReplyable: !hit.isDraft,
         },
       });
 
@@ -211,7 +220,7 @@ export class MsGraphKqlSearchEmailsQuery {
         return {
           id: request.requestId,
           method: 'GET',
-          url: `${base}?$search=${encodeURIComponent(search)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview&$top=${request.limit}`,
+          url: `${base}?$search=${encodeURIComponent(search)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview,isDraft&$top=${request.limit}`,
           headers: { Prefer: 'outlook.body-content-type="text"' },
         };
       });
@@ -297,6 +306,7 @@ export class MsGraphKqlSearchEmailsQuery {
             parentFolderId: msg.parentFolderId ?? '',
             webLink: msg.webLink ?? '',
             text: msg.uniqueBody?.content || msg.body?.content || msg.bodyPreview || '',
+            isDraft: msg.isDraft === true,
           });
         }
       }

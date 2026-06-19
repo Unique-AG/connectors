@@ -417,6 +417,23 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     });
   });
 
+  describe('replyToParams', () => {
+    it('marks draft messages as not replyable', async () => {
+      const mockPost = makeSuccessPost({
+        [OWN_EMAIL]: [makeMessage('draft-1', { isDraft: true })],
+      });
+      const { instance } = createQuery({ mockPost });
+
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }], SEARCH_CONFIG);
+
+      expect(results[0]?.replyToParams).toEqual({
+        inReplyToMessageId: 'draft-1',
+        idIsImmutable: false,
+        isReplyable: false,
+      });
+    });
+  });
+
   describe('outlookWebLink', () => {
     it('includes webLink for own-mailbox results', async () => {
       const mockPost = makeSuccessPost({ [OWN_EMAIL]: [makeMessage('own-1')] });

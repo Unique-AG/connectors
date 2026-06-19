@@ -35,7 +35,13 @@ const ReplyDraftInputSchema = z.object({
   inReplyToMessageId: z
     .string()
     .describe(
-      'The msGraphMessageId field from search_emails or outlook_email_search results for the email being replied to. Graph pre-fills all original recipients — do not pass toRecipients or ccRecipients.',
+      'Microsoft Graph message ID for the email being replied to. Use `replyToParams.inReplyToMessageId` from a `search_emails` result.',
+    ),
+  idIsImmutable: z
+    .boolean()
+    .optional()
+    .describe(
+      'Whether `inReplyToMessageId` is an immutable ID. Use `replyToParams.idIsImmutable` from a `search_emails` result.',
     ),
 });
 
@@ -121,7 +127,7 @@ export class CreateDraftEmailTool {
     name: 'draft_email',
     title: 'Draft Email',
     description:
-      'Creates a draft email in Outlook. **Replying to a received email is the most common use case** — when the user says "reply", "respond", "get back to", "answer this", "write back", or similar after reading an email, use type: "reply" with the inReplyToMessageId from the retrieved email (Graph pre-fills all recipients and subject automatically). For a new email, use type: "draft" with explicit toRecipients and subject. Optionally pass mailbox for shared mailboxes. The draft is saved but not sent.',
+      'Creates a draft email in Outlook. **Replying to a received email is the most common use case** — when the user says "reply", "respond", "get back to", "answer this", "write back", or similar after reading an email, use type: "reply" only when the search result\'s `replyToParams.isReplyable` is true — then pass `inReplyToMessageId` and `idIsImmutable` from `replyToParams` (Graph pre-fills all recipients and subject automatically). Pass `sourceMailbox` as top-level `mailbox` for shared or delegated mailboxes. For a new email, use type: "draft" with explicit toRecipients and subject. The draft is saved but not sent.',
     parameters: CreateDraftEmailInputSchema,
     outputSchema: CreateDraftEmailOutputSchema,
     annotations: {
