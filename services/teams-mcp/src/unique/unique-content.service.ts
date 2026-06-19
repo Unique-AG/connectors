@@ -191,6 +191,7 @@ export class UniqueContentService {
     return target.toString();
   }
 
+  // One skip/take page; callers paginate explicitly (e.g. `list_meetings`).
   @Span()
   public async getContentInfos(
     request: PublicContentInfosRequest,
@@ -284,6 +285,8 @@ export class UniqueContentService {
    * @param scopeContext - When provided, overrides `x-user-id` and `x-company-id` headers
    *   to scope the search to the given user's permissions. When `undefined`, the search
    *   runs unscoped with service-level credentials — this is intentional for admin/ingestion flows.
+   *
+   * One page/limit request; relevance-ranked, so callers don't collect all pages.
    */
   @Span()
   public async search(
