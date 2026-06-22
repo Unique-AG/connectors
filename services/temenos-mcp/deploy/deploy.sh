@@ -242,21 +242,29 @@ az role assignment create \
   --only-show-errors >/dev/null 2>&1 || true
 
 # === WAIT FOR RBAC TO PROPAGATE, THEN SEED SECRETS ===
-echo "Seeding Key Vault secrets (waiting for RBAC propagation, up to 90s)..."
-for i in 1 2 3 4 5 6 7 8 9; do
-  if az keyvault secret set --vault-name "${KV}" --name "${KV_SECRET_TEMENOS_API_KEY}" \
-       --value "${TEMENOS_API_KEY}" --only-show-errors >/dev/null 2>&1; then
-    break
-  fi
-  if [[ $i -eq 9 ]]; then
-    echo "ERROR: failed to write secret to Key Vault after 9 tries (~90s)." >&2
-    echo "Check: az role assignment list --assignee ${RUNNING_USER_OID} --scope ${KV_ID}" >&2
-    exit 1
-  fi
-  sleep 10
-done
-az keyvault secret set --vault-name "${KV}" --name "${KV_SECRET_MCP_API_KEY}" \
-  --value "${MCP_API_KEY}" --only-show-errors >/dev/null
+# Every write needs the same retry: the role assignment above propagates
+# asynchronously, and a one-shot write that races it would leave the secret
+# unset while the script merrily continues to configure app settings that
+# reference it.
+seed_kv_secret() {
+  local name="$1" value="$2"
+  for i in 1 2 3 4 5 6 7 8 9; do
+    if az keyvault secret set --vault-name "${KV}" --name "${name}" \
+         --value "${value}" --only-show-errors >/dev/null 2>&1; then
+      return 0
+    fi
+    if [[ ${i} -eq 9 ]]; then
+      echo "ERROR: failed to write '${name}' to Key Vault after 9 tries (~90s)." >&2
+      echo "Check: az role assignment list --assignee ${RUNNING_USER_OID} --scope ${KV_ID}" >&2
+      exit 1
+    fi
+    sleep 10
+  done
+}
+
+echo "Seeding Key Vault secrets (waiting for RBAC propagation, up to 90s per secret)..."
+seed_kv_secret "${KV_SECRET_TEMENOS_API_KEY}" "${TEMENOS_API_KEY}"
+seed_kv_secret "${KV_SECRET_MCP_API_KEY}" "${MCP_API_KEY}"
 
 # === APP SETTINGS (secrets via Key Vault references, non-secrets inline) ===
 APP_SETTINGS=(
