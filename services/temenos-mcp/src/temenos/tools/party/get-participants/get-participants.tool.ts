@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetParticipantsInputSchema, GetParticipantsOutputSchema, GetParticipantsQuery, type GetParticipantsResult } from './get-participants.query';
+import {
+  GetParticipantsInputSchema,
+  GetParticipantsOutputSchema,
+  GetParticipantsQuery,
+  type GetParticipantsResult,
+} from './get-participants.query';
 import { META } from './get-participants-tool.meta';
 
 @Injectable()
@@ -12,7 +17,8 @@ export class GetParticipantsTool {
   @Tool({
     name: 'get_participants',
     title: 'Get Participants',
-    description: 'Retrieve participant list from Temenos. Filter by record ID, account officer, or user.',
+    description:
+      'Retrieve participant list from Temenos. Filter by record ID, account officer, or user.',
     parameters: GetParticipantsInputSchema,
     outputSchema: GetParticipantsOutputSchema,
     annotations: {

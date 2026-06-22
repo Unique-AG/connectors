@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetReviewLimitsInputSchema, GetReviewLimitsOutputSchema, GetReviewLimitsQuery, type GetReviewLimitsResult } from './get-review-limits.query';
+import {
+  GetReviewLimitsInputSchema,
+  GetReviewLimitsOutputSchema,
+  GetReviewLimitsQuery,
+  type GetReviewLimitsResult,
+} from './get-review-limits.query';
 import { META } from './get-review-limits-tool.meta';
 
 @Injectable()
@@ -12,7 +17,8 @@ export class GetReviewLimitsTool {
   @Tool({
     name: 'get_review_limits',
     title: 'Get Review Limits',
-    description: 'Retrieve credit limits due for review from Temenos. Filter by review date, approval date, or liability number.',
+    description:
+      'Retrieve credit limits due for review from Temenos. Filter by review date, approval date, or liability number.',
     parameters: GetReviewLimitsInputSchema,
     outputSchema: GetReviewLimitsOutputSchema,
     annotations: {

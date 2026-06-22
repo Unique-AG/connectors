@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetCustomerSecureMessagesInputSchema, GetCustomerSecureMessagesOutputSchema, GetCustomerSecureMessagesQuery, type GetCustomerSecureMessagesResult } from './get-customer-secure-messages.query';
+import {
+  GetCustomerSecureMessagesInputSchema,
+  GetCustomerSecureMessagesOutputSchema,
+  GetCustomerSecureMessagesQuery,
+  type GetCustomerSecureMessagesResult,
+} from './get-customer-secure-messages.query';
 import { META } from './get-customer-secure-messages-tool.meta';
 
 @Injectable()

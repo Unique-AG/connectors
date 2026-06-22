@@ -1,13 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetReviewLimitsInputSchema = z.object({
-  limitReviewDate: z.string().optional().describe("The next date on which the limit is reviewed"),
-  approvalDate: z.string().optional().describe("The date the limit was last approved by the credit committee"),
-  liabilityNumber: z.string().optional().describe("Identifier of the liability customer to the credit limit"),
+  limitReviewDate: z.string().optional().describe('The next date on which the limit is reviewed'),
+  approvalDate: z
+    .string()
+    .optional()
+    .describe('The date the limit was last approved by the credit committee'),
+  liabilityNumber: z
+    .string()
+    .optional()
+    .describe('Identifier of the liability customer to the credit limit'),
 });
 
 export type GetReviewLimitsInput = z.infer<typeof GetReviewLimitsInputSchema>;

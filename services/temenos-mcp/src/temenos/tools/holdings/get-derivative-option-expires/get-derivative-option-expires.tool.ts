@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetDerivativeOptionExpiresInputSchema, GetDerivativeOptionExpiresOutputSchema, GetDerivativeOptionExpiresQuery, type GetDerivativeOptionExpiresResult } from './get-derivative-option-expires.query';
+import {
+  GetDerivativeOptionExpiresInputSchema,
+  GetDerivativeOptionExpiresOutputSchema,
+  GetDerivativeOptionExpiresQuery,
+  type GetDerivativeOptionExpiresResult,
+} from './get-derivative-option-expires.query';
 import { META } from './get-derivative-option-expires-tool.meta';
 
 @Injectable()

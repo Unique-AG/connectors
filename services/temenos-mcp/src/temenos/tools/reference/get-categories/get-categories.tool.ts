@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetCategoriesInputSchema, GetCategoriesOutputSchema, GetCategoriesQuery, type GetCategoriesResult } from './get-categories.query';
+import {
+  GetCategoriesInputSchema,
+  GetCategoriesOutputSchema,
+  GetCategoriesQuery,
+  type GetCategoriesResult,
+} from './get-categories.query';
 import { META } from './get-categories-tool.meta';
 
 @Injectable()

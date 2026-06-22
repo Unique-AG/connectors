@@ -71,7 +71,9 @@ export class TemenosHttpClient {
   }
 
   private tryParseJson(raw: string): unknown {
-    if (!raw) return undefined;
+    if (!raw) {
+      return undefined;
+    }
     try {
       return JSON.parse(raw);
     } catch {
@@ -86,10 +88,14 @@ export class TemenosHttpClient {
         this.getStringField(body, 'detail') ??
         this.getStringField(body, 'title') ??
         this.getStringField(body, 'error');
-      if (message) return message;
+      if (message) {
+        return message;
+      }
     }
     const trimmed = raw.trim();
-    if (trimmed) return trimmed.length > 200 ? `${trimmed.slice(0, 200)}...` : trimmed;
+    if (trimmed) {
+      return trimmed.length > 200 ? `${trimmed.slice(0, 200)}...` : trimmed;
+    }
     return `HTTP ${status}`;
   }
 

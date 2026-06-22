@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetUsLoanCovenantsInputSchema, GetUsLoanCovenantsOutputSchema, GetUsLoanCovenantsQuery, type GetUsLoanCovenantsResult } from './get-us-loan-covenants.query';
+import {
+  GetUsLoanCovenantsInputSchema,
+  GetUsLoanCovenantsOutputSchema,
+  GetUsLoanCovenantsQuery,
+  type GetUsLoanCovenantsResult,
+} from './get-us-loan-covenants.query';
 import { META } from './get-us-loan-covenants-tool.meta';
 
 @Injectable()

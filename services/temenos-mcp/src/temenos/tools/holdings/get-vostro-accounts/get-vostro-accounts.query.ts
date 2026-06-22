@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetVostroAccountsInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
-  customerId: z.string().optional().describe("Identifier of the customer"),
-  productName: z.string().optional().describe("Product name of the bank for this account"),
-  currencyId: z.string().optional().describe("ISO 4217 three-letter currency code"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
+  customerId: z.string().optional().describe('Identifier of the customer'),
+  productName: z.string().optional().describe('Product name of the bank for this account'),
+  currencyId: z.string().optional().describe('ISO 4217 three-letter currency code'),
 });
 
 export type GetVostroAccountsInput = z.infer<typeof GetVostroAccountsInputSchema>;

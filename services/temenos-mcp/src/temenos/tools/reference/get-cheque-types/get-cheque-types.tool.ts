@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetChequeTypesInputSchema, GetChequeTypesOutputSchema, GetChequeTypesQuery, type GetChequeTypesResult } from './get-cheque-types.query';
+import {
+  GetChequeTypesInputSchema,
+  GetChequeTypesOutputSchema,
+  GetChequeTypesQuery,
+  type GetChequeTypesResult,
+} from './get-cheque-types.query';
 import { META } from './get-cheque-types-tool.meta';
 
 @Injectable()
@@ -12,7 +17,8 @@ export class GetChequeTypesTool {
   @Tool({
     name: 'get_cheque_types',
     title: 'Get Cheque Types',
-    description: 'Retrieve cheque type definitions from Temenos. Optionally filter by product name.',
+    description:
+      'Retrieve cheque type definitions from Temenos. Optionally filter by product name.',
     parameters: GetChequeTypesInputSchema,
     outputSchema: GetChequeTypesOutputSchema,
     annotations: {

@@ -1,8 +1,12 @@
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import type * as z from 'zod';
-import { GetNostroAccountsInputSchema, GetNostroAccountsOutputSchema, GetNostroAccountsQuery, type GetNostroAccountsResult } from './get-nostro-accounts.query';
+import {
+  GetNostroAccountsInputSchema,
+  GetNostroAccountsOutputSchema,
+  GetNostroAccountsQuery,
+  type GetNostroAccountsResult,
+} from './get-nostro-accounts.query';
 import { META } from './get-nostro-accounts-tool.meta';
 
 @Injectable()

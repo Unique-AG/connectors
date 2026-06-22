@@ -1,8 +1,12 @@
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import type * as z from 'zod';
-import { GetTransactionStopInvestigationsInputSchema, GetTransactionStopInvestigationsOutputSchema, GetTransactionStopInvestigationsQuery, type GetTransactionStopInvestigationsResult } from './get-transaction-stop-investigations.query';
+import {
+  GetTransactionStopInvestigationsInputSchema,
+  GetTransactionStopInvestigationsOutputSchema,
+  GetTransactionStopInvestigationsQuery,
+  type GetTransactionStopInvestigationsResult,
+} from './get-transaction-stop-investigations.query';
 import { META } from './get-transaction-stop-investigations-tool.meta';
 
 @Injectable()

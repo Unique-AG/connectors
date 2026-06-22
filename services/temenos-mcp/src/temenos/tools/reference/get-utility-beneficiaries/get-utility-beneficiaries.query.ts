@@ -1,19 +1,31 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetUtilityBeneficiariesInputSchema = z.object({
-  productName: z.string().optional().describe("Product name for this account"),
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
-  beneficiaryAccountId: z.string().optional().describe("Unique account identifier of the beneficiary"),
-  bankSortCode: z.string().optional().describe("Sort code or national clearing code of the beneficiary bank"),
-  transactionType: z.string().optional().describe("Transaction type, e.g. ACPX or OTPX"),
-  paymentProduct: z.string().optional().describe("Preferred payment product for this beneficiary"),
-  companyName: z.string().optional().describe("Company in which the payment is processed"),
-  beneficiaryIBAN: z.string().optional().describe("IBAN of the beneficiary account for international transfers"),
-  owningCustomerId: z.string().optional().describe("Customer ID to which the beneficiary is linked"),
+  productName: z.string().optional().describe('Product name for this account'),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
+  beneficiaryAccountId: z
+    .string()
+    .optional()
+    .describe('Unique account identifier of the beneficiary'),
+  bankSortCode: z
+    .string()
+    .optional()
+    .describe('Sort code or national clearing code of the beneficiary bank'),
+  transactionType: z.string().optional().describe('Transaction type, e.g. ACPX or OTPX'),
+  paymentProduct: z.string().optional().describe('Preferred payment product for this beneficiary'),
+  companyName: z.string().optional().describe('Company in which the payment is processed'),
+  beneficiaryIBAN: z
+    .string()
+    .optional()
+    .describe('IBAN of the beneficiary account for international transfers'),
+  owningCustomerId: z
+    .string()
+    .optional()
+    .describe('Customer ID to which the beneficiary is linked'),
 });
 
 export type GetUtilityBeneficiariesInput = z.infer<typeof GetUtilityBeneficiariesInputSchema>;

@@ -1,21 +1,30 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetPendingPaymentsInputSchema = z.object({
-  company: z.string().optional().describe("The company code"),
-  date: z.string().optional().describe("The date on which activity was performed"),
-  transactionReference: z.string().optional().describe("Identifier for the transaction in the core system"),
-  direction: z.string().optional().describe("Direction of the direct debit claim: Outward or Inward"),
-  currency: z.string().optional().describe("ISO currency code"),
-  amount: z.string().optional().describe("Payment amount"),
-  debitClientID: z.string().optional().describe("Debit customer client ID"),
-  creditClientID: z.string().optional().describe("Credit customer client ID"),
-  debitMainAccountCurrencyCode: z.string().optional().describe("ISO currency code for the debit main account"),
-  debitAccountId: z.string().optional().describe("Debit account number of the payment"),
-  creditAccountId: z.string().optional().describe("Credit account identifier of the payment"),
+  company: z.string().optional().describe('The company code'),
+  date: z.string().optional().describe('The date on which activity was performed'),
+  transactionReference: z
+    .string()
+    .optional()
+    .describe('Identifier for the transaction in the core system'),
+  direction: z
+    .string()
+    .optional()
+    .describe('Direction of the direct debit claim: Outward or Inward'),
+  currency: z.string().optional().describe('ISO currency code'),
+  amount: z.string().optional().describe('Payment amount'),
+  debitClientID: z.string().optional().describe('Debit customer client ID'),
+  creditClientID: z.string().optional().describe('Credit customer client ID'),
+  debitMainAccountCurrencyCode: z
+    .string()
+    .optional()
+    .describe('ISO currency code for the debit main account'),
+  debitAccountId: z.string().optional().describe('Debit account number of the payment'),
+  creditAccountId: z.string().optional().describe('Credit account identifier of the payment'),
 });
 
 export type GetPendingPaymentsInput = z.infer<typeof GetPendingPaymentsInputSchema>;

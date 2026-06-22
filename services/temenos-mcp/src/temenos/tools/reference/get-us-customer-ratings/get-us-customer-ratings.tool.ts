@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetUsCustomerRatingsInputSchema, GetUsCustomerRatingsOutputSchema, GetUsCustomerRatingsQuery, type GetUsCustomerRatingsResult } from './get-us-customer-ratings.query';
+import {
+  GetUsCustomerRatingsInputSchema,
+  GetUsCustomerRatingsOutputSchema,
+  GetUsCustomerRatingsQuery,
+  type GetUsCustomerRatingsResult,
+} from './get-us-customer-ratings.query';
 import { META } from './get-us-customer-ratings-tool.meta';
 
 @Injectable()

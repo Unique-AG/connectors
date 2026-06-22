@@ -67,7 +67,8 @@ export class Metrics {
 
   public constructor(metricService: MetricService) {
     this.toolCallDuration = metricService.getHistogram('temenos_tool_call_duration_ms', {
-      description: 'Duration of Temenos MCP tool calls in milliseconds, labelled by tool and result',
+      description:
+        'Duration of Temenos MCP tool calls in milliseconds, labelled by tool and result',
     });
 
     this.apiRequests = metricService.getCounter('temenos_api_requests_total', {

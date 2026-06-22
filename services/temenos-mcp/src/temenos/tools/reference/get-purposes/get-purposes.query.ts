@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetPurposesInputSchema = z.object({});
 

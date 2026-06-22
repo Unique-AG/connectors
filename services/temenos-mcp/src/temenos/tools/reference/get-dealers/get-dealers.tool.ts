@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetDealersInputSchema, GetDealersOutputSchema, GetDealersQuery, type GetDealersResult } from './get-dealers.query';
+import {
+  GetDealersInputSchema,
+  GetDealersOutputSchema,
+  GetDealersQuery,
+  type GetDealersResult,
+} from './get-dealers.query';
 import { META } from './get-dealers-tool.meta';
 
 @Injectable()

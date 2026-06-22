@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetChequeTypesInputSchema = z.object({
-  productName: z.string().optional().describe("Product name of the bank for this account"),
+  productName: z.string().optional().describe('Product name of the bank for this account'),
 });
 
 export type GetChequeTypesInput = z.infer<typeof GetChequeTypesInputSchema>;

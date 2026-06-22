@@ -1,8 +1,12 @@
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import type * as z from 'zod';
-import { GetCustomerProspectsInputSchema, GetCustomerProspectsOutputSchema, GetCustomerProspectsQuery, type GetCustomerProspectsResult } from './get-customer-prospects.query';
+import {
+  GetCustomerProspectsInputSchema,
+  GetCustomerProspectsOutputSchema,
+  GetCustomerProspectsQuery,
+  type GetCustomerProspectsResult,
+} from './get-customer-prospects.query';
 import { META } from './get-customer-prospects-tool.meta';
 
 @Injectable()

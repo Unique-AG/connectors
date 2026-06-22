@@ -1,8 +1,12 @@
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import type * as z from 'zod';
-import { GetLanguageCodesInputSchema, GetLanguageCodesOutputSchema, GetLanguageCodesQuery, type GetLanguageCodesResult } from './get-language-codes.query';
+import {
+  GetLanguageCodesInputSchema,
+  GetLanguageCodesOutputSchema,
+  GetLanguageCodesQuery,
+  type GetLanguageCodesResult,
+} from './get-language-codes.query';
 import { META } from './get-language-codes-tool.meta';
 
 @Injectable()

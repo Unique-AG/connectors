@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetUsStatesInputSchema = z.object({
-  countryId: z.string().optional().describe("ISO country code of the financial institution"),
+  countryId: z.string().optional().describe('ISO country code of the financial institution'),
 });
 
 export type GetUsStatesInput = z.infer<typeof GetUsStatesInputSchema>;

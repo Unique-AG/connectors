@@ -1,24 +1,30 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetDerivativeOptionExpiresInputSchema = z.object({
-  tradeStatus: z.string().optional().describe("Trade status: ACTIVE or CLOSED"),
-  lot: z.string().optional().describe("Number of lots or contracts traded"),
-  tradeType: z.string().optional().describe("Contract type: FUTURE, OPTION, or STOCK"),
-  syTransactionReference: z.string().optional().describe("Structured product reference for the trade"),
-  PndSett: z.string().optional().describe("ID of any pending DX.CLOSEOUT for this customer"),
-  portfolioId: z.string().optional().describe("ID of the portfolio or security account"),
-  instrumentId: z.string().optional().describe("Identifier of the instrument"),
-  maturityDate: z.string().optional().describe("Maturity date of the contract"),
-  strikePrice: z.string().optional().describe("Price at which the option holder may buy (Call) or sell (Put) the underlying"),
-  callOrPut: z.string().optional().describe("Option type: CALL or PUT"),
-  tradeCurrency: z.string().optional().describe("Settlement currency for the trade"),
-  contractCurrency: z.string().optional().describe("Contract currency"),
-  optionStyle: z.string().optional().describe("Settlement rule: AMERICAN or EUROPEAN"),
-  referenceId: z.string().optional().describe("Unique identifier of the activity"),
+  tradeStatus: z.string().optional().describe('Trade status: ACTIVE or CLOSED'),
+  lot: z.string().optional().describe('Number of lots or contracts traded'),
+  tradeType: z.string().optional().describe('Contract type: FUTURE, OPTION, or STOCK'),
+  syTransactionReference: z
+    .string()
+    .optional()
+    .describe('Structured product reference for the trade'),
+  PndSett: z.string().optional().describe('ID of any pending DX.CLOSEOUT for this customer'),
+  portfolioId: z.string().optional().describe('ID of the portfolio or security account'),
+  instrumentId: z.string().optional().describe('Identifier of the instrument'),
+  maturityDate: z.string().optional().describe('Maturity date of the contract'),
+  strikePrice: z
+    .string()
+    .optional()
+    .describe('Price at which the option holder may buy (Call) or sell (Put) the underlying'),
+  callOrPut: z.string().optional().describe('Option type: CALL or PUT'),
+  tradeCurrency: z.string().optional().describe('Settlement currency for the trade'),
+  contractCurrency: z.string().optional().describe('Contract currency'),
+  optionStyle: z.string().optional().describe('Settlement rule: AMERICAN or EUROPEAN'),
+  referenceId: z.string().optional().describe('Unique identifier of the activity'),
 });
 
 export type GetDerivativeOptionExpiresInput = z.infer<typeof GetDerivativeOptionExpiresInputSchema>;
@@ -32,7 +38,9 @@ export const GetDerivativeOptionExpiresOutputSchema = z
   })
   .loose();
 
-export type GetDerivativeOptionExpiresResult = z.infer<typeof GetDerivativeOptionExpiresOutputSchema>;
+export type GetDerivativeOptionExpiresResult = z.infer<
+  typeof GetDerivativeOptionExpiresOutputSchema
+>;
 
 @Injectable()
 export class GetDerivativeOptionExpiresQuery {
@@ -44,7 +52,9 @@ export class GetDerivativeOptionExpiresQuery {
   ) {}
 
   @Span()
-  public async run(input: GetDerivativeOptionExpiresInput): Promise<GetDerivativeOptionExpiresResult> {
+  public async run(
+    input: GetDerivativeOptionExpiresInput,
+  ): Promise<GetDerivativeOptionExpiresResult> {
     this.logger.debug({}, 'get_derivative_option_expires: invoked');
     const start = Date.now();
     let result: 'success' | 'error' = 'success';

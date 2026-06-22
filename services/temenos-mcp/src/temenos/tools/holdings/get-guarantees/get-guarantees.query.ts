@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetGuaranteesInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
-  customerId: z.string().optional().describe("Identifier of the customer"),
-  eventStatus: z.string().optional().describe("Request status: With Bank, With Customer, Approved, or Rejected"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
+  customerId: z.string().optional().describe('Identifier of the customer'),
+  eventStatus: z
+    .string()
+    .optional()
+    .describe('Request status: With Bank, With Customer, Approved, or Rejected'),
 });
 
 export type GetGuaranteesInput = z.infer<typeof GetGuaranteesInputSchema>;

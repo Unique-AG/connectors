@@ -1,15 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetRepoPositionsInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
-  portfolioId: z.string().optional().describe("ID of the portfolio or security account"),
-  depositoryId: z.string().optional().describe("ID of the securities depository"),
-  instrumentId: z.string().optional().describe("Identifier of the instrument"),
-  quantity: z.string().optional().describe("Nominal quantity"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
+  portfolioId: z.string().optional().describe('ID of the portfolio or security account'),
+  depositoryId: z.string().optional().describe('ID of the securities depository'),
+  instrumentId: z.string().optional().describe('Identifier of the instrument'),
+  quantity: z.string().optional().describe('Nominal quantity'),
 });
 
 export type GetRepoPositionsInput = z.infer<typeof GetRepoPositionsInputSchema>;
@@ -40,13 +40,16 @@ export class GetRepoPositionsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/instruments/repurchaseAgreements/positions', {
-        recordId: input.recordId,
-        portfolioId: input.portfolioId,
-        depositoryId: input.depositoryId,
-        instrumentId: input.instrumentId,
-        quantity: input.quantity,
-      });
+      const data = await this.client.get<unknown>(
+        '/holdings/instruments/repurchaseAgreements/positions',
+        {
+          recordId: input.recordId,
+          portfolioId: input.portfolioId,
+          depositoryId: input.depositoryId,
+          instrumentId: input.instrumentId,
+          quantity: input.quantity,
+        },
+      );
       return { success: true, data };
     } catch (err) {
       result = 'error';

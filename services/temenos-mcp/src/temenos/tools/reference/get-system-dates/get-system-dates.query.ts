@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetSystemDatesInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
-  nextWorkingDate: z.string().optional().describe("Date of the next business day to be processed"),
-  lastWorkingDate: z.string().optional().describe("Date of the last business day processed"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
+  nextWorkingDate: z.string().optional().describe('Date of the next business day to be processed'),
+  lastWorkingDate: z.string().optional().describe('Date of the last business day processed'),
 });
 
 export type GetSystemDatesInput = z.infer<typeof GetSystemDatesInputSchema>;

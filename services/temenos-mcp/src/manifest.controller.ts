@@ -16,8 +16,7 @@ export class ManifestController {
       },
       features: ['Temenos DataHub ODS integration', '49 operational data tools'],
       documentation: {
-        readme:
-          'https://github.com/Unique-AG/connectors/blob/main/services/temenos-mcp/README.md',
+        readme: 'https://github.com/Unique-AG/connectors/blob/main/services/temenos-mcp/README.md',
         mcp: 'https://modelcontextprotocol.io/',
       },
       timestamp: new Date().toISOString(),

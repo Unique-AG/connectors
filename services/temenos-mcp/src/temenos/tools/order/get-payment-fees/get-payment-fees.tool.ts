@@ -1,8 +1,12 @@
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import type * as z from 'zod';
-import { GetPaymentFeesInputSchema, GetPaymentFeesOutputSchema, GetPaymentFeesQuery, type GetPaymentFeesResult } from './get-payment-fees.query';
+import {
+  GetPaymentFeesInputSchema,
+  GetPaymentFeesOutputSchema,
+  GetPaymentFeesQuery,
+  type GetPaymentFeesResult,
+} from './get-payment-fees.query';
 import { META } from './get-payment-fees-tool.meta';
 
 @Injectable()

@@ -1,8 +1,12 @@
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import type * as z from 'zod';
-import { GetPurposesInputSchema, GetPurposesOutputSchema, GetPurposesQuery, type GetPurposesResult } from './get-purposes.query';
+import {
+  GetPurposesInputSchema,
+  GetPurposesOutputSchema,
+  GetPurposesQuery,
+  type GetPurposesResult,
+} from './get-purposes.query';
 import { META } from './get-purposes-tool.meta';
 
 @Injectable()

@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetLetterOfCreditTenorsInputSchema, GetLetterOfCreditTenorsOutputSchema, GetLetterOfCreditTenorsQuery, type GetLetterOfCreditTenorsResult } from './get-letter-of-credit-tenors.query';
+import {
+  GetLetterOfCreditTenorsInputSchema,
+  GetLetterOfCreditTenorsOutputSchema,
+  GetLetterOfCreditTenorsQuery,
+  type GetLetterOfCreditTenorsResult,
+} from './get-letter-of-credit-tenors.query';
 import { META } from './get-letter-of-credit-tenors-tool.meta';
 
 @Injectable()

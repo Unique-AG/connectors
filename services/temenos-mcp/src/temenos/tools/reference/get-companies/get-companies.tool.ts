@@ -1,8 +1,12 @@
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import type * as z from 'zod';
-import { GetCompaniesInputSchema, GetCompaniesOutputSchema, GetCompaniesQuery, type GetCompaniesResult } from './get-companies.query';
+import {
+  GetCompaniesInputSchema,
+  GetCompaniesOutputSchema,
+  GetCompaniesQuery,
+  type GetCompaniesResult,
+} from './get-companies.query';
 import { META } from './get-companies-tool.meta';
 
 @Injectable()

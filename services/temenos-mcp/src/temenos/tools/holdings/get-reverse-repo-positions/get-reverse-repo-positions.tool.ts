@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetReverseRepoPositionsInputSchema, GetReverseRepoPositionsOutputSchema, GetReverseRepoPositionsQuery, type GetReverseRepoPositionsResult } from './get-reverse-repo-positions.query';
+import {
+  GetReverseRepoPositionsInputSchema,
+  GetReverseRepoPositionsOutputSchema,
+  GetReverseRepoPositionsQuery,
+  type GetReverseRepoPositionsResult,
+} from './get-reverse-repo-positions.query';
 import { META } from './get-reverse-repo-positions-tool.meta';
 
 @Injectable()

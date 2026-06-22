@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetGuaranteesInputSchema, GetGuaranteesOutputSchema, GetGuaranteesQuery, type GetGuaranteesResult } from './get-guarantees.query';
+import {
+  GetGuaranteesInputSchema,
+  GetGuaranteesOutputSchema,
+  GetGuaranteesQuery,
+  type GetGuaranteesResult,
+} from './get-guarantees.query';
 import { META } from './get-guarantees-tool.meta';
 
 @Injectable()
@@ -12,7 +17,8 @@ export class GetGuaranteesTool {
   @Tool({
     name: 'get_guarantees',
     title: 'Get Guarantees',
-    description: 'Retrieve guarantee request details from Temenos. Optionally filter by record ID, customer ID, or event status.',
+    description:
+      'Retrieve guarantee request details from Temenos. Optionally filter by record ID, customer ID, or event status.',
     parameters: GetGuaranteesInputSchema,
     outputSchema: GetGuaranteesOutputSchema,
     annotations: {

@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetPaymentStopsInputSchema, GetPaymentStopsOutputSchema, GetPaymentStopsQuery, type GetPaymentStopsResult } from './get-payment-stops.query';
+import {
+  GetPaymentStopsInputSchema,
+  GetPaymentStopsOutputSchema,
+  GetPaymentStopsQuery,
+  type GetPaymentStopsResult,
+} from './get-payment-stops.query';
 import { META } from './get-payment-stops-tool.meta';
 
 @Injectable()
@@ -12,7 +17,8 @@ export class GetPaymentStopsTool {
   @Tool({
     name: 'get_payment_stops',
     title: 'Get Payment Stops',
-    description: 'Retrieve payment stop instructions from Temenos. Filter by record, customer, or stop type.',
+    description:
+      'Retrieve payment stop instructions from Temenos. Filter by record, customer, or stop type.',
     parameters: GetPaymentStopsInputSchema,
     outputSchema: GetPaymentStopsOutputSchema,
     annotations: {

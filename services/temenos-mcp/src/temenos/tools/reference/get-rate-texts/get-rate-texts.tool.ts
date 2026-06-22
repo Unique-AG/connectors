@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetRateTextsInputSchema, GetRateTextsOutputSchema, GetRateTextsQuery, type GetRateTextsResult } from './get-rate-texts.query';
+import {
+  GetRateTextsInputSchema,
+  GetRateTextsOutputSchema,
+  GetRateTextsQuery,
+  type GetRateTextsResult,
+} from './get-rate-texts.query';
 import { META } from './get-rate-texts-tool.meta';
 
 @Injectable()

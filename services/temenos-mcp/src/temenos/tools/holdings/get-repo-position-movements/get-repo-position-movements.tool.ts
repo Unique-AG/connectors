@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetRepoPositionMovementsInputSchema, GetRepoPositionMovementsOutputSchema, GetRepoPositionMovementsQuery, type GetRepoPositionMovementsResult } from './get-repo-position-movements.query';
+import {
+  GetRepoPositionMovementsInputSchema,
+  GetRepoPositionMovementsOutputSchema,
+  GetRepoPositionMovementsQuery,
+  type GetRepoPositionMovementsResult,
+} from './get-repo-position-movements.query';
 import { META } from './get-repo-position-movements-tool.meta';
 
 @Injectable()

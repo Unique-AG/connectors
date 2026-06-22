@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetExternalUserPreferencesInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
 });
 
 export type GetExternalUserPreferencesInput = z.infer<typeof GetExternalUserPreferencesInputSchema>;
@@ -19,7 +19,9 @@ export const GetExternalUserPreferencesOutputSchema = z
   })
   .loose();
 
-export type GetExternalUserPreferencesResult = z.infer<typeof GetExternalUserPreferencesOutputSchema>;
+export type GetExternalUserPreferencesResult = z.infer<
+  typeof GetExternalUserPreferencesOutputSchema
+>;
 
 @Injectable()
 export class GetExternalUserPreferencesQuery {
@@ -31,7 +33,9 @@ export class GetExternalUserPreferencesQuery {
   ) {}
 
   @Span()
-  public async run(input: GetExternalUserPreferencesInput): Promise<GetExternalUserPreferencesResult> {
+  public async run(
+    input: GetExternalUserPreferencesInput,
+  ): Promise<GetExternalUserPreferencesResult> {
     this.logger.debug({}, 'get_external_user_preferences: invoked');
     const start = Date.now();
     let result: 'success' | 'error' = 'success';

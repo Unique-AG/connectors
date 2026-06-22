@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetPaymentStopsInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
-  customerId: z.string().optional().describe("Identifier of the customer"),
-  stopTypeId: z.string().optional().describe("Reason for the payment stop, e.g. cheque lost or funds not available"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
+  customerId: z.string().optional().describe('Identifier of the customer'),
+  stopTypeId: z
+    .string()
+    .optional()
+    .describe('Reason for the payment stop, e.g. cheque lost or funds not available'),
 });
 
 export type GetPaymentStopsInput = z.infer<typeof GetPaymentStopsInputSchema>;

@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetLetterOfCreditIncoTermsInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
 });
 
 export type GetLetterOfCreditIncoTermsInput = z.infer<typeof GetLetterOfCreditIncoTermsInputSchema>;
@@ -19,7 +19,9 @@ export const GetLetterOfCreditIncoTermsOutputSchema = z
   })
   .loose();
 
-export type GetLetterOfCreditIncoTermsResult = z.infer<typeof GetLetterOfCreditIncoTermsOutputSchema>;
+export type GetLetterOfCreditIncoTermsResult = z.infer<
+  typeof GetLetterOfCreditIncoTermsOutputSchema
+>;
 
 @Injectable()
 export class GetLetterOfCreditIncoTermsQuery {
@@ -31,7 +33,9 @@ export class GetLetterOfCreditIncoTermsQuery {
   ) {}
 
   @Span()
-  public async run(input: GetLetterOfCreditIncoTermsInput): Promise<GetLetterOfCreditIncoTermsResult> {
+  public async run(
+    input: GetLetterOfCreditIncoTermsInput,
+  ): Promise<GetLetterOfCreditIncoTermsResult> {
     this.logger.debug({}, 'get_letter_of_credit_inco_terms: invoked');
     const start = Date.now();
     let result: 'success' | 'error' = 'success';

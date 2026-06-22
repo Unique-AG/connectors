@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetUsStatesInputSchema, GetUsStatesOutputSchema, GetUsStatesQuery, type GetUsStatesResult } from './get-us-states.query';
+import {
+  GetUsStatesInputSchema,
+  GetUsStatesOutputSchema,
+  GetUsStatesQuery,
+  type GetUsStatesResult,
+} from './get-us-states.query';
 import { META } from './get-us-states-tool.meta';
 
 @Injectable()

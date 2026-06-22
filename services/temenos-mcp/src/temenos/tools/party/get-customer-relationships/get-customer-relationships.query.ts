@@ -1,14 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetCustomerRelationshipsInputSchema = z.object({
-  customerRelationGroupId: z.string().optional().describe("Key to the customer relationship group"),
-  partyId: z.string().optional().describe("Customer or person entity ID that is part of the relationship"),
-  relationPartyId: z.string().optional().describe("Related customer or person entity ID"),
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
+  customerRelationGroupId: z.string().optional().describe('Key to the customer relationship group'),
+  partyId: z
+    .string()
+    .optional()
+    .describe('Customer or person entity ID that is part of the relationship'),
+  relationPartyId: z.string().optional().describe('Related customer or person entity ID'),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
 });
 
 export type GetCustomerRelationshipsInput = z.infer<typeof GetCustomerRelationshipsInputSchema>;

@@ -1,8 +1,12 @@
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import type * as z from 'zod';
-import { GetInterestConditionsInputSchema, GetInterestConditionsOutputSchema, GetInterestConditionsQuery, type GetInterestConditionsResult } from './get-interest-conditions.query';
+import {
+  GetInterestConditionsInputSchema,
+  GetInterestConditionsOutputSchema,
+  GetInterestConditionsQuery,
+  type GetInterestConditionsResult,
+} from './get-interest-conditions.query';
 import { META } from './get-interest-conditions-tool.meta';
 
 @Injectable()

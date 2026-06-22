@@ -1,12 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetExpiringLimitsInputSchema = z.object({
-  expiryDate: z.string().optional().describe("The date the credit facility or limit is due to expire"),
-  approvalDate: z.string().optional().describe("The date the limit was last approved by the credit committee"),
+  expiryDate: z
+    .string()
+    .optional()
+    .describe('The date the credit facility or limit is due to expire'),
+  approvalDate: z
+    .string()
+    .optional()
+    .describe('The date the limit was last approved by the credit committee'),
 });
 
 export type GetExpiringLimitsInput = z.infer<typeof GetExpiringLimitsInputSchema>;

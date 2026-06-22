@@ -1,12 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetTransactionStopInvestigationsInputSchema = z.object({});
 
-export type GetTransactionStopInvestigationsInput = z.infer<typeof GetTransactionStopInvestigationsInputSchema>;
+export type GetTransactionStopInvestigationsInput = z.infer<
+  typeof GetTransactionStopInvestigationsInputSchema
+>;
 
 export const GetTransactionStopInvestigationsOutputSchema = z
   .object({
@@ -17,7 +19,9 @@ export const GetTransactionStopInvestigationsOutputSchema = z
   })
   .loose();
 
-export type GetTransactionStopInvestigationsResult = z.infer<typeof GetTransactionStopInvestigationsOutputSchema>;
+export type GetTransactionStopInvestigationsResult = z.infer<
+  typeof GetTransactionStopInvestigationsOutputSchema
+>;
 
 @Injectable()
 export class GetTransactionStopInvestigationsQuery {
@@ -34,7 +38,10 @@ export class GetTransactionStopInvestigationsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/order/transactionStops/investigations', undefined);
+      const data = await this.client.get<unknown>(
+        '/order/transactionStops/investigations',
+        undefined,
+      );
       return { success: true, data };
     } catch (err) {
       result = 'error';

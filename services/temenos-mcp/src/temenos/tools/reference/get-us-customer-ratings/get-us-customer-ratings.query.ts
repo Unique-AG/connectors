@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetUsCustomerRatingsInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
 });
 
 export type GetUsCustomerRatingsInput = z.infer<typeof GetUsCustomerRatingsInputSchema>;

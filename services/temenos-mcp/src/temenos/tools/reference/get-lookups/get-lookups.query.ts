@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetLookupsInputSchema = z.object({
-  virtualTable: z.string().optional().describe("Table name derived from the EB.LOOKUP table ID"),
-  otherInfo: z.string().optional().describe("Additional lookup information"),
+  virtualTable: z.string().optional().describe('Table name derived from the EB.LOOKUP table ID'),
+  otherInfo: z.string().optional().describe('Additional lookup information'),
 });
 
 export type GetLookupsInput = z.infer<typeof GetLookupsInputSchema>;

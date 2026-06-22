@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetRateTextsInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
-  displayName: z.string().optional().describe("Name used for display purposes"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
+  displayName: z.string().optional().describe('Name used for display purposes'),
 });
 
 export type GetRateTextsInput = z.infer<typeof GetRateTextsInputSchema>;

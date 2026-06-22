@@ -1,8 +1,12 @@
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
-import type * as z from 'zod';
-import { GetBrokersInputSchema, GetBrokersOutputSchema, GetBrokersQuery, type GetBrokersResult } from './get-brokers.query';
+import {
+  GetBrokersInputSchema,
+  GetBrokersOutputSchema,
+  GetBrokersQuery,
+  type GetBrokersResult,
+} from './get-brokers.query';
 import { META } from './get-brokers-tool.meta';
 
 @Injectable()

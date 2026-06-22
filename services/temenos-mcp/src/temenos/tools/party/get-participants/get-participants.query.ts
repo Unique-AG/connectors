@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetParticipantsInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
-  accountOfficer: z.string().optional().describe("Identifier of the department account officer"),
-  user: z.string().optional().describe("The user who created the record"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
+  accountOfficer: z.string().optional().describe('Identifier of the department account officer'),
+  user: z.string().optional().describe('The user who created the record'),
 });
 
 export type GetParticipantsInput = z.infer<typeof GetParticipantsInputSchema>;

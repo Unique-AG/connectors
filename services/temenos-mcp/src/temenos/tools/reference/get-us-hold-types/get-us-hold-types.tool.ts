@@ -2,7 +2,12 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import type * as z from 'zod';
-import { GetUsHoldTypesInputSchema, GetUsHoldTypesOutputSchema, GetUsHoldTypesQuery, type GetUsHoldTypesResult } from './get-us-hold-types.query';
+import {
+  GetUsHoldTypesInputSchema,
+  GetUsHoldTypesOutputSchema,
+  GetUsHoldTypesQuery,
+  type GetUsHoldTypesResult,
+} from './get-us-hold-types.query';
 import { META } from './get-us-hold-types-tool.meta';
 
 @Injectable()

@@ -1,17 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetReverseRepoPositionMovementsInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
-  portfolioId: z.string().optional().describe("ID of the portfolio or security account"),
-  instrumentId: z.string().optional().describe("Identifier of the instrument"),
-  depositoryId: z.string().optional().describe("ID of the securities depository"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
+  portfolioId: z.string().optional().describe('ID of the portfolio or security account'),
+  instrumentId: z.string().optional().describe('Identifier of the instrument'),
+  depositoryId: z.string().optional().describe('ID of the securities depository'),
 });
 
-export type GetReverseRepoPositionMovementsInput = z.infer<typeof GetReverseRepoPositionMovementsInputSchema>;
+export type GetReverseRepoPositionMovementsInput = z.infer<
+  typeof GetReverseRepoPositionMovementsInputSchema
+>;
 
 export const GetReverseRepoPositionMovementsOutputSchema = z
   .object({
@@ -22,7 +24,9 @@ export const GetReverseRepoPositionMovementsOutputSchema = z
   })
   .loose();
 
-export type GetReverseRepoPositionMovementsResult = z.infer<typeof GetReverseRepoPositionMovementsOutputSchema>;
+export type GetReverseRepoPositionMovementsResult = z.infer<
+  typeof GetReverseRepoPositionMovementsOutputSchema
+>;
 
 @Injectable()
 export class GetReverseRepoPositionMovementsQuery {
@@ -34,17 +38,22 @@ export class GetReverseRepoPositionMovementsQuery {
   ) {}
 
   @Span()
-  public async run(input: GetReverseRepoPositionMovementsInput): Promise<GetReverseRepoPositionMovementsResult> {
+  public async run(
+    input: GetReverseRepoPositionMovementsInput,
+  ): Promise<GetReverseRepoPositionMovementsResult> {
     this.logger.debug({}, 'get_reverse_repo_position_movements: invoked');
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/instruments/reverseRepurchaseAgreements/positionMovements', {
-        recordId: input.recordId,
-        portfolioId: input.portfolioId,
-        instrumentId: input.instrumentId,
-        depositoryId: input.depositoryId,
-      });
+      const data = await this.client.get<unknown>(
+        '/holdings/instruments/reverseRepurchaseAgreements/positionMovements',
+        {
+          recordId: input.recordId,
+          portfolioId: input.portfolioId,
+          instrumentId: input.instrumentId,
+          depositoryId: input.depositoryId,
+        },
+      );
       return { success: true, data };
     } catch (err) {
       result = 'error';

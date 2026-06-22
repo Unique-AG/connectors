@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 import { Metrics } from '../../../metrics';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
 
 export const GetRepoPositionMovementsInputSchema = z.object({
-  recordId: z.string().optional().describe("Unique identifier of an entity"),
-  portfolioId: z.string().optional().describe("ID of the portfolio or security account"),
-  instrumentId: z.string().optional().describe("Identifier of the instrument"),
-  depositoryId: z.string().optional().describe("ID of the securities depository"),
+  recordId: z.string().optional().describe('Unique identifier of an entity'),
+  portfolioId: z.string().optional().describe('ID of the portfolio or security account'),
+  instrumentId: z.string().optional().describe('Identifier of the instrument'),
+  depositoryId: z.string().optional().describe('ID of the securities depository'),
 });
 
 export type GetRepoPositionMovementsInput = z.infer<typeof GetRepoPositionMovementsInputSchema>;
@@ -39,12 +39,15 @@ export class GetRepoPositionMovementsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/instruments/repurchaseAgreements/positionMovements', {
-        recordId: input.recordId,
-        portfolioId: input.portfolioId,
-        instrumentId: input.instrumentId,
-        depositoryId: input.depositoryId,
-      });
+      const data = await this.client.get<unknown>(
+        '/holdings/instruments/repurchaseAgreements/positionMovements',
+        {
+          recordId: input.recordId,
+          portfolioId: input.portfolioId,
+          instrumentId: input.instrumentId,
+          depositoryId: input.depositoryId,
+        },
+      );
       return { success: true, data };
     } catch (err) {
       result = 'error';
