@@ -36,6 +36,12 @@ const GetChannelMessagesInputSchema = z.object({
     .describe(
       'full = ISO 8601 with ms, short = YYYY-MM-DD HH:mm, none = omit timestamps. Default: short',
     ),
+  detail: z
+    .enum(['standard', 'full'])
+    .default('standard')
+    .describe(
+      'standard returns sender, content, and timestamp. full adds contentType (source format from Graph). Default: standard',
+    ),
 });
 
 const GetChannelMessagesOutputSchema = z.object({
@@ -47,6 +53,7 @@ const GetChannelMessagesOutputSchema = z.object({
       createdDateTime: z.string().optional(),
       senderDisplayName: z.string().nullable(),
       content: z.string(),
+      contentType: z.string().optional(),
     }),
   ),
 });
@@ -149,6 +156,10 @@ export class GetChannelMessagesTool {
         input.timestampFormat === 'full'
           ? m.createdDateTime
           : m.createdDateTime.replace('T', ' ').slice(0, 16);
+    }
+
+    if (input.detail === 'full') {
+      msg.contentType = m.contentType;
     }
 
     return msg;
