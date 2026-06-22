@@ -9,9 +9,13 @@
 #   op inject -i deploy/.env.deploy.tpl -o deploy/.env.deploy
 #
 # Items live in the "role/developer" vault on unique-team.1password.com.
+# The slash in the vault name collides with the op://VAULT/ITEM/FIELD
+# separator and isn't escapable in this `op` version, so we reference the
+# vault by its immutable UUID instead. Look up the UUID with `op vault list`.
 
 # === 1Password-sourced secrets ===
-TEMENOS_API_KEY="op://role/developer/Temenos Sandbox API key/Api Key"
+# vault "role/developer" (UUID s6nhjzc6dvkbn734b4vfquxcl4)
+TEMENOS_API_KEY="op://s6nhjzc6dvkbn734b4vfquxcl4/Temenos Sandbox API key/API Key"
 
 # === Manually-managed secrets ===
 # Generate once with: openssl rand -hex 32
