@@ -27,6 +27,7 @@ const ListChatsInputSchema = z.object({
 const ListChatsOutputSchema = z.object({
   chats: z.array(
     z.object({
+      chatId: z.string(),
       chatType: z.string(),
       topic: z.string().nullable(),
       createdDateTime: z.string().nullable(),
@@ -57,7 +58,7 @@ export class ListChatsTool {
     name: 'list_chats',
     title: 'List My Chats',
     description:
-      "List the current user's Microsoft Teams chats (1:1, group, and meeting chats). Returns up to 50 most recent chats, each with its creation date (createdDateTime) and the timestamp of its last message (lastMessageAt) to help tell apart chats that share a topic or member. Use the topic or a member's display name as chatIdentifier in get_chat_messages or send_chat_message.",
+      "List the current user's Microsoft Teams chats (1:1, group, and meeting chats). Returns up to 50 most recent chats, each with its chatId plus creation date (createdDateTime) and last-message timestamp (lastMessageAt) to tell apart chats that share a topic or member. Pass the chatId to get_chat_messages or send_chat_message to target a specific chat unambiguously (preferred over the topic/member name when several chats share a name).",
     parameters: ListChatsInputSchema,
     outputSchema: ListChatsOutputSchema,
     annotations: {
@@ -103,12 +104,14 @@ export class ListChatsTool {
     includeMemberEmails: boolean,
   ): z.output<typeof ListChatsOutputSchema>['chats'][number] {
     const mapped: {
+      chatId: string;
       chatType: string;
       topic: string | null;
       createdDateTime: string | null;
       lastMessageAt: string | null;
       members?: { displayName: string | null; email?: string | null }[];
     } = {
+      chatId: chat.id,
       chatType: chat.chatType,
       topic: chat.topic ?? null,
       createdDateTime: chat.createdDateTime,
