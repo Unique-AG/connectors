@@ -68,10 +68,10 @@ export async function disambiguate<T>(
     // elicitation capability. Log it so a genuinely unexpected error (rather
     // than the expected "elicitation unsupported") is still visible, then fall
     // back to today's behaviour.
-    logger.warn(
-      { err: err instanceof Error ? err.message : String(err) },
-      'Elicitation failed; falling back to ConflictException',
-    );
+    // Pass the full error (not just its message) so the logger's error
+    // serializer keeps the stack trace and type — that detail is what tells an
+    // expected "elicitation unsupported" case apart from a real defect.
+    logger.warn({ err }, 'Elicitation failed; falling back to ConflictException');
     throw new ConflictException(opts.conflictMessage);
   }
 }
