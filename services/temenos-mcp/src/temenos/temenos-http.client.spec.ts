@@ -18,11 +18,17 @@ const stubConfig = { apiBaseUrl: 'https://api.example.com', apiKey: { value: 'ke
 const mockedRequest = vi.mocked(request);
 
 function mockResponse(statusCode: number, body: string): Dispatcher.ResponseData {
+  // The client reads via `for await (const chunk of response.body)` so the
+  // mock must expose an async iterator over Buffer chunks.
   return {
     statusCode,
     headers: {},
     body: {
-      text: vi.fn().mockResolvedValue(body),
+      async *[Symbol.asyncIterator]() {
+        if (body.length > 0) {
+          yield Buffer.from(body, 'utf-8');
+        }
+      },
     },
   } as unknown as Dispatcher.ResponseData;
 }
@@ -89,14 +95,27 @@ describe('TemenosHttpClient', () => {
       });
     });
 
-    it('falls back to the raw body when the error payload has no known message field', async () => {
+    it('returns a generic HTTP message when the error payload has no known field', async () => {
+      // Raw upstream text is intentionally not echoed into the error message:
+      // a Temenos response without a documented error field could contain
+      // arbitrary content (HTML, stack traces, customer data) that must not
+      // leak via the thrown error or the catch-block log.
       mockedRequest.mockResolvedValueOnce(mockResponse(500, 'upstream exploded'));
 
       await expect(unit.get('/reference/v1.0.0/lookups')).rejects.toMatchObject({
         name: 'TemenosApiError',
         status: 500,
-        message: 'upstream exploded',
+        message: 'HTTP 500',
       } satisfies Partial<TemenosApiError>);
+    });
+
+    it('throws when the response body exceeds the size cap', async () => {
+      // 11 MB > the 10 MB cap defined in TemenosHttpClient.MAX_RESPONSE_BYTES.
+      // The streaming reader must bail before buffering the full payload.
+      const oversized = 'x'.repeat(11 * 1024 * 1024);
+      mockedRequest.mockResolvedValueOnce(mockResponse(200, oversized));
+
+      await expect(unit.get('/reference/v1.0.0/lookups')).rejects.toThrow(/exceeded/);
     });
 
     it('rethrows transport errors after logging and still records metrics with status 0', async () => {

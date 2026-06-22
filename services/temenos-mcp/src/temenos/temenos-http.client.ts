@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { isPlainObject, isString } from 'remeda';
-import { request } from 'undici';
+import { type Dispatcher, request } from 'undici';
 import { TemenosConfig } from '~/config';
 import { Metrics } from './metrics';
 
@@ -17,6 +17,11 @@ export class TemenosApiError extends Error {
 
 @Injectable()
 export class TemenosHttpClient {
+  // Hard cap on upstream response size. Temenos paginates (default 99 records),
+  // so legitimate bodies stay well under this. The cap stops attacker-controlled
+  // paging from forcing unbounded heap allocation.
+  private static readonly MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
+
   private readonly logger = new Logger(TemenosHttpClient.name);
 
   public constructor(
@@ -41,21 +46,47 @@ export class TemenosHttpClient {
       });
 
       status = response.statusCode;
-      const rawBody = await response.body.text();
+      const rawBody = await this.readBodyWithLimit(
+        response.body,
+        TemenosHttpClient.MAX_RESPONSE_BYTES,
+      );
       const responseBody = this.tryParseJson(rawBody);
 
       if (status >= 400) {
-        const message = this.extractErrorMessage(responseBody, status, rawBody);
+        const message = this.extractErrorMessage(responseBody, status);
         throw new TemenosApiError(status, path, message);
       }
 
       return responseBody as T;
     } catch (err) {
-      this.logger.error({ path, status, err }, 'Temenos API request failed');
+      // Log only the error class + message, never the full error object. The
+      // message is sourced from a documented Temenos error envelope field; raw
+      // upstream bodies are dropped in extractErrorMessage so they can't reach
+      // the log as a side channel for customer/account details.
+      const errorName = err instanceof Error ? err.name : 'unknown';
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this.logger.error({ path, status, errorName, errorMessage }, 'Temenos API request failed');
       throw err;
     } finally {
       this.metrics.recordApiRequest({ path, status, durationMs: Date.now() - start });
     }
+  }
+
+  private async readBodyWithLimit(
+    body: Dispatcher.ResponseData['body'],
+    maxBytes: number,
+  ): Promise<string> {
+    let total = 0;
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += buf.length;
+      if (total > maxBytes) {
+        throw new Error(`Temenos response exceeded ${maxBytes} bytes`);
+      }
+      chunks.push(buf);
+    }
+    return Buffer.concat(chunks).toString('utf-8');
   }
 
   private buildUrl(path: string, params?: Record<string, string | undefined>): string {
@@ -81,7 +112,11 @@ export class TemenosHttpClient {
     }
   }
 
-  private extractErrorMessage(body: unknown, status: number, raw: string): string {
+  private extractErrorMessage(body: unknown, status: number): string {
+    // Only surface text from documented Temenos error-envelope fields. Falling
+    // back to the raw body would echo arbitrary upstream content into errors
+    // (and logs), which is a PII leak risk on responses containing customer
+    // or account details.
     if (isPlainObject(body)) {
       const message =
         this.getStringField(body, 'message') ??
@@ -91,10 +126,6 @@ export class TemenosHttpClient {
       if (message) {
         return message;
       }
-    }
-    const trimmed = raw.trim();
-    if (trimmed) {
-      return trimmed.length > 200 ? `${trimmed.slice(0, 200)}...` : trimmed;
     }
     return `HTTP ${status}`;
   }
