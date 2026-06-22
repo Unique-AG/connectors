@@ -25,7 +25,7 @@ KV_SECRET_MCP_API_KEY="mcp-api-key"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${SERVICE_DIR}/../.." && pwd)"
-ENV_OP_FILE="${SCRIPT_DIR}/.env.deploy.1password"
+ENV_OP_FILE="${SCRIPT_DIR}/.env.1password"
 ENV_FILE="${SCRIPT_DIR}/.env.deploy"
 DOCKERFILE="services/temenos-mcp/deploy/Dockerfile"
 
