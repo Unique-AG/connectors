@@ -25,21 +25,32 @@ KV_SECRET_MCP_API_KEY="mcp-api-key"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${SERVICE_DIR}/../.." && pwd)"
-ENV_TPL="${SCRIPT_DIR}/.env.deploy.tpl"
+ENV_OP_FILE="${SCRIPT_DIR}/.env.deploy.1password"
 ENV_FILE="${SCRIPT_DIR}/.env.deploy"
 DOCKERFILE="services/temenos-mcp/deploy/Dockerfile"
 
+# === SELF RE-EXEC UNDER `op run` ===
+# `op run --env-file=…` parses KEY="op://..." lines and injects their resolved
+# values as env vars into the wrapped process — no tempfile on disk, no comment
+# scanning, no fragility around special chars in vault/item/field names. We
+# re-exec ourselves under `op run` once and set OP_RUN_ACTIVE to prevent loops.
+# Falls back to the legacy .env.deploy flow when 1Password CLI is unavailable.
+if [[ -z "${OP_RUN_ACTIVE:-}" ]] \
+     && [[ -f "${ENV_OP_FILE}" ]] \
+     && command -v op >/dev/null 2>&1 \
+     && op whoami >/dev/null 2>&1; then
+  echo "Re-executing under 1Password (op run --env-file=${ENV_OP_FILE##*/})..."
+  exec env OP_RUN_ACTIVE=1 op run \
+    --env-file="${ENV_OP_FILE}" \
+    --account="unique-team.1password.com" \
+    -- "$0" "$@"
+fi
+
 # === UNIFIED CLEANUP ===
-# Single EXIT trap that handles both the 1Password-injected env tempfile and
-# the auto-stash restore. Bash only honors one trap per signal; declaring this
-# upfront keeps later sections from clobbering each other.
-RESOLVED_ENV=""
+# Single EXIT trap so later sections (e.g. the auto-stash) don't clobber it.
 STASH_DONE=false
 STASH_MSG=""
 cleanup() {
-  if [[ -n "${RESOLVED_ENV}" && -f "${RESOLVED_ENV}" ]]; then
-    rm -f "${RESOLVED_ENV}"
-  fi
   if [[ "${STASH_DONE}" == "true" ]]; then
     local ref
     ref="$(git -C "${REPO_ROOT}" stash list | grep -F "${STASH_MSG}" | head -1 | cut -d: -f1)"
@@ -53,25 +64,20 @@ cleanup() {
 trap cleanup EXIT
 
 # === LOAD SECRETS ===
-# Prefer .env.deploy.tpl + 1Password CLI: secret refs in the template are
-# resolved at deploy time via `op inject`, so no plaintext secrets ever land
-# on disk. Falls back to .env.deploy (the legacy flow) for operators without
-# the 1Password CLI signed in.
-if [[ -f "${ENV_TPL}" ]] && command -v op >/dev/null 2>&1 && op whoami >/dev/null 2>&1; then
-  echo "Resolving secrets from 1Password (op inject ${ENV_TPL##*/})..."
-  RESOLVED_ENV="$(mktemp -t temenos-env.XXXXXX)"
-  op inject -i "${ENV_TPL}" -o "${RESOLVED_ENV}"
-  # shellcheck disable=SC1090
-  set -a; source "${RESOLVED_ENV}"; set +a
-elif [[ -f "${ENV_FILE}" ]]; then
-  echo "Loading secrets from ${ENV_FILE##*/} (1Password CLI not signed in)."
-  # shellcheck disable=SC1090
-  set -a; source "${ENV_FILE}"; set +a
-else
-  echo "ERROR: no secrets source found." >&2
-  echo "       Option A: sign in to 1Password (op signin) — uses ${ENV_TPL##*/}." >&2
-  echo "       Option B: copy ${ENV_TPL##*/} to ${ENV_FILE##*/}, fill values, re-run." >&2
-  exit 1
+# By this point either (a) we're inside `op run` and the secrets are already
+# in the environment, or (b) `op` wasn't available and we fall back to the
+# legacy .env.deploy file. The validation below catches both branches.
+if [[ -z "${OP_RUN_ACTIVE:-}" ]]; then
+  if [[ -f "${ENV_FILE}" ]]; then
+    echo "Loading secrets from ${ENV_FILE##*/} (1Password CLI not signed in)."
+    # shellcheck disable=SC1090
+    set -a; source "${ENV_FILE}"; set +a
+  else
+    echo "ERROR: no secrets source found." >&2
+    echo "       Option A: sign in to 1Password (op signin) — uses ${ENV_OP_FILE##*/}." >&2
+    echo "       Option B: copy ${ENV_OP_FILE##*/} to ${ENV_FILE##*/}, fill values, re-run." >&2
+    exit 1
+  fi
 fi
 
 : "${TEMENOS_API_KEY:?TEMENOS_API_KEY missing (check 1Password item / .env.deploy)}"
