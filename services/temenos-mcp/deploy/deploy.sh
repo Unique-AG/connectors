@@ -25,20 +25,57 @@ KV_SECRET_MCP_API_KEY="mcp-api-key"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${SERVICE_DIR}/../.." && pwd)"
+ENV_TPL="${SCRIPT_DIR}/.env.deploy.tpl"
 ENV_FILE="${SCRIPT_DIR}/.env.deploy"
 DOCKERFILE="services/temenos-mcp/deploy/Dockerfile"
 
+# === UNIFIED CLEANUP ===
+# Single EXIT trap that handles both the 1Password-injected env tempfile and
+# the auto-stash restore. Bash only honors one trap per signal; declaring this
+# upfront keeps later sections from clobbering each other.
+RESOLVED_ENV=""
+STASH_DONE=false
+STASH_MSG=""
+cleanup() {
+  if [[ -n "${RESOLVED_ENV}" && -f "${RESOLVED_ENV}" ]]; then
+    rm -f "${RESOLVED_ENV}"
+  fi
+  if [[ "${STASH_DONE}" == "true" ]]; then
+    local ref
+    ref="$(git -C "${REPO_ROOT}" stash list | grep -F "${STASH_MSG}" | head -1 | cut -d: -f1)"
+    if [[ -n "${ref}" ]]; then
+      echo "Restoring packages/utils/package.json from stash ${ref}..."
+      git -C "${REPO_ROOT}" stash pop "${ref}" >/dev/null || \
+        echo "WARN: could not auto-restore stash ${ref}. Run: git stash list" >&2
+    fi
+  fi
+}
+trap cleanup EXIT
+
 # === LOAD SECRETS ===
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "ERROR: ${ENV_FILE} not found." >&2
-  echo "Copy .env.deploy.example to .env.deploy and fill in the values." >&2
+# Prefer .env.deploy.tpl + 1Password CLI: secret refs in the template are
+# resolved at deploy time via `op inject`, so no plaintext secrets ever land
+# on disk. Falls back to .env.deploy (the legacy flow) for operators without
+# the 1Password CLI signed in.
+if [[ -f "${ENV_TPL}" ]] && command -v op >/dev/null 2>&1 && op whoami >/dev/null 2>&1; then
+  echo "Resolving secrets from 1Password (op inject ${ENV_TPL##*/})..."
+  RESOLVED_ENV="$(mktemp -t temenos-env.XXXXXX)"
+  op inject -i "${ENV_TPL}" -o "${RESOLVED_ENV}"
+  # shellcheck disable=SC1090
+  set -a; source "${RESOLVED_ENV}"; set +a
+elif [[ -f "${ENV_FILE}" ]]; then
+  echo "Loading secrets from ${ENV_FILE##*/} (1Password CLI not signed in)."
+  # shellcheck disable=SC1090
+  set -a; source "${ENV_FILE}"; set +a
+else
+  echo "ERROR: no secrets source found." >&2
+  echo "       Option A: sign in to 1Password (op signin) — uses ${ENV_TPL##*/}." >&2
+  echo "       Option B: copy ${ENV_TPL##*/} to ${ENV_FILE##*/}, fill values, re-run." >&2
   exit 1
 fi
-# shellcheck disable=SC1090
-set -a; source "${ENV_FILE}"; set +a
 
-: "${TEMENOS_API_KEY:?TEMENOS_API_KEY is required in .env.deploy}"
-: "${MCP_API_KEY:?MCP_API_KEY is required in .env.deploy}"
+: "${TEMENOS_API_KEY:?TEMENOS_API_KEY missing (check 1Password item / .env.deploy)}"
+: "${MCP_API_KEY:?MCP_API_KEY missing (generate via: openssl rand -hex 32)}"
 : "${TEMENOS_API_BASE_URL:=https://api.temenos.com/api/v1.0.0}"
 
 # === PIN SUBSCRIPTION ===
@@ -86,24 +123,13 @@ fi
 # Auto-stash the packages/utils/package.json `prepare: tsc` edit if present.
 # That hook runs during `pnpm install` in the deps stage and fails because
 # tsconfig.json is not yet in scope, breaking every monorepo Dockerfile build.
-# We restore the stash via a trap so the user's working tree is untouched.
-STASH_DONE=false
+# The unified `cleanup` trap restores the stash so the working tree is untouched.
 if git -C "${REPO_ROOT}" diff -- packages/utils/package.json 2>/dev/null \
      | grep -qE '^\+\s*"prepare":\s*"tsc"'; then
   STASH_MSG="temenos-deploy-auto-stash-$$"
   echo "Auto-stashing packages/utils/package.json (contains build-breaking prepare:tsc)..."
   if git -C "${REPO_ROOT}" stash push -m "${STASH_MSG}" -- packages/utils/package.json >/dev/null; then
     STASH_DONE=true
-    trap '
-      if [[ "${STASH_DONE}" == "true" ]]; then
-        REF=$(git -C "'"${REPO_ROOT}"'" stash list | grep -F "'"${STASH_MSG}"'" | head -1 | cut -d: -f1)
-        if [[ -n "$REF" ]]; then
-          echo "Restoring packages/utils/package.json from stash $REF..."
-          git -C "'"${REPO_ROOT}"'" stash pop "$REF" >/dev/null || \
-            echo "WARN: could not auto-restore stash $REF. Run: git stash list" >&2
-        fi
-      fi
-    ' EXIT
   else
     echo "ERROR: failed to stash packages/utils/package.json." >&2
     exit 1
