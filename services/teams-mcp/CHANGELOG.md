@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.20](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.19...teams-mcp@0.2.20) (2026-06-20)
+
+
+### Features
+
+* **teams-mcp,deps:** add Teams chat & channel messaging tools (8 tools) ([#344](https://github.com/Unique-AG/connectors/issues/344)) ([116780a](https://github.com/Unique-AG/connectors/commit/116780a12e00c6dd484c1af359cb927337284252))
+
 ## [0.2.19](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.18...teams-mcp@0.2.19) (2026-06-18)
 
 
