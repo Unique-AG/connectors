@@ -1,0 +1,15 @@
+services:
+  temenos-mcp:
+    # image: ghcr.io/unique-ag/connectors/services/temenos-mcp:latest
+    build:
+      context: ../.. # Build from monorepo root
+      dockerfile: ./services/temenos-mcp/deploy/Dockerfile
+    ports:
+      - "9543:9543"
+    environment:
+      - NODE_ENV=production
+      - PORT=9543
+      - TEMENOS_API_BASE_URL=${TEMENOS_API_BASE_URL:-https://api.temenos.com/api/v1.0.0}
+      - TEMENOS_API_KEY=${TEMENOS_API_KEY}
+      - MCP_API_KEY=${MCP_API_KEY}
+    restart: unless-stopped

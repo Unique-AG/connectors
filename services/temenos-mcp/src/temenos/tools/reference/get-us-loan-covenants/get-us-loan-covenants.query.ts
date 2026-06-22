@@ -1,0 +1,53 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { Span } from 'nestjs-otel';
+import * as z from 'zod';
+import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { Metrics } from '../../../metrics';
+
+export const GetUsLoanCovenantsInputSchema = z.object({
+  recordId: z.string().optional().describe("Unique identifier of an entity"),
+});
+
+export type GetUsLoanCovenantsInput = z.infer<typeof GetUsLoanCovenantsInputSchema>;
+
+export const GetUsLoanCovenantsOutputSchema = z
+  .object({
+    success: z.boolean(),
+    data: z.unknown().optional(),
+    statusCode: z.number().optional(),
+    message: z.string().optional(),
+  })
+  .loose();
+
+export type GetUsLoanCovenantsResult = z.infer<typeof GetUsLoanCovenantsOutputSchema>;
+
+@Injectable()
+export class GetUsLoanCovenantsQuery {
+  private readonly logger = new Logger(GetUsLoanCovenantsQuery.name);
+
+  public constructor(
+    private readonly client: TemenosHttpClient,
+    private readonly metrics: Metrics,
+  ) {}
+
+  @Span()
+  public async run(input: GetUsLoanCovenantsInput): Promise<GetUsLoanCovenantsResult> {
+    this.logger.debug({}, 'get_us_loan_covenants: invoked');
+    const start = Date.now();
+    let result: 'success' | 'error' = 'success';
+    try {
+      const data = await this.client.get<unknown>('/reference/us/covenants', {
+        recordId: input.recordId,
+      });
+      return { success: true, data };
+    } catch (err) {
+      result = 'error';
+      if (err instanceof TemenosApiError) {
+        return { success: false, statusCode: err.status, message: err.message };
+      }
+      throw err;
+    } finally {
+      this.metrics.recordToolDuration('get_us_loan_covenants', result, start);
+    }
+  }
+}
