@@ -1,7 +1,9 @@
 import assert from 'node:assert';
 import { type Context } from '@unique-ag/mcp-server-module';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, Logger } from '@nestjs/common';
 import * as z from 'zod';
+
+const logger = new Logger('disambiguate');
 
 // Above this many matches a single-select picker is more hindrance than help;
 // fall back to asking the user to be more specific instead.
@@ -63,7 +65,13 @@ export async function disambiguate<T>(
       throw err;
     }
     // Otherwise elicit itself threw — stateless mode or the client lacks the
-    // elicitation capability. Fall back to today's behaviour.
+    // elicitation capability. Log it so a genuinely unexpected error (rather
+    // than the expected "elicitation unsupported") is still visible, then fall
+    // back to today's behaviour.
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      'Elicitation failed; falling back to ConflictException',
+    );
     throw new ConflictException(opts.conflictMessage);
   }
 }
