@@ -182,6 +182,10 @@ export class ChatService {
       .api('/me/chats')
       .expand('members,lastMessagePreview')
       .top(GRAPH_PAGE_SIZE)
+      // Same ordering as `listChats` (most-recent message first) so resolution
+      // walks chats in the same order the list tool shows them. $orderby on
+      // /me/chats only supports lastMessagePreview/createdDateTime desc.
+      .orderby('lastMessagePreview/createdDateTime desc')
       .select('id,chatType,topic,members,createdDateTime')
       .get();
 

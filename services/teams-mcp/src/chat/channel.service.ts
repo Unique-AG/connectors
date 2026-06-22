@@ -48,7 +48,7 @@ export class ChannelService {
     // /teams/{id}/channels supports $select but not $top; it pages via @odata.nextLink.
     const response = await client
       .api(`/teams/${teamId}/channels`)
-      .select('id,displayName,description,createdDateTime,membershipType,webUrl')
+      .select('id,displayName,description,createdDateTime,membershipType')
       .get();
 
     const { items } = await collectAllPages(client, response, { label: 'listChannels' });
