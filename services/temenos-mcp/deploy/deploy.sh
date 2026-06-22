@@ -75,7 +75,8 @@ if [[ -z "${OP_RUN_ACTIVE:-}" ]]; then
   else
     echo "ERROR: no secrets source found." >&2
     echo "       Option A: sign in to 1Password (op signin) — uses ${ENV_OP_FILE##*/}." >&2
-    echo "       Option B: copy ${ENV_OP_FILE##*/} to ${ENV_FILE##*/}, fill values, re-run." >&2
+    echo "       Option B: copy ${ENV_OP_FILE##*/} to ${ENV_FILE##*/} and REPLACE each" >&2
+    echo "                op:// reference with the actual secret value." >&2
     exit 1
   fi
 fi
@@ -83,6 +84,19 @@ fi
 : "${TEMENOS_API_KEY:?TEMENOS_API_KEY missing (check 1Password item / .env.deploy)}"
 : "${MCP_API_KEY:?MCP_API_KEY missing (generate via: openssl rand -hex 32)}"
 : "${TEMENOS_API_BASE_URL:=https://api.temenos.com/api/v1.0.0}"
+
+# Guard the fallback path: if .env.deploy was copied verbatim from
+# .env.1password it may still hold literal `op://…` references that the
+# legacy `source` branch can't resolve. Letting those reach Key Vault would
+# silently push the reference string as the secret value.
+for var in TEMENOS_API_KEY MCP_API_KEY; do
+  if [[ "${!var}" == op://* ]]; then
+    echo "ERROR: \$${var} contains an unresolved 1Password reference." >&2
+    echo "       Either sign in to 1Password (op signin) so deploy.sh can resolve it," >&2
+    echo "       or replace the op:// value in ${ENV_FILE##*/} with the actual secret." >&2
+    exit 1
+  fi
+done
 
 # === PIN SUBSCRIPTION ===
 # Switch the active sub explicitly so we never deploy to the wrong place.
