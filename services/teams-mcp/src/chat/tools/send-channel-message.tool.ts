@@ -52,7 +52,7 @@ export class SendChannelMessageTool {
   @Span()
   public async sendChannelMessage(
     input: z.infer<typeof SendChannelMessageInputSchema>,
-    _context: Context,
+    context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof SendChannelMessageOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -72,6 +72,7 @@ export class SendChannelMessageTool {
       input.channelName,
       input.message,
       input.includeWebUrl,
+      context,
     );
   }
 
@@ -81,13 +82,15 @@ export class SendChannelMessageTool {
     channelName: string,
     message: string,
     includeWebUrl: boolean,
+    context: Context,
   ): Promise<z.output<typeof SendChannelMessageOutputSchema>> {
-    const team = await this.channelService.resolveTeamByName(userProfileId, teamName);
+    const team = await this.channelService.resolveTeamByName(userProfileId, teamName, context);
     const channel = await this.channelService.resolveChannelByName(
       userProfileId,
       team.id,
       channelName,
       teamName,
+      context,
     );
     const result = await this.channelService.sendChannelMessage(
       userProfileId,

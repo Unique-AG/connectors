@@ -1,5 +1,6 @@
+import { type Context } from '@unique-ag/mcp-server-module';
 import { type PageCollection } from '@microsoft/microsoft-graph-client';
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
@@ -10,6 +11,7 @@ import {
   GRAPH_PAGE_SIZE,
 } from '~/msgraph/graph-pagination';
 import { MsChat, MsChatMessage, MsChatMessageSchema, MsChatSchema } from './chat.dtos';
+import { disambiguate } from './disambiguate';
 
 @Injectable()
 export class ChatService {
@@ -36,10 +38,10 @@ export class ChatService {
     // — /me/chats is not sorted by activity by default.
     const response: PageCollection = await client
       .api('/me/chats')
-      .expand('members')
+      .expand('members,lastMessagePreview')
       .top(limit)
       .orderby('lastMessagePreview/createdDateTime desc')
-      .select('id,chatType,topic,members')
+      .select('id,chatType,topic,members,createdDateTime')
       .get();
 
     const chats = z.array(MsChatSchema).parse(response.value);
@@ -99,6 +101,7 @@ export class ChatService {
   public async resolveChatByNameOrMember(
     userProfileId: string,
     identifier: string,
+    context: Context,
   ): Promise<MsChat> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
@@ -138,17 +141,29 @@ export class ChatService {
       );
     }
 
-    // TODO: replace with context.elicitInput() once exposed on Context interface
-    // in mcp-server-module. Present a picker with chat type, topic/member name,
-    // and last message timestamp so the user can select the intended chat.
     if (matches.length > 1) {
+      span?.addEvent('ambiguous chat identifier', { matchCount: matches.length });
       const matchDescriptions = matches
         .map((c) => c.topic ?? c.members.map((m) => m.displayName).join(', '))
         .join('; ');
-      span?.addEvent('ambiguous chat identifier', { matchCount: matches.length });
-      throw new ConflictException(
-        `Identifier "${identifier}" matches multiple chats: ${matchDescriptions}. Please be more specific.`,
-      );
+      // Present an interactive picker so the model/user can choose the intended
+      // chat; falls back to the original "be more specific" error when the
+      // client does not support elicitation or the user declines.
+      const chat = await disambiguate(matches, {
+        context,
+        toLabel: (c) => {
+          const memberNames =
+            c.members
+              .map((m) => m.displayName)
+              .filter(Boolean)
+              .join(', ') || 'unknown';
+          return `${c.topic ?? '1:1'} · ${c.chatType} · members: ${memberNames} · last msg ${c.lastMessageAt ?? 'n/a'}`;
+        },
+        promptMessage: `Multiple chats match "${identifier}". Which one did you mean?`,
+        conflictMessage: `Identifier "${identifier}" matches multiple chats: ${matchDescriptions}. Please be more specific.`,
+      });
+      span?.setAttribute('resolved_chat_id', chat.id);
+      return chat;
     }
 
     // matches.length === 1 is guaranteed by the checks above
@@ -165,9 +180,9 @@ export class ChatService {
   ): Promise<{ chats: MsChat[]; truncated: boolean }> {
     const response = await client
       .api('/me/chats')
-      .expand('members')
+      .expand('members,lastMessagePreview')
       .top(GRAPH_PAGE_SIZE)
-      .select('id,chatType,topic,members')
+      .select('id,chatType,topic,members,createdDateTime')
       .get();
 
     const { items, truncated } = await collectAllPages(client, response, {

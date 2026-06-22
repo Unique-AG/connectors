@@ -29,6 +29,8 @@ const ListChatsOutputSchema = z.object({
     z.object({
       chatType: z.string(),
       topic: z.string().nullable(),
+      createdDateTime: z.string().nullable(),
+      lastMessageAt: z.string().nullable(),
       members: z
         .array(
           z.object({
@@ -55,7 +57,7 @@ export class ListChatsTool {
     name: 'list_chats',
     title: 'List My Chats',
     description:
-      "List the current user's Microsoft Teams chats (1:1, group, and meeting chats). Returns up to 50 most recent chats. Use the topic or a member's display name as chatIdentifier in get_chat_messages or send_chat_message.",
+      "List the current user's Microsoft Teams chats (1:1, group, and meeting chats). Returns up to 50 most recent chats, each with its creation date (createdDateTime) and the timestamp of its last message (lastMessageAt) to help tell apart chats that share a topic or member. Use the topic or a member's display name as chatIdentifier in get_chat_messages or send_chat_message.",
     parameters: ListChatsInputSchema,
     outputSchema: ListChatsOutputSchema,
     annotations: {
@@ -103,10 +105,14 @@ export class ListChatsTool {
     const mapped: {
       chatType: string;
       topic: string | null;
+      createdDateTime: string | null;
+      lastMessageAt: string | null;
       members?: { displayName: string | null; email?: string | null }[];
     } = {
       chatType: chat.chatType,
       topic: chat.topic ?? null,
+      createdDateTime: chat.createdDateTime,
+      lastMessageAt: chat.lastMessageAt,
     };
 
     // Only include members for chats without a topic (1:1 chats need member names as their identifier)

@@ -21,6 +21,8 @@ const ListChannelsOutputSchema = z.object({
     z.object({
       displayName: z.string(),
       description: z.string().optional(),
+      createdDateTime: z.string().nullable(),
+      membershipType: z.string().nullable(),
     }),
   ),
 });
@@ -38,7 +40,7 @@ export class ListChannelsTool {
     name: 'list_channels',
     title: 'List Team Channels',
     description:
-      'List all channels in a Microsoft Teams team. Use this to discover channel names before calling send_channel_message.',
+      'List all channels in a Microsoft Teams team. Each channel includes its creation date and membership type (standard, private, or shared), which help distinguish channels that share a display name. Use this to discover channel names before calling send_channel_message.',
     parameters: ListChannelsInputSchema,
     outputSchema: ListChannelsOutputSchema,
     annotations: {
@@ -55,7 +57,7 @@ export class ListChannelsTool {
   @Span()
   public async listChannels(
     input: z.infer<typeof ListChannelsInputSchema>,
-    _context: Context,
+    context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof ListChannelsOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -68,7 +70,11 @@ export class ListChannelsTool {
 
     this.logger.log({ userProfileId }, 'Listing channels for team');
 
-    const team = await this.channelService.resolveTeamByName(userProfileId, input.teamName);
+    const team = await this.channelService.resolveTeamByName(
+      userProfileId,
+      input.teamName,
+      context,
+    );
     const channels = await this.channelService.listChannels(userProfileId, team.id);
     span?.setAttribute('resolved_team_id', team.id);
 
@@ -77,8 +83,15 @@ export class ListChannelsTool {
     return {
       teamName: team.displayName,
       channels: channels.map((c) => {
-        const channel: { displayName: string; description?: string } = {
+        const channel: {
+          displayName: string;
+          description?: string;
+          createdDateTime: string | null;
+          membershipType: string | null;
+        } = {
           displayName: c.displayName,
+          createdDateTime: c.createdDateTime ?? null,
+          membershipType: c.membershipType ?? null,
         };
         if (input.includeDescriptions && c.description) {
           channel.description = c.description;
