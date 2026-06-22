@@ -2,10 +2,16 @@ import * as z from 'zod';
 
 // ─── Teams ────────────────────────────────────────────────────────────────────
 
+// NOTE: /me/joinedTeams populates only id, displayName, description, isArchived,
+// and tenantId — visibility, webUrl, and createdDateTime are always returned as
+// null on that endpoint (see user-list-joinedteams docs), so they are not
+// modelled here. `isArchived` is the one extra populated field useful for
+// disambiguating same-named teams (an archived team is read-only).
 export const MsTeamSchema = z.object({
   id: z.string(),
   displayName: z.string(),
   description: z.string().nullish(),
+  isArchived: z.boolean().nullish(),
 });
 
 export type MsTeam = z.infer<typeof MsTeamSchema>;
@@ -16,6 +22,8 @@ export const MsChannelSchema = z.object({
   id: z.string(),
   displayName: z.string(),
   description: z.string().nullish(),
+  createdDateTime: z.string().nullish(),
+  membershipType: z.string().nullish(),
 });
 
 export type MsChannel = z.infer<typeof MsChannelSchema>;
@@ -28,12 +36,25 @@ export const MsChatMemberSchema = z.object({
   email: z.string().nullish(),
 });
 
-export const MsChatSchema = z.object({
-  id: z.string(),
-  chatType: z.string(),
-  topic: z.string().nullish(),
-  members: z.array(MsChatMemberSchema),
-});
+// `lastMessagePreview` is a navigation property (chatMessageInfo) only returned
+// when $expanded on the list-chats operation; we keep just its timestamp.
+export const MsChatSchema = z
+  .object({
+    id: z.string(),
+    chatType: z.string(),
+    topic: z.string().nullish(),
+    createdDateTime: z.string().nullish(),
+    lastMessagePreview: z.object({ createdDateTime: z.string().nullish() }).nullish(),
+    members: z.array(MsChatMemberSchema),
+  })
+  .transform((chat) => ({
+    id: chat.id,
+    chatType: chat.chatType,
+    topic: chat.topic,
+    createdDateTime: chat.createdDateTime ?? null,
+    lastMessageAt: chat.lastMessagePreview?.createdDateTime ?? null,
+    members: chat.members,
+  }));
 
 export const MsChatMessageSchema = z
   .object({

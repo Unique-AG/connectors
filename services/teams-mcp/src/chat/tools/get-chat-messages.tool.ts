@@ -86,7 +86,7 @@ export class GetChatMessagesTool {
   @Span()
   public async getChatMessages(
     input: z.infer<typeof GetChatMessagesInputSchema>,
-    _context: Context,
+    context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof GetChatMessagesOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -103,6 +103,7 @@ export class GetChatMessagesTool {
     const chat = await this.chatService.resolveChatByNameOrMember(
       userProfileId,
       input.chatIdentifier,
+      context,
     );
     span?.setAttribute('resolved_chat_id', chat.id);
 

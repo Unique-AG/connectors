@@ -82,7 +82,7 @@ export class GetChannelMessagesTool {
   @Span()
   public async getChannelMessages(
     input: z.infer<typeof GetChannelMessagesInputSchema>,
-    _context: Context,
+    context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof GetChannelMessagesOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -96,15 +96,18 @@ export class GetChannelMessagesTool {
 
     this.logger.log({ userProfileId, limit: input.limit }, 'Getting channel messages');
 
-    const team = await this.channelService.resolveTeamByName(userProfileId, input.teamName);
+    const team = await this.channelService.resolveTeamByName(
+      userProfileId,
+      input.teamName,
+      context,
+    );
 
-    // TODO: if channel resolution fails, could use context.elicitInput() to show
-    // available channels as a picker rather than throwing NotFoundException.
     const channel = await this.channelService.resolveChannelByName(
       userProfileId,
       team.id,
       input.channelName,
       input.teamName,
+      context,
     );
     span?.setAttribute('resolved_team_id', team.id);
     span?.setAttribute('resolved_channel_id', channel.id);

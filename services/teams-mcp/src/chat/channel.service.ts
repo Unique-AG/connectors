@@ -1,9 +1,11 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { type Context } from '@unique-ag/mcp-server-module';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { collectAllPages } from '~/msgraph/graph-pagination';
 import { MsChannel, MsChannelSchema, MsTeam, MsTeamSchema } from './chat.dtos';
+import { disambiguate } from './disambiguate';
 
 @Injectable()
 export class ChannelService {
@@ -46,7 +48,7 @@ export class ChannelService {
     // /teams/{id}/channels supports $select but not $top; it pages via @odata.nextLink.
     const response = await client
       .api(`/teams/${teamId}/channels`)
-      .select('id,displayName,description')
+      .select('id,displayName,description,createdDateTime,membershipType,webUrl')
       .get();
 
     const { items } = await collectAllPages(client, response, { label: 'listChannels' });
@@ -59,7 +61,11 @@ export class ChannelService {
   }
 
   @Span()
-  public async resolveTeamByName(userProfileId: string, teamName: string): Promise<MsTeam> {
+  public async resolveTeamByName(
+    userProfileId: string,
+    teamName: string,
+    context: Context,
+  ): Promise<MsTeam> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
 
@@ -76,13 +82,19 @@ export class ChannelService {
       throw new NotFoundException(`Team "${teamName}" not found`);
     }
 
-    // Multiple teams can share a display name; refuse to silently pick one and
-    // risk acting on the wrong team.
+    // Multiple teams can share a display name; present a picker rather than
+    // silently picking one and risking acting on the wrong team.
     if (matches.length > 1) {
       span?.addEvent('ambiguous team name', { matchCount: matches.length });
-      throw new ConflictException(
-        `Team name "${teamName}" matches multiple teams (${matches.length}). Please be more specific.`,
-      );
+      const team = await disambiguate(matches, {
+        context,
+        toLabel: (t) =>
+          `${t.displayName}${t.description ? ` — ${t.description}` : ''}${t.isArchived ? ' · archived' : ''}`,
+        promptMessage: `Multiple teams match "${teamName}". Which one did you mean?`,
+        conflictMessage: `Team name "${teamName}" matches multiple teams (${matches.length}). Please be more specific.`,
+      });
+      span?.setAttribute('resolved_team_id', team.id);
+      return team;
     }
 
     const [team] = matches as [MsTeam];
@@ -96,6 +108,7 @@ export class ChannelService {
     teamId: string,
     channelName: string,
     teamName: string,
+    context: Context,
   ): Promise<MsChannel> {
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
@@ -116,9 +129,15 @@ export class ChannelService {
 
     if (matches.length > 1) {
       span?.addEvent('ambiguous channel name', { matchCount: matches.length });
-      throw new ConflictException(
-        `Channel name "${channelName}" matches multiple channels in team "${teamName}" (${matches.length}). Please be more specific.`,
-      );
+      const channel = await disambiguate(matches, {
+        context,
+        toLabel: (c) =>
+          `${c.displayName} · ${c.membershipType ?? ''}${c.description ? ` — ${c.description}` : ''}`,
+        promptMessage: `Multiple channels in team "${teamName}" match "${channelName}". Which one did you mean?`,
+        conflictMessage: `Channel name "${channelName}" matches multiple channels in team "${teamName}" (${matches.length}). Please be more specific.`,
+      });
+      span?.setAttribute('resolved_channel_id', channel.id);
+      return channel;
     }
 
     const [channel] = matches as [MsChannel];

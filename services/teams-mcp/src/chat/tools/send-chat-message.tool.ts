@@ -47,7 +47,7 @@ export class SendChatMessageTool {
   @Span()
   public async sendChatMessage(
     input: z.infer<typeof SendChatMessageInputSchema>,
-    _context: Context,
+    context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof SendChatMessageOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -61,15 +61,20 @@ export class SendChatMessageTool {
 
     this.logger.log({ userProfileId }, 'Sending chat message');
 
-    return this.resolveAndSend(userProfileId, input.chatIdentifier, input.message);
+    return this.resolveAndSend(userProfileId, input.chatIdentifier, input.message, context);
   }
 
   private async resolveAndSend(
     userProfileId: string,
     chatIdentifier: string,
     message: string,
+    context: Context,
   ): Promise<z.output<typeof SendChatMessageOutputSchema>> {
-    const chat = await this.chatService.resolveChatByNameOrMember(userProfileId, chatIdentifier);
+    const chat = await this.chatService.resolveChatByNameOrMember(
+      userProfileId,
+      chatIdentifier,
+      context,
+    );
     const result = await this.chatService.sendChatMessage(userProfileId, chat.id, message);
     return { messageId: result.id, chatId: chat.id };
   }

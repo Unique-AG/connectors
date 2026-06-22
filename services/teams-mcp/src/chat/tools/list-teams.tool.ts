@@ -19,6 +19,7 @@ const ListTeamsOutputSchema = z.object({
     z.object({
       displayName: z.string(),
       description: z.string().optional(),
+      isArchived: z.boolean().nullable(),
     }),
   ),
 });
@@ -36,7 +37,7 @@ export class ListTeamsTool {
     name: 'list_teams',
     title: 'List My Teams',
     description:
-      'List all Microsoft Teams the current user is a member of. Use this to discover team names before calling list_channels or send_channel_message.',
+      'List all Microsoft Teams the current user is a member of. Each team includes an isArchived flag (archived teams are read-only), which helps distinguish teams that share a display name. Use this to discover team names before calling list_channels or send_channel_message.',
     parameters: ListTeamsInputSchema,
     outputSchema: ListTeamsOutputSchema,
     annotations: {
@@ -72,8 +73,9 @@ export class ListTeamsTool {
 
     return {
       teams: teams.map((t) => {
-        const team: { displayName: string; description?: string } = {
+        const team: { displayName: string; description?: string; isArchived: boolean | null } = {
           displayName: t.displayName,
+          isArchived: t.isArchived ?? null,
         };
         if (input.includeDescriptions && t.description) {
           team.description = t.description;
