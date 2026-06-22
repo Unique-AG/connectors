@@ -44,7 +44,7 @@
     "remeda": "2.32.0",
     "rxjs": "7.8.2",
     "typeid-js": "1.2.0",
-    "undici": "7.24.4",
+    "undici": "7.28.0",
     "zod": "4.1.5"
   },
   "devDependencies": {
