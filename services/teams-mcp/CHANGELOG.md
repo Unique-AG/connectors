@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.21](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.20...teams-mcp@0.2.21) (2026-06-22)
+
+
+### Features
+
+* **teams-mcp:** interactive disambiguation + richer list metadata ([#653](https://github.com/Unique-AG/connectors/issues/653)) ([30e7400](https://github.com/Unique-AG/connectors/commit/30e7400d0c220c5ebb4de9ea79ac34dce8d2ca86))
+
 ## [0.2.20](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.19...teams-mcp@0.2.20) (2026-06-20)
 
 
