@@ -1,21 +1,12 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { ChannelService } from '../channel.service';
 
 const ListChannelsInputSchema = z.object({
-  teamId: z
-    .string()
-    .optional()
-    .describe('Exact team id from list_teams. Preferred — unambiguous. Provide this or teamName.'),
-  teamName: z
-    .string()
-    .optional()
-    .describe(
-      'Display name of the team (case-insensitive). Fallback when you do not have the teamId; may match multiple teams.',
-    ),
+  teamId: z.string().describe('Exact team id from list_teams. Use list_teams to find it.'),
   includeDescriptions: z
     .boolean()
     .default(false)
@@ -26,8 +17,6 @@ const ListChannelsInputSchema = z.object({
 
 const ListChannelsOutputSchema = z.object({
   teamId: z.string(),
-  // Null when the team was addressed by teamId (the display name was not resolved).
-  teamName: z.string().nullable(),
   channels: z.array(
     z.object({
       channelId: z.string(),
@@ -52,7 +41,7 @@ export class ListChannelsTool {
     name: 'list_channels',
     title: 'List Team Channels',
     description:
-      'List all channels in a Microsoft Teams team (addressed by teamId from list_teams, or by teamName). Each channel includes its channelId plus creation date and membership type (standard, private, or shared). Pass the teamId + channelId to send_channel_message or get_channel_messages to target a specific channel unambiguously.',
+      'List all channels in a Microsoft Teams team, identified by teamId (from list_teams). Each channel includes its channelId plus creation date and membership type (standard, private, or shared). Pass the teamId + channelId to send_channel_message or get_channel_messages.',
     parameters: ListChannelsInputSchema,
     outputSchema: ListChannelsOutputSchema,
     annotations: {
@@ -69,7 +58,7 @@ export class ListChannelsTool {
   @Span()
   public async listChannels(
     input: z.infer<typeof ListChannelsInputSchema>,
-    context: Context,
+    _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof ListChannelsOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -79,34 +68,15 @@ export class ListChannelsTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
+    span?.setAttribute('team_id', input.teamId);
 
     this.logger.log({ userProfileId }, 'Listing channels for team');
 
-    // Prefer the exact teamId; fall back to resolving the team by display name.
-    let teamId: string;
-    let teamName: string | null;
-    if (input.teamId) {
-      teamId = input.teamId;
-      teamName = null;
-    } else if (input.teamName) {
-      const team = await this.channelService.resolveTeamByName(
-        userProfileId,
-        input.teamName,
-        context,
-      );
-      teamId = team.id;
-      teamName = team.displayName;
-    } else {
-      throw new BadRequestException('Provide either teamId (from list_teams) or teamName.');
-    }
-
-    const channels = await this.channelService.listChannels(userProfileId, teamId);
-    span?.setAttribute('resolved_team_id', teamId);
+    const channels = await this.channelService.listChannels(userProfileId, input.teamId);
     span?.setAttribute('result_count', channels.length);
 
     return {
-      teamId,
-      teamName,
+      teamId: input.teamId,
       channels: channels.map((c) => {
         const channel: {
           channelId: string;

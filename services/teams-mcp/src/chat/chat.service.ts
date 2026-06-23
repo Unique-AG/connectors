@@ -1,17 +1,10 @@
-import { type Context } from '@unique-ag/mcp-server-module';
 import { type PageCollection } from '@microsoft/microsoft-graph-client';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import {
-  collectAllPages,
-  collectUntil,
-  GRAPH_MAX_ITEMS,
-  GRAPH_PAGE_SIZE,
-} from '~/msgraph/graph-pagination';
+import { collectUntil } from '~/msgraph/graph-pagination';
 import { MsChat, MsChatMessage, MsChatMessageSchema, MsChatSchema } from './chat.dtos';
-import { disambiguate } from './disambiguate';
 
 @Injectable()
 export class ChatService {
@@ -95,104 +88,6 @@ export class ChatService {
     this.logger.debug({ userProfileId, chatId, count: messages.length }, 'Retrieved chat messages');
 
     return messages;
-  }
-
-  @Span()
-  public async resolveChatByNameOrMember(
-    userProfileId: string,
-    identifier: string,
-    context: Context,
-  ): Promise<MsChat> {
-    const span = this.traceService.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId);
-
-    this.logger.debug({ userProfileId }, 'Resolving chat by topic or member name');
-
-    const client = this.graphClientFactory.createClientForUser(userProfileId);
-    const [{ chats, truncated }, me] = await Promise.all([
-      this.fetchAllChats(client),
-      client.api('/me').select('id').get() as Promise<{ id: string }>,
-    ]);
-    const currentUserId = me.id;
-    const lowerIdentifier = identifier.toLowerCase();
-
-    // Exact case-insensitive match on the chat topic, or on a member's display
-    // name. Member matching applies to both 1:1 and group chats — group chats
-    // are frequently topicless and only addressable by member. The current user
-    // is excluded from member matching so searching one's own name does not
-    // match every chat.
-    const matches = chats.filter((c) => {
-      if (c.topic?.toLowerCase() === lowerIdentifier) {
-        return true;
-      }
-      return c.members.some(
-        (m) => m.userId !== currentUserId && m.displayName?.toLowerCase() === lowerIdentifier,
-      );
-    });
-
-    if (matches.length === 0) {
-      span?.addEvent('chat not found', { truncated });
-      // When the chat list was capped, the target may simply be beyond the cap
-      // rather than non-existent — say so instead of a flat "not found".
-      throw new NotFoundException(
-        truncated
-          ? `Chat "${identifier}" not found in your ${GRAPH_MAX_ITEMS} most recent chats. If it is an older chat, open it in Teams first or use a more specific identifier.`
-          : `Chat "${identifier}" not found`,
-      );
-    }
-
-    if (matches.length > 1) {
-      span?.addEvent('ambiguous chat identifier', { matchCount: matches.length });
-      const matchDescriptions = matches
-        .map((c) => c.topic ?? c.members.map((m) => m.displayName).join(', '))
-        .join('; ');
-      // Present an interactive picker so the model/user can choose the intended
-      // chat; falls back to the original "be more specific" error when the
-      // client does not support elicitation or the user declines.
-      const chat = await disambiguate(matches, {
-        context,
-        toLabel: (c) => {
-          const memberNames =
-            c.members
-              .map((m) => m.displayName)
-              .filter(Boolean)
-              .join(', ') || 'unknown';
-          return `${c.topic ?? '1:1'} · ${c.chatType} · members: ${memberNames} · last msg ${c.lastMessageAt ?? 'n/a'}`;
-        },
-        promptMessage: `Multiple chats match "${identifier}". Which one did you mean?`,
-        conflictMessage: `Identifier "${identifier}" matches multiple chats: ${matchDescriptions}. Please be more specific.`,
-      });
-      span?.setAttribute('resolved_chat_id', chat.id);
-      return chat;
-    }
-
-    // matches.length === 1 is guaranteed by the checks above
-    const [chat] = matches as [MsChat];
-    span?.setAttribute('resolved_chat_id', chat.id);
-    return chat;
-  }
-
-  // Pages through all of the user's chats so chat resolution is not limited to
-  // the most recent window (unlike `listChats`, which is intentionally bounded
-  // for the list tool).
-  private async fetchAllChats(
-    client: ReturnType<GraphClientFactory['createClientForUser']>,
-  ): Promise<{ chats: MsChat[]; truncated: boolean }> {
-    const response = await client
-      .api('/me/chats')
-      .expand('members,lastMessagePreview')
-      .top(GRAPH_PAGE_SIZE)
-      // Same ordering as `listChats` (most-recent message first) so resolution
-      // walks chats in the same order the list tool shows them. $orderby on
-      // /me/chats only supports lastMessagePreview/createdDateTime desc.
-      .orderby('lastMessagePreview/createdDateTime desc')
-      .select('id,chatType,topic,members,createdDateTime')
-      .get();
-
-    const { items, truncated } = await collectAllPages(client, response, {
-      label: 'resolveChatByNameOrMember',
-    });
-    return { chats: z.array(MsChatSchema).parse(items), truncated };
   }
 
   @Span()
