@@ -56,18 +56,15 @@ export class SendChatMessageTool {
       throw new UnauthorizedException('User not authenticated');
     }
 
+    const { chatId, message } = input;
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('chat_id', input.chatId);
-    span?.setAttribute('message_length', input.message.length);
+    span?.setAttribute('chat_id', chatId);
+    span?.setAttribute('message_length', message.length);
 
     this.logger.log({ userProfileId }, 'Sending chat message');
 
-    const result = await this.chatService.sendChatMessage(
-      userProfileId,
-      input.chatId,
-      input.message,
-    );
-    return { messageId: result.id, chatId: input.chatId };
+    const result = await this.chatService.sendChatMessage(userProfileId, chatId, message);
+    return { messageId: result.id, chatId };
   }
 }

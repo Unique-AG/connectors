@@ -64,23 +64,24 @@ export class SendChannelMessageTool {
       throw new UnauthorizedException('User not authenticated');
     }
 
+    const { teamId, channelId, message, includeWebUrl } = input;
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('team_id', input.teamId);
-    span?.setAttribute('channel_id', input.channelId);
-    span?.setAttribute('message_length', input.message.length);
+    span?.setAttribute('team_id', teamId);
+    span?.setAttribute('channel_id', channelId);
+    span?.setAttribute('message_length', message.length);
 
     this.logger.log({ userProfileId }, 'Sending channel message');
 
     const result = await this.channelService.sendChannelMessage(
       userProfileId,
-      input.teamId,
-      input.channelId,
-      input.message,
+      teamId,
+      channelId,
+      message,
     );
     return {
       messageId: result.id,
-      ...(input.includeWebUrl && result.webUrl ? { webUrl: result.webUrl } : {}),
+      ...(includeWebUrl && result.webUrl ? { webUrl: result.webUrl } : {}),
     };
   }
 }
