@@ -6,7 +6,9 @@ import * as z from 'zod';
 import { ChatService } from '../chat.service';
 
 const SendChatMessageInputSchema = z.object({
-  chatIdentifier: z.string().describe('Chat topic or member display name (case-insensitive)'),
+  chatId: z
+    .string()
+    .describe('Exact chat id from list_chats or search_messages. Use list_chats first to find it.'),
   message: z.string().describe('Plain text message content to send'),
 });
 
@@ -28,7 +30,7 @@ export class SendChatMessageTool {
     name: 'send_chat_message',
     title: 'Send Chat Message',
     description:
-      "Send a plain text message to a Microsoft Teams chat (1:1 or group). Identify the chat by its topic or the other person's display name. Use list_chats first to discover available chats.",
+      'Send a plain text message to a Microsoft Teams chat (1:1 or group), identified by its chatId. Call list_chats first to find the chatId (it also returns topic/members/dates so you can pick the right chat).',
     parameters: SendChatMessageInputSchema,
     outputSchema: SendChatMessageOutputSchema,
     annotations: {
@@ -40,14 +42,13 @@ export class SendChatMessageTool {
     },
     _meta: {
       'unique.app/icon': 'send',
-      'unique.app/system-prompt':
-        'Use list_chats first if you do not know the exact chat identifier.',
+      'unique.app/system-prompt': 'Call list_chats first to get the chatId, then send by chatId.',
     },
   })
   @Span()
   public async sendChatMessage(
     input: z.infer<typeof SendChatMessageInputSchema>,
-    context: Context,
+    _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof SendChatMessageOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -55,27 +56,15 @@ export class SendChatMessageTool {
       throw new UnauthorizedException('User not authenticated');
     }
 
+    const { chatId, message } = input;
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('message_length', input.message.length);
+    span?.setAttribute('chat_id', chatId);
+    span?.setAttribute('message_length', message.length);
 
     this.logger.log({ userProfileId }, 'Sending chat message');
 
-    return this.resolveAndSend(userProfileId, input.chatIdentifier, input.message, context);
-  }
-
-  private async resolveAndSend(
-    userProfileId: string,
-    chatIdentifier: string,
-    message: string,
-    context: Context,
-  ): Promise<z.output<typeof SendChatMessageOutputSchema>> {
-    const chat = await this.chatService.resolveChatByNameOrMember(
-      userProfileId,
-      chatIdentifier,
-      context,
-    );
-    const result = await this.chatService.sendChatMessage(userProfileId, chat.id, message);
-    return { messageId: result.id, chatId: chat.id };
+    const result = await this.chatService.sendChatMessage(userProfileId, chatId, message);
+    return { messageId: result.id, chatId };
   }
 }

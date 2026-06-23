@@ -3,14 +3,17 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
-import { ChannelService } from '../channel.service';
 import { MsChatMessage } from '../chat.dtos';
 import { ChatService } from '../chat.service';
 import { normalizeContent } from '../utils/normalize-content';
 
 const GetChannelMessagesInputSchema = z.object({
-  teamName: z.string().describe('Display name of the team (case-insensitive)'),
-  channelName: z.string().describe('Display name of the channel (case-insensitive)'),
+  teamId: z.string().describe('Exact team id from list_teams. Use list_teams to find it.'),
+  channelId: z
+    .string()
+    .describe(
+      'Exact channel id from list_channels. Use list_channels (with the teamId) to find it.',
+    ),
   limit: z
     .number()
     .int()
@@ -36,17 +39,24 @@ const GetChannelMessagesInputSchema = z.object({
     .describe(
       'full = ISO 8601 with ms, short = YYYY-MM-DD HH:mm, none = omit timestamps. Default: short',
     ),
+  detail: z
+    .enum(['standard', 'full'])
+    .default('standard')
+    .describe(
+      'standard returns sender, content, and timestamp. full adds contentType (source format from Graph). Default: standard',
+    ),
 });
 
 const GetChannelMessagesOutputSchema = z.object({
-  teamName: z.string(),
-  channelName: z.string(),
+  teamId: z.string(),
+  channelId: z.string(),
   messages: z.array(
     z.object({
       id: z.string(),
       createdDateTime: z.string().optional(),
       senderDisplayName: z.string().nullable(),
       content: z.string(),
+      contentType: z.string().optional(),
     }),
   ),
 });
@@ -57,7 +67,6 @@ export class GetChannelMessagesTool {
 
   public constructor(
     private readonly traceService: TraceService,
-    private readonly channelService: ChannelService,
     private readonly chatService: ChatService,
   ) {}
 
@@ -65,7 +74,7 @@ export class GetChannelMessagesTool {
     name: 'get_channel_messages',
     title: 'Get Channel Messages',
     description:
-      'Retrieves recent messages from a Microsoft Teams channel. Use `list_teams` and `list_channels` first to discover available teams and channels.',
+      'Retrieves recent messages from a Microsoft Teams channel, identified by teamId + channelId. Call list_teams then list_channels (with that teamId) first to find the ids.',
     parameters: GetChannelMessagesInputSchema,
     outputSchema: GetChannelMessagesOutputSchema,
     annotations: {
@@ -82,7 +91,7 @@ export class GetChannelMessagesTool {
   @Span()
   public async getChannelMessages(
     input: z.infer<typeof GetChannelMessagesInputSchema>,
-    context: Context,
+    _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof GetChannelMessagesOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -92,30 +101,16 @@ export class GetChannelMessagesTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
+    span?.setAttribute('team_id', input.teamId);
+    span?.setAttribute('channel_id', input.channelId);
     span?.setAttribute('limit', input.limit);
 
     this.logger.log({ userProfileId, limit: input.limit }, 'Getting channel messages');
 
-    const team = await this.channelService.resolveTeamByName(
-      userProfileId,
-      input.teamName,
-      context,
-    );
-
-    const channel = await this.channelService.resolveChannelByName(
-      userProfileId,
-      team.id,
-      input.channelName,
-      input.teamName,
-      context,
-    );
-    span?.setAttribute('resolved_team_id', team.id);
-    span?.setAttribute('resolved_channel_id', channel.id);
-
     const messages = await this.chatService.getChannelMessages(
       userProfileId,
-      team.id,
-      channel.id,
+      input.teamId,
+      input.channelId,
       input.limit,
       { excludeSystemMessages: !input.includeSystemMessages },
     );
@@ -123,8 +118,8 @@ export class GetChannelMessagesTool {
     span?.setAttribute('result_count', messages.length);
 
     return {
-      teamName: team.displayName,
-      channelName: channel.displayName,
+      teamId: input.teamId,
+      channelId: input.channelId,
       messages: messages.map((m) => this.mapMessage(m, input)),
     };
   }
@@ -149,6 +144,10 @@ export class GetChannelMessagesTool {
         input.timestampFormat === 'full'
           ? m.createdDateTime
           : m.createdDateTime.replace('T', ' ').slice(0, 16);
+    }
+
+    if (input.detail === 'full') {
+      msg.contentType = m.contentType;
     }
 
     return msg;

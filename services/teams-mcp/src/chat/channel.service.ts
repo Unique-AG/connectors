@@ -1,11 +1,9 @@
-import { type Context } from '@unique-ag/mcp-server-module';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { collectAllPages } from '~/msgraph/graph-pagination';
 import { MsChannel, MsChannelSchema, MsTeam, MsTeamSchema } from './chat.dtos';
-import { disambiguate } from './disambiguate';
 
 @Injectable()
 export class ChannelService {
@@ -48,7 +46,7 @@ export class ChannelService {
     // /teams/{id}/channels supports $select but not $top; it pages via @odata.nextLink.
     const response = await client
       .api(`/teams/${teamId}/channels`)
-      .select('id,displayName,description,createdDateTime,membershipType,webUrl')
+      .select('id,displayName,description,createdDateTime,membershipType')
       .get();
 
     const { items } = await collectAllPages(client, response, { label: 'listChannels' });
@@ -58,91 +56,6 @@ export class ChannelService {
     this.logger.debug({ userProfileId, teamId, count: channels.length }, 'Retrieved team channels');
 
     return channels;
-  }
-
-  @Span()
-  public async resolveTeamByName(
-    userProfileId: string,
-    teamName: string,
-    context: Context,
-  ): Promise<MsTeam> {
-    const span = this.traceService.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId);
-
-    this.logger.debug({ userProfileId }, 'Resolving team by display name');
-
-    const teams = await this.listTeams(userProfileId);
-
-    // NOTE: case-insensitive match to avoid user friction when exact casing is unknown
-    const lowerName = teamName.toLowerCase();
-    const matches = teams.filter((t) => t.displayName.toLowerCase() === lowerName);
-
-    if (matches.length === 0) {
-      span?.addEvent('team not found');
-      throw new NotFoundException(`Team "${teamName}" not found`);
-    }
-
-    // Multiple teams can share a display name; present a picker rather than
-    // silently picking one and risking acting on the wrong team.
-    if (matches.length > 1) {
-      span?.addEvent('ambiguous team name', { matchCount: matches.length });
-      const team = await disambiguate(matches, {
-        context,
-        toLabel: (t) =>
-          `${t.displayName}${t.description ? ` — ${t.description}` : ''}${t.isArchived ? ' · archived' : ''}`,
-        promptMessage: `Multiple teams match "${teamName}". Which one did you mean?`,
-        conflictMessage: `Team name "${teamName}" matches multiple teams (${matches.length}). Please be more specific.`,
-      });
-      span?.setAttribute('resolved_team_id', team.id);
-      return team;
-    }
-
-    const [team] = matches as [MsTeam];
-    span?.setAttribute('resolved_team_id', team.id);
-    return team;
-  }
-
-  @Span()
-  public async resolveChannelByName(
-    userProfileId: string,
-    teamId: string,
-    channelName: string,
-    teamName: string,
-    context: Context,
-  ): Promise<MsChannel> {
-    const span = this.traceService.getSpan();
-    span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('team_id', teamId);
-
-    this.logger.debug({ userProfileId, teamId }, 'Resolving channel by display name');
-
-    const channels = await this.listChannels(userProfileId, teamId);
-
-    // NOTE: case-insensitive match to avoid user friction when exact casing is unknown
-    const lowerName = channelName.toLowerCase();
-    const matches = channels.filter((c) => c.displayName.toLowerCase() === lowerName);
-
-    if (matches.length === 0) {
-      span?.addEvent('channel not found');
-      throw new NotFoundException(`Channel "${channelName}" not found in team "${teamName}"`);
-    }
-
-    if (matches.length > 1) {
-      span?.addEvent('ambiguous channel name', { matchCount: matches.length });
-      const channel = await disambiguate(matches, {
-        context,
-        toLabel: (c) =>
-          `${c.displayName} · ${c.membershipType ?? ''}${c.description ? ` — ${c.description}` : ''}`,
-        promptMessage: `Multiple channels in team "${teamName}" match "${channelName}". Which one did you mean?`,
-        conflictMessage: `Channel name "${channelName}" matches multiple channels in team "${teamName}" (${matches.length}). Please be more specific.`,
-      });
-      span?.setAttribute('resolved_channel_id', channel.id);
-      return channel;
-    }
-
-    const [channel] = matches as [MsChannel];
-    span?.setAttribute('resolved_channel_id', channel.id);
-    return channel;
   }
 
   @Span()

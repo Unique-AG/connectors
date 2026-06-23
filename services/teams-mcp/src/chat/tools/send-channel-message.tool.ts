@@ -6,8 +6,12 @@ import * as z from 'zod';
 import { ChannelService } from '../channel.service';
 
 const SendChannelMessageInputSchema = z.object({
-  teamName: z.string().describe('Display name of the team (case-insensitive)'),
-  channelName: z.string().describe('Display name of the channel (case-insensitive)'),
+  teamId: z.string().describe('Exact team id from list_teams. Use list_teams to find it.'),
+  channelId: z
+    .string()
+    .describe(
+      'Exact channel id from list_channels. Use list_channels (with the teamId) to find it.',
+    ),
   message: z.string().describe('Plain text message content to send'),
   includeWebUrl: z
     .boolean()
@@ -33,7 +37,7 @@ export class SendChannelMessageTool {
     name: 'send_channel_message',
     title: 'Send Channel Message',
     description:
-      'Send a plain text message to a Microsoft Teams channel. Resolves team and channel by display name. Use list_teams and list_channels to discover available teams and channels.',
+      'Send a plain text message to a Microsoft Teams channel, identified by teamId + channelId. Call list_teams then list_channels (with that teamId) first to find the ids.',
     parameters: SendChannelMessageInputSchema,
     outputSchema: SendChannelMessageOutputSchema,
     annotations: {
@@ -46,13 +50,13 @@ export class SendChannelMessageTool {
     _meta: {
       'unique.app/icon': 'send',
       'unique.app/system-prompt':
-        'Use list_teams and list_channels first if you do not know the exact team or channel name.',
+        'Call list_teams then list_channels first to get teamId + channelId, then send by id.',
     },
   })
   @Span()
   public async sendChannelMessage(
     input: z.infer<typeof SendChannelMessageInputSchema>,
-    context: Context,
+    _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof SendChannelMessageOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -60,42 +64,19 @@ export class SendChannelMessageTool {
       throw new UnauthorizedException('User not authenticated');
     }
 
+    const { teamId, channelId, message, includeWebUrl } = input;
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
-    span?.setAttribute('message_length', input.message.length);
+    span?.setAttribute('team_id', teamId);
+    span?.setAttribute('channel_id', channelId);
+    span?.setAttribute('message_length', message.length);
 
     this.logger.log({ userProfileId }, 'Sending channel message');
 
-    return this.resolveAndSend(
-      userProfileId,
-      input.teamName,
-      input.channelName,
-      input.message,
-      input.includeWebUrl,
-      context,
-    );
-  }
-
-  private async resolveAndSend(
-    userProfileId: string,
-    teamName: string,
-    channelName: string,
-    message: string,
-    includeWebUrl: boolean,
-    context: Context,
-  ): Promise<z.output<typeof SendChannelMessageOutputSchema>> {
-    const team = await this.channelService.resolveTeamByName(userProfileId, teamName, context);
-    const channel = await this.channelService.resolveChannelByName(
-      userProfileId,
-      team.id,
-      channelName,
-      teamName,
-      context,
-    );
     const result = await this.channelService.sendChannelMessage(
       userProfileId,
-      team.id,
-      channel.id,
+      teamId,
+      channelId,
       message,
     );
     return {

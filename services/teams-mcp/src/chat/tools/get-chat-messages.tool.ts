@@ -8,7 +8,9 @@ import { ChatService } from '../chat.service';
 import { normalizeContent } from '../utils/normalize-content';
 
 const GetChatMessagesInputSchema = z.object({
-  chatIdentifier: z.string().describe('Chat topic or member display name (case-insensitive)'),
+  chatId: z
+    .string()
+    .describe('Exact chat id from list_chats or search_messages. Use list_chats first to find it.'),
   limit: z
     .number()
     .int()
@@ -44,7 +46,6 @@ const GetChatMessagesInputSchema = z.object({
 
 const GetChatMessagesOutputSchema = z.object({
   chatId: z.string(),
-  chatTopic: z.string().nullable(),
   messages: z.array(
     z.object({
       id: z.string(),
@@ -69,7 +70,7 @@ export class GetChatMessagesTool {
     name: 'get_chat_messages',
     title: 'Get Chat Messages',
     description:
-      "Retrieve recent messages from a Microsoft Teams chat. Identify the chat by its topic (for group chats) or by the other person's display name (for 1:1 chats). Use list_chats first if unsure.",
+      'Retrieve recent messages from a Microsoft Teams chat, identified by its chatId. Call list_chats first to find the chatId (it also returns topic/members/dates so you can pick the right chat).',
     parameters: GetChatMessagesInputSchema,
     outputSchema: GetChatMessagesOutputSchema,
     annotations: {
@@ -86,7 +87,7 @@ export class GetChatMessagesTool {
   @Span()
   public async getChatMessages(
     input: z.infer<typeof GetChatMessagesInputSchema>,
-    context: Context,
+    _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof GetChatMessagesOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -96,26 +97,24 @@ export class GetChatMessagesTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
+    span?.setAttribute('chat_id', input.chatId);
     span?.setAttribute('limit', input.limit);
 
     this.logger.log({ userProfileId, limit: input.limit }, 'Getting chat messages');
 
-    const chat = await this.chatService.resolveChatByNameOrMember(
+    const messages = await this.chatService.getChatMessages(
       userProfileId,
-      input.chatIdentifier,
-      context,
+      input.chatId,
+      input.limit,
+      {
+        excludeSystemMessages: !input.includeSystemMessages,
+      },
     );
-    span?.setAttribute('resolved_chat_id', chat.id);
-
-    const messages = await this.chatService.getChatMessages(userProfileId, chat.id, input.limit, {
-      excludeSystemMessages: !input.includeSystemMessages,
-    });
 
     span?.setAttribute('result_count', messages.length);
 
     return {
-      chatId: chat.id,
-      chatTopic: chat.topic ?? null,
+      chatId: input.chatId,
       messages: messages.map((m) => this.mapMessage(m, input)),
     };
   }

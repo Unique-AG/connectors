@@ -6,7 +6,7 @@ import * as z from 'zod';
 import { ChannelService } from '../channel.service';
 
 const ListChannelsInputSchema = z.object({
-  teamName: z.string().describe('Display name of the team (case-insensitive)'),
+  teamId: z.string().describe('Exact team id from list_teams. Use list_teams to find it.'),
   includeDescriptions: z
     .boolean()
     .default(false)
@@ -16,9 +16,10 @@ const ListChannelsInputSchema = z.object({
 });
 
 const ListChannelsOutputSchema = z.object({
-  teamName: z.string(),
+  teamId: z.string(),
   channels: z.array(
     z.object({
+      channelId: z.string(),
       displayName: z.string(),
       description: z.string().optional(),
       createdDateTime: z.string().nullable(),
@@ -40,7 +41,7 @@ export class ListChannelsTool {
     name: 'list_channels',
     title: 'List Team Channels',
     description:
-      'List all channels in a Microsoft Teams team. Each channel includes its creation date and membership type (standard, private, or shared), which help distinguish channels that share a display name. Use this to discover channel names before calling send_channel_message.',
+      'List all channels in a Microsoft Teams team, identified by teamId (from list_teams). Each channel includes its channelId plus creation date and membership type (standard, private, or shared). Pass the teamId + channelId to send_channel_message or get_channel_messages.',
     parameters: ListChannelsInputSchema,
     outputSchema: ListChannelsOutputSchema,
     annotations: {
@@ -57,7 +58,7 @@ export class ListChannelsTool {
   @Span()
   public async listChannels(
     input: z.infer<typeof ListChannelsInputSchema>,
-    context: Context,
+    _context: Context,
     request: McpAuthenticatedRequest,
   ): Promise<z.output<typeof ListChannelsOutputSchema>> {
     const userProfileId = request.user?.userProfileId;
@@ -67,28 +68,24 @@ export class ListChannelsTool {
 
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
+    span?.setAttribute('team_id', input.teamId);
 
     this.logger.log({ userProfileId }, 'Listing channels for team');
 
-    const team = await this.channelService.resolveTeamByName(
-      userProfileId,
-      input.teamName,
-      context,
-    );
-    const channels = await this.channelService.listChannels(userProfileId, team.id);
-    span?.setAttribute('resolved_team_id', team.id);
-
+    const channels = await this.channelService.listChannels(userProfileId, input.teamId);
     span?.setAttribute('result_count', channels.length);
 
     return {
-      teamName: team.displayName,
+      teamId: input.teamId,
       channels: channels.map((c) => {
         const channel: {
+          channelId: string;
           displayName: string;
           description?: string;
           createdDateTime: string | null;
           membershipType: string | null;
         } = {
+          channelId: c.id,
           displayName: c.displayName,
           createdDateTime: c.createdDateTime ?? null,
           membershipType: c.membershipType ?? null,
