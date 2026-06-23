@@ -35,9 +35,21 @@ const SendChannelMessageInputSchema = z
       .default(false)
       .describe('Include the Teams web URL of the sent message. Default: false'),
   })
-  .refine((d) => (d.teamId && d.channelId) || (d.teamName && d.channelName), {
-    message: 'Provide either teamId + channelId (from list_channels) or teamName + channelName.',
-  });
+  .refine(
+    (d) => {
+      // When any id is supplied, require the full teamId + channelId pair. A
+      // partial id (only one) must not pass via the name pair and silently
+      // resolve a different channel than the id implied.
+      if (d.teamId !== undefined || d.channelId !== undefined) {
+        return d.teamId !== undefined && d.channelId !== undefined;
+      }
+      return d.teamName !== undefined && d.channelName !== undefined;
+    },
+    {
+      message:
+        'Provide a complete teamId + channelId (from list_channels) or teamName + channelName. A partial id is not allowed.',
+    },
+  );
 
 const SendChannelMessageOutputSchema = z.object({
   messageId: z.string(),
