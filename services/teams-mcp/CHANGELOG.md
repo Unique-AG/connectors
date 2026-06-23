@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.22](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.21...teams-mcp@0.2.22) (2026-06-23)
+
+
+### Features
+
+* **teams-mcp:** id-only chat/channel targeting ([#656](https://github.com/Unique-AG/connectors/issues/656)) ([d1033b8](https://github.com/Unique-AG/connectors/commit/d1033b8e0ca45502eab6d7da0e06d2940185381c))
+
 ## [0.2.21](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.20...teams-mcp@0.2.21) (2026-06-22)
 
 
