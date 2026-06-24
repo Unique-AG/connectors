@@ -1,0 +1,382 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Confluence Connector Values",
+  "description": "Values for the Confluence Connector Helm chart. Takes content from Confluence and sends it to Unique AI for RAG ingestion.",
+  "type": "object",
+  "properties": {
+    "grafana": {
+      "type": "object",
+      "description": "Grafana dashboard configuration",
+      "properties": {
+        "dashboard": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Grafana dashboard creation"
+            },
+            "folder": {
+              "type": "string",
+              "description": "Grafana folder name for the dashboard"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "alerts": {
+      "type": "object",
+      "description": "Prometheus alerting rules configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable Prometheus alerting rules",
+          "default": false
+        },
+        "defaultAlerts": {
+          "type": "object",
+          "description": "Default alert configurations",
+          "properties": {
+            "uniqueApi": {
+              "type": "object",
+              "description": "Configuration for Unique REST API error alerts",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable Unique REST API error rate alerts",
+                  "default": true
+                },
+                "disabled": {
+                  "type": "object",
+                  "description": "Disable specific alerts by setting them to true",
+                  "properties": {
+                    "ConfluenceConnectorUniqueAPIErrors": {
+                      "type": "boolean",
+                      "description": "Disable the ConfluenceConnectorUniqueAPIErrors alert"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "customRules": {
+                  "type": "object",
+                  "description": "Override alert rules with custom values",
+                  "properties": {
+                    "ConfluenceConnectorUniqueAPIErrors": {
+                      "type": "object",
+                      "description": "Custom configuration for ConfluenceConnectorUniqueAPIErrors alert",
+                      "properties": {
+                        "threshold": {
+                          "type": "number",
+                          "description": "Error rate threshold (0.01 = 1% error rate)",
+                          "default": 0.01
+                        },
+                        "for": {
+                          "type": "string",
+                          "description": "Duration the condition must be true before firing",
+                          "default": "30s"
+                        },
+                        "severity": {
+                          "type": "string",
+                          "enum": ["critical", "warning", "info"],
+                          "description": "Alert severity",
+                          "default": "warning"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "additionalLabels": {
+              "type": "object",
+              "description": "Additional labels to add to all alerts and the PrometheusRule"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "connectorConfig": {
+      "type": "object",
+      "description": "Confluence connector configuration",
+      "required": ["enabled", "tenants"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to use the connector config."
+        },
+        "tenants": {
+          "type": "array",
+          "description": "List of tenant configurations",
+          "items": {
+            "type": "object",
+            "required": ["name", "confluence", "unique", "processing", "ingestion"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Tenant name used as identifier and config file prefix"
+              },
+              "confluence": {
+                "type": "object",
+                "description": "Confluence configuration",
+                "required": [
+                  "instanceType",
+                  "baseUrl",
+                  "auth",
+                  "apiRateLimitPerMinute",
+                  "ingestSingleLabel",
+                  "ingestAllLabel"
+                ],
+                "properties": {
+                  "instanceType": {
+                    "type": "string",
+                    "enum": ["cloud", "data-center"],
+                    "description": "Confluence instance type: cloud or data-center"
+                  },
+                  "cloudId": {
+                    "type": "string",
+                    "description": "Atlassian Cloud ID (UUID) for the Confluence site. Required when instanceType is cloud."
+                  },
+                  "baseUrl": {
+                    "type": "string",
+                    "description": "Confluence base URL",
+                    "examples": ["https://acme.atlassian.net", "https://confluence.acme.com"]
+                  },
+                  "auth": {
+                    "type": "object",
+                    "description": "Confluence authentication configuration",
+                    "required": ["mode"],
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": ["oauth_2lo"],
+                            "description": "OAuth 2.0 two-legged (client credentials)"
+                          },
+                          "clientId": {
+                            "type": "string",
+                            "description": "OAuth 2.0 (2LO) application client ID"
+                          },
+                          "clientSecret": {
+                            "type": "string",
+                            "description": "OAuth 2.0 client secret. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
+                          }
+                        },
+                        "required": ["mode", "clientId", "clientSecret"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": ["pat"],
+                            "description": "Personal Access Token (Data Center only)"
+                          },
+                          "token": {
+                            "type": "string",
+                            "description": "Personal Access Token. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
+                          }
+                        },
+                        "required": ["mode", "token"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "enum": ["basic"],
+                            "description": "HTTP Basic username/password (Data Center only)"
+                          },
+                          "username": {
+                            "type": "string",
+                            "description": "Confluence username for Basic auth"
+                          },
+                          "password": {
+                            "type": "string",
+                            "description": "Confluence password for Basic auth. Use \"os.environ/ENV_VAR_NAME\" to read from environment variable at runtime."
+                          }
+                        },
+                        "required": ["mode", "username", "password"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "apiRateLimitPerMinute": {
+                    "type": "integer",
+                    "description": "Number of Confluence API requests allowed per minute"
+                  },
+                  "ingestSingleLabel": {
+                    "type": "string",
+                    "description": "Label to trigger single-page sync"
+                  },
+                  "ingestAllLabel": {
+                    "type": "string",
+                    "description": "Label to trigger full sync of all labeled pages"
+                  }
+                },
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "auth": {
+                          "type": "object",
+                          "required": ["mode"],
+                          "properties": {
+                            "mode": {
+                              "enum": ["pat", "basic"]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "then": {
+                      "properties": {
+                        "instanceType": {
+                          "const": "data-center"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "if": {
+                      "properties": {
+                        "instanceType": {
+                          "const": "cloud"
+                        }
+                      }
+                    },
+                    "then": {
+                      "required": ["cloudId"]
+                    }
+                  }
+                ],
+                "additionalProperties": false
+              },
+              "unique": {
+                "type": "object",
+                "description": "Unique platform configuration",
+                "required": ["authMode", "apiRateLimitPerMinute"],
+                "properties": {
+                  "ingestionServiceBaseUrl": {
+                    "type": "string",
+                    "description": "Base URL for the ingestion service"
+                  },
+                  "scopeManagementServiceBaseUrl": {
+                    "type": "string",
+                    "description": "Base URL for the scope management service"
+                  },
+                  "apiRateLimitPerMinute": {
+                    "type": "integer",
+                    "description": "Number of Unique API requests allowed per minute"
+                  },
+                  "authMode": {
+                    "type": "string",
+                    "enum": ["cluster_local", "external"],
+                    "description": "Communication mode for the Unique Services"
+                  },
+                  "serviceExtraHeaders": {
+                    "type": "object",
+                    "description": "HTTP extra headers for Unique API requests. Required when authMode is cluster_local."
+                  },
+                  "ingestionConfig": {
+                    "type": "object",
+                    "description": "Config object to pass when submitting content for ingestion"
+                  },
+                  "zitadel": {
+                    "type": "object",
+                    "description": "Zitadel authentication configuration (required when authMode is external)",
+                    "required": ["clientId", "oauthTokenUrl", "projectId"],
+                    "properties": {
+                      "clientId": { "type": "string" },
+                      "oauthTokenUrl": { "type": "string" },
+                      "projectId": { "type": "string" }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              "processing": {
+                "type": "object",
+                "description": "Page processing configuration",
+                "properties": {
+                  "concurrency": { "type": "integer" },
+                  "scanIntervalCron": { "type": "string" },
+                  "maxItemsToScan": { "type": ["integer", "null"] }
+                },
+                "additionalProperties": false
+              },
+              "ingestion": {
+                "type": "object",
+                "description": "Ingestion configuration",
+                "required": ["ingestionMode", "scopeId"],
+                "properties": {
+                  "ingestionMode": {
+                    "type": "string",
+                    "enum": ["flat"]
+                  },
+                  "scopeId": { "type": "string" },
+                  "storeInternally": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"]
+                  },
+                  "useV1KeyFormat": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"]
+                  },
+                  "attachments": {
+                    "type": "object",
+                    "properties": {
+                      "mode": { "type": "string", "enum": ["enabled", "disabled"] },
+                      "allowedMimeTypes": { "type": "array", "items": { "type": "string" } },
+                      "maxFileSizeMb": { "type": "integer" },
+                      "imageOcr": { "type": "string", "enum": ["enabled", "disabled"] }
+                    },
+                    "additionalProperties": false
+                  },
+                  "pageIngestionConfig": { "type": "object" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "proxyConfig": {
+      "type": "object",
+      "description": "HTTP proxy configuration for external API calls.",
+      "required": ["enabled", "authMode"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable proxy configuration.",
+          "default": true
+        },
+        "authMode": {
+          "type": "string",
+          "enum": ["none", "no_auth", "username_password", "ssl_tls"],
+          "description": "Proxy authentication mode",
+          "default": "none"
+        },
+        "host": { "type": "string" },
+        "port": { "type": "integer" },
+        "protocol": { "type": "string", "enum": ["http", "https"] },
+        "username": { "type": "string" },
+        "sslCertPath": { "type": "string" },
+        "sslKeyPath": { "type": "string" },
+        "sslCaBundlePath": { "type": "string" },
+        "headers": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

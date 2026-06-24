@@ -1,107 +1,174 @@
-connector:
-  deployment:
-    metadata:
-      annotations:
-        reloader.stakater.com/auto: "true"
-  env:
-    LOG_LEVEL: info
-    LOGS_DIAGNOSTICS_DATA_POLICY: conceal
-    # When to emit config diagnostics logs. JSON object with emit: "on"/"off" and required events array when "on".
-    LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY: '{"emit":"on","events":["on_startup","on_sync"]}'
-    MAX_FILE_SIZE_BYTES: "209715200"
-    MAX_HEAP_MB: 1920
-    NODE_ENV: production
-    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
-    OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
-    OTEL_METRICS_EXPORTER: "prometheus"
-    # Glob pattern to match tenant configuration YAML files
-    TENANT_CONFIG_PATH_PATTERN: /app/tenant-configs/*-tenant-config.yaml
-  # -- Environment variables from secrets.
-  # Example for loading secrets (uncomment and customize as needed):
-  #   envVars:
-  #     # For Zitadel authentication (required when authMode is 'external')
-  #     - name: ZITADEL_CLIENT_SECRET
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: sharepoint-connector-secret
-  #           key: ZITADEL_CLIENT_SECRET
-  #     # For encrypted certificate private key (optional, only if key is password-protected)
-  #     - name: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: sharepoint-connector-secret
-  #           key: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
-  #     # For proxy basic auth password (required when proxy.authMode is 'username_password')
-  #     - name: PROXY_PASSWORD
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: sharepoint-connector-secret
-  #           key: PROXY_PASSWORD
-  # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
-  envVars: []
-  # -- List of ConfigMaps to load as environment variables.
+# ════ Identity ════════════════════════════════════════════════════════════════
+nameOverride: sharepoint-connector
+fullnameOverride: sharepoint-connector
+selectorComponentLabel: server
+
+# ════ Compute ═════════════════════════════════════════════════════════════════
+
+# ── Deployment ────────────────────────────────────────────────────────────────
+deployment:
+  revisionHistoryLimit: 3
+  metadata:
+    annotations:
+      reloader.stakater.com/auto: "true"
+
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  LOG_LEVEL: info
+  LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+  # When to emit config diagnostics logs. JSON object with emit: "on"/"off" and required events array when "on".
+  LOGS_DIAGNOSTICS_CONFIG_EMIT_POLICY: '{"emit":"on","events":["on_startup","on_sync"]}'
+  MAX_FILE_SIZE_BYTES: "209715200"
+  MAX_HEAP_MB: 1920
+  NODE_ENV: production
+  OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+  OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
+  OTEL_METRICS_EXPORTER: "prometheus"
+  # Glob pattern to match tenant configuration YAML files
+  TENANT_CONFIG_PATH_PATTERN: /app/tenant-configs/*-tenant-config.yaml
+
+# -- Environment variables from secrets.
+# Example for loading secrets (uncomment and customize as needed):
+#   envVars:
+#     # For Zitadel authentication (required when authMode is 'external')
+#     - name: ZITADEL_CLIENT_SECRET
+#       valueFrom:
+#         secretKeyRef:
+#           name: sharepoint-connector-secret
+#           key: ZITADEL_CLIENT_SECRET
+#     # For encrypted certificate private key (optional, only if key is password-protected)
+#     - name: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
+#       valueFrom:
+#         secretKeyRef:
+#           name: sharepoint-connector-secret
+#           key: SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD
+#     # For proxy basic auth password (required when proxy.authMode is 'username_password')
+#     - name: PROXY_PASSWORD
+#       valueFrom:
+#         secretKeyRef:
+#           name: sharepoint-connector-secret
+#           key: PROXY_PASSWORD
+envVars: []
+
+# -- List of ConfigMaps to load as environment variables.
+# The default assumes releaseName=sharepoint-connector. For multi-instance deployments
+# with a different release name, override to match the rendered ConfigMap name
+# (<releaseName>-proxy-config).
+extraEnvCM:
+  - sharepoint-connector-proxy-config
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/sharepoint-connector
+  tag: 2.7.0 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 51345
+  metrics: 51346
+
+resources:
+  # Resources are granted generously as the service for now is a singleton
+  limits:
+    memory: 2048Mi
+  requests:
+    cpu: 1
+    memory: 1984Mi
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+serviceAccount:
+  enabled: true
+
+workloadIdentity:
+  azure:
+    enabled: true
+    clientId: unset_default_value
+
+volumes:
+  - name: tmp
+    emptyDir: {}
+  # -- Graph/SharePoint Certificate Secret
+  # by default the chart expects the certificate to be in a secret named sharepoint-connector-secret under the key key.pem
+  # Users can supersede this with their own secret that contains the certificate under a different key or use their own secret name
+  # Users must also set the connectorConfig.sharepoint.auth.privateKeyPath to the path of the certificate in the secret
+  - name: sharepoint-connector-secret
+    secret:
+      secretName: sharepoint-connector-secret
+      items:
+        - key: key.pem
+          path: key.pem
+  # -- Tenant configuration YAML file mounted from ConfigMap.
   # The default assumes releaseName=sharepoint-connector. For multi-instance deployments
   # with a different release name, override to match the rendered ConfigMap name
-  # (<releaseName>-proxy-config).
-  extraEnvCM:
-    - sharepoint-connector-proxy-config
-  image:
-    repository: ghcr.io/unique-ag/connectors/services/sharepoint-connector
-    tag: 2.7.0 # x-release-please-version
-  ports:
-    application: 51345
-    metrics: 51346
-  resources:
-    # Resources are granted generously as the service for now is a singleton
-    limits:
-      memory: 2048Mi
-    requests:
-      cpu: 1
-      memory: 1984Mi
-  routes:
-    paths:
-      default:
-        enabled: false
-  service:
-    enabled: false
-  serviceAccount:
-    enabled: true
-    workloadIdentity:
-      enabled: true
-      clientId: unset_default_value
-  volumes:
-    - name: tmp
-      emptyDir: {}
-      # -- Graph/SharePoint Certificate Secret
-      # by default the chart expects the certificate to be in a secret named sharepoint-connector-secret under the key key.pem
-      # Users can supersede this with their own secret that contains the certificate under a different key or use their own secret name
-      # Users must also set the connectorConfig.sharepoint.auth.privateKeyPath to the path of the certificate in the secret
-    - name: sharepoint-connector-secret
-      secret:
-        secretName: sharepoint-connector-secret
-        items:
-          - key: key.pem
-            path: key.pem
-    # -- Tenant configuration YAML file mounted from ConfigMap.
-    # The default assumes releaseName=sharepoint-connector. For multi-instance deployments
-    # with a different release name, override to match the rendered ConfigMap name
-    # (<releaseName>-tenant-config).
-    - name: tenant-config
-      configMap:
-        name: sharepoint-connector-tenant-config
-  volumeMounts:
-    - name: tmp
-      mountPath: /tmp
-    - name: sharepoint-connector-secret
-      mountPath: /app/key.pem
-      subPath: key.pem
-      readOnly: true
-    # -- Mount tenant configuration directory
-    - name: tenant-config
-      mountPath: /app/tenant-configs
-      readOnly: true
+  # (<releaseName>-tenant-config).
+  - name: tenant-config
+    configMap:
+      name: sharepoint-connector-tenant-config
 
-# -- Grafana dashboard configuration
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+  - name: sharepoint-connector-secret
+    mountPath: /app/key.pem
+    subPath: key.pem
+    readOnly: true
+  # -- Mount tenant configuration directory
+  - name: tenant-config
+    mountPath: /app/tenant-configs
+    readOnly: true
+
+# ════ Data ════════════════════════════════════════════════════════════════════
+
+# ── InternalServices ──────────────────────────────────────────────────────────
+internalServices:
+  dependencies:
+    ingestion:
+      name: ingestion
+      servicePort: 8091
+      podPort: 8080
+    scopeManagement:
+      name: scope-management
+      servicePort: 8094
+      podPort: 8080
+
+# ════ Exposure ════════════════════════════════════════════════════════════════
+
+# ── Service ───────────────────────────────────────────────────────────────────
+service:
+  enabled: false
+
+# ── HTTPRoute ─────────────────────────────────────────────────────────────────
+routes:
+  hostname: "" # no HTTPRoute via base chart; connector uses custom ingress.yaml for wildcard domain support
+
+# ════ Operations ══════════════════════════════════════════════════════════════
+
+# ── Grafana dashboard configuration ───────────────────────────────────────────
 grafana:
   dashboard:
     # -- Enable Grafana dashboard ConfigMap creation
@@ -109,67 +176,85 @@ grafana:
     # -- Grafana folder where the dashboard will be placed
     folder: connectors
 
-# -- Prometheus alerting rules configuration
-alerts:
-  # -- Enable PrometheusRule resource creation
-  enabled: false
-  # -- Default alert definitions
-  defaultAlerts:
-    # -- Enable GraphQL API error rate alerts
-    graphql:
-      enabled: true
-      # -- Disable specific alerts by setting them to true
-      disabled: {}
-        # SharepointConnectorGraphQLErrors: false
-      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
-      customRules: {}
-        # SharepointConnectorGraphQLErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    # -- Enable Unique REST API error rate alerts
-    uniqueApi:
-      enabled: true
-      # -- Disable specific alerts by setting them to true
-      disabled: {}
-        # SharepointConnectorUniqueAPIErrors: false
-      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
-      customRules: {}
-        # SharepointConnectorUniqueAPIErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    # -- Enable sync failure alerts
-    syncs:
-      enabled: true
-      # -- Disable specific alerts by setting them to true
-      disabled: {}
-        # SharepointConnectorSyncFailures: false
-      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
-      customRules: {}
-        # SharepointConnectorSyncFailures:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    # -- Additional labels to add to all default alerts
-    additionalLabels: {}
-      # environment: production
-      # team: backend
+# ── Prometheus ────────────────────────────────────────────────────────────────
+prometheus:
+  additionalAlerts:
+    SharepointConnectorGraphQLErrors:
+      alert: SharepointConnectorGraphQLErrors
+      annotations:
+        summary: "SharePoint Connector GraphQL API errors detected"
+        description: "The SharePoint Connector is experiencing GraphQL API errors (4xx/5xx responses). Current error rate: {{ $value | humanizePercentage }}."
+        runbook: |
+          1. Inspect application logs for specific error messages
+          2. Check for recent deployments or configuration changes
+          3. Verify network connectivity between connector and GraphQL API
+          4. Verify authentication credentials and token validity
+          5. Check for rate limiting or throttling issues
+      expr: |
+        (
+          sum(rate(spc_unique_graphql_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+          /
+          sum(rate(spc_unique_graphql_api_request_duration_seconds_count[5m]))
+        ) > 0.01
+      for: 30s
+      labels:
+        severity: warning
+        alertGroup: sharepoint-connector
+    SharepointConnectorSyncFailures:
+      alert: SharepointConnectorSyncFailures
+      annotations:
+        summary: "SharePoint Connector sync failures detected"
+        description: "The SharePoint Connector is experiencing sync failures. Current failure rate: {{ $value | humanizePercentage }}."
+        runbook: |
+          1. Inspect application logs for specific error messages
+          2. Check the failure_step label to identify where the sync failed
+          3. Verify SharePoint connectivity and permissions
+          4. Check for rate limiting or throttling issues
+          5. Check for recent changes to the deployment as well as its underlying infrastructure
+      expr: |
+        (
+          sum(rate(spc_sync_duration_seconds_count{result="failure"}[5m]))
+          /
+          sum(rate(spc_sync_duration_seconds_count[5m]))
+        ) > 0.01
+      for: 30s
+      labels:
+        severity: warning
+        alertGroup: sharepoint-connector
+    SharepointConnectorUniqueAPIErrors:
+      alert: SharepointConnectorUniqueAPIErrors
+      annotations:
+        summary: "SharePoint Connector Unique REST API errors detected"
+        description: "The SharePoint Connector is experiencing Unique REST API errors (4xx/5xx responses). Current error rate: {{ $value | humanizePercentage }}."
+        runbook: |
+          1. Inspect application logs for specific error messages
+          2. Check for recent deployments or configuration changes (both the connector and the Unique Services)
+          3. Verify network connectivity between connector and Unique Services
+          4. Verify service user settings and permissions within Unique
+      expr: |
+        (
+          sum(rate(spc_unique_rest_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+          /
+          sum(rate(spc_unique_rest_api_request_duration_seconds_count[5m]))
+        ) > 0.01
+      for: 30s
+      labels:
+        severity: warning
+        alertGroup: sharepoint-connector
 
 # -- Config for the deployed connector, will be mapped to the connectors environment variables.
 # Users preferring setting all variables on their own disable the enabled flag and remove the
-# tenant-config from the connector.volumes and connector.volumeMounts.
+# tenant-config from volumes and volumeMounts.
 connectorConfig:
-  # -- if disabled, tenant-config must be removed from the connector.volumes and
-  # connector.volumeMounts
+  # -- if disabled, tenant-config must be removed from volumes and volumeMounts
   enabled: true
   sharepoint:
     # -- tenant id against which the graph api calls are made
     # example: 12345678-1234-1234-1234-123456789012
-    tenantId: unset_default_value
+    tenantId: '{{ fail "connectorConfig.sharepoint.tenantId is mandatory. Override in your deployment values." }}'
     # -- base url of the sharepoint instance
     # example: https://acme.sharepoint.com
-    baseUrl: unset_default_value
+    baseUrl: '{{ fail "connectorConfig.sharepoint.baseUrl is mandatory. Override in your deployment values." }}'
     auth:
       # -- authentication mode
       # possible values: certificate
@@ -177,9 +262,9 @@ connectorConfig:
       # -- Azure AD application client ID
       # example: 00000000-0000-0000-0000-000000000000
       # The matching certificate (private key file) must be sourced and mounted from a secret
-      clientId: unset_default_value
+      clientId: '{{ fail "connectorConfig.sharepoint.auth.clientId is mandatory when auth.mode is certificate. Override in your deployment values." }}'
       # -- path to the private key file of the Azure AD application certificate in PEM format
-      # this closely relates to the volumeMounts and volume definitions in the connector section
+      # this closely relates to the volumeMounts and volume definitions
       # users wanting to use another path can override this value and unset the volumeMounts and
       # volume definitions
       # if the key is encrypted, the password must be via a secret into a SHAREPOINT_AUTH_PRIVATE_KEY_PASSWORD environment variable
@@ -230,22 +315,6 @@ connectorConfig:
     #     storeInternally: enabled
     #     syncStatus: active
     #     syncMode: content_and_permissions
-    #     # -- THIS CONFIG HAS EFFECT ONLY IN CONTENT_ONLY SYNC MODE: inheritance mode for scopes and files.
-    #     # Allowed values: inherit_scopes_and_files, inherit_scopes, inherit_files, none.
-    #     # When unset, defaults to inherit_scopes_and_files; ignored in content_and_permissions.
-    #     permissionsInheritanceMode: inherit_scopes_and_files
-    #     # -- Whether to recursively discover and sync content from subsites.
-    #     # Allowed values: enabled, disabled. Default: disabled.
-    #     subsitesScan: disabled
-    #   Example: Additional site with different settings
-    #   - siteId: 00000000-0000-0000-0000-000000000001
-    #     syncColumnName: HRKnowledge
-    #     ingestionMode: flat
-    #     scopeId: scope_bu4gokr0atzj0kfiubbbbbb
-    #     maxFilesToIngest: 500
-    #     storeInternally: enabled
-    #     syncStatus: active
-    #     syncMode: content_only
     #     permissionsInheritanceMode: inherit_scopes_and_files
     #     subsitesScan: disabled
 
@@ -255,22 +324,20 @@ connectorConfig:
     # cluster_local: communicates using in-cluster URLs and requires serviceExtraHeaders with x-company-id and x-user-id
     # external: communicates using external URLs and requires authentication via Zitadel
     authMode: cluster_local
-    # -- base URL for the ingestion service
-    # example: https://api.unique.app/ingestion
-    # example: http://node-ingestion.finance-gpt:8091
-    ingestionServiceBaseUrl: unset_default_value
-    # -- base URL for the scope management service
-    # example: https://api.unique.app/scope-management
-    # example: http://node-scope-management.finance-gpt:8094
-    scopeManagementServiceBaseUrl: unset_default_value
+    # -- base URL for the ingestion service; auto-derived from internalServices.dependencies.ingestion
+    # override with an explicit URL when authMode is external, e.g. https://api.unique.app/ingestion
+    ingestionServiceBaseUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.ingestion) }}'
+    # -- base URL for the scope management service; auto-derived from internalServices.dependencies.scopeManagement
+    # override with an explicit URL when authMode is external, e.g. https://api.unique.app/scope-management
+    scopeManagementServiceBaseUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.scopeManagement) }}'
     # -- Number of Unique API requests allowed per minute
     apiRateLimitPerMinute: 100
     # -- Object containing extra HTTP headers for Unique API requests (GraphQL and REST)
     # Required when authMode is cluster_local. Must contain x-company-id and x-user-id headers.
     # example: {"x-company-id": "1234567890", "x-user-id": "1234567890"}
     serviceExtraHeaders:
-      x-company-id: unset_default_value
-      x-user-id: unset_default_value
+      x-company-id: '{{ fail "connectorConfig.unique.serviceExtraHeaders.x-company-id is mandatory when authMode is cluster_local. Override in your deployment values." }}'
+      x-user-id: '{{ fail "connectorConfig.unique.serviceExtraHeaders.x-user-id is mandatory when authMode is cluster_local. Override in your deployment values." }}'
     # -- Optional object containing config to pass when submitting file for ingestion
     # ingestionConfig:
     #   uniqueIngestionMode: SKIP_INGESTION
@@ -278,14 +345,14 @@ connectorConfig:
     # -- Zitadel authentication configuration (required when authMode is external)
     zitadel:
       # -- Zitadel client ID
-      clientId: unset_default_value
+      clientId: '{{ fail "connectorConfig.unique.zitadel.clientId is mandatory when authMode is external. Override in your deployment values." }}'
       # -- Zitadel OAuth token URL
       # example: https://idp.unique.app/oauth/v2/token
-      oauthTokenUrl: unset_default_value
+      oauthTokenUrl: '{{ fail "connectorConfig.unique.zitadel.oauthTokenUrl is mandatory when authMode is external. Override in your deployment values." }}'
       # -- Zitadel project ID
       # example: 225317577440629999
-      projectId: unset_default_value
-      # clientSecret is loaded from a secret, see connector.envVars
+      projectId: '{{ fail "connectorConfig.unique.zitadel.projectId is mandatory when authMode is external. Override in your deployment values." }}'
+      # clientSecret is loaded from a secret, see envVars
 
   processing:
     # -- timeout in seconds for a file processing step before it will stop and skip processing the file
@@ -313,9 +380,9 @@ connectorConfig:
 # -- HTTP proxy configuration for external API calls
 # Required for environments where internet access is only available through a proxy.
 # Users preferring setting all variables by hand disable the enabled flag and remove
-# the proxy-config ConfigMap from connector.extraEnvCM.
+# the proxy-config ConfigMap from extraEnvCM.
 proxyConfig:
-  # -- if disabled, the proxy-config ConfigMap must be removed from connector.extraEnvCM.
+  # -- if disabled, the proxy-config ConfigMap must be removed from extraEnvCM.
   enabled: true
   # -- Proxy authentication mode
   # none: proxy disabled
@@ -331,7 +398,7 @@ proxyConfig:
   # protocol: http
   # -- Basic auth username (required for username_password mode)
   # username: proxy-user
-  # password is loaded from a secret, see connector.envVars example for PROXY_PASSWORD
+  # password is loaded from a secret, see envVars example for PROXY_PASSWORD
   # -- Path to SSL/TLS client certificate (required for ssl_tls mode)
   # sslCertPath: /app/proxy-certs/client.crt
   # -- Path to SSL/TLS client key (required for ssl_tls mode)
@@ -340,3 +407,25 @@ proxyConfig:
   # sslCaBundlePath: /app/proxy-certs/ca.crt
   # -- Optional JSON string of headers for CONNECT request
   # headers: '{"X-Proxy-Header":"value"}'
+
+# ── NetworkPolicy ─────────────────────────────────────────────────────────────
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      namespace: system
+    egress:
+      microsoft:
+        toFQDNs:
+          - matchName: login.microsoftonline.com
+          - matchPattern: "*.sharepoint.com"
+          - matchName: graph.microsoft.com
+          - matchPattern: "*.microsoft.com"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP

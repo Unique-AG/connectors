@@ -1,61 +1,200 @@
-server:
-  deployment:
-    metadata:
-      annotations:
-        reloader.stakater.com/auto: "true"
-  hooks:
-    migration:
-      enabled: true
-      command: |
-        pnpm run db:migrate
-  env:
-    LOG_LEVEL: info
-    MAX_HEAP_MB: 850
-    NODE_ENV: production
-    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
-    OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
-    OTEL_METRICS_EXPORTER: "prometheus"
-  # -- Environment variables from secrets.
-  # Example for loading secrets (uncomment and customize as needed):
-  #   envVars:
-  #     # For Zitadel authentication (required when authMode is 'external')
-  #     - name: UNIQUE_ZITADEL_CLIENT_SECRET
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: outlook-semantic-mcp-zitadel-secret
-  #           key: UNIQUE_ZITADEL_CLIENT_SECRET
-  envVars: []
-  # -- ConfigMap(s) to load environment variables from.
-  # Default assumes release name is "outlook-semantic-mcp" (i.e., chart.fullname resolves to "outlook-semantic-mcp").
-  # Override with [<your-fullname>-config] if using a different release name or fullnameOverride.
-  extraEnvCM:
-    - outlook-semantic-mcp-config
-  image:
-    repository: ghcr.io/unique-ag/connectors/services/outlook-semantic-mcp
-    tag: 2.0.2 # x-release-please-version
-  ports:
-    application: 51345
-    metrics: 51346
-  resources:
-    # Resources are granted generously as the service for now is a singleton
-    limits:
-      memory: 1Gi
-    requests:
-      cpu: 1
-      memory: 512Mi
-  routes:
-    paths:
-      default:
-        enabled: false
-  volumes:
-    - name: tmp
-      emptyDir:
-        sizeLimit: 20Gi
-  volumeMounts:
-    - name: tmp
-      mountPath: /tmp
+# ════ Identity ════════════════════════════════════════════════════════════════
+nameOverride: outlook-semantic-mcp
+fullnameOverride: outlook-semantic-mcp
+selectorComponentLabel: server
 
-# -- Ingress configuration
+# ════ Compute ═════════════════════════════════════════════════════════════════
+
+# ── Deployment ────────────────────────────────────────────────────────────────
+deployment:
+  revisionHistoryLimit: 3
+  metadata:
+    annotations:
+      reloader.stakater.com/auto: "true"
+
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  LOG_LEVEL: info
+  MAX_HEAP_MB: 850
+  NODE_ENV: production
+  OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+  OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
+  OTEL_METRICS_EXPORTER: "prometheus"
+  OTEL_EXPORTER_OTLP_ENDPOINT:
+    if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
+    value: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.otelTraces) }}'
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:
+    if: '{{ .Values.internalServices.dependencies.otelTraces.enabled }}'
+    value: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.otelTraces) }}/v1/traces'
+
+# -- Environment variables from secrets.
+# Example for loading secrets (uncomment and customize as needed):
+#   envVars:
+#     # For Zitadel authentication (required when authMode is 'external')
+#     - name: UNIQUE_ZITADEL_CLIENT_SECRET
+#       valueFrom:
+#         secretKeyRef:
+#           name: outlook-semantic-mcp-zitadel-secret
+#           key: UNIQUE_ZITADEL_CLIENT_SECRET
+envVars: []
+
+# -- ConfigMap(s) to load environment variables from.
+# Default assumes release name is "outlook-semantic-mcp" (i.e., base.fullname resolves to "outlook-semantic-mcp").
+# Override with [<your-fullname>-config] if using a different release name or fullnameOverride.
+extraEnvCM:
+  - outlook-semantic-mcp-config
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/outlook-semantic-mcp
+  tag: 2.0.2 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 51345
+  metrics: 51346
+
+resources:
+  # Resources are granted generously as the service for now is a singleton
+  limits:
+    memory: 1Gi
+  requests:
+    cpu: 1
+    memory: 512Mi
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+serviceAccount:
+  enabled: true
+
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 20Gi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+# ════ Data ════════════════════════════════════════════════════════════════════
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+postgresql:
+  enabled: true
+  connection:
+    sslMode: verify
+    # ── Use-case B — in-cluster PostgreSQL (CloudNativePG) ────────────────────
+    #
+    # host:
+    #   fromKubernetesService:
+    #     name: <release-name>-pg-cluster-rw
+    #     namespace: <namespace>
+    #     port: 5432
+    #     podPort: 5432
+    #     podSelectorLabels:
+    #       cnpg.io/cluster: <release-name>-pg-cluster
+    #
+    # url:
+    #   fromSecret:
+    #     name: <release-name>-pg-cluster-app
+    #     key: fqdn-uri
+
+# ── RabbitMQ ──────────────────────────────────────────────────────────────────
+rabbitmq:
+  enabled: true
+  connection: {}
+  # ── Use-case B — in-cluster RabbitMQ (Bitnami Helm release) ──────────────
+  #
+  # host:
+  #   fromKubernetesService:
+  #     name: <helm-release>-<nameOverride>-headless
+  #     namespace: <namespace>
+  #     port: 5672
+  #     podPort: 5672
+  #     podSelectorLabels:
+  #       app.kubernetes.io/instance: <helm-release>
+  # username:
+  #   fromSecret:
+  #     name: rabbitmq-cluster-service-binding
+  #     key: AMQP_USERNAME
+  # password:
+  #   fromSecret:
+  #     name: rabbitmq-cluster-service-binding
+  #     key: AMQP_PASSWORD
+  #
+  # ── Use-case C — in-cluster RabbitMQ Cluster Operator ─────────────────────
+  #
+  # host:
+  #   fromKubernetesService:
+  #     name: <rabbitmqcluster-name>
+  #     namespace: <namespace>
+  #     port: 5672
+  #     podPort: 5672
+  #     podSelectorLabels:
+  #       app.kubernetes.io/component: rabbitmq
+  #       app.kubernetes.io/name: <rabbitmqcluster-name>
+  # username:
+  #   fromSecret:
+  #     name: rabbitmq-cluster-chat-service-binding
+  #     key: AMQP_USERNAME
+  # password:
+  #   fromSecret:
+  #     name: rabbitmq-cluster-chat-service-binding
+  #     key: AMQP_PASSWORD
+
+# ── InternalServices ──────────────────────────────────────────────────────────
+internalServices:
+  dependencies:
+    ingestion:
+      name: ingestion
+      servicePort: 8091
+      podPort: 8080
+    otelTraces:
+      enabled: false
+      name: otel-traces
+      servicePort: 4318
+    scopeManagement:
+      name: scope-management
+      servicePort: 8094
+      podPort: 8080
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+# ════ Exposure ════════════════════════════════════════════════════════════════
+
+# ── Service ───────────────────────────────────────────────────────────────────
+service:
+  port: 80
+
+routes:
+  hostname: "" # no HTTPRoute via base chart; MCP uses custom ingress.yaml for wildcard domain support
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
 # MCP servers need to be hosted on their own domain. With Kong as current controller, it is easier to use
 # ingress than http routes to obtain 'wildcard' domains.
 ingress:
@@ -83,7 +222,16 @@ ingress:
     #   hosts:
     #     - outlook.mcp.example.com
 
-# -- Grafana dashboard configuration
+# ════ Operations ══════════════════════════════════════════════════════════════
+
+# ── Job (migration hook) ──────────────────────────────────────────────────────
+hooks:
+  migration:
+    enabled: true
+    command: |
+      pnpm run db:migrate
+
+# ── Grafana dashboard configuration ───────────────────────────────────────────
 grafana:
   dashboard:
     # -- Enable Grafana dashboard ConfigMap creation
@@ -91,45 +239,55 @@ grafana:
     # -- Grafana folder where the dashboard will be placed
     folder: mcp-servers
 
-# -- Prometheus alerting rules configuration
-alerts:
-  # -- Enable PrometheusRule resource creation
-  enabled: false
-  # -- Default alert definitions
-  defaultAlerts:
-    # -- Enable GraphQL API error rate alerts
-    graphql:
-      enabled: true
-      # -- Disable specific alerts by setting them to true
-      disabled: {}
-        # OutlookSemanticMcpGraphQLErrors: false
-      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
-      customRules: {}
-        # OutlookSemanticMcpGraphQLErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    # -- Enable Unique REST API error rate alerts
-    uniqueApi:
-      enabled: true
-      # -- Disable specific alerts by setting them to true
-      disabled: {}
-        # OutlookSemanticMcpUniqueAPIErrors: false
-      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
-      customRules: {}
-        # OutlookSemanticMcpUniqueAPIErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    # -- Additional labels to add to all default alerts
-    additionalLabels: {}
-      # environment: production
-      # team: backend
+# ── Prometheus ────────────────────────────────────────────────────────────────
+prometheus:
+  additionalAlerts:
+    OutlookSemanticMcpGraphQLErrors:
+      alert: OutlookSemanticMcpGraphQLErrors
+      annotations:
+        summary: "Outlook Semantic MCP GraphQL API errors detected"
+        description: "The Outlook Semantic MCP server is experiencing GraphQL API errors (4xx/5xx responses). Current error rate: {{ $value | humanizePercentage }}."
+        runbook: |
+          1. Inspect application logs for specific error messages
+          2. Check for recent deployments or configuration changes
+          3. Verify network connectivity between MCP server and GraphQL API
+          4. Verify authentication credentials and token validity
+          5. Check for rate limiting or throttling issues
+      expr: |
+        (
+          sum(rate(outlook_semantic_mcp_unique_graphql_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+          /
+          sum(rate(outlook_semantic_mcp_unique_graphql_api_request_duration_seconds_count[5m]))
+        ) > 0.01
+      for: 30s
+      labels:
+        severity: warning
+        alertGroup: outlook-semantic-mcp
+    OutlookSemanticMcpUniqueAPIErrors:
+      alert: OutlookSemanticMcpUniqueAPIErrors
+      annotations:
+        summary: "Outlook Semantic MCP Unique REST API errors detected"
+        description: "The Outlook Semantic MCP server is experiencing Unique REST API errors (4xx/5xx responses). Current error rate: {{ $value | humanizePercentage }}."
+        runbook: |
+          1. Inspect application logs for specific error messages
+          2. Check for recent deployments or configuration changes (both the MCP server and the Unique Services)
+          3. Verify network connectivity between MCP server and Unique Services
+          4. Verify service user settings and permissions within Unique
+      expr: |
+        (
+          sum(rate(outlook_semantic_mcp_unique_rest_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+          /
+          sum(rate(outlook_semantic_mcp_unique_rest_api_request_duration_seconds_count[5m]))
+        ) > 0.01
+      for: 30s
+      labels:
+        severity: warning
+        alertGroup: outlook-semantic-mcp
 
 # -- Configuration for the deployed Outlook Semantic MCP Server, will be mapped to environment variables
 # Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
 mcpConfig:
-  # -- if disabled, server.extraEnvCM must be set to []
+  # -- if disabled, extraEnvCM must be set to []
   enabled: true
 
   # -- Application configuration
@@ -137,7 +295,7 @@ mcpConfig:
     # -- The URL of the MCP Server. Used for OAuth callbacks.
     # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
     # example: https://outlook.mcp.unique.app
-    selfUrl: unset_default_value
+    selfUrl: '{{ fail "mcpConfig.app.selfUrl is mandatory. Override in your deployment values." }}'
     # -- Debug mode for the MCP server. Set to "enabled" to expose:
     #    1. Debugging tools
     #    2. Extra debugging data in tool responses.
@@ -194,8 +352,6 @@ mcpConfig:
       ignoredContents: []
       ignoredSenders: []
     # -- Optional. Overlapping window (minutes) for standard live catch-up sync runs.
-    # Office 365 uses eventual consistency — messages can appear with a delayed updatedAt after
-    # the actual event. Re-querying an overlapping window avoids missing late-arriving messages.
     # Minimum: 2. Default: 3. Env var: INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES
     # liveCatchupOverlappingWindowMinutes: 3
     # -- Optional. Overlapping window (minutes) for live catch-up ready-recheck runs.
@@ -227,7 +383,7 @@ mcpConfig:
   microsoft:
     # -- The client ID of the Microsoft App Registration
     # example: 12345678-1234-1234-1234-123456789012
-    clientId: unset_default_value
+    clientId: '{{ fail "mcpConfig.microsoft.clientId is mandatory. Override in your deployment values." }}'
     # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions.
     # Optional - defaults to SELF_URL if not provided.
     # example: https://outlook.mcp.unique.app
@@ -235,8 +391,8 @@ mcpConfig:
     # -- Optional. Hour of day in UTC when scheduled subscription expirations should occur (0-23). To override:
     # subscriptionExpirationTimeHoursUTC: 3
     # Or set env var directly: MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC=3
-    # clientSecret is loaded from a secret, see server.envVars
-    # webhookSecret is loaded from a secret, see server.envVars
+    # clientSecret is loaded from a secret, see envVars
+    # webhookSecret is loaded from a secret, see envVars
 
   # -- Unique API configuration
   unique:
@@ -251,13 +407,13 @@ mcpConfig:
     # Note: external mode does NOT use serviceExtraHeaders.
     # It authenticates via Zitadel OAuth (see zitadel section below).
 
-    # -- Base URL for Unique ingestion service
-    # example: http://node-ingestion.finance-gpt:8091
-    ingestionServiceBaseUrl: unset_default_value
+    # -- Base URL for Unique ingestion service; auto-derived from internalServices.dependencies.ingestion
+    # override with an explicit URL when serviceAuthMode is external, e.g. https://api.unique.app/ingestion
+    ingestionServiceBaseUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.ingestion) }}'
 
-    # -- Base URL for Unique scope management
-    # example: http://node-scope-management.finance-gpt:8094
-    scopeManagementServiceBaseUrl: unset_default_value
+    # -- Base URL for Unique scope management; auto-derived from internalServices.dependencies.scopeManagement
+    # override with an explicit URL when serviceAuthMode is external, e.g. https://api.unique.app/scope-management
+    scopeManagementServiceBaseUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.scopeManagement) }}'
 
     # -- Optional. Whether to store emails internally in the Unique knowledge base. To override:
     # storeInternally: enabled
@@ -265,9 +421,9 @@ mcpConfig:
 
     # Zitadel config
     zitadel:
-        clientId: unset_default_value
-        oauthTokenUrl: unset_default_value
-        projectId: unset_default_value
+      clientId: '{{ fail "mcpConfig.unique.zitadel.clientId is mandatory when serviceAuthMode is external. Override in your deployment values." }}'
+      oauthTokenUrl: '{{ fail "mcpConfig.unique.zitadel.oauthTokenUrl is mandatory when serviceAuthMode is external. Override in your deployment values." }}'
+      projectId: '{{ fail "mcpConfig.unique.zitadel.projectId is mandatory when serviceAuthMode is external. Override in your deployment values." }}'
 
   # -- Authentication configuration for the MCP server
   # Optional. Access and refresh token expiration times. To override:
@@ -277,14 +433,33 @@ mcpConfig:
   # Or set env vars directly:
   #   AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS=60
   #   AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS=2592000
-  # hmacSecret is loaded from a secret, see server.envVars
+  # hmacSecret is loaded from a secret, see envVars
 
-  # Note: The following secrets must be provided via server.envVars:
-  # - DATABASE_URL: PostgreSQL connection string
-  # - AMQP (choose one):
-  #   - AMQP_URL: Full AMQP/RabbitMQ connection URL (contains credentials)
-  #   - AMQP_*: AMQP individual fields (username, password, host, port, vhost)
+  # Note: The following secrets must be provided via envVars:
   # - MICROSOFT_CLIENT_SECRET: Microsoft App Registration client secret
   # - MICROSOFT_WEBHOOK_SECRET: 128 character random string for webhook validation
   # - AUTH_HMAC_SECRET: Secret key for signing HMAC tokens
   # - ENCRYPTION_KEY: 32-byte (256-bit) secret for AES-256-GCM encryption (hex or base64)
+
+# ── NetworkPolicy ─────────────────────────────────────────────────────────────
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      namespace: system
+    egress:
+      microsoft:
+        toFQDNs:
+          - matchName: login.microsoftonline.com
+          - matchName: graph.microsoft.com
+          - matchPattern: "*.microsoft.com"
+          - matchName: outlook.office.com
+          - matchName: outlook.office365.com
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
