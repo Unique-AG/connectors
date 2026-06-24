@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "chart.fullname" . }}-tenant-config
+  name: {{ include "base.fullname" . }}-tenant-config
   labels:
-    {{- include "chart.labels" . | nindent 4 }}
+    {{- include "base.labels.common" . | nindent 4 }}
 data:
   {{- range $index, $tenant := .Values.connectorConfig.tenants }}
   {{ $tenant.name }}-tenant-config.yaml: |
@@ -12,13 +12,13 @@ data:
     confluence:
       instanceType: {{ $tenant.confluence.instanceType | quote }}
       {{- if eq $tenant.confluence.instanceType "cloud" }}
-      cloudId: {{ $tenant.confluence.cloudId | quote }}
+      cloudId: {{ tpl $tenant.confluence.cloudId $ | quote }}
       {{- end }}
-      baseUrl: {{ $tenant.confluence.baseUrl | quote }}
+      baseUrl: {{ tpl $tenant.confluence.baseUrl $ | quote }}
       auth:
         mode: {{ $tenant.confluence.auth.mode | quote }}
         {{- if eq $tenant.confluence.auth.mode "oauth_2lo" }}
-        clientId: {{ $tenant.confluence.auth.clientId | quote }}
+        clientId: {{ tpl $tenant.confluence.auth.clientId $ | quote }}
         clientSecret: {{ $tenant.confluence.auth.clientSecret | quote }}
         {{- end }}
         {{- if eq $tenant.confluence.auth.mode "pat" }}
@@ -37,17 +37,17 @@ data:
       {{- if eq $tenant.unique.authMode "cluster_local" }}
       serviceExtraHeaders:
         {{- range $key, $value := $tenant.unique.serviceExtraHeaders }}
-        {{ $key }}: {{ $value | quote }}
+        {{ $key }}: {{ tpl $value $ | quote }}
         {{- end }}
       {{- end }}
       {{- if eq $tenant.unique.authMode "external" }}
-      zitadelOauthTokenUrl: {{ $tenant.unique.zitadel.oauthTokenUrl | quote }}
-      zitadelProjectId: {{ $tenant.unique.zitadel.projectId | quote }}
-      zitadelClientId: {{ $tenant.unique.zitadel.clientId | quote }}
+      zitadelOauthTokenUrl: {{ tpl $tenant.unique.zitadel.oauthTokenUrl $ | quote }}
+      zitadelProjectId: {{ tpl $tenant.unique.zitadel.projectId $ | quote }}
+      zitadelClientId: {{ tpl $tenant.unique.zitadel.clientId $ | quote }}
       zitadelClientSecret: "os.environ/ZITADEL_CLIENT_SECRET"
       {{- end }}
-      ingestionServiceBaseUrl: {{ $tenant.unique.ingestionServiceBaseUrl | quote }}
-      scopeManagementServiceBaseUrl: {{ $tenant.unique.scopeManagementServiceBaseUrl | quote }}
+      ingestionServiceBaseUrl: {{ tpl ($tenant.unique.ingestionServiceBaseUrl | default (include "base.internalService.url" (dict "root" $ "dep" $.Values.internalServices.dependencies.ingestion))) $ | quote }}
+      scopeManagementServiceBaseUrl: {{ tpl ($tenant.unique.scopeManagementServiceBaseUrl | default (include "base.internalService.url" (dict "root" $ "dep" $.Values.internalServices.dependencies.scopeManagement))) $ | quote }}
       apiRateLimitPerMinute: {{ $tenant.unique.apiRateLimitPerMinute }}
       {{- if $tenant.unique.ingestionConfig }}
       ingestionConfig:
@@ -67,7 +67,7 @@ data:
     # Ingestion Configuration
     ingestion:
       ingestionMode: {{ $tenant.ingestion.ingestionMode | quote }}
-      scopeId: {{ $tenant.ingestion.scopeId | quote }}
+      scopeId: {{ tpl $tenant.ingestion.scopeId $ | quote }}
       storeInternally: {{ $tenant.ingestion.storeInternally | quote }}
       useV1KeyFormat: {{ $tenant.ingestion.useV1KeyFormat | quote }}
       {{- if $tenant.ingestion.attachments }}

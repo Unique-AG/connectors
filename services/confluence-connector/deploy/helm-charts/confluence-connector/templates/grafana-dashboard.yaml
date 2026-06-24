@@ -2,12 +2,12 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "chart.fullname" . }}-grafana-dashboard
+  name: {{ include "base.fullname" . }}-grafana-dashboard
   labels:
     grafana_dashboard: "1"
-    {{- include "chart.labels" . | nindent 4 }}
+    {{- include "base.labels.common" . | nindent 4 }}
   annotations:
     grafana_folder: {{ .Values.grafana.dashboard.folder | quote }}
 data:
-  {{ include "chart.fullname" . }}.json: {{ .Files.Get "files/grafana-dashboard.json" | quote }}
+  {{ include "base.fullname" . }}.json: {{ .Files.Get "files/grafana-dashboard.json" | quote }}
 {{- end }}

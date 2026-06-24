@@ -24,6 +24,7 @@ concurrency:
 permissions:
   contents: read
   actions: write # required for pnpm cache writes in _template-ci.yaml (reusable workflows cannot exceed caller permissions)
+  packages: read # required for validate-helm and helm-schema-check jobs in _template-ci.yaml to pull OCI chart dependencies from GHCR
 
 jobs:
   detect-changes:

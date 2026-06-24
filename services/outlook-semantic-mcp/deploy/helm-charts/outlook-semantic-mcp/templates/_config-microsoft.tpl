@@ -1,6 +1,6 @@
 {{- define "chart.config.microsoft" -}}
 {{- with .Values.mcpConfig.microsoft }}
-MICROSOFT_CLIENT_ID: {{ .clientId | quote }}
+MICROSOFT_CLIENT_ID: {{ tpl .clientId $ | quote }}
 {{- if .publicWebhookUrl }}
 MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .publicWebhookUrl | quote }}
 {{- end }}
