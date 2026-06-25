@@ -1,29 +1,29 @@
-import { createSmeared } from '@unique-ag/utils';
-import { Injectable, Logger } from '@nestjs/common';
-import { Span } from 'nestjs-otel';
-import { groupBy, unique } from 'remeda';
-import * as z from 'zod';
-import { UserProfile } from '~/db';
+import { createSmeared } from "@unique-ag/utils";
+import { Injectable, Logger } from "@nestjs/common";
+import { Span } from "nestjs-otel";
+import { groupBy, unique } from "remeda";
+import * as z from "zod";
+import { UserProfile } from "~/db";
 import {
   SearchBackend,
   SearchEmailResult,
-} from '~/features/content/search/semantic-search-emails.query';
-import { RemoveDelegatedAccessCommand } from '~/features/delegated-access/commands/remove-delegated-access.command';
-import { TranslateGraphIdsToImmutableIdsQuery } from '~/features/graph-utils/translate-graph-ids-to-immutable-ids.query';
-import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
-import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
-import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { NonNullishProps } from '~/utils/non-nullish-props';
-import { safeStringify } from '~/utils/safe-stringify';
-import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
-import { sleep } from '~/utils/sleep';
+} from "~/features/content/search/semantic-search-emails.query";
+import { RemoveDelegatedAccessCommand } from "~/features/delegated-access/commands/remove-delegated-access.command";
+import { TranslateGraphIdsToImmutableIdsQuery } from "~/features/graph-utils/translate-graph-ids-to-immutable-ids.query";
+import { GetUserProfileQuery } from "~/features/user-utils/get-user-profile.query";
+import { GraphClientFactory } from "~/msgraph/graph-client.factory";
+import { convertDateTimeToTimezone } from "~/utils/convert-datetime-to-timezone";
+import { UserProfileTypeID } from "~/utils/convert-user-profile-id-to-type-id";
+import { NonNullishProps } from "~/utils/non-nullish-props";
+import { safeStringify } from "~/utils/safe-stringify";
+import { sanitizeKqlQuery } from "~/utils/sanitize-kql-query";
+import { sleep } from "~/utils/sleep";
 import {
   BuildMsGraphKqlBatchRequestsQuery,
   GraphBatchRequest,
   QueryInput,
-} from './build-ms-graph-kql-batch-requests.query';
-import { MsGraphSearchConfig } from './search.config';
+} from "./build-ms-graph-kql-batch-requests.query";
+import { MsGraphSearchConfig } from "./search.config";
 
 const batchResponseSchema = z.object({
   responses: z.array(
@@ -85,13 +85,19 @@ export class MsGraphKqlSearchEmailsQuery {
     queries: Array<QueryInput>,
     searchConfig: MsGraphSearchConfig,
     outputTimeZone?: string,
-  ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
+  ): Promise<{
+    results: SearchEmailResult[];
+    searchSummary: string | undefined;
+  }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const {
       requests: allRequests,
       skippedFolders,
       queriedMailboxesWithoutFullAccess,
-    } = await this.buildMsGraphKqlBatchRequestsQuery.run(userProfileId, queries);
+    } = await this.buildMsGraphKqlBatchRequestsQuery.run(
+      userProfileId,
+      queries,
+    );
 
     if (!allRequests.length) {
       return {
@@ -101,16 +107,26 @@ export class MsGraphKqlSearchEmailsQuery {
           skippedFolders,
           throttledMailboxes: new Set(),
           lostAccessMailboxes: new Set(),
-          additionalMessages: [`Your queries do not match any inbox which you can access`],
+          additionalMessages: [
+            `Your queries do not match any inbox which you can access`,
+          ],
         }),
       };
     }
 
-    const round1 = await this.executeBatchRound(allRequests, userProfile, outputTimeZone);
+    const round1 = await this.executeBatchRound(
+      allRequests,
+      userProfile,
+      outputTimeZone,
+    );
     if (round1.retryRequests.length > 0) {
       await sleep(round1.retryAfterMs);
     }
-    const round2 = await this.executeBatchRound(round1.retryRequests, userProfile, outputTimeZone);
+    const round2 = await this.executeBatchRound(
+      round1.retryRequests,
+      userProfile,
+      outputTimeZone,
+    );
     const hits = [...round1.hits, ...round2.hits];
 
     const throttledMailboxes = round2.throttledMailboxes;
@@ -120,18 +136,21 @@ export class MsGraphKqlSearchEmailsQuery {
       ...round2.lostAccessMailboxes,
     ]);
 
-    const filteredHits = hits.filter((item) => !lostAccessMailboxes.has(item.mailbox));
+    const filteredHits = hits.filter(
+      (item) => !lostAccessMailboxes.has(item.mailbox),
+    );
 
     const hitsByMailbox = groupBy(filteredHits, (item) => item.mailbox);
 
     const idsTranslationMaps = new Map<string, Map<string, string>>(
       await Promise.all(
         Object.entries(hitsByMailbox).map(async ([mailbox, mailboxHits]) => {
-          const translationMap = await this.translateGraphIdsToImmutableIdsQuery.run({
-            userProfileId: userProfile.id,
-            ids: mailboxHits.map(({ restId }) => restId),
-            ownerEmail: mailbox === userProfile.email ? undefined : mailbox,
-          });
+          const translationMap =
+            await this.translateGraphIdsToImmutableIdsQuery.run({
+              userProfileId: userProfile.id,
+              ids: mailboxHits.map(({ restId }) => restId),
+              ownerEmail: mailbox === userProfile.email ? undefined : mailbox,
+            });
           return [mailbox, translationMap] as const;
         }),
       ),
@@ -151,7 +170,7 @@ export class MsGraphKqlSearchEmailsQuery {
         title: hit.subject,
         from: hit.from,
         sourceMailbox: hit.mailbox,
-        outlookWebLink: hit.isDelegated ? '' : hit.webLink,
+        outlookWebLink: hit.webLink,
         receivedDateTime: hit.receivedDateTime,
         text: hit.text,
         uniqueContentUrl: undefined,
@@ -183,7 +202,7 @@ export class MsGraphKqlSearchEmailsQuery {
 
   private async executeBatchRound(
     requests: GraphBatchRequest[],
-    userProfile: NonNullishProps<UserProfile, 'email'>,
+    userProfile: NonNullishProps<UserProfile, "email">,
     outputTimeZone: string | undefined,
   ): Promise<{
     hits: Hit[];
@@ -210,7 +229,7 @@ export class MsGraphKqlSearchEmailsQuery {
           : `/users/${request.mailbox}/messages`;
         return {
           id: request.requestId,
-          method: 'GET',
+          method: "GET",
           url: `${base}?$search=${encodeURIComponent(search)}&$select=subject,from,receivedDateTime,parentFolderId,webLink,uniqueBody,body,bodyPreview&$top=${request.limit}`,
           headers: { Prefer: 'outlook.body-content-type="text"' },
         };
@@ -218,7 +237,9 @@ export class MsGraphKqlSearchEmailsQuery {
 
       let batchResponse: z.infer<typeof batchResponseSchema>;
       try {
-        const raw = await client.api('$batch').post({ requests: batchApiInput });
+        const raw = await client
+          .api("$batch")
+          .post({ requests: batchApiInput });
         batchResponse = batchResponseSchema.parse(raw);
       } catch {
         retryRequests.push(...batch);
@@ -226,7 +247,9 @@ export class MsGraphKqlSearchEmailsQuery {
       }
 
       for (const subResponse of batchResponse.responses) {
-        const originalRequest = batch.find((item) => subResponse.id === item.requestId);
+        const originalRequest = batch.find(
+          (item) => subResponse.id === item.requestId,
+        );
         if (!originalRequest) {
           continue;
         }
@@ -237,7 +260,8 @@ export class MsGraphKqlSearchEmailsQuery {
           retryRequests.push(originalRequest);
           throttledMailboxes.add(originalRequest.mailbox);
           const retryAfterHeader =
-            subResponse.headers?.['Retry-After'] ?? subResponse.headers?.['retry-after'];
+            subResponse.headers?.["Retry-After"] ??
+            subResponse.headers?.["retry-after"];
           if (retryAfterHeader) {
             const seconds = parseInt(retryAfterHeader, 10);
             if (!Number.isNaN(seconds)) {
@@ -256,7 +280,9 @@ export class MsGraphKqlSearchEmailsQuery {
           });
 
           lostAccessMailboxes.add(originalRequest.mailbox);
-          queue = queue.filter((item) => item.mailbox !== originalRequest.mailbox);
+          queue = queue.filter(
+            (item) => item.mailbox !== originalRequest.mailbox,
+          );
           continue;
         }
 
@@ -269,7 +295,7 @@ export class MsGraphKqlSearchEmailsQuery {
         if (status < 200 || status >= 300) {
           this.logger.error({
             ...details,
-            msg: 'MS Graph batch sub-request failed',
+            msg: "MS Graph batch sub-request failed",
             status,
           });
           continue;
@@ -279,7 +305,7 @@ export class MsGraphKqlSearchEmailsQuery {
         if (!parsed.success) {
           this.logger.error({
             ...details,
-            msg: 'MS Graph message response failed schema validation',
+            msg: "MS Graph message response failed schema validation",
             error: parsed.error,
           });
           continue;
@@ -290,13 +316,18 @@ export class MsGraphKqlSearchEmailsQuery {
             restId: msg.id,
             mailbox: originalRequest.mailbox,
             isDelegated: originalRequest.isDelegated,
-            subject: msg.subject ?? '',
-            from: msg.from?.emailAddress.address ?? '',
+            subject: msg.subject ?? "",
+            from: msg.from?.emailAddress.address ?? "",
             receivedDateTime:
-              convertDateTimeToTimezone(msg.receivedDateTime, outputTimeZone) ?? null,
-            parentFolderId: msg.parentFolderId ?? '',
-            webLink: msg.webLink ?? '',
-            text: msg.uniqueBody?.content || msg.body?.content || msg.bodyPreview || '',
+              convertDateTimeToTimezone(msg.receivedDateTime, outputTimeZone) ??
+              null,
+            parentFolderId: msg.parentFolderId ?? "",
+            webLink: msg.webLink ?? "",
+            text:
+              msg.uniqueBody?.content ||
+              msg.body?.content ||
+              msg.bodyPreview ||
+              "",
           });
         }
       }
@@ -316,7 +347,9 @@ export class MsGraphKqlSearchEmailsQuery {
     searchConfig: MsGraphSearchConfig,
   ): Hit[] {
     const allResults: Hit[] = [];
-    const indicesMap = new Map(Object.keys(hitsByMailbox).map((mailbox) => [mailbox, 0]));
+    const indicesMap = new Map(
+      Object.keys(hitsByMailbox).map((mailbox) => [mailbox, 0]),
+    );
     let hasMoreItems = true;
 
     while (hasMoreItems) {
@@ -368,17 +401,17 @@ export class MsGraphKqlSearchEmailsQuery {
     let summaryParts: string[] = [];
     if (throttledMailboxes.size > 0) {
       summaryParts.push(
-        `Results from the following mailboxes ${Array.from(throttledMailboxes).sort().join(', ')} may be incomplete, search was throttled.`,
+        `Results from the following mailboxes ${Array.from(throttledMailboxes).sort().join(", ")} may be incomplete, search was throttled.`,
       );
     }
     if (lostAccessMailboxes.size > 0) {
       summaryParts.push(
-        `Access to the following mailboxes was revoked: ${Array.from(lostAccessMailboxes).sort().join(', ')}.`,
+        `Access to the following mailboxes was revoked: ${Array.from(lostAccessMailboxes).sort().join(", ")}.`,
       );
     }
     if (queriedMailboxesWithoutFullAccess.length > 0) {
       summaryParts.push(
-        `Could not search in the following mailboxes: ${unique(queriedMailboxesWithoutFullAccess).sort().join(', ')}. Microsoft does not offer an api to search in shared folders from this mailbox.`,
+        `Could not search in the following mailboxes: ${unique(queriedMailboxesWithoutFullAccess).sort().join(", ")}. Microsoft does not offer an api to search in shared folders from this mailbox.`,
       );
     }
 
@@ -394,11 +427,11 @@ export class MsGraphKqlSearchEmailsQuery {
     );
     for (const [mailbox, folders] of Object.entries(byMailbox)) {
       summaryParts.push(
-        `The following folders '${folders.sort().join(', ')}' in mailbox ${mailbox} were excluded because they were not recognized.`,
+        `The following folders '${folders.sort().join(", ")}' in mailbox ${mailbox} were excluded because they were not recognized.`,
       );
     }
     summaryParts = [...summaryParts, ...(additionalMessages ?? [])];
 
-    return summaryParts.length > 0 ? summaryParts.join('\n') : undefined;
+    return summaryParts.length > 0 ? summaryParts.join("\n") : undefined;
   }
 }
