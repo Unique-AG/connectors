@@ -199,6 +199,10 @@
             "publicWebhookUrl": {
               "type": "string",
               "description": "The public webhook URL reachable from external network for Microsoft Graph subscriptions. Optional - defaults to SELF_URL if not provided. Example: https://teams.mcp.unique.app/webhooks"
+            },
+            "autoStartIngestion": {
+              "type": "boolean",
+              "description": "When enabled, automatically enqueue a transcript subscription for every user at login (skips the start_kb_integration tool)."
             }
           },
           "required": ["clientId"]

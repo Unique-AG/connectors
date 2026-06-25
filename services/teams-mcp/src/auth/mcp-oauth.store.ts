@@ -10,11 +10,13 @@ import {
   PassportUser,
   RefreshTokenMetadata,
 } from '@unique-ag/mcp-oauth';
+import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { eq, lt } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { typeid } from 'typeid-js';
+import { MAIN_EXCHANGE } from '../amqp/amqp.constants';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import {
   authorizationCodes,
@@ -32,6 +34,7 @@ import {
   toDrizzleSessionInsert,
 } from '../utils/case-converter';
 import { normalizeError } from '../utils/normalize-error';
+import { UserAuthorizedEventDto } from './dtos/user-authorized-event.dto';
 
 export class McpOAuthStore implements IOAuthStore {
   private readonly logger = new Logger(this.constructor.name);
@@ -44,6 +47,7 @@ export class McpOAuthStore implements IOAuthStore {
     private readonly drizzle: DrizzleDatabase,
     private readonly encryptionService: IEncryptionService,
     private readonly cacheManager: Cache,
+    private readonly amqpConnection: AmqpConnection,
   ) {}
 
   public async storeClient(client: OAuthClient): Promise<OAuthClient> {
@@ -178,7 +182,24 @@ export class McpOAuthStore implements IOAuthStore {
       throw new Error('Failed to upsert user profile');
     }
 
-    return saved.id;
+    const userProfileId = saved.id;
+    const event = UserAuthorizedEventDto.parse({
+      type: 'unique.teams-mcp.auth.user-authorized',
+      payload: { userProfileId },
+    });
+    // We do not await the publish because we do not want to break the authorization flow in any possible way.
+    this.amqpConnection
+      .publish(MAIN_EXCHANGE.name, event.type, event)
+      .then()
+      .catch((error) => {
+        this.logger.error({
+          message: 'Failed to publish user authorized event',
+          userProfileId,
+          error: serializeError(normalizeError(error)),
+        });
+      });
+
+    return userProfileId;
   }
 
   public async getUserProfileById(

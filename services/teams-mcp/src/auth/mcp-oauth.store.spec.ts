@@ -7,11 +7,13 @@ describe('McpOAuthStore', () => {
   let mockDrizzle: MockDrizzleDatabase;
   let mockEncryption: MockEncryptionService;
   let mockCache: MockCacheManager;
+  let mockAmqp: { publish: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     mockDrizzle = new MockDrizzleDatabase();
     mockEncryption = new MockEncryptionService();
     mockCache = new MockCacheManager();
+    mockAmqp = { publish: vi.fn().mockResolvedValue(true) };
     vi.clearAllMocks();
   });
 
@@ -43,7 +45,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextInsertReturningRows = [savedClient];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.storeClient(mockClient);
 
@@ -66,7 +73,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextSelectRows = [drizzleClient];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.getClient('test-client-id');
 
@@ -77,7 +89,12 @@ describe('McpOAuthStore', () => {
     it('returns undefined when client not found', async () => {
       mockDrizzle.__nextSelectRows = [];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.getClient('non-existent');
 
@@ -99,7 +116,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextSelectRows = [drizzleClient];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.findClient('Test Client');
 
@@ -108,7 +130,12 @@ describe('McpOAuthStore', () => {
     });
 
     it('generates client ID with normalized name', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = unit.generateClientId({
         client_name: 'Test Client App!',
@@ -131,7 +158,12 @@ describe('McpOAuthStore', () => {
     };
 
     it('stores authorization code', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       await unit.storeAuthCode(mockAuthCode);
 
@@ -154,7 +186,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextSelectRows = [drizzleAuthCode];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.getAuthCode('test-auth-code');
 
@@ -183,7 +220,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextSelectRows = [expiredAuthCode];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.getAuthCode('expired-code');
 
@@ -192,7 +234,12 @@ describe('McpOAuthStore', () => {
     });
 
     it('removes authorization code', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       await unit.removeAuthCode('test-code');
 
@@ -218,12 +265,52 @@ describe('McpOAuthStore', () => {
       const userProfileId = 'user_profile_01kcrvsne6fq9att23mp4z5ef2';
       mockDrizzle.__nextInsertReturningRows = [{ id: userProfileId }];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.upsertUserProfile(mockUser);
 
       expect(result).toBe(userProfileId);
       expect(mockDrizzle.insert).toHaveBeenCalled();
+    });
+
+    it('publishes a user-authorized event after upserting the profile', async () => {
+      const userProfileId = 'user_profile_01kcrvsne6fq9att23mp4z5ef2';
+      mockDrizzle.__nextInsertReturningRows = [{ id: userProfileId }];
+
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
+
+      await unit.upsertUserProfile(mockUser);
+
+      expect(mockAmqp.publish).toHaveBeenCalledWith(
+        'unique.teams-mcp.main',
+        'unique.teams-mcp.auth.user-authorized',
+        { type: 'unique.teams-mcp.auth.user-authorized', payload: { userProfileId } },
+      );
+    });
+
+    it('still resolves the profile id when publishing the event rejects', async () => {
+      const userProfileId = 'user_profile_01kcrvsne6fq9att23mp4z5ef2';
+      mockDrizzle.__nextInsertReturningRows = [{ id: userProfileId }];
+      mockAmqp.publish.mockRejectedValue(new Error('broker down'));
+
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
+
+      await expect(unit.upsertUserProfile(mockUser)).resolves.toBe(userProfileId);
     });
 
     it('gets user profile by ID', async () => {
@@ -244,7 +331,12 @@ describe('McpOAuthStore', () => {
 
       mockDrizzle.__nextSelectRows = [mockProfile];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.getUserProfileById('profile-123');
 
@@ -281,7 +373,12 @@ describe('McpOAuthStore', () => {
         },
       ];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       await unit.storeAccessToken('test-token', mockAccessTokenMetadata);
 
@@ -297,7 +394,12 @@ describe('McpOAuthStore', () => {
     it('gets access token from cache first', async () => {
       mockCache.get.mockResolvedValue(mockAccessTokenMetadata);
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.getAccessToken('test-token');
 
@@ -320,7 +422,12 @@ describe('McpOAuthStore', () => {
         },
       ];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.getAccessToken('test-token');
 
@@ -339,7 +446,12 @@ describe('McpOAuthStore', () => {
     });
 
     it('removes access token and clears cache', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       await unit.removeAccessToken('test-token');
 
@@ -350,7 +462,12 @@ describe('McpOAuthStore', () => {
 
   describe('Refresh Token Family management', () => {
     it('revokes token family', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       await unit.revokeTokenFamily('family-123');
 
@@ -358,7 +475,12 @@ describe('McpOAuthStore', () => {
     });
 
     it('marks refresh token as used', async () => {
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       await unit.markRefreshTokenAsUsed('refresh-token');
 
@@ -368,7 +490,12 @@ describe('McpOAuthStore', () => {
     it('checks if refresh token is used', async () => {
       mockDrizzle.__nextSelectRows = [{ usedAt: new Date() }];
 
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.isRefreshTokenUsed('refresh-token');
 
@@ -380,7 +507,12 @@ describe('McpOAuthStore', () => {
   describe('Token cleanup', () => {
     it('cleans up expired tokens', async () => {
       mockDrizzle.__nextDeleteReturningRows = [{ id: 't1' }, { id: 't2' }];
-      const unit = new McpOAuthStore(mockDrizzle as any, mockEncryption, mockCache as any);
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+      );
 
       const result = await unit.cleanupExpiredTokens(30);
 

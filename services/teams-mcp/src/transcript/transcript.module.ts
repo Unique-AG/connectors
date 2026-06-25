@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DrizzleModule } from '~/drizzle/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueModule } from '~/unique/unique.module';
+import { PostAuthorizationListener } from './post-authorization.listener';
 import { SubscriptionCreateService } from './subscription-create.service';
 import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscription-remove.service';
@@ -27,6 +28,8 @@ import { TranscriptUtilsService } from './transcript-utils.service';
     SubscriptionReauthorizeService,
     SubscriptionRemoveService,
     TranscriptCreatedService,
+    // Auto-start ingestion at login (gated by MICROSOFT_AUTO_START_INGESTION)
+    PostAuthorizationListener,
     // KB Integration MCP Tools
     VerifyKbIntegrationStatusTool,
     StartKbIntegrationTool,

@@ -34,6 +34,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | `SELF_URL` | Webhook URL if different from SELF_URL |
+| `MICROSOFT_AUTO_START_INGESTION` | `mcpConfig.microsoft.autoStartIngestion` | `false` | When enabled, auto-enqueue a transcript subscription for every user at login (skips the `start_kb_integration` tool) |
 
 ### Unique API Configuration
 
