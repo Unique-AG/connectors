@@ -444,7 +444,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       expect(results[0]?.outlookWebLink).toBe('https://outlook.com/msg/own-1');
     });
 
-    it('sets outlookWebLink to empty string for delegated-mailbox results', async () => {
+    it('includes webLink for delegated-mailbox results (Graph $search always returns classic OWA format)', async () => {
       const mockPost = makeSuccessPost({ [DELEGATED_EMAIL]: [makeMessage('del-1')] });
       const { instance } = createQuery({
         mockBuildResult: {
@@ -462,7 +462,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         SEARCH_CONFIG,
       );
 
-      expect(results[0]?.outlookWebLink).toBe('');
+      expect(results[0]?.outlookWebLink).toBe('https://outlook.com/msg/del-1');
     });
   });
 

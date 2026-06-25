@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { TranslateImmutableIdsToRestIdsQuery } from './translate-immutable-ids-to-rest-ids.query';
 
 export interface WebLinkInput {
@@ -57,6 +57,8 @@ export function webLinkMapKey(mailbox: string, id: string): string {
 
 @Injectable()
 export class BuildWebLinksCommand {
+  private readonly logger = new Logger(this.constructor.name);
+
   public constructor(
     private readonly translateImmutableIdsToRestIdsQuery: TranslateImmutableIdsToRestIdsQuery,
   ) {}
@@ -98,8 +100,13 @@ export class BuildWebLinksCommand {
           : new Map<string, string>();
 
       for (const item of immutableItems) {
-        const restId = immutableToRest.get(item.id) ?? item.id;
-        result.set(webLinkMapKey(item.mailbox, item.id), this.buildOwaUrl(restId));
+        const restId = immutableToRest.get(item.id);
+        if (!restId) {
+          this.logger.warn({ msg: 'ID translation missing — omitting web link', id: item.id });
+          result.set(webLinkMapKey(item.mailbox, item.id), '');
+        } else {
+          result.set(webLinkMapKey(item.mailbox, item.id), this.buildOwaUrl(restId));
+        }
       }
 
       for (const item of restItems) {
