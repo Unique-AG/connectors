@@ -188,9 +188,11 @@ export class McpOAuthStore implements IOAuthStore {
       payload: { userProfileId },
     });
     // We do not await the publish because we do not want to break the authorization flow in any possible way.
-    this.amqpConnection
-      .publish(MAIN_EXCHANGE.name, event.type, event)
-      .then()
+    // `publish` runs synchronously and can throw (e.g. the managed channel isn't ready yet under
+    // `connectionInitOptions.wait: false`), so we defer it into a microtask to turn any synchronous
+    // throw into a rejection the `.catch` can handle — keeping the auth flow intact regardless.
+    Promise.resolve()
+      .then(() => this.amqpConnection.publish(MAIN_EXCHANGE.name, event.type, event))
       .catch((error) => {
         this.logger.error({
           message: 'Failed to publish user authorized event',

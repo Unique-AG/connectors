@@ -1,16 +1,12 @@
-import { fromString, parseTypeId, typeid } from 'typeid-js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MicrosoftConfig } from '~/config';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { PostAuthorizationListener } from './post-authorization.listener';
 import type { SubscriptionCreateService } from './subscription-create.service';
 
 const userProfileId = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 
-const expectedTypeId = () => {
-  const tid = fromString(userProfileId, 'user_profile');
-  const pid = parseTypeId(tid);
-  return typeid(pid.prefix, pid.suffix);
-};
+const expectedTypeId = () => convertUserProfileIdToTypeId(userProfileId);
 
 const makeListener = (
   autoStartIngestion: boolean,

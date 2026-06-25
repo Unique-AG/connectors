@@ -2,8 +2,8 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
-import { fromString, parseTypeId, typeid } from 'typeid-js';
 import * as z from 'zod';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
 const StartKbIntegrationInputSchema = z.object({});
@@ -66,11 +66,9 @@ export class StartKbIntegrationTool {
 
     this.logger.log({ userProfileId }, 'Starting knowledge base integration for user');
 
-    const tid = fromString(userProfileId, 'user_profile');
-    const pid = parseTypeId(tid);
-    const userProfileTypeid = typeid(pid.prefix, pid.suffix);
-
-    const result = await this.subscriptionCreate.subscribe(userProfileTypeid);
+    const result = await this.subscriptionCreate.subscribe(
+      convertUserProfileIdToTypeId(userProfileId),
+    );
     const { status, subscription } = result;
 
     const expiresAt = new Date(subscription.expiresAt);
