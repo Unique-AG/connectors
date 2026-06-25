@@ -187,6 +187,18 @@ sequenceDiagram
 - Returned in every webhook payload
 - Requests with invalid `clientState` are rejected
 
+## Write Surface (Send Tools)
+
+The `send_chat_message` and `send_channel_message` tools are **write operations** — they post messages to Teams chats and channels as the signed-in user. This is the first write capability in the Teams MCP Server and is worth stating explicitly.
+
+These tools operate under the same delegated-OAuth and token-isolation model as all read operations: Microsoft tokens are stored encrypted on the server and never sent to the client, and the agent can only post to chats and channels that the signed-in user can access. The `ChannelMessage.Send` and `ChatMessage.Send` permissions cover sending only; they do not grant read access to message content.
+
+## Channel Message Admin Consent
+
+Reading channel message content (`get_channel_messages`, `search_messages` with `detail=full`) requires the `ChannelMessage.Read.All` permission, which **requires admin consent** because channel messages may contain sensitive organisational content. Without admin consent for this permission, the send and list tools remain fully functional.
+
+See [Permissions](./permissions.md) for the full consent breakdown and the distinction between user-consentable and admin-consent-required scopes.
+
 ## Secret Management
 
 ### Required Secrets

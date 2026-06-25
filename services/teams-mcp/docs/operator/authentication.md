@@ -14,7 +14,7 @@ For technical details about the OAuth flow, see [Microsoft OAuth Setup Flow](../
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. Two permissions require admin consent before users can connect.
+All permissions are **delegated** — they act on behalf of the signed-in user. Three permissions require admin consent before users can connect.
 
 | Permission | Type | Admin Consent |
 |------------|------|---------------|
@@ -24,6 +24,13 @@ All permissions are **delegated** — they act on behalf of the signed-in user. 
 | `OnlineMeetingRecording.Read.All` | Delegated | **Yes** |
 | `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** |
 | `offline_access` | Delegated | No |
+| `ChannelMessage.Send` | Delegated | No |
+| `ChatMessage.Send` | Delegated | No |
+| `Chat.ReadBasic` | Delegated | No |
+| `Chat.Read` | Delegated | No |
+| `Team.ReadBasic.All` | Delegated | No |
+| `Channel.ReadBasic.All` | Delegated | No |
+| `ChannelMessage.Read.All` | Delegated | **Yes** |
 
 For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
 
@@ -35,7 +42,7 @@ For full justifications, see [Microsoft Graph Permissions](../technical/permissi
 https://login.microsoftonline.com/organizations/adminconsent?client_id=8ddffb12-1579-4fa8-8844-ca122e4308bc
 ```
 
-The consent prompt lists the [Required Permissions](#required-permissions) above. Note that `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` require admin consent — the URL above handles that in one step. Without it, users will see an error when trying to connect.
+The consent prompt lists the [Required Permissions](#required-permissions) above. Note that `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ChannelMessage.Read.All` require admin consent — the URL above handles all three in one step. Without it, users will see an error when trying to connect.
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `8ddffb12-1579-4fa8-8844-ca122e4308bc`.
 
@@ -82,7 +89,7 @@ module "teams_mcp_app" {
    - Add all permissions listed under [Required Permissions](#required-permissions)
 
 3. Click **Grant admin consent for [Tenant]** and confirm.
-   `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` require this step — without it users cannot connect.
+   `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ChannelMessage.Read.All` require this step — without it users cannot connect.
 
 4. Go to **Certificates & secrets** → **New client secret**:
    - Set description and expiration
@@ -168,9 +175,9 @@ This secret is passed to Microsoft when creating Graph subscriptions and returne
 
 **This is standard Microsoft behavior, not Teams MCP specific.** All Microsoft 365 apps use the same consent model.
 
-Because `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` require admin consent, the consent sequence is:
+Because three permissions require admin consent (`OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ChannelMessage.Read.All`), the consent sequence is:
 
-1. **Admin grants consent** for the two admin-required permissions (organisation-wide or per-user)
+1. **Admin grants consent** for those three permissions (organisation-wide or per-user). The remaining 10 permissions — including all other chat scopes (`ChannelMessage.Send`, `ChatMessage.Send`, `Chat.ReadBasic`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`) — are user-consentable and do not require admin action.
 2. **User consent** — on first connection, the user sees the Microsoft consent screen and approves the remaining permissions
 
 **How to grant admin consent:**
