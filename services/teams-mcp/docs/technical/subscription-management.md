@@ -90,5 +90,3 @@ Microsoft Graph sends lifecycle notifications when a subscription's state change
 - [Flows](./flows.md) - Subscription lifecycle and transcript-processing sequence diagrams
 - [Permissions](./permissions.md) - The `OnlineMeetingTranscript.Read.All` / `OnlineMeetingRecording.Read.All` admin-consent scopes the subscription depends on
 - [Configuration](../operator/configuration.md) - `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` and webhook settings
-</content>
-</invoke>

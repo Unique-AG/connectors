@@ -504,5 +504,3 @@ Stop automatic ingestion of meeting transcripts. Removes the Microsoft Graph web
 - [Subscription Management](./subscription-management.md) - Lifecycle behind `start_kb_integration` / `stop_kb_integration` / `verify_kb_integration_status`
 - [Permissions](./permissions.md) - Microsoft Graph permissions required by these tools
 - [Security](./security.md) - Token isolation, delegated access, and the message-send write surface
-</content>
-</invoke>
