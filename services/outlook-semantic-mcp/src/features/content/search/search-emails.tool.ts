@@ -60,7 +60,7 @@ const SearchEmailResultSchema = z.object({
   outlookWebLink: z
     .string()
     .describe(
-      'Direct URL to open this email in Outlook on the web. When non-empty, use it as the link target. When empty (delegated mailbox results), do NOT construct a URL — show the subject as plain text instead.',
+      'Direct URL to open this email in Outlook on the web. When non-empty, use it as the link target. When empty, show the subject as plain text.',
     ),
   sourceMailbox: z
     .string()

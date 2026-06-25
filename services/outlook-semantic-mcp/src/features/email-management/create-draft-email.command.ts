@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { z } from 'zod';
+import {
+  BuildWebLinksCommand,
+  webLinkMapKey,
+} from '~/features/graph-utils/build-web-links.command';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
@@ -8,7 +13,10 @@ import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-em
 import { AttachmentFailure } from './email-attachments/utils';
 import { markdownToHtml } from './markdown-to-html';
 
-const CreateMessageResponseSchema = z.object({ id: z.string(), webLink: z.string().optional() });
+const CreateMessageResponseSchema = z.object({
+  id: z.string(),
+  webLink: z.string().optional(),
+});
 
 interface CreateDraftEmailInput {
   content: string;
@@ -46,6 +54,8 @@ export class CreateDraftEmailCommand {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly addAttachmentsToDraftEmailCommand: AddAttachmentsToDraftEmailCommand,
+    private readonly buildWebLinksCommand: BuildWebLinksCommand,
+    private readonly getUserProfileQuery: GetUserProfileQuery,
   ) {}
 
   @Span()
@@ -87,6 +97,7 @@ export class CreateDraftEmailCommand {
     input: CreateDraftEmailInput,
   ): Promise<CreateDraftEmailResult> {
     const userProfileIdString = userProfileId.toString();
+    const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const recipientsData = input.recipientsData;
     const prefix = input.mailbox ? `/users/${input.mailbox}` : '/me';
 
@@ -111,11 +122,17 @@ export class CreateDraftEmailCommand {
               },
               subject: recipientsData.subject,
               toRecipients: recipientsData.toRecipients.map((item) => ({
-                emailAddress: { address: item.email, ...(item.name && { name: item.name }) },
+                emailAddress: {
+                  address: item.email,
+                  ...(item.name && { name: item.name }),
+                },
               })),
               ccRecipients:
                 recipientsData.ccRecipients?.map((item) => ({
-                  emailAddress: { address: item.email, ...(item.name && { name: item.name }) },
+                  emailAddress: {
+                    address: item.email,
+                    ...(item.name && { name: item.name }),
+                  },
                 })) ?? [],
             },
             successMessage: 'Draft email created successfully.',
@@ -130,10 +147,19 @@ export class CreateDraftEmailCommand {
 
       const message = CreateMessageResponseSchema.parse(await graphRequest.post(apiParams.body));
 
+      const webLink = await this.buildWebLink({
+        userProfileId: userProfileIdString,
+        userProfileEmail: userProfile.email,
+        messageId: message.id,
+        graphWebLink: message.webLink,
+        idIsImmutable: apiParams.idIsImmutable,
+        mailbox: input.mailbox,
+      });
+
       return {
         success: true,
         draftId: message.id,
-        ...(message.webLink && { webLink: message.webLink }),
+        ...(webLink && { webLink }),
         message: apiParams.successMessage,
       };
     } catch (err) {
@@ -147,5 +173,38 @@ export class CreateDraftEmailCommand {
         message: 'Failed to create draft email via Microsoft Graph',
       };
     }
+  }
+
+  // See BuildWebLinksCommand for a full explanation of why we cannot use the Graph webLink
+  // directly for delegated mailboxes (cloud.microsoft format, broken OWA ItemID).
+  private async buildWebLink({
+    userProfileId,
+    userProfileEmail,
+    messageId,
+    graphWebLink,
+    idIsImmutable,
+    mailbox,
+  }: {
+    userProfileId: string;
+    userProfileEmail: string;
+    messageId: string;
+    graphWebLink: string | undefined;
+    idIsImmutable: boolean;
+    mailbox: string | null | undefined;
+  }): Promise<string | undefined> {
+    const messageMailbox = mailbox ?? userProfileEmail;
+    const webLinksMap = await this.buildWebLinksCommand.run({
+      userProfileId,
+      userProfileEmail,
+      ids: [
+        {
+          id: messageId,
+          isImmutable: idIsImmutable,
+          mailbox: messageMailbox,
+          webLink: graphWebLink ?? '',
+        },
+      ],
+    });
+    return webLinksMap.get(webLinkMapKey(messageMailbox, messageId));
   }
 }

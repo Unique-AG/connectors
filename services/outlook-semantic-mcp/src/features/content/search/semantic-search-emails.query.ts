@@ -11,6 +11,10 @@ import { filter, isNonNullish, isNullish, map, pick, pipe, sortBy } from 'remeda
 import * as z from 'zod';
 import { UserProfile } from '~/db';
 import { GetDelegatedAccessQuery } from '~/features/delegated-access/queries/get-delegates-access.query';
+import {
+  BuildWebLinksCommand,
+  webLinkMapKey,
+} from '~/features/graph-utils/build-web-links.command';
 import { MessageMetadata } from '~/features/process-email/utils/get-metadata-from-message';
 import { traceError } from '~/features/tracing.utils';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
@@ -99,6 +103,7 @@ export class SemanticSearchEmailsQuery {
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
     private readonly getUserProfileQuery: GetUserProfileQuery,
     private readonly cleanupSearchConditionsForUserQuery: CleanupSearchConditionsForUserQuery,
+    private readonly buildWebLinksCommand: BuildWebLinksCommand,
   ) {}
 
   @Span()
@@ -172,7 +177,7 @@ export class SemanticSearchEmailsQuery {
       });
     }
 
-    const results = pipe(
+    const rawResults = pipe(
       Array.from(accumulated.values()),
       sortBy((item) => item.index),
       map((item): SearchEmailResult => {
@@ -191,10 +196,7 @@ export class SemanticSearchEmailsQuery {
           title: item.content.title ?? '',
           uniqueContentId: item.content.id,
           uniqueContentUrl: item.content.url ?? undefined,
-          // OWA deep links require full mailbox access. Folder-level delegates receive an
-          // AccessDeniedException when following them. Since we cannot distinguish full from
-          // folder-level access at query time, we suppress the link for all delegated mailboxes.
-          outlookWebLink: userProfile.email === sourceMailbox ? (metadata?.webLink ?? '') : '',
+          outlookWebLink: metadata?.webLink ?? '',
           sourceMailbox,
           msGraphMessageId,
           folderId: metadata?.parentFolderId ?? '',
@@ -216,6 +218,41 @@ export class SemanticSearchEmailsQuery {
         };
       }),
     );
+
+    // Semantic-backend IDs are always immutable. For delegated mailboxes the stored webLink may
+    // use the new outlook.cloud.microsoft format (broken for some tenants) — translate the
+    // immutable ID to a RestId and construct a working OWA URL.
+    const buildWebLinksForIds = rawResults.flatMap((message) => {
+      if (!message.msGraphMessageId || !message.sourceMailbox) {
+        return [];
+      }
+
+      return [
+        {
+          id: message.msGraphMessageId,
+          isImmutable: true,
+          mailbox: message.sourceMailbox,
+          webLink: message.outlookWebLink,
+        },
+      ];
+    });
+
+    const webLinksMap = await this.buildWebLinksCommand.run({
+      userProfileId: userProfile.id,
+      userProfileEmail: userProfile.email,
+      ids: buildWebLinksForIds,
+    });
+
+    const results = rawResults.map((message) => {
+      const outlookWebLink =
+        message.msGraphMessageId && message.sourceMailbox
+          ? (webLinksMap.get(webLinkMapKey(message.sourceMailbox, message.msGraphMessageId)) ?? '')
+          : '';
+      return {
+        ...message,
+        outlookWebLink,
+      };
+    });
 
     return {
       results: results.slice(0, searchConfig.maxEmailsLimit),

@@ -22,7 +22,11 @@ function makeCommand() {
     }),
   } as unknown as GraphClientFactory;
 
-  const command = new CreateDraftEmailCommand(graphClientFactory, { run: vi.fn() } as never);
+  const command = new CreateDraftEmailCommand(
+    graphClientFactory,
+    { run: vi.fn() } as never,
+    { run: vi.fn() } as never,
+  );
 
   return { command, graphRequest };
 }
@@ -71,6 +75,7 @@ describe('CreateDraftEmailCommand.createDraft', () => {
     const command = new CreateDraftEmailCommand(
       { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
       { run: vi.fn() } as never,
+      { run: vi.fn().mockResolvedValue(new Map()) } as never,
     );
 
     await command.createDraft(USER_PROFILE_ID, {
@@ -96,6 +101,7 @@ describe('CreateDraftEmailCommand.createDraft', () => {
     });
     const command = new CreateDraftEmailCommand(
       { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
+      { run: vi.fn() } as never,
       { run: vi.fn() } as never,
     );
 
