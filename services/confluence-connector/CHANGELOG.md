@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.1.0...confluence-connector@2.2.0) (2026-06-17)
+
+
+### Features
+
+* **ci,sharepoint-connector,confluence-connector:** publish helm charts to getunique ([#606](https://github.com/Unique-AG/connectors/issues/606)) ([72823c7](https://github.com/Unique-AG/connectors/commit/72823c73e4916ee084e24103684c24a4e803f935))
+* **confluence-connector,deps,main:** inline page image attachments as base64 data URIs ([#563](https://github.com/Unique-AG/connectors/issues/563)) ([fb39e72](https://github.com/Unique-AG/connectors/commit/fb39e72792109752446f5f2b52742619e0b4b755))
+
 ## [2.1.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.0.1...confluence-connector@2.1.0) (2026-06-03)
 
 

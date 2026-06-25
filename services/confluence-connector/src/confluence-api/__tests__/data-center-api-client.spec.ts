@@ -500,4 +500,130 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(result).toBe(mockStream);
     });
   });
+
+  describe('fetchAttachmentsByPageTitle', () => {
+    function clientWithAttachments() {
+      return new DataCenterConfluenceApiClient(mockConfig, mockAuth as never, mockHttpClient, {
+        attachmentsEnabled: true,
+      });
+    }
+
+    it('returns null without HTTP when attachmentsEnabled is false', async () => {
+      const result = await client.fetchAttachmentsByPageTitle('SP', 'Other Page');
+
+      expect(result).toBeNull();
+      expect(mockHttpClient.rateLimitedRequest).not.toHaveBeenCalled();
+    });
+
+    it('queries /rest/api/content with URL-encoded spaceKey, title, type=page, and attachment expand', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
+
+      await clientWithAttachments().fetchAttachmentsByPageTitle(
+        'TST SPACE',
+        'Page With "Quotes" & Stuff',
+      );
+
+      const url = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls[0]?.[0] as string;
+      expect(url.startsWith(`${BASE_URL}/rest/api/content?`)).toBe(true);
+      expect(url).toContain('spaceKey=TST%20SPACE');
+      expect(url).toContain('title=Page%20With%20%22Quotes%22%20%26%20Stuff');
+      expect(url).toContain('type=page');
+      expect(url).toContain('expand=metadata.labels,version,space');
+      expect(url).toContain('children.attachment');
+    });
+
+    it('returns null when the search returns no results', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [],
+        _links: {},
+      });
+
+      const result = await clientWithAttachments().fetchAttachmentsByPageTitle('SP', 'Missing');
+
+      expect(result).toBeNull();
+    });
+
+    it('returns pageId + attachments of the first matching page', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
+        results: [
+          makePage({
+            id: '500',
+            children: {
+              attachment: {
+                results: [
+                  {
+                    id: 'att-x',
+                    title: 'x.png',
+                    extensions: { mediaType: 'image/png', fileSize: 1234 },
+                    version: { when: '2024-01-01' },
+                    _links: { download: '/download/attachments/500/x.png' },
+                  },
+                ],
+                size: 1,
+                limit: 25,
+                _links: {},
+              },
+            },
+          }),
+        ],
+        _links: {},
+      });
+
+      const result = await clientWithAttachments().fetchAttachmentsByPageTitle('SP', 'Other Page');
+
+      expect(result?.pageId).toBe('500');
+      expect(result?.attachments).toHaveLength(1);
+      expect(result?.attachments[0]?.id).toBe('att-x');
+    });
+
+    it('follows _links.next to fetch attachments beyond the initial 25', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest)
+        .mockResolvedValueOnce({
+          results: [
+            makePage({
+              id: '700',
+              children: {
+                attachment: {
+                  results: [
+                    {
+                      id: 'att-1',
+                      title: 'a.png',
+                      extensions: { mediaType: 'image/png', fileSize: 1 },
+                      version: { when: '2024-01-01' },
+                      _links: { download: '/d/a.png' },
+                    },
+                  ],
+                  size: 25,
+                  limit: 25,
+                  _links: { next: '/rest/api/content/700/child/attachment?start=25' },
+                },
+              },
+            }),
+          ],
+          _links: {},
+        })
+        .mockResolvedValueOnce({
+          results: [
+            {
+              id: 'att-2',
+              title: 'b.png',
+              extensions: { mediaType: 'image/png', fileSize: 2 },
+              version: { when: '2024-01-01' },
+              _links: { download: '/d/b.png' },
+            },
+          ],
+          _links: {},
+        });
+
+      const result = await clientWithAttachments().fetchAttachmentsByPageTitle('SP', 'Other Page');
+
+      const calls = vi.mocked(mockHttpClient.rateLimitedRequest).mock.calls;
+      expect(calls).toHaveLength(2);
+      expect(calls[1]?.[0]).toBe(`${BASE_URL}/rest/api/content/700/child/attachment?start=25`);
+      expect(result?.attachments.map((a) => a.id)).toEqual(['att-1', 'att-2']);
+    });
+  });
 });

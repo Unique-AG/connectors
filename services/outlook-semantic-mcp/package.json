@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/outlook-semantic-mcp",
   "description": "",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -41,7 +41,7 @@
     "@nestjs/swagger": "11.2.6",
     "@nestjs/terminus": "11.1.1",
     "@opentelemetry/api": "1.9.0",
-    "@opentelemetry/instrumentation-pg": "0.58.0",
+    "@opentelemetry/instrumentation-pg": "0.70.0",
     "@proventuslabs/nestjs-zod": "2.0.0",
     "@unique-ag/aes-gcm-encryption": "workspace:*",
     "@unique-ag/instrumentation": "workspace:*",
@@ -62,7 +62,7 @@
     "fastest-levenshtein": "1.0.16",
     "jsonwebtoken": "9.0.3",
     "lru-cache": "11.5.0",
-    "markdown-it": "14.1.1",
+    "markdown-it": "14.2.0",
     "nestjs-otel": "8.0.2",
     "nestjs-pino": "4.6.1",
     "nestjs-zod": "5.0.1",
@@ -76,7 +76,7 @@
     "safe-regex2": "5.0.0",
     "serialize-error-cjs": "0.2.0",
     "typeid-js": "1.2.0",
-    "undici": "7.24.4",
+    "undici": "7.28.0",
     "windows-iana": "5.1.0",
     "zod": "4.1.5"
   },
@@ -99,7 +99,7 @@
     "@types/passport-microsoft": "2.1.0",
     "@types/pg": "8.15.5",
     "@types/supertest": "6.0.3",
-    "@vitest/coverage-istanbul": "3.2.4",
+    "@vitest/coverage-istanbul": "3.2.6",
     "globals": "16.3.0",
     "istanbul-badges-readme": "1.9.0",
     "source-map-support": "0.5.21",
@@ -107,7 +107,7 @@
     "type-fest": "5.2.0",
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
-    "vitest": "3.2.4"
+    "vitest": "3.2.6"
   },
   "packageManager": "pnpm@10.28.1"
 }

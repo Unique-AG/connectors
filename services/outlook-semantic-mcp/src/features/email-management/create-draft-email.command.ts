@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { z } from 'zod';
+import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-email.command';
@@ -21,7 +22,11 @@ interface CreateDraftEmailInput {
         toRecipients: Array<{ name?: string; email: string }>;
         ccRecipients?: Array<{ name?: string; email: string }>;
       }
-    | { type: 'reply'; inReplyToMessageId: string };
+    | {
+        type: 'reply';
+        inReplyToMessageId: string;
+        idIsImmutable?: boolean;
+      };
 }
 
 export type CreateDraftEmailResult =
@@ -82,30 +87,28 @@ export class CreateDraftEmailCommand {
     input: CreateDraftEmailInput,
   ): Promise<CreateDraftEmailResult> {
     const userProfileIdString = userProfileId.toString();
-
+    const recipientsData = input.recipientsData;
     const prefix = input.mailbox ? `/users/${input.mailbox}` : '/me';
 
-    const sharedBodyFields = {
-      body: {
-        contentType: 'HTML',
-        content: markdownToHtml(input.content),
-      },
-    };
+    const htmlContent = markdownToHtml(input.content);
 
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
-    const recipientsData = input.recipientsData;
 
     const apiParams =
       recipientsData.type === 'reply'
         ? {
-            apiPath: `${prefix}/messages/${recipientsData.inReplyToMessageId}/createReplyAll`,
-            body: { message: sharedBodyFields },
+            apiPath: `${prefix}/messages/${encodeGraphItemIdForUrlPath(recipientsData.inReplyToMessageId)}/createReplyAll`,
+            body: { comment: htmlContent },
             successMessage: 'Reply-all draft created successfully.',
+            idIsImmutable: recipientsData.idIsImmutable === true,
           }
         : {
             apiPath: `${prefix}/messages`,
             body: {
-              ...sharedBodyFields,
+              body: {
+                contentType: 'HTML',
+                content: htmlContent,
+              },
               subject: recipientsData.subject,
               toRecipients: recipientsData.toRecipients.map((item) => ({
                 emailAddress: { address: item.email, ...(item.name && { name: item.name }) },
@@ -116,12 +119,16 @@ export class CreateDraftEmailCommand {
                 })) ?? [],
             },
             successMessage: 'Draft email created successfully.',
+            idIsImmutable: false,
           };
 
     try {
-      const message = CreateMessageResponseSchema.parse(
-        await client.api(apiParams.apiPath).post(apiParams.body),
-      );
+      let graphRequest = client.api(apiParams.apiPath);
+      if (apiParams.idIsImmutable) {
+        graphRequest = graphRequest.header('Prefer', 'IdType="ImmutableId"');
+      }
+
+      const message = CreateMessageResponseSchema.parse(await graphRequest.post(apiParams.body));
 
       return {
         success: true,

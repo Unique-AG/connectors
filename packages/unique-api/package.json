@@ -22,7 +22,7 @@
     "graphql": "16.11.0",
     "graphql-request": "7.2.0",
     "remeda": "2.32.0",
-    "undici": "7.24.4",
+    "undici": "7.28.0",
     "zod": "4.1.5"
   },
   "devDependencies": {
@@ -40,7 +40,7 @@
     "reflect-metadata": "0.2.2",
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
-    "vitest": "3.2.4"
+    "vitest": "3.2.6"
   },
   "peerDependencies": {
     "@nestjs/common": "^11",

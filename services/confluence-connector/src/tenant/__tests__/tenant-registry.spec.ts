@@ -61,6 +61,7 @@ function createMockTenantConfig(): TenantConfig {
       scopeId: 'scope-1',
       storeInternally: true,
       useV1KeyFormat: false,
+      inlineImagesEnabled: true,
       attachments: {
         enabled: false,
         allowedMimeTypes: [],

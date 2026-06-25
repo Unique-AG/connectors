@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@2.0.0...outlook-semantic-mcp@2.0.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* **deps:** address pnpm audit vulnerabilities ([#650](https://github.com/Unique-AG/connectors/issues/650)) ([f7cbc71](https://github.com/Unique-AG/connectors/commit/f7cbc71e8ada8778548d8f1d064753ca5355dc25))
+* **deps:** resolve dependency vulnerabilities ([#637](https://github.com/Unique-AG/connectors/issues/637)) ([a91efe6](https://github.com/Unique-AG/connectors/commit/a91efe65c7595ab0ab75523edac3481499ed6866))
+* **outlook-semantic-mcp:** fix reply draft failures and preserve quoted thread ([#649](https://github.com/Unique-AG/connectors/issues/649)) ([08dccd5](https://github.com/Unique-AG/connectors/commit/08dccd5866358082acbfcd8003e2192da36f8280))
+
 ## [2.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@1.0.1...outlook-semantic-mcp@2.0.0) (2026-06-10)
 
 

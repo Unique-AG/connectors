@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.2.22](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.21...teams-mcp@0.2.22) (2026-06-23)
+
+
+### Features
+
+* **teams-mcp:** id-only chat/channel targeting ([#656](https://github.com/Unique-AG/connectors/issues/656)) ([d1033b8](https://github.com/Unique-AG/connectors/commit/d1033b8e0ca45502eab6d7da0e06d2940185381c))
+
+## [0.2.21](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.20...teams-mcp@0.2.21) (2026-06-22)
+
+
+### Features
+
+* **teams-mcp:** interactive disambiguation + richer list metadata ([#653](https://github.com/Unique-AG/connectors/issues/653)) ([30e7400](https://github.com/Unique-AG/connectors/commit/30e7400d0c220c5ebb4de9ea79ac34dce8d2ca86))
+
+## [0.2.20](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.19...teams-mcp@0.2.20) (2026-06-20)
+
+
+### Features
+
+* **teams-mcp,deps:** add Teams chat & channel messaging tools (8 tools) ([#344](https://github.com/Unique-AG/connectors/issues/344)) ([116780a](https://github.com/Unique-AG/connectors/commit/116780a12e00c6dd484c1af359cb927337284252))
+
+## [0.2.19](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.18...teams-mcp@0.2.19) (2026-06-18)
+
+
+### Features
+
+* **teams-mcp:** add subject and meeting_id to ingested artifact metadata ([#638](https://github.com/Unique-AG/connectors/issues/638)) ([d6054a6](https://github.com/Unique-AG/connectors/commit/d6054a6739f2814d734b59d83375aa149b0a78aa))
+* **teams-mcp:** folder-per-meeting ingestion + folder ACL + source-based discovery ([#640](https://github.com/Unique-AG/connectors/issues/640)) ([64238f0](https://github.com/Unique-AG/connectors/commit/64238f0b32f411e1fe56da0d3c18f0a053327b38))
+
+
+### Bug Fixes
+
+* **deps:** resolve dependency vulnerabilities ([#637](https://github.com/Unique-AG/connectors/issues/637)) ([a91efe6](https://github.com/Unique-AG/connectors/commit/a91efe65c7595ab0ab75523edac3481499ed6866))
+
+
+### Reverts
+
+* **teams-mcp:** restore nested + locked meeting folder ingestion ([#646](https://github.com/Unique-AG/connectors/issues/646)) ([4d9805b](https://github.com/Unique-AG/connectors/commit/4d9805ba7f0bfcf2b3fa0f237d6e82b654f29616))
+
 ## [0.2.18](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.17...teams-mcp@0.2.18) (2026-06-08)
 
 

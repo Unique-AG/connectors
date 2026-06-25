@@ -41,3 +41,13 @@ ingestion:
   ingestionMode: flat
   scopeId: your-scope-id
   storeInternally: enabled
+  # Ingestion configuration applied to each ingested page. Setting
+  # htmlConfig.imageContentExtraction.enabled to true and .languageModel to the visual LLM
+  # configured in Knowledge Base turns on inlining of page images as base64 data URIs
+  # (requires Unique platform 2026.24.0+); without both, images fall back to standalone
+  # attachment ingestion.
+  pageIngestionConfig:
+    htmlConfig:
+      imageContentExtraction:
+        enabled: true
+        languageModel: AZURE_GPT_4o_2024_1120

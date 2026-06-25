@@ -47,7 +47,7 @@
     "cron": "4.3.5",
     "graphql": "16.11.0",
     "graphql-request": "7.2.0",
-    "js-yaml": "4.1.1",
+    "js-yaml": "4.2.0",
     "nestjs-otel": "8.0.2",
     "nestjs-pino": "4.6.1",
     "nestjs-zod": "5.0.1",
@@ -57,7 +57,7 @@
     "remeda": "2.32.0",
     "rxjs": "7.8.2",
     "serialize-error-cjs": "0.2.0",
-    "undici": "7.24.4",
+    "undici": "7.28.0",
     "zod": "4.1.5"
   },
   "devDependencies": {
@@ -73,7 +73,7 @@
     "@types/js-yaml": "4.0.9",
     "@types/node": "22.16.5",
     "@types/supertest": "6.0.3",
-    "@vitest/coverage-istanbul": "3.2.4",
+    "@vitest/coverage-istanbul": "3.2.6",
     "globals": "16.3.0",
     "istanbul-badges-readme": "1.9.0",
     "pino-http-print": "3.1.0",
@@ -81,6 +81,7 @@
     "supertest": "7.1.4",
     "typescript": "5.9.2",
     "unplugin-swc": "1.5.7",
-    "vitest": "3.2.4"
-  }
+    "vitest": "3.2.6"
+  },
+  "packageManager": "pnpm@10.28.1"
 }

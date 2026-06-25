@@ -5,8 +5,10 @@ import type { ConfluenceConfig } from '../config';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import {
   type ApiClientOptions,
+  buildPageAttachmentLookupResult,
   ConfluenceApiClient,
   type InstanceIdentifier,
+  type PageAttachmentLookupResult,
 } from './confluence-api-client';
 import { fetchAllPaginated } from './confluence-fetch-paginated';
 import {
@@ -74,6 +76,28 @@ export class CloudConfluenceApiClient extends ConfluenceApiClient {
 
     const response = paginatedResponseSchema(confluencePageSchema).parse(raw);
     return response.results[0] ?? null;
+  }
+
+  public async fetchAttachmentsByPageTitle(
+    spaceKey: string,
+    pageTitle: string,
+  ): Promise<PageAttachmentLookupResult | null> {
+    if (!this.options.attachmentsEnabled) {
+      return null;
+    }
+
+    const expand = `metadata.labels,version,space${this.attachmentExpand}`;
+    const url = `${this.apiBaseUrl}/wiki/rest/api/content?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(pageTitle)}&type=page&expand=${expand}`;
+    const raw = await this.makeAuthenticatedRequest(url);
+
+    const response = paginatedResponseSchema(confluencePageSchema).parse(raw);
+    const page = response.results[0];
+    if (!page) {
+      return null;
+    }
+
+    await this.fetchMoreAttachments([page]);
+    return buildPageAttachmentLookupResult(page);
   }
 
   // V1 CQL `ancestor` returns all descendants at any depth with labels; V2 bulk pages lacks label support.

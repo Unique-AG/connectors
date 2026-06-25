@@ -1,10 +1,9 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
-import type { UniqueConfigNamespaced } from '~/config';
+import { TEAMS_SOURCE_KIND } from '~/unique/unique.consts';
 import { type PublicSearchRequest, SearchType } from '~/unique/unique.dtos';
 import { UniqueContentService } from '~/unique/unique-content.service';
 import { UniqueUserMappingService } from '~/unique/unique-user-mapping.service';
@@ -67,7 +66,6 @@ export class FindTranscriptsTool {
   private readonly logger = new Logger(this.constructor.name);
 
   public constructor(
-    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
     private readonly contentService: UniqueContentService,
     private readonly userMapping: UniqueUserMappingService,
     private readonly traceService: TraceService,
@@ -131,8 +129,7 @@ export class FindTranscriptsTool {
       'Searching within meeting transcripts',
     );
 
-    const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
-    const searchRequest = this.buildSearchRequest(rootScopeId, input);
+    const searchRequest = this.buildSearchRequest(input);
 
     const result = await this.contentService.scopedSearch(searchRequest, scopeContext);
 
@@ -166,7 +163,6 @@ export class FindTranscriptsTool {
   }
 
   private buildSearchRequest(
-    rootScopeId: string,
     input: z.infer<typeof FindTranscriptsInputSchema>,
   ): PublicSearchRequest {
     return {
@@ -174,7 +170,8 @@ export class FindTranscriptsTool {
       searchType: SearchType.COMBINED,
       limit: input.limit,
       scoreThreshold: 0,
-      metaDataFilter: buildTranscriptFilter(rootScopeId, input),
+      metaDataFilter: buildTranscriptFilter(input),
+      sourceKind: TEAMS_SOURCE_KIND,
     };
   }
 }

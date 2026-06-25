@@ -90,6 +90,29 @@ const SearchEmailResultSchema = z.object({
     .describe(
       'Pre-constructed input for `open_email`. Pass this object directly as the tool input without modification.',
     ),
+  replyToParams: z
+    .object({
+      inReplyToMessageId: z
+        .string()
+        .optional()
+        .describe(
+          'Microsoft Graph message ID for the reply target. Copy into `recipientsData.inReplyToMessageId` when calling `draft_email` with `type: "reply"`. Absent when no Graph message ID is available.',
+        ),
+      idIsImmutable: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether `inReplyToMessageId` is an immutable ID. Copy into `recipientsData.idIsImmutable` when calling `draft_email` with `type: "reply"`.',
+        ),
+      isReplyable: z
+        .boolean()
+        .describe(
+          'Whether this message can be used as a reply target. Do not call `draft_email` with `type: "reply"` when false — pick a different email or explain that a reply is not possible.',
+        ),
+    })
+    .describe(
+      'Reply metadata from search. Copy `inReplyToMessageId` and `idIsImmutable` into matching `recipientsData` fields when `isReplyable` is true. Use top-level `mailbox` on `draft_email` (from `sourceMailbox`) for shared or delegated mailboxes.',
+    ),
 });
 
 const SearchEmailsOutputSchema = z.object({

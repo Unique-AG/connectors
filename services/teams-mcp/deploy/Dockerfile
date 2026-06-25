@@ -5,19 +5,14 @@ ARG APP_NAME=teams-mcp
 # ------------------------------------------------------------------------------
 # Stage 1: base
 # Shared foundation for pruner, deps, and builder stages.
-# Using full bookworm image (not slim) because we need build tools for native modules.
+# Using full trixie image (not slim) because we need build tools for native modules.
 # ------------------------------------------------------------------------------
-FROM node:24-bookworm AS base
+FROM node:26.3.0-trixie@sha256:f9a1756160a9e1c3dca456bc0b185bf8f2f112a6771c694df87288046f4306f1 AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-# Set explicit cache location so we can copy it to runner stage
-ENV COREPACK_HOME="/corepack"
-# Copy root package.json so corepack can read "packageManager" field
-COPY package.json /tmp/package.json
-WORKDIR /tmp
-# Corepack manages pnpm version from package.json "packageManager" field
-# prepare --activate downloads and caches pnpm for offline use in runner
-RUN corepack enable && corepack prepare --activate
+# Install pnpm directly. Node 25+ no longer bundles corepack.
+# Keep the version in sync with "packageManager" in the root package.json.
+RUN npm install -g pnpm@10.28.1
 
 # ------------------------------------------------------------------------------
 # Stage 2: pruner
@@ -71,7 +66,7 @@ RUN --mount=type=cache,target=/root/.cache/turbo \
 # Stage 5: runner
 # Minimal production image. Only this stage is included in the final image.
 # ------------------------------------------------------------------------------
-FROM node:24-bookworm-slim AS runner
+FROM node:26.3.0-trixie-slim@sha256:95a34da32a840bd9b3b09a5b773591c16923e350174b1c50e1200c75bf15eaa9 AS runner
 ARG APP_NAME
 WORKDIR /app
 
@@ -88,15 +83,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && groupadd --system --gid 1001 nodejs \
     && useradd --system --uid 1001 --gid nodejs --shell /bin/bash --create-home nestjs
 
-# pnpm/corepack needed at runtime for migrations via docker-compose command override:
+# pnpm needed at runtime for migrations via docker-compose command override:
 #   command: ["pnpm", "run", "db:migrate"]
 # Using /tmp paths because nestjs user can write there
 ENV PNPM_HOME="/tmp/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-ENV COREPACK_HOME="/tmp/.cache/corepack"
-RUN corepack enable
-# Copy pre-downloaded pnpm from base stage (avoids runtime download)
-COPY --from=base --chown=nestjs:nodejs /corepack $COREPACK_HOME
+RUN npm install -g pnpm@10.28.1
 
 ENV NODE_ENV=production
 

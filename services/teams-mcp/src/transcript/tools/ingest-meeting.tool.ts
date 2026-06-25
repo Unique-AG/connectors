@@ -5,7 +5,8 @@ import { Span, TraceService } from 'nestjs-otel';
 import { fromString, parseTypeId, typeid } from 'typeid-js';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { MeetingCollection, TranscriptCollection } from '../transcript.dtos';
+import { collectAllPages, GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
+import { MeetingCollection, Transcript } from '../transcript.dtos';
 import { TranscriptCreatedService } from '../transcript-created.service';
 
 const IngestMeetingInputSchema = z.object({
@@ -118,15 +119,21 @@ export class IngestMeetingTool {
       joinUrl: meeting.joinWebUrl.href,
     };
 
-    // 2. List the meeting's transcripts.
+    // 2. List the meeting's transcripts. A meeting rarely has more than a page
+    // of transcripts, but page through them anyway for consistency with the
+    // other Graph collections.
     const transcriptsResponse = await client
       .api(`/me/onlineMeetings/${meeting.id}/transcripts`)
+      .top(GRAPH_PAGE_SIZE)
       .get();
-    const transcripts = await TranscriptCollection.parseAsync(transcriptsResponse);
+    const { items } = await collectAllPages(client, transcriptsResponse, {
+      label: 'ingestMeeting.transcripts',
+    });
+    const transcripts = z.array(Transcript).parse(items);
 
-    span?.setAttribute('transcript_count', transcripts.value.length);
+    span?.setAttribute('transcript_count', transcripts.length);
 
-    if (transcripts.value.length === 0) {
+    if (transcripts.length === 0) {
       span?.addEvent('no_transcripts');
       return {
         success: false,
@@ -138,7 +145,7 @@ export class IngestMeetingTool {
     }
 
     // 3. Optionally narrow by date (UTC day of the transcript creation time).
-    let candidates = transcripts.value;
+    let candidates = transcripts;
     if (input.date) {
       candidates = candidates.filter(
         (t) => t.createdDateTime.toISOString().slice(0, 10) === input.date,
@@ -146,7 +153,7 @@ export class IngestMeetingTool {
 
       if (candidates.length === 0) {
         const availableDates = [
-          ...new Set(transcripts.value.map((t) => t.createdDateTime.toISOString().slice(0, 10))),
+          ...new Set(transcripts.map((t) => t.createdDateTime.toISOString().slice(0, 10))),
         ].sort();
         span?.addEvent('date_matched_nothing');
         return {

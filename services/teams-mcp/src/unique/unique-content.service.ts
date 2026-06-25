@@ -191,6 +191,7 @@ export class UniqueContentService {
     return target.toString();
   }
 
+  // One skip/take page; callers paginate explicitly (e.g. `list_meetings`).
   @Span()
   public async getContentInfos(
     request: PublicContentInfosRequest,
@@ -228,12 +229,13 @@ export class UniqueContentService {
   @Span()
   public async findByMetadata(
     filter: MetadataFilter,
-    options?: { skip?: number; take?: number },
+    options?: { skip?: number; take?: number; sourceKind?: string },
   ): Promise<{ contents: ContentInfoItem[]; total: number }> {
     const request: PublicContentInfosRequest = {
       skip: options?.skip ?? 0,
       take: options?.take ?? 50,
       metadataFilter: filter,
+      sourceKind: options?.sourceKind,
     };
 
     const result = await this.getContentInfos(request);
@@ -251,12 +253,13 @@ export class UniqueContentService {
   public async scopedFindByMetadata(
     filter: MetadataFilter,
     scopeContext: UniqueIdentity,
-    options?: { skip?: number; take?: number },
+    options?: { skip?: number; take?: number; sourceKind?: string },
   ): Promise<{ contents: ContentInfoItem[]; total: number }> {
     const request: PublicContentInfosRequest = {
       skip: options?.skip ?? 0,
       take: options?.take ?? 50,
       metadataFilter: filter,
+      sourceKind: options?.sourceKind,
     };
 
     const payload = PublicContentInfosRequestSchema.encode(request);
@@ -282,6 +285,8 @@ export class UniqueContentService {
    * @param scopeContext - When provided, overrides `x-user-id` and `x-company-id` headers
    *   to scope the search to the given user's permissions. When `undefined`, the search
    *   runs unscoped with service-level credentials — this is intentional for admin/ingestion flows.
+   *
+   * One page/limit request; relevance-ranked, so callers don't collect all pages.
    */
   @Span()
   public async search(

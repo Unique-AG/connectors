@@ -6,7 +6,12 @@ import { Span, TraceService } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import type { UniqueConfigNamespaced } from '~/config';
 import { buildMeetingExternalId, buildOccurrenceExternalId } from './scope-external-id';
-import { TEAMS_SOURCE_KIND, TEAMS_SOURCE_NAME } from './unique.consts';
+import {
+  RECORDING_MIME_TYPE,
+  TEAMS_SOURCE_KIND,
+  TEAMS_SOURCE_NAME,
+  TRANSCRIPT_MIME_TYPE,
+} from './unique.consts';
 import {
   type PublicScopeAccessSchema,
   ScopeAccessEntityType,
@@ -136,6 +141,12 @@ export class UniqueService {
       entityType: ScopeAccessEntityType.User,
       type: ScopeAccessType.Manage,
     });
+    // NOTE: The subject scope is shared across all occurrences of a recurring series (same
+    // meetingId), and add-access is additive, so the parent accumulates the union of every
+    // occurrence's participants — which the inheritAccess=true children below pick up. This means
+    // a participant from one occurrence can read later occurrences they did not attend. Known and
+    // accepted: locking + grouping recurring sessions under one folder is worth more to us than
+    // per-occurrence roster isolation.
     await this.scopeService.addScopeAccesses(parentScope.id, accesses);
 
     const childScope = await this.scopeService.createScope(parentScope.id, datePath, true);
@@ -143,6 +154,9 @@ export class UniqueService {
 
     // Stamp the occurrence (session) scope, anchored on the transcript id so each
     // recording session gets a unique externalId even for same-day meetings.
+    // NOTE: datePath is second-precision, so two transcripts in the same second under the same
+    // parent would collide onto one child scope and overwrite its externalId. Not reachable in
+    // practice: Teams cannot produce two transcripts for the same meeting in the same second.
     await this.scopeService.updateScope(childScope.id, {
       externalId: buildOccurrenceExternalId(meeting.meetingId, transcript.id),
     });
@@ -164,7 +178,7 @@ export class UniqueService {
         sourceOwnerType: SourceOwnerType.Company,
         input: {
           key: transcript.id,
-          mimeType: 'text/vtt',
+          mimeType: TRANSCRIPT_MIME_TYPE,
           title: meeting.subject || 'Untitled Meeting',
           byteSize: 1,
           metadata: this.buildContentMetadata(meeting),
@@ -174,7 +188,7 @@ export class UniqueService {
       await this.contentService.uploadToStorage(
         transcriptUpload.writeUrl,
         transcriptSpool,
-        'text/vtt',
+        TRANSCRIPT_MIME_TYPE,
       );
 
       await this.contentService.upsertContent({
@@ -186,7 +200,7 @@ export class UniqueService {
         fileUrl: transcriptUpload.readUrl,
         input: {
           key: transcript.id,
-          mimeType: 'text/vtt',
+          mimeType: TRANSCRIPT_MIME_TYPE,
           title: meeting.subject || 'Untitled Meeting',
         },
       });
@@ -244,7 +258,7 @@ export class UniqueService {
             sourceOwnerType: SourceOwnerType.Company,
             input: {
               key: recording.id,
-              mimeType: 'video/mp4',
+              mimeType: RECORDING_MIME_TYPE,
               title: meeting.subject || 'Untitled Meeting',
               byteSize: 1,
               ingestionConfig: {
@@ -256,7 +270,7 @@ export class UniqueService {
           await this.contentService.uploadToStorage(
             recordingUpload.writeUrl,
             recordingSpool,
-            'video/mp4',
+            RECORDING_MIME_TYPE,
           );
           await this.contentService.upsertContent({
             storeInternally: true,
@@ -267,7 +281,7 @@ export class UniqueService {
             fileUrl: recordingUpload.readUrl,
             input: {
               key: recording.id,
-              mimeType: 'video/mp4',
+              mimeType: RECORDING_MIME_TYPE,
               title: meeting.subject || 'Untitled Meeting',
               ingestionConfig: {
                 uniqueIngestionMode: UniqueIngestionMode.SKIP_INGESTION,
@@ -349,6 +363,8 @@ export class UniqueService {
       date: Date;
       startDateTime: Date;
       endDateTime: Date;
+      meetingId: string;
+      subject: string;
       contentCorrelationId: string;
       owner: { name: string; email: string };
       participants: { name: string; email: string }[];
@@ -361,9 +377,14 @@ export class UniqueService {
       date: meeting.date.toISOString(),
       start_datetime: startDateTime.toISOString(),
       end_datetime: endDateTime.toISOString(),
+      meeting_id: meeting.meetingId,
       content_correlation_id: meeting.contentCorrelationId,
       organizer_email: meeting.owner.email.toLowerCase(),
     };
+
+    if (meeting.subject) {
+      metadata.subject = meeting.subject;
+    }
 
     if (meeting.owner.name) {
       metadata.organizer_name = meeting.owner.name;

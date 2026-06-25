@@ -78,9 +78,6 @@ export const MultipleNotificationChangeType = z.codec(
     },
   },
 );
-export type MultipleNotificationChangeTypeInput = z.input<typeof MultipleNotificationChangeType>;
-export type MultipleNotificationChangeTypeOutput = z.output<typeof MultipleNotificationChangeType>;
-
 /**
  * See docs on {@link https://learn.microsoft.com/en-us/graph/api/subscription-list?view=graph-rest-1.0&tabs=http#response-1 subscription list}.
  */
@@ -199,17 +196,12 @@ export const CreateSubscriptionRequestSchema = z.object({
   resource: z.string(),
   expirationDateTime: isoDatetimeToDate({ offset: true }),
 });
-export type CreateSubscriptionRequestInput = z.input<typeof CreateSubscriptionRequestSchema>;
-export type CreateSubscriptionRequestOutput = z.output<typeof CreateSubscriptionRequestSchema>;
-
 /**
  * See docs on {@link https://learn.microsoft.com/en-us/graph/api/subscription-update?view=graph-rest-1.0&tabs=http update subscription}.
  */
 export const UpdateSubscriptionRequestSchema = z.object({
   expirationDateTime: isoDatetimeToDate({ offset: true }),
 });
-export type UpdateSubscriptionRequestInput = z.input<typeof UpdateSubscriptionRequestSchema>;
-export type UpdateSubscriptionRequestOutput = z.output<typeof UpdateSubscriptionRequestSchema>;
 
 /**
  * See docs on {@link https://learn.microsoft.com/en-us/graph/api/calltranscript-get?view=graph-rest-1.0&tabs=http#http-request call transcript resource}.
@@ -238,52 +230,6 @@ export const TranscriptResourceSchema = z.string().transform((resource, ctx) => 
   return { userId, meetingId, transcriptId };
 });
 
-export const TranscriptVttMetadataSchema = z
-  .base64()
-  .transform((b) => Buffer.from(b, 'base64').toString())
-  .transform((vtt, ctx) => {
-    const languages = new Map<string, number>();
-    const languagePattern = /"spokenLanguage":"(.*?)"/g;
-    let match: RegExpExecArray | null;
-
-    // biome-ignore lint/suspicious/noAssignInExpressions: this is a common pattern for exec
-    while ((match = languagePattern.exec(vtt)) !== null) {
-      const extractedLanguage = match[1];
-      if (!extractedLanguage) {
-        ctx.addIssue({
-          code: 'invalid_format',
-          format: 'regex',
-          path: ['languagePattern'],
-          pattern: languagePattern.source,
-          message: 'Spoken Language group is expected to have a group value',
-        });
-        continue;
-      }
-      const [locale, region] = extractedLanguage.split('-');
-      if (!locale) {
-        ctx.addIssue({
-          code: 'invalid_format',
-          format: 'iso-language',
-          path: ['extractedLanguage'],
-          message: 'The extracted language was expected to have at least the locale part',
-        });
-        continue;
-      }
-      const language = region ? `${locale}-${region.toUpperCase()}` : locale;
-
-      const count = languages.get(language) ?? 0;
-      languages.set(language, count + 1);
-    }
-    const entries = Array.from(languages.entries());
-    const mostSpoken = entries.length > 0 ? entries.reduce((a, b) => (a[1] > b[1] ? a : b))[0] : '';
-
-    if (ctx.issues.length > 0) {
-      return z.NEVER;
-    }
-
-    return { mostSpoken, languages };
-  });
-
 /**
  * See docs on {@link https://learn.microsoft.com/en-us/graph/api/calltranscript-get?view=graph-rest-1.0&tabs=http#response-1 transcript}.
  */
@@ -307,8 +253,6 @@ export const Transcript = z.object({
   }),
 });
 export type Transcript = z.infer<typeof Transcript>;
-
-export const TranscriptCollection = Collection(Transcript);
 
 const extractThreadId = (url: URL): string | null => {
   const match = url.pathname.match(/\/meetup-join\/([^/]+)/);

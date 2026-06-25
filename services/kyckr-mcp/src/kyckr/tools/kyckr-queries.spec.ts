@@ -21,6 +21,9 @@ const mockKyckrClient = {
   post: vi.fn(),
 };
 
+const PDF_ONLY_DETAIL =
+  'This document is only available as a PDF. PDF delivery is not yet supported; support is coming soon.';
+
 const mockMetrics = {
   recordToolDuration: vi.fn(),
   recordCreditsConsumed: vi.fn(),
@@ -333,7 +336,7 @@ describe('CreateDocumentOrderQuery', () => {
     );
   });
 
-  it('creates an order with the configured customer reference and contact email', async () => {
+  it('creates an order with the configured customer reference and contact email and does not fetch the document body when status is Pending', async () => {
     const response = {
       correlationId: 'corr-order-create',
       cost: { value: 3 },
@@ -352,8 +355,111 @@ describe('CreateDocumentOrderQuery', () => {
       customerReference: 'customer-ref-123',
       contactEmail: 'ops@example.com',
     });
+    expect(mockKyckrClient.get).not.toHaveBeenCalled();
     expect(result).toEqual({ success: true, ...response });
     expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('create_document_order', 3);
+  });
+
+  it('inlines documentJson and strips raw download links when the order completes immediately', async () => {
+    const createResponse = {
+      correlationId: 'corr-order-create',
+      cost: { value: 3 },
+      data: {
+        orderId: 12345,
+        status: 'Success',
+        links: { document: 'https://downloads.example.com/12345.pdf' },
+      },
+    };
+    const documentJson = {
+      CompanyName: 'Acme Ltd',
+      Identifiers: { PrimaryRegistrationNumber: '00112233' },
+      Addresses: [{ Type: 'POSTAL', FullAddress: '1 Acme Way' }],
+    };
+    const downloadEnvelope = {
+      CorrelationId: 'corr-download',
+      CustomerReference: 'cust-ref',
+      TimeStamp: '2026-05-13T12:00:00Z',
+      Details: 'Success',
+      Data: documentJson,
+    };
+    mockKyckrClient.post.mockResolvedValueOnce(createResponse);
+    mockKyckrClient.get.mockResolvedValueOnce(downloadEnvelope);
+
+    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' });
+
+    expect(mockKyckrClient.get).toHaveBeenCalledWith('/orders/12345/download', {
+      format: 'json',
+    });
+    expect(result).toMatchObject({
+      success: true,
+      data: { orderId: 12345, status: 'Success', documentJson },
+    });
+    expect(result.data?.links).toBeUndefined();
+  });
+
+  it('surfaces the PDF-only message when the JSON envelope returns Data: null', async () => {
+    const createResponse = {
+      correlationId: 'corr-order-create',
+      cost: { value: 3 },
+      data: { orderId: 'ORD-1', status: 'Success' },
+    };
+    const downloadEnvelope = {
+      CorrelationId: 'corr-download',
+      Details: 'Success',
+      Data: null,
+    };
+    mockKyckrClient.post.mockResolvedValueOnce(createResponse);
+    mockKyckrClient.get.mockResolvedValueOnce(downloadEnvelope);
+
+    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' });
+
+    expect(result).toEqual({
+      success: true,
+      ...createResponse,
+      details: PDF_ONLY_DETAIL,
+      data: { ...createResponse.data, documentJson: undefined },
+    });
+  });
+
+  it('surfaces the PDF-only message when the JSON download is unavailable (404)', async () => {
+    const createResponse = {
+      correlationId: 'corr-order-create',
+      cost: { value: 3 },
+      data: { orderId: 'ORD-1', status: 'Success' },
+    };
+    mockKyckrClient.post.mockResolvedValueOnce(createResponse);
+    mockKyckrClient.get.mockRejectedValueOnce(
+      makeKyckrApiError(404, '/orders/ORD-1/download', 'No JSON form', 'corr-download-404'),
+    );
+
+    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' });
+
+    expect(result).toEqual({
+      success: true,
+      ...createResponse,
+      details: PDF_ONLY_DETAIL,
+      data: { ...createResponse.data, documentJson: undefined },
+    });
+  });
+
+  it('surfaces the PDF-only message when the JSON download is empty', async () => {
+    const createResponse = {
+      correlationId: 'corr-order-create',
+      cost: { value: 3 },
+      details: 'Success',
+      data: { orderId: 'ORD-1', status: 'Success' },
+    };
+    mockKyckrClient.post.mockResolvedValueOnce(createResponse);
+    mockKyckrClient.get.mockResolvedValueOnce(undefined);
+
+    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' });
+
+    expect(result).toEqual({
+      success: true,
+      ...createResponse,
+      details: `Success ${PDF_ONLY_DETAIL}`,
+      data: { ...createResponse.data, documentJson: undefined },
+    });
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -391,8 +497,32 @@ describe('GetOrderQuery', () => {
     );
   });
 
-  it('returns order details on success', async () => {
+  it('returns order details and does not fetch the document body when status is Pending', async () => {
     const response = {
+      correlationId: 'corr-order',
+      cost: { value: 0 },
+      data: {
+        orderId: 'ORD-1',
+        status: 'Pending',
+        links: { document: 'https://downloads.example.com/ORD-1.pdf' },
+      },
+    };
+    mockKyckrClient.get.mockResolvedValueOnce(response);
+
+    const result = await unit.run({ orderId: 'ORD-1' });
+
+    expect(mockKyckrClient.get).toHaveBeenCalledTimes(1);
+    expect(mockKyckrClient.get).toHaveBeenCalledWith('/orders/ORD-1');
+    expect(result).toMatchObject({
+      success: true,
+      data: { orderId: 'ORD-1', status: 'Pending' },
+    });
+    expect(result.data?.links).toBeUndefined();
+    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('get_order', 0);
+  });
+
+  it('inlines documentJson and strips raw download links when the order is Success', async () => {
+    const orderResponse = {
       correlationId: 'corr-order',
       cost: { value: 0 },
       data: {
@@ -400,16 +530,105 @@ describe('GetOrderQuery', () => {
         status: 'Success',
         links: {
           document: 'https://downloads.example.com/ORD-1.pdf',
+          data: 'https://downloads.example.com/ORD-1?format=json',
         },
       },
     };
-    mockKyckrClient.get.mockResolvedValueOnce(response);
+    const documentJson = {
+      CompanyName: 'Acme Ltd',
+      Identifiers: { PrimaryRegistrationNumber: '00112233' },
+    };
+    const downloadEnvelope = {
+      CorrelationId: 'corr-download',
+      Details: 'Success',
+      Data: documentJson,
+    };
+    mockKyckrClient.get
+      .mockResolvedValueOnce(orderResponse)
+      .mockResolvedValueOnce(downloadEnvelope);
 
     const result = await unit.run({ orderId: 'ORD-1' });
 
-    expect(mockKyckrClient.get).toHaveBeenCalledWith('/orders/ORD-1');
-    expect(result).toEqual({ success: true, ...response });
-    expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('get_order', 0);
+    expect(mockKyckrClient.get).toHaveBeenNthCalledWith(1, '/orders/ORD-1');
+    expect(mockKyckrClient.get).toHaveBeenNthCalledWith(2, '/orders/ORD-1/download', {
+      format: 'json',
+    });
+    expect(result).toMatchObject({
+      success: true,
+      data: { orderId: 'ORD-1', status: 'Success', documentJson },
+    });
+    expect(result.data?.links).toBeUndefined();
+  });
+
+  it('surfaces the PDF-only message when the JSON envelope returns Data: null', async () => {
+    const orderResponse = {
+      correlationId: 'corr-order',
+      cost: { value: 0 },
+      data: { orderId: 'ORD-1', status: 'Success' },
+    };
+    const downloadEnvelope = {
+      CorrelationId: 'corr-download',
+      Details: 'Success',
+      Data: null,
+    };
+    mockKyckrClient.get
+      .mockResolvedValueOnce(orderResponse)
+      .mockResolvedValueOnce(downloadEnvelope);
+
+    const result = await unit.run({ orderId: 'ORD-1' });
+
+    expect(result).toEqual({
+      success: true,
+      ...orderResponse,
+      details: PDF_ONLY_DETAIL,
+      data: { ...orderResponse.data, documentJson: undefined },
+    });
+  });
+
+  it('surfaces the PDF-only message when the JSON download 404s', async () => {
+    const orderResponse = {
+      correlationId: 'corr-order',
+      cost: { value: 0 },
+      data: {
+        orderId: 'ORD-1',
+        status: 'Success',
+        links: { document: 'https://downloads.example.com/ORD-1.pdf' },
+      },
+    };
+    mockKyckrClient.get
+      .mockResolvedValueOnce(orderResponse)
+      .mockRejectedValueOnce(
+        makeKyckrApiError(404, '/orders/ORD-1/download', 'No JSON form', 'corr-download-404'),
+      );
+
+    const result = await unit.run({ orderId: 'ORD-1' });
+
+    const { links: _drop, ...dataWithoutLinks } = orderResponse.data;
+    expect(result).toEqual({
+      success: true,
+      ...orderResponse,
+      details: PDF_ONLY_DETAIL,
+      data: { ...dataWithoutLinks, documentJson: undefined },
+    });
+  });
+
+  it('surfaces the PDF-only message when the JSON download is empty', async () => {
+    const orderResponse = {
+      correlationId: 'corr-order',
+      cost: { value: 0 },
+      details: 'Success',
+      data: { orderId: 'ORD-1', status: 'Success' },
+    };
+    mockKyckrClient.get.mockResolvedValueOnce(orderResponse).mockResolvedValueOnce(undefined);
+
+    const result = await unit.run({ orderId: 'ORD-1' });
+
+    expect(result).toEqual({
+      success: true,
+      ...orderResponse,
+      details: `Success ${PDF_ONLY_DETAIL}`,
+      data: { ...orderResponse.data, documentJson: undefined },
+    });
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
