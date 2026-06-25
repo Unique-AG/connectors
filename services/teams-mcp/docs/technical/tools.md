@@ -8,16 +8,13 @@ The Teams MCP Server exposes **14 tools** in two categories:
 - **Chat & messaging tools** (8) interact with Microsoft Teams chats and channels synchronously through the Microsoft Graph API: list teams/channels/chats, read messages, search across messages, and send messages.
 - **Transcript & knowledge-base tools** (6) manage meeting-transcript ingestion into the Unique knowledge base and search the transcripts that have already been ingested.
 
-All chat and messaging tools use **id-only targeting**. There is no name-based addressing: you discover the id you need with a `list_*` tool (or `search_messages`), then pass that id to the tool that reads or writes. The canonical workflow is:
+Chat and messaging tools target chats and channels by id: you discover the id with a `list_*` tool (or `search_messages`), then pass it to the tool that reads or writes:
 
 ```
 list_teams / list_chats / list_channels  →  id  →  get_*_messages / send_*_message
 ```
 
 The `list_*` tools return distinguishing metadata (creation dates, last-message timestamps, archived/membership flags, member names) so the agent can pick the right id when several teams, chats, or channels share a display name.
-
-!!! note "Historical note: id-only targeting"
-    Earlier pre-release builds accepted display names and resolved them with an interactive disambiguation picker. That path was removed: every chat/channel tool now takes ids only, and the `list_*` tools surface the metadata needed to choose between same-named entities. (The transcript `ingest_meeting` tool still uses interactive elicitation to pick between multiple transcripts of one recurring meeting — see below.)
 
 ## Tool Overview
 

@@ -17,7 +17,7 @@
 
 The Teams MCP Server is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
-**Note:** This is a connector-style MCP server that does two things. First, it automatically ingests meeting transcripts into the Unique knowledge base in the background. Second, it exposes an interactive tool surface of 14 MCP tools — 8 chat/messaging tools and 6 transcript/KB management tools. All tools use id-only targeting: the workflow is discover-ids-then-act (`list_*` → id → read/write/search). See [Technical Reference — Tools](./technical/tools.md) for the full tool reference.
+**Note:** This is a connector-style MCP server that does two things. First, it automatically ingests meeting transcripts into the Unique knowledge base in the background. Second, it exposes an interactive tool surface of 14 MCP tools — 8 chat/messaging tools and 6 transcript/KB management tools. Chat and channel tools take ids obtained from the `list_*` tools. See [Technical Reference — Tools](./technical/tools.md) for the full tool reference.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
@@ -100,7 +100,7 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 
 **Teams Chat Messaging**
 
-All chat/messaging tools use **id-only targeting**: there are no name-based parameters. The workflow is **discover-ids-then-act** — call a list tool to obtain an id and distinguishing metadata, then pass that id to a read, write, or search tool.
+Chat and messaging tools target chats and channels by id: call a `list_*` tool to obtain an id (and distinguishing metadata), then pass that id to a read, write, or search tool.
 
 - `list_teams`: List all Microsoft Teams the user is a member of; returns team id and `isArchived` flag
 - `list_channels`: List all channels in a team (by team id); returns channel id, `createdDateTime`, and `membershipType`

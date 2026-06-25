@@ -149,7 +149,7 @@ The Chat Module (`src/chat/`) exposes a synchronous request/response tool surfac
 | `send_channel_message` | Posts a plain-text message to a team channel by ID |
 | `search_messages` | Searches messages across chats, channels, or both |
 
-**ID-only targeting:** `list_*` tools return identifiers (chat ID, team ID, channel ID). Those IDs are then passed directly to `get_*_messages` and `send_*_message` tools. There is no name-based resolution — the client must perform the `list_*` → ID → action workflow. See [Chat Flows](./flows.md#Chat-Flows) for sequence diagrams.
+**Targeting by id:** `list_*` tools return identifiers (chat id, team id, channel id) that are passed directly to the `get_*_messages` and `send_*_message` tools. See [Chat Flows](./flows.md#Chat-Flows) for sequence diagrams.
 
 **Search specifics (`SearchService`):** The Microsoft Search API does not use `@odata.nextLink`; pagination is driven by `offset`/`size` on the request body and `moreResultsAvailable` on the response. When `detail=full`, each matching hit is hydrated with its full message body via an additional Graph call (N+1). Hydration runs with a concurrency cap of 5 (via `pLimit`). A hit that returns 403 or 404 during hydration falls back to its summary-only row rather than failing the entire page.
 

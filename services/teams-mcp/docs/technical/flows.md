@@ -343,7 +343,7 @@ flowchart TB
 
 The Chat Module exposes a **synchronous request/response** tool surface. Each tool call is handled inline — there is no queue or background worker. This is distinct from the async webhook/transcript ingestion path above.
 
-All chat and channel targeting is **ID-only**: `list_*` tools return identifiers that the caller passes to subsequent `get_*_messages` or `send_*_message` calls. See also: [Tools Reference](./tools.md).
+Each tool targets a chat or channel by id: `list_*` tools return identifiers that the caller passes to subsequent `get_*_messages` or `send_*_message` calls. See also: [Tools Reference](./tools.md).
 
 ### Chat Read Flow
 
