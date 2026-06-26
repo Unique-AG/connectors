@@ -4,6 +4,7 @@ import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { CreateDraftEmailCommand } from '../create-draft-email.command';
 
 const USER_PROFILE_ID = { toString: () => 'user-1' } as unknown as UserProfileTypeID;
+const USER_PROFILE = { id: 'user-1', email: 'user@test.com' };
 
 interface MockGraphRequest {
   header: ReturnType<typeof vi.fn>;
@@ -22,7 +23,12 @@ function makeCommand() {
     }),
   } as unknown as GraphClientFactory;
 
-  const command = new CreateDraftEmailCommand(graphClientFactory, { run: vi.fn() } as never);
+  const command = new CreateDraftEmailCommand(
+    graphClientFactory,
+    { run: vi.fn() } as never,
+    { run: vi.fn().mockResolvedValue(new Map()) } as never,
+    { run: vi.fn().mockResolvedValue(USER_PROFILE) } as never,
+  );
 
   return { command, graphRequest };
 }
@@ -71,6 +77,8 @@ describe('CreateDraftEmailCommand.createDraft', () => {
     const command = new CreateDraftEmailCommand(
       { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
       { run: vi.fn() } as never,
+      { run: vi.fn().mockResolvedValue(new Map()) } as never,
+      { run: vi.fn().mockResolvedValue(USER_PROFILE) } as never,
     );
 
     await command.createDraft(USER_PROFILE_ID, {
@@ -97,6 +105,8 @@ describe('CreateDraftEmailCommand.createDraft', () => {
     const command = new CreateDraftEmailCommand(
       { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
       { run: vi.fn() } as never,
+      { run: vi.fn().mockResolvedValue(new Map()) } as never,
+      { run: vi.fn().mockResolvedValue(USER_PROFILE) } as never,
     );
 
     await command.createDraft(USER_PROFILE_ID, {

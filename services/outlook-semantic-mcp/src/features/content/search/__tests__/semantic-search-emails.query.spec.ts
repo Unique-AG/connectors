@@ -137,11 +137,14 @@ function createMockQuery(
   const profileMock = getUserProfileQuery as any;
   // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
   const sanitizeMock = sanitize as any;
+  // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
+  const buildWebLinksMock = { run: vi.fn().mockResolvedValue(new Map()) } as any;
   const instance = new SemanticSearchEmailsQuery(
     getDelegatedAccessQuery,
     apiMock,
     profileMock,
     sanitizeMock,
+    buildWebLinksMock,
   );
 
   return { instance, contentSearch };

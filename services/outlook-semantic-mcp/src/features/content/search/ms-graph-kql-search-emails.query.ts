@@ -87,7 +87,10 @@ export class MsGraphKqlSearchEmailsQuery {
     queries: Array<QueryInput>,
     searchConfig: MsGraphSearchConfig,
     outputTimeZone?: string,
-  ): Promise<{ results: SearchEmailResult[]; searchSummary: string | undefined }> {
+  ): Promise<{
+    results: SearchEmailResult[];
+    searchSummary: string | undefined;
+  }> {
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     const {
       requests: allRequests,
@@ -155,7 +158,7 @@ export class MsGraphKqlSearchEmailsQuery {
         title: hit.subject,
         from: hit.from,
         sourceMailbox: hit.mailbox,
-        outlookWebLink: hit.isDelegated ? '' : hit.webLink,
+        outlookWebLink: hit.webLink,
         receivedDateTime: hit.receivedDateTime,
         text: hit.text,
         uniqueContentUrl: undefined,
@@ -295,6 +298,11 @@ export class MsGraphKqlSearchEmailsQuery {
         }
 
         for (const msg of parsed.data.value) {
+          // The $search parameter causes Graph to return webLinks in the classic OWA format
+          // (outlook.office365.com/owa/?ItemID={restId}&…) rather than the new
+          // outlook.cloud.microsoft format that regular GET/POST endpoints return on migrated
+          // tenants. The classic format embeds a RestId, which OWA accepts — so these webLinks
+          // work as-is without any ID translation, even for delegated mailboxes.
           hits.push({
             restId: msg.id,
             mailbox: originalRequest.mailbox,

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { GraphUtilsModule } from '~/features/graph-utils/graph-utils.module';
 import { SubscriptionModule } from '~/features/subscriptions/subscription.module';
 import { UserUtilsModule } from '~/features/user-utils/user-utils.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
@@ -18,7 +19,13 @@ const COMMANDS = [
 const QUERIES = [LookupContactsQuery];
 
 @Module({
-  imports: [MsGraphModule, SubscriptionModule, UserUtilsModule, UniqueApiFeatureModule],
+  imports: [
+    MsGraphModule,
+    GraphUtilsModule,
+    SubscriptionModule,
+    UserUtilsModule,
+    UniqueApiFeatureModule,
+  ],
   providers: [...COMMANDS, ...QUERIES],
   exports: [...COMMANDS, ...QUERIES],
 })
