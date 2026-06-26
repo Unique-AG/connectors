@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@2.0.1...outlook-semantic-mcp@2.0.2) (2026-06-26)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** un-22182 fix delegated mailboxes web links ([#661](https://github.com/Unique-AG/connectors/issues/661)) ([92d21e1](https://github.com/Unique-AG/connectors/commit/92d21e17677865731f6e1cf776e1862ecc2ce403))
+
 ## [2.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@2.0.0...outlook-semantic-mcp@2.0.1) (2026-06-19)
 
 
