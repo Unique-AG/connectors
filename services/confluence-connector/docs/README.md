@@ -189,7 +189,7 @@ sequenceDiagram
 
         Connector->>Confluence: Fetch full page content
         Confluence->>Connector: Page HTML body
-        opt Page has <ac:image> references to Confluence attachments
+        opt Page has #60;ac:image#62; references to Confluence attachments
             opt Some references point to another page
                 Connector->>Confluence: Look up target page by (spaceKey, title)
                 Confluence->>Connector: Target page + its attachments
