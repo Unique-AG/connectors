@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { collectAllPages, GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { MeetingCollection, Transcript } from '../transcript.dtos';
 import { TranscriptCreatedService } from '../transcript-created.service';
 
@@ -71,6 +72,7 @@ export class IngestMeetingTool {
         'Ingests a specific Teams meeting transcript by its join URL. Ask the user for the meeting join URL if not provided. If the meeting has multiple transcripts and no date is given, the user will be prompted to choose; if their client cannot prompt, ask them to provide a date (YYYY-MM-DD).',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async ingestMeeting(
     input: z.infer<typeof IngestMeetingInputSchema>,

@@ -3,6 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { ChatService } from '../chat.service';
 
 const SendChatMessageInputSchema = z.object({
@@ -45,6 +46,7 @@ export class SendChatMessageTool {
       'unique.app/system-prompt': 'Call list_chats first to get the chatId, then send by chatId.',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async sendChatMessage(
     input: z.infer<typeof SendChatMessageInputSchema>,

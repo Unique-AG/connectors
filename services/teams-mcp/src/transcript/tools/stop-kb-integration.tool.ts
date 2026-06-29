@@ -4,6 +4,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { SubscriptionRemoveService } from '../subscription-remove.service';
 
 const StopKbIntegrationInputSchema = z.object({});
@@ -48,6 +49,7 @@ export class StopKbIntegrationTool {
         'Stops the knowledge base integration for meeting transcripts. After stopping, new meeting transcripts will no longer be ingested. Use verify_kb_integration_status first to check if it is running.',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async stopKbIntegration(
     _input: z.infer<typeof StopKbIntegrationInputSchema>,

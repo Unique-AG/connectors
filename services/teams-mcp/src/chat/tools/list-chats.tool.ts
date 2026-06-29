@@ -3,6 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { MsChat } from '../chat.dtos';
 import { ChatService } from '../chat.service';
 
@@ -72,6 +73,7 @@ export class ListChatsTool {
       'unique.app/icon': 'message-circle',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async listChats(
     input: z.infer<typeof ListChatsInputSchema>,

@@ -7,6 +7,7 @@ import { TEAMS_SOURCE_KIND } from '~/unique/unique.consts';
 import { type PublicSearchRequest, SearchType } from '~/unique/unique.dtos';
 import { UniqueContentService } from '~/unique/unique-content.service';
 import { UniqueUserMappingService } from '~/unique/unique-user-mapping.service';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { buildTranscriptFilter, parseTranscriptMetadata } from './transcript-tools.helpers';
 
 const FindTranscriptsInputSchema = z.object({
@@ -91,6 +92,7 @@ export class FindTranscriptsTool {
         'Use this tool to search meeting transcripts. Cite results using [N] where N is the array index (e.g., [0] for first result, [1] for second). The platform will automatically convert these to proper references.',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async findTranscripts(
     input: z.infer<typeof FindTranscriptsInputSchema>,

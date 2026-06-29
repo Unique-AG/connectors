@@ -3,6 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { ChannelService } from '../channel.service';
 
 const ListTeamsInputSchema = z.object({
@@ -52,6 +53,7 @@ export class ListTeamsTool {
       'unique.app/icon': 'users',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async listTeams(
     input: z.infer<typeof ListTeamsInputSchema>,

@@ -3,6 +3,7 @@ import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { ChannelService } from '../channel.service';
 
 const SendChannelMessageInputSchema = z.object({
@@ -53,6 +54,7 @@ export class SendChannelMessageTool {
         'Call list_teams then list_channels first to get teamId + channelId, then send by id.',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async sendChannelMessage(
     input: z.infer<typeof SendChannelMessageInputSchema>,

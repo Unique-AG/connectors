@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { TEAMS_SOURCE_KIND } from '~/unique/unique.consts';
 import { UniqueContentService } from '~/unique/unique-content.service';
 import { UniqueUserMappingService } from '~/unique/unique-user-mapping.service';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { buildTranscriptFilter, parseTranscriptMetadata } from './transcript-tools.helpers';
 
 const ListMeetingsInputSchema = z.object({
@@ -85,6 +86,7 @@ export class ListMeetingsTool {
         'Use this tool to browse meetings by date, organizer, or participant without a search query. Returns meeting IDs that can be used with find_transcripts for deeper search.',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async listMeetings(
     input: z.infer<typeof ListMeetingsInputSchema>,

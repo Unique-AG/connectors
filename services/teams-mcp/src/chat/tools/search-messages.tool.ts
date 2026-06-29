@@ -4,6 +4,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { SearchService } from '../search.service';
 
 const SearchMessagesInputSchema = z
@@ -141,6 +142,7 @@ export class SearchMessagesTool {
       'unique.app/icon': 'search',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async searchMessages(
     input: z.infer<typeof SearchMessagesInputSchema>,
