@@ -11,11 +11,11 @@ function graphError(statusCode: number, code?: string, requestId?: string): Grap
   return error;
 }
 
-function networkError(code: string): Error {
+function networkError(code: string, hostname = 'graph.microsoft.com'): Error {
   // Mirrors how undici surfaces transport failures: a `TypeError: fetch failed`
-  // whose `.cause` carries the original errno.
+  // whose `.cause` carries the original errno (and `.hostname` for DNS failures).
   const error = new TypeError('fetch failed');
-  (error as NodeJS.ErrnoException).cause = Object.assign(new Error(code), { code });
+  (error as NodeJS.ErrnoException).cause = Object.assign(new Error(code), { code, hostname });
   return error;
 }
 
@@ -84,12 +84,30 @@ describe('classifyError', () => {
     expect(classifyError(graphError(404, 'NotFound')).fault).toBe('client_request');
   });
 
-  it('classifies a fetch-failed network error as upstream_network', () => {
-    const result = classifyError(networkError('EAI_AGAIN'));
+  it('classifies a fetch-failed network error to a Microsoft host as upstream_network', () => {
+    const result = classifyError(networkError('EAI_AGAIN', 'graph.microsoft.com'));
     expect(result.fault).toBe('upstream_network');
     expect(result.retryable).toBe(true);
     expect(result.message).toContain('Microsoft Graph');
     expect(result.message).toContain('EAI_AGAIN');
+  });
+
+  it('classifies a network failure to the login host as upstream_network', () => {
+    expect(classifyError(networkError('ETIMEDOUT', 'login.microsoftonline.com')).fault).toBe(
+      'upstream_network',
+    );
+  });
+
+  it('does NOT attribute a network failure to a non-Microsoft host to Graph', () => {
+    // e.g. Postgres/Drizzle or Unique API DNS failure surfacing the same errno.
+    const result = classifyError(networkError('EAI_AGAIN', 'db.internal.cluster.local'));
+    expect(result.fault).toBe('unknown');
+    expect(result.message).not.toContain('Microsoft Graph');
+  });
+
+  it('does NOT attribute a hostless transport error to Graph', () => {
+    const bare = new TypeError('fetch failed');
+    expect(classifyError(bare).fault).toBe('unknown');
   });
 
   it('classifies an arbitrary error as unknown, preserving the message', () => {
@@ -120,9 +138,14 @@ describe('toAttributedError', () => {
     expect((result as Error).message).toContain('req-xyz');
   });
 
-  it('rewrites a network error into an attributed Error', () => {
-    const result = toAttributedError(networkError('EAI_AGAIN'));
+  it('rewrites a network error to a Microsoft host into an attributed Error', () => {
+    const result = toAttributedError(networkError('EAI_AGAIN', 'graph.microsoft.com'));
     expect(result).toBeInstanceOf(Error);
     expect((result as Error).message).toContain('Could not reach Microsoft Graph');
+  });
+
+  it('returns a non-Microsoft-host network error unchanged', () => {
+    const dbError = networkError('EAI_AGAIN', 'db.internal.cluster.local');
+    expect(toAttributedError(dbError)).toBe(dbError);
   });
 });

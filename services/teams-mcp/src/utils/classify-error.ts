@@ -24,6 +24,41 @@ const UPSTREAM_NETWORK_CODES = new Set([
 ]);
 
 /**
+ * Registrable domains for the Microsoft endpoints this connector talks to (Graph + login,
+ * including national clouds). The transport errnos above also surface from Postgres/Drizzle
+ * and the Unique API, so a network failure is only attributed to Microsoft Graph when the
+ * unreachable host matches one of these — otherwise we'd blame Graph for a database or
+ * platform outage.
+ */
+const MICROSOFT_HOST_DOMAINS = [
+  'microsoft.com',
+  'microsoft.us',
+  'microsoftonline.com',
+  'microsoftonline.us',
+  'microsoftonline.cn',
+  'microsoftgraph.chinacloudapi.cn',
+];
+
+/**
+ * The host that could not be reached, if the error carries one. Node's DNS failures
+ * (`EAI_AGAIN`, `ENOTFOUND`) expose `.hostname`; undici nests the original errno — and its
+ * `.hostname` — under `.cause`.
+ */
+function extractTargetHost(error: unknown): string | undefined {
+  const errno = error as (NodeJS.ErrnoException & { hostname?: string }) | undefined;
+  const cause = errno?.cause as (NodeJS.ErrnoException & { hostname?: string }) | undefined;
+  return errno?.hostname ?? cause?.hostname;
+}
+
+function isMicrosoftHost(host: string | undefined): boolean {
+  if (!host) {
+    return false;
+  }
+  const lower = host.toLowerCase();
+  return MICROSOFT_HOST_DOMAINS.some((domain) => lower === domain || lower.endsWith(`.${domain}`));
+}
+
+/**
  * The party at fault for a failed operation.
  * - `upstream_microsoft` — Microsoft Graph returned 429 or 5xx (their server erred).
  * - `upstream_network`    — we could not reach Microsoft Graph (connectivity / DNS).
@@ -48,8 +83,11 @@ export interface ClassifiedError {
 }
 
 /**
- * True when the error is a transport-level failure to reach Microsoft Graph
- * (DNS resolution, connection, socket) rather than an HTTP response from Graph.
+ * True when the error is a transport-level failure (DNS resolution, connection, socket)
+ * rather than an HTTP response. This is host-agnostic — it does not assert *which* host
+ * was unreachable (the same errnos arise from Graph, Postgres and the Unique API). Callers
+ * that need to attribute the failure to Microsoft must additionally confirm the host
+ * (see `classifyError`); the Graph metrics middleware is already Graph-scoped by construction.
  *
  * undici wraps these in a `TypeError: fetch failed` whose `.cause` carries the
  * original `NodeJS.ErrnoException` (`cause.code`), so we check both levels.
@@ -121,7 +159,10 @@ export function classifyError(error: unknown): ClassifiedError {
     }
   }
 
-  if (isUpstreamNetworkError(error)) {
+  // Only attribute a transport failure to Microsoft Graph when the unreachable host is a
+  // confirmed Microsoft endpoint. The same errnos arise from Postgres/Drizzle and the Unique
+  // API; without a confirmed Microsoft host we fall through to `unknown` rather than blame Graph.
+  if (isUpstreamNetworkError(error) && isMicrosoftHost(extractTargetHost(error))) {
     const errno = error as NodeJS.ErrnoException;
     const cause = errno.cause as NodeJS.ErrnoException | undefined;
     const code = errno.code ?? cause?.code;
