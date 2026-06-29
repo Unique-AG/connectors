@@ -35,6 +35,6 @@ export class GetPendingPaymentsTool {
     input: z.infer<typeof GetPendingPaymentsInputSchema>,
     _context: Context,
   ): Promise<GetPendingPaymentsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

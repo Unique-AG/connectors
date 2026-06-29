@@ -33,6 +33,6 @@ export class GetSectorsTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetSectorsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

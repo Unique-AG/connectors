@@ -34,6 +34,6 @@ export class GetSharedLimitsTool {
     input: z.infer<typeof GetSharedLimitsInputSchema>,
     _context: Context,
   ): Promise<GetSharedLimitsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

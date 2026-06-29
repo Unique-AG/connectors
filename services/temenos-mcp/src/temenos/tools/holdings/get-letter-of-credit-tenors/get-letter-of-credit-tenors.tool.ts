@@ -34,6 +34,6 @@ export class GetLetterOfCreditTenorsTool {
     input: z.infer<typeof GetLetterOfCreditTenorsInputSchema>,
     _context: Context,
   ): Promise<GetLetterOfCreditTenorsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

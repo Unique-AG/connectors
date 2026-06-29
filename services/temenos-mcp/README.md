@@ -41,7 +41,7 @@ The server exposes **49** tools across five domains, each wrapping a single Teme
 | Product | 1 | `get_interest_conditions` |
 | Reference | 23 | `get_countries`, `get_industries`, `get_companies`, `get_sectors`, `get_account_officers`, `get_lookups`, `get_system_dates`, `get_us_states` |
 
-On a Temenos 4xx/5xx the HTTP client raises a `TemenosApiError` carrying the upstream status, request path, and the best available error message (`message` / `detail` / `title` / `error`, else the raw body).
+On a Temenos 4xx/5xx the HTTP client raises a `TemenosApiError` carrying the upstream status, request path, and the best available error message (`message` / `detail` / `title` / `error`, else `HTTP <status>`). Raw upstream bodies are never echoed into errors or logs.
 
 ## Configuration
 

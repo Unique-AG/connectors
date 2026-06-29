@@ -34,6 +34,6 @@ export class GetRepoPositionMovementsTool {
     input: z.infer<typeof GetRepoPositionMovementsInputSchema>,
     _context: Context,
   ): Promise<GetRepoPositionMovementsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

@@ -34,6 +34,6 @@ export class GetCategoriesTool {
     input: z.infer<typeof GetCategoriesInputSchema>,
     _context: Context,
   ): Promise<GetCategoriesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

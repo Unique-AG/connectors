@@ -34,6 +34,6 @@ export class GetRepoPositionsTool {
     input: z.infer<typeof GetRepoPositionsInputSchema>,
     _context: Context,
   ): Promise<GetRepoPositionsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

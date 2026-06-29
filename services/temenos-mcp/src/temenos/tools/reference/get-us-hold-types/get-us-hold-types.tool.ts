@@ -34,6 +34,6 @@ export class GetUsHoldTypesTool {
     input: z.infer<typeof GetUsHoldTypesInputSchema>,
     _context: Context,
   ): Promise<GetUsHoldTypesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

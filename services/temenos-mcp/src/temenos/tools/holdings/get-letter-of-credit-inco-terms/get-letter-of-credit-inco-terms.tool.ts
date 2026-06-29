@@ -34,6 +34,6 @@ export class GetLetterOfCreditIncoTermsTool {
     input: z.infer<typeof GetLetterOfCreditIncoTermsInputSchema>,
     _context: Context,
   ): Promise<GetLetterOfCreditIncoTermsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

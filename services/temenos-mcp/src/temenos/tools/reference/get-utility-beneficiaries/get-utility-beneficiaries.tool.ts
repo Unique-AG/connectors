@@ -35,6 +35,6 @@ export class GetUtilityBeneficiariesTool {
     input: z.infer<typeof GetUtilityBeneficiariesInputSchema>,
     _context: Context,
   ): Promise<GetUtilityBeneficiariesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

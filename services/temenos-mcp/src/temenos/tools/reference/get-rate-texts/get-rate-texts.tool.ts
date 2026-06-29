@@ -34,6 +34,6 @@ export class GetRateTextsTool {
     input: z.infer<typeof GetRateTextsInputSchema>,
     _context: Context,
   ): Promise<GetRateTextsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

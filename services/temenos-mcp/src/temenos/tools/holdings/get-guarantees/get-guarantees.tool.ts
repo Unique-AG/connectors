@@ -35,6 +35,6 @@ export class GetGuaranteesTool {
     input: z.infer<typeof GetGuaranteesInputSchema>,
     _context: Context,
   ): Promise<GetGuaranteesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

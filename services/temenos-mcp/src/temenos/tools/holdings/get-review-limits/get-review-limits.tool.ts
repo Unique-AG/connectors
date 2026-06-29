@@ -35,6 +35,6 @@ export class GetReviewLimitsTool {
     input: z.infer<typeof GetReviewLimitsInputSchema>,
     _context: Context,
   ): Promise<GetReviewLimitsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

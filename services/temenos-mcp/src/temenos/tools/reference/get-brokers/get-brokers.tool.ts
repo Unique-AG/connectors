@@ -33,6 +33,6 @@ export class GetBrokersTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetBrokersResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

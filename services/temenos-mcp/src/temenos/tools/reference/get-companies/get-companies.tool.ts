@@ -33,6 +33,6 @@ export class GetCompaniesTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetCompaniesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

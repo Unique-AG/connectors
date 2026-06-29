@@ -35,6 +35,6 @@ export class GetCustomerRelationshipsTool {
     input: z.infer<typeof GetCustomerRelationshipsInputSchema>,
     _context: Context,
   ): Promise<GetCustomerRelationshipsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

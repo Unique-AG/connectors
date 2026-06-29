@@ -34,6 +34,6 @@ export class GetDealersTool {
     input: z.infer<typeof GetDealersInputSchema>,
     _context: Context,
   ): Promise<GetDealersResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

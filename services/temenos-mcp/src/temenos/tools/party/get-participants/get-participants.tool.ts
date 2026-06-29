@@ -35,6 +35,6 @@ export class GetParticipantsTool {
     input: z.infer<typeof GetParticipantsInputSchema>,
     _context: Context,
   ): Promise<GetParticipantsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

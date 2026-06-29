@@ -34,6 +34,6 @@ export class GetCountriesTool {
     input: z.infer<typeof GetCountriesInputSchema>,
     _context: Context,
   ): Promise<GetCountriesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

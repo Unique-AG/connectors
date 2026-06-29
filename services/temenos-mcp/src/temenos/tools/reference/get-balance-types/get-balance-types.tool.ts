@@ -33,6 +33,6 @@ export class GetBalanceTypesTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetBalanceTypesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

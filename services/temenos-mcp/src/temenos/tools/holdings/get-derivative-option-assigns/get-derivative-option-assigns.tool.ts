@@ -34,6 +34,6 @@ export class GetDerivativeOptionAssignsTool {
     input: z.infer<typeof GetDerivativeOptionAssignsInputSchema>,
     _context: Context,
   ): Promise<GetDerivativeOptionAssignsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

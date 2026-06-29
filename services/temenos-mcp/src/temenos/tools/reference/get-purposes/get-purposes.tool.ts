@@ -33,6 +33,6 @@ export class GetPurposesTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetPurposesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

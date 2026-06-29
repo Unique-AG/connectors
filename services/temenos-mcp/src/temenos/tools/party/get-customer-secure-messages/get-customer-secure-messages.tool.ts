@@ -34,6 +34,6 @@ export class GetCustomerSecureMessagesTool {
     input: z.infer<typeof GetCustomerSecureMessagesInputSchema>,
     _context: Context,
   ): Promise<GetCustomerSecureMessagesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

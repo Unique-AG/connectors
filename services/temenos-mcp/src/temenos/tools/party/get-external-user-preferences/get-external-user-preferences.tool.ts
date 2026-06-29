@@ -34,6 +34,6 @@ export class GetExternalUserPreferencesTool {
     input: z.infer<typeof GetExternalUserPreferencesInputSchema>,
     _context: Context,
   ): Promise<GetExternalUserPreferencesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

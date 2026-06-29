@@ -34,6 +34,6 @@ export class GetUsFdicClasscodesTool {
     input: z.infer<typeof GetUsFdicClasscodesInputSchema>,
     _context: Context,
   ): Promise<GetUsFdicClasscodesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

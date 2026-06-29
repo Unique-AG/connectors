@@ -33,6 +33,6 @@ export class GetIndustriesTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetIndustriesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

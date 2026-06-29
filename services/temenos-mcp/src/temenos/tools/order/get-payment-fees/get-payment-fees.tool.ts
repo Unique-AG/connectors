@@ -33,6 +33,6 @@ export class GetPaymentFeesTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetPaymentFeesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

@@ -33,6 +33,6 @@ export class GetNostroAccountsTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetNostroAccountsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

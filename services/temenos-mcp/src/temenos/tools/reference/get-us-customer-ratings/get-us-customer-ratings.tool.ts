@@ -34,6 +34,6 @@ export class GetUsCustomerRatingsTool {
     input: z.infer<typeof GetUsCustomerRatingsInputSchema>,
     _context: Context,
   ): Promise<GetUsCustomerRatingsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

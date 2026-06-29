@@ -33,6 +33,6 @@ export class GetLanguageCodesTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetLanguageCodesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

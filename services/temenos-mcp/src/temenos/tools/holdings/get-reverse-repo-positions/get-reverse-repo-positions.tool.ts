@@ -34,6 +34,6 @@ export class GetReverseRepoPositionsTool {
     input: z.infer<typeof GetReverseRepoPositionsInputSchema>,
     _context: Context,
   ): Promise<GetReverseRepoPositionsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

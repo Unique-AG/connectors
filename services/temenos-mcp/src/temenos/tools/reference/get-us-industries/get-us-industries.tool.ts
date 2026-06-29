@@ -34,6 +34,6 @@ export class GetUsIndustriesTool {
     input: z.infer<typeof GetUsIndustriesInputSchema>,
     _context: Context,
   ): Promise<GetUsIndustriesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

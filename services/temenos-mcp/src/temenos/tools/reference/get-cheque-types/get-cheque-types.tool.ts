@@ -35,6 +35,6 @@ export class GetChequeTypesTool {
     input: z.infer<typeof GetChequeTypesInputSchema>,
     _context: Context,
   ): Promise<GetChequeTypesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

@@ -34,6 +34,6 @@ export class GetReverseRepoPositionMovementsTool {
     input: z.infer<typeof GetReverseRepoPositionMovementsInputSchema>,
     _context: Context,
   ): Promise<GetReverseRepoPositionMovementsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

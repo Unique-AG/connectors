@@ -35,6 +35,6 @@ export class GetPaymentStopsTool {
     input: z.infer<typeof GetPaymentStopsInputSchema>,
     _context: Context,
   ): Promise<GetPaymentStopsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

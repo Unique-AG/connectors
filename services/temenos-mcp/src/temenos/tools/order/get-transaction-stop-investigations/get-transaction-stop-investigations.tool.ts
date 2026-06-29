@@ -33,6 +33,6 @@ export class GetTransactionStopInvestigationsTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetTransactionStopInvestigationsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

@@ -35,6 +35,6 @@ export class GetLookupsTool {
     input: z.infer<typeof GetLookupsInputSchema>,
     _context: Context,
   ): Promise<GetLookupsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

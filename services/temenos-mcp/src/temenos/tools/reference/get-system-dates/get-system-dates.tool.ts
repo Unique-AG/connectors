@@ -35,6 +35,6 @@ export class GetSystemDatesTool {
     input: z.infer<typeof GetSystemDatesInputSchema>,
     _context: Context,
   ): Promise<GetSystemDatesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

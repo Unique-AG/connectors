@@ -33,6 +33,6 @@ export class GetUsBeneficialOwnerTypesTool {
     input: Record<string, never>,
     _context: Context,
   ): Promise<GetUsBeneficialOwnerTypesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

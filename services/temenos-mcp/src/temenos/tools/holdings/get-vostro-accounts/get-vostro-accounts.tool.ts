@@ -35,6 +35,6 @@ export class GetVostroAccountsTool {
     input: z.infer<typeof GetVostroAccountsInputSchema>,
     _context: Context,
   ): Promise<GetVostroAccountsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

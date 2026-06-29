@@ -34,6 +34,6 @@ export class GetUsStatesTool {
     input: z.infer<typeof GetUsStatesInputSchema>,
     _context: Context,
   ): Promise<GetUsStatesResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

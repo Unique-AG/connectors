@@ -34,6 +34,6 @@ export class GetLimitMasterGroupsTool {
     input: z.infer<typeof GetLimitMasterGroupsInputSchema>,
     _context: Context,
   ): Promise<GetLimitMasterGroupsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

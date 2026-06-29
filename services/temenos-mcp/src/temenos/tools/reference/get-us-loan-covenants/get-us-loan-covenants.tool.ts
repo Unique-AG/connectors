@@ -34,6 +34,6 @@ export class GetUsLoanCovenantsTool {
     input: z.infer<typeof GetUsLoanCovenantsInputSchema>,
     _context: Context,
   ): Promise<GetUsLoanCovenantsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }

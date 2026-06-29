@@ -35,6 +35,6 @@ export class GetExpiringLimitsTool {
     input: z.infer<typeof GetExpiringLimitsInputSchema>,
     _context: Context,
   ): Promise<GetExpiringLimitsResult> {
-    return this.query.run(input as never);
+    return this.query.run(input);
   }
 }
