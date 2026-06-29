@@ -29,6 +29,7 @@ outlook-semantic-mcp = services/outlook-semantic-mcp/**
 sharepoint-connector = services/sharepoint-connector/**
 confluence-connector = services/confluence-connector/**
 teams-mcp = services/teams-mcp/**
+temenos-mcp = services/temenos-mcp/**
 
 # Packages
 aes-gcm-encryption = packages/aes-gcm-encryption/**

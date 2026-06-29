@@ -1283,6 +1283,136 @@ importers:
         specifier: 3.2.6
         version: 3.2.6(@types/node@22.16.5)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3)
 
+  services/temenos-mcp:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: 1.27.1
+        version: 1.27.1(zod@4.1.5)
+      '@nestjs/common':
+        specifier: 11.1.18
+        version: 11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/config':
+        specifier: 4.0.3
+        version: 4.0.3(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: 11.1.18
+        version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: 11.1.18
+        version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)
+      '@opentelemetry/api':
+        specifier: 1.9.0
+        version: 1.9.0
+      '@proventuslabs/nestjs-zod':
+        specifier: 2.0.0
+        version: 2.0.0(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.3(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.1.5)
+      '@unique-ag/instrumentation':
+        specifier: workspace:*
+        version: file:packages/instrumentation(@prisma/instrumentation@6.19.3(@opentelemetry/api@1.9.0))
+      '@unique-ag/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@unique-ag/mcp-server-module':
+        specifier: workspace:*
+        version: link:../../packages/mcp-server-module
+      '@unique-ag/probe':
+        specifier: workspace:*
+        version: file:packages/probe(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.4(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2))
+      '@unique-ag/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
+      express:
+        specifier: 5.1.0
+        version: 5.1.0
+      nestjs-otel:
+        specifier: 8.0.2
+        version: 8.0.2(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)
+      nestjs-pino:
+        specifier: 4.6.1
+        version: 4.6.1(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@10.5.0)(pino@10.3.1)(rxjs@7.8.2)
+      nestjs-zod:
+        specifier: 5.0.1
+        version: 5.0.1(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/swagger@11.4.4(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.1.5)
+      reflect-metadata:
+        specifier: 0.2.2
+        version: 0.2.2
+      remeda:
+        specifier: 2.32.0
+        version: 2.32.0
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
+      typeid-js:
+        specifier: 1.2.0
+        version: 1.2.0
+      undici:
+        specifier: 7.28.0
+        version: 7.28.0
+      zod:
+        specifier: 4.1.5
+        version: 4.1.5
+    devDependencies:
+      '@nestjs/cli':
+        specifier: 11.0.18
+        version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.16.5)
+      '@nestjs/schematics':
+        specifier: 11.0.10
+        version: 11.0.10(chokidar@4.0.3)(typescript@5.9.2)
+      '@nestjs/testing':
+        specifier: 11.1.18
+        version: 11.1.18(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/platform-express@11.1.18)
+      '@suites/di.nestjs':
+        specifier: 3.0.1
+        version: 3.0.1(@nestjs/common@11.1.18(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)
+      '@suites/doubles.vitest':
+        specifier: 3.0.1
+        version: 3.0.1(@vitest/spy@3.2.6)(vitest@3.2.6(@types/node@22.16.5)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))
+      '@suites/unit':
+        specifier: 3.0.1
+        version: 3.0.1
+      '@swc/cli':
+        specifier: 0.8.1
+        version: 0.8.1(@swc/core@1.13.5)(chokidar@4.0.3)
+      '@swc/core':
+        specifier: 1.13.5
+        version: 1.13.5
+      '@types/express':
+        specifier: 5.0.3
+        version: 5.0.3
+      '@types/node':
+        specifier: 22.16.5
+        version: 22.16.5
+      '@types/supertest':
+        specifier: 6.0.3
+        version: 6.0.3
+      '@vitest/coverage-istanbul':
+        specifier: 3.2.6
+        version: 3.2.6(vitest@3.2.6(@types/node@22.16.5)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3))
+      globals:
+        specifier: 16.3.0
+        version: 16.3.0
+      istanbul-badges-readme:
+        specifier: 1.9.0
+        version: 1.9.0
+      source-map-support:
+        specifier: 0.5.21
+        version: 0.5.21
+      supertest:
+        specifier: 7.1.4
+        version: 7.1.4
+      type-fest:
+        specifier: 5.2.0
+        version: 5.2.0
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      unplugin-swc:
+        specifier: 1.5.7
+        version: 1.5.7(@swc/core@1.13.5)(rollup@4.60.1)
+      vitest:
+        specifier: 3.2.6
+        version: 3.2.6(@types/node@22.16.5)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3)
+
 packages:
 
   '@ampproject/remapping@2.3.0':
