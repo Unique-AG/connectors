@@ -110,15 +110,15 @@ sequenceDiagram
         loop For each new/updated page (concurrency-limited)
             Connector->>Confluence: GET page by ID<br/>(body.storage)
             Confluence->>Connector: Page HTML content
-            Note over Connector: Parse storage XML, locate &lt;ac:image&gt; macros
+            Note over Connector: Parse storage XML, locate ac:image macros
             opt Image attachments referenced
                 opt Some references point to another page
-                    Connector->>Confluence: GET /rest/api/content?spaceKey=&amp;title=
+                    Connector->>Confluence: GET /rest/api/content by spaceKey and title
                     Confluence->>Connector: Target page + its attachments
                 end
                 Connector->>Confluence: Download each referenced image
                 Confluence->>Connector: Image binary streams
-                Note over Connector: Base64-encode and splice<br/>&lt;img src="data:..."&gt; in place of macros
+                Note over Connector: Base64-encode and splice<br/>img data-URI in place of macros
             end
             Connector->>Unique: Register content
             Connector->>Unique: PUT buffer upload (text/html)
