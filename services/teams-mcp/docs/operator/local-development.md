@@ -170,6 +170,17 @@ This URL is used when creating Microsoft Graph subscriptions.
 3. You should see the OAuth metadata JSON
 4. Connect with an MCP client that supports OAuth
 
+### Testing Chat Tools
+
+After connecting a test user via MCP Inspector:
+
+1. **Discover ids** — call `list_teams` to find team ids and `list_chats` to find chat ids. Both return ids alongside display names and metadata so you can identify the right target unambiguously.
+2. **Read messages** — call `get_chat_messages` with a chat id, or `get_channel_messages` with a team id and channel id (use `list_channels` to find channel ids). Both return paginated message history.
+3. **Search** — call `search_messages` with a keyword query. Results span both chats and channels; pass `detail=full` to hydrate full message content.
+4. **Send** — call `send_chat_message` with a chat id to post to a 1:1 or group chat, or `send_channel_message` with a team id and channel id to post to a channel. Verify the message appears in the Teams client.
+
+All tool inputs accept ids only (no display-name lookup at call time) — always use the `list_*` tools first to obtain the correct id.
+
 ### Testing Webhooks
 
 1. Ensure dev tunnel is running

@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 1802502170 -->
 <!-- confluence-space-key: PUBDOC -->
 
-The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Teams meetings with the Unique platform through the Model Context Protocol (MCP). It captures meeting transcripts and recordings from Microsoft Teams and ingests them into Unique with proper access controls.
+The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Teams with the Unique platform through the Model Context Protocol (MCP). It captures meeting transcripts and recordings from Microsoft Teams, ingests them into Unique with proper access controls, and exposes synchronous MCP tools for reading and sending messages across chats and channels.
 
 **Core Capabilities:**
 
@@ -10,6 +10,9 @@ The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Te
 - Handles OAuth2 authentication with Microsoft Entra ID
 - Ingests content into the Unique platform with participant-based access controls
 - Manages subscription lifecycle (create, renew, remove) with scheduled synchronization
+- Reads messages from personal chats and team channels via synchronous MCP tools
+- Searches across chats and channels using the Microsoft Search API
+- Sends messages to chats and channels via synchronous MCP tools
 
 ## High-Level Architecture
 
@@ -26,7 +29,8 @@ flowchart TB
     subgraph TeamsMCP["Teams MCP Server"]
         OAuth["OAuth Module"]
         API["REST API"]
-        Processor["Transcript Processor"]
+        ChatTools["Chat Tools<br/>(synchronous)"]
+        Processor["Transcript Processor<br/>(asynchronous)"]
         GraphClient["Graph Client"]
     end
 
@@ -38,15 +42,18 @@ flowchart TB
     User --> EntraID
     EntraID --> OAuth
     OAuth --> DB
-    
+
+    User -->|"MCP tool calls"| ChatTools
+    ChatTools --> GraphClient
+
     MSGraph -->|"Webhooks"| API
     API --> Queue
     Queue --> Processor
-    
+
     Processor --> GraphClient
     GraphClient --> DB
     GraphClient --> MSGraph
-    
+
     Processor --> Unique
 ```
 
@@ -57,6 +64,13 @@ flowchart TB
 flowchart TB
     subgraph Auth["Authentication"]
         AuthModule["OAuth Provider<br/>Token Store"]
+    end
+
+    subgraph Chat["Chat Module"]
+        ChatSvc["Chat Service<br/>(chats, chat messages)"]
+        ChannelSvc["Channel Service<br/>(teams, channels, channel messages)"]
+        SearchSvc["Search Service<br/>(Microsoft Search API)"]
+        ChatToolLayer["Tool Layer<br/>(8 MCP tools)"]
     end
 
     subgraph Transcript["Transcript Module"]
@@ -81,6 +95,13 @@ flowchart TB
     end
 
     AuthModule --> DB
+    ChatToolLayer --> ChatSvc
+    ChatToolLayer --> ChannelSvc
+    ChatToolLayer --> SearchSvc
+    SearchSvc --> ChatSvc
+    ChatSvc --> GraphClient
+    ChannelSvc --> GraphClient
+    SearchSvc --> GraphClient
     Webhook --> RabbitMQ
     RabbitMQ --> Services
     Services --> GraphClient
@@ -102,6 +123,35 @@ flowchart TB
 | **Transcript Created Service** | Processes new transcripts and fetches recordings |
 | **Unique Service** | Interfaces with Unique Public API for content ingestion |
 | **AMQP Module** | RabbitMQ integration for async message processing |
+
+### Chat Module
+
+The Chat Module (`src/chat/`) exposes a synchronous request/response tool surface over MCP, distinct from the asynchronous webhook/transcript ingestion path. Tool calls are handled inline — there is no queue or background worker.
+
+**Services:**
+
+| Service | File | Responsibility |
+|---------|------|----------------|
+| **ChatService** | `chat.service.ts` | Lists personal chats; fetches and sends chat messages via `/me/chats` and `/chats/{id}/messages` |
+| **ChannelService** | `channel.service.ts` | Lists joined teams and their channels; fetches and sends channel messages via `/me/joinedTeams`, `/teams/{id}/channels`, and `/teams/{id}/channels/{id}/messages` |
+| **SearchService** | `search.service.ts` | Cross-container message search via the Microsoft Search API (`POST /search/query` on Graph v1.0); delegates per-hit hydration to `ChatService` |
+
+**Tool layer** (`src/chat/tools/`):
+
+| Tool | What it does |
+|------|-------------|
+| `list_chats` | Lists recent personal chats with member and preview metadata |
+| `get_chat_messages` | Fetches messages from a personal chat by ID |
+| `send_chat_message` | Posts a plain-text message to a personal chat by ID |
+| `list_teams` | Lists all Teams the user has joined |
+| `list_channels` | Lists channels in a given team by ID |
+| `get_channel_messages` | Fetches messages from a team channel by ID |
+| `send_channel_message` | Posts a plain-text message to a team channel by ID |
+| `search_messages` | Searches messages across chats, channels, or both |
+
+**Targeting by id:** `list_*` tools return identifiers (chat id, team id, channel id) that are passed directly to the `get_*_messages` and `send_*_message` tools. See [Chat Flows](./flows.md#Chat-Flows) for sequence diagrams.
+
+**Search specifics (`SearchService`):** The Microsoft Search API does not use `@odata.nextLink`; pagination is driven by `offset`/`size` on the request body and `moreResultsAvailable` on the response. When `detail=full`, each matching hit is hydrated with its full message body via an additional Graph call (N+1). Hydration runs with a concurrency cap of 5 (via `pLimit`). A hit that returns 403 or 404 during hydration falls back to its summary-only row rather than failing the entire page.
 
 ## Infrastructure
 
@@ -324,7 +374,7 @@ The MCP OAuth layer implements the [MCP Authorization specification](https://mod
 
 ## Related Documentation
 
-- [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing
+- [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing, chat read/search/send
 - [Security](./security.md) - Encryption, authentication, and threat model
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
 

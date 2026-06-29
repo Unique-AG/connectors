@@ -17,7 +17,7 @@
 
 The Teams MCP Server is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
-**Note:** This is a connector-style MCP server. Once connected, it automatically ingests meeting transcripts into the Unique knowledge base. It also exposes 8 MCP tools for Teams chat messaging: listing teams, channels, and chats; reading chat and channel messages; searching messages by keyword; and sending messages to channels or chats.
+**Note:** This is a connector-style MCP server that does two things. First, it automatically ingests meeting transcripts into the Unique knowledge base in the background. Second, it exposes an interactive tool surface of 14 MCP tools — 8 chat/messaging tools and 6 transcript/KB management tools. Chat and channel tools take ids obtained from the `list_*` tools. See [Technical Reference — Tools](./technical/tools.md) for the full tool reference.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
@@ -54,6 +54,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 | Permission | Type | Admin Consent | Required |
 |------------|------|---------------|----------|
 | `User.Read` | Delegated | No | Yes |
+| `Calendars.Read` | Delegated | No | Yes |
 | `OnlineMeetings.Read` | Delegated | No | Yes |
 | `OnlineMeetingRecording.Read.All` | Delegated | Yes | Yes |
 | `OnlineMeetingTranscript.Read.All` | Delegated | Yes | Yes |
@@ -99,14 +100,16 @@ For detailed permission justifications, see [Microsoft Graph Permissions](./tech
 
 **Teams Chat Messaging**
 
-- `list_teams`: List all Microsoft Teams the user is a member of
-- `list_channels`: List all channels in a specific team
-- `list_chats`: List the user's recent chats (1:1, group, and meeting chats)
-- `get_chat_messages`: Retrieve recent messages from a chat
-- `get_channel_messages`: Retrieve recent messages from a channel
-- `search_messages`: Search messages by keyword across chats and channels (Microsoft Search API)
-- `send_channel_message`: Send a plain text message to a Teams channel
-- `send_chat_message`: Send a plain text message to a Teams chat
+Chat and messaging tools target chats and channels by id: call a `list_*` tool to obtain an id (and distinguishing metadata), then pass that id to a read, write, or search tool.
+
+- `list_teams`: List all Microsoft Teams the user is a member of; returns team id and `isArchived` flag
+- `list_channels`: List all channels in a team (by team id); returns channel id, `createdDateTime`, and `membershipType`
+- `list_chats`: List the user's recent chats (1:1, group, and meeting chats) by chat id; returns `createdDateTime`, `lastMessageAt`, and members for topic-less or 1:1 chats
+- `get_chat_messages`: Retrieve recent messages from a chat (by chat id)
+- `get_channel_messages`: Retrieve recent messages from a channel (by team id + channel id)
+- `search_messages`: Search messages by keyword across chats and channels via the Microsoft Search API; returns chat/channel ids alongside results, enabling subsequent reads or sends
+- `send_channel_message`: Send a plain text message to a Teams channel (by team id + channel id)
+- `send_chat_message`: Send a plain text message to a Teams chat (by chat id)
 
 ### Advanced Features
 
@@ -318,6 +321,9 @@ See [Authentication Architecture - Single App Registration Architecture](./techn
 - **Multi-tenant in one session**: A user belonging to multiple Microsoft tenants must authenticate separately for each tenant; one OAuth session covers exactly one tenant
 - **Transcript format variants**: Only VTT-format transcripts are processed; meetings with transcripts in other formats are silently skipped
 - **Recording size assurance**: No application-level size check on recordings; very large files (e.g., multi-hour all-hands) may time out during download and be skipped, while the transcript is still ingested
+- **Rich message sends**: `send_chat_message` and `send_channel_message` send plain text only — no `@mentions`, no rich content (bold, tables, adaptive cards), and no attachment upload
+- **Message threading/replies**: There is no tool for replying to a specific message in a thread; only new top-level messages can be sent
+- **Chat/channel message ingestion**: Messages read or searched via the messaging tools are fetched live from Microsoft Graph on every call and are **not** ingested into the Unique knowledge base; only meeting transcripts are ingested
 
 ### Microsoft Graph API Constraints
 

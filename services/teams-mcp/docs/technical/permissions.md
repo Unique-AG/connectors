@@ -133,7 +133,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | List the user's chats with basic metadata (topic, members, chat type) |
-| **Used For** | `list_chats` tool and resolving chats by topic or member name |
+| **Used For** | `list_chats` tool, which returns chat ids plus distinguishing metadata (topic, members, creation and last-message dates) used to pick the right chat id |
 | **Why Not Less** | No narrower permission exists for listing chats |
 | **Why Not `Chat.Read`** | `Chat.ReadBasic` is sufficient for listing chats; `Chat.Read` is only needed for reading message content |
 
@@ -151,18 +151,18 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | List all Teams the user is a member of |
-| **Used For** | `list_teams` tool and resolving teams by display name |
+| **Used For** | `list_teams` tool, which returns team ids plus `isArchived` status to disambiguate same-named teams |
 | **Why Not Less** | No narrower permission exists for listing joined teams |
-| **Why Not `Team.Read.All`** | `Team.ReadBasic.All` is sufficient for listing teams with display names |
+| **Why Not `Team.Read.All`** | `Team.ReadBasic.All` is sufficient for listing teams with the metadata needed for id-based targeting |
 
 ### `Channel.ReadBasic.All`
 
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | List channels in a Team |
-| **Used For** | `list_channels` tool and resolving channels by display name |
+| **Used For** | `list_channels` tool, which returns channel ids plus `createdDateTime` and `membershipType` used to pick the right channel id |
 | **Why Not Less** | No narrower permission exists for listing channels |
-| **Why Not `Channel.Read.All`** | `Channel.ReadBasic.All` is sufficient for listing channels with display names |
+| **Why Not `Channel.Read.All`** | `Channel.ReadBasic.All` is sufficient for listing channels with the metadata needed for id-based targeting |
 
 ### `ChannelMessage.Read.All`
 

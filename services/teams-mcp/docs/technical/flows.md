@@ -339,6 +339,139 @@ flowchart TB
 - Meeting participants receive **read** access
 - Users are resolved by email or username in Unique platform
 
+## Chat Flows
+
+The Chat Module exposes a **synchronous request/response** tool surface. Each tool call is handled inline — there is no queue or background worker. This is distinct from the async webhook/transcript ingestion path above.
+
+Each tool targets a chat or channel by id: `list_*` tools return identifiers that the caller passes to subsequent `get_*_messages` or `send_*_message` calls. See also: [Tools Reference](./tools.md).
+
+### Chat Read Flow
+
+The read flow applies to both personal chats (`list_chats` → `get_chat_messages`) and team channels (`list_teams` → `list_channels` → `get_channel_messages`). The diagram below shows the personal chat variant; the channel variant substitutes `list_teams`/`list_channels` for `list_chats` and queries `/teams/{teamId}/channels/{channelId}/messages` instead of `/chats/{chatId}/messages`.
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+sequenceDiagram
+    autonumber
+    participant MCPClient as MCP Client
+    participant TeamsMCP as Teams MCP Server
+    participant MSGraph as Microsoft Graph API
+
+    Note over MCPClient,MSGraph: Step 1 — discover the target ID
+
+    MCPClient->>TeamsMCP: list_chats (limit?)
+    TeamsMCP->>MSGraph: GET /me/chats?$expand=members,lastMessagePreview&$orderby=...
+    MSGraph->>TeamsMCP: Page of chats (id, chatType, topic, members, lastMessagePreview)
+    TeamsMCP->>MCPClient: chats[], hasMore
+
+    Note over MCPClient,MSGraph: Step 2 — fetch messages by ID
+
+    MCPClient->>TeamsMCP: get_chat_messages (chatId, limit, orderBy?, excludeSystemMessages?)
+    TeamsMCP->>MSGraph: GET /chats/{chatId}/messages?$top=limit&$orderby=...
+    MSGraph->>TeamsMCP: First page of messages
+
+    alt excludeSystemMessages = true and page short
+        loop Follow @odata.nextLink until limit user messages collected
+            TeamsMCP->>MSGraph: GET next page (via @odata.nextLink)
+            MSGraph->>TeamsMCP: Next page of messages
+        end
+    end
+
+    Note over TeamsMCP: Normalize Teams HTML body to plain text
+    TeamsMCP->>MCPClient: messages[] (id, from, body, createdDateTime, ...)
+```
+
+**Key points:**
+
+- `list_chats` returns a single bounded page (no auto-pagination); `hasMore` indicates whether more chats exist.
+- Graph does not support server-side `messageType` filtering on message endpoints. When `excludeSystemMessages=true`, the server pages through results client-side until the requested number of user messages is collected.
+- Message bodies are returned as-is from Graph (HTML). The `get_channel_messages` path is identical but targets `/teams/{teamId}/channels/{channelId}/messages`.
+
+### Chat Search Flow
+
+`search_messages` queries the **Microsoft Search API** (`POST /search/query` on Graph v1.0) and optionally hydrates each hit with its full message body.
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+sequenceDiagram
+    autonumber
+    participant MCPClient as MCP Client
+    participant TeamsMCP as Teams MCP Server
+    participant MSGraph as Microsoft Graph API
+
+    MCPClient->>TeamsMCP: search_messages (query, source?, detail?, offset, size)
+    TeamsMCP->>MSGraph: POST /search/query<br/>{ entityTypes: ['chatMessage'], from: offset, size: size }
+    MSGraph->>TeamsMCP: hitsContainers[{ hits[], moreResultsAvailable }]
+
+    Note over TeamsMCP: Map hits to rows (source derived from resource shape:<br/>channelIdentity → channel, chatId → chat)
+
+    opt source filter applied (chat | channel)
+        Note over TeamsMCP: Drop rows not matching the requested source<br/>(Graph has no server-side entityType sub-filter)
+    end
+
+    alt detail = full
+        Note over TeamsMCP: Hydrate each hit — one extra Graph call per hit (N+1),<br/>concurrency capped at 5 (pLimit)
+        loop For each hit (up to 5 in parallel)
+            alt hit.source = channel
+                TeamsMCP->>MSGraph: GET /teams/{teamId}/channels/{channelId}/messages/{id}
+            else hit.source = chat
+                TeamsMCP->>MSGraph: GET /chats/{chatId}/messages/{id}
+            end
+            MSGraph->>TeamsMCP: Full message (body, attachments, ...)
+            Note over TeamsMCP: On 403 / 404: fall back to summary-only row (no error)
+        end
+    end
+
+    TeamsMCP->>MCPClient: messages[], returnedCount, moreResultsAvailable
+```
+
+**Key points:**
+
+- Pagination uses `offset`/`size` on the request body and `moreResultsAvailable` on the response — **not** `@odata.nextLink`. The caller advances the page by incrementing `offset` by `size`.
+- The source filter (`chat`/`channel`/`all`) is applied client-side after the Graph response, because the Search API's `entityTypes: ['chatMessage']` covers both containers with no sub-filter.
+- `detail=full` issues one additional Graph call per hit. Concurrency is capped at 5 to avoid Graph throttling. A forbidden or deleted hit falls back to its summary row rather than failing the page.
+- See [Tools Reference](./tools.md) for the full `search_messages` parameter list.
+
+### Chat Send Flow
+
+The send flow applies to personal chats (`send_chat_message`) and team channels (`send_channel_message`). The caller must first obtain the target ID via a `list_*` call.
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+sequenceDiagram
+    autonumber
+    participant MCPClient as MCP Client
+    participant TeamsMCP as Teams MCP Server
+    participant MSGraph as Microsoft Graph API
+
+    Note over MCPClient,MSGraph: Step 1 — discover the target ID (if not already known)
+
+    MCPClient->>TeamsMCP: list_chats / list_teams + list_channels
+    TeamsMCP->>MSGraph: GET /me/chats or GET /me/joinedTeams + GET /teams/{id}/channels
+    MSGraph->>TeamsMCP: chats[] / teams[] + channels[]
+    TeamsMCP->>MCPClient: IDs and display names
+
+    Note over MCPClient,MSGraph: Step 2 — send the message by ID
+
+    alt Personal chat
+        MCPClient->>TeamsMCP: send_chat_message (chatId, message)
+        TeamsMCP->>MSGraph: POST /chats/{chatId}/messages<br/>{ body: { contentType: 'text', content: message } }
+        MSGraph->>TeamsMCP: Created message (id)
+        TeamsMCP->>MCPClient: { id }
+    else Team channel
+        MCPClient->>TeamsMCP: send_channel_message (teamId, channelId, message)
+        TeamsMCP->>MSGraph: POST /teams/{teamId}/channels/{channelId}/messages<br/>{ body: { contentType: 'text', content: message } }
+        MSGraph->>TeamsMCP: Created message (id, webUrl)
+        TeamsMCP->>MCPClient: { id, webUrl }
+    end
+```
+
+**Key points:**
+
+- Only plain-text messages are supported (`contentType: 'text'`). Rich HTML or adaptive cards are not sent.
+- `send_channel_message` returns a `webUrl` linking directly to the posted message in Teams. `send_chat_message` returns only the message `id`.
+- The entire flow is synchronous — the tool returns only after Graph confirms the message was created.
+
 ## Related Documentation
 
 - [Architecture](./architecture.md) - System components and infrastructure

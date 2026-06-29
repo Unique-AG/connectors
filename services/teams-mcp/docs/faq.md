@@ -5,38 +5,28 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Teams MCP Server is a connector-style MCP server, not a traditional MCP server. Unlike traditional MCP servers that provide tools, prompts, resources, or other interactive capabilities, this server operates automatically in the background once connected.
+**Answer:** The Teams MCP Server is both a **connector** and an **interactive MCP server**. It does two things simultaneously: it automatically ingests meeting transcripts into the Unique knowledge base in the background, and it exposes an interactive tool surface of 14 MCP tools that AI clients can call on demand.
 
 **What it does:**
 
-- Once a user connects their Microsoft account, the connector automatically ingests meeting transcripts into the Unique knowledge base
-- It does not expose any MCP tools, prompts, or resources
-- It does not require any tool calls or additional interaction after the initial connection
-- It operates continuously in the background, processing transcripts as they become available
+- Once a user connects their Microsoft account, the connector automatically ingests meeting transcripts into the Unique knowledge base via real-time webhook notifications from Microsoft Graph
+- Exposes **8 chat/messaging tools**: `list_teams`, `list_channels`, `list_chats`, `get_chat_messages`, `get_channel_messages`, `search_messages`, `send_channel_message`, `send_chat_message`
+- Exposes **6 transcript/KB management tools**: `find_transcripts`, `list_meetings`, `ingest_meeting`, `verify_kb_integration_status`, `start_kb_integration`, `stop_kb_integration`
+- All 14 tools are registered unconditionally — no feature flags or mode switching required
+- Chat and channel tools take ids obtained from the `list_*` tools (e.g. `list_chats` → `chatId` → `get_chat_messages`)
 
-**What it does not do:**
+**What the user sees:**
 
-- Provide MCP tools for querying or manipulating data
-- Offer prompts or prompt templates
-- Expose resources for browsing or accessing
-- Require any interaction beyond the initial connection
-
-**Architecture:**
-
-- Uses MCP OAuth for user authentication and connection
-- Does not implement MCP tools, prompts, or resources
-- Operates as a background service that automatically ingests transcripts
-- Processes webhook notifications from Microsoft Graph API
-- Ingests content into Unique knowledge base without requiring tool calls
+- An initial OAuth consent screen to connect their Microsoft account
+- 14 MCP tools available in their AI client immediately after connection
+- Automatic transcript ingestion in the background for all meetings with transcription enabled, once `start_kb_integration` is called
 
 **Design rationale:**
 
-- The connector model allows for automatic, continuous data ingestion
-- Users connect once and transcripts are automatically captured
-- No need for interactive tool calls or resource browsing
-- Simplifies the user experience by removing the need for ongoing interaction
+- The connector model provides automatic, continuous transcript ingestion without requiring user interaction after setup
+- The interactive tool surface gives AI assistants live access to Teams chats, channels, and transcript management — on demand
 
-This is a data ingestion connector that uses the MCP protocol for authentication and connection management, but functions as a background service rather than an interactive MCP server.
+**See also:** [Technical Reference — Tools](./technical/tools.md)
 
 ## Authentication & Permissions
 
