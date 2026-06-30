@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 
 const VerifyKbIntegrationStatusInputSchema = z.object({});
 
@@ -54,6 +55,7 @@ export class VerifyKbIntegrationStatusTool {
         'Returns the current status of the knowledge base integration for meeting transcripts. Use this to verify if transcription ingestion is running before suggesting to start or stop it.',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async verifyKbIntegrationStatus(
     _input: z.infer<typeof VerifyKbIntegrationStatusInputSchema>,

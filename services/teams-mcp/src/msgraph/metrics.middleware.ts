@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import type { Counter, Histogram } from '@opentelemetry/api';
 import { MetricService } from 'nestjs-otel';
 import { serializeError } from 'serialize-error-cjs';
+import { isUpstreamNetworkError } from '../utils/classify-error';
 import { normalizeError } from '../utils/normalize-error';
 
 export class MetricsMiddleware implements Middleware {
@@ -157,7 +158,8 @@ export class MetricsMiddleware implements Middleware {
       this.msgraphRequestCounter.add(1, {
         endpoint,
         method,
-        status_class: '5xx',
+        // Distinguish "couldn't reach Microsoft" (DNS/connectivity) from "Microsoft's server errored".
+        status_class: isUpstreamNetworkError(error) ? 'network' : '5xx',
       });
 
       this.msgraphRequestDuration.record(duration / 1000, {

@@ -4,6 +4,7 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { SubscriptionCreateService } from '../subscription-create.service';
 
 const StartKbIntegrationInputSchema = z.object({});
@@ -50,6 +51,7 @@ export class StartKbIntegrationTool {
         'Starts the knowledge base integration for meeting transcripts. Use verify_kb_integration_status first to check if it is already running. If already active, inform the user that ingestion is already running.',
     },
   })
+  @AttributeUpstreamErrors()
   @Span()
   public async startKbIntegration(
     _input: z.infer<typeof StartKbIntegrationInputSchema>,
