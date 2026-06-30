@@ -3,6 +3,7 @@ import { defaultLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
+import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -93,7 +94,14 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     McpOAuthModule.forRootAsync({
       imports: [DrizzleModule],
-      inject: [ConfigService, AesGcmEncryptionService, DRIZZLE, CACHE_MANAGER, MetricService],
+      inject: [
+        ConfigService,
+        AesGcmEncryptionService,
+        DRIZZLE,
+        CACHE_MANAGER,
+        MetricService,
+        AmqpConnection,
+      ],
       useFactory: async (
         configService: ConfigService<
           AppConfigNamespaced & MicrosoftConfigNamespaced & AuthConfigNamespaced,
@@ -103,6 +111,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         drizzle: DrizzleDatabase,
         cacheManager: Cache,
         metricService: MetricService,
+        amqpConnection: AmqpConnection,
       ) => ({
         provider: MicrosoftOAuthProvider,
 
@@ -120,7 +129,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
           infer: true,
         }),
 
-        oauthStore: new McpOAuthStore(drizzle, aesService, cacheManager),
+        oauthStore: new McpOAuthStore(drizzle, aesService, cacheManager, amqpConnection),
         encryptionService: aesService,
         metricService,
       }),

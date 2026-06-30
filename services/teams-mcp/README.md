@@ -42,6 +42,7 @@ Copy `.env.example` to `.env` and configure the following:
 | `MICROSOFT_CLIENT_SECRET` | Azure AD application client secret |
 | `MICROSOFT_WEBHOOK_SECRET` | 128-char hex secret used as `clientState` for webhook validation |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | Publicly reachable URL for Microsoft webhooks |
+| `MICROSOFT_AUTO_START_INGESTION` | Auto-enqueue a transcript subscription for every user at login (default `false`) |
 | `AUTH_HMAC_SECRET` | 64-char hex secret for JWT signing |
 | `ENCRYPTION_KEY` | 64-char hex secret for AES-GCM token encryption |
 

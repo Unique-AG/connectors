@@ -2,10 +2,10 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
-import { fromString, parseTypeId, typeid } from 'typeid-js';
 import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { collectAllPages, GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { MeetingCollection, Transcript } from '../transcript.dtos';
 import { TranscriptCreatedService } from '../transcript-created.service';
 
@@ -227,9 +227,7 @@ export class IngestMeetingTool {
     }
 
     // 5. Enqueue an ingest event per selected transcript (async — the upload happens downstream).
-    const userProfileTid = fromString(userProfileId, 'user_profile');
-    const pid = parseTypeId(userProfileTid);
-    const userProfileTypeid = typeid(pid.prefix, pid.suffix);
+    const userProfileTypeid = convertUserProfileIdToTypeId(userProfileId);
 
     for (const transcript of selected) {
       await this.transcriptCreated.enqueueIngestRequested({

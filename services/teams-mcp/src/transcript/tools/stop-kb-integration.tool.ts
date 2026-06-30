@@ -2,8 +2,8 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
-import { fromString, parseTypeId, typeid } from 'typeid-js';
 import * as z from 'zod';
+import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SubscriptionRemoveService } from '../subscription-remove.service';
 
 const StopKbIntegrationInputSchema = z.object({});
@@ -64,11 +64,9 @@ export class StopKbIntegrationTool {
 
     this.logger.log({ userProfileId }, 'Stopping knowledge base integration for user');
 
-    const tid = fromString(userProfileId, 'user_profile');
-    const pid = parseTypeId(tid);
-    const userProfileTypeid = typeid(pid.prefix, pid.suffix);
-
-    const result = await this.subscriptionRemove.removeByUserProfileId(userProfileTypeid);
+    const result = await this.subscriptionRemove.removeByUserProfileId(
+      convertUserProfileIdToTypeId(userProfileId),
+    );
     const { status, subscription } = result;
 
     const messages: Record<typeof status, string> = {

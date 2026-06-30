@@ -145,6 +145,9 @@ mcpConfig:
     # Optional - defaults to SELF_URL if not provided.
     # example: https://teams.mcp.unique.app
     # publicWebhookUrl: ""
+    # -- When enabled, automatically enqueue a transcript subscription for every user at login
+    # (skips the start_kb_integration tool).
+    autoStartIngestion: false
     # clientSecret is loaded from a secret, see server.envVars
     # webhookSecret is loaded from a secret, see server.envVars
 

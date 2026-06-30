@@ -11,6 +11,9 @@ data:
   {{- if .Values.mcpConfig.microsoft.publicWebhookUrl }}
   MICROSOFT_PUBLIC_WEBHOOK_URL: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
   {{- end }}
+  {{- if .Values.mcpConfig.microsoft.autoStartIngestion }}
+  MICROSOFT_AUTO_START_INGESTION: {{ .Values.mcpConfig.microsoft.autoStartIngestion | quote }}
+  {{- end }}
   UNIQUE_SERVICE_AUTH_MODE: {{ .Values.mcpConfig.unique.serviceAuthMode | quote }}
   UNIQUE_API_BASE_URL: {{ include "chart.ensureTrailingSlash" (dict "url" .Values.mcpConfig.unique.apiBaseUrl) | quote }}
   UNIQUE_API_VERSION: {{ .Values.mcpConfig.unique.apiVersion | quote }}

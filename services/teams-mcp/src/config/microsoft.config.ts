@@ -30,6 +30,12 @@ const ConfigSchema = z.object({
     .describe(
       'The hour of the day in UTC when scheduled subscription expirations should occur. This should be done during off-peak hours to avoid disruptions of incoming notifications.',
     ),
+  autoStartIngestion: z
+    .stringbool()
+    .default(false)
+    .describe(
+      'When enabled, automatically enqueue a transcript subscription for every user at login (skips the start_kb_integration tool).',
+    ),
 });
 
 export const microsoftConfig = registerConfig('microsoft', ConfigSchema);

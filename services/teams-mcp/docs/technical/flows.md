@@ -3,7 +3,7 @@
 
 ## User Connection Flow
 
-Everything starts when a user connects to the MCP server. This triggers OAuth authentication. After authentication, the user can start the KB integration via the `start_kb_integration` tool to begin receiving meeting notifications.
+Everything starts when a user connects to the MCP server. This triggers OAuth authentication. After authentication, the user can start the KB integration via the `start_kb_integration` tool to begin receiving meeting notifications. Alternatively, operators can enable `MICROSOFT_AUTO_START_INGESTION`, in which case every login automatically enqueues a transcript subscription (no tool call required).
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -21,8 +21,10 @@ flowchart LR
         Store["Store encrypted tokens"]
     end
 
-    subgraph Setup["Subscription Setup (via Tool)"]
-        StartTool["User calls start_kb_integration"]
+    subgraph Setup["Subscription Setup"]
+        AutoStart["Auto-enqueue subscription (flag on)"]
+        StartTool["User calls start_kb_integration (manual)"]
+        Enqueue["Publish subscription-requested"]
         CreateSub["Create Graph subscription"]
         StoreSub["Store subscription record"]
     end
@@ -38,7 +40,10 @@ flowchart LR
     Consent --> Callback
     Callback --> Exchange
     Exchange --> Store
-    Store --> StartTool
+    Store -->|MICROSOFT_AUTO_START_INGESTION on| AutoStart
+    Store -.->|manual| StartTool
+    AutoStart --> Enqueue
+    Enqueue --> CreateSub
     StartTool --> CreateSub
     CreateSub --> StoreSub
     StoreSub --> Active
