@@ -29,11 +29,13 @@ import {
   databaseConfig,
   type EncryptionConfig,
   encryptionConfig,
+  healthConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
   uniqueConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
+import { HealthModule } from './health/health.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
@@ -51,6 +53,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         authConfig,
         databaseConfig,
         encryptionConfig,
+        healthConfig,
         microsoftConfig,
         uniqueConfig,
       ],
@@ -149,6 +152,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     AMQPModule,
     TranscriptModule,
     ChatModule,
+    HealthModule,
   ],
   controllers: [ManifestController],
   providers: [
