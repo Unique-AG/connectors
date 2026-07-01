@@ -11,7 +11,11 @@ For end-user and administrator documentation, see the [Outlook Semantic MCP Over
 
 ## Architecture
 
-The diagram below shows the full **Mode A** (`microsoft_graph_and_unique_api`) topology. In Mode B (`microsoft_graph`), all infrastructure components are identical — the Unique Knowledge Base is still required in both modes (for scope management and to attach email attachments to outgoing emails), but the ingestion arrows are inactive and no email content is written to it.
+The connector runs as a **single pod** that handles MCP tool requests, stores state in PostgreSQL, and authenticates users via Microsoft Entra ID. The deployment mode (`MCP_BACKEND`) determines whether emails are ingested into the Unique knowledge base or queried live from Microsoft Graph.
+
+### Mode A — `microsoft_graph_and_unique_api`
+
+After a user connects, the pod creates a Microsoft Graph webhook subscription and runs background pipelines (full sync and live catch-up) that ingest emails into the Unique knowledge base. `search_emails` runs semantic search against the knowledge base and KQL keyword search against Microsoft Graph in parallel, then merges the results. RabbitMQ decouples webhook receipt from email processing so the service can respond to Microsoft within the required deadline.
 
 ```mermaid
 flowchart LR
@@ -27,14 +31,36 @@ flowchart LR
     MCPClient -->|"MCP tool requests"| Kong
     Kong -->|"MCP + Webhooks"| OutlookMCP
     OutlookMCP --> PostgreSQL
-    OutlookMCP -->|"Publish"| RabbitMQ
-    RabbitMQ -->|"Consume"| OutlookMCP
-    OutlookMCP --> UniqueKB
+    OutlookMCP -->|"Enqueue / consume\n(email sync)"| RabbitMQ
+    OutlookMCP -->|"Ingest + semantic search"| UniqueKB
+    OutlookMCP -->|"Fetch emails, KQL search,\ndrafts, contacts"| MSGraph
     MSGraph -->|"Webhooks"| Kong
     OutlookMCP -->|"OAuth"| EntraID
 ```
 
-The Outlook Semantic MCP Server runs as a **single pod** that handles MCP tool requests, receives Microsoft Graph webhook notifications, processes email via RabbitMQ consumers, stores state in PostgreSQL, and ingests email content into the Unique knowledge base.
+### Mode B — `microsoft_graph`
+
+No ingestion pipeline runs — no webhook subscriptions are created and no email content is written to the Unique knowledge base. `search_emails` queries Microsoft Graph directly using KQL keyword search. The Unique knowledge base is still required for scope management and to attach email attachments to outgoing drafts. RabbitMQ remains a required infrastructure dependency but is not part of the email data path.
+
+```mermaid
+flowchart LR
+    MCPClient["User's MCP Client"]
+    Kong["Kong Gateway"]
+    OutlookMCP["Outlook Semantic MCP Pod"]
+    PostgreSQL["PostgreSQL"]
+    RabbitMQ["RabbitMQ"]
+    UniqueKB["Unique Knowledge Base"]
+    MSGraph["Microsoft Graph API"]
+    EntraID["Microsoft Entra ID"]
+
+    MCPClient -->|"MCP tool requests"| Kong
+    Kong -->|"MCP"| OutlookMCP
+    OutlookMCP --> PostgreSQL
+    OutlookMCP -.->|"Required\n(not used for email)"| RabbitMQ
+    OutlookMCP -->|"Scope management,\nattachments"| UniqueKB
+    OutlookMCP -->|"Live KQL search,\ndrafts, contacts"| MSGraph
+    OutlookMCP -->|"OAuth"| EntraID
+```
 
 ## Quick Start
 
