@@ -47,7 +47,7 @@ connector:
     - confluence-connector-proxy-config
   image:
     repository: ghcr.io/unique-ag/connectors/services/confluence-connector
-    tag: 2.2.0 # x-release-please-version
+    tag: 2.2.1 # x-release-please-version
   ports:
     application: 51349
     metrics: 51350

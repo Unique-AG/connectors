@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.1](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.2.0...confluence-connector@2.2.1) (2026-07-01)
+
+
+### Bug Fixes
+
+* **confluence-connector:** make mermaid diagrams publishable ([#665](https://github.com/Unique-AG/connectors/issues/665)) ([04f5c32](https://github.com/Unique-AG/connectors/commit/04f5c32025a094ee1ec48059cf145cbe71ecf4dc))
+* **deps:** address pnpm audit vulnerabilities ([#650](https://github.com/Unique-AG/connectors/issues/650)) ([f7cbc71](https://github.com/Unique-AG/connectors/commit/f7cbc71e8ada8778548d8f1d064753ca5355dc25))
+
 ## [2.2.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.1.0...confluence-connector@2.2.0) (2026-06-17)
 
 
