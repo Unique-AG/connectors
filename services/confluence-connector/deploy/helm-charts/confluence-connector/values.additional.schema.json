@@ -25,82 +25,6 @@
       },
       "additionalProperties": false
     },
-    "alerts": {
-      "type": "object",
-      "description": "Prometheus alerting rules configuration",
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "description": "Enable Prometheus alerting rules",
-          "default": false
-        },
-        "defaultAlerts": {
-          "type": "object",
-          "description": "Default alert configurations",
-          "properties": {
-            "uniqueApi": {
-              "type": "object",
-              "description": "Configuration for Unique REST API error alerts",
-              "properties": {
-                "enabled": {
-                  "type": "boolean",
-                  "description": "Enable Unique REST API error rate alerts",
-                  "default": true
-                },
-                "disabled": {
-                  "type": "object",
-                  "description": "Disable specific alerts by setting them to true",
-                  "properties": {
-                    "ConfluenceConnectorUniqueAPIErrors": {
-                      "type": "boolean",
-                      "description": "Disable the ConfluenceConnectorUniqueAPIErrors alert"
-                    }
-                  },
-                  "additionalProperties": false
-                },
-                "customRules": {
-                  "type": "object",
-                  "description": "Override alert rules with custom values",
-                  "properties": {
-                    "ConfluenceConnectorUniqueAPIErrors": {
-                      "type": "object",
-                      "description": "Custom configuration for ConfluenceConnectorUniqueAPIErrors alert",
-                      "properties": {
-                        "threshold": {
-                          "type": "number",
-                          "description": "Error rate threshold (0.01 = 1% error rate)",
-                          "default": 0.01
-                        },
-                        "for": {
-                          "type": "string",
-                          "description": "Duration the condition must be true before firing",
-                          "default": "30s"
-                        },
-                        "severity": {
-                          "type": "string",
-                          "enum": ["critical", "warning", "info"],
-                          "description": "Alert severity",
-                          "default": "warning"
-                        }
-                      },
-                      "additionalProperties": false
-                    }
-                  },
-                  "additionalProperties": false
-                }
-              },
-              "additionalProperties": false
-            },
-            "additionalLabels": {
-              "type": "object",
-              "description": "Additional labels to add to all alerts and the PrometheusRule"
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
     "connectorConfig": {
       "type": "object",
       "description": "Confluence connector configuration",
@@ -293,9 +217,15 @@
                     "description": "Zitadel authentication configuration (required when authMode is external)",
                     "required": ["clientId", "oauthTokenUrl", "projectId"],
                     "properties": {
-                      "clientId": { "type": "string" },
-                      "oauthTokenUrl": { "type": "string" },
-                      "projectId": { "type": "string" }
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "oauthTokenUrl": {
+                        "type": "string"
+                      },
+                      "projectId": {
+                        "type": "string"
+                      }
                     },
                     "additionalProperties": false
                   }
@@ -306,9 +236,15 @@
                 "type": "object",
                 "description": "Page processing configuration",
                 "properties": {
-                  "concurrency": { "type": "integer" },
-                  "scanIntervalCron": { "type": "string" },
-                  "maxItemsToScan": { "type": ["integer", "null"] }
+                  "concurrency": {
+                    "type": "integer"
+                  },
+                  "scanIntervalCron": {
+                    "type": "string"
+                  },
+                  "maxItemsToScan": {
+                    "type": ["integer", "null"]
+                  }
                 },
                 "additionalProperties": false
               },
@@ -321,7 +257,9 @@
                     "type": "string",
                     "enum": ["flat"]
                   },
-                  "scopeId": { "type": "string" },
+                  "scopeId": {
+                    "type": "string"
+                  },
                   "storeInternally": {
                     "type": "string",
                     "enum": ["enabled", "disabled"]
@@ -333,14 +271,29 @@
                   "attachments": {
                     "type": "object",
                     "properties": {
-                      "mode": { "type": "string", "enum": ["enabled", "disabled"] },
-                      "allowedMimeTypes": { "type": "array", "items": { "type": "string" } },
-                      "maxFileSizeMb": { "type": "integer" },
-                      "imageOcr": { "type": "string", "enum": ["enabled", "disabled"] }
+                      "mode": {
+                        "type": "string",
+                        "enum": ["enabled", "disabled"]
+                      },
+                      "allowedMimeTypes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "maxFileSizeMb": {
+                        "type": "integer"
+                      },
+                      "imageOcr": {
+                        "type": "string",
+                        "enum": ["enabled", "disabled"]
+                      }
                     },
                     "additionalProperties": false
                   },
-                  "pageIngestionConfig": { "type": "object" }
+                  "pageIngestionConfig": {
+                    "type": "object"
+                  }
                 },
                 "additionalProperties": false
               }
@@ -367,14 +320,31 @@
           "description": "Proxy authentication mode",
           "default": "none"
         },
-        "host": { "type": "string" },
-        "port": { "type": "integer" },
-        "protocol": { "type": "string", "enum": ["http", "https"] },
-        "username": { "type": "string" },
-        "sslCertPath": { "type": "string" },
-        "sslKeyPath": { "type": "string" },
-        "sslCaBundlePath": { "type": "string" },
-        "headers": { "type": "string" }
+        "host": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["http", "https"]
+        },
+        "username": {
+          "type": "string"
+        },
+        "sslCertPath": {
+          "type": "string"
+        },
+        "sslKeyPath": {
+          "type": "string"
+        },
+        "sslCaBundlePath": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "string"
+        }
       },
       "additionalProperties": false
     }
