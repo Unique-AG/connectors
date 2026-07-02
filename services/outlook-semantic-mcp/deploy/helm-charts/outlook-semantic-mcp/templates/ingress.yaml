@@ -1,12 +1,12 @@
 {{- if .Values.ingress.enabled -}}
-{{- $fullName := include "chart.fullname" . -}}
+{{- $fullName := include "base.fullname" . -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ $fullName }}
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "chart.labels" $ | nindent 4 }}
+    {{- include "base.labels.common" $ | nindent 4 }}
     {{- with .Values.ingress.additionalLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}

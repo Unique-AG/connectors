@@ -2,18 +2,18 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "chart.fullname" . }}-tenant-config
+  name: {{ include "base.fullname" . }}-tenant-config
   labels:
-    {{- include "chart.labels" . | nindent 4 }}
+    {{- include "base.labels.common" . | nindent 4 }}
 data:
   default-tenant-config.yaml: |
     # SharePoint Configuration
     sharepoint:
-      tenantId: {{ .Values.connectorConfig.sharepoint.tenantId | quote }}
+      tenantId: {{ tpl .Values.connectorConfig.sharepoint.tenantId . | quote }}
       auth:
         mode: {{ .Values.connectorConfig.sharepoint.auth.mode | quote }}
         {{- if eq .Values.connectorConfig.sharepoint.auth.mode "certificate" }}
-        clientId: {{ .Values.connectorConfig.sharepoint.auth.clientId | quote }}
+        clientId: {{ tpl .Values.connectorConfig.sharepoint.auth.clientId . | quote }}
         privateKeyPath: {{ .Values.connectorConfig.sharepoint.auth.privateKeyPath | quote }}
         # privateKeyPassword is loaded from environment variable (secret) if key is encrypted
         {{- if .Values.connectorConfig.sharepoint.auth.thumbprintSha1 }}
@@ -23,7 +23,7 @@ data:
         thumbprintSha256: {{ .Values.connectorConfig.sharepoint.auth.thumbprintSha256 | quote }}
         {{- end }}
         {{- end }}
-      baseUrl: {{ .Values.connectorConfig.sharepoint.baseUrl | quote }}
+      baseUrl: {{ tpl .Values.connectorConfig.sharepoint.baseUrl . | quote }}
       {{- if .Values.connectorConfig.sharepoint.apiRateLimitPerMinuteThousands }}
       graphApiRateLimitPerMinuteThousands: {{ .Values.connectorConfig.sharepoint.apiRateLimitPerMinuteThousands }}
       {{- end }}
@@ -79,17 +79,17 @@ data:
       {{- if eq .Values.connectorConfig.unique.authMode "cluster_local" }}
       serviceExtraHeaders:
         {{- range $key, $value := .Values.connectorConfig.unique.serviceExtraHeaders }}
-        {{ $key }}: {{ $value | quote }}
+        {{ $key }}: {{ tpl $value . | quote }}
         {{- end }}
       {{- end }}
       {{- if eq .Values.connectorConfig.unique.authMode "external" }}
-      zitadelOauthTokenUrl: {{ .Values.connectorConfig.unique.zitadel.oauthTokenUrl | quote }}
-      zitadelProjectId: {{ .Values.connectorConfig.unique.zitadel.projectId | quote }}
-      zitadelClientId: {{ .Values.connectorConfig.unique.zitadel.clientId | quote }}
+      zitadelOauthTokenUrl: {{ tpl .Values.connectorConfig.unique.zitadel.oauthTokenUrl . | quote }}
+      zitadelProjectId: {{ tpl .Values.connectorConfig.unique.zitadel.projectId . | quote }}
+      zitadelClientId: {{ tpl .Values.connectorConfig.unique.zitadel.clientId . | quote }}
       # zitadelClientSecret is loaded from environment variable (secret)
       {{- end }}
-      ingestionServiceBaseUrl: {{ .Values.connectorConfig.unique.ingestionServiceBaseUrl | quote }}
-      scopeManagementServiceBaseUrl: {{ .Values.connectorConfig.unique.scopeManagementServiceBaseUrl | quote }}
+      ingestionServiceBaseUrl: {{ tpl (.Values.connectorConfig.unique.ingestionServiceBaseUrl | default (include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.ingestion))) . | quote }}
+      scopeManagementServiceBaseUrl: {{ tpl (.Values.connectorConfig.unique.scopeManagementServiceBaseUrl | default (include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.scopeManagement))) . | quote }}
       {{- if .Values.connectorConfig.unique.apiRateLimitPerMinute }}
       apiRateLimitPerMinute: {{ .Values.connectorConfig.unique.apiRateLimitPerMinute }}
       {{- end }}
