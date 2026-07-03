@@ -21,4 +21,4 @@
 .idea/
 *.tmproj
 .vscode/
-.chartsci-values.yaml
+ci-values.yaml
