@@ -1,7 +1,5 @@
 # teams-mcp
 
-![Version: 0.2.22](https://img.shields.io/badge/Version-0.2.22-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.2.22](https://img.shields.io/badge/AppVersion-0.2.22-informational?style=flat-square)
-
 An experimental MCP server for Teams leveraging the Microsoft Graph API.
 
 ## Requirements
@@ -9,6 +7,45 @@ An experimental MCP server for Teams leveraging the Microsoft Graph API.
 | Repository | Name | Version |
 |------------|------|---------|
 | oci://ghcr.io/unique-ag/helm | base | 0.1.0-4c70c3 |
+
+## Installation
+
+Use OCI charts only. Prefer `getunique.azurecr.io`; `uniquecr.azurecr.io` is private and kept for consistency, and GHCR is maintained best-effort.
+
+- `oci://getunique.azurecr.io/helm/teams-mcp`
+- `oci://uniquecr.azurecr.io/connectors/helm/teams-mcp`
+- `oci://ghcr.io/unique-ag/connectors/helm/teams-mcp`
+
+### Helm
+
+```bash
+helm template teams-mcp \
+  oci://getunique.azurecr.io/helm/teams-mcp \
+  --version <version>
+```
+
+### [`helmfile`](https://helmfile.readthedocs.io)
+
+```yaml
+# helmfile version v1.1.7
+releases:
+  - name: teams-mcp
+    chart: oci://getunique.azurecr.io/helm/teams-mcp
+    version: <version>
+```
+
+### [Argo Application](https://argo-cd.readthedocs.io/en/stable/user-guide/application-specification)
+
+Pin the chart by OCI digest in GitOps. Keep the version as a comment for humans.
+
+```yaml
+spec:
+  name: teams-mcp
+  sources:
+    - repoURL: oci://getunique.azurecr.io/helm/teams-mcp
+      path: .
+      targetRevision: sha256:<chart-digest> # <version>
+```
 
 ## Values
 
