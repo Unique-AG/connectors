@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.23](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.22...teams-mcp@0.2.23) (2026-07-01)
+
+
+### Features
+
+* **teams-mcp,deps:** add GET /health operational-status endpoint (UN-19379) ([#676](https://github.com/Unique-AG/connectors/issues/676)) ([45f4e05](https://github.com/Unique-AG/connectors/commit/45f4e05b66c0c892c5e0fba58c23c6bdb642ceb1))
+* **teams-mcp:** auto-start ingestion at login (UN-22169) ([#659](https://github.com/Unique-AG/connectors/issues/659)) ([2ca39fc](https://github.com/Unique-AG/connectors/commit/2ca39fc1547ebba2e438641a452d41b38a2a5397))
+
+
+### Bug Fixes
+
+* **teams-mcp:** attribute upstream Microsoft/network failures to the consumer ([#663](https://github.com/Unique-AG/connectors/issues/663)) ([d211763](https://github.com/Unique-AG/connectors/commit/d211763b2e06a54f7b48e270c73fd0594bb72a6f))
+
 ## [0.2.22](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.21...teams-mcp@0.2.22) (2026-06-23)
 
 
