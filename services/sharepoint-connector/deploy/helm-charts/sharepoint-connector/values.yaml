@@ -52,13 +52,6 @@ env:
 #           key: PROXY_PASSWORD
 envVars: []
 
-# -- List of ConfigMaps to load as environment variables.
-# The default assumes releaseName=sharepoint-connector. For multi-instance deployments
-# with a different release name, override to match the rendered ConfigMap name
-# (<releaseName>-proxy-config).
-extraEnvCM:
-  - sharepoint-connector-proxy-config
-
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/sharepoint-connector
@@ -122,24 +115,12 @@ volumes:
       items:
         - key: key.pem
           path: key.pem
-  # -- Tenant configuration YAML file mounted from ConfigMap.
-  # The default assumes releaseName=sharepoint-connector. For multi-instance deployments
-  # with a different release name, override to match the rendered ConfigMap name
-  # (<releaseName>-tenant-config).
-  - name: tenant-config
-    configMap:
-      name: sharepoint-connector-tenant-config
-
 volumeMounts:
   - name: tmp
     mountPath: /tmp
   - name: sharepoint-connector-secret
     mountPath: /app/key.pem
     subPath: key.pem
-    readOnly: true
-  # -- Mount tenant configuration directory
-  - name: tenant-config
-    mountPath: /app/tenant-configs
     readOnly: true
 
 # ════ Data ════════════════════════════════════════════════════════════════════
@@ -246,7 +227,6 @@ prometheus:
 # Users preferring setting all variables on their own disable the enabled flag and remove the
 # tenant-config from volumes and volumeMounts.
 connectorConfig:
-  # -- if disabled, tenant-config must be removed from volumes and volumeMounts
   enabled: true
   sharepoint:
     # -- tenant id against which the graph api calls are made
@@ -379,10 +359,7 @@ connectorConfig:
 
 # -- HTTP proxy configuration for external API calls
 # Required for environments where internet access is only available through a proxy.
-# Users preferring setting all variables by hand disable the enabled flag and remove
-# the proxy-config ConfigMap from extraEnvCM.
 proxyConfig:
-  # -- if disabled, the proxy-config ConfigMap must be removed from extraEnvCM.
   enabled: true
   # -- Proxy authentication mode
   # none: proxy disabled

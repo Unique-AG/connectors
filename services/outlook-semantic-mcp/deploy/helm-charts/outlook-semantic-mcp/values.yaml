@@ -40,12 +40,6 @@ env:
 #           key: UNIQUE_ZITADEL_CLIENT_SECRET
 envVars: []
 
-# -- ConfigMap(s) to load environment variables from.
-# Default assumes release name is "outlook-semantic-mcp" (i.e., base.fullname resolves to "outlook-semantic-mcp").
-# Override with [<your-fullname>-config] if using a different release name or fullnameOverride.
-extraEnvCM:
-  - outlook-semantic-mcp-config
-
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/outlook-semantic-mcp
@@ -285,9 +279,7 @@ prometheus:
         alertGroup: outlook-semantic-mcp
 
 # -- Configuration for the deployed Outlook Semantic MCP Server, will be mapped to environment variables
-# Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
 mcpConfig:
-  # -- if disabled, extraEnvCM must be set to []
   enabled: true
 
   # -- Application configuration

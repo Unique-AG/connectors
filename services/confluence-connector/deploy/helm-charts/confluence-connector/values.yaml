@@ -52,10 +52,6 @@ env:
 #           key: PROXY_PASSWORD
 envVars: []
 
-# -- List of ConfigMaps to load as environment variables.
-extraEnvCM:
-  - confluence-connector-proxy-config
-
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/confluence-connector
@@ -167,7 +163,6 @@ prometheus:
         alertGroup: confluence-connector
 
 connectorConfig:
-  # -- if disabled, tenant-config must be removed from volumes and volumeMounts
   enabled: true
   tenants:
     - name: default
@@ -285,10 +280,7 @@ connectorConfig:
 
 # -- HTTP proxy configuration for external API calls
 # Required for environments where internet access is only available through a proxy.
-# Users preferring setting all variables by hand disable the enabled flag and remove
-# confluence-connector-proxy-config from extraEnvCM.
 proxyConfig:
-  # -- if disabled, confluence-connector-proxy-config must be removed from extraEnvCM.
   enabled: true
   # -- Proxy authentication mode
   # none: proxy disabled
