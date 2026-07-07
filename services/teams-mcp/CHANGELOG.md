@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.23...teams-mcp@0.3.0) (2026-07-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **confluence-connector,sharepoint-connector,teams-mcp,outlook-semantic-mcp:** The `values.yaml` structure for all four charts was reorganised in #658. The `connector:` and `server:` alias namespaces were removed; all values now live at the top level under the five-domain layout. Existing `values.yaml` overrides must be updated accordingly.
+
+### Features
+
+* **confluence-connector,sharepoint-connector,teams-mcp,outlook-semantic-mcp,ci,scripts:** migrate helm charts to base library ([#658](https://github.com/Unique-AG/connectors/issues/658)) ([2ff907f](https://github.com/Unique-AG/connectors/commit/2ff907fb3b6793622fe236f33caf37874651e4ec))
+* **confluence-connector,sharepoint-connector,teams-mcp,outlook-semantic-mcp:** mark helm chart base-library migration as breaking change ([#680](https://github.com/Unique-AG/connectors/issues/680)) ([4343627](https://github.com/Unique-AG/connectors/commit/4343627911371db4107376a9c2a0fbd2d57aaf1b))
+
 ## [0.2.23](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.22...teams-mcp@0.2.23) (2026-07-01)
 
 
