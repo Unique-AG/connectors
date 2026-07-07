@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.0.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.2.0...confluence-connector@3.0.0) (2026-07-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **confluence-connector,sharepoint-connector,teams-mcp,outlook-semantic-mcp:** The `values.yaml` structure for all four charts was reorganised in #658. The `connector:` and `server:` alias namespaces were removed; all values now live at the top level under the five-domain layout. Existing `values.yaml` overrides must be updated accordingly.
+
+### Features
+
+* **confluence-connector,sharepoint-connector,teams-mcp,outlook-semantic-mcp,ci,scripts:** migrate helm charts to base library ([#658](https://github.com/Unique-AG/connectors/issues/658)) ([2ff907f](https://github.com/Unique-AG/connectors/commit/2ff907fb3b6793622fe236f33caf37874651e4ec))
+* **confluence-connector,sharepoint-connector,teams-mcp,outlook-semantic-mcp:** mark helm chart base-library migration as breaking change ([#680](https://github.com/Unique-AG/connectors/issues/680)) ([4343627](https://github.com/Unique-AG/connectors/commit/4343627911371db4107376a9c2a0fbd2d57aaf1b))
+
+
+### Bug Fixes
+
+* **confluence-connector:** make mermaid diagrams publishable ([#665](https://github.com/Unique-AG/connectors/issues/665)) ([04f5c32](https://github.com/Unique-AG/connectors/commit/04f5c32025a094ee1ec48059cf145cbe71ecf4dc))
+* **deps:** address pnpm audit vulnerabilities ([#650](https://github.com/Unique-AG/connectors/issues/650)) ([f7cbc71](https://github.com/Unique-AG/connectors/commit/f7cbc71e8ada8778548d8f1d064753ca5355dc25))
+
 ## [2.2.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@2.1.0...confluence-connector@2.2.0) (2026-06-17)
 
 
