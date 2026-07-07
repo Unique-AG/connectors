@@ -26,10 +26,6 @@ env:
 # -- Environment variables from secrets (required secrets listed at bottom of file)
 envVars: []
 
-# -- ConfigMap(s) to load environment variables from (must match release name + '-config')
-extraEnvCM:
-  - teams-mcp-config
-
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/teams-mcp
@@ -272,9 +268,7 @@ prometheus:
         alertGroup: teams-mcp
 
 # -- Configuration for the deployed Teams MCP Server, will be mapped to environment variables
-# Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
 mcpConfig:
-  # -- if disabled, extraEnvCM must be set to []
   enabled: true
 
   # -- Application configuration
