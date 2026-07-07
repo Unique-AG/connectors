@@ -22,4 +22,4 @@
 *.tmproj
 .vscode/
 .charts
-
+ci-values.yaml

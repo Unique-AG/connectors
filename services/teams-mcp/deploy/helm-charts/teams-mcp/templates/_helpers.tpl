@@ -1,58 +1,10 @@
 {{/*
-Expand the name of the chart.
+Chart-specific helpers. Generic identity/label helpers are provided by the base library (base.fullname, base.labels.common, etc.).
 */}}
-{{- define "chart.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- end }}
 
 {{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
-*/}}
-{{- define "chart.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
-{{- end }}
-
-{{/*
-Create chart name and version as used by the chart label.
-*/}}
-{{- define "chart.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Common labels
-*/}}
-{{- define "chart.labels" -}}
-helm.sh/chart: {{ include "chart.chart" . }}
-{{ include "chart.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "chart.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "chart.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end }}
-
-{{/*
-Ensure URL has trailing slash
-Accepts a context with .url containing the URL to process
+Ensure URL has trailing slash.
+Accepts a context with .url containing the URL to process.
 */}}
 {{- define "chart.ensureTrailingSlash" -}}
 {{- $url := .url }}
@@ -62,3 +14,41 @@ Accepts a context with .url containing the URL to process
 {{- printf "%s/" $url }}
 {{- end }}
 {{- end }}
+
+{{/*
+All mcpConfig environment variables, shared by deployment and hook job containers.
+*/}}
+{{- define "chart.config.mcpEnv" -}}
+- name: SELF_URL
+  value: {{ tpl .Values.mcpConfig.app.selfUrl . | quote }}
+- name: MICROSOFT_CLIENT_ID
+  value: {{ tpl .Values.mcpConfig.microsoft.clientId . | quote }}
+{{- if .Values.mcpConfig.microsoft.publicWebhookUrl }}
+- name: MICROSOFT_PUBLIC_WEBHOOK_URL
+  value: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
+{{- end }}
+{{- if .Values.mcpConfig.microsoft.autoStartIngestion }}
+- name: MICROSOFT_AUTO_START_INGESTION
+  value: {{ .Values.mcpConfig.microsoft.autoStartIngestion | quote }}
+{{- end }}
+- name: UNIQUE_SERVICE_AUTH_MODE
+  value: {{ .Values.mcpConfig.unique.serviceAuthMode | quote }}
+- name: UNIQUE_API_BASE_URL
+  value: {{ include "chart.ensureTrailingSlash" (dict "url" (tpl .Values.mcpConfig.unique.apiBaseUrl .)) | quote }}
+- name: UNIQUE_API_VERSION
+  value: {{ .Values.mcpConfig.unique.apiVersion | quote }}
+- name: UNIQUE_ROOT_SCOPE_ID
+  value: {{ .Values.mcpConfig.unique.rootScopeId | quote }}
+- name: UNIQUE_USER_FETCH_CONCURRENCY
+  value: {{ .Values.mcpConfig.unique.userFetchConcurrency | quote }}
+- name: UNIQUE_SERVICE_EXTRA_HEADERS
+  value: {{ .Values.mcpConfig.unique.serviceExtraHeaders | toJson | quote }}
+{{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
+- name: UNIQUE_INGESTION_SERVICE_BASE_URL
+  value: {{ include "chart.ensureTrailingSlash" (dict "url" (tpl .Values.mcpConfig.unique.ingestionServiceBaseUrl .)) | quote }}
+{{- end }}
+- name: AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS
+  value: {{ .Values.mcpConfig.auth.accessTokenExpiresInSeconds | quote }}
+- name: AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS
+  value: {{ .Values.mcpConfig.auth.refreshTokenExpiresInSeconds | quote }}
+{{- end -}}

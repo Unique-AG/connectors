@@ -1,58 +1,183 @@
-server:
-  deployment:
-    metadata:
-      annotations:
-        reloader.stakater.com/auto: "true"
-  hooks:
-    migration:
-      enabled: true
-      command: |
-        pnpm run db:migrate
-  env:
-    LOG_LEVEL: info
-    MAX_HEAP_MB: 1920
-    NODE_ENV: production
-    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
-    OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
-    OTEL_METRICS_EXPORTER: "prometheus"
-  # -- Environment variables from secrets (required secrets listed at bottom of file)
-  # @see https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars
-  envVars: []
-  # -- ConfigMap(s) to load environment variables from (must match release name + '-config')
-  extraEnvCM:
-    - teams-mcp-config
-  image:
-    repository: ghcr.io/unique-ag/connectors/services/teams-mcp
-    tag: 0.2.23 # x-release-please-version
-  ports:
-    application: 51345
-    metrics: 51346
-  resources:
-    # Resources are granted generously as the service for now is a singleton.
-    # ephemeral-storage covers the disk spool: recordings are uploaded by streaming
-    # the download to a temp file in /tmp (see UniqueContentService.uploadToStorage),
-    # and the ingestion consumer runs at prefetchCount: 1 so at most one ~5 GB
-    # recording is spooled at a time.
-    limits:
-      memory: 2048Mi
-      ephemeral-storage: 10Gi # >= the emptyDir cap; covers one ~5 GB spool + overlay/log overhead
-    requests:
-      cpu: 1
-      memory: 1984Mi
-      ephemeral-storage: 6Gi # reserve enough to guarantee one ~5 GB recording can spool
-  routes:
-    paths:
-      default:
-        enabled: false
-  volumes:
-    - name: tmp
-      emptyDir:
-        sizeLimit: 10Gi # one ~5 GB recording at a time (prefetch:1) + headroom
-  volumeMounts:
-    - name: tmp
-      mountPath: /tmp
+# ════ Identity ════════════════════════════════════════════════════════════════
+nameOverride: teams-mcp
+fullnameOverride: teams-mcp
+selectorComponentLabel: server
 
-# -- Ingress configuration
+# ════ Compute ═════════════════════════════════════════════════════════════════
+
+# ── Deployment ────────────────────────────────────────────────────────────────
+deployment:
+  revisionHistoryLimit: 3
+  metadata:
+    annotations:
+      reloader.stakater.com/auto: "true"
+
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  LOG_LEVEL: info
+  MAX_HEAP_MB: 1920
+  NODE_ENV: production
+  OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+  OTEL_EXPORTER_PROMETHEUS_PORT: "51346"
+  OTEL_METRICS_EXPORTER: "prometheus"
+
+# -- Environment variables from secrets (required secrets listed at bottom of file)
+envVars: []
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/teams-mcp
+  tag: 0.2.23 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 51345
+  metrics: 51346
+
+resources:
+  # Resources are granted generously as the service for now is a singleton.
+  # ephemeral-storage covers the disk spool: recordings are uploaded by streaming
+  # the download to a temp file in /tmp (see UniqueContentService.uploadToStorage),
+  # and the ingestion consumer runs at prefetchCount: 1 so at most one ~5 GB
+  # recording is spooled at a time.
+  limits:
+    memory: 2048Mi
+    ephemeral-storage: 10Gi # >= the emptyDir cap; covers one ~5 GB spool + overlay/log overhead
+  requests:
+    cpu: 1
+    memory: 1984Mi
+    ephemeral-storage: 6Gi # reserve enough to guarantee one ~5 GB recording can spool
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+serviceAccount:
+  enabled: true
+
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 10Gi # one ~5 GB recording at a time (prefetch:1) + headroom
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+# ════ Data ════════════════════════════════════════════════════════════════════
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+postgresql:
+  enabled: true
+  connection:
+    sslMode: verify
+    # ── Use-case B — in-cluster PostgreSQL (CloudNativePG) ────────────────────
+    #
+    # host:
+    #   fromKubernetesService:
+    #     name: <release-name>-pg-cluster-rw
+    #     namespace: <namespace>
+    #     port: 5432
+    #     podPort: 5432
+    #     podSelectorLabels:
+    #       cnpg.io/cluster: <release-name>-pg-cluster
+    #
+    # url:
+    #   fromSecret:
+    #     name: <release-name>-pg-cluster-app
+    #     key: fqdn-uri
+
+# ── RabbitMQ ──────────────────────────────────────────────────────────────────
+rabbitmq:
+  enabled: true
+  connection: {}
+  # ── Use-case B — in-cluster RabbitMQ (Bitnami Helm release) ──────────────
+  #
+  # host:
+  #   fromKubernetesService:
+  #     name: <helm-release>-<nameOverride>-headless
+  #     namespace: <namespace>
+  #     port: 5672
+  #     podPort: 5672
+  #     podSelectorLabels:
+  #       app.kubernetes.io/instance: <helm-release>
+  # username:
+  #   fromSecret:
+  #     name: rabbitmq-cluster-service-binding
+  #     key: AMQP_USERNAME
+  # password:
+  #   fromSecret:
+  #     name: rabbitmq-cluster-service-binding
+  #     key: AMQP_PASSWORD
+  #
+  # ── Use-case C — in-cluster RabbitMQ Cluster Operator ─────────────────────
+  #
+  # host:
+  #   fromKubernetesService:
+  #     name: <rabbitmqcluster-name>
+  #     namespace: <namespace>
+  #     port: 5672
+  #     podPort: 5672
+  #     podSelectorLabels:
+  #       app.kubernetes.io/component: rabbitmq
+  #       app.kubernetes.io/name: <rabbitmqcluster-name>
+  # username:
+  #   fromSecret:
+  #     name: rabbitmq-cluster-chat-service-binding
+  #     key: AMQP_USERNAME
+  # password:
+  #   fromSecret:
+  #     name: rabbitmq-cluster-chat-service-binding
+  #     key: AMQP_PASSWORD
+
+# ── InternalServices ──────────────────────────────────────────────────────────
+internalServices:
+  dependencies:
+    chat:
+      name: chat
+      servicePort: 8093
+      podPort: 8080
+    ingestion:
+      name: ingestion
+      servicePort: 8091
+      podPort: 8080
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+# ════ Exposure ════════════════════════════════════════════════════════════════
+
+# ── Service ───────────────────────────────────────────────────────────────────
+service:
+  port: 80
+
+routes:
+  hostname: "" # no HTTPRoute via base chart; MCP uses custom ingress.yaml for wildcard domain support
+
+# ── Ingress ───────────────────────────────────────────────────────────────────
 # MCP servers need to be hosted on their own domain. With Kong as current controller, it is easier to use
 # ingress than http routes to obtain 'wildcard' domains.
 ingress:
@@ -80,7 +205,16 @@ ingress:
     #   hosts:
     #     - teams.mcp.example.com
 
-# -- Grafana dashboard configuration
+# ════ Operations ══════════════════════════════════════════════════════════════
+
+# ── Job (migration hook) ──────────────────────────────────────────────────────
+hooks:
+  migration:
+    enabled: true
+    command: |
+      pnpm run db:migrate
+
+# ── Grafana dashboard configuration ───────────────────────────────────────────
 grafana:
   dashboard:
     # -- Enable Grafana dashboard ConfigMap creation
@@ -88,45 +222,53 @@ grafana:
     # -- Grafana folder where the dashboard will be placed
     folder: mcp-servers
 
-# -- Prometheus alerting rules configuration
-alerts:
-  # -- Enable PrometheusRule resource creation
-  enabled: true
-  # -- Default alert definitions
-  defaultAlerts:
-    # -- Enable GraphQL API error rate alerts
-    graphql:
-      enabled: true
-      # -- Disable specific alerts by setting them to true
-      disabled: {}
-        # TeamsMcpGraphQLErrors: false
-      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
-      customRules: {}
-        # TeamsMcpGraphQLErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    # -- Enable Unique REST API error rate alerts
-    uniqueApi:
-      enabled: true
-      # -- Disable specific alerts by setting them to true
-      disabled: {}
-        # TeamsMcpUniqueAPIErrors: false
-      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
-      customRules: {}
-        # TeamsMcpUniqueAPIErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    # -- Additional labels to add to all default alerts
-    additionalLabels: {}
-      # environment: production
-      # team: backend
+# ── Prometheus ────────────────────────────────────────────────────────────────
+prometheus:
+  additionalAlerts:
+    TeamsMcpGraphQLErrors:
+      alert: TeamsMcpGraphQLErrors
+      annotations:
+        summary: "Teams MCP GraphQL API errors detected"
+        description: "The Teams MCP server is experiencing GraphQL API errors (4xx/5xx responses). Current error rate: {{ $value | humanizePercentage }}."
+        runbook: |
+          1. Inspect application logs for specific error messages
+          2. Check for recent deployments or configuration changes
+          3. Verify network connectivity between MCP server and GraphQL API
+          4. Verify authentication credentials and token validity
+          5. Check for rate limiting or throttling issues
+      expr: |
+        (
+          sum(rate(teams_mcp_unique_graphql_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+          /
+          sum(rate(teams_mcp_unique_graphql_api_request_duration_seconds_count[5m]))
+        ) > 0.01
+      for: 30s
+      labels:
+        severity: warning
+        alertGroup: teams-mcp
+    TeamsMcpUniqueAPIErrors:
+      alert: TeamsMcpUniqueAPIErrors
+      annotations:
+        summary: "Teams MCP Unique REST API errors detected"
+        description: "The Teams MCP server is experiencing Unique REST API errors (4xx/5xx responses). Current error rate: {{ $value | humanizePercentage }}."
+        runbook: |
+          1. Inspect application logs for specific error messages
+          2. Check for recent deployments or configuration changes (both the MCP server and the Unique Services)
+          3. Verify network connectivity between MCP server and Unique Services
+          4. Verify service user settings and permissions within Unique
+      expr: |
+        (
+          sum(rate(teams_mcp_unique_rest_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+          /
+          sum(rate(teams_mcp_unique_rest_api_request_duration_seconds_count[5m]))
+        ) > 0.01
+      for: 30s
+      labels:
+        severity: warning
+        alertGroup: teams-mcp
 
 # -- Configuration for the deployed Teams MCP Server, will be mapped to environment variables
-# Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to []
 mcpConfig:
-  # -- if disabled, server.extraEnvCM must be set to []
   enabled: true
 
   # -- Application configuration
@@ -134,13 +276,13 @@ mcpConfig:
     # -- The URL of the MCP Server. Used for OAuth callbacks.
     # The URL must be reachable from the redirect location, e.g. must be publicly accessible.
     # example: https://teams.mcp.unique.app
-    selfUrl: unset_default_value
+    selfUrl: '{{ fail "mcpConfig.app.selfUrl is mandatory. Override in your deployment values." }}'
 
   # -- Microsoft Graph API configuration
   microsoft:
     # -- The client ID of the Microsoft App Registration
     # example: 12345678-1234-1234-1234-123456789012
-    clientId: unset_default_value
+    clientId: '{{ fail "mcpConfig.microsoft.clientId is mandatory. Override in your deployment values." }}'
     # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions.
     # Optional - defaults to SELF_URL if not provided.
     # example: https://teams.mcp.unique.app
@@ -148,8 +290,8 @@ mcpConfig:
     # -- When enabled, automatically enqueue a transcript subscription for every user at login
     # (skips the start_kb_integration tool).
     autoStartIngestion: false
-    # clientSecret is loaded from a secret, see server.envVars
-    # webhookSecret is loaded from a secret, see server.envVars
+    # clientSecret is loaded from a secret, see envVars
+    # webhookSecret is loaded from a secret, see envVars
 
   # -- Unique API configuration
   unique:
@@ -168,10 +310,9 @@ mcpConfig:
     #   x-user-id: "..."
     #   x-company-id: "..."
 
-    # -- The Public API URL
-    # example: https://gateway.unique.app/public/chat/
-    # example: http://node-chat.finance-gpt:8092/public/
-    apiBaseUrl: unset_default_value
+    # -- The Public API URL; auto-derived from internalServices.dependencies.chat with /public/ suffix
+    # override with an explicit URL when serviceAuthMode is external, e.g. https://gateway.unique.app/public/chat/
+    apiBaseUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.chat) }}/public/'
     # -- The Public API version to use
     apiVersion: "2023-12-06"
     # -- The root scope ID under which to create transcript and recording folders
@@ -180,9 +321,9 @@ mcpConfig:
     # -- Concurrency limit for fetching users when resolving scope accesses
     userFetchConcurrency: 5
 
-    # -- Base URL for Unique ingestion service (cluster_local mode only)
-    # example: http://node-ingestion.finance-gpt:8091
-    ingestionServiceBaseUrl: unset_default_value
+    # -- Base URL for Unique ingestion service; auto-derived from internalServices.dependencies.ingestion
+    # override with an explicit URL when serviceAuthMode is external, e.g. https://api.unique.app/ingestion
+    ingestionServiceBaseUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.ingestion) }}'
 
   # -- Authentication configuration for the MCP server
   auth:
@@ -190,14 +331,31 @@ mcpConfig:
     accessTokenExpiresInSeconds: 60
     # -- Refresh token expiration time in seconds (default: 30 days)
     refreshTokenExpiresInSeconds: 2592000
-    # hmacSecret is loaded from a secret, see server.envVars
+    # hmacSecret is loaded from a secret, see envVars
 
-  # Note: The following secrets must be provided via server.envVars:
-  # - DATABASE_URL: PostgreSQL connection string
-  # - AMQP (choose one):
-  #   - AMQP_URL: Full AMQP/RabbitMQ connection URL (contains credentials)
-  #   - AMQP_*: AMQP individual fields (username, password, host, port, vhost)
+  # Note: The following secrets must be provided via envVars:
   # - MICROSOFT_CLIENT_SECRET: Microsoft App Registration client secret
   # - MICROSOFT_WEBHOOK_SECRET: 128 character random string for webhook validation
   # - AUTH_HMAC_SECRET: Secret key for signing HMAC tokens
   # - ENCRYPTION_KEY: 32-byte (256-bit) secret for AES-256-GCM encryption (hex or base64)
+
+# ── NetworkPolicy ─────────────────────────────────────────────────────────────
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      namespace: system
+    egress:
+      microsoft:
+        toFQDNs:
+          - matchName: login.microsoftonline.com
+          - matchName: graph.microsoft.com
+          - matchPattern: "*.microsoft.com"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP

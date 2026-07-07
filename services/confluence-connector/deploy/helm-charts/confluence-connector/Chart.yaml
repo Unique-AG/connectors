@@ -2,10 +2,9 @@ apiVersion: v2
 name: confluence-connector
 description: Take content from Confluence and send it to Unique AI for RAG ingestion.
 type: application
-version: 2.2.0
-appVersion: 2.2.0
+version: 3.0.0
+appVersion: 3.0.0
 dependencies:
-  - alias: connector
-    name: backend-service
-    repository: oci://ghcr.io/unique-ag/helm-charts
-    version: ~10.1.0
+  - name: base
+    repository: oci://ghcr.io/unique-ag/helm
+    version: 0.1.0-4c70c3

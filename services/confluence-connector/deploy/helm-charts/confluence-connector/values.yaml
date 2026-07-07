@@ -1,89 +1,136 @@
-connector:
-  deployment:
-    metadata:
-      annotations:
-        reloader.stakater.com/auto: "true"
-  env:
-    HEALTH_CONNECTIVITY_TIMEOUT_MS: "3000"
-    HEALTH_SYNC_HISTORY_SIZE: "5"
-    HEALTH_SYNC_TENANT_FAILURE_THRESHOLD: "0.5"
-    LOG_LEVEL: info
-    LOGS_DIAGNOSTICS_DATA_POLICY: conceal
-    MAX_HEAP_MB: 1920
-    NODE_ENV: production
-    OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
-    OTEL_EXPORTER_PROMETHEUS_PORT: "51350"
-    OTEL_METRICS_EXPORTER: "prometheus"
-    # Glob pattern to match tenant configuration YAML files
-    TENANT_CONFIG_PATH_PATTERN: /app/tenant-configs/*-tenant-config.yaml
-  # -- Environment variables from secrets.
-  # Example for loading secrets (uncomment and customize as needed):
-  #   envVars:
-  #     # For Zitadel authentication (required when authMode is 'external')
-  #     - name: ZITADEL_CLIENT_SECRET
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: confluence-connector-secret
-  #           key: ZITADEL_CLIENT_SECRET
-  #     # For Confluence OAuth 2.0 (2LO) client secret
-  #     - name: CONFLUENCE_CLIENT_SECRET
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: confluence-connector-secret
-  #           key: CONFLUENCE_CLIENT_SECRET
-  #     # For proxy basic auth password (required when proxy.authMode is 'username_password')
-  #     - name: PROXY_PASSWORD
-  #       valueFrom:
-  #         secretKeyRef:
-  #           name: confluence-connector-secret
-  #           key: PROXY_PASSWORD
-  # See https://artifacthub.io/packages/helm/unique/backend-service?modal=values&path=envVars for more options.
-  envVars: []
-  # -- List of ConfigMaps to load as environment variables.
-  # The default assumes releaseName=confluence-connector. For multi-instance deployments
-  # with a different release name, override to match the rendered ConfigMap name
-  # (<releaseName>-proxy-config).
-  extraEnvCM:
-    - confluence-connector-proxy-config
-  image:
-    repository: ghcr.io/unique-ag/connectors/services/confluence-connector
-    tag: 2.2.0 # x-release-please-version
-  ports:
-    application: 51349
-    metrics: 51350
-  resources:
-    limits:
-      memory: 1Gi
-    requests:
-      cpu: 1
-      memory: 512Mi
-  routes:
-    paths:
-      default:
-        enabled: false
-  service:
-    enabled: false
-  serviceAccount:
-    enabled: true
-  volumes:
-    - name: tmp
-      emptyDir: {}
-    # -- Tenant configuration YAML file mounted from ConfigMap.
-    # The default assumes releaseName=confluence-connector. For multi-instance deployments
-    # with a different release name, override to match the rendered ConfigMap name
-    # (<releaseName>-tenant-config).
-    - name: tenant-config
-      configMap:
-        name: confluence-connector-tenant-config
-  volumeMounts:
-    - name: tmp
-      mountPath: /tmp
-    # -- Mount tenant configuration directory
-    - name: tenant-config
-      mountPath: /app/tenant-configs
-      readOnly: true
+# ════ Identity ════════════════════════════════════════════════════════════════
+nameOverride: confluence-connector
+fullnameOverride: confluence-connector
+selectorComponentLabel: server
 
-# -- Grafana dashboard configuration
+# ════ Compute ═════════════════════════════════════════════════════════════════
+
+# ── Deployment ────────────────────────────────────────────────────────────────
+deployment:
+  revisionHistoryLimit: 3
+  metadata:
+    annotations:
+      reloader.stakater.com/auto: "true"
+
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  HEALTH_CONNECTIVITY_TIMEOUT_MS: "3000"
+  HEALTH_SYNC_HISTORY_SIZE: "5"
+  HEALTH_SYNC_TENANT_FAILURE_THRESHOLD: "0.5"
+  LOG_LEVEL: info
+  LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+  MAX_HEAP_MB: 1920
+  NODE_ENV: production
+  OTEL_EXPORTER_PROMETHEUS_HOST: "0.0.0.0"
+  OTEL_EXPORTER_PROMETHEUS_PORT: "51350"
+  OTEL_METRICS_EXPORTER: "prometheus"
+  # Glob pattern to match tenant configuration YAML files
+  TENANT_CONFIG_PATH_PATTERN: /app/tenant-configs/*-tenant-config.yaml
+
+# -- Environment variables from secrets.
+# Example for loading secrets (uncomment and customize as needed):
+#   envVars:
+#     # For Zitadel authentication (required when authMode is 'external')
+#     - name: ZITADEL_CLIENT_SECRET
+#       valueFrom:
+#         secretKeyRef:
+#           name: confluence-connector-secret
+#           key: ZITADEL_CLIENT_SECRET
+#     # For Confluence OAuth 2.0 (2LO) client secret
+#     - name: CONFLUENCE_CLIENT_SECRET
+#       valueFrom:
+#         secretKeyRef:
+#           name: confluence-connector-secret
+#           key: CONFLUENCE_CLIENT_SECRET
+#     # For proxy basic auth password (required when proxy.authMode is 'username_password')
+#     - name: PROXY_PASSWORD
+#       valueFrom:
+#         secretKeyRef:
+#           name: confluence-connector-secret
+#           key: PROXY_PASSWORD
+envVars: []
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/confluence-connector
+  tag: 2.2.0 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 51349
+  metrics: 51350
+
+resources:
+  limits:
+    memory: 1Gi
+  requests:
+    cpu: 1
+    memory: 512Mi
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+serviceAccount:
+  enabled: true
+
+volumes:
+  - name: tmp
+    emptyDir: {}
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+# ════ Data ════════════════════════════════════════════════════════════════════
+
+# ── InternalServices ──────────────────────────────────────────────────────────
+internalServices:
+  dependencies:
+    ingestion:
+      name: ingestion
+      servicePort: 8091
+      podPort: 8080
+    scopeManagement:
+      name: scope-management
+      servicePort: 8094
+      podPort: 8080
+
+# ════ Exposure ════════════════════════════════════════════════════════════════
+
+# ── Service ───────────────────────────────────────────────────────────────────
+service:
+  enabled: false
+
+# ── HTTPRoute ─────────────────────────────────────────────────────────────────
+routes:
+  hostname: "" # no HTTPRoute via base chart; connector uses custom ingress.yaml for wildcard domain support
+
+# ════ Operations ══════════════════════════════════════════════════════════════
+
+# ── Grafana dashboard configuration ───────────────────────────────────────────
 grafana:
   dashboard:
     # -- Enable Grafana dashboard ConfigMap creation
@@ -91,32 +138,31 @@ grafana:
     # -- Grafana folder where the dashboard will be placed
     folder: connectors
 
-# -- Prometheus alerting rules configuration
-alerts:
-  # -- Enable PrometheusRule resource creation
-  enabled: false
-  # -- Default alert definitions
-  defaultAlerts:
-    # -- Enable Unique REST API error rate alerts
-    uniqueApi:
-      enabled: true
-      # -- Disable specific alerts by setting them to true
-      disabled: {}
-        # ConfluenceConnectorUniqueAPIErrors: false
-      # -- Override alert rules with custom values (for duration, severity, threshold, etc.)
-      customRules: {}
-        # ConfluenceConnectorUniqueAPIErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    # -- Additional labels to add to all default alerts
-    additionalLabels: {}
-      # environment: production
-      # team: backend
+# ── Prometheus ────────────────────────────────────────────────────────────────
+prometheus:
+  additionalAlerts:
+    ConfluenceConnectorUniqueAPIErrors:
+      alert: ConfluenceConnectorUniqueAPIErrors
+      annotations:
+        summary: "Confluence Connector Unique REST API errors detected"
+        description: "The Confluence Connector is experiencing Unique REST API errors (4xx/5xx responses). Current error rate: {{ $value | humanizePercentage }}."
+        runbook: |
+          1. Inspect application logs for specific error messages
+          2. Check for recent deployments or configuration changes (both the connector and the Unique Services)
+          3. Verify network connectivity between connector and Unique Services
+          4. Verify service user settings and permissions within Unique
+      expr: |
+        (
+          sum(rate(cfc_unique_rest_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+          /
+          sum(rate(cfc_unique_rest_api_request_duration_seconds_count[5m]))
+        ) > 0.01
+      for: 30s
+      labels:
+        severity: warning
+        alertGroup: confluence-connector
 
 connectorConfig:
-  # -- if disabled, tenant-config must be removed from the connector.volumes and
-  # connector.volumeMounts
   enabled: true
   tenants:
     - name: default
@@ -124,17 +170,17 @@ connectorConfig:
         # -- Confluence instance type: cloud or data-center
         instanceType: cloud
         # -- Atlassian Cloud ID (UUID) for the Confluence site (required for cloud instances)
-        cloudId: unset_default_value
+        cloudId: '{{ fail "confluence.cloudId is mandatory when instanceType is cloud. Override in your deployment values." }}'
         # -- base url of the Confluence instance
         # example (cloud): https://acme.atlassian.net
         # example (data-center): https://confluence.acme.com
-        baseUrl: unset_default_value
+        baseUrl: '{{ fail "confluence.baseUrl is mandatory. Override in your deployment values." }}'
         auth:
           # -- authentication mode
           # possible values: oauth_2lo
           mode: oauth_2lo
           # -- OAuth 2.0 (2LO) application client ID
-          clientId: unset_default_value
+          clientId: '{{ fail "confluence.auth.clientId is mandatory when auth.mode is oauth_2lo. Override in your deployment values." }}'
           # -- OAuth 2.0 client secret. Use "os.environ/ENV_VAR_NAME" to read from environment variable at runtime.
           # This default is overridden per-tenant in the monorepo app.yaml values.
           clientSecret: "os.environ/CONFLUENCE_CLIENT_SECRET"
@@ -152,22 +198,20 @@ connectorConfig:
         # cluster_local: communicates using in-cluster URLs and requires serviceExtraHeaders with x-company-id and x-user-id
         # external: communicates using external URLs and requires authentication via Zitadel
         authMode: cluster_local
-        # -- base URL for the ingestion service
-        # example: https://api.unique.app/ingestion
-        # example: http://node-ingestion.finance-gpt:8091
-        ingestionServiceBaseUrl: unset_default_value
-        # -- base URL for the scope management service
-        # example: https://api.unique.app/scope-management
-        # example: http://node-scope-management.finance-gpt:8094
-        scopeManagementServiceBaseUrl: unset_default_value
+        # -- base URL for the ingestion service; auto-derived from internalServices.dependencies.ingestion
+        # override with an explicit URL when authMode is external, e.g. https://api.unique.app/ingestion
+        ingestionServiceBaseUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.ingestion) }}'
+        # -- base URL for the scope management service; auto-derived from internalServices.dependencies.scopeManagement
+        # override with an explicit URL when authMode is external, e.g. https://api.unique.app/scope-management
+        scopeManagementServiceBaseUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.scopeManagement) }}'
         # -- Number of Unique API requests allowed per minute
         apiRateLimitPerMinute: 100
         # -- Object containing extra HTTP headers for Unique API requests (GraphQL and REST)
         # Required when authMode is cluster_local. Must contain x-company-id and x-user-id headers.
         # example: {"x-company-id": "1234567890", "x-user-id": "1234567890"}
         serviceExtraHeaders:
-          x-company-id: unset_default_value
-          x-user-id: unset_default_value
+          x-company-id: '{{ fail "unique.serviceExtraHeaders.x-company-id is mandatory when authMode is cluster_local. Override in your deployment values." }}'
+          x-user-id: '{{ fail "unique.serviceExtraHeaders.x-user-id is mandatory when authMode is cluster_local. Override in your deployment values." }}'
         # -- Optional object containing config to pass when submitting file for ingestion
         # ingestionConfig:
         #   uniqueIngestionMode: SKIP_INGESTION
@@ -175,13 +219,13 @@ connectorConfig:
         # -- Zitadel authentication configuration (required when authMode is external)
         zitadel:
           # -- Zitadel client ID
-          clientId: unset_default_value
+          clientId: '{{ fail "unique.zitadel.clientId is mandatory when authMode is external. Override in your deployment values." }}'
           # -- Zitadel OAuth token URL
           # example: https://idp.unique.app/oauth/v2/token
-          oauthTokenUrl: unset_default_value
+          oauthTokenUrl: '{{ fail "unique.zitadel.oauthTokenUrl is mandatory when authMode is external. Override in your deployment values." }}'
           # -- Zitadel project ID
           # example: 225317577440629999
-          projectId: unset_default_value
+          projectId: '{{ fail "unique.zitadel.projectId is mandatory when authMode is external. Override in your deployment values." }}'
 
       processing:
         # -- how many pages you want to submit for ingestion into Unique at once
@@ -195,7 +239,7 @@ connectorConfig:
         # -- Ingestion traversal mode
         ingestionMode: flat
         # -- Root scope ID for ingestion
-        scopeId: unset_default_value
+        scopeId: '{{ fail "ingestion.scopeId is mandatory. Override in your deployment values." }}'
         # -- Whether to store content internally in Unique
         storeInternally: enabled
         # -- Use v1-compatible ingestion key format (spaceId_spaceKey/pageId) without tenant prefix
@@ -236,10 +280,7 @@ connectorConfig:
 
 # -- HTTP proxy configuration for external API calls
 # Required for environments where internet access is only available through a proxy.
-# Users preferring setting all variables by hand disable the enabled flag and remove
-# confluence-connector-proxy-config from connector.extraEnvCM.
 proxyConfig:
-  # -- if disabled, confluence-connector-proxy-config must be removed from connector.extraEnvCM.
   enabled: true
   # -- Proxy authentication mode
   # none: proxy disabled
@@ -255,7 +296,7 @@ proxyConfig:
   # protocol: http
   # -- Basic auth username (required for username_password mode)
   # username: proxy-user
-  # password is loaded from a secret, see connector.envVars example for PROXY_PASSWORD
+  # password is loaded from a secret, see envVars example for PROXY_PASSWORD
   # -- Path to SSL/TLS client certificate (required for ssl_tls mode)
   # sslCertPath: /app/proxy-certs/client.crt
   # -- Path to SSL/TLS client key (required for ssl_tls mode)
@@ -264,3 +305,25 @@ proxyConfig:
   # sslCaBundlePath: /app/proxy-certs/ca.crt
   # -- Optional JSON string of headers for CONNECT request
   # headers: '{"X-Proxy-Header":"value"}'
+
+# ── NetworkPolicy ─────────────────────────────────────────────────────────────
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  baseline:
+    prometheus:
+      namespace: system
+    egress:
+      atlassian:
+        toFQDNs:
+          - matchPattern: "*.atlassian.net"
+          - matchName: api.atlassian.com
+          - matchName: auth.atlassian.com
+          - matchName: api.media.atlassian.com
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP

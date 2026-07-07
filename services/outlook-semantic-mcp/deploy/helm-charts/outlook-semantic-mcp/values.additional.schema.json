@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Outlook Semantic MCP Values",
+  "description": "Values for the Outlook Semantic MCP Helm chart. MCP server for Microsoft Outlook leveraging the Microsoft Graph API.",
+  "type": "object",
+  "properties": {
+    "ingress": {
+      "type": "object",
+      "description": "Ingress configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable ingress resource creation",
+          "default": false
+        },
+        "ingressClassName": {
+          "type": "string",
+          "description": "Ingress class name (e.g., nginx, traefik)"
+        },
+        "additionalLabels": {
+          "type": "object",
+          "description": "Additional labels for the ingress resource",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Annotations for the ingress resource",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "hosts": {
+          "type": "array",
+          "description": "Ingress hosts configuration",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "Hostname for this ingress rule"
+              },
+              "paths": {
+                "type": "array",
+                "description": "Paths for this host",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "description": "Path to match"
+                    },
+                    "pathType": {
+                      "type": "string",
+                      "enum": ["Exact", "Prefix", "ImplementationSpecific"],
+                      "description": "Path type for matching",
+                      "default": "ImplementationSpecific"
+                    },
+                    "serviceName": {
+                      "type": "string",
+                      "description": "Backend service name (defaults to chart fullname)"
+                    },
+                    "servicePort": {
+                      "type": "string",
+                      "description": "Backend service port name (defaults to 'http')"
+                    }
+                  },
+                  "required": ["path"]
+                }
+              }
+            },
+            "required": ["host", "paths"]
+          }
+        },
+        "tls": {
+          "type": "array",
+          "description": "TLS configuration for the ingress",
+          "items": {
+            "type": "object",
+            "properties": {
+              "secretName": {
+                "type": "string",
+                "description": "Name of the TLS secret"
+              },
+              "hosts": {
+                "type": "array",
+                "description": "Hosts covered by this TLS configuration",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["secretName", "hosts"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "grafana": {
+      "type": "object",
+      "description": "Grafana dashboard configuration",
+      "properties": {
+        "dashboard": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Grafana dashboard creation"
+            },
+            "folder": {
+              "type": "string",
+              "description": "Grafana folder name for the dashboard"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "mcpConfig": {
+      "type": "object",
+      "description": "Configuration for the Outlook MCP Server, will be mapped to environment variables",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "If disabled, server.extraEnvCM must be set to []"
+        },
+        "app": {
+          "type": "object",
+          "description": "Application configuration",
+          "properties": {
+            "selfUrl": {
+              "type": "string",
+              "description": "The URL of the MCP Server. Used for OAuth callbacks. Example: https://outlook.mcp.unique.app"
+            },
+            "mcpBackend": {
+              "type": "string",
+              "enum": ["microsoft_graph_and_unique_api", "microsoft_graph"],
+              "description": "Selects the search backend. microsoft_graph_and_unique_api: dual backend, KB ingestion + semantic search (default). microsoft_graph: direct Graph search, no ingestion.",
+              "default": "microsoft_graph_and_unique_api"
+            },
+            "delegatedAccessScan": {
+              "type": "string",
+              "enum": ["disabled", "full_access_only", "granular_access"],
+              "description": "Delegated access scanning mode. disabled: off (default). full_access_only: discovers Full Access delegation via /messages. granular_access: discovers folder-level delegation via /mailFolders, also runs verification.",
+              "default": "disabled"
+            },
+            "delegatedAccessDiscoveryCronSchedule": {
+              "type": "string",
+              "description": "Cron schedule for delegated access discovery. Required when delegatedAccessScan is not disabled. Default: '0 */6 * * *' (every 6 hours)."
+            },
+            "delegatedAccessVerificationCronSchedule": {
+              "type": "string",
+              "description": "Cron schedule for delegated access verification. Required when delegatedAccessScan is granular_access. Default: '0 */4 * * *' (every 4 hours)."
+            },
+            "delegatedAccessRecoveryCronSchedule": {
+              "type": "string",
+              "description": "Cron schedule for recovering stuck delegated access discovery and verification jobs. Active when delegatedAccessScan is not disabled. Default: '*/30 * * * *' (every 30 minutes)."
+            }
+          },
+          "required": ["selfUrl"]
+        },
+        "microsoft": {
+          "type": "object",
+          "description": "Microsoft Graph API configuration",
+          "properties": {
+            "clientId": {
+              "type": "string",
+              "description": "The client ID of the Microsoft App Registration"
+            },
+            "publicWebhookUrl": {
+              "type": "string",
+              "description": "The public webhook URL reachable from external network for Microsoft Graph subscriptions. Optional - defaults to SELF_URL if not provided. Example: https://outlook.mcp.unique.app/webhooks"
+            }
+          },
+          "required": ["clientId"]
+        },
+        "unique": {
+          "type": "object",
+          "description": "Unique API configuration",
+          "properties": {
+            "serviceAuthMode": {
+              "type": "string",
+              "enum": ["cluster_local", "external"],
+              "description": "Authentication mode for Unique API services: cluster_local for in-cluster, external for app key"
+            },
+            "serviceExtraHeaders": {
+              "type": "object",
+              "description": "Extra HTTP headers for cluster_local mode (requires x-company-id, x-user-id, x-service-id)",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "ingestionServiceBaseUrl": {
+              "type": "string",
+              "description": "Base URL for Unique ingestion service (cluster_local mode). Example: http://node-ingestion.namespace:8091"
+            },
+            "scopeManagementServiceBaseUrl": {
+              "type": "string",
+              "description": "Base URL for Unique scope management service"
+            },
+            "zitadel": {
+              "type": "object",
+              "description": "Zitadel configuration",
+              "properties": {
+                "clientId": {
+                  "type": "string",
+                  "description": "Zitadel client ID"
+                },
+                "oauthTokenUrl": {
+                  "type": "string",
+                  "description": "Zitadel OAuth token URL"
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Zitadel project ID"
+                }
+              }
+            }
+          },
+          "required": ["serviceAuthMode"]
+        },
+        "ingestion": {
+          "type": "object",
+          "description": "Ingestion backend configuration (applies when mcpBackend is microsoft_graph_and_unique_api)",
+          "properties": {
+            "defaultMailFilters": {
+              "type": "object",
+              "description": "Default mail filters applied when creating a new inbox configuration. Env var: INGESTION_DEFAULT_MAIL_FILTERS (JSON string)",
+              "properties": {
+                "retentionWindowInDays": {
+                  "type": "integer",
+                  "description": "Limits sync to emails received within the last N days (rolling forward daily)"
+                },
+                "ignoredContents": {
+                  "type": "array",
+                  "description": "List of content patterns to ignore",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "ignoredSenders": {
+                  "type": "array",
+                  "description": "List of sender addresses to ignore",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": ["retentionWindowInDays"]
+            },
+            "liveCatchupOverlappingWindowMinutes": {
+              "type": "integer",
+              "description": "Overlapping window (minutes) for live catch-up sync runs. Office 365 eventual consistency means late-arriving messages need re-querying. Minimum: 2. Default: 3. Env var: INGESTION_LIVE_CATCHUP_OVERLAPPING_WINDOW_MINUTES",
+              "minimum": 2,
+              "default": 3
+            },
+            "liveCatchupRecheckOverlappingWindowMinutes": {
+              "type": "integer",
+              "description": "Overlapping window (minutes) for live catch-up ready-recheck runs. Minimum: 10. Default: 10. Env var: INGESTION_LIVE_CATCHUP_RECHECK_OVERLAPPING_WINDOW_MINUTES",
+              "minimum": 10,
+              "default": 10
+            },
+            "fullSyncRecoveryCron": {
+              "type": "string",
+              "description": "Cron schedule for stuck full-sync recovery scans. Default: '*/2 * * * *'. Env var: INGESTION_FULL_SYNC_RECOVERY_CRON"
+            },
+            "liveCatchupRecoveryCron": {
+              "type": "string",
+              "description": "Cron schedule for stuck live catch-up recovery scans. Default: '*/5 * * * *'. Env var: INGESTION_LIVE_CATCHUP_RECOVERY_CRON"
+            },
+            "liveCatchupOauthUsersRecheckCron": {
+              "type": "string",
+              "description": "Cron schedule for subscription-user live catch-up ready-recheck runs. Default: '*/10 * * * *'. Env var: INGESTION_LIVE_CATCHUP_OAUTH_USERS_RECHECK_CRON"
+            },
+            "liveCatchupSharedMailboxRecheckCron": {
+              "type": "string",
+              "description": "Cron schedule for shared-mailbox live catch-up ready-recheck runs. Default: '*/10 * * * *'. Env var: INGESTION_LIVE_CATCHUP_SHARED_MAILBOX_RECHECK_CRON"
+            },
+            "deleteInboxRecoveryCron": {
+              "type": "string",
+              "description": "Cron schedule for stuck inbox deletion recovery scans. Default: '*/5 * * * *'. Env var: INGESTION_DELETE_INBOX_RECOVERY_CRON"
+            }
+          },
+          "required": ["defaultMailFilters"]
+        },
+        "auth": {
+          "type": "object",
+          "description": "Authentication configuration for the MCP server",
+          "properties": {
+            "accessTokenExpiresInSeconds": {
+              "type": "integer",
+              "description": "Access token expiration time in seconds",
+              "default": 60
+            },
+            "refreshTokenExpiresInSeconds": {
+              "type": "integer",
+              "description": "Refresh token expiration time in seconds",
+              "default": 2592000
+            }
+          }
+        }
+      },
+      "required": ["app", "microsoft", "unique"]
+    }
+  }
+}

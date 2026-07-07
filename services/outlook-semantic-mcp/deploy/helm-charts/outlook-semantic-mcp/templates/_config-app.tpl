@@ -1,16 +1,22 @@
 {{- define "chart.config.app" -}}
 {{- with .Values.mcpConfig }}
-SELF_URL: {{ .app.selfUrl | quote }}
-MCP_DEBUG_MODE: {{ .app.mcpDebugMode | quote }}
-MCP_BACKEND: {{ .app.mcpBackend | quote }}
+- name: SELF_URL
+  value: {{ tpl .app.selfUrl $ | quote }}
+- name: MCP_DEBUG_MODE
+  value: {{ .app.mcpDebugMode | quote }}
+- name: MCP_BACKEND
+  value: {{ .app.mcpBackend | quote }}
 {{- if .app.directorySyncCronSchedule }}
-DIRECTORY_SYNC_CRON_SCHEDULE: {{ .app.directorySyncCronSchedule | quote }}
+- name: DIRECTORY_SYNC_CRON_SCHEDULE
+  value: {{ .app.directorySyncCronSchedule | quote }}
 {{- end }}
 {{- if .app.logsBuffering }}
-LOGS_BUFFERING: {{ .app.logsBuffering | quote }}
+- name: LOGS_BUFFERING
+  value: {{ .app.logsBuffering | quote }}
 {{- end }}
 {{- if .app.logsDiagnosticsDataPolicy }}
-LOGS_DIAGNOSTICS_DATA_POLICY: {{ .app.logsDiagnosticsDataPolicy | quote }}
+- name: LOGS_DIAGNOSTICS_DATA_POLICY
+  value: {{ .app.logsDiagnosticsDataPolicy | quote }}
 {{- end }}
 {{- end }}
 {{- end }}

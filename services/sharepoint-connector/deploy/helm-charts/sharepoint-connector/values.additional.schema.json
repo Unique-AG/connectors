@@ -1,0 +1,438 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "SharePoint Connector Values",
+  "description": "Values for the SharePoint Connector Helm chart. Takes content from SharePoint and sends it to Unique AI for RAG ingestion.",
+  "type": "object",
+  "properties": {
+    "grafana": {
+      "type": "object",
+      "description": "Grafana dashboard configuration",
+      "properties": {
+        "dashboard": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Grafana dashboard creation"
+            },
+            "folder": {
+              "type": "string",
+              "description": "Grafana folder name for the dashboard"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "connectorConfig": {
+      "type": "object",
+      "description": "SharePoint connector configuration",
+      "required": ["enabled", "sharepoint", "unique", "processing"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Wether to use the connector config."
+        },
+        "sharepoint": {
+          "type": "object",
+          "description": "SharePoint configuration",
+          "required": ["tenantId", "baseUrl", "sitesSource", "auth"],
+          "properties": {
+            "tenantId": {
+              "type": "string",
+              "description": "Azure AD tenant ID against which the Graph API calls are made",
+              "examples": ["00000000-0000-0000-0000-000000000000"]
+            },
+            "baseUrl": {
+              "type": "string",
+              "description": "SharePoint base URL",
+              "examples": ["https://contoso.sharepoint.com", "https://my-company.sharepoint.com"]
+            },
+            "sitesSource": {
+              "type": "string",
+              "enum": ["config_file", "sharepoint_list"],
+              "description": "Sites source configuration. Determines how sites are configured: from static YAML (config_file) or dynamically from SharePoint list (sharepoint_list)"
+            },
+            "sharepointList": {
+              "type": "object",
+              "description": "SharePoint list details containing site configurations. Only used when sitesSource is 'sharepoint_list'",
+              "required": ["siteId", "listId"],
+              "properties": {
+                "siteId": {
+                  "type": "string",
+                  "description": "SharePoint site ID containing the configuration list",
+                  "examples": ["00000000-0000-0000-0000-000000000000"]
+                },
+                "listId": {
+                  "type": "string",
+                  "description": "GUID of the SharePoint configuration list",
+                  "examples": ["00000000-0000-0000-0000-000000000000"]
+                }
+              },
+              "additionalProperties": false
+            },
+            "siteDefaults": {
+              "type": "object",
+              "description": "Deployment-level defaults applied to every site. Per-site values override these when set; empty/blank values fall through to these defaults. Any field except siteId may be defaulted here.",
+              "properties": {
+                "syncColumnName": {
+                  "type": "string",
+                  "description": "Default column name marking files for sync"
+                },
+                "ingestionMode": {
+                  "type": "string",
+                  "enum": ["flat", "recursive"],
+                  "description": "Default ingestion mode"
+                },
+                "scopeId": {
+                  "type": "string",
+                  "description": "Default root scope ID"
+                },
+                "maxFilesToIngest": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Default maximum number of files to ingest per site per run"
+                },
+                "storeInternally": {
+                  "type": "string",
+                  "enum": ["enabled", "disabled"],
+                  "description": "Default storeInternally setting"
+                },
+                "syncStatus": {
+                  "type": "string",
+                  "enum": ["active", "inactive", "deleted"],
+                  "description": "Default sync status"
+                },
+                "syncMode": {
+                  "type": "string",
+                  "enum": ["content_only", "content_and_permissions"],
+                  "description": "Default sync mode"
+                },
+                "permissionsInheritanceMode": {
+                  "type": "string",
+                  "enum": ["inherit_scopes_and_files", "inherit_scopes", "inherit_files", "none"],
+                  "description": "Default permissions inheritance mode"
+                },
+                "subsitesScan": {
+                  "type": "string",
+                  "enum": ["enabled", "disabled"],
+                  "description": "Default subsitesScan setting"
+                }
+              },
+              "additionalProperties": false
+            },
+            "sites": {
+              "type": "array",
+              "description": "Array of SharePoint sites to sync with their individual configurations. Only used when sitesSource is 'config_file'",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["siteId"],
+                "properties": {
+                  "siteId": {
+                    "type": "string",
+                    "description": "SharePoint site ID (UUID)",
+                    "examples": ["00000000-0000-0000-0000-000000000000"]
+                  },
+                  "syncColumnName": {
+                    "type": "string",
+                    "description": "Column name for synchronization in this site",
+                    "examples": ["FinanceGPTKnowledge", "HRKnowledge"]
+                  },
+                  "ingestionMode": {
+                    "type": "string",
+                    "enum": ["flat", "recursive"],
+                    "description": "Ingestion mode for this site: flat ingests all files to a single root scope, recursive maintains the folder hierarchy"
+                  },
+                  "scopeId": {
+                    "type": "string",
+                    "description": "Scope ID to be used as root for ingestion for this site",
+                    "examples": ["scope_bu4gokr0atzj0kfiuaaaaaaa"]
+                  },
+                  "maxFilesToIngest": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum number of files to ingest for this site in a single run"
+                  },
+                  "storeInternally": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
+                    "description": "Whether to store content internally in Unique for this site"
+                  },
+                  "syncStatus": {
+                    "type": "string",
+                    "enum": ["active", "inactive", "deleted"],
+                    "description": "Sync status: active = sync normally, inactive = skip, deleted = delete scope recursively"
+                  },
+                  "syncMode": {
+                    "type": "string",
+                    "enum": ["content_only", "content_and_permissions"],
+                    "description": "Mode of synchronization for this site"
+                  },
+                  "permissionsInheritanceMode": {
+                    "type": "string",
+                    "enum": ["inherit_scopes_and_files", "inherit_scopes", "inherit_files", "none"],
+                    "description": "Inheritance mode for scopes and files. Only used in content_only sync mode; ignored in content_and_permissions mode.",
+                    "default": "inherit_scopes_and_files"
+                  },
+                  "subsitesScan": {
+                    "type": "string",
+                    "enum": ["enabled", "disabled"],
+                    "description": "Whether to recursively discover and sync content from subsites",
+                    "default": "disabled"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "auth": {
+              "type": "object",
+              "description": "SharePoint authentication configuration",
+              "required": ["mode", "clientId", "privateKeyPath"],
+              "anyOf": [
+                {
+                  "required": ["thumbprintSha1"]
+                },
+                {
+                  "required": ["thumbprintSha256"]
+                }
+              ],
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "description": "Authentication mode",
+                  "enum": ["certificate"]
+                },
+                "clientId": {
+                  "type": "string",
+                  "description": "Azure AD application client ID",
+                  "examples": ["00000000-0000-0000-0000-000000000000"]
+                },
+                "clientSecret": {
+                  "type": ["string", "null"],
+                  "description": "Azure AD application client secret"
+                },
+                "privateKeyPath": {
+                  "type": "string",
+                  "description": "Path to the private key file of the Azure AD application certificate in PEM format",
+                  "examples": ["/app/key.pem", "/my/custom/mount/path/key.pem"]
+                },
+                "thumbprintSha1": {
+                  "type": "string",
+                  "description": "SHA1 thumbprint of the Azure AD application certificate",
+                  "examples": ["2fd4e1c67a2d28fced849ee1bb76e7391b93eb12"]
+                },
+                "thumbprintSha256": {
+                  "type": "string",
+                  "description": "SHA256 thumbprint of the Azure AD application certificate",
+                  "examples": ["abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"]
+                }
+              },
+              "additionalProperties": false
+            },
+            "apiRateLimitPerMinuteThousands": {
+              "type": "number",
+              "description": "Rate limiting for Graph API requests per minute (in thousands)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "unique": {
+          "type": "object",
+          "description": "Unique platform configuration",
+          "required": ["ingestionServiceBaseUrl", "scopeManagementServiceBaseUrl", "authMode"],
+          "properties": {
+            "ingestionServiceBaseUrl": {
+              "type": "string",
+              "description": "Base URL for the ingestion service",
+              "examples": [
+                "http://node-ingestion.finance-gpt:8091",
+                "https://api.unique.app/ingestion"
+              ]
+            },
+            "scopeManagementServiceBaseUrl": {
+              "type": "string",
+              "description": "Base URL for the scope management service",
+              "examples": [
+                "http://node-scope-management.finance-gpt:8094",
+                "https://api.unique.app/scope-management"
+              ]
+            },
+            "apiRateLimitPerMinute": {
+              "type": "integer",
+              "description": "Number of Unique API requests allowed per minute"
+            },
+            "authMode": {
+              "type": "string",
+              "enum": ["cluster_local", "external"],
+              "description": "Communication mode for the Unique Services. cluster_local: communicates using in-cluster URLs and requires serviceExtraHeaders with x-company-id and x-user-id. external: communicates using external URLs and requires authentication via Zitadel."
+            },
+            "serviceExtraHeaders": {
+              "type": "object",
+              "description": "HTTP extra headers for ingestion API requests. Required when authMode is cluster_local. Must contain x-company-id and x-user-id headers.",
+              "examples": [
+                {
+                  "x-company-id": "123456789101112131",
+                  "x-user-id": "123456789101112131"
+                }
+              ]
+            },
+            "ingestionConfig": {
+              "type": "object",
+              "description": "JSON string of config to pass when submitting file for ingestion",
+              "examples": [
+                {
+                  "uniqueIngestionMode": "INGESTION",
+                  "customProperty": "value"
+                }
+              ]
+            },
+            "zitadel": {
+              "type": "object",
+              "description": "Zitadel authentication configuration (required when authMode is external)",
+              "required": ["clientId", "oauthTokenUrl", "projectId"],
+              "properties": {
+                "clientId": {
+                  "type": "string",
+                  "description": "Zitadel client ID",
+                  "examples": ["sharepoint-connector@idp.unique.app"]
+                },
+                "oauthTokenUrl": {
+                  "type": "string",
+                  "description": "Zitadel OAuth token URL",
+                  "examples": ["https://idp.unique.app/oauth/v2/token"]
+                },
+                "projectId": {
+                  "type": "string",
+                  "description": "Zitadel project ID",
+                  "examples": ["123456789101112131"]
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "processing": {
+          "type": "object",
+          "description": "Files processing configuration",
+          "required": ["allowedMimeTypes", "concurrency"],
+          "properties": {
+            "allowedMimeTypes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "examples": [
+                  "application/pdf",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ]
+              },
+              "description": "List of allowed MIME types for file processing",
+              "examples": [
+                [
+                  "application/pdf",
+                  "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ]
+              ]
+            },
+            "concurrency": {
+              "type": "integer",
+              "description": "Number of concurrent processing operations"
+            },
+            "stepTimeoutSeconds": {
+              "type": "integer",
+              "description": "Timeout in seconds for processing steps"
+            },
+            "maxFileSizeToIngestBytes": {
+              "type": ["integer", "null"],
+              "description": "Maximum file size in bytes to ingest"
+            },
+            "mimeTypeOverridesByExtension": {
+              "type": "object",
+              "description": "Map of file extension suffix to canonical MIME type. Overrides the SharePoint-reported mimeType. Keys must match one or more lowercase '.alphanumeric' segments (e.g. '.csv', '.tar.gz'). User-supplied values replace the default wholesale.",
+              "patternProperties": {
+                "^(\\.[a-z0-9]+)+$": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": false,
+              "examples": [
+                {
+                  ".csv": "text/csv"
+                }
+              ]
+            },
+            "scanIntervalCron": {
+              "type": "string",
+              "description": "Cron expression for the scheduled SharePoint scan interval",
+              "examples": ["*/15 * * * *"]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "proxyConfig": {
+      "type": "object",
+      "description": "HTTP proxy configuration for external API calls. Required for environments where internet access is only available through a proxy.",
+      "required": ["enabled", "authMode"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable proxy configuration. If disabled, the proxy-config ConfigMap must be removed from connector.extraEnvCM.",
+          "default": true
+        },
+        "authMode": {
+          "type": "string",
+          "enum": ["none", "no_auth", "username_password", "ssl_tls"],
+          "description": "Proxy authentication mode: none (proxy disabled), no_auth (proxy enabled, no authentication), username_password (username/password authentication), ssl_tls (TLS client certificate authentication)",
+          "default": "none"
+        },
+        "host": {
+          "type": "string",
+          "description": "Proxy server hostname (required for no_auth/username_password/ssl_tls modes)",
+          "examples": ["proxy.example.com"]
+        },
+        "port": {
+          "type": "integer",
+          "description": "Proxy server port (required for no_auth/username_password/ssl_tls modes)",
+          "examples": [8080, 3128]
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["http", "https"],
+          "description": "Proxy protocol: http or https (required for no_auth/username_password/ssl_tls modes)",
+          "default": "http"
+        },
+        "username": {
+          "type": "string",
+          "description": "Basic auth username (required for username_password mode)"
+        },
+        "sslCertPath": {
+          "type": "string",
+          "description": "Path to SSL/TLS client certificate (required for ssl_tls mode)",
+          "examples": ["/app/proxy-certs/client.crt"]
+        },
+        "sslKeyPath": {
+          "type": "string",
+          "description": "Path to SSL/TLS client key (required for ssl_tls mode)",
+          "examples": ["/app/proxy-certs/client.key"]
+        },
+        "sslCaBundlePath": {
+          "type": "string",
+          "description": "Path to CA bundle for verifying proxy server certificate (optional)",
+          "examples": ["/app/proxy-certs/ca.crt"]
+        },
+        "headers": {
+          "type": "string",
+          "description": "Optional JSON string of headers for CONNECT request",
+          "examples": ["{\"X-Proxy-Header\":\"value\"}"]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
