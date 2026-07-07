@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.0.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.7.0...sharepoint-connector@3.0.0) (2026-07-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* **confluence-connector,sharepoint-connector,teams-mcp,outlook-semantic-mcp:** The `values.yaml` structure for all four charts was reorganised in #658. The `connector:` and `server:` alias namespaces were removed; all values now live at the top level under the five-domain layout. Existing `values.yaml` overrides must be updated accordingly.
+
+### Features
+
+* **charts,outlook-semantic-mcp,sharepoint-connector,teams-mcp:** add admin consent redirect uris ([#577](https://github.com/Unique-AG/connectors/issues/577)) ([3e36a6d](https://github.com/Unique-AG/connectors/commit/3e36a6deea5e620b6e5316a7f3df0dd4fd5c74b3))
+* **ci,sharepoint-connector,confluence-connector:** publish helm charts to getunique ([#606](https://github.com/Unique-AG/connectors/issues/606)) ([72823c7](https://github.com/Unique-AG/connectors/commit/72823c73e4916ee084e24103684c24a4e803f935))
+* **confluence-connector,sharepoint-connector,teams-mcp,outlook-semantic-mcp,ci,scripts:** migrate helm charts to base library ([#658](https://github.com/Unique-AG/connectors/issues/658)) ([2ff907f](https://github.com/Unique-AG/connectors/commit/2ff907fb3b6793622fe236f33caf37874651e4ec))
+* **confluence-connector,sharepoint-connector,teams-mcp,outlook-semantic-mcp:** mark helm chart base-library migration as breaking change ([#680](https://github.com/Unique-AG/connectors/issues/680)) ([4343627](https://github.com/Unique-AG/connectors/commit/4343627911371db4107376a9c2a0fbd2d57aaf1b))
+
+
+### Bug Fixes
+
+* **deps:** address pnpm audit vulnerabilities ([#650](https://github.com/Unique-AG/connectors/issues/650)) ([f7cbc71](https://github.com/Unique-AG/connectors/commit/f7cbc71e8ada8778548d8f1d064753ca5355dc25))
+
 ## [2.7.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.6.1...sharepoint-connector@2.7.0) (2026-05-13)
 
 
