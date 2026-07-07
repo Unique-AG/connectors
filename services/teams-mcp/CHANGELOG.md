@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.0...teams-mcp@0.3.1) (2026-07-07)
+
+
+### Bug Fixes
+
+* **teams-mcp:** replace favicon set with custom MS Teams logo ([#681](https://github.com/Unique-AG/connectors/issues/681)) ([c1519ae](https://github.com/Unique-AG/connectors/commit/c1519ae313262ddf49bf55487a3c166400a15569))
+
 ## [0.3.0](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.2.23...teams-mcp@0.3.0) (2026-07-07)
 
 
