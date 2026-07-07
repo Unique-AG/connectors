@@ -3,7 +3,7 @@ name: sharepoint-connector
 description: Take content from SharePoint and send it to Unique AI for RAG ingestion.
 type: application
 version: 3.0.0
-appVersion: 2.7.0
+appVersion: 3.0.0
 dependencies:
   - name: base
     repository: oci://ghcr.io/unique-ag/helm
