@@ -9,7 +9,9 @@ import { ChatService } from '../chat.service';
 const SendChatMessageInputSchema = z.object({
   chatId: z
     .string()
-    .describe('Exact chat id from list_chats or search_messages. Use list_chats first to find it.'),
+    .describe(
+      'Opaque Microsoft Teams chat id (e.g. "19:...@thread.v2"). Do not invent, guess, or reconstruct this id; only copy an exact chatId returned by list_chats or search_messages. If you do not have one, call list_chats first.',
+    ),
   message: z.string().describe('Plain text message content to send'),
 });
 
