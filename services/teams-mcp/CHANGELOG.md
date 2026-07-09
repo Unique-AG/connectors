@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.2...teams-mcp@0.3.3) (2026-07-09)
+
+
+### Bug Fixes
+
+* **teams-mcp:** only send OData params Graph supports on chat/channel message endpoints [UN-22733] ([#685](https://github.com/Unique-AG/connectors/issues/685)) ([82e333f](https://github.com/Unique-AG/connectors/commit/82e333f24c541bb83807383f7341059a66f98319))
+
 ## [0.3.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.1...teams-mcp@0.3.2) (2026-07-09)
 
 
