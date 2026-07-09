@@ -79,6 +79,7 @@ export const MsChatMessageSchema = z
       )
       .nullish(),
     messageType: z.string().default('message'),
+    deletedDateTime: z.string().nullish(),
   })
   .transform((msg) => ({
     id: msg.id,
@@ -89,6 +90,7 @@ export const MsChatMessageSchema = z
     contentType: msg.body.contentType,
     attachments: (msg.attachments ?? []).map((a) => ({ id: a.id, name: a.name ?? null })),
     messageType: msg.messageType,
+    deletedDateTime: msg.deletedDateTime ?? null,
   }));
 
 export type MsChatMember = z.infer<typeof MsChatMemberSchema>;

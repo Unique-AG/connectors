@@ -93,7 +93,7 @@ export function classifyError(error: unknown): ClassifiedError {
           (requestId
             ? ` Microsoft request id: ${requestId} (provide this to Microsoft support).`
             : '') +
-          ` This is usually transient — please retry shortly.`,
+          ` Some of these errors are transient and clear on a retry (for example a rate limit); others are persistent — notably a 500 returned while reading a chat whose messages contain content Graph cannot serialize (such as Loop components or certain cards) recurs on every attempt and will not clear by retrying.`,
       };
     }
 
