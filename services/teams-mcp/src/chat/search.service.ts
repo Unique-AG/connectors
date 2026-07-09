@@ -198,7 +198,12 @@ export class SearchService {
 
             const content =
               contentFormat === 'normalized'
-                ? normalizeContent(message.content, message.contentType, message.attachments)
+                ? normalizeContent(
+                    message.content,
+                    message.contentType,
+                    message.attachments,
+                    message.deletedDateTime,
+                  )
                 : message.content;
 
             return { ...row, content };

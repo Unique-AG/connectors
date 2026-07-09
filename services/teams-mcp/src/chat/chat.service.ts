@@ -69,7 +69,7 @@ export class ChatService {
       .api(`/chats/${chatId}/messages`)
       .top(limit)
       .orderby(orderBy)
-      .select('id,createdDateTime,from,body,attachments,messageType')
+      .select('id,createdDateTime,from,body,attachments,messageType,deletedDateTime')
       .get();
 
     // Graph does not support a server-side messageType filter on the chat and
@@ -115,7 +115,7 @@ export class ChatService {
       .api(`/teams/${teamId}/channels/${channelId}/messages`)
       .top(limit)
       .orderby(orderBy)
-      .select('id,createdDateTime,from,body,attachments,messageType')
+      .select('id,createdDateTime,from,body,attachments,messageType,deletedDateTime')
       .get();
 
     const raw = await collectUntil(client, response, {
@@ -155,7 +155,7 @@ export class ChatService {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client
       .api(`/chats/${chatId}/messages/${messageId}`)
-      .select('id,createdDateTime,from,body,attachments,messageType')
+      .select('id,createdDateTime,from,body,attachments,messageType,deletedDateTime')
       .get();
 
     return MsChatMessageSchema.parse(response);
@@ -182,7 +182,7 @@ export class ChatService {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client
       .api(`/teams/${teamId}/channels/${channelId}/messages/${messageId}`)
-      .select('id,createdDateTime,from,body,attachments,messageType')
+      .select('id,createdDateTime,from,body,attachments,messageType,deletedDateTime')
       .get();
 
     return MsChatMessageSchema.parse(response);

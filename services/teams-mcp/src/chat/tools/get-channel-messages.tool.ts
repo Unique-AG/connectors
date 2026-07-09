@@ -132,7 +132,7 @@ export class GetChannelMessagesTool {
   ): z.output<typeof GetChannelMessagesOutputSchema>['messages'][number] {
     const content =
       input.contentFormat === 'normalized'
-        ? normalizeContent(m.content, m.contentType, m.attachments)
+        ? normalizeContent(m.content, m.contentType, m.attachments, m.deletedDateTime)
         : m.content;
 
     const msg: z.output<typeof GetChannelMessagesOutputSchema>['messages'][number] = {
