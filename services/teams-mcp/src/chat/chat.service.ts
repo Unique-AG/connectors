@@ -29,12 +29,14 @@ export class ChatService {
     // Single-page by design (not collectAllPages): a bounded "recent chats"
     // window with an accurate `hasMore`. $orderby is required for "most recent"
     // — /me/chats is not sorted by activity by default.
+    // /me/chats supports only $expand, $top, $filter and $orderby — $select is
+    // rejected as an unsupported OData parameter (see chat-list docs), so we let
+    // the members/lastMessagePreview expansions bring back the fields we need.
     const response: PageCollection = await client
       .api('/me/chats')
       .expand('members,lastMessagePreview')
       .top(limit)
       .orderby('lastMessagePreview/createdDateTime desc')
-      .select('id,chatType,topic,members,createdDateTime')
       .get();
 
     const chats = z.array(MsChatSchema).parse(response.value);
@@ -65,11 +67,13 @@ export class ChatService {
     );
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
+    // The chat messages endpoint supports only $top, $orderby and $filter — a
+    // $select is rejected as an unsupported OData parameter (see chat-list-messages
+    // docs), so we request the full message and let the schema pick out fields.
     const response = await client
       .api(`/chats/${chatId}/messages`)
       .top(limit)
       .orderby(orderBy)
-      .select('id,createdDateTime,from,body,attachments,messageType,deletedDateTime')
       .get();
 
     // Graph does not support a server-side messageType filter on the chat and
@@ -96,9 +100,9 @@ export class ChatService {
     teamId: string,
     channelId: string,
     limit: number,
-    options: { orderBy?: string; excludeSystemMessages?: boolean } = {},
+    options: { excludeSystemMessages?: boolean } = {},
   ): Promise<MsChatMessage[]> {
-    const { orderBy = 'createdDateTime desc', excludeSystemMessages = false } = options;
+    const { excludeSystemMessages = false } = options;
     const span = this.traceService.getSpan();
     span?.setAttribute('user_profile_id', userProfileId);
     span?.setAttribute('team_id', teamId);
@@ -111,11 +115,13 @@ export class ChatService {
     );
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
+    // Unlike /chats/{id}/messages, the channel messages endpoint supports only
+    // $top and $expand — any $orderby or $select is rejected with HTTP 400 (see
+    // channel-list-messages docs). Messages come back sorted by the last modified
+    // date of the reply chain, so we page with $top alone and take the newest.
     const response = await client
       .api(`/teams/${teamId}/channels/${channelId}/messages`)
       .top(limit)
-      .orderby(orderBy)
-      .select('id,createdDateTime,from,body,attachments,messageType,deletedDateTime')
       .get();
 
     const raw = await collectUntil(client, response, {
@@ -153,10 +159,10 @@ export class ChatService {
     );
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    const response = await client
-      .api(`/chats/${chatId}/messages/${messageId}`)
-      .select('id,createdDateTime,from,body,attachments,messageType,deletedDateTime')
-      .get();
+    // Getting a single message supports no OData query parameters at all — a
+    // $select is rejected (see chatmessage-get docs) — so we fetch the full
+    // message and let the schema pick out the fields we need.
+    const response = await client.api(`/chats/${chatId}/messages/${messageId}`).get();
 
     return MsChatMessageSchema.parse(response);
   }
@@ -180,9 +186,11 @@ export class ChatService {
     );
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
+    // Getting a single message supports no OData query parameters at all — a
+    // $select is rejected (see chatmessage-get docs) — so we fetch the full
+    // message and let the schema pick out the fields we need.
     const response = await client
       .api(`/teams/${teamId}/channels/${channelId}/messages/${messageId}`)
-      .select('id,createdDateTime,from,body,attachments,messageType,deletedDateTime')
       .get();
 
     return MsChatMessageSchema.parse(response);
