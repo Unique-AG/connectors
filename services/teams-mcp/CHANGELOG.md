@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.1...teams-mcp@0.3.2) (2026-07-09)
+
+
+### Bug Fixes
+
+* **teams-mcp:** chat message rendering + chatId description hardening [UN-22733] ([#683](https://github.com/Unique-AG/connectors/issues/683)) ([3377b8c](https://github.com/Unique-AG/connectors/commit/3377b8c3538f3a8f2cd96f11d5d46307a545295b))
+
 ## [0.3.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.0...teams-mcp@0.3.1) (2026-07-07)
 
 
