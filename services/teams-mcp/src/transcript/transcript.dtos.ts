@@ -237,7 +237,9 @@ export const Transcript = z.object({
   id: z.string(),
   meetingId: z.string(),
   callId: z.string(),
-  contentCorrelationId: z.string(),
+  // Graph returns null when the transcript has no correlated recording; the field is only a
+  // link to a recording, so it is legitimately absent for transcript-only meetings.
+  contentCorrelationId: z.string().nullish(),
   transcriptContentUrl: stringToURL(),
   createdDateTime: isoDatetimeToDate({ offset: true }),
   endDateTime: isoDatetimeToDate({ offset: true }),
@@ -246,7 +248,8 @@ export const Transcript = z.object({
     device: z.string().nullable(),
     user: z.object({
       userIdentityType: z.string(),
-      tenantId: z.string(),
+      // identity.tenantId is documented as Optional and can be omitted for some organizers.
+      tenantId: z.string().nullish(),
       id: z.string(),
       displayName: z.string().nullable(),
     }),
@@ -357,7 +360,8 @@ export const Recording = z.object({
     device: z.string().nullable(),
     user: z.object({
       userIdentityType: z.string(),
-      tenantId: z.string(),
+      // identity.tenantId is documented as Optional and can be omitted for some organizers.
+      tenantId: z.string().nullish(),
       id: z.string(),
       displayName: z.string().nullable(),
     }),
