@@ -43,7 +43,7 @@ export class UniqueService {
       date: Date;
       startDateTime: Date;
       endDateTime: Date;
-      contentCorrelationId: string;
+      contentCorrelationId?: string | null;
       participants: { id?: string; name: string; email: string }[];
       owner: { id: string; name: string; email: string };
     },
@@ -365,7 +365,7 @@ export class UniqueService {
       endDateTime: Date;
       meetingId: string;
       subject: string;
-      contentCorrelationId: string;
+      contentCorrelationId?: string | null;
       owner: { name: string; email: string };
       participants: { name: string; email: string }[];
     },
@@ -378,9 +378,13 @@ export class UniqueService {
       start_datetime: startDateTime.toISOString(),
       end_datetime: endDateTime.toISOString(),
       meeting_id: meeting.meetingId,
-      content_correlation_id: meeting.contentCorrelationId,
       organizer_email: meeting.owner.email.toLowerCase(),
     };
+
+    // Only present when the transcript is linked to a recording.
+    if (meeting.contentCorrelationId) {
+      metadata.content_correlation_id = meeting.contentCorrelationId;
+    }
 
     if (meeting.subject) {
       metadata.subject = meeting.subject;

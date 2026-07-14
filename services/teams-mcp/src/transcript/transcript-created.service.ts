@@ -230,7 +230,7 @@ export class TranscriptCreatedService {
     span?.addEvent('microsoft graph data retrieved', {
       meetingId,
       transcriptId,
-      contentCorrelationId: transcript.contentCorrelationId,
+      contentCorrelationId: transcript.contentCorrelationId ?? undefined,
     });
     this.logger.debug(
       {
@@ -243,13 +243,16 @@ export class TranscriptCreatedService {
 
     span?.addEvent('transcript processing completed');
 
-    // Fetch the correlated recording (if available) before ingesting
-    const recording = await this.recordingService.fetchRecording(
-      userProfileId,
-      ownerPath,
-      meetingId,
-      transcript.contentCorrelationId,
-    );
+    // Fetch the correlated recording (if available) before ingesting. A transcript-only meeting
+    // has no contentCorrelationId, so there is no recording to correlate — skip the lookup.
+    const recording = transcript.contentCorrelationId
+      ? await this.recordingService.fetchRecording(
+          userProfileId,
+          ownerPath,
+          meetingId,
+          transcript.contentCorrelationId,
+        )
+      : null;
 
     await this.unique.ingestTranscript(
       {
