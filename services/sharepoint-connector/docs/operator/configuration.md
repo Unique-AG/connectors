@@ -686,7 +686,7 @@ The Helm chart organizes alerts into three categories, each independently toggle
 | ----------- | ------------------------------------ | -------------------------------- |
 | `graphql`   | `SharepointConnectorGraphQLErrors`   | GraphQL API error rate alert     |
 | `uniqueApi` | `SharepointConnectorUniqueAPIErrors` | Unique REST API error rate alert |
-| `syncs`     | `SharepointConnectorSyncFailures`    | Sync cycle failure alert         |
+| `syncs`     | `SharepointConnectorSyncDegraded`    | Site sync failure ratio alert    |
 
 Each category supports `enabled`, `disabled` (per-alert), and `customRules` (to override `for`, `severity`, `threshold`).
 
