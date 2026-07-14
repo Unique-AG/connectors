@@ -219,16 +219,42 @@ The service account credentials are passed via the `x-company-id` and `x-user-id
          x-user-id: "<your-service-account-user-id>"
    ```
 
-### Service Account Permissions
+### Service Account Roles
 
-The service account must have permissions to:
+The Teams MCP Server calls the Unique Public API, whose downstream services
+(`node-ingestion`, `node-scope-management`) authorize each request against the
+Zitadel roles granted to the calling user. Grant the following roles to the
+service account in the target organization:
 
-- Read user information (to resolve meeting participants)
-- Create scopes/folders in the organization
-- Create and modify access permissions
-- Upload content to the knowledge base
+| Role | Why it is required |
+|------|--------------------|
+| `chat.admin.all` | **Mandatory.** The only role accepted when updating a scope (setting its `externalId`/name, `PATCH /folder/{id}`) — there is no alternative. It also covers creating scope access (`PATCH /folder/add-access`), upserting content (`POST /content/upsert`), and resolving participants (`GET /users`). |
+| `chat.knowledge.read` | **Mandatory.** Required to query existing content (`POST /content/infos`), which the server uses to deduplicate and list already-ingested meetings. `chat.admin.all` is **not** accepted by this endpoint, so this role must be granted in addition. |
 
-Ensure the service account has sufficient permissions in the target organization to perform these operations.
+Each API operation maps to a downstream role check as follows:
+
+| Operation | Endpoint | Accepted roles |
+|-----------|----------|----------------|
+| Resolve meeting participant | `GET /users` | `chat.admin.all`, `admin.space.write`, `chat.knowledge.write` |
+| Create meeting scope | `POST /folder` | Service-identity only (no user role required) |
+| Grant participant scope access | `PATCH /folder/add-access` | `chat.admin.all`, `chat.knowledge.write` |
+| Set scope `externalId` / name | `PATCH /folder/{id}` | `chat.admin.all` **only** |
+| Upsert transcript / recording content | `POST /content/upsert` | `chat.admin.all`, `chat.knowledge.write` |
+| Query existing content | `POST /content/infos` | `chat.knowledge.read`, `admin.space.write` |
+| Search content | `POST /search/search` | None (header auth only) |
+| Upload blob | `PUT /scoped/upload` | None (secured by encrypted key) |
+
+> **Note — participant roles.** When the server grants scope access to a meeting
+> participant, Unique additionally requires that *participant's* own Zitadel
+> account to already hold `chat.knowledge.write` (or `chat.admin.all`) for write
+> access, or `chat.knowledge.read` for read access. A participant with no roles
+> assigned in Zitadel is rejected. This is a property of the users being granted
+> access, not of the service account.
+
+> **Note — role enforcement toggle.** Downstream role checks are only enforced
+> when `unique-api` runs with `ENABLE_ROLE_AUTHORIZATION=true` (the platform
+> default). When disabled, `unique-api` calls downstream services with a service
+> identity that bypasses these checks, and the roles above are not required.
 
 ## Root Scope
 
