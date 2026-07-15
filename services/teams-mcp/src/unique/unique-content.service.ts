@@ -191,7 +191,7 @@ export class UniqueContentService {
     return target.toString();
   }
 
-  // One skip/take page; callers paginate explicitly (e.g. `find_transcripts`).
+  // One skip/take page; callers paginate explicitly.
   @Span()
   public async getContentInfos(
     request: PublicContentInfosRequest,
@@ -239,42 +239,6 @@ export class UniqueContentService {
     };
 
     const result = await this.getContentInfos(request);
-    return {
-      contents: result.contents,
-      total: result.total ?? result.contents.length,
-    };
-  }
-
-  /**
-   * Scoped variant of findByMetadata — passes `x-user-id` and `x-company-id` headers
-   * so results are filtered to what the given user is permitted to access.
-   */
-  @Span()
-  public async scopedFindByMetadata(
-    filter: MetadataFilter,
-    scopeContext: UniqueIdentity,
-    options?: { skip?: number; take?: number; sourceKind?: string },
-  ): Promise<{ contents: ContentInfoItem[]; total: number }> {
-    const request: PublicContentInfosRequest = {
-      skip: options?.skip ?? 0,
-      take: options?.take ?? 50,
-      metadataFilter: filter,
-      sourceKind: options?.sourceKind,
-    };
-
-    const payload = PublicContentInfosRequestSchema.encode(request);
-
-    const response = await this.fetch('content/infos', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-user-id': scopeContext.userId,
-        'x-company-id': scopeContext.companyId,
-      },
-      body: JSON.stringify(payload),
-    });
-    const result = PublicContentInfosResultSchema.parse(await response.json());
-
     return {
       contents: result.contents,
       total: result.total ?? result.contents.length,

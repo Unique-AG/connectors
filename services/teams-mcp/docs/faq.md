@@ -5,7 +5,7 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Teams MCP Server is both a **connector** and an **interactive MCP server**. It does two things simultaneously: it automatically ingests meeting transcripts into the Unique knowledge base in the background, and it exposes an interactive tool surface of 14 MCP tools that AI clients can call on demand.
+**Answer:** The Teams MCP Server is both a **connector** and an **interactive MCP server**. It does two things simultaneously: it automatically ingests meeting transcripts into the Unique knowledge base in the background, and it exposes an interactive tool surface of 13 MCP tools that AI clients can call on demand.
 
 **What it does:**
 
@@ -18,7 +18,7 @@
 **What the user sees:**
 
 - An initial OAuth consent screen to connect their Microsoft account
-- 14 MCP tools available in their AI client immediately after connection
+- 13 MCP tools available in their AI client immediately after connection
 - Automatic transcript ingestion in the background for all meetings with transcription enabled, once `start_kb_integration` is called
 
 **Design rationale:**
