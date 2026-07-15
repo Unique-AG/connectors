@@ -29,7 +29,6 @@ The `list_*` tools return distinguishing metadata (creation dates, last-message 
 | [`send_channel_message`](#send_channel_message) | Messages | Yes | Send a plain-text message to a channel |
 | [`search_messages`](#search_messages) | Search | No | Search messages across chats and channels |
 | [`find_transcripts`](#find_transcripts) | Transcript & KB | No | Semantic + keyword search within ingested transcripts |
-| [`list_meetings`](#list_meetings) | Transcript & KB | No | Browse ingested meetings by date/organizer/participant |
 | [`ingest_meeting`](#ingest_meeting) | Transcript & KB | Yes | Ingest a specific meeting's transcript on demand |
 | [`verify_kb_integration_status`](#verify_kb_integration_status) | Transcript & KB | No | Check transcript-ingestion subscription status |
 | [`start_kb_integration`](#start_kb_integration) | Transcript & KB | Yes | Start automatic transcript ingestion |
@@ -386,43 +385,6 @@ Search within ingested meeting transcripts using hybrid semantic + keyword searc
       "participants": ["Alice Smith", "Bob Jones"]
     }
   ]
-}
-```
-
----
-
-### `list_meetings`
-
-Browse ingested meetings without a search query. Use this to discover meetings by date range, organizer, participant, or subject; then use `find_transcripts` to search within them.
-
-**Input parameters:**
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `dateFrom` | string (ISO 8601 datetime) | No | — | Meetings that started on or after this datetime. |
-| `dateTo` | string (ISO 8601 datetime) | No | — | Meetings that started on or before this datetime. |
-| `organizer` | string | No | — | Filter by organizer name or email (partial match). |
-| `participant` | string | No | — | Filter by participant name or email (partial match). |
-| `subject` | string | No | — | Filter by meeting subject (partial match). |
-| `skip` | integer (≥ 0) | No | `0` | Number of results to skip (pagination). |
-| `take` | integer (1–50) | No | `20` | Maximum number of meetings to return. |
-
-**Returns:** A `meetings` array and `total` (number of matching meetings). Each meeting has `id` (content id — reference it in other tools), `title`, `meetingDate`, `startDatetime`, `endDatetime`, `organizer`, and `participants`.
-
-**Example:**
-
-```json
-{
-  "meetings": [
-    {
-      "id": "cont_abc123",
-      "title": "Q2 Planning",
-      "meetingDate": "2024-06-01T10:00:00Z",
-      "organizer": "Alice Smith",
-      "participants": ["Alice Smith", "Bob Jones"]
-    }
-  ],
-  "total": 1
 }
 ```
 

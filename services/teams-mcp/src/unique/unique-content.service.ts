@@ -191,7 +191,7 @@ export class UniqueContentService {
     return target.toString();
   }
 
-  // One skip/take page; callers paginate explicitly (e.g. `list_meetings`).
+  // One skip/take page; callers paginate explicitly (e.g. `find_transcripts`).
   @Span()
   public async getContentInfos(
     request: PublicContentInfosRequest,

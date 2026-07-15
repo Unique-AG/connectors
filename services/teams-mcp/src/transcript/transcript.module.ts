@@ -9,7 +9,6 @@ import { SubscriptionRemoveService } from './subscription-remove.service';
 import {
   FindTranscriptsTool,
   IngestMeetingTool,
-  ListMeetingsTool,
   StartKbIntegrationTool,
   StopKbIntegrationTool,
   VerifyKbIntegrationStatusTool,
@@ -36,7 +35,6 @@ import { TranscriptUtilsService } from './transcript-utils.service';
     StopKbIntegrationTool,
     // Transcript Search Tools
     FindTranscriptsTool,
-    ListMeetingsTool,
     // On-demand Ingestion Tool
     IngestMeetingTool,
   ],

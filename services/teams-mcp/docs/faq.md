@@ -11,8 +11,8 @@
 
 - Once a user connects their Microsoft account, the connector automatically ingests meeting transcripts into the Unique knowledge base via real-time webhook notifications from Microsoft Graph
 - Exposes **8 chat/messaging tools**: `list_teams`, `list_channels`, `list_chats`, `get_chat_messages`, `get_channel_messages`, `search_messages`, `send_channel_message`, `send_chat_message`
-- Exposes **6 transcript/KB management tools**: `find_transcripts`, `list_meetings`, `ingest_meeting`, `verify_kb_integration_status`, `start_kb_integration`, `stop_kb_integration`
-- All 14 tools are registered unconditionally — no feature flags or mode switching required
+- Exposes **5 transcript/KB management tools**: `find_transcripts`, `ingest_meeting`, `verify_kb_integration_status`, `start_kb_integration`, `stop_kb_integration`
+- All 13 tools are registered unconditionally — no feature flags or mode switching required
 - Chat and channel tools take ids obtained from the `list_*` tools (e.g. `list_chats` → `chatId` → `get_chat_messages`)
 
 **What the user sees:**

@@ -91,7 +91,7 @@ This is the single most important distinction between the two tracks. **Both are
 |---|---|---|
 | **Accessible through Unique?** | **Yes** — via Unique AI and the transcript tools | **Yes** — via the MCP messaging tools |
 | **Ingested (copied) into Unique?** | **Yes** — stored in the knowledge base | **No** — never copied; the data lives only in Microsoft |
-| **How it is served** | Queried from the **stored copy in Unique** — indexed and searchable (`find_transcripts`, `list_meetings`) | Fetched **live from the Microsoft Graph API** on every call (`get_*_messages`, `search_messages`) |
+| **How it is served** | Queried from the **stored copy in Unique** — indexed and searchable (`find_transcripts`) | Fetched **live from the Microsoft Graph API** on every call (`get_*_messages`, `search_messages`) |
 | **Freshness** | Point-in-time snapshot captured at ingestion | Always current — reflects Teams in real time |
 | **If this server is disconnected** | The copy remains in Unique and stays queryable | No longer reachable — nothing was stored, so there is no copy to fall back on |
 | **Data flow** | Teams → Unique knowledge base (once) → query the copy | Teams → live fetch on each call → returned to the caller (no copy kept) |
@@ -130,7 +130,6 @@ This is the connector track: once a user connects, meeting transcripts (and reco
 **Search & management tools** (see [Technical Reference — Tools](./technical/tools.md#transcript--knowledge-base-management)):
 
 - `find_transcripts`: Semantic + keyword search within ingested transcripts
-- `list_meetings`: Browse ingested meetings by date, organizer, or participant
 - `ingest_meeting`: Ingest a specific meeting's transcript on demand
 - `start_kb_integration` / `stop_kb_integration` / `verify_kb_integration_status`: Manage and inspect the ingestion subscription
 
@@ -324,7 +323,7 @@ Both tracks begin with the same one-time connection, then diverge — because th
    - Transcript and recording (if available) are captured and **ingested into the Unique knowledge base**
 3. **Query in Unique** (Ongoing)
    - Meeting content lives in the Unique knowledge base — organizer gets write + read, participants get read
-   - Search and query it **from within Unique** via Unique AI, or with `find_transcripts` / `list_meetings`
+   - Search and query it **from within Unique** via Unique AI, or with `find_transcripts`
    - Content remains available in Unique even after the user disconnects
 
 #### Chats & Channels Workflow — always query live from the API
