@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.4](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.3...teams-mcp@0.3.4) (2026-07-16)
+
+
+### Features
+
+* **teams-mcp:** ensure service-user permissions on root scope at startup ([#693](https://github.com/Unique-AG/connectors/issues/693)) ([d397eb4](https://github.com/Unique-AG/connectors/commit/d397eb4e77668a18a46950f997d50fa2c0b3091d))
+* **teams-mcp:** remove list_meetings and find_transcripts tools ([#692](https://github.com/Unique-AG/connectors/issues/692)) ([5523379](https://github.com/Unique-AG/connectors/commit/5523379abd4c96e124b17d245f307bed97a1e240))
+
+
+### Bug Fixes
+
+* **teams-mcp:** tolerate null contentCorrelationId and optional organizer tenantId ([#689](https://github.com/Unique-AG/connectors/issues/689)) ([6d12464](https://github.com/Unique-AG/connectors/commit/6d12464c18fe1c1e1ff18036d9cdea4bbaffd6b6))
+
 ## [0.3.3](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.2...teams-mcp@0.3.3) (2026-07-09)
 
 
