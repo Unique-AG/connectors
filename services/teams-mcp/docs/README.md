@@ -17,7 +17,7 @@
 
 The Teams MCP Server is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
 
-**Note:** This is a connector-style MCP server that does two things. First, it automatically ingests meeting **transcripts and recordings** into the Unique knowledge base in the background, where they are then queried **from within Unique**. Second, it exposes an interactive tool surface of 13 MCP tools — 8 chat/messaging tools and 5 transcript/KB management tools. Through these tools, **chat and channel messages are accessible in Unique on demand, but are never ingested into it** — they are fetched live from the Microsoft Graph API and exist only in Microsoft, whereas transcripts and recordings are copied into the Unique knowledge base. This ingested-vs-live distinction is the key thing to understand; see [Where the data lives](#where-the-data-lives-ingested-vs-live). Chat and channel tools take ids obtained from the `list_*` tools. See [Technical Reference — Tools](./technical/tools.md) for the full tool reference.
+**Note:** This is a connector-style MCP server that does two things. First, it automatically ingests meeting **transcripts and recordings** into the Unique knowledge base in the background, where they are then queried **from within Unique**. Second, it exposes an interactive tool surface of 12 MCP tools — 8 chat/messaging tools and 4 transcript/KB management tools. Through these tools, **chat and channel messages are accessible in Unique on demand, but are never ingested into it** — they are fetched live from the Microsoft Graph API and exist only in Microsoft, whereas transcripts and recordings are copied into the Unique knowledge base. This ingested-vs-live distinction is the key thing to understand; see [Where the data lives](#where-the-data-lives-ingested-vs-live). Chat and channel tools take ids obtained from the `list_*` tools. See [Technical Reference — Tools](./technical/tools.md) for the full tool reference.
 
 For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
 
@@ -91,7 +91,7 @@ This is the single most important distinction between the two tracks. **Both are
 |---|---|---|
 | **Accessible through Unique?** | **Yes** — via Unique AI and the transcript tools | **Yes** — via the MCP messaging tools |
 | **Ingested (copied) into Unique?** | **Yes** — stored in the knowledge base | **No** — never copied; the data lives only in Microsoft |
-| **How it is served** | Queried from the **stored copy in Unique** — indexed and searchable (`find_transcripts`) | Fetched **live from the Microsoft Graph API** on every call (`get_*_messages`, `search_messages`) |
+| **How it is served** | Queried from the **stored copy in Unique** — indexed and searchable from within Unique | Fetched **live from the Microsoft Graph API** on every call (`get_*_messages`, `search_messages`) |
 | **Freshness** | Point-in-time snapshot captured at ingestion | Always current — reflects Teams in real time |
 | **If this server is disconnected** | The copy remains in Unique and stays queryable | No longer reachable — nothing was stored, so there is no copy to fall back on |
 | **Data flow** | Teams → Unique knowledge base (once) → query the copy | Teams → live fetch on each call → returned to the caller (no copy kept) |
@@ -127,9 +127,8 @@ This is the connector track: once a user connects, meeting transcripts (and reco
 - Meets Microsoft's strict webhook response requirements (< 10 seconds)
 - See [FAQ - Why use RabbitMQ for webhook processing?](./faq.md#why-use-rabbitmq-for-webhook-processing) for details
 
-**Search & management tools** (see [Technical Reference — Tools](./technical/tools.md#transcript--knowledge-base-management)):
+**Ingestion & management tools** (see [Technical Reference — Tools](./technical/tools.md#transcript--knowledge-base-management)):
 
-- `find_transcripts`: Semantic + keyword search within ingested transcripts
 - `ingest_meeting`: Ingest a specific meeting's transcript on demand
 - `start_kb_integration` / `stop_kb_integration` / `verify_kb_integration_status`: Manage and inspect the ingestion subscription
 
@@ -323,7 +322,7 @@ Both tracks begin with the same one-time connection, then diverge — because th
    - Transcript and recording (if available) are captured and **ingested into the Unique knowledge base**
 3. **Query in Unique** (Ongoing)
    - Meeting content lives in the Unique knowledge base — organizer gets write + read, participants get read
-   - Search and query it **from within Unique** via Unique AI, or with `find_transcripts`
+   - Search and query it **from within Unique** via Unique AI
    - Content remains available in Unique even after the user disconnects
 
 #### Chats & Channels Workflow — always query live from the API

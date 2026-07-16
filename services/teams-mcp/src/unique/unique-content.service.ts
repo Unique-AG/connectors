@@ -302,15 +302,6 @@ export class UniqueContentService {
     return result;
   }
 
-  /** Scoped search — requires a resolved Unique identity. Use this in user-facing tools. */
-  @Span()
-  public async scopedSearch(
-    request: PublicSearchRequest,
-    scopeContext: UniqueIdentity,
-  ): Promise<PublicSearchResult> {
-    return this.search(request, scopeContext);
-  }
-
   @Span()
   public async searchByScope(
     searchString: string,

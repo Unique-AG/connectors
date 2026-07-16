@@ -3,10 +3,10 @@
 
 # Teams MCP - Tools
 
-The Teams MCP Server exposes **13 tools** in two categories:
+The Teams MCP Server exposes **12 tools** in two categories:
 
 - **Chat & messaging tools** (8) interact with Microsoft Teams chats and channels synchronously through the Microsoft Graph API: list teams/channels/chats, read messages, search across messages, and send messages.
-- **Transcript & knowledge-base tools** (5) manage meeting-transcript ingestion into the Unique knowledge base and search the transcripts that have already been ingested.
+- **Transcript & knowledge-base tools** (4) manage meeting-transcript ingestion into the Unique knowledge base.
 
 Chat and messaging tools target chats and channels by id: you discover the id with a `list_*` tool (or `search_messages`), then pass it to the tool that reads or writes:
 
@@ -28,7 +28,6 @@ The `list_*` tools return distinguishing metadata (creation dates, last-message 
 | [`send_chat_message`](#send_chat_message) | Messages | Yes | Send a plain-text message to a chat |
 | [`send_channel_message`](#send_channel_message) | Messages | Yes | Send a plain-text message to a channel |
 | [`search_messages`](#search_messages) | Search | No | Search messages across chats and channels |
-| [`find_transcripts`](#find_transcripts) | Transcript & KB | No | Semantic + keyword search within ingested transcripts |
 | [`ingest_meeting`](#ingest_meeting) | Transcript & KB | Yes | Ingest a specific meeting's transcript on demand |
 | [`verify_kb_integration_status`](#verify_kb_integration_status) | Transcript & KB | No | Check transcript-ingestion subscription status |
 | [`start_kb_integration`](#start_kb_integration) | Transcript & KB | Yes | Start automatic transcript ingestion |
@@ -38,7 +37,7 @@ The `list_*` tools return distinguishing metadata (creation dates, last-message 
 
 - **Microsoft Teams** — posts a new message to a chat or channel via Microsoft Graph, on behalf of the signed-in user
 - **Internal database** — persists or removes state managed by this server (e.g. the transcript-ingestion subscription record)
-- **Unique knowledge base** — queues meeting-transcript content for indexing into the knowledge base used by `find_transcripts`
+- **Unique knowledge base** — queues meeting-transcript content for indexing into the knowledge base
 
 | Tool | What it mutates |
 |------|----------------|
@@ -49,7 +48,7 @@ The `list_*` tools return distinguishing metadata (creation dates, last-message 
 | `ingest_meeting` | Queues the selected meeting transcript(s) for asynchronous ingestion into the Unique knowledge base |
 
 !!! warning "Chat and channel messages are not ingested"
-    The message tools read and write Teams messages live through Microsoft Graph. Unlike meeting transcripts, **chat and channel messages are never copied into the Unique knowledge base** — `get_*_messages` and `search_messages` query Microsoft Graph on every call. Only meeting transcripts are ingested (via `start_kb_integration` / `ingest_meeting`) and searched with `find_transcripts`.
+    The message tools read and write Teams messages live through Microsoft Graph. Unlike meeting transcripts, **chat and channel messages are never copied into the Unique knowledge base** — `get_*_messages` and `search_messages` query Microsoft Graph on every call. Only meeting transcripts are ingested (via `start_kb_integration` / `ingest_meeting`).
 
 ---
 
@@ -350,45 +349,7 @@ Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messag
 
 ## Transcript & Knowledge-Base Management
 
-These tools manage and search **meeting transcripts** ingested into the Unique knowledge base. This is distinct from the message tools above — chat and channel messages are never ingested.
-
-### `find_transcripts`
-
-Search within ingested meeting transcripts using hybrid semantic + keyword search. Returns relevant passages that can be cited with `[N]` notation, where `N` is the result index.
-
-**Input parameters:**
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `query` | string | Yes | — | Search query to match content within transcripts. |
-| `subject` | string | No | — | Filter by meeting subject (partial match). |
-| `dateFrom` | string (ISO 8601 datetime) | No | — | Only transcripts whose meeting started on or after this datetime. |
-| `dateTo` | string (ISO 8601 datetime) | No | — | Only transcripts whose meeting started on or before this datetime. |
-| `organizer` | string | No | — | Filter by meeting organizer name or email (partial match). |
-| `participant` | string | No | — | Filter by participant name or email (partial match). |
-| `limit` | integer (1–100) | No | `10` | Maximum number of results to return. |
-
-**Returns:** A `results` array of passages. Each has `id` (content id), `chunkId`, `title`, `key`, `text` (the passage), `url` (`unique://content/{id}`), `meetingDate`, `startDatetime`, `endDatetime`, `organizer`, and `participants`. Cite a passage with `[N]` where `N` is its array index.
-
-**Example:**
-
-```json
-{
-  "results": [
-    {
-      "id": "cont_abc123",
-      "title": "Q2 Planning",
-      "text": "We agreed to ship the connector in July...",
-      "url": "unique://content/cont_abc123",
-      "meetingDate": "2024-06-01T10:00:00Z",
-      "organizer": "Alice Smith",
-      "participants": ["Alice Smith", "Bob Jones"]
-    }
-  ]
-}
-```
-
----
+These tools manage the ingestion of **meeting transcripts** into the Unique knowledge base, where they are then searched and queried from within Unique. This is distinct from the message tools above — chat and channel messages are never ingested.
 
 ### `ingest_meeting`
 

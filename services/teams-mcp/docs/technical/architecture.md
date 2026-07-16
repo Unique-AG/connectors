@@ -128,7 +128,7 @@ flowchart TB
 
 The Chat Module (`src/chat/`) exposes a synchronous request/response tool surface over MCP, distinct from the asynchronous webhook/transcript ingestion path. Tool calls are handled inline — there is no queue or background worker.
 
-**Chat and channel messages are accessible through these tools but are never ingested into Unique.** The Unique AI can read, search, and send them on demand, but each call is served **live from the Microsoft Graph API** — Unique keeps no knowledge-base copy, and the messages exist only in Microsoft. This is the opposite of the Transcript Module, whose output *is* ingested into Unique and later queried from that stored copy (`find_transcripts`). "Not ingested" refers to storage, not accessibility. See [README — Where the Data Lives](../README.md#where-the-data-lives-ingested-vs-live).
+**Chat and channel messages are accessible through these tools but are never ingested into Unique.** The Unique AI can read, search, and send them on demand, but each call is served **live from the Microsoft Graph API** — Unique keeps no knowledge-base copy, and the messages exist only in Microsoft. This is the opposite of the Transcript Module, whose output *is* ingested into Unique and later queried from that stored copy. "Not ingested" refers to storage, not accessibility. See [README — Where the Data Lives](../README.md#where-the-data-lives-ingested-vs-live).
 
 **Services:**
 

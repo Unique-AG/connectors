@@ -5,20 +5,20 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Teams MCP Server is both a **connector** and an **interactive MCP server**. It does two things simultaneously: it automatically ingests meeting transcripts into the Unique knowledge base in the background, and it exposes an interactive tool surface of 13 MCP tools that AI clients can call on demand.
+**Answer:** The Teams MCP Server is both a **connector** and an **interactive MCP server**. It does two things simultaneously: it automatically ingests meeting transcripts into the Unique knowledge base in the background, and it exposes an interactive tool surface of 12 MCP tools that AI clients can call on demand.
 
 **What it does:**
 
 - Once a user connects their Microsoft account, the connector automatically ingests meeting transcripts into the Unique knowledge base via real-time webhook notifications from Microsoft Graph
 - Exposes **8 chat/messaging tools**: `list_teams`, `list_channels`, `list_chats`, `get_chat_messages`, `get_channel_messages`, `search_messages`, `send_channel_message`, `send_chat_message`
-- Exposes **5 transcript/KB management tools**: `find_transcripts`, `ingest_meeting`, `verify_kb_integration_status`, `start_kb_integration`, `stop_kb_integration`
-- All 13 tools are registered unconditionally — no feature flags or mode switching required
+- Exposes **4 transcript/KB management tools**: `ingest_meeting`, `verify_kb_integration_status`, `start_kb_integration`, `stop_kb_integration`
+- All 12 tools are registered unconditionally — no feature flags or mode switching required
 - Chat and channel tools take ids obtained from the `list_*` tools (e.g. `list_chats` → `chatId` → `get_chat_messages`)
 
 **What the user sees:**
 
 - An initial OAuth consent screen to connect their Microsoft account
-- 13 MCP tools available in their AI client immediately after connection
+- 12 MCP tools available in their AI client immediately after connection
 - Automatic transcript ingestion in the background for all meetings with transcription enabled, once `start_kb_integration` is called
 
 **Design rationale:**
