@@ -7,11 +7,17 @@ import { ScopeAccessEntityType, ScopeAccessType } from './unique.dtos';
 import { UniqueScopeService } from './unique-scope.service';
 
 /**
- * Self-grants the service user MANAGE/READ/WRITE on the configured root scope at
+ * (Re-)grants the service user MANAGE/READ/WRITE on the configured root scope at
  * startup. Ingestion assumes the service user already owns the root scope so it
- * can create sub-scopes and grant access under it; this hook makes a
- * misconfiguration crash the pod at boot instead of surfacing as an opaque
- * platform error mid-ingestion.
+ * can create sub-scopes and grant access under it; this hook enforces that
+ * assumption at boot, making a misconfiguration crash the pod immediately
+ * instead of surfacing as an opaque platform error mid-ingestion.
+ *
+ * The grant goes through the Public API `folder/add-access`, which is additive —
+ * re-affirming access the service user already has is safe on every boot. It is
+ * not a from-zero provisioner: granting still requires the service user to be
+ * permitted to manage the scope (the manual grant documented in the operator
+ * configuration guide), so a truly unconfigured root scope fails fast here.
  */
 @Injectable()
 export class RootScopeBootstrapService implements OnApplicationBootstrap {
