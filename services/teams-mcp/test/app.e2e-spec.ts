@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
+import { RootScopeBootstrapService } from '../src/unique/root-scope-bootstrap.service';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
@@ -10,7 +11,12 @@ describe('AppController (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      // The bootstrap hook grants root-scope access against the Unique API at boot;
+      // stub it so app.init() does not require a live Unique API for these e2e tests.
+      .overrideProvider(RootScopeBootstrapService)
+      .useValue({ onApplicationBootstrap: () => Promise.resolve() })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();

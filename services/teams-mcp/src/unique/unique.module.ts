@@ -9,6 +9,7 @@ import {
 } from '@qfetch/qfetch';
 import type { UniqueConfigNamespaced } from '~/config';
 import { DrizzleModule } from '../drizzle/drizzle.module';
+import { RootScopeBootstrapService } from './root-scope-bootstrap.service';
 import { UNIQUE_FETCH } from './unique.consts';
 import { UniqueService } from './unique.service';
 import { UniqueContentService } from './unique-content.service';
@@ -39,6 +40,7 @@ import { UniqueUserMappingService } from './unique-user-mapping.service';
     UniqueScopeService,
     UniqueContentService,
     UniqueService,
+    RootScopeBootstrapService,
   ],
   exports: [
     UNIQUE_FETCH,
