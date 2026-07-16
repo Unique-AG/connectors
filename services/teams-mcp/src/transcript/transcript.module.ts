@@ -7,9 +7,7 @@ import { SubscriptionCreateService } from './subscription-create.service';
 import { SubscriptionReauthorizeService } from './subscription-reauthorize.service';
 import { SubscriptionRemoveService } from './subscription-remove.service';
 import {
-  FindTranscriptsTool,
   IngestMeetingTool,
-  ListMeetingsTool,
   StartKbIntegrationTool,
   StopKbIntegrationTool,
   VerifyKbIntegrationStatusTool,
@@ -34,9 +32,6 @@ import { TranscriptUtilsService } from './transcript-utils.service';
     VerifyKbIntegrationStatusTool,
     StartKbIntegrationTool,
     StopKbIntegrationTool,
-    // Transcript Search Tools
-    FindTranscriptsTool,
-    ListMeetingsTool,
     // On-demand Ingestion Tool
     IngestMeetingTool,
   ],
