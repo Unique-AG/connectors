@@ -250,7 +250,8 @@ The root scope must be created **manually** in the Unique platform before deploy
 
 3. **Grant the service account access**
 
-   - Ensure the Zitadel service account (see above) has read/write permissions on the root scope
+   - Ensure the Zitadel service account (see above) has `MANAGE`, `READ`, and `WRITE` permissions on the root scope
+   - On startup the server self-grants these three access types to the service user (the `x-user-id` from the API headers) on the configured root scope, so a correctly configured deployment converges automatically. If that grant fails (e.g. the scope ID is wrong or the service account lacks permission to manage it), the pod **hard-fails at boot** rather than surfacing the error mid-ingestion — check the startup logs for `root scope <id> permission bootstrap failed`.
 
 4. **Configure in Helm Values**
    ```yaml
