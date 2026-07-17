@@ -181,24 +181,22 @@ prometheus:
       labels:
         severity: warning
         alertGroup: sharepoint-connector
-    SharepointConnectorSyncFailures:
-      alert: SharepointConnectorSyncFailures
+    SharepointConnectorSyncDegraded:
+      alert: SharepointConnectorSyncDegraded
       annotations:
-        summary: "SharePoint Connector sync failures detected"
-        description: "The SharePoint Connector is experiencing sync failures. Current failure rate: {{ $value | humanizePercentage }}."
+        summary: "SharePoint Connector sync degraded"
+        description: "Site sync failure ratio over ~5 cycles exceeded 50%. Current: {{ $value | humanizePercentage }}."
         runbook: |
           1. Inspect application logs for specific error messages
           2. Check the failure_step label to identify where the sync failed
           3. Verify SharePoint connectivity and permissions
-          4. Check for rate limiting or throttling issues
-          5. Check for recent changes to the deployment as well as its underlying infrastructure
       expr: |
         (
-          sum(rate(spc_sync_duration_seconds_count{result="failure"}[5m]))
+          sum(rate(spc_sync_duration_seconds_count{result="failure",sync_type="site"}[75m]))
           /
-          sum(rate(spc_sync_duration_seconds_count[5m]))
-        ) > 0.01
-      for: 30s
+          sum(rate(spc_sync_duration_seconds_count{sync_type="site"}[75m]))
+        ) > 0.5
+      for: 15m
       labels:
         severity: warning
         alertGroup: sharepoint-connector

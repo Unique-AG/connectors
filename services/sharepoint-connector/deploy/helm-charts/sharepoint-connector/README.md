@@ -142,14 +142,14 @@ spec:
 | prometheus.additionalAlerts.SharepointConnectorGraphQLErrors.for | string | `"30s"` |  |
 | prometheus.additionalAlerts.SharepointConnectorGraphQLErrors.labels.alertGroup | string | `"sharepoint-connector"` |  |
 | prometheus.additionalAlerts.SharepointConnectorGraphQLErrors.labels.severity | string | `"warning"` |  |
-| prometheus.additionalAlerts.SharepointConnectorSyncFailures.alert | string | `"SharepointConnectorSyncFailures"` |  |
-| prometheus.additionalAlerts.SharepointConnectorSyncFailures.annotations.description | string | `"The SharePoint Connector is experiencing sync failures. Current failure rate: {{ $value | humanizePercentage }}."` |  |
-| prometheus.additionalAlerts.SharepointConnectorSyncFailures.annotations.runbook | string | `"1. Inspect application logs for specific error messages\n2. Check the failure_step label to identify where the sync failed\n3. Verify SharePoint connectivity and permissions\n4. Check for rate limiting or throttling issues\n5. Check for recent changes to the deployment as well as its underlying infrastructure\n"` |  |
-| prometheus.additionalAlerts.SharepointConnectorSyncFailures.annotations.summary | string | `"SharePoint Connector sync failures detected"` |  |
-| prometheus.additionalAlerts.SharepointConnectorSyncFailures.expr | string | `"(\n  sum(rate(spc_sync_duration_seconds_count{result=\"failure\"}[5m]))\n  /\n  sum(rate(spc_sync_duration_seconds_count[5m]))\n) > 0.01\n"` |  |
-| prometheus.additionalAlerts.SharepointConnectorSyncFailures.for | string | `"30s"` |  |
-| prometheus.additionalAlerts.SharepointConnectorSyncFailures.labels.alertGroup | string | `"sharepoint-connector"` |  |
-| prometheus.additionalAlerts.SharepointConnectorSyncFailures.labels.severity | string | `"warning"` |  |
+| prometheus.additionalAlerts.SharepointConnectorSyncDegraded.alert | string | `"SharepointConnectorSyncDegraded"` |  |
+| prometheus.additionalAlerts.SharepointConnectorSyncDegraded.annotations.description | string | `"Site sync failure ratio over ~5 cycles exceeded 50%. Current: {{ $value | humanizePercentage }}."` |  |
+| prometheus.additionalAlerts.SharepointConnectorSyncDegraded.annotations.runbook | string | `"1. Inspect application logs for specific error messages\n2. Check the failure_step label to identify where the sync failed\n3. Verify SharePoint connectivity and permissions\n"` |  |
+| prometheus.additionalAlerts.SharepointConnectorSyncDegraded.annotations.summary | string | `"SharePoint Connector sync degraded"` |  |
+| prometheus.additionalAlerts.SharepointConnectorSyncDegraded.expr | string | `"(\n  sum(rate(spc_sync_duration_seconds_count{result=\"failure\",sync_type=\"site\"}[75m]))\n  /\n  sum(rate(spc_sync_duration_seconds_count{sync_type=\"site\"}[75m]))\n) > 0.5\n"` |  |
+| prometheus.additionalAlerts.SharepointConnectorSyncDegraded.for | string | `"15m"` |  |
+| prometheus.additionalAlerts.SharepointConnectorSyncDegraded.labels.alertGroup | string | `"sharepoint-connector"` |  |
+| prometheus.additionalAlerts.SharepointConnectorSyncDegraded.labels.severity | string | `"warning"` |  |
 | prometheus.additionalAlerts.SharepointConnectorUniqueAPIErrors.alert | string | `"SharepointConnectorUniqueAPIErrors"` |  |
 | prometheus.additionalAlerts.SharepointConnectorUniqueAPIErrors.annotations.description | string | `"The SharePoint Connector is experiencing Unique REST API errors (4xx/5xx responses). Current error rate: {{ $value | humanizePercentage }}."` |  |
 | prometheus.additionalAlerts.SharepointConnectorUniqueAPIErrors.annotations.runbook | string | `"1. Inspect application logs for specific error messages\n2. Check for recent deployments or configuration changes (both the connector and the Unique Services)\n3. Verify network connectivity between connector and Unique Services\n4. Verify service user settings and permissions within Unique\n"` |  |
