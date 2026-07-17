@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Ascendant Capital fictional investor-relations workspace"
+    />
+    <title>Ascendant Capital — Investor Relations</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">Skip to workspace</a>
+    <div class="demo-warning" role="note">
+      <strong>Public demonstration</strong>
+      <span>Fictional investor data · changes are temporary</span>
+    </div>
+
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">AC</span>
+        <div>
+          <strong>Ascendant Capital</strong>
+          <span>Investor relations</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span class="snapshot">Snapshot <strong id="snapshot-date">—</strong></span>
+        <button class="button quiet danger-text" id="reset-button" type="button">
+          Reset demo data
+        </button>
+      </div>
+    </header>
+
+    <nav id="primary-nav" class="top-tabs" aria-label="Primary navigation">
+      <button class="top-tab is-active" data-page="lps" type="button" aria-current="page">LPs</button>
+      <button class="top-tab" data-page="prospects" type="button">Prospects</button>
+      <button class="top-tab" data-page="meetings" type="button">Meetings</button>
+      <button class="top-tab" data-page="calendar" type="button">Calendar</button>
+      <button class="top-tab" data-page="emails" type="button">Emails</button>
+    </nav>
+
+    <main id="workspace" class="workspace" tabindex="-1">
+      <div id="page" class="page" aria-live="polite"></div>
+    </main>
+
+    <dialog id="record-dialog" class="record-dialog" aria-labelledby="dialog-title">
+      <form id="record-form">
+        <header class="dialog-header">
+          <div>
+            <p class="eyebrow" id="dialog-eyebrow">Record</p>
+            <h2 id="dialog-title">New record</h2>
+          </div>
+          <button class="icon-button" id="dialog-close" type="button" aria-label="Close dialog">
+            ×
+          </button>
+        </header>
+        <div id="record-fields" class="dialog-body"></div>
+        <footer class="dialog-footer">
+          <button class="button secondary" id="dialog-cancel" type="button">Cancel</button>
+          <button class="button primary" id="dialog-submit" type="submit">Save</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-title">
+      <form method="dialog">
+        <p class="eyebrow">Confirmation required</p>
+        <h2 id="confirm-title">Confirm action</h2>
+        <p id="confirm-copy"></p>
+        <div class="dialog-footer">
+          <button class="button secondary" value="cancel">Cancel</button>
+          <button class="button danger" id="confirm-action" value="confirm">Confirm</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast-region" class="toast-region" aria-live="assertive" aria-atomic="true"></div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

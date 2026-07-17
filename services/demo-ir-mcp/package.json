@@ -1,0 +1,38 @@
+{
+  "name": "@unique-ag/demo-ir-mcp",
+  "description": "Unauthenticated investor-relations CRM and Outlook demo MCP server",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Unique License v1",
+  "files": [
+    "dist",
+    "deploy"
+  ],
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "codegen": "echo \"No codegen for this demo server\"",
+    "style": "biome check .",
+    "style:fix": "biome check . --write",
+    "check-types": "tsc --noEmit",
+    "test": "echo \"No tests for this demo server\""
+  },
+  "dependencies": {
+    "@nestjs/common": "11.1.18",
+    "@nestjs/core": "11.1.18",
+    "@nestjs/platform-express": "11.1.18",
+    "@opentelemetry/api": "1.9.0",
+    "@unique-ag/mcp-server-module": "workspace:*",
+    "nestjs-otel": "8.0.2",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "4.1.5"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "11.0.18",
+    "@types/node": "22.16.5",
+    "typescript": "5.9.2",
+    "unplugin-swc": "1.5.7"
+  },
+  "packageManager": "pnpm@10.28.1"
+}
