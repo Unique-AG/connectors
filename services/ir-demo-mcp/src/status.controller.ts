@@ -18,7 +18,7 @@ export class StatusController {
   @Header('Cache-Control', 'no-store')
   public getManifest() {
     return {
-      name: '@unique-ag/demo-ir-mcp',
+      name: '@unique-ag/ir-demo-mcp',
       version: '0.1.0',
       type: 'mcp-server',
       authentication: {

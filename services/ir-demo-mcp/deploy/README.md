@@ -1,4 +1,4 @@
-# Deploy Demo IR MCP
+# Deploy IR Demo MCP
 
 The service runs in Azure Container Apps. The frontend and REST API use Zitadel through Azure Container Apps Custom OpenID Connect authentication. The MCP endpoint, probe, and manifest remain unauthenticated.
 
@@ -14,7 +14,7 @@ The service runs in Azure Container Apps. The frontend and REST API use Zitadel 
 Create the local deployment configuration:
 
 ```bash
-cd services/demo-ir-mcp/deploy
+cd services/ir-demo-mcp/deploy
 cp .env.deploy.example .env.deploy
 ```
 
@@ -25,7 +25,7 @@ Set `RESOURCE_GROUP`, a globally unique `ACR_NAME`, and the Container App names 
 From the repository root:
 
 ```bash
-services/demo-ir-mcp/deploy/deploy.sh
+services/ir-demo-mcp/deploy/deploy.sh
 ```
 
 The script builds and pushes the image, creates or updates the Container App, verifies `/probe`, and prints the public URLs. Copy the printed OIDC callback URL. It has this form:
@@ -65,7 +65,7 @@ The client secret is stored directly as an Azure Container App secret. It is not
 Apply the authentication configuration:
 
 ```bash
-services/demo-ir-mcp/deploy/configure-auth.sh
+services/ir-demo-mcp/deploy/configure-auth.sh
 ```
 
 The script is idempotent and can also be used to rotate the client secret. It protects the frontend and `/api`, while excluding:

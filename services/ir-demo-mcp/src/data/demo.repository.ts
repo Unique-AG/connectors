@@ -156,7 +156,7 @@ export class DemoRepository implements OnModuleDestroy {
   public snapshotDate = seedData.snapshotDate;
 
   public constructor() {
-    const databasePath = process.env.DEMO_DB_PATH ?? join(tmpdir(), 'demo-ir-mcp.sqlite');
+    const databasePath = process.env.DEMO_DB_PATH ?? join(tmpdir(), 'ir-demo-mcp.sqlite');
     if (databasePath !== ':memory:') {
       rmSync(databasePath, { force: true });
       rmSync(`${databasePath}-shm`, { force: true });

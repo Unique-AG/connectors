@@ -15,7 +15,7 @@ import { StatusController } from './status.controller';
       },
     }),
     McpModule.forRoot({
-      name: 'demo-ir-mcp',
+      name: 'ir-demo-mcp',
       version: '0.1.0',
       instructions:
         'Use these tools to inspect fictional Ascendant Capital investor-relations CRM, calendar, and email data.',

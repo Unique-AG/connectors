@@ -1,4 +1,4 @@
-# Demo IR MCP
+# IR Demo MCP
 
 This is a vibe-coded MCP server for demonstrating fictional investor-relations workflows. It uses temporary resettable data and is not intended for production use. The deployed frontend and REST API use Zitadel authentication; the MCP endpoint remains unauthenticated.
 

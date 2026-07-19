@@ -553,7 +553,7 @@ importers:
         specifier: 3.2.6
         version: 3.2.6(@types/node@22.16.5)(jiti@2.7.0)(terser@5.43.1)(tsx@4.20.5)(yaml@2.8.3)
 
-  services/demo-ir-mcp:
+  services/ir-demo-mcp:
     dependencies:
       '@nestjs/common':
         specifier: 11.1.18

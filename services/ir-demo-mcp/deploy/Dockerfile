@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG APP_NAME=demo-ir-mcp
+ARG APP_NAME=ir-demo-mcp
 
 FROM node:26.4.0-trixie@sha256:b46a10d964ad15136ebdf9012142131481caa0697d7a4d4eafe4bbabd818f876 AS base
 ENV PNPM_HOME="/pnpm"
@@ -45,7 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV NODE_ENV=production
 ENV PORT=9542
 
-COPY --from=builder --chown=nestjs:nodejs /app/services/demo-ir-mcp/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/services/ir-demo-mcp/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/out/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/out/package.json ./package.json
 

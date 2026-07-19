@@ -24,7 +24,7 @@ fi
 PORT=9542
 IMAGE_REPOSITORY="ir-demo-mcp"
 IMAGE="${IMAGE_REPOSITORY}:${IMAGE_TAG}"
-DOCKERFILE="services/demo-ir-mcp/deploy/Dockerfile"
+DOCKERFILE="services/ir-demo-mcp/deploy/Dockerfile"
 
 az account set --subscription "${SUBSCRIPTION_ID}"
 SUBSCRIPTION_NAME="$(az account show --query name -o tsv)"
@@ -102,7 +102,7 @@ if az containerapp show \
     --image "${LOGIN_SERVER}/${IMAGE}" \
     --min-replicas 1 \
     --max-replicas 1 \
-    --set-env-vars "PORT=${PORT}" "DEMO_DB_PATH=/tmp/demo-ir-mcp.sqlite" \
+    --set-env-vars "PORT=${PORT}" "DEMO_DB_PATH=/tmp/ir-demo-mcp.sqlite" \
     --only-show-errors >/dev/null
   az containerapp ingress enable \
     --name "${CONTAINER_APP_NAME}" \
@@ -129,7 +129,7 @@ else
     --memory 1Gi \
     --min-replicas 1 \
     --max-replicas 1 \
-    --env-vars "PORT=${PORT}" "DEMO_DB_PATH=/tmp/demo-ir-mcp.sqlite" \
+    --env-vars "PORT=${PORT}" "DEMO_DB_PATH=/tmp/ir-demo-mcp.sqlite" \
     --only-show-errors >/dev/null
 fi
 
