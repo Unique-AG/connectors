@@ -50,7 +50,7 @@ OIDC_ARGS=(
   --client-id "${ZITADEL_CLIENT_ID}"
   --client-secret-name "${CLIENT_SECRET_NAME}"
   --openid-configuration "${OPENID_CONFIGURATION}"
-  --scopes openid profile email
+  --scopes "openid,profile,email"
   --yes
   --only-show-errors
 )
@@ -70,7 +70,7 @@ az containerapp auth update \
   --enabled true \
   --unauthenticated-client-action RedirectToLoginPage \
   --redirect-provider "${PROVIDER_NAME}" \
-  --excluded-paths /mcp /probe /manifest \
+  --excluded-paths "/mcp,/probe,/manifest" \
   --require-https true \
   --yes \
   --only-show-errors >/dev/null
