@@ -1,6 +1,6 @@
 {
   "name": "@unique-ag/demo-ir-mcp",
-  "description": "Unauthenticated investor-relations CRM and Outlook demo MCP server",
+  "description": "Investor-relations CRM and Outlook demo MCP server",
   "version": "0.1.0",
   "private": true,
   "license": "Unique License v1",

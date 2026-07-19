@@ -21,7 +21,11 @@ export class StatusController {
       name: '@unique-ag/demo-ir-mcp',
       version: '0.1.0',
       type: 'mcp-server',
-      authentication: 'none',
+      authentication: {
+        frontend: 'zitadel-oidc',
+        api: 'zitadel-oidc',
+        mcp: 'none',
+      },
       endpoints: {
         frontend: '/',
         api: '/api',
@@ -29,7 +33,7 @@ export class StatusController {
         probe: '/probe',
       },
       snapshotDate: this.repository.snapshotDate,
-      disclaimer: 'Public dummy data for demonstration only.',
+      disclaimer: 'Dummy data for demonstration only.',
     };
   }
 }

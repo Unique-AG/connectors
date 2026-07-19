@@ -17,12 +17,12 @@ fi
 : "${RESOURCE_GROUP:?Set RESOURCE_GROUP in deploy/.env.deploy}"
 : "${LOCATION:=swedencentral}"
 : "${ACR_NAME:?Set ACR_NAME in deploy/.env.deploy; Azure registry names are globally unique}"
-: "${CONTAINER_APP_ENV:=demo-ir-mcp-env}"
-: "${CONTAINER_APP_NAME:=demo-ir-mcp}"
+: "${CONTAINER_APP_ENV:=ir-demo-mcp-env}"
+: "${CONTAINER_APP_NAME:=ir-demo-mcp}"
 : "${IMAGE_TAG:=$(date -u +%Y%m%d%H%M%S)}"
 
 PORT=9542
-IMAGE_REPOSITORY="demo-ir-mcp"
+IMAGE_REPOSITORY="ir-demo-mcp"
 IMAGE="${IMAGE_REPOSITORY}:${IMAGE_TAG}"
 DOCKERFILE="services/demo-ir-mcp/deploy/Dockerfile"
 
@@ -150,3 +150,7 @@ echo "Deployment complete."
 echo "Frontend: ${BASE_URL}/"
 echo "MCP:      ${BASE_URL}/mcp"
 echo "Probe:    ${BASE_URL}/probe"
+echo "OIDC callback: ${BASE_URL}/.auth/login/zitadel/callback"
+echo
+echo "Next: create the Zitadel Web Application, add its credentials to deploy/.env.deploy,"
+echo "then run ${SCRIPT_DIR}/configure-auth.sh. See deploy/README.md."

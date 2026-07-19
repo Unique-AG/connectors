@@ -5,7 +5,6 @@ import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  app.enableCors({ origin: true });
   app.enableShutdownHooks();
   app.useBodyParser('json', { limit: '2mb' });
   app.useStaticAssets(join(__dirname, 'public'), {
