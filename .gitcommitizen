@@ -24,6 +24,7 @@ revert = Reverts a previous commit
 
 [scopes]
 # Services
+ir-demo-mcp = services/ir-demo-mcp/**
 kyckr-mcp = services/kyckr-mcp/**
 outlook-semantic-mcp = services/outlook-semantic-mcp/**
 sharepoint-connector = services/sharepoint-connector/**
