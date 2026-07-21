@@ -35,6 +35,12 @@ import {
   MessageListOutputSchema,
   MessageOutputSchema,
   MessageSchema,
+  OutlookTaskListInputSchema,
+  OutlookTaskListOutputSchema,
+  OutlookTaskOutputSchema,
+  OutlookTaskSchema,
+  RecordMeetingBriefInputSchema,
+  RecordOutlookTaskArtifactInputSchema,
   RelationshipListInputSchema,
   RelationshipListOutputSchema,
   RelationshipOutputSchema,
@@ -49,6 +55,13 @@ import {
 
 const READ_ONLY_ANNOTATIONS = {
   readOnlyHint: true,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+} as const;
+
+const WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
   destructiveHint: false,
   idempotentHint: true,
   openWorldHint: false,
@@ -262,6 +275,71 @@ export class DemoTools {
   }
 
   @Tool({
+    name: 'outlook_list_tasks',
+    title: 'List Outlook Tasks',
+    description:
+      'List Outlook tasks by due date, optionally filtered by status, importance, due-date range, or text.',
+    parameters: OutlookTaskListInputSchema,
+    outputSchema: OutlookTaskListOutputSchema,
+    annotations: READ_ONLY_ANNOTATIONS,
+  })
+  public listOutlookTasks(
+    input: z.infer<typeof OutlookTaskListInputSchema>,
+    _context: Context,
+  ): z.infer<typeof OutlookTaskListOutputSchema> {
+    const items = this.repository
+      .list('outlookTasks')
+      .filter((record) => matchesValue(record, 'status', input.status))
+      .filter((record) => matchesValue(record, 'importance', input.importance))
+      .filter((record) => matchesDateRange(record, 'dueDate', input.dueFrom, input.dueTo))
+      .filter((record) => matchesQuery(record, ['subject', 'body', 'categories'], input.query))
+      .sort((left, right) => compareByDate(left, right, 'dueDate', 'ascending'))
+      .map((record) => OutlookTaskSchema.parse(toPublicRecord(record)));
+    return { items, total: items.length };
+  }
+
+  @Tool({
+    name: 'outlook_get_task',
+    title: 'Get Outlook Task',
+    description: 'Get one Outlook task by ID.',
+    parameters: GetInputSchema,
+    outputSchema: OutlookTaskOutputSchema,
+    annotations: READ_ONLY_ANNOTATIONS,
+  })
+  public getOutlookTask(
+    input: z.infer<typeof GetInputSchema>,
+    _context: Context,
+  ): z.infer<typeof OutlookTaskOutputSchema> {
+    const record = this.repository.get('outlookTasks', input.id);
+    if (record === undefined) {
+      throw new Error(`Outlook task "${input.id}" was not found.`);
+    }
+    return { item: OutlookTaskSchema.parse(toPublicRecord(record)) };
+  }
+
+  @Tool({
+    name: 'ir_record_outlook_task_artifact',
+    title: 'Record Outlook Task Artifact',
+    description:
+      'Record the absolute knowledge-base path of an artifact generated for an Outlook task.',
+    parameters: RecordOutlookTaskArtifactInputSchema,
+    outputSchema: OutlookTaskOutputSchema,
+    annotations: WRITE_ANNOTATIONS,
+  })
+  public recordOutlookTaskArtifact(
+    input: z.infer<typeof RecordOutlookTaskArtifactInputSchema>,
+    _context: Context,
+  ): z.infer<typeof OutlookTaskOutputSchema> {
+    const updated = this.repository.update('outlookTasks', input.taskId, {
+      data: { artifactPath: input.artifactPath },
+    });
+    if (updated === undefined) {
+      throw new Error(`Outlook task "${input.taskId}" was not found.`);
+    }
+    return { item: OutlookTaskSchema.parse(toPublicRecord(updated)) };
+  }
+
+  @Tool({
     name: 'outlook_list_calendar_events',
     title: 'List Outlook Calendar Events',
     description:
@@ -310,6 +388,28 @@ export class DemoTools {
       throw new Error(`Calendar event "${input.id}" was not found.`);
     }
     return { item: CalendarEventSchema.parse(toPublicRecord(record)) };
+  }
+
+  @Tool({
+    name: 'ir_record_meeting_brief',
+    title: 'Record Meeting Brief',
+    description:
+      'Record the absolute knowledge-base path of a generated brief on its calendar event.',
+    parameters: RecordMeetingBriefInputSchema,
+    outputSchema: CalendarOutputSchema,
+    annotations: WRITE_ANNOTATIONS,
+  })
+  public recordMeetingBrief(
+    input: z.infer<typeof RecordMeetingBriefInputSchema>,
+    _context: Context,
+  ): z.infer<typeof CalendarOutputSchema> {
+    const updated = this.repository.update('calendarEvents', input.eventId, {
+      data: { meetingBriefPath: input.meetingBriefPath },
+    });
+    if (updated === undefined) {
+      throw new Error(`Calendar event "${input.eventId}" was not found.`);
+    }
+    return { item: CalendarEventSchema.parse(toPublicRecord(updated)) };
   }
 
   @Tool({

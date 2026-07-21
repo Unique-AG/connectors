@@ -25,7 +25,6 @@ interface DatabaseRow {
 
 const seedData = seedDataJson as SeedData;
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
-const CURATED_PREVIOUS_WEEK_DATE = '2026-07-24';
 const BUSINESS_DATE_FIELDS = new Set([
   'date',
   'assignedDate',
@@ -75,13 +74,9 @@ const shiftDateValue = (value: unknown, dayDelta: number): unknown => {
   return `${shiftedPrefix}${value.slice(10)}`;
 };
 
-const shiftBusinessDates = (
-  value: unknown,
-  dayDelta: number,
-  curatePreviousWeekDate: boolean,
-): unknown => {
+const shiftBusinessDates = (value: unknown, dayDelta: number): unknown => {
   if (Array.isArray(value)) {
-    return value.map((item) => shiftBusinessDates(item, dayDelta, curatePreviousWeekDate));
+    return value.map((item) => shiftBusinessDates(item, dayDelta));
   }
   if (typeof value !== 'object' || value === null) {
     return value;
@@ -90,17 +85,10 @@ const shiftBusinessDates = (
   return Object.fromEntries(
     Object.entries(value).map(([key, item]) => {
       if (!BUSINESS_DATE_FIELDS.has(key)) {
-        return [key, shiftBusinessDates(item, dayDelta, curatePreviousWeekDate)];
+        return [key, shiftBusinessDates(item, dayDelta)];
       }
 
-      const curatedDayDelta =
-        curatePreviousWeekDate &&
-        key === 'date' &&
-        typeof item === 'string' &&
-        item.slice(0, 10) === CURATED_PREVIOUS_WEEK_DATE
-          ? dayDelta - 7
-          : dayDelta;
-      return [key, shiftDateValue(item, curatedDayDelta)];
+      return [key, shiftDateValue(item, dayDelta)];
     }),
   );
 };
@@ -334,7 +322,7 @@ export class DemoRepository implements OnModuleDestroy {
     timestamp: string,
     dayDelta: number,
   ): void {
-    const data = shiftBusinessDates(record.data, dayDelta, record.resource === 'calendarEvents');
+    const data = shiftBusinessDates(record.data, dayDelta);
     statement.run(
       record.resource,
       record.id,
@@ -371,6 +359,8 @@ export class DemoRepository implements OnModuleDestroy {
         return this.nextCanonicalId(resource, /^SUB-(\d+)$/, 'SUB-', 4);
       case 'diligence':
         return this.nextCanonicalId(resource, /^DDQ-(\d+)$/, 'DDQ-', 4);
+      case 'outlookTasks':
+        return this.nextCanonicalId(resource, /^OT-(\d+)$/, 'OT-', 4);
       case 'calendarEvents':
         return this.nextCanonicalId(resource, /^CAL-(\d+)$/, 'CAL-', 4);
       case 'messages':
@@ -459,6 +449,7 @@ export class DemoRepository implements OnModuleDestroy {
       case 'activities':
         return { ...data, activityId: id };
       case 'tasks':
+      case 'outlookTasks':
         return { ...data, taskId: id };
       default:
         return { ...data };

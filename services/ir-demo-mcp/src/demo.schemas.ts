@@ -95,6 +95,16 @@ export const ActivitySchema = BaseRecordSchema.extend({
   nextSteps: OptionalStringSchema,
 }).passthrough();
 
+export const OutlookTaskSchema = BaseRecordSchema.extend({
+  taskId: z.string().optional(),
+  subject: z.string(),
+  body: z.string().optional(),
+  dueDate: z.string().optional(),
+  importance: z.string().optional(),
+  status: z.string(),
+  categories: z.array(z.string()).optional(),
+}).passthrough();
+
 export const CalendarEventSchema = BaseRecordSchema.extend({
   date: z.string(),
   time: z.string(),
@@ -184,6 +194,14 @@ export const ActivityListInputSchema = RelatedListInputSchema.extend({
     .describe('Searches activity type, contact, subject, notes, and next steps.'),
 });
 
+export const OutlookTaskListInputSchema = z.object({
+  status: z.string().min(1).optional(),
+  importance: z.string().min(1).optional(),
+  dueFrom: DateFilterSchema.optional(),
+  dueTo: DateFilterSchema.optional(),
+  query: z.string().min(1).optional().describe('Searches task subject, body, and categories.'),
+});
+
 export const CalendarListInputSchema = RelatedListInputSchema.extend({
   owner: z.string().min(1).optional(),
   type: z.string().min(1).optional(),
@@ -208,6 +226,16 @@ export const MessageListInputSchema = RelatedListInputSchema.extend({
 
 export const GetInputSchema = z.object({
   id: z.string().min(1),
+});
+
+export const RecordMeetingBriefInputSchema = z.object({
+  eventId: z.string().min(1),
+  meetingBriefPath: z.string().startsWith('/'),
+});
+
+export const RecordOutlookTaskArtifactInputSchema = z.object({
+  taskId: z.string().min(1),
+  artifactPath: z.string().startsWith('/'),
 });
 
 export const RelationshipListOutputSchema = z.object({
@@ -240,6 +268,11 @@ export const ActivityListOutputSchema = z.object({
   items: z.array(ActivitySchema),
   total: z.number().int().nonnegative(),
 });
+export const OutlookTaskListOutputSchema = z.object({
+  items: z.array(OutlookTaskSchema),
+  total: z.number().int().nonnegative(),
+});
+export const OutlookTaskOutputSchema = z.object({ item: OutlookTaskSchema });
 export const CalendarListOutputSchema = z.object({
   items: z.array(CalendarEventSchema),
   total: z.number().int().nonnegative(),

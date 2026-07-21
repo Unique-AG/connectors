@@ -104,6 +104,15 @@ const FIELD_CONFIG = {
     ['date', 'Date and time', 'datetime-local'],
     ['body', 'Body', 'textarea', { full: true, tall: true }],
   ],
+  outlookTasks: [
+    ['taskId', 'Task ID', 'readonly-id'],
+    ['subject', 'Subject', 'text', { required: true, full: true }],
+    ['body', 'Body', 'textarea', { full: true }],
+    ['dueDate', 'Due date', 'date'],
+    ['importance', 'Importance', 'select'],
+    ['status', 'Status', 'select'],
+    ['categories', 'Categories', 'list'],
+  ],
 };
 
 const OWNER_OPTIONS = ['Claire Whitfield', 'Daniel Ferreira', 'James Okafor', 'Renata Silva'];
@@ -240,6 +249,8 @@ const OPTION_CATALOG = {
     'Save-the-date sent',
     'Tentative - contact unresponsive',
   ],
+  'outlookTasks.importance': ['low', 'normal', 'high'],
+  'outlookTasks.status': ['notStarted', 'inProgress', 'completed', 'waitingOnOthers', 'deferred'],
 };
 
 const RESOURCE_META = {
@@ -251,6 +262,7 @@ const RESOURCE_META = {
   activities: { label: 'Activities', singular: 'activity' },
   calendarEvents: { label: 'Meetings', singular: 'meeting' },
   messages: { label: 'Emails', singular: 'email' },
+  outlookTasks: { label: 'Outlook tasks', singular: 'task' },
 };
 
 const RELATED_RESOURCES = [
@@ -266,13 +278,14 @@ const RELATED_RESOURCES = [
 
 const RELATED_COLUMNS = {
   coverageAssignments: [
+    ['id', 'Record ID', 'record-id'],
     ['ownerName', 'Owner'],
     ['coverageRole', 'Role'],
     ['team', 'Team'],
     ['assignedDate', 'Assigned', 'date'],
   ],
   contacts: [
-    ['contactId', 'Contact ID'],
+    ['id', 'Record ID', 'record-id'],
     ['name', 'Name'],
     ['title', 'Title'],
     ['email', 'Email'],
@@ -280,19 +293,21 @@ const RELATED_COLUMNS = {
     ['primaryContact', 'Primary', 'boolean'],
   ],
   subscriptions: [
+    ['id', 'Record ID', 'record-id'],
     ['fund', 'Fund'],
     ['currentNavUsdMm', 'Current NAV (USD mm)', 'number'],
     ['initialSubscriptionDate', 'Subscribed', 'date'],
     ['cumulativeNetReturnPct', 'Net return (%)', 'number'],
   ],
   diligence: [
+    ['id', 'Record ID', 'record-id'],
     ['ddqType', 'Type'],
     ['ddqStatus', 'DDQ status', 'status'],
     ['dueDate', 'Due', 'date'],
     ['targetCompletionDate', 'Target', 'date'],
   ],
   tasks: [
-    ['taskId', 'Task ID'],
+    ['id', 'Record ID', 'record-id'],
     ['description', 'Description'],
     ['owner', 'Owner'],
     ['dueDate', 'Due', 'date'],
@@ -300,7 +315,7 @@ const RELATED_COLUMNS = {
     ['status', 'Status', 'status'],
   ],
   activities: [
-    ['activityId', 'Activity ID'],
+    ['id', 'Record ID', 'record-id'],
     ['date', 'Date', 'date'],
     ['type', 'Type'],
     ['subject', 'Subject'],
@@ -308,6 +323,7 @@ const RELATED_COLUMNS = {
     ['outcome', 'Outcome'],
   ],
   calendarEvents: [
+    ['id', 'Record ID', 'record-id'],
     ['date', 'Date', 'date'],
     ['time', 'Time'],
     ['purpose', 'Purpose'],
@@ -315,6 +331,7 @@ const RELATED_COLUMNS = {
     ['status', 'Status', 'status'],
   ],
   messages: [
+    ['id', 'Record ID', 'record-id'],
     ['date', 'Date', 'datetime'],
     ['from', 'From'],
     ['subject', 'Subject'],
@@ -331,7 +348,7 @@ const PAGE_CONFIG = {
     newLabel: 'New LP',
     searchLabel: 'Search LPs',
     columns: [
-      ['investorId', 'LP ID'],
+      ['investorId', 'LP ID', 'record-id'],
       ['name', 'LP name', 'link'],
       ['lpType', 'LP type'],
       ['domicile', 'Domicile'],
@@ -347,7 +364,7 @@ const PAGE_CONFIG = {
     newLabel: 'New prospect',
     searchLabel: 'Search prospects',
     columns: [
-      ['prospectId', 'Prospect ID'],
+      ['prospectId', 'Prospect ID', 'record-id'],
       ['name', 'Prospect name', 'link'],
       ['fundType', 'Fund type'],
       ['country', 'Country'],
@@ -357,6 +374,20 @@ const PAGE_CONFIG = {
       ['targetCommitmentUsdMm', 'Target (USD mm)', 'number'],
     ],
   },
+  outlookTasks: {
+    title: 'Outlook tasks',
+    description: 'Track unassociated deadlines and deliverables from Outlook.',
+    resource: 'outlookTasks',
+    newLabel: 'New task',
+    searchLabel: 'Search Outlook tasks',
+    columns: [
+      ['id', 'Record ID', 'record-id'],
+      ['subject', 'Subject', 'link'],
+      ['dueDate', 'Due date', 'date'],
+      ['importance', 'Importance', 'status'],
+      ['status', 'Status', 'status'],
+    ],
+  },
   meetings: {
     title: 'Meetings',
     description: 'Plan and maintain meetings across LP and prospect relationships.',
@@ -364,10 +395,11 @@ const PAGE_CONFIG = {
     newLabel: 'New meeting',
     searchLabel: 'Search meetings',
     columns: [
+      ['id', 'Record ID', 'record-id'],
       ['purpose', 'Purpose', 'link'],
       ['date', 'Date', 'date'],
       ['time', 'Time'],
-      ['relationshipName', 'Related LP or prospect'],
+      ['relationshipName', 'Related LP or prospect', 'relationship-link'],
       ['owner', 'Owner'],
       ['status', 'Status', 'status'],
     ],
@@ -388,7 +420,7 @@ const PAGE_CONFIG = {
       ['subject', 'Subject', 'link'],
       ['from', 'From'],
       ['to', 'To'],
-      ['relationshipName', 'Related LP or prospect'],
+      ['relationshipName', 'Related LP or prospect', 'relationship-link'],
       ['date', 'Date', 'datetime'],
     ],
   },
@@ -403,6 +435,7 @@ const state = {
   filters: {
     lps: '',
     prospects: '',
+    outlookTasks: '',
     meetings: '',
     emails: '',
   },
@@ -513,7 +546,9 @@ const recordLabel = (resource, record) => {
         ? data.purpose
         : resource === 'messages'
           ? data.subject
-          : (data.name ?? data.description ?? data.subject ?? data.fund ?? data.ddqType);
+          : resource === 'outlookTasks'
+            ? data.subject
+            : (data.name ?? data.description ?? data.subject ?? data.fund ?? data.ddqType);
   return String(label || `Untitled ${RESOURCE_META[resource]?.singular ?? 'record'}`);
 };
 
@@ -638,6 +673,20 @@ const relationshipName = (relationshipId, relationships) => {
   return relationship ? recordLabel('relationships', relationship) : 'Relationship unavailable';
 };
 
+const relationshipLink = (relationshipId, label) => {
+  if (!relationshipId) {
+    return escapeHtml(displayValue(label));
+  }
+  return `
+    <button class="record-link" type="button" data-action="open-relationship"
+      data-id="${escapeHtml(relationshipId)}"
+      aria-label="Open relationship ${escapeHtml(label)}"
+      title="Open relationship ${escapeHtml(label)}">
+      ${escapeHtml(label)}
+    </button>
+  `;
+};
+
 const showToast = (message, tone = 'success') => {
   const toast = document.createElement('div');
   toast.className = `toast ${tone === 'error' ? 'error' : ''}`;
@@ -686,9 +735,11 @@ const pageHeading = (title, copy, actions) => `
 `;
 
 const valueForColumn = (record, key, relationships) =>
-  key === 'relationshipName'
-    ? relationshipName(record.relationshipId, relationships)
-    : record.data?.[key];
+  key === 'id'
+    ? record.id
+    : key === 'relationshipName'
+      ? relationshipName(record.relationshipId, relationships)
+      : record.data?.[key];
 
 const recordSearchText = (record, columns, relationships) =>
   columns
@@ -714,6 +765,16 @@ const sortPageRecords = (records, page) => {
       recordLabel('relationships', left).localeCompare(recordLabel('relationships', right)),
     );
   }
+  if (page === 'outlookTasks') {
+    return [...records].sort((left, right) => {
+      const leftDate = parseDate(left.data?.dueDate)?.getTime() ?? Number.POSITIVE_INFINITY;
+      const rightDate = parseDate(right.data?.dueDate)?.getTime() ?? Number.POSITIVE_INFINITY;
+      return (
+        leftDate - rightDate ||
+        recordLabel('outlookTasks', left).localeCompare(recordLabel('outlookTasks', right))
+      );
+    });
+  }
   const direction = page === 'emails' ? -1 : 1;
   return [...records].sort((left, right) => {
     const leftDate = parseDate(left.data?.date)?.getTime() ?? 0;
@@ -725,12 +786,29 @@ const sortPageRecords = (records, page) => {
 const renderCell = (record, column, relationships, detailPage) => {
   const [key, , type = 'text'] = column;
   const value = valueForColumn(record, key, relationships);
-  if (type === 'link') {
+  if (type === 'link' || type === 'record-id') {
+    const label = displayValue(value);
     return `
-      <button class="record-link" type="button" data-action="open-record"
+      <button class="record-link${type === 'record-id' ? ' record-id' : ''}" type="button"
+        data-action="open-record"
         data-resource="${escapeHtml(PAGE_CONFIG[detailPage].resource)}"
-        data-id="${escapeHtml(record.id)}">
-        ${escapeHtml(displayValue(value))}
+        data-id="${escapeHtml(record.id)}" aria-label="Open ${escapeHtml(label)}"
+        title="Open ${escapeHtml(label)}">
+        ${escapeHtml(label)}
+      </button>
+    `;
+  }
+  if (type === 'relationship-link') {
+    if (!record.relationshipId) {
+      return escapeHtml(displayValue(value));
+    }
+    const label = displayValue(value);
+    return `
+      <button class="record-link" type="button" data-action="open-relationship"
+        data-id="${escapeHtml(record.relationshipId)}"
+        aria-label="Open relationship ${escapeHtml(label)}"
+        title="Open relationship ${escapeHtml(label)}">
+        ${escapeHtml(label)}
       </button>
     `;
   }
@@ -1018,7 +1096,10 @@ const renderMailboxDetail = (record, relationships) => {
         <div><dt>To</dt><dd>${escapeHtml(displayValue(record.data?.to))}</dd></div>
         <div><dt>Cc</dt><dd>${escapeHtml(displayValue(record.data?.cc))}</dd></div>
         <div><dt>Date</dt><dd>${escapeHtml(formatDate(record.data?.date, true))}</dd></div>
-        <div><dt>Relationship</dt><dd>${escapeHtml(linkedName)}</dd></div>
+        <div>
+          <dt>Relationship</dt>
+          <dd>${relationshipLink(record.relationshipId, linkedName)}</dd>
+        </div>
       </dl>
       <div class="mail-paper">${escapeHtml(displayValue(record.data?.body))}</div>
     </article>
@@ -1035,6 +1116,7 @@ const renderEmailsPage = async () => {
   const filtered = normalizedFilter
     ? sorted.filter((record) =>
         [
+          record.id,
           record.data?.from,
           record.data?.to,
           record.data?.cc,
@@ -1074,6 +1156,9 @@ const renderEmailsPage = async () => {
             <time datetime="${escapeHtml(record.data?.date ?? '')}">${escapeHtml(
               formatDate(record.data?.date),
             )}</time>
+          </span>
+          <span class="mail-row-id" title="${escapeHtml(record.id)}">
+            ${escapeHtml(record.id)}
           </span>
           <span class="mail-row-subject">${escapeHtml(displayValue(record.data?.subject))}</span>
           <span class="mail-row-preview">${escapeHtml(messagePreview(record.data?.body))}</span>
@@ -1134,10 +1219,14 @@ const renderDetailFields = (record, fields, options = {}) => {
   return [...additionalFields, ...fields]
     .map(([key, label, type = 'text']) => {
       const value = key === 'relationshipName' ? options.relationshipName : record.data?.[key];
+      const rendered =
+        key === 'relationshipName'
+          ? relationshipLink(options.relationshipId, displayValue(value))
+          : escapeHtml(formatValue(value, type === 'datetime-local' ? 'datetime' : type));
       return `
         <div class="detail-field">
           <dt>${escapeHtml(label)}</dt>
-          <dd>${escapeHtml(formatValue(value, type === 'datetime-local' ? 'datetime' : type))}</dd>
+          <dd>${rendered}</dd>
         </div>
       `;
     })
@@ -1169,7 +1258,20 @@ const renderRelatedTable = (resource, records, relationshipId, relationshipKind)
         <tr>
           ${columns
             .map(([key, , type = 'text']) => {
-              const value = record.data?.[key];
+              const value = key === 'id' ? record.id : record.data?.[key];
+              if (type === 'record-id') {
+                const label = displayValue(value);
+                return `
+                  <td>
+                    <button class="record-link record-id" type="button"
+                      data-action="open-related-record" data-resource="${escapeHtml(resource)}"
+                      data-id="${escapeHtml(record.id)}" aria-label="Open ${escapeHtml(label)}"
+                      title="Open ${escapeHtml(label)}">
+                      ${escapeHtml(label)}
+                    </button>
+                  </td>
+                `;
+              }
               const rendered =
                 type === 'status' ? statusBadge(value) : escapeHtml(formatValue(value, type));
               return `<td><span class="cell-truncate">${rendered}</span></td>`;
@@ -1202,6 +1304,10 @@ const renderRelationshipDetail = async (id) => {
   const relationship = details.relationship;
   const kind = relationship.data?.kind === 'prospect' ? 'prospect' : 'existing';
   const page = kind === 'prospect' ? 'prospects' : 'lps';
+  const returnPage = state.detail?.returnPage ?? page;
+  const backLabel = state.detail?.returnTarget
+    ? 'Back to previous record'
+    : `Back to ${PAGE_CONFIG[returnPage].title}`;
   const relatedSections = RELATED_RESOURCES.map((resource) => {
     const records = details.related[resource] ?? [];
     return `
@@ -1222,7 +1328,7 @@ const renderRelationshipDetail = async (id) => {
   }).join('');
   return `
     <button class="back-button" type="button" data-action="back-to-list">
-      Back to ${escapeHtml(PAGE_CONFIG[page].title)}
+      ${escapeHtml(backLabel)}
     </button>
     <article>
       <header class="record-header">
@@ -1256,13 +1362,23 @@ const renderSimpleDetail = async (resource, id) => {
     loadResource('relationships'),
   ]);
   const page = state.detail?.returnPage ?? (resource === 'calendarEvents' ? 'meetings' : 'emails');
+  const backLabel = state.detail?.returnTarget
+    ? 'Back to previous record'
+    : `Back to ${PAGE_CONFIG[page].title}`;
   const fields = fieldsForResource(resource);
   const bodyField = resource === 'messages' ? fields.find(([key]) => key === 'body') : null;
   const summaryFields = bodyField ? fields.filter(([key]) => key !== 'body') : fields;
   const linkedName = relationshipName(record.relationshipId, relationships);
+  const detailRelationshipOptions =
+    resource === 'outlookTasks'
+      ? {}
+      : {
+          relationshipId: record.relationshipId,
+          relationshipName: linkedName,
+        };
   return `
     <button class="back-button" type="button" data-action="back-to-list">
-      Back to ${escapeHtml(PAGE_CONFIG[page].title)}
+      ${escapeHtml(backLabel)}
     </button>
     <article>
       <header class="record-header">
@@ -1281,7 +1397,7 @@ const renderSimpleDetail = async (resource, id) => {
         <section class="detail-card">
           <header class="record-section-title"><h2>Details</h2></header>
           <dl class="record-grid">
-            ${renderDetailFields(record, summaryFields, { relationshipName: linkedName })}
+            ${renderDetailFields(record, summaryFields, detailRelationshipOptions)}
           </dl>
           ${
             bodyField
@@ -1346,8 +1462,23 @@ const setPage = async (page) => {
   moveToTop();
 };
 
-const openDetail = async (resource, id, returnPage = state.page) => {
-  state.detail = { resource, id, returnPage };
+const copyDetailTarget = (detail) =>
+  detail
+    ? {
+        resource: detail.resource,
+        id: detail.id,
+        returnPage: detail.returnPage,
+        returnTarget: copyDetailTarget(detail.returnTarget),
+      }
+    : null;
+
+const openDetail = async (resource, id, { returnPage = state.page, returnTarget = null } = {}) => {
+  state.detail = {
+    resource,
+    id,
+    returnPage,
+    returnTarget: copyDetailTarget(returnTarget),
+  };
   await renderPage();
   workspaceElement.focus({ preventScroll: true });
   moveToTop();
@@ -1565,7 +1696,8 @@ const openRecordDialog = async (
     ? 'Save changes'
     : `Create ${labels.singular}`;
 
-  const showRelationshipSelector = resource !== 'relationships' && !fixedRelationshipId;
+  const showRelationshipSelector =
+    !['relationships', 'outlookTasks'].includes(resource) && !fixedRelationshipId;
   const relationshipField = showRelationshipSelector
     ? `
       <div class="form-field full">
@@ -1851,7 +1983,8 @@ const deleteRecord = async (resource, id) => {
     });
     invalidateAfterWrite(resource);
     if (state.detail?.resource === resource && state.detail.id === id) {
-      state.detail = null;
+      state.detail =
+        resource === 'relationships' ? null : copyDetailTarget(state.detail.returnTarget);
     }
     if (resource === 'messages' && state.selectedEmailId === id) {
       state.selectedEmailId = nextMessageId;
@@ -1927,8 +2060,20 @@ pageElement.addEventListener('click', async (event) => {
   if (action === 'open-record') {
     await openDetail(resource, id);
   }
+  if (action === 'open-related-record') {
+    await openDetail(resource, id, {
+      returnPage: state.page,
+      returnTarget: state.detail,
+    });
+  }
+  if (action === 'open-relationship') {
+    await openDetail('relationships', id, {
+      returnPage: state.page,
+      returnTarget: state.detail,
+    });
+  }
   if (action === 'open-calendar-event') {
-    await openDetail(resource, id, 'calendar');
+    await openDetail(resource, id, { returnPage: 'calendar' });
   }
   if (action === 'select-email') {
     state.selectedEmailId = id;
@@ -1959,7 +2104,7 @@ pageElement.addEventListener('click', async (event) => {
     await renderPage(false);
   }
   if (action === 'back-to-list') {
-    state.detail = null;
+    state.detail = copyDetailTarget(state.detail?.returnTarget);
     await renderPage();
     workspaceElement.focus({ preventScroll: true });
     moveToTop();
