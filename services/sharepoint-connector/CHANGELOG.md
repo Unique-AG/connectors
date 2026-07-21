@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.0.0...sharepoint-connector@3.1.0) (2026-07-20)
+
+
+### Features
+
+* **sharepoint-connector:** replace noisy sync failure alert with SyncDegraded ([#691](https://github.com/Unique-AG/connectors/issues/691)) ([9faa76a](https://github.com/Unique-AG/connectors/commit/9faa76a20fae363d850ab47d405ccfe8b40b7e7b))
+
 ## [3.0.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@2.7.0...sharepoint-connector@3.0.0) (2026-07-07)
 
 
