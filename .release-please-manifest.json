@@ -1,6 +1,6 @@
 {
   "services/sharepoint-connector": "3.1.0",
-  "services/teams-mcp": "0.3.4",
+  "services/teams-mcp": "0.3.5",
   "services/confluence-connector": "3.0.0",
   "services/outlook-semantic-mcp": "3.0.0",
   "services/kyckr-mcp": "0.1.0"

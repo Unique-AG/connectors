@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.5](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.4...teams-mcp@0.3.5) (2026-07-22)
+
+
+### Features
+
+* **teams-mcp:** make Unique integration optional via UNIQUE_INTEGRATION ([#697](https://github.com/Unique-AG/connectors/issues/697)) ([9c6dd2d](https://github.com/Unique-AG/connectors/commit/9c6dd2d94a6cc95b0601e8fa11653bc2f467adc6))
+
 ## [0.3.4](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.3...teams-mcp@0.3.4) (2026-07-16)
 
 
