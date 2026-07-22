@@ -2170,6 +2170,15 @@
           "type": "object",
           "description": "Unique API configuration",
           "properties": {
+            "integration": {
+              "type": "string",
+              "enum": [
+                "enabled",
+                "disabled"
+              ],
+              "default": "enabled",
+              "description": "Enable Unique knowledge-base integration. When disabled, Unique/Zitadel config is not required (chat-only mode)."
+            },
             "serviceAuthMode": {
               "type": "string",
               "enum": [
@@ -2225,10 +2234,25 @@
             }
           },
           "required": [
-            "serviceAuthMode",
-            "apiBaseUrl",
-            "rootScopeId"
-          ]
+            "integration"
+          ],
+          "if": {
+            "properties": {
+              "integration": {
+                "const": "enabled"
+              }
+            },
+            "required": [
+              "integration"
+            ]
+          },
+          "then": {
+            "required": [
+              "serviceAuthMode",
+              "apiBaseUrl",
+              "rootScopeId"
+            ]
+          }
         },
         "auth": {
           "type": "object",

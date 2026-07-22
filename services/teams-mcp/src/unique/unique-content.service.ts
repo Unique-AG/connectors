@@ -31,6 +31,7 @@ import {
   SearchType,
 } from './unique.dtos';
 import type { UniqueIdentity } from './unique-identity.types';
+import { assertUniqueIntegrationEnabled } from './unique-integration.guard';
 
 /**
  * A download streamed to a local temp file, ready to upload with an authoritative `Content-Length`.
@@ -181,6 +182,7 @@ export class UniqueContentService {
   // In external mode the public writeUrl is used as-is.
   private correctWriteUrl(writeUrl: string): string {
     const config = this.config.get('unique', { infer: true });
+    assertUniqueIntegrationEnabled(config);
     if (config.serviceAuthMode === 'external') {
       return writeUrl;
     }

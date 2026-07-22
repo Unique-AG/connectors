@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { UniqueConfigNamespaced } from '~/config';
 import { normalizeError } from '~/utils/normalize-error';
 import { ScopeAccessEntityType, ScopeAccessType } from './unique.dtos';
+import { isUniqueIntegrationEnabled } from './unique-integration.guard';
 import { UniqueScopeService } from './unique-scope.service';
 
 /**
@@ -18,6 +19,8 @@ import { UniqueScopeService } from './unique-scope.service';
  * not a from-zero provisioner: granting still requires the service user to be
  * permitted to manage the scope (the manual grant documented in the operator
  * configuration guide), so a truly unconfigured root scope fails fast here.
+ *
+ * Skipped when UNIQUE_INTEGRATION=disabled (chat-only mode).
  */
 @Injectable()
 export class RootScopeBootstrapService implements OnApplicationBootstrap {
@@ -29,7 +32,13 @@ export class RootScopeBootstrapService implements OnApplicationBootstrap {
   ) {}
 
   public async onApplicationBootstrap(): Promise<void> {
-    const { rootScopeId, serviceExtraHeaders } = this.config.get('unique', { infer: true });
+    const uniqueConfig = this.config.get('unique', { infer: true });
+    if (!isUniqueIntegrationEnabled(uniqueConfig)) {
+      this.logger.log('Skipping root scope permission bootstrap: Unique integration is disabled');
+      return;
+    }
+
+    const { rootScopeId, serviceExtraHeaders } = uniqueConfig;
     const serviceUserId = serviceExtraHeaders['x-user-id'];
     // The config schema already requires x-user-id in both auth modes; this guards
     // that invariant before we build the access grants.

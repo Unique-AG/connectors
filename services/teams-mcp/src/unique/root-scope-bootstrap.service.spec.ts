@@ -29,7 +29,11 @@ describe('RootScopeBootstrapService', () => {
 
   it('grants MANAGE/READ/WRITE to the service user on the root scope', async () => {
     const service = makeService(
-      { rootScopeId, serviceExtraHeaders: { 'x-user-id': serviceUserId } },
+      {
+        integration: 'enabled',
+        rootScopeId,
+        serviceExtraHeaders: { 'x-user-id': serviceUserId },
+      },
       mockScopeService,
     );
 
@@ -55,10 +59,22 @@ describe('RootScopeBootstrapService', () => {
     ]);
   });
 
+  it('skips bootstrap when Unique integration is disabled', async () => {
+    const service = makeService({ integration: 'disabled' }, mockScopeService);
+
+    await service.onApplicationBootstrap();
+
+    expect(mockScopeService.addScopeAccesses).not.toHaveBeenCalled();
+  });
+
   it('rethrows when the grant fails so startup hard-fails', async () => {
     mockScopeService.addScopeAccesses.mockRejectedValue(new Error('add-access failed'));
     const service = makeService(
-      { rootScopeId, serviceExtraHeaders: { 'x-user-id': serviceUserId } },
+      {
+        integration: 'enabled',
+        rootScopeId,
+        serviceExtraHeaders: { 'x-user-id': serviceUserId },
+      },
       mockScopeService,
     );
 
@@ -66,7 +82,10 @@ describe('RootScopeBootstrapService', () => {
   });
 
   it('throws the assertion when x-user-id is missing', async () => {
-    const service = makeService({ rootScopeId, serviceExtraHeaders: {} }, mockScopeService);
+    const service = makeService(
+      { integration: 'enabled', rootScopeId, serviceExtraHeaders: {} },
+      mockScopeService,
+    );
 
     await expect(service.onApplicationBootstrap()).rejects.toThrow(/x-user-id/);
     expect(mockScopeService.addScopeAccesses).not.toHaveBeenCalled();

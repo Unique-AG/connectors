@@ -31,6 +31,9 @@ All mcpConfig environment variables, shared by deployment and hook job container
 - name: MICROSOFT_AUTO_START_INGESTION
   value: {{ .Values.mcpConfig.microsoft.autoStartIngestion | quote }}
 {{- end }}
+- name: UNIQUE_INTEGRATION
+  value: {{ .Values.mcpConfig.unique.integration | quote }}
+{{- if eq .Values.mcpConfig.unique.integration "enabled" }}
 - name: UNIQUE_SERVICE_AUTH_MODE
   value: {{ .Values.mcpConfig.unique.serviceAuthMode | quote }}
 - name: UNIQUE_API_BASE_URL
@@ -46,6 +49,7 @@ All mcpConfig environment variables, shared by deployment and hook job container
 {{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
 - name: UNIQUE_INGESTION_SERVICE_BASE_URL
   value: {{ include "chart.ensureTrailingSlash" (dict "url" (tpl .Values.mcpConfig.unique.ingestionServiceBaseUrl .)) | quote }}
+{{- end }}
 {{- end }}
 - name: AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS
   value: {{ .Values.mcpConfig.auth.accessTokenExpiresInSeconds | quote }}

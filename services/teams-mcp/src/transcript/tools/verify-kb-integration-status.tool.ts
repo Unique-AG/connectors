@@ -1,10 +1,16 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
+import type { UniqueConfigNamespaced } from '~/config';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
+import {
+  isUniqueIntegrationEnabled,
+  UNIQUE_INTEGRATION_DISABLED_TOOL_MESSAGE,
+} from '~/unique/unique-integration.guard';
 import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 
 const VerifyKbIntegrationStatusInputSchema = z.object({});
@@ -33,6 +39,7 @@ export class VerifyKbIntegrationStatusTool {
   public constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly traceService: TraceService,
+    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
   ) {}
 
   @Tool({
@@ -65,6 +72,14 @@ export class VerifyKbIntegrationStatusTool {
     const userProfileId = request.user?.userProfileId;
     if (!userProfileId) {
       throw new UnauthorizedException('User not authenticated');
+    }
+
+    if (!isUniqueIntegrationEnabled(this.config.get('unique', { infer: true }))) {
+      return {
+        status: 'not_configured' as SubscriptionStatus,
+        message: UNIQUE_INTEGRATION_DISABLED_TOOL_MESSAGE,
+        subscription: null,
+      };
     }
 
     const span = this.traceService.getSpan();

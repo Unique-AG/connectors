@@ -6,58 +6,46 @@ import {
 import { z } from 'zod/v4';
 import { json, stringToURL } from '~/utils/zod';
 
-// ==== Config for local in-cluster communication with Unique API services ====
+const serviceExtraHeadersClusterLocal = json(z.record(z.string(), z.string()))
+  .refine(
+    (headers) => {
+      const providedHeaders = Object.keys(headers);
+      const requiredHeaders = ['x-company-id', 'x-user-id'];
+      return requiredHeaders.every((header) => providedHeaders.includes(header));
+    },
+    {
+      message: 'Must contain x-company-id and x-user-id headers',
+      path: ['serviceExtraHeaders'],
+    },
+  )
+  .describe(
+    'JSON string of extra HTTP headers for API requests ' +
+      '(e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
+  );
 
-const clusterLocalConfig = z.object({
-  serviceAuthMode: z
-    .literal('cluster_local')
-    .describe('Authentication mode to use for accessing Unique API services'),
-  serviceExtraHeaders: json(z.record(z.string(), z.string()))
-    .refine(
-      (headers) => {
-        const providedHeaders = Object.keys(headers);
-        const requiredHeaders = ['x-company-id', 'x-user-id'];
-        return requiredHeaders.every((header) => providedHeaders.includes(header));
-      },
-      {
-        message: 'Must contain x-company-id and x-user-id headers',
-        path: ['serviceExtraHeaders'],
-      },
-    )
+const serviceExtraHeadersExternal = json(z.record(z.string(), z.string()))
+  .refine(
+    (headers) => {
+      const providedHeaders = Object.keys(headers);
+      const requiredHeaders = ['authorization', 'x-app-id', 'x-user-id', 'x-company-id'];
+      return requiredHeaders.every((header) => providedHeaders.includes(header));
+    },
+    {
+      message: 'Must contain authorization, x-app-id, x-user-id, and x-company-id headers',
+      path: ['serviceExtraHeaders'],
+    },
+  )
+  .describe(
+    'JSON string of extra HTTP headers for API requests ' +
+      '(e.g., {"authorization": "Bearer <app-key>", "x-app-id": "<app-id>", "x-user-id": "<user-id>", "x-company-id": "<company-id>"})',
+  );
+
+const enabledCommonFields = {
+  integration: z
+    .literal('enabled')
     .describe(
-      'JSON string of extra HTTP headers for API requests ' +
-        '(e.g., {"x-company-id": "<company-id>", "x-user-id": "<user-id>"})',
+      'Unique integration is enabled; knowledge base tools and ingestion require full Unique config.',
     ),
-  ingestionServiceBaseUrl: stringToURL().describe('Base URL for Unique ingestion service'),
-});
-
-// ==== Config for external communication with Unique API services via app key ====
-
-const externalConfig = z.object({
-  serviceAuthMode: z
-    .literal('external')
-    .describe('Authentication mode to use for accessing Unique API services'),
-  serviceExtraHeaders: json(z.record(z.string(), z.string()))
-    .refine(
-      (headers) => {
-        const providedHeaders = Object.keys(headers);
-        const requiredHeaders = ['authorization', 'x-app-id', 'x-user-id', 'x-company-id'];
-        return requiredHeaders.every((header) => providedHeaders.includes(header));
-      },
-      {
-        message: 'Must contain authorization, x-app-id, x-user-id, and x-company-id headers',
-        path: ['serviceExtraHeaders'],
-      },
-    )
-    .describe(
-      'JSON string of extra HTTP headers for API requests ' +
-        '(e.g., {"authorization": "Bearer <app-key>", "x-app-id": "<app-id>", "x-user-id": "<user-id>", "x-company-id": "<company-id>"})',
-    ),
-});
-
-// ==== Config common for both cluster_local and external authentication modes ====
-
-const baseConfig = z.object({
   apiBaseUrl: stringToURL().describe('The Public API URL.'),
   apiVersion: z
     .string()
@@ -73,13 +61,40 @@ const baseConfig = z.object({
     .positive()
     .default(5)
     .describe('The concurrency limit for fetching users when resolving scope accesses.'),
+};
+
+const enabledClusterLocalConfig = z.object({
+  ...enabledCommonFields,
+  serviceAuthMode: z
+    .literal('cluster_local')
+    .describe('Authentication mode to use for accessing Unique API services'),
+  serviceExtraHeaders: serviceExtraHeadersClusterLocal,
+  ingestionServiceBaseUrl: stringToURL().describe('Base URL for Unique ingestion service'),
 });
 
-export const UniqueConfigSchema = z
-  .discriminatedUnion('serviceAuthMode', [clusterLocalConfig, externalConfig])
-  .and(baseConfig);
+const enabledExternalConfig = z.object({
+  ...enabledCommonFields,
+  serviceAuthMode: z
+    .literal('external')
+    .describe('Authentication mode to use for accessing Unique API services'),
+  serviceExtraHeaders: serviceExtraHeadersExternal,
+});
+
+const disabledUniqueConfig = z.object({
+  integration: z
+    .literal('disabled')
+    .describe('Unique integration is disabled; chat-only mode without knowledge base features.'),
+});
+
+// Enabled variants are separate object schemas (Zod 4 discriminatedUnion does not support `.and()`).
+export const UniqueConfigSchema = z.union([
+  disabledUniqueConfig,
+  z.discriminatedUnion('serviceAuthMode', [enabledClusterLocalConfig, enabledExternalConfig]),
+]);
 
 export const uniqueConfig = registerConfig('unique', UniqueConfigSchema);
 
 export type UniqueConfigNamespaced = NamespacedConfigType<typeof uniqueConfig>;
 export type UniqueConfig = ConfigType<typeof uniqueConfig>;
+export type EnabledUniqueConfig = Extract<UniqueConfig, { integration: 'enabled' }>;
+export type DisabledUniqueConfig = Extract<UniqueConfig, { integration: 'disabled' }>;

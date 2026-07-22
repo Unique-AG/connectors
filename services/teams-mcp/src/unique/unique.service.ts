@@ -20,6 +20,7 @@ import {
   UniqueIngestionMode,
 } from './unique.dtos';
 import { type SpooledContent, UniqueContentService } from './unique-content.service';
+import { assertRootScopeId, assertUniqueIntegrationEnabled } from './unique-integration.guard';
 import { UniqueScopeService } from './unique-scope.service';
 import { UniqueUserService } from './unique-user.service';
 
@@ -77,7 +78,11 @@ export class UniqueService {
       'Beginning processing of meeting transcript for ingestion',
     );
 
-    const concurrency = this.config.get('unique.userFetchConcurrency', { infer: true });
+    const uniqueConfig = this.config.get('unique', { infer: true });
+    assertUniqueIntegrationEnabled(uniqueConfig);
+    const rootScopeId = assertRootScopeId(uniqueConfig);
+
+    const concurrency = uniqueConfig.userFetchConcurrency;
     const limit = pLimit(concurrency);
     const participantsPromises = meeting.participants.map((p) =>
       limit(() => this.userService.findUserByEmail(p.email)),
@@ -104,8 +109,6 @@ export class UniqueService {
       { foundParticipants: participants.length, totalParticipants: meeting.participants.length },
       'Successfully resolved meeting participant accounts in Unique system',
     );
-
-    const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
     const { subjectPath, datePath } = this.mapMeetingToRelativePaths(
       meeting.subject,
       meeting.meetingId,

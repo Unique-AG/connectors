@@ -295,6 +295,10 @@ mcpConfig:
 
   # -- Unique API configuration
   unique:
+    # -- Enable Unique knowledge-base integration (transcript ingestion).
+    # When disabled, chat tools work without Unique/Zitadel configuration.
+    # possible values: enabled, disabled
+    integration: enabled
     # -- Authentication mode for Unique API services
     # possible values: cluster_local, external
     # cluster_local: communicates using in-cluster URLs with service headers
@@ -316,7 +320,8 @@ mcpConfig:
     # -- The Public API version to use
     apiVersion: "2023-12-06"
     # -- The root scope ID under which to create transcript and recording folders
-    # @default -- (required)
+    # Required when integration is enabled
+    # @default -- (required when integration=enabled)
     rootScopeId: ""
     # -- Concurrency limit for fetching users when resolving scope accesses
     userFetchConcurrency: 5

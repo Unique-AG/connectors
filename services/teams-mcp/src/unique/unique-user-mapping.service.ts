@@ -8,6 +8,7 @@ import type { UniqueConfigNamespaced } from '~/config';
 import { DRIZZLE, type DrizzleDatabase } from '~/drizzle';
 import { userProfiles } from '~/drizzle/schema/user-profiles.table';
 import type { UniqueIdentity } from './unique-identity.types';
+import { assertUniqueIntegrationEnabled } from './unique-integration.guard';
 import { UniqueUserService } from './unique-user.service';
 
 const CACHE_PREFIX = 'unique_identity:';
@@ -63,8 +64,9 @@ export class UniqueUserMappingService {
     }
 
     // TODO(UN-17569): replace with proper per-user company ID resolution
-    const companyId =
-      this.config.get('unique.serviceExtraHeaders', { infer: true })['x-company-id'] ?? '';
+    const uniqueConfig = this.config.get('unique', { infer: true });
+    assertUniqueIntegrationEnabled(uniqueConfig);
+    const companyId = uniqueConfig.serviceExtraHeaders['x-company-id'] ?? '';
 
     const identity: UniqueIdentity = { userId: uniqueUser.id, companyId };
     await this.cache.set(cacheKey, identity);
