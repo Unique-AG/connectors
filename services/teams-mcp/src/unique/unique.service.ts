@@ -20,7 +20,7 @@ import {
   UniqueIngestionMode,
 } from './unique.dtos';
 import { type SpooledContent, UniqueContentService } from './unique-content.service';
-import { assertRootScopeId, assertUniqueIntegrationEnabled } from './unique-integration.guard';
+import { assertRootScopeId, isUniqueIntegrationEnabled } from './unique-integration.guard';
 import { UniqueScopeService } from './unique-scope.service';
 import { UniqueUserService } from './unique-user.service';
 
@@ -79,7 +79,14 @@ export class UniqueService {
     );
 
     const uniqueConfig = this.config.get('unique', { infer: true });
-    assertUniqueIntegrationEnabled(uniqueConfig);
+    if (!isUniqueIntegrationEnabled(uniqueConfig)) {
+      span?.addEvent('unique_integration_disabled');
+      this.logger.warn(
+        { transcriptId: transcript.id },
+        'Unique integration is disabled; skipping transcript ingestion',
+      );
+      return;
+    }
     const rootScopeId = assertRootScopeId(uniqueConfig);
 
     const concurrency = uniqueConfig.userFetchConcurrency;

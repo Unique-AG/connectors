@@ -4,8 +4,6 @@ import {
   assertRootScopeId,
   assertUniqueIntegrationEnabled,
   isUniqueIntegrationEnabled,
-  requireUniqueIntegrationForTool,
-  UNIQUE_INTEGRATION_DISABLED_TOOL_MESSAGE,
   UNIQUE_INTEGRATION_MISCONFIGURED_MESSAGE,
 } from './unique-integration.guard';
 
@@ -49,15 +47,5 @@ describe('unique-integration.guard', () => {
   it('assertRootScopeId returns the root scope id', () => {
     assertUniqueIntegrationEnabled(enabledConfig);
     expect(assertRootScopeId(enabledConfig)).toBe('scope_root_01');
-  });
-
-  it('requireUniqueIntegrationForTool throws the tool message when disabled', () => {
-    expect(() => requireUniqueIntegrationForTool(disabledConfig)).toThrow(
-      UNIQUE_INTEGRATION_DISABLED_TOOL_MESSAGE,
-    );
-  });
-
-  it('requireUniqueIntegrationForTool does not throw when enabled', () => {
-    expect(() => requireUniqueIntegrationForTool(enabledConfig)).not.toThrow();
   });
 });

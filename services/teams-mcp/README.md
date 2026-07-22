@@ -81,7 +81,6 @@ UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-i
 | `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `60` | Access token TTL |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `2592000` | Refresh token TTL (30 days) |
-| `UNIQUE_INTEGRATION` | (required) | `enabled` or `disabled` (chat-only when disabled) |
 | `UNIQUE_USER_FETCH_CONCURRENCY` | `5` | Concurrent user resolution limit |
 
 For complete configuration reference, see [Configuration Guide](./docs/operator/configuration.md).

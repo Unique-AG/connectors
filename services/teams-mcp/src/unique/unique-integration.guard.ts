@@ -24,12 +24,3 @@ export function assertRootScopeId(config: EnabledUniqueConfig): string {
   );
   return config.rootScopeId;
 }
-
-/** Throws when Unique integration is disabled — for tools whose output schema has no success field. */
-export function requireUniqueIntegrationForTool(
-  config: UniqueConfig,
-): asserts config is EnabledUniqueConfig {
-  if (!isUniqueIntegrationEnabled(config)) {
-    throw new Error(UNIQUE_INTEGRATION_DISABLED_TOOL_MESSAGE);
-  }
-}
