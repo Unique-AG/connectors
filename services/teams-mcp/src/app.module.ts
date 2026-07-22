@@ -36,10 +36,10 @@ import {
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
 import { HealthModule } from './health/health.module';
+import { registerKbIntegrationModule } from './kb-integration/kb-integration.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
-import { TranscriptModule } from './transcript/transcript.module';
 import { GraphErrorFilter } from './utils/graph-error.filter';
 
 @Module({
@@ -150,7 +150,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     MsGraphModule,
     AMQPModule,
-    TranscriptModule,
+    ...registerKbIntegrationModule(),
     ChatModule,
     HealthModule,
   ],

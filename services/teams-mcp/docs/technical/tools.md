@@ -3,10 +3,10 @@
 
 # Teams MCP - Tools
 
-The Teams MCP Server exposes **12 tools** in two categories:
+The Teams MCP Server exposes **chat & messaging tools** always, and **transcript & knowledge-base tools** only when `UNIQUE_INTEGRATION=enabled`:
 
 - **Chat & messaging tools** (8) interact with Microsoft Teams chats and channels synchronously through the Microsoft Graph API: list teams/channels/chats, read messages, search across messages, and send messages.
-- **Transcript & knowledge-base tools** (4) manage meeting-transcript ingestion into the Unique knowledge base.
+- **Transcript & knowledge-base tools** (4) manage meeting-transcript ingestion into the Unique knowledge base. These tools are registered only when Unique integration is enabled.
 
 Chat and messaging tools target chats and channels by id: you discover the id with a `list_*` tool (or `search_messages`), then pass it to the tool that reads or writes:
 

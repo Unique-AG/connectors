@@ -38,16 +38,20 @@ Set via `mcpConfig.microsoft` in Helm values:
 
 ### Unique API Configuration
 
-Set via `mcpConfig.unique` in Helm values:
+Set via `mcpConfig.unique` in Helm values.
+
+When `UNIQUE_INTEGRATION=disabled`, other Unique variables are not required (chat-only mode). Knowledge-base tools and the transcript ingestion pipeline are not registered.
 
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
-| `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
-| `UNIQUE_API_BASE_URL` | `mcpConfig.unique.apiBaseUrl` | (required) | Unique API endpoint |
+| `UNIQUE_INTEGRATION` | `mcpConfig.unique.integration` | (required) | `enabled` or `disabled`. When disabled, Unique/Zitadel config is optional |
+| `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` (required when enabled) |
+| `UNIQUE_API_BASE_URL` | `mcpConfig.unique.apiBaseUrl` | (required when enabled) | Unique API endpoint |
 | `UNIQUE_API_VERSION` | `mcpConfig.unique.apiVersion` | `2023-12-06` | API version |
-| `UNIQUE_ROOT_SCOPE_ID` | `mcpConfig.unique.rootScopeId` | (required) | Root scope ID for uploads |
+| `UNIQUE_ROOT_SCOPE_ID` | `mcpConfig.unique.rootScopeId` | (required when enabled) | Root scope ID for uploads |
 | `UNIQUE_USER_FETCH_CONCURRENCY` | `mcpConfig.unique.userFetchConcurrency` | `5` | Parallel user lookups |
-| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required) | Ingestion service endpoint |
+| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required when enabled + cluster_local) | Ingestion service endpoint |
+| `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required when enabled) | Zitadel service account headers (`x-company-id`, `x-user-id`, …) |
 
 ### Authentication Configuration
 
@@ -114,6 +118,7 @@ mcpConfig:
     # publicWebhookUrl: https://teams.mcp.example.com  # optional
 
   unique:
+    integration: enabled
     serviceAuthMode: cluster_local
     apiBaseUrl: http://api-gateway.unique:8080
     apiVersion: "2023-12-06"
@@ -181,7 +186,7 @@ mcpConfig:
 
 ### Why a Zitadel Service Account is Required
 
-The Teams MCP Server requires a Zitadel service account to authenticate with the Unique Public API. This service account is used to:
+When `UNIQUE_INTEGRATION=enabled`, the Teams MCP Server requires a Zitadel service account to authenticate with the Unique Public API. This service account is used to:
 
 1. **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants
 2. **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts and recordings
@@ -283,6 +288,7 @@ The root scope must be created **manually** in the Unique platform before deploy
    ```yaml
    mcpConfig:
      unique:
+       integration: enabled
        rootScopeId: "scope_abc123xyz"
    ```
 

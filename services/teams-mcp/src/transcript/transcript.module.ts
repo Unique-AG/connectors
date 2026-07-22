@@ -17,6 +17,10 @@ import { TranscriptCreatedService } from './transcript-created.service';
 import { TranscriptRecordingService } from './transcript-recording.service';
 import { TranscriptUtilsService } from './transcript-utils.service';
 
+/**
+ * Transcript ingestion + KB MCP tools. Only imported via KbIntegrationModule
+ * when UNIQUE_INTEGRATION=enabled — do not import from AppModule directly.
+ */
 @Module({
   imports: [DrizzleModule, MsGraphModule, UniqueModule],
   providers: [

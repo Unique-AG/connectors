@@ -6,9 +6,30 @@ import {
 import { z } from 'zod/v4';
 import { json, stringToURL } from '~/utils/zod';
 
+const baseConfig = z.object({
+  integration: z
+    .literal('enabled')
+    .describe('Unique integration is enabled; chat-only with knowledge base features.'),
+  apiBaseUrl: stringToURL().describe('The Public API URL.'),
+  apiVersion: z
+    .string()
+    .default('2023-12-06')
+    .describe('The Public API version to use (maps to `x-api-version`).'),
+  rootScopeId: z
+    .string()
+    .min(1, 'rootScopeId cannot be empty')
+    .describe('The root scope ID under which to create transcript and recording folders.'),
+  userFetchConcurrency: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(5)
+    .describe('The concurrency limit for fetching users when resolving scope accesses.'),
+});
+
 // ==== Config for local in-cluster communication with Unique API services ====
 
-const clusterLocalConfig = z.object({
+const clusterLocalConfig = baseConfig.extend({
   serviceAuthMode: z
     .literal('cluster_local')
     .describe('Authentication mode to use for accessing Unique API services'),
@@ -33,7 +54,7 @@ const clusterLocalConfig = z.object({
 
 // ==== Config for external communication with Unique API services via app key ====
 
-const externalConfig = z.object({
+const externalConfig = baseConfig.extend({
   serviceAuthMode: z
     .literal('external')
     .describe('Authentication mode to use for accessing Unique API services'),
@@ -56,30 +77,25 @@ const externalConfig = z.object({
 });
 
 // ==== Config common for both cluster_local and external authentication modes ====
+const enabledUniqueConfig = z.discriminatedUnion('serviceAuthMode', [
+  clusterLocalConfig,
+  externalConfig,
+]);
 
-const baseConfig = z.object({
-  apiBaseUrl: stringToURL().describe('The Public API URL.'),
-  apiVersion: z
-    .string()
-    .default('2023-12-06')
-    .describe('The Public API version to use (maps to `x-api-version`).'),
-  rootScopeId: z
-    .string()
-    .min(1, 'rootScopeId cannot be empty')
-    .describe('The root scope ID under which to create transcript and recording folders.'),
-  userFetchConcurrency: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(5)
-    .describe('The concurrency limit for fetching users when resolving scope accesses.'),
+const disabledUniqueConfig = z.object({
+  integration: z
+    .literal('disabled')
+    .describe('Unique integration is disabled; chat-only mode without knowledge base features.'),
 });
 
-export const UniqueConfigSchema = z
-  .discriminatedUnion('serviceAuthMode', [clusterLocalConfig, externalConfig])
-  .and(baseConfig);
+export const UniqueConfigSchema = z.discriminatedUnion('integration', [
+  enabledUniqueConfig,
+  disabledUniqueConfig,
+]);
 
 export const uniqueConfig = registerConfig('unique', UniqueConfigSchema);
 
 export type UniqueConfigNamespaced = NamespacedConfigType<typeof uniqueConfig>;
 export type UniqueConfig = ConfigType<typeof uniqueConfig>;
+export type EnabledUniqueConfig = Extract<UniqueConfig, { integration: 'enabled' }>;
+export type DisabledUniqueConfig = Extract<UniqueConfig, { integration: 'disabled' }>;

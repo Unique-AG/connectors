@@ -50,18 +50,27 @@ For complete configuration reference, see [Configuration Guide](./docs/operator/
 
 ### Unique API Configuration
 
+**Toggle** (required; set `disabled` for chat-only without Zitadel/Unique config):
+```env
+UNIQUE_INTEGRATION=enabled
+```
+
 **External Mode** (for external deployments):
 ```env
+UNIQUE_INTEGRATION=enabled
 UNIQUE_SERVICE_AUTH_MODE=external
 UNIQUE_API_BASE_URL=http://localhost:8092/public/
+UNIQUE_ROOT_SCOPE_ID=<root-scope-id>
 UNIQUE_SERVICE_EXTRA_HEADERS={"authorization":"Bearer <app-key>","x-app-id":"<app-id>","x-user-id":"<user-id>","x-company-id":"<company-id>"}
 ```
 
 **Cluster Local Mode** (for in-cluster deployments):
 ```env
+UNIQUE_INTEGRATION=enabled
 UNIQUE_SERVICE_AUTH_MODE=cluster_local
 UNIQUE_API_BASE_URL=http://chat.namespace.svc:PORT/public/chat/
 UNIQUE_INGESTION_SERVICE_BASE_URL=http://ingestions.namespace.svc:PORT
+UNIQUE_ROOT_SCOPE_ID=<root-scope-id>
 UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-id>"}
 ```
 
@@ -72,7 +81,6 @@ UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-i
 | `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `60` | Access token TTL |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `2592000` | Refresh token TTL (30 days) |
-| `UNIQUE_ROOT_SCOPE_PATH` | `Teams-MCP` | Root folder path in Unique |
 | `UNIQUE_USER_FETCH_CONCURRENCY` | `5` | Concurrent user resolution limit |
 
 For complete configuration reference, see [Configuration Guide](./docs/operator/configuration.md).
