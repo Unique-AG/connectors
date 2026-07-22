@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.5...teams-mcp@0.4.0) (2026-07-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **teams-mcp:** move autoStartIngestion to unique config ([#699](https://github.com/Unique-AG/connectors/issues/699))
+
+### Features
+
+* **teams-mcp:** move autoStartIngestion to unique config ([#699](https://github.com/Unique-AG/connectors/issues/699)) ([b770528](https://github.com/Unique-AG/connectors/commit/b7705282504b55936f3b9706983ddb16ccae5626))
+
 ## [0.3.5](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.4...teams-mcp@0.3.5) (2026-07-22)
 
 
