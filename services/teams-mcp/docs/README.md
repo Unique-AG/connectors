@@ -314,7 +314,7 @@ Both tracks begin with the same one-time connection, then diverge — because th
 
 #### Transcripts & Recordings Workflow — ingest once, then query in Unique
 
-1. **Enable ingestion** (One-time) — call `start_kb_integration` (or rely on `MICROSOFT_AUTO_START_INGESTION` if the operator enabled it)
+1. **Enable ingestion** (One-time) — call `start_kb_integration` (or rely on `UNIQUE_AUTO_START_INGESTION` if the operator enabled it)
 2. **Automatic capture** (Ongoing)
    - Attend Microsoft Teams meetings with transcription enabled
    - Meeting ends and transcript becomes available

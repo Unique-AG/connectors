@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MicrosoftConfig } from '~/config';
+import type { EnabledUniqueConfig } from '~/config';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { PostAuthorizationListener } from './post-authorization.listener';
 import type { SubscriptionCreateService } from './subscription-create.service';
@@ -12,7 +12,7 @@ const makeListener = (
   autoStartIngestion: boolean,
   subscriptionCreate: Pick<SubscriptionCreateService, 'enqueueSubscriptionRequested'>,
 ) => {
-  const config = { autoStartIngestion } as unknown as MicrosoftConfig;
+  const config = { autoStartIngestion } as unknown as EnabledUniqueConfig;
   return new PostAuthorizationListener(config, subscriptionCreate as SubscriptionCreateService);
 };
 
