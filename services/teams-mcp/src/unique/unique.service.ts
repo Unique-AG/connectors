@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import pLimit from 'p-limit';
-import type { UniqueConfigNamespaced } from '~/config';
+import type { EnabledUniqueConfig } from '~/config';
+import { KB_INTEGRATION_ENABLED_CONFIG } from '~/kb-integration/kb-integration-config.module';
 import { buildMeetingExternalId, buildOccurrenceExternalId } from './scope-external-id';
 import {
   RECORDING_MIME_TYPE,
@@ -20,7 +20,6 @@ import {
   UniqueIngestionMode,
 } from './unique.dtos';
 import { type SpooledContent, UniqueContentService } from './unique-content.service';
-import { assertRootScopeId, isUniqueIntegrationEnabled } from './unique-integration.guard';
 import { UniqueScopeService } from './unique-scope.service';
 import { UniqueUserService } from './unique-user.service';
 
@@ -29,7 +28,7 @@ export class UniqueService {
   private readonly logger = new Logger(UniqueService.name);
 
   public constructor(
-    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
+    @Inject(KB_INTEGRATION_ENABLED_CONFIG) private readonly config: EnabledUniqueConfig,
     private readonly trace: TraceService,
     private readonly userService: UniqueUserService,
     private readonly scopeService: UniqueScopeService,
@@ -78,18 +77,7 @@ export class UniqueService {
       'Beginning processing of meeting transcript for ingestion',
     );
 
-    const uniqueConfig = this.config.get('unique', { infer: true });
-    if (!isUniqueIntegrationEnabled(uniqueConfig)) {
-      span?.addEvent('unique_integration_disabled');
-      this.logger.warn(
-        { transcriptId: transcript.id },
-        'Unique integration is disabled; skipping transcript ingestion',
-      );
-      return;
-    }
-    const rootScopeId = assertRootScopeId(uniqueConfig);
-
-    const concurrency = uniqueConfig.userFetchConcurrency;
+    const { rootScopeId, userFetchConcurrency: concurrency } = this.config;
     const limit = pLimit(concurrency);
     const participantsPromises = meeting.participants.map((p) =>
       limit(() => this.userService.findUserByEmail(p.email)),

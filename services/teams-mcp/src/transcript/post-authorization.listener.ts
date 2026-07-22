@@ -4,13 +4,11 @@ import {
   RabbitSubscribe,
 } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { serializeError } from 'serialize-error-cjs';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { UserAuthorizedEventDto } from '~/auth/dtos/user-authorized-event.dto';
-import { type MicrosoftConfig, microsoftConfig, type UniqueConfigNamespaced } from '~/config';
-import { isUniqueIntegrationEnabled } from '~/unique/unique-integration.guard';
+import { type MicrosoftConfig, microsoftConfig } from '~/config';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { normalizeError } from '~/utils/normalize-error';
 import { SubscriptionCreateService } from './subscription-create.service';
@@ -21,7 +19,6 @@ export class PostAuthorizationListener {
 
   public constructor(
     @Inject(microsoftConfig.KEY) private readonly config: MicrosoftConfig,
-    private readonly uniqueConfig: ConfigService<UniqueConfigNamespaced, true>,
     private readonly subscriptionCreate: SubscriptionCreateService,
   ) {}
 
@@ -38,14 +35,6 @@ export class PostAuthorizationListener {
   public async onUserAuthorized(@RabbitPayload() payload: unknown): Promise<void> {
     const event = UserAuthorizedEventDto.parse(payload);
     const { userProfileId } = event.payload;
-
-    if (!isUniqueIntegrationEnabled(this.uniqueConfig.get('unique', { infer: true }))) {
-      this.logger.log(
-        { userProfileId },
-        'Unique integration is disabled, skipping subscription enqueue for authorized user',
-      );
-      return;
-    }
 
     if (!this.config.autoStartIngestion) {
       this.logger.debug(

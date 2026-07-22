@@ -1,16 +1,10 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
-import type { UniqueConfigNamespaced } from '~/config';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { collectAllPages, GRAPH_PAGE_SIZE } from '~/msgraph/graph-pagination';
-import {
-  isUniqueIntegrationEnabled,
-  UNIQUE_INTEGRATION_DISABLED_TOOL_MESSAGE,
-} from '~/unique/unique-integration.guard';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { MeetingCollection, Transcript } from '../transcript.dtos';
@@ -56,7 +50,6 @@ export class IngestMeetingTool {
     private readonly traceService: TraceService,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly transcriptCreated: TranscriptCreatedService,
-    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
   ) {}
 
   @Tool({
@@ -89,15 +82,6 @@ export class IngestMeetingTool {
     const userProfileId = request.user?.userProfileId;
     if (!userProfileId) {
       throw new UnauthorizedException('User not authenticated');
-    }
-
-    if (!isUniqueIntegrationEnabled(this.config.get('unique', { infer: true }))) {
-      return {
-        success: false,
-        message: UNIQUE_INTEGRATION_DISABLED_TOOL_MESSAGE,
-        meeting: null,
-        queued: [],
-      };
     }
 
     const span = this.traceService.getSpan();

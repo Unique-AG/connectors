@@ -1,14 +1,8 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Span, TraceService } from 'nestjs-otel';
 import * as z from 'zod';
-import type { UniqueConfigNamespaced } from '~/config';
-import {
-  isUniqueIntegrationEnabled,
-  UNIQUE_INTEGRATION_DISABLED_TOOL_MESSAGE,
-} from '~/unique/unique-integration.guard';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { AttributeUpstreamErrors } from '../../utils/attribute-upstream-errors.decorator';
 import { SubscriptionCreateService } from '../subscription-create.service';
@@ -35,7 +29,6 @@ export class StartKbIntegrationTool {
   public constructor(
     private readonly traceService: TraceService,
     private readonly subscriptionCreate: SubscriptionCreateService,
-    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
   ) {}
 
   @Tool({
@@ -68,14 +61,6 @@ export class StartKbIntegrationTool {
     const userProfileId = request.user?.userProfileId;
     if (!userProfileId) {
       throw new UnauthorizedException('User not authenticated');
-    }
-
-    if (!isUniqueIntegrationEnabled(this.config.get('unique', { infer: true }))) {
-      return {
-        success: false,
-        message: UNIQUE_INTEGRATION_DISABLED_TOOL_MESSAGE,
-        subscription: null,
-      };
     }
 
     const span = this.traceService.getSpan();

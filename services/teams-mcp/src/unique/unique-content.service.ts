@@ -7,10 +7,10 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { FetchFn } from '@qfetch/qfetch';
 import { Span, TraceService } from 'nestjs-otel';
-import type { UniqueConfigNamespaced } from '~/config';
+import type { EnabledUniqueConfig } from '~/config';
+import { KB_INTEGRATION_ENABLED_CONFIG } from '~/kb-integration/kb-integration-config.module';
 import { UNIQUE_FETCH } from './unique.consts';
 import {
   type ContentInfoItem,
@@ -31,7 +31,6 @@ import {
   SearchType,
 } from './unique.dtos';
 import type { UniqueIdentity } from './unique-identity.types';
-import { assertUniqueIntegrationEnabled } from './unique-integration.guard';
 
 /**
  * A download streamed to a local temp file, ready to upload with an authoritative `Content-Length`.
@@ -54,7 +53,7 @@ export class UniqueContentService {
   public constructor(
     @Inject(UNIQUE_FETCH) private readonly fetch: FetchFn,
     private readonly trace: TraceService,
-    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
+    @Inject(KB_INTEGRATION_ENABLED_CONFIG) private readonly config: EnabledUniqueConfig,
   ) {}
 
   @Span()
@@ -181,14 +180,12 @@ export class UniqueContentService {
   // it to route through node-ingestion's scoped upload endpoint, reachable in-cluster.
   // In external mode the public writeUrl is used as-is.
   private correctWriteUrl(writeUrl: string): string {
-    const config = this.config.get('unique', { infer: true });
-    assertUniqueIntegrationEnabled(config);
-    if (config.serviceAuthMode === 'external') {
+    if (this.config.serviceAuthMode === 'external') {
       return writeUrl;
     }
     const key = new URL(writeUrl).searchParams.get('key');
     assert.ok(key, 'writeUrl is missing key parameter');
-    const target = new URL('/scoped/upload', config.ingestionServiceBaseUrl);
+    const target = new URL('/scoped/upload', this.config.ingestionServiceBaseUrl);
     target.searchParams.set('key', key);
     return target.toString();
   }

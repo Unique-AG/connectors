@@ -1,6 +1,5 @@
-import type { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { UniqueConfigNamespaced } from '~/config';
+import type { EnabledUniqueConfig } from '~/config';
 import { RootScopeBootstrapService } from './root-scope-bootstrap.service';
 import { ScopeAccessEntityType, ScopeAccessType } from './unique.dtos';
 import type { UniqueScopeService } from './unique-scope.service';
@@ -8,16 +7,13 @@ import type { UniqueScopeService } from './unique-scope.service';
 const rootScopeId = 'scope_root_01';
 const serviceUserId = 'user_service_01';
 
-const makeConfig = (unique: Record<string, unknown>) =>
-  ({ get: vi.fn().mockReturnValue(unique) }) as unknown as ConfigService<
-    UniqueConfigNamespaced,
-    true
-  >;
+const makeConfig = (serviceExtraHeaders: Record<string, string>) =>
+  ({ rootScopeId, serviceExtraHeaders }) as EnabledUniqueConfig;
 
 const makeService = (
-  unique: Record<string, unknown>,
+  config: EnabledUniqueConfig,
   scopeService: Pick<UniqueScopeService, 'addScopeAccesses'>,
-) => new RootScopeBootstrapService(makeConfig(unique), scopeService as UniqueScopeService);
+) => new RootScopeBootstrapService(config, scopeService as UniqueScopeService);
 
 describe('RootScopeBootstrapService', () => {
   let mockScopeService: { addScopeAccesses: ReturnType<typeof vi.fn> };
@@ -28,14 +24,7 @@ describe('RootScopeBootstrapService', () => {
   });
 
   it('grants MANAGE/READ/WRITE to the service user on the root scope', async () => {
-    const service = makeService(
-      {
-        integration: 'enabled',
-        rootScopeId,
-        serviceExtraHeaders: { 'x-user-id': serviceUserId },
-      },
-      mockScopeService,
-    );
+    const service = makeService(makeConfig({ 'x-user-id': serviceUserId }), mockScopeService);
 
     await service.onApplicationBootstrap();
 
@@ -59,33 +48,15 @@ describe('RootScopeBootstrapService', () => {
     ]);
   });
 
-  it('skips bootstrap when Unique integration is disabled', async () => {
-    const service = makeService({ integration: 'disabled' }, mockScopeService);
-
-    await service.onApplicationBootstrap();
-
-    expect(mockScopeService.addScopeAccesses).not.toHaveBeenCalled();
-  });
-
   it('rethrows when the grant fails so startup hard-fails', async () => {
     mockScopeService.addScopeAccesses.mockRejectedValue(new Error('add-access failed'));
-    const service = makeService(
-      {
-        integration: 'enabled',
-        rootScopeId,
-        serviceExtraHeaders: { 'x-user-id': serviceUserId },
-      },
-      mockScopeService,
-    );
+    const service = makeService(makeConfig({ 'x-user-id': serviceUserId }), mockScopeService);
 
     await expect(service.onApplicationBootstrap()).rejects.toThrow('add-access failed');
   });
 
   it('throws the assertion when x-user-id is missing', async () => {
-    const service = makeService(
-      { integration: 'enabled', rootScopeId, serviceExtraHeaders: {} },
-      mockScopeService,
-    );
+    const service = makeService(makeConfig({}), mockScopeService);
 
     await expect(service.onApplicationBootstrap()).rejects.toThrow(/x-user-id/);
     expect(mockScopeService.addScopeAccesses).not.toHaveBeenCalled();

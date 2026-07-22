@@ -1,14 +1,11 @@
 import assert from 'node:assert';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { and, eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
-import type { UniqueConfigNamespaced } from '~/config';
 import { DRIZZLE, type DrizzleDatabase, subscriptions } from '~/drizzle';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { isUniqueIntegrationEnabled } from '~/unique/unique-integration.guard';
 import {
   ReauthorizationRequiredEventDto,
   Subscription,
@@ -26,7 +23,6 @@ export class SubscriptionReauthorizeService {
     @Inject(DRIZZLE) private readonly db: DrizzleDatabase,
     private readonly graphClientFactory: GraphClientFactory,
     private readonly utils: TranscriptUtilsService,
-    private readonly uniqueConfig: ConfigService<UniqueConfigNamespaced, true>,
   ) {}
 
   @Span()
@@ -71,15 +67,6 @@ export class SubscriptionReauthorizeService {
     const span = this.trace.getSpan();
     span?.setAttribute('subscription_id', subscriptionId);
     span?.setAttribute('operation', 'reauthorize_subscription');
-
-    if (!isUniqueIntegrationEnabled(this.uniqueConfig.get('unique', { infer: true }))) {
-      span?.addEvent('unique_integration_disabled');
-      this.logger.log(
-        { subscriptionId },
-        'Unique integration is disabled; skipping subscription reauthorization so leftover webhooks can expire',
-      );
-      return;
-    }
 
     this.logger.log(
       { subscriptionId },

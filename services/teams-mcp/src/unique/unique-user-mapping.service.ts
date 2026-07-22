@@ -1,14 +1,13 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Cache } from 'cache-manager';
 import { eq } from 'drizzle-orm';
 import { Span, TraceService } from 'nestjs-otel';
-import type { UniqueConfigNamespaced } from '~/config';
+import type { EnabledUniqueConfig } from '~/config';
 import { DRIZZLE, type DrizzleDatabase } from '~/drizzle';
 import { userProfiles } from '~/drizzle/schema/user-profiles.table';
+import { KB_INTEGRATION_ENABLED_CONFIG } from '~/kb-integration/kb-integration-config.module';
 import type { UniqueIdentity } from './unique-identity.types';
-import { assertUniqueIntegrationEnabled } from './unique-integration.guard';
 import { UniqueUserService } from './unique-user.service';
 
 const CACHE_PREFIX = 'unique_identity:';
@@ -20,7 +19,7 @@ export class UniqueUserMappingService {
   public constructor(
     @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
     @Inject(CACHE_MANAGER) private readonly cache: Cache,
-    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
+    @Inject(KB_INTEGRATION_ENABLED_CONFIG) private readonly config: EnabledUniqueConfig,
     private readonly userService: UniqueUserService,
     private readonly trace: TraceService,
   ) {}
@@ -64,9 +63,7 @@ export class UniqueUserMappingService {
     }
 
     // TODO(UN-17569): replace with proper per-user company ID resolution
-    const uniqueConfig = this.config.get('unique', { infer: true });
-    assertUniqueIntegrationEnabled(uniqueConfig);
-    const companyId = uniqueConfig.serviceExtraHeaders['x-company-id'] ?? '';
+    const companyId = this.config.serviceExtraHeaders['x-company-id'] ?? '';
 
     const identity: UniqueIdentity = { userId: uniqueUser.id, companyId };
     await this.cache.set(cacheKey, identity);

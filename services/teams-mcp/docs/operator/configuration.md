@@ -40,7 +40,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 
 Set via `mcpConfig.unique` in Helm values.
 
-When `UNIQUE_INTEGRATION=disabled`, other Unique variables are not required (chat-only mode). Knowledge-base tools remain registered but return an error if called.
+When `UNIQUE_INTEGRATION=disabled`, other Unique variables are not required (chat-only mode). Knowledge-base tools and the transcript ingestion pipeline are not registered.
 
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|

@@ -1,6 +1,5 @@
-import type { ConfigService } from '@nestjs/config';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MicrosoftConfig, UniqueConfigNamespaced } from '~/config';
+import type { MicrosoftConfig } from '~/config';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { PostAuthorizationListener } from './post-authorization.listener';
 import type { SubscriptionCreateService } from './subscription-create.service';
@@ -9,22 +8,12 @@ const userProfileId = 'user_profile_01jxk5r1s2fq9att23mp4z5ef2';
 
 const expectedTypeId = () => convertUserProfileIdToTypeId(userProfileId);
 
-const makeUniqueConfig = (integration: 'enabled' | 'disabled') =>
-  ({
-    get: vi.fn().mockReturnValue({ integration }),
-  }) as unknown as ConfigService<UniqueConfigNamespaced, true>;
-
 const makeListener = (
   autoStartIngestion: boolean,
   subscriptionCreate: Pick<SubscriptionCreateService, 'enqueueSubscriptionRequested'>,
-  uniqueIntegration: 'enabled' | 'disabled' = 'enabled',
 ) => {
   const config = { autoStartIngestion } as unknown as MicrosoftConfig;
-  return new PostAuthorizationListener(
-    config,
-    makeUniqueConfig(uniqueIntegration),
-    subscriptionCreate as SubscriptionCreateService,
-  );
+  return new PostAuthorizationListener(config, subscriptionCreate as SubscriptionCreateService);
 };
 
 const userAuthorizedEvent = (id: string) => ({
@@ -55,14 +44,6 @@ describe('PostAuthorizationListener', () => {
 
   it('does nothing when the flag is off', async () => {
     const listener = makeListener(false, mockSubscriptionCreate);
-
-    await listener.onUserAuthorized(userAuthorizedEvent(userProfileId));
-
-    expect(mockSubscriptionCreate.enqueueSubscriptionRequested).not.toHaveBeenCalled();
-  });
-
-  it('does nothing when Unique integration is disabled', async () => {
-    const listener = makeListener(true, mockSubscriptionCreate, 'disabled');
 
     await listener.onUserAuthorized(userAuthorizedEvent(userProfileId));
 
