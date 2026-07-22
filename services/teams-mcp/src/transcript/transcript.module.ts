@@ -30,7 +30,7 @@ import { TranscriptUtilsService } from './transcript-utils.service';
     SubscriptionReauthorizeService,
     SubscriptionRemoveService,
     TranscriptCreatedService,
-    // Auto-start ingestion at login (gated by MICROSOFT_AUTO_START_INGESTION)
+    // Auto-start ingestion at login (gated by UNIQUE_AUTO_START_INGESTION)
     PostAuthorizationListener,
     // KB Integration MCP Tools
     VerifyKbIntegrationStatusTool,

@@ -42,7 +42,6 @@ Copy `.env.example` to `.env` and configure the following:
 | `MICROSOFT_CLIENT_SECRET` | Azure AD application client secret |
 | `MICROSOFT_WEBHOOK_SECRET` | 128-char hex secret used as `clientState` for webhook validation |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | Publicly reachable URL for Microsoft webhooks |
-| `MICROSOFT_AUTO_START_INGESTION` | Auto-enqueue a transcript subscription for every user at login (default `false`) |
 | `AUTH_HMAC_SECRET` | 64-char hex secret for JWT signing |
 | `ENCRYPTION_KEY` | 64-char hex secret for AES-GCM token encryption |
 
@@ -82,6 +81,7 @@ UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-i
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `60` | Access token TTL |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `2592000` | Refresh token TTL (30 days) |
 | `UNIQUE_USER_FETCH_CONCURRENCY` | `5` | Concurrent user resolution limit |
+| `UNIQUE_AUTO_START_INGESTION` | `false` | Auto-enqueue a transcript subscription for every user at login (skips the `start_kb_integration` tool) |
 
 For complete configuration reference, see [Configuration Guide](./docs/operator/configuration.md).
 

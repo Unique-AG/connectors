@@ -287,9 +287,6 @@ mcpConfig:
     # Optional - defaults to SELF_URL if not provided.
     # example: https://teams.mcp.unique.app
     # publicWebhookUrl: ""
-    # -- When enabled, automatically enqueue a transcript subscription for every user at login
-    # (skips the start_kb_integration tool).
-    autoStartIngestion: false
     # clientSecret is loaded from a secret, see envVars
     # webhookSecret is loaded from a secret, see envVars
 
@@ -329,6 +326,10 @@ mcpConfig:
     # -- Base URL for Unique ingestion service; auto-derived from internalServices.dependencies.ingestion
     # override with an explicit URL when serviceAuthMode is external, e.g. https://api.unique.app/ingestion
     ingestionServiceBaseUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.ingestion) }}'
+
+    # -- When enabled, automatically enqueue a transcript subscription for every user at login
+    # (skips the start_kb_integration tool).
+    autoStartIngestion: false
 
   # -- Authentication configuration for the MCP server
   auth:

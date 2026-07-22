@@ -21,6 +21,7 @@ const enabledConfig = {
   apiVersion: '2023-12-06',
   rootScopeId: 'scope_root_01',
   userFetchConcurrency: 5,
+  autoStartIngestion: false,
   serviceExtraHeaders: {
     authorization: 'Bearer app-key',
     'x-app-id': 'app_01',

@@ -34,7 +34,6 @@ Set via `mcpConfig.microsoft` in Helm values:
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | `SELF_URL` | Webhook URL if different from SELF_URL |
-| `MICROSOFT_AUTO_START_INGESTION` | `mcpConfig.microsoft.autoStartIngestion` | `false` | When enabled, auto-enqueue a transcript subscription for every user at login (skips the `start_kb_integration` tool) |
 
 ### Unique API Configuration
 
@@ -52,6 +51,7 @@ When `UNIQUE_INTEGRATION=disabled`, other Unique variables are not required (cha
 | `UNIQUE_USER_FETCH_CONCURRENCY` | `mcpConfig.unique.userFetchConcurrency` | `5` | Parallel user lookups |
 | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required when enabled + cluster_local) | Ingestion service endpoint |
 | `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required when enabled) | Zitadel service account headers (`x-company-id`, `x-user-id`, …) |
+| `UNIQUE_AUTO_START_INGESTION` | `mcpConfig.unique.autoStartIngestion` | `false` | When enabled, auto-enqueue a transcript subscription for every user at login (skips the `start_kb_integration` tool) |
 
 ### Authentication Configuration
 

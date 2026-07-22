@@ -25,6 +25,12 @@ const baseConfig = z.object({
     .positive()
     .default(5)
     .describe('The concurrency limit for fetching users when resolving scope accesses.'),
+  autoStartIngestion: z
+    .stringbool()
+    .default(false)
+    .describe(
+      'When enabled, automatically enqueue a transcript subscription for every user at login (skips the start_kb_integration tool).',
+    ),
 });
 
 // ==== Config for local in-cluster communication with Unique API services ====

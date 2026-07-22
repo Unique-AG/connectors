@@ -27,10 +27,6 @@ All mcpConfig environment variables, shared by deployment and hook job container
 - name: MICROSOFT_PUBLIC_WEBHOOK_URL
   value: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
 {{- end }}
-{{- if .Values.mcpConfig.microsoft.autoStartIngestion }}
-- name: MICROSOFT_AUTO_START_INGESTION
-  value: {{ .Values.mcpConfig.microsoft.autoStartIngestion | quote }}
-{{- end }}
 - name: UNIQUE_INTEGRATION
   value: {{ .Values.mcpConfig.unique.integration | quote }}
 {{- if eq .Values.mcpConfig.unique.integration "enabled" }}
@@ -49,6 +45,10 @@ All mcpConfig environment variables, shared by deployment and hook job container
 {{- if eq .Values.mcpConfig.unique.serviceAuthMode "cluster_local" }}
 - name: UNIQUE_INGESTION_SERVICE_BASE_URL
   value: {{ include "chart.ensureTrailingSlash" (dict "url" (tpl .Values.mcpConfig.unique.ingestionServiceBaseUrl .)) | quote }}
+{{- end }}
+{{- if .Values.mcpConfig.unique.autoStartIngestion }}
+- name: UNIQUE_AUTO_START_INGESTION
+  value: {{ .Values.mcpConfig.unique.autoStartIngestion | quote }}
 {{- end }}
 {{- end }}
 - name: AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS
