@@ -99,7 +99,16 @@ export class DiscoverDelegatedAccessCommand {
         },
       );
 
-      await this.logDiscoverySummary(finalState);
+      // Best-effort summary: a logging/query failure here must not flip the
+      // already-committed discovery outcome into a failed run.
+      try {
+        await this.logDiscoverySummary(finalState);
+      } catch (error) {
+        this.logger.warn({
+          msg: `Failed to log delegated access discovery summary`,
+          err: error,
+        });
+      }
     });
   }
 
@@ -117,17 +126,17 @@ export class DiscoverDelegatedAccessCommand {
       .innerJoin(ownerProfiles, eq(delegatedAccessAccounts.ownerUserId, ownerProfiles.id))
       .groupBy(delegateProfiles.email);
 
-    const delegatedAccessByDelegate = Object.fromEntries(
-      rows.map((row) => [
-        smearEmail(createSmeared(row.delegateEmail ?? '')),
-        row.ownerEmails.map((email) => smearEmail(createSmeared(email ?? ''))),
-      ]),
-    );
+    // An array (not an object keyed by email) avoids distinct addresses collapsing
+    // to the same smeared key and overwriting each other under conceal mode.
+    const delegatedAccess = rows.map((row) => ({
+      delegate: smearEmail(createSmeared(row.delegateEmail ?? '')),
+      owners: row.ownerEmails.map((email) => smearEmail(createSmeared(email ?? ''))),
+    }));
 
     this.logger.log({
       msg: `Delegated access discovery completed, final state: ${finalState}`,
       delegatesWithAccess: rows.length,
-      delegatedAccessByDelegate,
+      delegatedAccess,
     });
   }
 
