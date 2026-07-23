@@ -4,6 +4,12 @@ import { sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpProcessesHealthIndicator } from './mcp-processes-health.indicator';
 
+// The full-sync / live-catchup checks delegate eligibility to this shared helper,
+// which builds a UNION subquery; stub it so the hand-rolled db mock stays simple.
+vi.mock('~/features/sync/sync-scheduler.utils', () => ({
+  selectUserProfileIdsWhichCanRunTheSyncProcess: () => [],
+}));
+
 const MOCK_SUBQUERY = sql`SELECT user_profile_id FROM inbox_configurations`;
 
 const INGESTION_UNIQUEAPI = {
@@ -31,9 +37,6 @@ function createMockDb(selectRow: object) {
   return {
     selectDistinct: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue(MOCK_SUBQUERY),
-        }),
         where: vi.fn().mockReturnValue(MOCK_SUBQUERY),
       }),
     }),
@@ -177,14 +180,14 @@ describe('McpProcessesHealthIndicator', () => {
       expect(result).toMatchObject({ delegatedAccess: { status: 'down' } });
     });
 
-    it('reports how many delegated users still hold a valid refresh token', async () => {
-      const db = createMockDb({ totalDelegated: 100, stale: 14, withValidRefreshToken: 80 });
+    it('reports how many delegated users still hold a valid access token', async () => {
+      const db = createMockDb({ totalDelegated: 100, stale: 14, withValidAccessToken: 80 });
       const indicator = createIndicator(db, INGESTION_GRAPH, DELEGATED_ENABLED);
 
       const result = await indicator.checkDelegatedAccess('delegatedAccess');
 
       expect(result).toMatchObject({
-        delegatedAccess: { eligibleUsers: 100, usersWithValidRefreshToken: 80 },
+        delegatedAccess: { eligibleUsers: 100, usersWithValidAccessToken: 80 },
       });
     });
 

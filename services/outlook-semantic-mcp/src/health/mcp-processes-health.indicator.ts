@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { and, count, countDistinct, eq, gt, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, count, countDistinct, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import {
   DelegatedAccessConfig,
   delegatedAccessConfig,
@@ -13,12 +14,11 @@ import {
   DrizzleDatabase,
   delegatedAccessAccounts,
   inboxConfigurations,
-  subscriptions,
-  tokens,
   userProfiles,
 } from '~/db';
 import { DISCOVER_DELEGATED_ACCESS_CACHE_KEY } from '~/features/delegated-access/discovery/discover-delegated-access.command';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
+import { selectUserProfileIdsWhichCanRunTheSyncProcess } from '~/features/sync/sync-scheduler.utils';
 import { FAILED_HEARTBEAT_MINUTES } from '~/features/sync/full-sync/full-sync.command';
 import { FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES } from '~/features/sync/live-catch-up/live-catch-up.command';
 import { getThreshold } from '~/utils/get-threshold';
@@ -50,7 +50,12 @@ export class McpProcessesHealthIndicator {
           THEN 1 ELSE 0 END), 0)`,
       })
       .from(inboxConfigurations)
-      .where(inArray(inboxConfigurations.userProfileId, this.eligibleSubquery()));
+      .where(
+        inArray(
+          inboxConfigurations.userProfileId,
+          selectUserProfileIdsWhichCanRunTheSyncProcess(this.db),
+        ),
+      );
 
     const eligible = row?.totalEligible ?? 0;
     const failing = Number(row?.failing ?? 0);
@@ -82,7 +87,12 @@ export class McpProcessesHealthIndicator {
           THEN 1 ELSE 0 END), 0)`,
       })
       .from(inboxConfigurations)
-      .where(inArray(inboxConfigurations.userProfileId, this.eligibleSubquery()));
+      .where(
+        inArray(
+          inboxConfigurations.userProfileId,
+          selectUserProfileIdsWhichCanRunTheSyncProcess(this.db),
+        ),
+      );
 
     const eligible = row?.totalEligible ?? 0;
     const failing = Number(row?.failing ?? 0);
@@ -105,6 +115,9 @@ export class McpProcessesHealthIndicator {
     const { failureThreshold, stalenessThresholdHours } = this.delegatedAccessCfg;
     const stalenessThreshold = sql`NOW() - (${stalenessThresholdHours} * INTERVAL '1 hour')`;
 
+    // Count Microsoft access tokens on the delegate's own user profile, not the MCP
+    // OAuth-provider tokens in the `tokens` table (which are unrelated to Graph auth).
+    const delegateProfiles = alias(userProfiles, 'delegate_profiles');
     const [row] = await this.db
       .select({
         totalDelegated: countDistinct(delegatedAccessAccounts.delegateUserId),
@@ -113,22 +126,21 @@ export class McpProcessesHealthIndicator {
             OR ${delegatedAccessAccounts.lastVerifiedAt} < ${stalenessThreshold}
           THEN ${delegatedAccessAccounts.delegateUserId}
         END)`,
-        withValidRefreshToken: sql<number>`COUNT(DISTINCT ${tokens.userProfileId})`,
+        withValidAccessToken: sql<number>`COUNT(DISTINCT ${delegateProfiles.id})`,
       })
       .from(delegatedAccessAccounts)
       .leftJoin(
-        tokens,
+        delegateProfiles,
         and(
-          eq(tokens.userProfileId, delegatedAccessAccounts.delegateUserId),
-          eq(tokens.type, 'REFRESH'),
-          gt(tokens.expiresAt, sql`NOW()`),
+          eq(delegateProfiles.id, delegatedAccessAccounts.delegateUserId),
+          isNotNull(delegateProfiles.accessToken),
         ),
       )
       .where(inArray(delegatedAccessAccounts.delegateUserId, this.usersWithValidTokenSubquery()));
 
     const total = row?.totalDelegated ?? 0;
     const stale = Number(row?.stale ?? 0);
-    const withValidRefreshToken = Number(row?.withValidRefreshToken ?? 0);
+    const withValidAccessToken = Number(row?.withValidAccessToken ?? 0);
     const ratio = total > 0 ? stale / total : 0;
 
     const scan = await this.persistentCacheService.get(
@@ -141,7 +153,7 @@ export class McpProcessesHealthIndicator {
       threshold: failureThreshold,
       eligibleUsers: total,
       failingUsers: stale,
-      usersWithValidRefreshToken: withValidRefreshToken,
+      usersWithValidAccessToken: withValidAccessToken,
       ratio,
       scanStatus: scan?.payload.state ?? 'unknown',
       scanLastRunAt: lastProgressRegisteredAt
@@ -158,26 +170,5 @@ export class McpProcessesHealthIndicator {
       .selectDistinct({ userProfileId: userProfiles.id })
       .from(userProfiles)
       .where(and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)));
-  }
-
-  private eligibleSubquery() {
-    return this.db
-      .selectDistinct({ userProfileId: inboxConfigurations.userProfileId })
-      .from(inboxConfigurations)
-      .innerJoin(
-        tokens,
-        and(
-          eq(tokens.userProfileId, inboxConfigurations.userProfileId),
-          eq(tokens.type, 'REFRESH'),
-          gt(tokens.expiresAt, sql`NOW()`),
-        ),
-      )
-      .innerJoin(
-        subscriptions,
-        and(
-          eq(subscriptions.userProfileId, inboxConfigurations.userProfileId),
-          gt(subscriptions.expiresAt, sql`NOW()`),
-        ),
-      );
   }
 }
