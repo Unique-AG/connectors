@@ -1,8 +1,9 @@
 import assert from 'node:assert';
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, gt, isNotNull, notInArray, or } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, notInArray, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, last } from 'remeda';
 import { AppConfig, appConfig, DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
@@ -97,6 +98,36 @@ export class DiscoverDelegatedAccessCommand {
           });
         },
       );
+
+      await this.logDiscoverySummary(finalState);
+    });
+  }
+
+  private async logDiscoverySummary(finalState: string): Promise<void> {
+    const delegateProfiles = alias(userProfiles, 'delegate_profiles');
+    const ownerProfiles = alias(userProfiles, 'owner_profiles');
+
+    const rows = await this.db
+      .select({
+        delegateEmail: delegateProfiles.email,
+        ownerEmails: sql<(string | null)[]>`ARRAY_AGG(${ownerProfiles.email})`,
+      })
+      .from(delegatedAccessAccounts)
+      .innerJoin(delegateProfiles, eq(delegatedAccessAccounts.delegateUserId, delegateProfiles.id))
+      .innerJoin(ownerProfiles, eq(delegatedAccessAccounts.ownerUserId, ownerProfiles.id))
+      .groupBy(delegateProfiles.email);
+
+    const delegatedAccessByDelegate = Object.fromEntries(
+      rows.map((row) => [
+        smearEmail(createSmeared(row.delegateEmail ?? '')),
+        row.ownerEmails.map((email) => smearEmail(createSmeared(email ?? ''))),
+      ]),
+    );
+
+    this.logger.log({
+      msg: `Delegated access discovery completed, final state: ${finalState}`,
+      delegatesWithAccess: rows.length,
+      delegatedAccessByDelegate,
     });
   }
 
@@ -213,7 +244,7 @@ export class DiscoverDelegatedAccessCommand {
                   msg: `Delegated access discovery failed for accounts pair. Process will continue`,
                   delegateUserId,
                   ownerUserId,
-                  ownerEmail: createSmeared(ownerEmail).toString(),
+                  ownerEmail: smearEmail(createSmeared(ownerEmail)),
                   ownerSource,
                   err,
                 });

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { and, count, countDistinct, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, count, countDistinct, eq, gt, inArray, isNotNull, sql } from 'drizzle-orm';
 import {
   DelegatedAccessConfig,
   delegatedAccessConfig,
@@ -15,7 +15,10 @@ import {
   inboxConfigurations,
   subscriptions,
   tokens,
+  userProfiles,
 } from '~/db';
+import { DISCOVER_DELEGATED_ACCESS_CACHE_KEY } from '~/features/delegated-access/discovery/discover-delegated-access.command';
+import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { FAILED_HEARTBEAT_MINUTES } from '~/features/sync/full-sync/full-sync.command';
 import { FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES } from '~/features/sync/live-catch-up/live-catch-up.command';
 import { getThreshold } from '~/utils/get-threshold';
@@ -27,6 +30,7 @@ export class McpProcessesHealthIndicator {
     @Inject(ingestionConfig.KEY) private readonly ingestionCfg: IngestionConfig,
     @Inject(delegatedAccessConfig.KEY) private readonly delegatedAccessCfg: DelegatedAccessConfig,
     private readonly healthIndicatorService: HealthIndicatorService,
+    private readonly persistentCacheService: PersistentCacheService,
   ) {}
 
   public async checkFullSync(key: string): Promise<HealthIndicatorResult> {
@@ -109,21 +113,51 @@ export class McpProcessesHealthIndicator {
             OR ${delegatedAccessAccounts.lastVerifiedAt} < ${stalenessThreshold}
           THEN ${delegatedAccessAccounts.delegateUserId}
         END)`,
+        withValidRefreshToken: sql<number>`COUNT(DISTINCT ${tokens.userProfileId})`,
       })
       .from(delegatedAccessAccounts)
-      .where(inArray(delegatedAccessAccounts.delegateUserId, this.eligibleSubquery()));
+      .leftJoin(
+        tokens,
+        and(
+          eq(tokens.userProfileId, delegatedAccessAccounts.delegateUserId),
+          eq(tokens.type, 'REFRESH'),
+          gt(tokens.expiresAt, sql`NOW()`),
+        ),
+      )
+      .where(inArray(delegatedAccessAccounts.delegateUserId, this.usersWithValidTokenSubquery()));
 
     const total = row?.totalDelegated ?? 0;
     const stale = Number(row?.stale ?? 0);
+    const withValidRefreshToken = Number(row?.withValidRefreshToken ?? 0);
     const ratio = total > 0 ? stale / total : 0;
+
+    const scan = await this.persistentCacheService.get(
+      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
+      'DelegatedAccessDiscovery',
+    );
+    const lastProgressRegisteredAt = scan?.payload.lastProgressRegisteredAt;
 
     const details = {
       threshold: failureThreshold,
       eligibleUsers: total,
       failingUsers: stale,
+      usersWithValidRefreshToken: withValidRefreshToken,
       ratio,
+      scanStatus: scan?.payload.state ?? 'unknown',
+      scanLastRunAt: lastProgressRegisteredAt
+        ? new Date(lastProgressRegisteredAt).toISOString()
+        : null,
     };
     return ratio > failureThreshold ? indicator.down(details) : indicator.up(details);
+  }
+
+  private usersWithValidTokenSubquery() {
+    // Mirrors the delegate candidate set in DiscoverDelegatedAccessCommand.fetchBatch:
+    // delegates are always OAuth profiles that hold an access token.
+    return this.db
+      .selectDistinct({ userProfileId: userProfiles.id })
+      .from(userProfiles)
+      .where(and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)));
   }
 
   private eligibleSubquery() {

@@ -3,6 +3,8 @@ export const LogsDiagnosticDataPolicy = {
   DISCLOSE: 'disclose',
 } as const;
 
+const DEFAULT_LEAVE_OVER = 4;
+
 /**
  * Wraps diagnostic data that we want visible in dev but smeared in production.
  *
@@ -18,10 +20,11 @@ export class Smeared {
   public constructor(
     public readonly value: string,
     public readonly active: boolean,
+    public readonly leaveOver = DEFAULT_LEAVE_OVER,
   ) {}
 
   public toString(): string {
-    return this.active ? smear(this.value) : this.value;
+    return this.active ? smear(this.value, this.leaveOver) : this.value;
   }
 
   public toJSON(): string {
@@ -29,7 +32,7 @@ export class Smeared {
   }
 
   public transform(transformer: (value: string) => string): Smeared {
-    return new Smeared(transformer(this.value), this.active);
+    return new Smeared(transformer(this.value), this.active, this.leaveOver);
   }
 }
 
@@ -54,6 +57,22 @@ export function smearPath(path: Smeared) {
     .join('/');
 }
 
+export function smearEmail(email: Smeared) {
+  const emailParts = email.value.split('@');
+
+  return emailParts
+    .map((part, index) => {
+      if (index + 1 === emailParts.length) {
+        return part
+          .split('.')
+          .map((subPart) => new Smeared(subPart, email.active))
+          .join('.');
+      }
+      return new Smeared(part, email.active).toString();
+    })
+    .join('@');
+}
+
 /**
  * @description
  * Smear function should be used to obfuscate logs like emails / names basically details
@@ -70,7 +89,7 @@ export function smearPath(path: Smeared) {
  * smear('ab');               // "[Smeared]"
  * smear(null);               // "__erroneous__"
  */
-export function smear(text: string | null | undefined, leaveOver = 4) {
+export function smear(text: string | null | undefined, leaveOver = DEFAULT_LEAVE_OVER) {
   if (text === undefined || text === null) {
     return '__erroneous__';
   }

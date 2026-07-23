@@ -1,5 +1,5 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, inArray, not, sql } from 'drizzle-orm';
@@ -62,7 +62,7 @@ export class SyncDirectoriesForUserProfileCommand {
     });
 
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const userEmail = createSmeared(userProfile.email);
+    const userEmail = smearEmail(createSmeared(userProfile.email));
     traceAttrs({ userProfileId: userProfile.id });
     this.logger.log({
       userProfileId: userProfile.id,
@@ -88,7 +88,7 @@ export class SyncDirectoriesForUserProfileCommand {
     client: Client,
     userProfile: NonNullishProps<UserProfile, 'email'>,
   ): Promise<void> {
-    const userEmail = createSmeared(userProfile.email);
+    const userEmail = smearEmail(createSmeared(userProfile.email));
 
     await this.createRootScopeCommand.run({
       userProviderUserId: userProfile.providerUserId,

@@ -4,6 +4,7 @@ import {
   isSmearingActive,
   LogsDiagnosticDataPolicy,
   Smeared,
+  smearEmail,
   smearPath,
 } from '../smeared';
 
@@ -251,6 +252,47 @@ describe('Smeared', () => {
       const result = smearPath(path);
 
       expect(result).toBe('/[Smeared]/[Smeared]/[Smeared]');
+    });
+  });
+
+  describe('smearEmail()', () => {
+    beforeEach(() => {
+      delete process.env.LOGS_DIAGNOSTICS_DATA_POLICY;
+    });
+
+    it('smears the local part and the domain individually', () => {
+      const email = new Smeared('john.smith@example.com', true);
+      const result = smearEmail(email);
+
+      expect(result.split('@')).toHaveLength(2);
+      expect(result).toContain('*');
+      expect(result).not.toContain('john.smith');
+      expect(result).not.toContain('example.com');
+    });
+
+    it('unsmeared email preserves the value with the @ separator', () => {
+      const email = new Smeared('john.smith@example.com', false);
+      const result = smearEmail(email);
+
+      expect(result).toBe('john.smith@example.com');
+    });
+
+    it('propagates the passed object active flag regardless of env', () => {
+      process.env.LOGS_DIAGNOSTICS_DATA_POLICY = LogsDiagnosticDataPolicy.DISCLOSE;
+
+      const email = new Smeared('john.smith@example.com', true);
+      const result = smearEmail(email);
+
+      expect(result).not.toContain('john.smith');
+      expect(result).not.toContain('example.com');
+    });
+
+    it('fully masks a part with 3 or fewer characters', () => {
+      const email = new Smeared('abc@example.com', true);
+      const result = smearEmail(email);
+
+      // The 3-char local part is too short to leave any characters visible.
+      expect(result).toBe('[Smeared]@***mple.[Smeared]');
     });
   });
 
