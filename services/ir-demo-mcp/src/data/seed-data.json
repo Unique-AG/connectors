@@ -153,7 +153,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:4",
+      "id": "COV-0001",
       "relationshipId": "LP-001",
       "data": {
         "investorId": "LP-001",
@@ -165,7 +165,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:5",
+      "id": "COV-0002",
       "relationshipId": "LP-001",
       "data": {
         "investorId": "LP-001",
@@ -177,7 +177,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:6",
+      "id": "COV-0003",
       "relationshipId": "LP-002",
       "data": {
         "investorId": "LP-002",
@@ -189,7 +189,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:7",
+      "id": "COV-0004",
       "relationshipId": "LP-003",
       "data": {
         "investorId": "LP-003",
@@ -201,7 +201,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:8",
+      "id": "COV-0005",
       "relationshipId": "LP-004",
       "data": {
         "investorId": "LP-004",
@@ -213,7 +213,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:9",
+      "id": "COV-0006",
       "relationshipId": "LP-005",
       "data": {
         "investorId": "LP-005",
@@ -225,7 +225,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:10",
+      "id": "COV-0007",
       "relationshipId": "LP-006",
       "data": {
         "investorId": "LP-006",
@@ -237,7 +237,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:11",
+      "id": "COV-0008",
       "relationshipId": "LP-007",
       "data": {
         "investorId": "LP-007",
@@ -249,7 +249,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:12",
+      "id": "COV-0009",
       "relationshipId": "LP-008",
       "data": {
         "investorId": "LP-008",
@@ -261,7 +261,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:13",
+      "id": "COV-0010",
       "relationshipId": "LP-009",
       "data": {
         "investorId": "LP-009",
@@ -273,7 +273,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Coverage:14",
+      "id": "COV-0011",
       "relationshipId": "LP-010",
       "data": {
         "investorId": "LP-010",
@@ -525,7 +525,7 @@
     },
     {
       "resource": "subscriptions",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Subscriptions:4",
+      "id": "SUB-0001",
       "relationshipId": "LP-001",
       "data": {
         "investorId": "LP-001",
@@ -542,7 +542,7 @@
     },
     {
       "resource": "subscriptions",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Subscriptions:5",
+      "id": "SUB-0002",
       "relationshipId": "LP-002",
       "data": {
         "investorId": "LP-002",
@@ -559,7 +559,7 @@
     },
     {
       "resource": "subscriptions",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Subscriptions:6",
+      "id": "SUB-0003",
       "relationshipId": "LP-003",
       "data": {
         "investorId": "LP-003",
@@ -576,7 +576,7 @@
     },
     {
       "resource": "subscriptions",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Subscriptions:7",
+      "id": "SUB-0004",
       "relationshipId": "LP-004",
       "data": {
         "investorId": "LP-004",
@@ -593,7 +593,7 @@
     },
     {
       "resource": "subscriptions",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Subscriptions:8",
+      "id": "SUB-0005",
       "relationshipId": "LP-005",
       "data": {
         "investorId": "LP-005",
@@ -610,7 +610,7 @@
     },
     {
       "resource": "subscriptions",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Subscriptions:9",
+      "id": "SUB-0006",
       "relationshipId": "LP-006",
       "data": {
         "investorId": "LP-006",
@@ -627,7 +627,7 @@
     },
     {
       "resource": "subscriptions",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Subscriptions:10",
+      "id": "SUB-0007",
       "relationshipId": "LP-007",
       "data": {
         "investorId": "LP-007",
@@ -644,7 +644,7 @@
     },
     {
       "resource": "subscriptions",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Subscriptions:11",
+      "id": "SUB-0008",
       "relationshipId": "LP-008",
       "data": {
         "investorId": "LP-008",
@@ -661,7 +661,7 @@
     },
     {
       "resource": "subscriptions",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Subscriptions:12",
+      "id": "SUB-0009",
       "relationshipId": "LP-009",
       "data": {
         "investorId": "LP-009",
@@ -678,7 +678,7 @@
     },
     {
       "resource": "subscriptions",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Subscriptions:13",
+      "id": "SUB-0010",
       "relationshipId": "LP-010",
       "data": {
         "investorId": "LP-010",
@@ -695,7 +695,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:DDQ_Compliance:4",
+      "id": "DDQ-0001",
       "relationshipId": "LP-001",
       "data": {
         "investorId": "LP-001",
@@ -709,7 +709,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:DDQ_Compliance:5",
+      "id": "DDQ-0002",
       "relationshipId": "LP-002",
       "data": {
         "investorId": "LP-002",
@@ -723,7 +723,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:DDQ_Compliance:6",
+      "id": "DDQ-0003",
       "relationshipId": "LP-003",
       "data": {
         "investorId": "LP-003",
@@ -737,7 +737,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:DDQ_Compliance:7",
+      "id": "DDQ-0004",
       "relationshipId": "LP-004",
       "data": {
         "investorId": "LP-004",
@@ -751,7 +751,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:DDQ_Compliance:8",
+      "id": "DDQ-0005",
       "relationshipId": "LP-005",
       "data": {
         "investorId": "LP-005",
@@ -765,7 +765,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:DDQ_Compliance:9",
+      "id": "DDQ-0006",
       "relationshipId": "LP-006",
       "data": {
         "investorId": "LP-006",
@@ -779,7 +779,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:DDQ_Compliance:10",
+      "id": "DDQ-0007",
       "relationshipId": "LP-007",
       "data": {
         "investorId": "LP-007",
@@ -793,7 +793,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:DDQ_Compliance:11",
+      "id": "DDQ-0008",
       "relationshipId": "LP-008",
       "data": {
         "investorId": "LP-008",
@@ -807,7 +807,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:DDQ_Compliance:12",
+      "id": "DDQ-0009",
       "relationshipId": "LP-009",
       "data": {
         "investorId": "LP-009",
@@ -821,7 +821,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:DDQ_Compliance:13",
+      "id": "DDQ-0010",
       "relationshipId": "LP-010",
       "data": {
         "investorId": "LP-010",
@@ -835,7 +835,7 @@
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Upcoming_Meetings:4",
+      "id": "CAL-0001",
       "relationshipId": "LP-003",
       "data": {
         "investorId": "LP-003",
@@ -853,7 +853,7 @@
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Upcoming_Meetings:5",
+      "id": "CAL-0002",
       "relationshipId": "LP-005",
       "data": {
         "investorId": "LP-005",
@@ -871,7 +871,7 @@
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Upcoming_Meetings:6",
+      "id": "CAL-0003",
       "relationshipId": "LP-008",
       "data": {
         "investorId": "LP-008",
@@ -889,7 +889,7 @@
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Upcoming_Meetings:7",
+      "id": "CAL-0004",
       "relationshipId": "LP-004",
       "data": {
         "investorId": "LP-004",
@@ -907,7 +907,7 @@
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Upcoming_Meetings:8",
+      "id": "CAL-0005",
       "relationshipId": "LP-006",
       "data": {
         "investorId": "LP-006",
@@ -925,7 +925,7 @@
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Upcoming_Meetings:9",
+      "id": "CAL-0006",
       "relationshipId": "LP-009",
       "data": {
         "investorId": "LP-009",
@@ -943,7 +943,7 @@
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Upcoming_Meetings:10",
+      "id": "CAL-0007",
       "relationshipId": "LP-007",
       "data": {
         "investorId": "LP-007",
@@ -961,7 +961,7 @@
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Upcoming_Meetings:11",
+      "id": "CAL-0008",
       "relationshipId": "LP-010",
       "data": {
         "investorId": "LP-010",
@@ -979,7 +979,7 @@
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ExistingInvestors_v(07.09.2026).xlsx:Upcoming_Meetings:12",
+      "id": "CAL-0009",
       "relationshipId": "LP-002",
       "data": {
         "investorId": "LP-002",
@@ -1882,13 +1882,13 @@
       "data": {
         "activityId": "ACT-0056",
         "investorId": "LP-004",
-        "date": "2026-07-22",
+        "date": "2026-07-18",
         "type": "Internal Note",
         "owner": "Renata Silva",
         "contactName": "Fiona Marsh",
-        "subject": "Internal - Overdue Materials Flag",
-        "notes": "The June 30 commitment to send Fund V strategy summary and first-close timing materials within two weeks (target July 14) has not been fulfilled — now 8 days overdue with no client-facing follow-up logged.",
-        "nextSteps": "Send materials immediately; also tracked in the Fund V prospect pipeline (T-ALD-01)."
+        "subject": "Internal - Fund V Materials Delivered",
+        "notes": "The Fund V strategy summary and first-close timing materials committed on June 30 were sent July 18, four days after the original two-week target.",
+        "nextSteps": "Propose a follow-up call with the deal team."
       }
     },
     {
@@ -3265,12 +3265,12 @@
         "aumUsdBn": "N/A (existing LP)",
         "priorityTier": "2",
         "pipelineStage": "Outreach Sent",
-        "stageDetail": "Existing Fund III LP ($25M). Principal expressed re-up interest June 30; requested Fund V strategy summary and first-close timing. No specific number discussed yet. Materials commitment (2 weeks) is now overdue.",
+        "stageDetail": "Existing Fund III LP ($25M). Principal expressed re-up interest June 30; requested Fund V strategy summary and first-close timing. No specific number discussed yet. Materials sent July 18; deal-team call now being proposed.",
         "probabilityPct": 0.3,
         "targetCommitmentUsdMm": 10,
         "weightedCommitmentUsdMm": 3,
-        "lastContactDate": "2026-06-30",
-        "nextTouchpointDate": "TBD - pending materials",
+        "lastContactDate": "2026-07-18",
+        "nextTouchpointDate": "2026-08-05",
         "kind": "prospect",
         "name": "Alderney Family Office"
       }
@@ -3311,19 +3311,19 @@
         "aumUsdBn": 580,
         "priorityTier": "1",
         "pipelineStage": "Final IC Review",
-        "stageDetail": "Extensive DD history since mid-2024 (formal DD request, op DD session, GIPS track record delivered). CPPIB's External Portfolio Management committee has already cleared Fund V for formal IC consideration. Full Ascendant executive team (CIO, PM, CRO, COO, IR) hosting a dedicated in-person session two weeks ahead of CPPIB's Aug 12 IC date. No specific target size ever discussed; likely anchor-scale (>=$250M) given seniority of engagement, which would leave zero anchor slots remaining if ADIA and OTPP also close.",
+        "stageDetail": "Extensive DD history since mid-2024 (formal DD request, op DD session, GIPS track record delivered, formal Oct 2025 presentation). CPPIB's External Portfolio Management committee has already cleared Fund V for formal IC consideration. Full Ascendant executive team (CIO, PM, CRO, COO, IR) hosting a dedicated in-person session two weeks ahead of CPPIB's Aug 12 IC date. Robert Yuen has internally indicated he will recommend a $200M initial allocation, scaling to $300M (SMA threshold, already executed) within 12 months subject to performance.",
         "probabilityPct": 0.75,
-        "targetCommitmentUsdMm": 250,
-        "weightedCommitmentUsdMm": 187.5,
+        "targetCommitmentUsdMm": 200,
+        "weightedCommitmentUsdMm": 150,
         "lastContactDate": "2026-07-10",
-        "nextTouchpointDate": "2026-07-29",
+        "nextTouchpointDate": "2026-07-24",
         "kind": "prospect",
         "name": "CPP Investments (CPPIB)"
       }
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:4",
+      "id": "COV-0012",
       "relationshipId": "P-001",
       "data": {
         "prospectId": "P-001",
@@ -3334,7 +3334,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:5",
+      "id": "COV-0013",
       "relationshipId": "P-001",
       "data": {
         "prospectId": "P-001",
@@ -3345,7 +3345,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:6",
+      "id": "COV-0014",
       "relationshipId": "P-002",
       "data": {
         "prospectId": "P-002",
@@ -3356,7 +3356,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:7",
+      "id": "COV-0015",
       "relationshipId": "P-002",
       "data": {
         "prospectId": "P-002",
@@ -3367,7 +3367,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:8",
+      "id": "COV-0016",
       "relationshipId": "P-003",
       "data": {
         "prospectId": "P-003",
@@ -3378,7 +3378,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:9",
+      "id": "COV-0017",
       "relationshipId": "P-003",
       "data": {
         "prospectId": "P-003",
@@ -3389,7 +3389,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:10",
+      "id": "COV-0018",
       "relationshipId": "P-004",
       "data": {
         "prospectId": "P-004",
@@ -3400,7 +3400,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:11",
+      "id": "COV-0019",
       "relationshipId": "P-004",
       "data": {
         "prospectId": "P-004",
@@ -3411,7 +3411,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:12",
+      "id": "COV-0020",
       "relationshipId": "P-005",
       "data": {
         "prospectId": "P-005",
@@ -3422,7 +3422,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:13",
+      "id": "COV-0021",
       "relationshipId": "P-005",
       "data": {
         "prospectId": "P-005",
@@ -3433,7 +3433,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:14",
+      "id": "COV-0022",
       "relationshipId": "P-006",
       "data": {
         "prospectId": "P-006",
@@ -3444,7 +3444,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:15",
+      "id": "COV-0023",
       "relationshipId": "P-006",
       "data": {
         "prospectId": "P-006",
@@ -3455,7 +3455,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:16",
+      "id": "COV-0024",
       "relationshipId": "P-007",
       "data": {
         "prospectId": "P-007",
@@ -3466,7 +3466,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:17",
+      "id": "COV-0025",
       "relationshipId": "P-008",
       "data": {
         "prospectId": "P-008",
@@ -3477,7 +3477,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:18",
+      "id": "COV-0026",
       "relationshipId": "P-009",
       "data": {
         "prospectId": "P-009",
@@ -3488,7 +3488,7 @@
     },
     {
       "resource": "coverageAssignments",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Coverage:19",
+      "id": "COV-0027",
       "relationshipId": "P-010",
       "data": {
         "prospectId": "P-010",
@@ -3784,8 +3784,21 @@
       }
     },
     {
+      "resource": "contacts",
+      "id": "PC-106",
+      "relationshipId": "P-010",
+      "data": {
+        "prospectId": "P-010",
+        "contactId": "PC-106",
+        "name": "Daniel Park",
+        "title": "Quantitative Analyst",
+        "email": "d.park@cppib.com",
+        "primaryContact": "No"
+      }
+    },
+    {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:DDQ_Status:4",
+      "id": "DDQ-0011",
       "relationshipId": "P-001",
       "data": {
         "prospectId": "P-001",
@@ -3797,7 +3810,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:DDQ_Status:5",
+      "id": "DDQ-0012",
       "relationshipId": "P-002",
       "data": {
         "prospectId": "P-002",
@@ -3809,7 +3822,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:DDQ_Status:6",
+      "id": "DDQ-0013",
       "relationshipId": "P-003",
       "data": {
         "prospectId": "P-003",
@@ -3821,7 +3834,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:DDQ_Status:7",
+      "id": "DDQ-0014",
       "relationshipId": "P-004",
       "data": {
         "prospectId": "P-004",
@@ -3833,7 +3846,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:DDQ_Status:8",
+      "id": "DDQ-0015",
       "relationshipId": "P-005",
       "data": {
         "prospectId": "P-005",
@@ -3845,7 +3858,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:DDQ_Status:9",
+      "id": "DDQ-0016",
       "relationshipId": "P-006",
       "data": {
         "prospectId": "P-006",
@@ -3857,7 +3870,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:DDQ_Status:10",
+      "id": "DDQ-0017",
       "relationshipId": "P-007",
       "data": {
         "prospectId": "P-007",
@@ -3869,7 +3882,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:DDQ_Status:11",
+      "id": "DDQ-0018",
       "relationshipId": "P-008",
       "data": {
         "prospectId": "P-008",
@@ -3881,7 +3894,7 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:DDQ_Status:12",
+      "id": "DDQ-0019",
       "relationshipId": "P-009",
       "data": {
         "prospectId": "P-009",
@@ -3893,29 +3906,14 @@
     },
     {
       "resource": "diligence",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:DDQ_Status:13",
+      "id": "DDQ-0020",
       "relationshipId": "P-010",
       "data": {
         "prospectId": "P-010",
         "ddqStatus": "Passed - IC Cleared, Final Presentation Prep",
         "keyFocusAreas": "Operational DD (GlobeOp report, BCP/DR), risk policy/VaR framework, ISDA/CSA documentation, CFTC exempt CPO status, SMA structure, Brazil DI stress scenario",
         "targetCompletionDate": "2025-04-07",
-        "notes": "Formal DD substantively completed via the Dec 2024 request and Apr 2025 consolidated response. CPPIB's External Portfolio Management committee has since cleared Fund V for formal IC consideration (Jan 2026). Remaining items are final-presentation deliverables (updated GIPS through Q2 2026, executed SMA term sheet, Skadden CFTC letter, sanctions screening), not diligence gaps."
-      }
-    },
-    {
-      "resource": "tasks",
-      "id": "T-ADIA-01",
-      "relationshipId": "P-001",
-      "data": {
-        "taskId": "T-ADIA-01",
-        "prospectId": "P-001",
-        "description": "Deliver updated risk attribution deck covering Q1 2026 drawdown analysis",
-        "owner": "Claire Whitfield",
-        "dueDate": "2026-06-24",
-        "priority": "URGENT",
-        "status": "Completed",
-        "notes": "Delivered COB June 24; IC reviewed June 25 and was satisfied."
+        "notes": "Formal DD substantively completed via the Dec 2024 request and Apr 2025 consolidated response. CPPIB's External Portfolio Management committee has since cleared Fund V for formal IC consideration (Jan 2026). One item remains to fully close out DDQ: OFAC/Canadian sanctions screening confirmation, retargeted for July 24 (see Open_Items). All other final-presentation deliverables (updated GIPS through Q2 2026, executed SMA term sheet, Skadden CFTC letter) are complete."
       }
     },
     {
@@ -3927,40 +3925,10 @@
         "prospectId": "P-001",
         "description": "Prepare co-investment call talking points (structure, deal-by-deal governance, economics)",
         "owner": "Claire Whitfield",
-        "dueDate": "2026-08-01",
+        "dueDate": "2026-07-30",
         "priority": "URGENT",
         "status": "Open",
-        "notes": "Call confirmed Fri Aug 1, 3:00 PM ET with Ahmed Al-Rashid. Last open item before ADIA advances to final stage."
-      }
-    },
-    {
-      "resource": "tasks",
-      "id": "T-FF-01",
-      "relationshipId": "P-002",
-      "data": {
-        "taskId": "T-FF-01",
-        "prospectId": "P-002",
-        "description": "Send revised side letter (v4) with AIFMD compliance addendum",
-        "owner": "Claire Whitfield",
-        "dueDate": "2026-06-10",
-        "priority": "URGENT",
-        "status": "Completed",
-        "notes": "Sent June 10, three days after the original June 7 target."
-      }
-    },
-    {
-      "resource": "tasks",
-      "id": "T-FF-02",
-      "relationshipId": "P-002",
-      "data": {
-        "taskId": "T-FF-02",
-        "prospectId": "P-002",
-        "description": "Agree and send ESG quarterly reporting framework",
-        "owner": "Renata Silva",
-        "dueDate": "2026-06-10",
-        "priority": "MEDIUM",
-        "status": "Completed",
-        "notes": "Agreed and sent June 10 alongside the side letter."
+        "notes": "Call confirmed Fri Aug 1, 3:00 PM ET with Ahmed Al-Rashid. Prep due 2 days ahead. Last open item before ADIA advances to final stage."
       }
     },
     {
@@ -4055,21 +4023,6 @@
     },
     {
       "resource": "tasks",
-      "id": "T-BWGI-02",
-      "relationshipId": "P-003",
-      "data": {
-        "taskId": "T-BWGI-02",
-        "prospectId": "P-003",
-        "description": "60-minute diligence call with Ricardo Bezerra and Isabela Carvalho",
-        "owner": "Daniel Ferreira",
-        "dueDate": "2026-06-24",
-        "priority": "MEDIUM",
-        "status": "Completed",
-        "notes": "Held June 24. IC feedback on materials positive. Ricardo confirmed internal DD target Aug 14, IC review Aug 25."
-      }
-    },
-    {
-      "resource": "tasks",
       "id": "T-BWGI-03",
       "relationshipId": "P-003",
       "data": {
@@ -4081,36 +4034,6 @@
         "priority": "LOW",
         "status": "Open",
         "notes": "Potential second ticket from the same relationship. Respond promptly if a direct enquiry is received."
-      }
-    },
-    {
-      "resource": "tasks",
-      "id": "T-AP1-01",
-      "relationshipId": "P-006",
-      "data": {
-        "taskId": "T-AP1-01",
-        "prospectId": "P-006",
-        "description": "Deliver quantitative attribution data pack (Sharpe decomposition, correlation matrix)",
-        "owner": "Renata Silva",
-        "dueDate": "2026-06-27",
-        "priority": "MEDIUM",
-        "status": "Completed",
-        "notes": "Delivered June 27; Erik Lindqvist confirmed receipt June 30, analysis underway."
-      }
-    },
-    {
-      "resource": "tasks",
-      "id": "T-AP1-02",
-      "relationshipId": "P-006",
-      "data": {
-        "taskId": "T-AP1-02",
-        "prospectId": "P-006",
-        "description": "Send momentum factor methodology clarification (12-1 vs 6-1) and gross monthly return series",
-        "owner": "Renata Silva",
-        "dueDate": "2026-07-25",
-        "priority": "MEDIUM",
-        "status": "Open",
-        "notes": "Two clarifications requested by Erik Lindqvist following the data pack review."
       }
     },
     {
@@ -4130,21 +4053,6 @@
     },
     {
       "resource": "tasks",
-      "id": "T-ALD-01",
-      "relationshipId": "P-008",
-      "data": {
-        "taskId": "T-ALD-01",
-        "prospectId": "P-008",
-        "description": "Send Fund V strategy summary and first-close timing materials to Julian Ashworth-Reyes and Fiona Marsh",
-        "owner": "Renata Silva",
-        "dueDate": "2026-07-14",
-        "priority": "MEDIUM",
-        "status": "Overdue",
-        "notes": "Committed to sending within two weeks of the June 30 London meeting (target July 14). Not yet sent as of July 22 — 8 days overdue. Propose call with deal team once sent."
-      }
-    },
-    {
-      "resource": "tasks",
       "id": "T-TID-01",
       "relationshipId": "P-009",
       "data": {
@@ -4152,10 +4060,10 @@
         "prospectId": "P-009",
         "description": "Prepare Fund V capacity and terms discussion materials ahead of confirmed call",
         "owner": "Daniel Ferreira",
-        "dueDate": "2026-07-27",
+        "dueDate": "2026-07-25",
         "priority": "HIGH",
         "status": "Open",
-        "notes": "Call confirmed for July 27 following the June 27 re-up signal. Coordinating with the product/fundraising team on indicative capacity given Tidewater's existing $300M Fund II position and potential anchor-scale interest."
+        "notes": "Call confirmed for July 27 following the June 27 re-up signal. Prep due 2 days ahead. Coordinating with the product/fundraising team on indicative capacity given Tidewater's existing $300M Fund II position and potential anchor-scale interest."
       }
     },
     {
@@ -4165,42 +4073,14 @@
       "data": {
         "taskId": "T-CPPIB-01",
         "prospectId": "P-010",
-        "description": "Deliver OFAC and Canadian sanctions screening confirmation to CPPIB compliance",
+        "description": "CPPIB DDQ — responses to diligence questions from CPPIB",
         "owner": "Claire Whitfield",
-        "dueDate": "2026-07-17",
-        "priority": "HIGH",
-        "status": "Overdue",
-        "notes": "Committed in the July 1 meeting-confirmation email to deliver on or before July 17. Not yet confirmed sent as of July 22 — 5 days overdue, and Thomas flagged on July 10 that he would chase Priya once received. Needs to go out before the July 29 meeting."
-      }
-    },
-    {
-      "resource": "tasks",
-      "id": "T-CPPIB-02",
-      "relationshipId": "P-010",
-      "data": {
-        "taskId": "T-CPPIB-02",
-        "prospectId": "P-010",
-        "description": "Prepare IC opening framing — lead with the pension portfolio problem Fund V solves, not the strategy label",
-        "owner": "Claire Whitfield",
-        "dueDate": "2026-07-29",
+        "dueDate": "2026-07-22",
         "priority": "URGENT",
         "status": "Open",
-        "notes": "Explicit request from Robert Yuen (via Thomas, July 10): several IC members are less familiar with liquid macro strategies. Jonathan should open the same way he did in the October presentation."
-      }
-    },
-    {
-      "resource": "tasks",
-      "id": "T-CPPIB-03",
-      "relationshipId": "P-010",
-      "data": {
-        "taskId": "T-CPPIB-03",
-        "prospectId": "P-010",
-        "description": "Prepare specific answers on Brazil DI stress scenario: how June/July volatility compares to the December walkthrough, whether the 10-day liquidation assumption holds, and the recovery path",
-        "owner": "Claire Whitfield",
-        "dueDate": "2026-07-29",
-        "priority": "URGENT",
-        "status": "Open",
-        "notes": "James Leclerc will raise this in the room per Thomas's July 10 note. Not a change-of-mind signal, but he wants a specific, not general, answer. Alex Voss and Dr. Vasquez should be briefed ahead of time."
+        "actionType": "navigate",
+        "actionUrl": "/space/assistant_uf8pigrvth36n3jovxbpds17",
+        "notes": "Originally committed for July 17 per the July 1 confirmation email; delivery slipped and Thomas flagged the gap on July 10. Due today — the single remaining item needed to fully close out Fund V DDQ for CPPIB ahead of the July 24 meeting. Most time-sensitive open item in the pipeline."
       }
     },
     {
@@ -4212,15 +4092,63 @@
         "prospectId": "P-010",
         "description": "Finalize and send GIPS performance document through Q2 2026, executed SMA term sheet, and Skadden CFTC exempt CPO letter",
         "owner": "Claire Whitfield",
-        "dueDate": "2026-07-29",
+        "dueDate": "2026-07-23",
         "priority": "HIGH",
         "status": "Open",
-        "notes": "Committed to send all three ahead of the meeting per the July 1 confirmation email."
+        "notes": "Committed to send all three ahead of the meeting per the July 1 confirmation email. Originally targeted for July 22; retargeted to July 23."
+      }
+    },
+    {
+      "resource": "outlookTasks",
+      "id": "OT-0001",
+      "relationshipId": null,
+      "data": {
+        "taskId": "OT-0001",
+        "subject": "Complete AIMA DDQ template",
+        "body": "Complete the industry-standard AIMA due diligence questionnaire and prepare the filled template for review.",
+        "dueDate": "2026-07-24",
+        "importance": "high",
+        "status": "notStarted",
+        "actionType": "navigate",
+        "actionUrl": "/space/assistant_exi3a15byza862e9f3r6p89j?prompt=Help%20me%20complete%20the%20AIMA%20DDQ%20template%20using%20approved%20Investor%20Relations%20knowledge%20and%20prepare%20the%20filled%20template%20for%20review.",
+        "categories": ["Investor Relations", "Due Diligence"]
+      }
+    },
+    {
+      "resource": "outlookTasks",
+      "id": "OT-0002",
+      "relationshipId": null,
+      "data": {
+        "taskId": "OT-0002",
+        "subject": "Draft Q2 2026 Quarterly Letter",
+        "body": "Generate the Q2 2026 investor letter, incorporate portfolio commentary, and prepare the draft for approval.",
+        "dueDate": "2026-07-24",
+        "importance": "high",
+        "status": "notStarted",
+        "actionType": "navigate",
+        "actionUrl": "/space/assistant_s0g6v8r25dkm2iiyvk5sojnw?prompt=Create%20an%20investor%20letter%20in%20.docx%20format%20for%20Q2%202026%20pulling%20from%20internal%20risk%20reports%2C%20portfolio%20positioning%2C%20performance%20analytics%2C%20PM%20commentary.%20Please%20refer%20to%20previous%20two%20quarterly%20investor%20letters%20in%20the%20Knowledge%20Base%20to%20ensure%20consistency%20and%20continuity%20of%20messaging.",
+        "categories": ["Investor Communications", "Quarterly Reporting"]
       }
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Upcoming_Touchpoints:4",
+      "id": "CAL-0010",
+      "relationshipId": null,
+      "data": {
+        "date": "2026-07-20",
+        "time": "07:00 CEST",
+        "type": "Internal Meeting",
+        "owner": "Claire Whitfield",
+        "attendees": "Investor Relations team",
+        "purpose": "Weekly IR risk review and action triage",
+        "relatedItem": "Follow-up overdue: circulate decisions and assign owners",
+        "status": "Follow-up overdue",
+        "kind": "internal"
+      }
+    },
+    {
+      "resource": "calendarEvents",
+      "id": "CAL-0011",
       "relationshipId": "P-001",
       "data": {
         "prospectId": "P-001",
@@ -4232,12 +4160,12 @@
         "attendees": "Ahmed Al-Rashid (ADIA)",
         "purpose": "Co-investment structure, governance, and economics discussion",
         "status": "Confirmed",
-        "kind": "touchpoint"
+        "kind": "meeting"
       }
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Upcoming_Touchpoints:5",
+      "id": "CAL-0012",
       "relationshipId": "P-002",
       "data": {
         "prospectId": "P-002",
@@ -4249,12 +4177,12 @@
         "attendees": "David McAllister (Future Fund) - no meeting scheduled",
         "purpose": "Countersignature expected from both approvers; monitor only, chase if not received",
         "status": "Awaiting external action",
-        "kind": "touchpoint"
+        "kind": "meeting"
       }
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Upcoming_Touchpoints:6",
+      "id": "CAL-0013",
       "relationshipId": "P-003",
       "data": {
         "prospectId": "P-003",
@@ -4266,12 +4194,12 @@
         "attendees": "Ricardo Bezerra (BWGI)",
         "purpose": "Send Portuguese-language one-pager and Q4 2025 investor letter, ahead of BWGI's Aug 25 internal IC",
         "status": "Planned",
-        "kind": "touchpoint"
+        "kind": "meeting"
       }
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Upcoming_Touchpoints:7",
+      "id": "CAL-0014",
       "relationshipId": "P-004",
       "data": {
         "prospectId": "P-004",
@@ -4283,12 +4211,12 @@
         "attendees": "James Whitfield, Priya Mehta (OTPP) - IC members",
         "purpose": "Final IC presentation, 1 York Street Toronto / Zoom",
         "status": "Confirmed",
-        "kind": "touchpoint"
+        "kind": "meeting"
       }
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Upcoming_Touchpoints:8",
+      "id": "CAL-0015",
       "relationshipId": "P-005",
       "data": {
         "prospectId": "P-005",
@@ -4300,12 +4228,12 @@
         "attendees": "Francois Lefebvre (CDPQ) - coordinating",
         "purpose": "Montreal office ODD visit, subject to DDQ review",
         "status": "Proposed - provisional",
-        "kind": "touchpoint"
+        "kind": "meeting"
       }
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Upcoming_Touchpoints:9",
+      "id": "CAL-0016",
       "relationshipId": "P-006",
       "data": {
         "prospectId": "P-006",
@@ -4317,12 +4245,12 @@
         "attendees": "Erik Lindqvist (AP1)",
         "purpose": "Send momentum factor methodology clarification and gross monthly return series",
         "status": "Planned",
-        "kind": "touchpoint"
+        "kind": "meeting"
       }
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Upcoming_Touchpoints:10",
+      "id": "CAL-0017",
       "relationshipId": "P-007",
       "data": {
         "prospectId": "P-007",
@@ -4334,29 +4262,29 @@
         "attendees": "Mikael Korhonen (Keva)",
         "purpose": "Intro call on DDQ process and investor reference shortlist",
         "status": "Proposed - awaiting confirmation",
-        "kind": "touchpoint"
+        "kind": "meeting"
       }
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Upcoming_Touchpoints:11",
+      "id": "CAL-0018",
       "relationshipId": "P-008",
       "data": {
         "prospectId": "P-008",
         "institution": "Alderney Family Office",
-        "date": "TBD",
+        "date": "2026-08-05",
         "time": "TBD",
         "type": "Call",
         "owner": "Renata Silva",
-        "attendees": "Julian Ashworth-Reyes (Alderney), Ascendant deal team - not yet scheduled",
-        "purpose": "Fund V strategy/deal team call, blocked pending overdue materials send (T-ALD-01)",
-        "status": "Blocked - materials not yet sent",
-        "kind": "touchpoint"
+        "attendees": "Julian Ashworth-Reyes (Alderney), Ascendant deal team",
+        "purpose": "Fund V strategy/deal team call, following July 18 materials delivery",
+        "status": "Proposed - awaiting confirmation",
+        "kind": "meeting"
       }
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Upcoming_Touchpoints:12",
+      "id": "CAL-0019",
       "relationshipId": "P-009",
       "data": {
         "prospectId": "P-009",
@@ -4368,24 +4296,26 @@
         "attendees": "Wei Ling Tan, Arjun Nair (Tidewater)",
         "purpose": "Fund V capacity and terms discussion following June 27 re-up signal",
         "status": "Confirmed",
-        "kind": "touchpoint"
+        "kind": "meeting"
       }
     },
     {
       "resource": "calendarEvents",
-      "id": "xlsx:Ascendant_CRMExport_ProspectiveInvestors_v(07.09.2026).xlsx:Upcoming_Touchpoints:13",
+      "id": "CAL-0020",
       "relationshipId": "P-010",
       "data": {
         "prospectId": "P-010",
         "institution": "CPP Investments (CPPIB)",
-        "date": "2026-07-29",
+        "date": "2026-07-24",
         "time": "9:00 AM - 12:00 PM ET",
         "type": "In-Person Meeting (Executive)",
         "owner": "Claire Whitfield",
-        "attendees": "Ascendant: Jonathan Reeves (CIO), Alexandra Voss (PM), Dr. Elena Vasquez (CRO), Michael Torres (COO), Claire Whitfield (IR). CPPIB: Margaret Osei, Thomas Brennan, Robert Yuen, Priya Sharma, James Leclerc",
+        "attendees": "Ascendant: Jonathan Reeves (CIO), Alexandra Voss (PM), Dr. Elena Vasquez (CRO), Michael Torres (COO), Claire Whitfield (IR). CPPIB: Margaret Osei, Thomas Brennan, Robert Yuen, Priya Sharma, James Leclerc, Daniel Park",
         "purpose": "Formal IC-track presentation two weeks ahead of CPPIB's Aug 12 Investment Committee — strategy deep-dive, risk/attribution, firm overview, portfolio fit, Q&A",
         "status": "Confirmed",
-        "kind": "touchpoint"
+        "kind": "meeting",
+        "actionType": "navigate",
+        "actionUrl": "/space/assistant_zu586ufgtg57ncjpuqb4kq6k?prompt=i%29%20Search%20my%20Outlook%20folders%2C%20call%20reports%20from%20the%20Knowledge%20Base%20and%20Share%20Point%20for%20all%20CPPIB%20correspondence%20in%20the%20last%20year%20related%20to%20Ascendant%20Capital%20and%20Fund%20V.%0Aii%29%20Search%20With%20Intelligence%20data%20from%20the%20Knowledge%20Base%2C%20online%20for%20the%20latest%20information%20on%20CPPIB%20%E2%80%94%20recent%20portfolio%20decisions%2C%20public%20statements%20on%20alternatives%20any%20relevant%20news%20from%20the%20last%203%20months%20that%20may%20relate%20to%20Ascendant%20Fund%20V.%0Aiii%29%20Extract%20top%203%20outstanding%20items%20and%20present%20as%20a%20fully%20rendered%2C%20self-contained%20HTML%20document%20with%20the%20relevant%20source%20notes%20from%20emails%2C%20meeting%20notes%20and%20web%20search.%20Keep%20the%20HTML%20document%20to%20one%20page%20only%2C%20with%20key%20risks%20or%20call%20outs%20that%20I%20need%20to%20tell%20everyone%20before%20the%20meeting.%20Ensure%20format%20of%20the%20HTML%20is%20clean%20and%20symmetric."
       }
     },
     {
@@ -4987,13 +4917,13 @@
       "data": {
         "activityId": "PACT-0038",
         "prospectId": "P-008",
-        "date": "2026-07-22",
-        "type": "Internal Note",
+        "date": "2026-07-18",
+        "type": "Email",
         "owner": "Renata Silva",
         "location": "N/A",
-        "attendees": "Internal",
-        "notes": "Materials commitment (Fund V strategy summary + first-close timing) made June 30 with a two-week target (July 14) has not been sent. Now 8 days overdue with no external follow-up logged.",
-        "outcome": "Watch - overdue, no client-facing action taken yet"
+        "attendees": "Julian Ashworth-Reyes, Fiona Marsh",
+        "notes": "Sent the Fund V strategy summary and first-close timing materials committed to on June 30 (four days after the original two-week target). Proposed a follow-up call with the deal team.",
+        "outcome": "Positive - materials delivered, on track"
       }
     },
     {
@@ -5147,6 +5077,22 @@
       "data": {
         "activityId": "PACT-0048",
         "prospectId": "P-010",
+        "date": "2025-10-16",
+        "type": "In-Person Meeting",
+        "owner": "Claire Whitfield",
+        "location": "N/A",
+        "attendees": "Margaret Osei, Robert Yuen, Thomas Brennan, Priya Sharma, James Leclerc",
+        "notes": "Formal presentation to the full CPPIB team at Ascendant's NY office (2.5 hours). Jonathan, Alex, Dr. Vasquez, and Michael Torres presented strategy, shadow portfolio attribution, risk framework, and portfolio fit. Reception very positive; Robert Yuen engaged throughout. One pushback: James Leclerc raised Brazil DI liquidity concerns in a risk-off scenario, requesting formal stress scenario analysis as a follow-up.",
+        "outcome": "Very positive - final step before IC submission, one follow-up item"
+      }
+    },
+    {
+      "resource": "activities",
+      "id": "PACT-0050",
+      "relationshipId": "P-010",
+      "data": {
+        "activityId": "PACT-0050",
+        "prospectId": "P-010",
         "date": "2026-01-05",
         "type": "Email",
         "owner": "Claire Whitfield",
@@ -5163,29 +5109,13 @@
       "data": {
         "activityId": "PACT-0049",
         "prospectId": "P-010",
-        "date": "2026-07-01",
-        "type": "Email",
+        "date": "2026-02-21",
+        "type": "Legal Document",
         "owner": "Claire Whitfield",
         "location": "N/A",
-        "attendees": "Margaret Osei, Thomas Brennan, Robert Yuen, Priya Sharma, James Leclerc",
-        "notes": "Confirmed the in-person meeting for Wednesday, July 29, 9:00 AM-12:00 PM ET at Ascendant's NY office, with the full senior team attending (CIO, PM, CRO, COO, IR). Committed to sending updated GIPS doc (H1 2026 net +9.7%, ITD +20.4%), executed SMA term sheet, and Skadden CFTC letter, plus sanctions screening confirmation by July 17.",
-        "outcome": "Positive - meeting confirmed"
-      }
-    },
-    {
-      "resource": "activities",
-      "id": "PACT-0050",
-      "relationshipId": "P-010",
-      "data": {
-        "activityId": "PACT-0050",
-        "prospectId": "P-010",
-        "date": "2026-07-10",
-        "type": "Email",
-        "owner": "Claire Whitfield",
-        "location": "N/A",
-        "attendees": "Thomas Brennan, Margaret Osei, Robert Yuen, Priya Sharma, James Leclerc",
-        "notes": "Thomas's pre-meeting brief: James Leclerc will press for a specific view on Brazil DI volatility (vs. the December stress scenario walkthrough, the 10-day liquidation assumption, and recovery path) — not a change of sentiment, just wants precision. Robert reinforced that the opening framing (pension portfolio problem, not strategy label) is the most important 5 minutes of the session.",
-        "outcome": "Neutral - clear prep requirements ahead of July 29"
+        "attendees": "Rachel Kwan, Priya Sharma",
+        "notes": "SMA term sheet executed by both parties. Structure confirmed at $300M initial threshold, quarterly redemption with 60-day notice, USD denomination with a CPPIB-side CAD hedge via cross-currency swap overlay.",
+        "outcome": "Complete - final SMA structure in place"
       }
     },
     {
@@ -5195,18 +5125,50 @@
       "data": {
         "activityId": "PACT-0051",
         "prospectId": "P-010",
+        "date": "2026-07-01",
+        "type": "Email",
+        "owner": "Claire Whitfield",
+        "location": "N/A",
+        "attendees": "Margaret Osei, Thomas Brennan, Robert Yuen, Priya Sharma, James Leclerc",
+        "notes": "Confirmed the in-person meeting for Friday, July 24, 9:00 AM-12:00 PM ET at Ascendant's NY office, with the full senior team attending (CIO, PM, CRO, COO, IR). Committed to sending updated GIPS doc (H1 2026 net +9.7%, ITD +20.4%), executed SMA term sheet, and Skadden CFTC letter, plus sanctions screening confirmation by July 17.",
+        "outcome": "Positive - meeting confirmed"
+      }
+    },
+    {
+      "resource": "activities",
+      "id": "PACT-0052",
+      "relationshipId": "P-010",
+      "data": {
+        "activityId": "PACT-0052",
+        "prospectId": "P-010",
+        "date": "2026-07-10",
+        "type": "Email",
+        "owner": "Claire Whitfield",
+        "location": "N/A",
+        "attendees": "Thomas Brennan, Margaret Osei, Robert Yuen, Priya Sharma, James Leclerc",
+        "notes": "Thomas's pre-meeting brief: James Leclerc will press for a specific view on Brazil DI volatility (vs. the December stress scenario walkthrough, the 10-day liquidation assumption, and recovery path) — not a change of sentiment, just wants precision. Robert reinforced that the opening framing (pension portfolio problem, not strategy label) is the most important 5 minutes of the session.",
+        "outcome": "Neutral - clear prep requirements ahead of July 24"
+      }
+    },
+    {
+      "resource": "activities",
+      "id": "PACT-0053",
+      "relationshipId": "P-010",
+      "data": {
+        "activityId": "PACT-0053",
+        "prospectId": "P-010",
         "date": "2026-07-22",
         "type": "Internal Note",
         "owner": "Claire Whitfield",
         "location": "N/A",
         "attendees": "Internal",
-        "notes": "Sanctions screening confirmation committed for July 17 has not been confirmed sent — now 5 days overdue heading into the July 29 meeting. IC opening framing and Brazil DI talking points still need to be finalized with Jonathan, Alex, and Elena.",
-        "outcome": "Watch - two urgent prep items open ahead of July 29"
+        "notes": "Sanctions screening confirmation committed for July 17 has not been confirmed sent — now 5 days overdue heading into the July 24 meeting. IC opening framing and Brazil DI talking points still need to be finalized with Jonathan, Alex, and Elena.",
+        "outcome": "Watch - two urgent prep items open ahead of July 24"
       }
     },
     {
       "resource": "messages",
-      "id": "eml:AdvancedProspects_emails_FIXED/ADIA_Ahmed_AlRashid_RiskDeck_Request.eml",
+      "id": "MSG-0001",
       "relationshipId": "P-001",
       "data": {
         "from": "ahmed.alrashid@adia.ae",
@@ -5220,7 +5182,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:AdvancedProspects_emails_FIXED/AP1_Erik_QuantDataPack.eml",
+      "id": "MSG-0002",
       "relationshipId": "P-006",
       "data": {
         "from": "erik.lindqvist@ap1.se",
@@ -5234,7 +5196,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:AdvancedProspects_emails_FIXED/BWGI_Ricardo_PortugueseOnePager.eml",
+      "id": "MSG-0003",
       "relationshipId": "P-003",
       "data": {
         "from": "r.bezerra@bwginvestimentos.com.br",
@@ -5248,7 +5210,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:AdvancedProspects_emails_FIXED/CDPQ_Francois_DDQ_Submission.eml",
+      "id": "MSG-0004",
       "relationshipId": "P-005",
       "data": {
         "from": "amelie.tremblay@cdpq.com",
@@ -5262,7 +5224,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:AdvancedProspects_emails_FIXED/FutureFund_McAllister_CountersignatureAck.eml",
+      "id": "MSG-0005",
       "relationshipId": "P-002",
       "data": {
         "from": "d.mcallister@futurefund.gov.au",
@@ -5276,7 +5238,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:AdvancedProspects_emails_FIXED/FutureFund_SideLetter_Urgent.eml",
+      "id": "MSG-0006",
       "relationshipId": "P-002",
       "data": {
         "from": "c.whitfield@ascendantcapital.com",
@@ -5290,7 +5252,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:AdvancedProspects_emails_FIXED/Internal_IRTeam_WeeklyPrepNote.eml",
+      "id": "MSG-0007",
       "relationshipId": null,
       "data": {
         "from": "c.whitfield@ascendantcapital.com",
@@ -5304,7 +5266,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:AdvancedProspects_emails_FIXED/Keva_Mikael_TeaserSent.eml",
+      "id": "MSG-0008",
       "relationshipId": "P-007",
       "data": {
         "from": "mikael.korhonen@keva.fi",
@@ -5318,7 +5280,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:AdvancedProspects_emails_FIXED/OTPP_James_IC_Confirmation.eml",
+      "id": "MSG-0009",
       "relationshipId": "P-004",
       "data": {
         "from": "j.whitfield@otpp.com",
@@ -5332,7 +5294,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:CPPIB_meeting_prep_emails_FIXED/01 - Introduction — Ascendant Capital · New Multi-Asset Macro Strategy.eml",
+      "id": "MSG-0010",
       "relationshipId": "P-010",
       "data": {
         "from": "Claire Whitfield <c.whitfield@ascendantcapital.com>",
@@ -5346,7 +5308,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:CPPIB_meeting_prep_emails_FIXED/02 - Introduction — Ascendant Capital · Materials + Proposed Call.eml",
+      "id": "MSG-0011",
       "relationshipId": "P-010",
       "data": {
         "from": "Thomas Brennan <t.brennan@cppib.com>",
@@ -5360,7 +5322,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:CPPIB_meeting_prep_emails_FIXED/03 - Ascendant Fund V — Post-Call Follow-Up & Initial Questions.eml",
+      "id": "MSG-0012",
       "relationshipId": "P-010",
       "data": {
         "from": "Thomas Brennan <t.brennan@cppib.com>",
@@ -5374,7 +5336,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:CPPIB_meeting_prep_emails_FIXED/04 - Ascendant Fund V — Formal Due Diligence Request.eml",
+      "id": "MSG-0013",
       "relationshipId": "P-010",
       "data": {
         "from": "Priya Sharma <p.sharma@cppib.com>",
@@ -5392,7 +5354,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:CPPIB_meeting_prep_emails_FIXED/05 - Ascendant Fund V — Responses to Initial Questions.eml",
+      "id": "MSG-0014",
       "relationshipId": "P-010",
       "data": {
         "from": "Claire Whitfield <c.whitfield@ascendantcapital.com>",
@@ -5410,7 +5372,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:CPPIB_meeting_prep_emails_FIXED/06 - Ascendant Fund V — H1 2025 Shadow Portfolio Update & Re-engagement.eml",
+      "id": "MSG-0015",
       "relationshipId": "P-010",
       "data": {
         "from": "Claire Whitfield <c.whitfield@ascendantcapital.com>",
@@ -5424,7 +5386,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:CPPIB_meeting_prep_emails_FIXED/07 - Ascendant Fund V — Investment Committee Clearance & Meeting Request.eml",
+      "id": "MSG-0016",
       "relationshipId": "P-010",
       "data": {
         "from": "Margaret Osei <m.osei@cppib.com>",
@@ -5442,7 +5404,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:CPPIB_meeting_prep_emails_FIXED/08 - Ascendant Fund V — Investment Committee Clearance & Meeting Confirmation.eml",
+      "id": "MSG-0017",
       "relationshipId": "P-010",
       "data": {
         "from": "Claire Whitfield <c.whitfield@ascendantcapital.com>",
@@ -5455,13 +5417,13 @@
         ],
         "subject": " Re: Ascendant Fund V — Investment Committee Clearance & Meeting Confirmation",
         "date": "2026-07-01T14:18:00",
-        "body": "Hi Margaret,\r\n\r\nWonderful news, and yes of course we would be happy to host the meeting ahead of your IC on Wednesday, August 12.\r\n\r\nAs discussed over the phone with Thomas last week, we will host at our NY office (address below) and are confirming Wednesday, July 29, 2026, 9:00 AM – 12:00 PM ET.\r\n\r\nAscendant Address: 590 Madison Avenue, 28th Floor, New York, NY 10022\r\n\r\nAscendant attendees: Jonathan Reeves (CIO); Alexandra Voss (PM, Fund V); Dr. Elena Vasquez (CRO); Michael Torres (COO); Claire Whitfield (IR). We can add Rachel Kwan from our legal team if helpful for the SMA / hedging conversation.\r\n\r\nWe look forward to hosting you all and will prepare according to your proposed agenda:\r\n\r\n  1. Fund V strategy deep-dive — Alex Voss to lead (45 mins)\r\n  2. Risk framework and shadow portfolio attribution — Dr. Vasquez (30 mins) — Alex will additionally walk through the updated Brazil DI stress scenario, including the follow-up on the recovery assumption and a note on the June / early-July 2026 EM rates volatility.\r\n  3. Firm overview, team stability, and operational infrastructure — Jonathan Reeves and COO Torres (30 mins)\r\n  4. Portfolio fit discussion — how Fund V complements CPPIB's existing alternatives book, framed for the full IC committee (30 mins)\r\n  5. Open Q&A (15 mins)\r\n\r\nAhead of the meeting we will send: (1) the GIPS performance document updated through Q2 2026 (H1 2026 net +9.7%, ITD +20.4%), (2) the executed SMA term sheet, and (3) the Skadden CFTC exempt CPO letter. Our compliance team will separately deliver the OFAC and Canadian sanctions screening confirmation your team has requested, on or before Friday 17 July.\r\n\r\nThomas and I have a brief final alignment call scheduled for Wednesday 8 July to close out remaining logistics.\r\n\r\nBest regards,\r\nClaire Whitfield\r\nHead of Investor Relations · Ascendant Capital\r\nc.whitfield@ascendantcapital.com · +1 (212) 555-0182\r\n590 Madison Avenue, 28th Floor · New York, NY 10022\r\n",
+        "body": "Hi Margaret,\r\n\r\nWonderful news, and yes of course we would be happy to host the meeting ahead of your IC on Wednesday, August 12.\r\n\r\nAs discussed over the phone with Thomas last week, we will host at our NY office (address below) and are confirming the upcoming Friday, 9:00 AM – 12:00 PM ET.\r\n\r\nAscendant Address: 590 Madison Avenue, 28th Floor, New York, NY 10022\r\n\r\nAscendant attendees: Jonathan Reeves (CIO); Alexandra Voss (PM, Fund V); Dr. Elena Vasquez (CRO); Michael Torres (COO); Claire Whitfield (IR). We can add Rachel Kwan from our legal team if helpful for the SMA / hedging conversation.\r\n\r\nWe look forward to hosting you all and will prepare according to your proposed agenda:\r\n\r\n  1. Fund V strategy deep-dive — Alex Voss to lead (45 mins)\r\n  2. Risk framework and shadow portfolio attribution — Dr. Vasquez (30 mins) — Alex will additionally walk through the updated Brazil DI stress scenario, including the follow-up on the recovery assumption and a note on the June / early-July 2026 EM rates volatility.\r\n  3. Firm overview, team stability, and operational infrastructure — Jonathan Reeves and COO Torres (30 mins)\r\n  4. Portfolio fit discussion — how Fund V complements CPPIB's existing alternatives book, framed for the full IC committee (30 mins)\r\n  5. Open Q&A (15 mins)\r\n\r\nAhead of the meeting we will send: (1) the GIPS performance document updated through Q2 2026 (H1 2026 net +9.7%, ITD +20.4%), (2) the executed SMA term sheet, and (3) the Skadden CFTC exempt CPO letter. Our compliance team will separately deliver the OFAC and Canadian sanctions screening confirmation your team has requested, on or before Friday 17 July.\r\n\r\nThomas and I have a brief final alignment call scheduled for Wednesday 8 July to close out remaining logistics.\r\n\r\nBest regards,\r\nClaire Whitfield\r\nHead of Investor Relations · Ascendant Capital\r\nc.whitfield@ascendantcapital.com · +1 (212) 555-0182\r\n590 Madison Avenue, 28th Floor · New York, NY 10022\r\n",
         "sourceFile": "CPPIB_meeting_prep_emails_FIXED/08 - Ascendant Fund V — Investment Committee Clearance & Meeting Confirmation.eml"
       }
     },
     {
       "resource": "messages",
-      "id": "eml:CPPIB_meeting_prep_emails_FIXED/09 - Ascendant Fund V — Brazil DI Volatility Note Ahead of Sept 2 Meeting.eml",
+      "id": "MSG-0018",
       "relationshipId": "P-010",
       "data": {
         "from": "Thomas Brennan <t.brennan@cppib.com>",
@@ -5472,15 +5434,15 @@
           "Robert Yuen <r.yuen@cppib.com>",
           "James Leclerc <j.leclerc@cppib.com>"
         ],
-        "subject": "Ascendant Fund V — Brazil DI Volatility Note Ahead of Jul 29 Meeting",
+        "subject": "Ascendant Fund V — Brazil DI Volatility Note Ahead of Executive Meeting",
         "date": "2026-07-10T15:47:00",
-        "body": "Claire,\r\n\r\nQuick note following our alignment call on Wednesday. Two things I want to flag ahead of July 29 so Alex and Elena are not caught cold.\r\n\r\nBrazil DI — June / early July 2026 volatility. Leclerc has been watching the recent widening in DI spreads and the intraday moves in the past three weeks. He is broadly comfortable with how Fund V is positioned — this is not a change of mind — but he is going to raise it in the room and he wants a specific view on: (i) how the current market resembles or differs from the stress scenario Alex walked through in December, (ii) whether the 10-day liquidation assumption still holds in the June/July tape, and (iii) what the recovery path looks like from here. He does not need a long answer, but he needs a specific one.\r\n\r\nIC narrative. As I mentioned on the call, a couple of our IC members are less familiar with liquid macro strategies. Robert asked me to reinforce with you that the opening framing of the July 29 presentation is the single most important thing — not the strategy label, but the pension portfolio problem Fund V is solving. Jonathan handled this brilliantly in the October presentation; I would like the July opening to hit the same notes.\r\n\r\nEverything else is on track. GIPS through Q2 is with us, the SMA executed copy is with our legal team, and I will chase Priya for the compliance ack on the sanctions screening once your team sends it.\r\n\r\nSee you on July 29.\r\n\r\nBest,\r\nThomas Brennan\r\nDirector, Hedge Fund Investments · CPP Investments\r\nt.brennan@cppib.com · +1 (416) 868-4212\r\nOne Queen Street East, Suite 2500 · Toronto, ON M5C 2W5\r\n",
+        "body": "Claire,\r\n\r\nQuick note following our alignment call on Wednesday. Two things I want to flag ahead of the executive meeting so Alex and Elena are not caught cold.\r\n\r\nBrazil DI — June / early July 2026 volatility. Leclerc has been watching the recent widening in DI spreads and the intraday moves in the past three weeks. He is broadly comfortable with how Fund V is positioned — this is not a change of mind — but he is going to raise it in the room and he wants a specific view on: (i) how the current market resembles or differs from the stress scenario Alex walked through in December, (ii) whether the 10-day liquidation assumption still holds in the June/July tape, and (iii) what the recovery path looks like from here. He does not need a long answer, but he needs a specific one.\r\n\r\nIC narrative. As I mentioned on the call, a couple of our IC members are less familiar with liquid macro strategies. Robert asked me to reinforce with you that the opening framing of the executive meeting presentation is the single most important thing — not the strategy label, but the pension portfolio problem Fund V is solving. Jonathan handled this brilliantly in the October presentation; I would like the executive meeting opening to hit the same notes.\r\n\r\nEverything else is on track. GIPS through Q2 is with us, the SMA executed copy is with our legal team, and I will chase Priya for the compliance ack on the sanctions screening once your team sends it.\r\n\r\nSee you at the executive meeting.\r\n\r\nBest,\r\nThomas Brennan\r\nDirector, Hedge Fund Investments · CPP Investments\r\nt.brennan@cppib.com · +1 (416) 868-4212\r\nOne Queen Street East, Suite 2500 · Toronto, ON M5C 2W5\r\n",
         "sourceFile": "CPPIB_meeting_prep_emails_FIXED/09 - Ascendant Fund V — Brazil DI Volatility Note Ahead of Sept 2 Meeting.eml"
       }
     },
     {
       "resource": "messages",
-      "id": "eml:ExistingInvestor_emails_FIXED/David_Marsh_Blue_Harbor_Insurance_Co_URGENT.eml",
+      "id": "MSG-0019",
       "relationshipId": "LP-003",
       "data": {
         "from": "David Marsh <d.marsh@blueharborinsurance.com>",
@@ -5494,7 +5456,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:ExistingInvestor_emails_FIXED/Elena_Vogel_Castellan_University_Endowment_Investment_Office_Transition_Upcoming_DDQ_Ren.eml",
+      "id": "MSG-0020",
       "relationshipId": "LP-005",
       "data": {
         "from": "Elena Vogel <e.vogel@castellan.edu>",
@@ -5508,7 +5470,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:ExistingInvestor_emails_FIXED/Grant_Delacroix_Oakcliff_OCIO_Solutions_Checking_in.eml",
+      "id": "MSG-0021",
       "relationshipId": "LP-009",
       "data": {
         "from": "Daniel Ferreira <d.ferreira@ascendantcapital.com>",
@@ -5522,7 +5484,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:ExistingInvestor_emails_FIXED/Katherine_Ruiz_Teacher_Retirement_System_of_Texas_DDQ_Renewal_Timeline.eml",
+      "id": "MSG-0022",
       "relationshipId": "LP-007",
       "data": {
         "from": "Katherine Ruiz <k.ruiz@trs.texas.gov>",
@@ -5536,7 +5498,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:ExistingInvestor_emails_FIXED/Nina_Osei_Larkspur_Multi_Family_Office_DDQ_Renewal_Q2_Materials.eml",
+      "id": "MSG-0023",
       "relationshipId": "LP-010",
       "data": {
         "from": "Renata Silva <r.silva@ascendantcapital.com>",
@@ -5550,7 +5512,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:ExistingInvestor_emails_FIXED/Rebecca_Lin_CalSTRS_Annual_Operational_Due_Diligence_Update.eml",
+      "id": "MSG-0024",
       "relationshipId": "LP-001",
       "data": {
         "from": "Rebecca Lin <r.lin@calstrs.com>",
@@ -5564,7 +5526,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:ExistingInvestor_emails_FIXED/Sanjay_Iyer_Castellan_University_Endowment_Following_Up.eml",
+      "id": "MSG-0025",
       "relationshipId": "LP-005",
       "data": {
         "from": "James Okafor <j.okafor@ascendantcapital.com>",
@@ -5578,7 +5540,7 @@
     },
     {
       "resource": "messages",
-      "id": "eml:ExistingInvestor_emails_FIXED/Tomas_Berger_Northgate_Fund_of_Funds_Performance_Attribution_Memo.eml",
+      "id": "MSG-0026",
       "relationshipId": "LP-006",
       "data": {
         "from": "Renata Silva <r.silva@ascendantcapital.com>",
