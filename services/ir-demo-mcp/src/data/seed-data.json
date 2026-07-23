@@ -4078,7 +4078,8 @@
         "dueDate": "2026-07-22",
         "priority": "URGENT",
         "status": "Open",
-        "actionUrl": "https://next.unique.app/admin/custom-space/assistant_uf8pigrvth36n3jovxbpds17",
+        "actionType": "navigate",
+        "actionUrl": "/space/assistant_uf8pigrvth36n3jovxbpds17",
         "notes": "Originally committed for July 17 per the July 1 confirmation email; delivery slipped and Thomas flagged the gap on July 10. Due today — the single remaining item needed to fully close out Fund V DDQ for CPPIB ahead of the July 24 meeting. Most time-sensitive open item in the pipeline."
       }
     },
@@ -4108,7 +4109,8 @@
         "dueDate": "2026-07-24",
         "importance": "high",
         "status": "notStarted",
-        "actionUrl": "https://next.unique.app/admin/swappable-intelligence-space/assistant_exi3a15byza862e9f3r6p89j",
+        "actionType": "navigate",
+        "actionUrl": "/space/assistant_exi3a15byza862e9f3r6p89j?prompt=Help%20me%20complete%20the%20AIMA%20DDQ%20template%20using%20approved%20Investor%20Relations%20knowledge%20and%20prepare%20the%20filled%20template%20for%20review.",
         "categories": ["Investor Relations", "Due Diligence"]
       }
     },
@@ -4123,6 +4125,8 @@
         "dueDate": "2026-07-24",
         "importance": "high",
         "status": "notStarted",
+        "actionType": "navigate",
+        "actionUrl": "/space/assistant_s0g6v8r25dkm2iiyvk5sojnw?prompt=Create%20an%20investor%20letter%20in%20.docx%20format%20for%20Q2%202026%20pulling%20from%20internal%20risk%20reports%2C%20portfolio%20positioning%2C%20performance%20analytics%2C%20PM%20commentary.%20Please%20refer%20to%20previous%20two%20quarterly%20investor%20letters%20in%20the%20Knowledge%20Base%20to%20ensure%20consistency%20and%20continuity%20of%20messaging.",
         "categories": ["Investor Communications", "Quarterly Reporting"]
       }
     },
@@ -4310,7 +4314,8 @@
         "purpose": "Formal IC-track presentation two weeks ahead of CPPIB's Aug 12 Investment Committee — strategy deep-dive, risk/attribution, firm overview, portfolio fit, Q&A",
         "status": "Confirmed",
         "kind": "meeting",
-        "meetingBriefPath": "/Investor Relations Data/meeting-briefs/cal-0020.html"
+        "actionType": "navigate",
+        "actionUrl": "/space/assistant_zu586ufgtg57ncjpuqb4kq6k?prompt=i%29%20Search%20my%20Outlook%20folders%2C%20call%20reports%20from%20the%20Knowledge%20Base%20and%20Share%20Point%20for%20all%20CPPIB%20correspondence%20in%20the%20last%20year%20related%20to%20Ascendant%20Capital%20and%20Fund%20V.%0Aii%29%20Search%20With%20Intelligence%20data%20from%20the%20Knowledge%20Base%2C%20online%20for%20the%20latest%20information%20on%20CPPIB%20%E2%80%94%20recent%20portfolio%20decisions%2C%20public%20statements%20on%20alternatives%20any%20relevant%20news%20from%20the%20last%203%20months%20that%20may%20relate%20to%20Ascendant%20Fund%20V.%0Aiii%29%20Extract%20top%203%20outstanding%20items%20and%20present%20as%20a%20fully%20rendered%2C%20self-contained%20HTML%20document%20with%20the%20relevant%20source%20notes%20from%20emails%2C%20meeting%20notes%20and%20web%20search.%20Keep%20the%20HTML%20document%20to%20one%20page%20only%2C%20with%20key%20risks%20or%20call%20outs%20that%20I%20need%20to%20tell%20everyone%20before%20the%20meeting.%20Ensure%20format%20of%20the%20HTML%20is%20clean%20and%20symmetric."
       }
     },
     {
