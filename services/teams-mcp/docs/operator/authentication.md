@@ -14,7 +14,27 @@ For technical details about the OAuth flow, see [Microsoft OAuth Setup Flow](../
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. Three permissions require admin consent before users can connect.
+All permissions are **delegated** — they act on behalf of the signed-in user. Which scopes are requested depends on `UNIQUE_INTEGRATION`.
+
+### Chat-only (`UNIQUE_INTEGRATION=disabled`)
+
+Only identity + Teams messaging scopes. `ChannelMessage.Read.All` requires admin consent.
+
+| Permission | Type | Admin Consent |
+|------------|------|---------------|
+| `User.Read` | Delegated | No |
+| `offline_access` | Delegated | No |
+| `ChannelMessage.Send` | Delegated | No |
+| `ChatMessage.Send` | Delegated | No |
+| `Chat.ReadBasic` | Delegated | No |
+| `Chat.Read` | Delegated | No |
+| `Team.ReadBasic.All` | Delegated | No |
+| `Channel.ReadBasic.All` | Delegated | No |
+| `ChannelMessage.Read.All` | Delegated | **Yes** |
+
+### Unique knowledge base (`UNIQUE_INTEGRATION=enabled`)
+
+Chat scopes plus calendar/meeting/transcript/recording scopes. Three permissions require admin consent before users can connect.
 
 | Permission | Type | Admin Consent |
 |------------|------|---------------|
@@ -61,6 +81,7 @@ module "teams_mcp_app" {
   display_name     = "Teams MCP Server"
   sign_in_audience = "AzureADMyOrg"  # Single tenant
   notes            = "MCP server for Teams transcript capture"
+  # unique_integration = "disabled"  # chat-only: omits calendar/meeting/transcript scopes
 
   redirect_uris = [
     "https://teams.mcp.example.com/auth/callback"
@@ -89,7 +110,7 @@ module "teams_mcp_app" {
    - Add all permissions listed under [Required Permissions](#required-permissions)
 
 3. Click **Grant admin consent for [Tenant]** and confirm.
-   `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ChannelMessage.Read.All` require this step — without it users cannot connect.
+   For Unique-enabled deployments, `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ChannelMessage.Read.All` require this step. Chat-only deployments only need admin consent for `ChannelMessage.Read.All`.
 
 4. Go to **Certificates & secrets** → **New client secret**:
    - Set description and expiration
@@ -175,9 +196,9 @@ This secret is passed to Microsoft when creating Graph subscriptions and returne
 
 **This is standard Microsoft behavior, not Teams MCP specific.** All Microsoft 365 apps use the same consent model.
 
-Because three permissions require admin consent (`OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ChannelMessage.Read.All`), the consent sequence is:
+Because admin-consent scopes depend on deployment mode (`ChannelMessage.Read.All` always; plus `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` when Unique is enabled), the consent sequence is:
 
-1. **Admin grants consent** for those three permissions (organisation-wide or per-user). The remaining 10 permissions — including all other chat scopes (`ChannelMessage.Send`, `ChatMessage.Send`, `Chat.ReadBasic`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`) — are user-consentable and do not require admin action.
+1. **Admin grants consent** for the admin-required permissions for your mode (organisation-wide or per-user). Remaining permissions — including other chat scopes (`ChannelMessage.Send`, `ChatMessage.Send`, `Chat.ReadBasic`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`) — are user-consentable and do not require admin action.
 2. **User consent** — on first connection, the user sees the Microsoft consent screen and approves the remaining permissions
 
 **How to grant admin consent:**

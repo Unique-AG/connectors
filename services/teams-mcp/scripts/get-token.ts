@@ -35,16 +35,15 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
 const PORT = 9542;
 const REDIRECT_URI = `http://localhost:${PORT}/auth/callback`;
 const TENANT = 'common';
-const SCOPES = [
+const UNIQUE_INTEGRATION =
+  process.env.UNIQUE_INTEGRATION === 'disabled' ? 'disabled' : 'enabled';
+
+const CHAT_SCOPES = [
   'openid',
   'profile',
   'email',
   'offline_access',
   'User.Read',
-  'Calendars.Read',
-  'OnlineMeetings.Read',
-  'OnlineMeetingRecording.Read.All',
-  'OnlineMeetingTranscript.Read.All',
   'ChannelMessage.Send',
   'ChatMessage.Send',
   'Chat.ReadBasic',
@@ -52,7 +51,16 @@ const SCOPES = [
   'Team.ReadBasic.All',
   'Channel.ReadBasic.All',
   'ChannelMessage.Read.All',
-].join(' ');
+];
+const KB_SCOPES = [
+  'Calendars.Read',
+  'OnlineMeetings.Read',
+  'OnlineMeetingRecording.Read.All',
+  'OnlineMeetingTranscript.Read.All',
+];
+const SCOPES = (
+  UNIQUE_INTEGRATION === 'enabled' ? [...CHAT_SCOPES, ...KB_SCOPES] : CHAT_SCOPES
+).join(' ');
 
 async function exchangeCode(code: string): Promise<string> {
   const res = await fetch(`https://login.microsoftonline.com/${TENANT}/oauth2/v2.0/token`, {
