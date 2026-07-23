@@ -445,8 +445,8 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
     // Shared mailboxes appear in Entra ID as accountEnabled=false accounts
     let response = (await client
       .api('/users')
-      .filter('accountEnabled eq false')
       .select('id,mail,displayName')
+      .top(500)
       .get()) as { value: GraphUser[]; '@odata.nextLink'?: string };
 
     users.push(...response.value);
