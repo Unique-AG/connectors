@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.0...teams-mcp@0.4.1) (2026-07-23)
+
+
+### Features
+
+* **teams-mcp:** request fewer Graph scopes when Unique is disabled ([#703](https://github.com/Unique-AG/connectors/issues/703)) ([b24256f](https://github.com/Unique-AG/connectors/commit/b24256fecd31c23d25866275bab4a2a9e4b1847b))
+
 ## [0.4.0](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.5...teams-mcp@0.4.0) (2026-07-22)
 
 
