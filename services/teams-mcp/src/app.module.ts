@@ -17,7 +17,7 @@ import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
 import { AMQPModule } from './amqp/amqp.module';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
-import { MicrosoftOAuthProvider } from './auth/microsoft.provider';
+import { createMicrosoftOAuthProvider } from './auth/microsoft.provider';
 import { ChatModule } from './chat/chat.module';
 import {
   type AppConfig,
@@ -32,6 +32,7 @@ import {
   healthConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
+  type UniqueConfigNamespaced,
   uniqueConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
@@ -107,7 +108,10 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
       ],
       useFactory: async (
         configService: ConfigService<
-          AppConfigNamespaced & MicrosoftConfigNamespaced & AuthConfigNamespaced,
+          AppConfigNamespaced &
+            MicrosoftConfigNamespaced &
+            AuthConfigNamespaced &
+            UniqueConfigNamespaced,
           true
         >,
         aesService: AesGcmEncryptionService,
@@ -116,7 +120,9 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         metricService: MetricService,
         amqpConnection: AmqpConnection,
       ) => ({
-        provider: MicrosoftOAuthProvider,
+        provider: createMicrosoftOAuthProvider(
+          configService.get('unique.integration', { infer: true }),
+        ),
 
         clientId: configService.get('microsoft.clientId', { infer: true }),
         clientSecret: configService.get('microsoft.clientSecret', { infer: true }).value,
