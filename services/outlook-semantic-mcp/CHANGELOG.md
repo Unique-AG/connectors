@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.0.0...outlook-semantic-mcp@3.0.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** stop filtering shared mailboxes by accountEnabled ([#701](https://github.com/Unique-AG/connectors/issues/701)) ([b164ba7](https://github.com/Unique-AG/connectors/commit/b164ba7fe0d6c7d0c8050ccf159f785fe5f230e8))
+
 ## [3.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@2.0.2...outlook-semantic-mcp@3.0.0) (2026-07-07)
 
 
