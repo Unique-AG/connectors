@@ -29,7 +29,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/teams-mcp
-  tag: 0.4.0 # x-release-please-version
+  tag: 0.4.1 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
