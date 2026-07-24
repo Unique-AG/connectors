@@ -37,9 +37,11 @@ function createMockDb(selectRow: object) {
       }),
     }),
     select: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([selectRow]),
-      }),
+      from: vi.fn().mockReturnValue(
+        Object.assign(Promise.resolve([selectRow]), {
+          where: vi.fn().mockResolvedValue([selectRow]),
+        }),
+      ),
     }),
   };
 }
