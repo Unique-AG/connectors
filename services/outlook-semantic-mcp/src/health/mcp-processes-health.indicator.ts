@@ -160,7 +160,9 @@ export class McpProcessesHealthIndicator {
           THEN ${delegatedAccessAccounts.delegateUserId}
         END)`,
       })
-      .from(delegatedAccessAccounts);
+      .from(delegatedAccessAccounts)
+      .innerJoin(userProfiles, eq(userProfiles.id, delegatedAccessAccounts.delegateUserId))
+      .where(and(eq(userProfiles.source, 'oauth')));
 
     const total = row?.totalDelegated ?? 0;
     const stale = Number(row?.stale ?? 0);
