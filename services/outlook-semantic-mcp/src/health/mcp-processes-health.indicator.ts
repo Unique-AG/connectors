@@ -30,50 +30,6 @@ export class McpProcessesHealthIndicator {
     private readonly healthIndicatorService: HealthIndicatorService,
   ) {}
 
-  public async checkSharedMailboxesDatabaseSync(key: string): Promise<HealthIndicatorResult> {
-    if (this.delegatedAccessCfg.scan === 'disabled') {
-      throw new Error(`${key} requires delegated access to be enabled`);
-    }
-    const indicator = this.healthIndicatorService.check(key);
-    const usersWhichCanOptainAnMcpSessionWithoutLogin = await this.db
-      .select({ totalUsers: countDistinct(tokens.userProfileId) })
-      .from(tokens)
-      .where(
-        or(
-          and(eq(tokens.type, 'ACCESS'), gt(tokens.expiresAt, sql`now()`)),
-          and(eq(tokens.token, 'REFRESH'), gt(tokens.expiresAt, sql`now()`)),
-        ),
-      )
-      .then((rows) => rows[0]?.totalUsers ?? 0);
-
-    const usersWithOauthAndMicrosoftToken = await this.db
-      .select({ totalUsers: count(userProfiles.id) })
-      .from(userProfiles)
-      .where(and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)))
-      .then((rows) => rows[0]?.totalUsers);
-
-    const details = {
-      sharedMailboxEmailsSyncronizedToDatabase: 0,
-      sharedMailboxEmailsCount: this.delegatedAccessCfg.sharedMailboxEmails.length,
-      usersWithOauthAndMicrosoftToken,
-      usersWhichCanOptainAnMcpSessionWithoutLogin,
-    };
-
-    if (details.sharedMailboxEmailsCount === 0) {
-      return indicator.up(details);
-    }
-
-    details.sharedMailboxEmailsSyncronizedToDatabase = await this.db
-      .select({ total: countDistinct(userProfiles.id) })
-      .from(userProfiles)
-      .where(inArray(userProfiles.email, this.delegatedAccessCfg.sharedMailboxEmails))
-      .then((rows) => rows[0]?.total ?? 0);
-
-    return details.sharedMailboxEmailsSyncronizedToDatabase < details.sharedMailboxEmailsCount
-      ? indicator.down(details)
-      : indicator.up(details);
-  }
-
   public async checkFullSync(key: string): Promise<HealthIndicatorResult> {
     const indicator = this.healthIndicatorService.check(key);
     if (this.ingestionCfg.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {
@@ -136,6 +92,50 @@ export class McpProcessesHealthIndicator {
       ratio,
     };
     return ratio > syncFailureThreshold ? indicator.down(details) : indicator.up(details);
+  }
+
+  public async checkSharedMailboxesDatabaseSync(key: string): Promise<HealthIndicatorResult> {
+    if (this.delegatedAccessCfg.scan === 'disabled') {
+      throw new Error(`${key} requires delegated access to be enabled`);
+    }
+    const indicator = this.healthIndicatorService.check(key);
+    const usersWhichCanOptainAnMcpSessionWithoutLogin = await this.db
+      .select({ totalUsers: countDistinct(tokens.userProfileId) })
+      .from(tokens)
+      .where(
+        or(
+          and(eq(tokens.type, 'ACCESS'), gt(tokens.expiresAt, sql`now()`)),
+          and(eq(tokens.token, 'REFRESH'), gt(tokens.expiresAt, sql`now()`)),
+        ),
+      )
+      .then((rows) => rows[0]?.totalUsers ?? 0);
+
+    const usersWithOauthAndMicrosoftToken = await this.db
+      .select({ totalUsers: count(userProfiles.id) })
+      .from(userProfiles)
+      .where(and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)))
+      .then((rows) => rows[0]?.totalUsers);
+
+    const details = {
+      sharedMailboxEmailsSyncronizedToDatabase: 0,
+      sharedMailboxEmailsCount: this.delegatedAccessCfg.sharedMailboxEmails.length,
+      usersWithOauthAndMicrosoftToken,
+      usersWhichCanOptainAnMcpSessionWithoutLogin,
+    };
+
+    if (details.sharedMailboxEmailsCount === 0) {
+      return indicator.up(details);
+    }
+
+    details.sharedMailboxEmailsSyncronizedToDatabase = await this.db
+      .select({ total: countDistinct(userProfiles.id) })
+      .from(userProfiles)
+      .where(inArray(userProfiles.email, this.delegatedAccessCfg.sharedMailboxEmails))
+      .then((rows) => rows[0]?.total ?? 0);
+
+    return details.sharedMailboxEmailsSyncronizedToDatabase < details.sharedMailboxEmailsCount
+      ? indicator.down(details)
+      : indicator.up(details);
   }
 
   public async checkDelegatedAccess(key: string): Promise<HealthIndicatorResult> {
