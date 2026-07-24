@@ -3,7 +3,9 @@ import { and, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { DRIZZLE, DrizzleDatabase, directoriesSync, userProfiles } from '~/db';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
+import { getRetryAfterMs } from '~/utils/get-retry-after-ms';
+import { isRateLimitError } from '~/utils/is-rate-limit-error';
+import { makeRetryResponse, withRetryAttempts } from '~/utils/with-retry-attempts';
 import { SyncDirectoriesCommand } from './sync-directories.command';
 
 @Injectable()
@@ -38,14 +40,17 @@ export class SyncDirectoriesForAllUserProfilesCommand {
           await this.syncDirectoriesCommand.run(convertUserProfileIdToTypeId(id));
           return 'success';
         },
-        onError: makeDefaultOnErrorHandler((err) => {
-          this.logger.warn({
-            msg: `Scan directories failed for user profile`,
-            userProfileId: id,
-            err,
-          });
+        onError: ({ error, wasLastAttempt }) => {
+          if (isRateLimitError(error)) {
+            if (wasLastAttempt) {
+              throw error;
+            }
+            return makeRetryResponse(getRetryAfterMs(error));
+          }
+
+          this.logger.warn({ error, msg: `User skipped for directories sync`, userProfileId: id });
           return 'failed';
-        }),
+        },
       });
     }
   }
