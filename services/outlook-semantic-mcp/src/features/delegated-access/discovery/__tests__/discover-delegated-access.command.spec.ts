@@ -50,7 +50,6 @@ function createMockDb() {
   const deleteWhere = vi.fn().mockResolvedValue(undefined);
   const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });
 
-  // Chain used by logDiscoverySummary(): select().from().innerJoin().innerJoin().groupBy()
   const selectGroupBy = vi.fn().mockResolvedValue([]);
   const select = vi.fn().mockReturnValue({
     from: vi.fn().mockReturnValue({

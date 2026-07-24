@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { and, count, countDistinct, eq, gt, inArray, sql, isNotNull, or } from 'drizzle-orm';
+import { and, count, countDistinct, eq, gt, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import {
   DelegatedAccessConfig,
   delegatedAccessConfig,

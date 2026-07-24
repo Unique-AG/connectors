@@ -99,45 +99,46 @@ export class DiscoverDelegatedAccessCommand {
         },
       );
 
-      // Best-effort summary: a logging/query failure here must not flip the
-      // already-committed discovery outcome into a failed run.
-      try {
-        await this.logDiscoverySummary(finalState);
-      } catch (error) {
-        this.logger.warn({
-          msg: `Failed to log delegated access discovery summary`,
-          err: error,
-        });
-      }
+      await this.logDiscoverySummary(finalState);
     });
   }
 
   private async logDiscoverySummary(finalState: string): Promise<void> {
-    const delegateProfiles = alias(userProfiles, 'delegate_profiles');
-    const ownerProfiles = alias(userProfiles, 'owner_profiles');
+    try {
+      const delegateProfiles = alias(userProfiles, 'delegate_profiles');
+      const ownerProfiles = alias(userProfiles, 'owner_profiles');
 
-    const rows = await this.db
-      .select({
-        delegateEmail: delegateProfiles.email,
-        ownerEmails: sql<(string | null)[]>`ARRAY_AGG(${ownerProfiles.email})`,
-      })
-      .from(delegatedAccessAccounts)
-      .innerJoin(delegateProfiles, eq(delegatedAccessAccounts.delegateUserId, delegateProfiles.id))
-      .innerJoin(ownerProfiles, eq(delegatedAccessAccounts.ownerUserId, ownerProfiles.id))
-      .groupBy(delegateProfiles.email);
+      const rows = await this.db
+        .select({
+          delegateEmail: delegateProfiles.email,
+          ownerEmails: sql<(string | null)[]>`ARRAY_AGG(${ownerProfiles.email})`,
+        })
+        .from(delegatedAccessAccounts)
+        .innerJoin(
+          delegateProfiles,
+          eq(delegatedAccessAccounts.delegateUserId, delegateProfiles.id),
+        )
+        .innerJoin(ownerProfiles, eq(delegatedAccessAccounts.ownerUserId, ownerProfiles.id))
+        .groupBy(delegateProfiles.email);
 
-    // An array (not an object keyed by email) avoids distinct addresses collapsing
-    // to the same smeared key and overwriting each other under conceal mode.
-    const delegatedAccess = rows.map((row) => ({
-      delegate: smearEmail(createSmeared(row.delegateEmail ?? '')),
-      owners: row.ownerEmails.map((email) => smearEmail(createSmeared(email ?? ''))),
-    }));
+      // An array (not an object keyed by email) avoids distinct addresses collapsing
+      // to the same smeared key and overwriting each other under conceal mode.
+      const delegatedAccess = rows.map((row) => ({
+        delegate: smearEmail(createSmeared(row.delegateEmail ?? '')),
+        owners: row.ownerEmails.map((email) => smearEmail(createSmeared(email ?? ''))),
+      }));
 
-    this.logger.log({
-      msg: `Delegated access discovery completed, final state: ${finalState}`,
-      delegatesWithAccess: rows.length,
-      delegatedAccess,
-    });
+      this.logger.log({
+        msg: `Delegated access discovery completed, final state: ${finalState}`,
+        delegatesWithAccess: rows.length,
+        delegatedAccess,
+      });
+    } catch (error) {
+      this.logger.warn({
+        msg: `Failed to log delegated access discovery summary`,
+        err: error,
+      });
+    }
   }
 
   @Span()

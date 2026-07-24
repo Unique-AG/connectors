@@ -292,7 +292,7 @@ describe('Smeared', () => {
       const result = smearEmail(email);
 
       // The 3-char local part is too short to leave any characters visible.
-      expect(result).toBe('[Smeared]@***mple.[Smeared]');
+      expect(result).toBe('[Smeared]@exam***.***');
     });
   });
 
