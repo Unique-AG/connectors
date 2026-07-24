@@ -48,7 +48,11 @@ export class SyncDirectoriesForAllUserProfilesCommand {
             return makeRetryResponse(getRetryAfterMs(error));
           }
 
-          this.logger.warn({ error, msg: `User skipped for directories sync`, userProfileId: id });
+          this.logger.warn({
+            err: error,
+            msg: `User skipped for directories sync`,
+            userProfileId: id,
+          });
           return 'failed';
         },
       });
