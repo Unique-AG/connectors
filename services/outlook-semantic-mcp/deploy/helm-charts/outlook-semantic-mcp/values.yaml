@@ -43,7 +43,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/outlook-semantic-mcp
-  tag: 3.0.1 # x-release-please-version
+  tag: 3.1.0 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:

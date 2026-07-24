@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.0.1...outlook-semantic-mcp@3.1.0) (2026-07-24)
+
+
+### Features
+
+* **outlook-semantic-mcp,utils:** smear emails in logs and refine delegated-access health metrics, fix directory sync ([#706](https://github.com/Unique-AG/connectors/issues/706)) ([b9f90e6](https://github.com/Unique-AG/connectors/commit/b9f90e6cc98a89c74a273e4b87df7aa356bbd9c3))
+
 ## [3.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.0.0...outlook-semantic-mcp@3.0.1) (2026-07-23)
 
 
