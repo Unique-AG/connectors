@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
@@ -197,7 +197,7 @@ export class SubscriptionCreateService {
     this.logger.debug({
       msg: 'Successfully retrieved user profile from database',
       userProfileId: userProfile.id,
-      userEmail: createSmeared(userProfile.email ?? `___Empty Email__`),
+      userEmail: smearEmail(createSmeared(userProfile.email ?? `___Empty Email__`)),
       providerUserId: userProfile.providerUserId,
     });
 

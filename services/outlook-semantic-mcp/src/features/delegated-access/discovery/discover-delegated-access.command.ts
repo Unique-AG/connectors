@@ -1,8 +1,9 @@
 import assert from 'node:assert';
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, gt, isNotNull, notInArray, or } from 'drizzle-orm';
+import { and, eq, gt, isNotNull, notInArray, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { Span } from 'nestjs-otel';
 import { isNonNullish, last } from 'remeda';
 import { AppConfig, appConfig, DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
@@ -97,7 +98,47 @@ export class DiscoverDelegatedAccessCommand {
           });
         },
       );
+
+      await this.logDiscoverySummary(finalState);
     });
+  }
+
+  private async logDiscoverySummary(finalState: string): Promise<void> {
+    try {
+      const delegateProfiles = alias(userProfiles, 'delegate_profiles');
+      const ownerProfiles = alias(userProfiles, 'owner_profiles');
+
+      const rows = await this.db
+        .select({
+          delegateEmail: delegateProfiles.email,
+          ownerEmails: sql<(string | null)[]>`ARRAY_AGG(${ownerProfiles.email})`,
+        })
+        .from(delegatedAccessAccounts)
+        .innerJoin(
+          delegateProfiles,
+          eq(delegatedAccessAccounts.delegateUserId, delegateProfiles.id),
+        )
+        .innerJoin(ownerProfiles, eq(delegatedAccessAccounts.ownerUserId, ownerProfiles.id))
+        .groupBy(delegateProfiles.email);
+
+      // An array (not an object keyed by email) avoids distinct addresses collapsing
+      // to the same smeared key and overwriting each other under conceal mode.
+      const delegatedAccess = rows.map((row) => ({
+        delegate: smearEmail(createSmeared(row.delegateEmail ?? '')),
+        owners: row.ownerEmails.map((email) => smearEmail(createSmeared(email ?? ''))),
+      }));
+
+      this.logger.log({
+        msg: `Delegated access discovery completed, final state: ${finalState}`,
+        delegatesWithAccess: rows.length,
+        delegatedAccess,
+      });
+    } catch (error) {
+      this.logger.warn({
+        msg: `Failed to log delegated access discovery summary`,
+        err: error,
+      });
+    }
   }
 
   @Span()
@@ -213,7 +254,7 @@ export class DiscoverDelegatedAccessCommand {
                   msg: `Delegated access discovery failed for accounts pair. Process will continue`,
                   delegateUserId,
                   ownerUserId,
-                  ownerEmail: createSmeared(ownerEmail).toString(),
+                  ownerEmail: smearEmail(createSmeared(ownerEmail)),
                   ownerSource,
                   err,
                 });

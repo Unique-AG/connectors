@@ -50,9 +50,20 @@ function createMockDb() {
   const deleteWhere = vi.fn().mockResolvedValue(undefined);
   const deleteFn = vi.fn().mockReturnValue({ where: deleteWhere });
 
+  const selectGroupBy = vi.fn().mockResolvedValue([]);
+  const select = vi.fn().mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      innerJoin: vi.fn().mockReturnValue({
+        innerJoin: vi.fn().mockReturnValue({ groupBy: selectGroupBy }),
+      }),
+    }),
+  });
+
   return {
     insert,
     delete: deleteFn,
+    select,
+    __selectGroupBy: selectGroupBy,
     __insertOnConflictDoUpdate: insertOnConflictDoUpdate,
     __insertValues: insertValues,
     __insert: insert,
