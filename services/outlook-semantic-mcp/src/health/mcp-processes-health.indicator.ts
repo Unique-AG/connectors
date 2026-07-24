@@ -130,7 +130,12 @@ export class McpProcessesHealthIndicator {
     details.sharedMailboxEmailsSyncronizedToDatabase = await this.db
       .select({ total: countDistinct(userProfiles.id) })
       .from(userProfiles)
-      .where(inArray(userProfiles.email, this.delegatedAccessCfg.sharedMailboxEmails))
+      .where(
+        inArray(
+          sql`lower(${userProfiles.email})`,
+          this.delegatedAccessCfg.sharedMailboxEmails.map((item) => item.trim().toLowerCase()),
+        ),
+      )
       .then((rows) => rows[0]?.total ?? 0);
 
     return details.sharedMailboxEmailsSyncronizedToDatabase < details.sharedMailboxEmailsCount
