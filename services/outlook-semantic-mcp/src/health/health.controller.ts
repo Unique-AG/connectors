@@ -37,8 +37,12 @@ export class HealthController {
     ];
 
     if (this.delegatedAccessEnvConfig.scan !== 'disabled') {
-      checksToRun.push(() =>
-        this.mcpProcessesIndicator.checkDelegatedAccess('mcpProcesses.delegatedAccess'),
+      checksToRun.push(
+        () => this.mcpProcessesIndicator.checkDelegatedAccess('mcpProcesses.delegatedAccess'),
+        () =>
+          this.mcpProcessesIndicator.checkSharedMailboxesDatabaseSync(
+            'mcpProcesses.sharedMailboxesDatabaseSync',
+          ),
       );
     }
 

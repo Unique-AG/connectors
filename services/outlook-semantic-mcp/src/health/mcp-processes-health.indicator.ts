@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { and, count, countDistinct, eq, inArray, isNotNull, sql } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
+import { and, count, countDistinct, eq, gt, inArray, sql, isNotNull, or } from 'drizzle-orm';
 import {
   DelegatedAccessConfig,
   delegatedAccessConfig,
@@ -14,11 +13,10 @@ import {
   DrizzleDatabase,
   delegatedAccessAccounts,
   inboxConfigurations,
+  subscriptions,
+  tokens,
   userProfiles,
 } from '~/db';
-import { DISCOVER_DELEGATED_ACCESS_CACHE_KEY } from '~/features/delegated-access/discovery/discover-delegated-access.command';
-import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
-import { selectUserProfileIdsWhichCanRunTheSyncProcess } from '~/features/sync/sync-scheduler.utils';
 import { FAILED_HEARTBEAT_MINUTES } from '~/features/sync/full-sync/full-sync.command';
 import { FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES } from '~/features/sync/live-catch-up/live-catch-up.command';
 import { getThreshold } from '~/utils/get-threshold';
@@ -30,8 +28,51 @@ export class McpProcessesHealthIndicator {
     @Inject(ingestionConfig.KEY) private readonly ingestionCfg: IngestionConfig,
     @Inject(delegatedAccessConfig.KEY) private readonly delegatedAccessCfg: DelegatedAccessConfig,
     private readonly healthIndicatorService: HealthIndicatorService,
-    private readonly persistentCacheService: PersistentCacheService,
   ) {}
+
+  public async checkSharedMailboxesDatabaseSync(key: string): Promise<HealthIndicatorResult> {
+    if (this.delegatedAccessCfg.scan === 'disabled') {
+      throw new Error(`${key} requires delegated access to be enabled`);
+    }
+    const indicator = this.healthIndicatorService.check(key);
+    const usersWhichCanOptainAnMcpSessionWithoutLogin = await this.db
+      .select({ totalUsers: countDistinct(tokens.userProfileId) })
+      .from(tokens)
+      .where(
+        or(
+          and(eq(tokens.type, 'ACCESS'), gt(tokens.expiresAt, sql`now()`)),
+          and(eq(tokens.token, 'REFRESH'), gt(tokens.expiresAt, sql`now()`)),
+        ),
+      )
+      .then((rows) => rows[0]?.totalUsers ?? 0);
+
+    const usersWithOauthAndMicrosoftToken = await this.db
+      .select({ totalUsers: count(userProfiles.id) })
+      .from(userProfiles)
+      .where(and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)))
+      .then((rows) => rows[0]?.totalUsers);
+
+    const details = {
+      sharedMailboxEmailsSyncronizedToDatabase: 0,
+      sharedMailboxEmailsCount: this.delegatedAccessCfg.sharedMailboxEmails.length,
+      usersWithOauthAndMicrosoftToken,
+      usersWhichCanOptainAnMcpSessionWithoutLogin,
+    };
+
+    if (details.sharedMailboxEmailsCount === 0) {
+      return indicator.up(details);
+    }
+
+    details.sharedMailboxEmailsSyncronizedToDatabase = await this.db
+      .select({ total: countDistinct(userProfiles.id) })
+      .from(userProfiles)
+      .where(inArray(userProfiles.email, this.delegatedAccessCfg.sharedMailboxEmails))
+      .then((rows) => rows[0]?.total ?? 0);
+
+    return details.sharedMailboxEmailsSyncronizedToDatabase < details.sharedMailboxEmailsCount
+      ? indicator.down(details)
+      : indicator.up(details);
+  }
 
   public async checkFullSync(key: string): Promise<HealthIndicatorResult> {
     const indicator = this.healthIndicatorService.check(key);
@@ -50,12 +91,7 @@ export class McpProcessesHealthIndicator {
           THEN 1 ELSE 0 END), 0)`,
       })
       .from(inboxConfigurations)
-      .where(
-        inArray(
-          inboxConfigurations.userProfileId,
-          selectUserProfileIdsWhichCanRunTheSyncProcess(this.db),
-        ),
-      );
+      .where(inArray(inboxConfigurations.userProfileId, this.eligibleUsersForSyncSubquery()));
 
     const eligible = row?.totalEligible ?? 0;
     const failing = Number(row?.failing ?? 0);
@@ -87,12 +123,7 @@ export class McpProcessesHealthIndicator {
           THEN 1 ELSE 0 END), 0)`,
       })
       .from(inboxConfigurations)
-      .where(
-        inArray(
-          inboxConfigurations.userProfileId,
-          selectUserProfileIdsWhichCanRunTheSyncProcess(this.db),
-        ),
-      );
+      .where(inArray(inboxConfigurations.userProfileId, this.eligibleUsersForSyncSubquery()));
 
     const eligible = row?.totalEligible ?? 0;
     const failing = Number(row?.failing ?? 0);
@@ -115,9 +146,6 @@ export class McpProcessesHealthIndicator {
     const { failureThreshold, stalenessThresholdHours } = this.delegatedAccessCfg;
     const stalenessThreshold = sql`NOW() - (${stalenessThresholdHours} * INTERVAL '1 hour')`;
 
-    // Count Microsoft access tokens on the delegate's own user profile, not the MCP
-    // OAuth-provider tokens in the `tokens` table (which are unrelated to Graph auth).
-    const delegateProfiles = alias(userProfiles, 'delegate_profiles');
     const [row] = await this.db
       .select({
         totalDelegated: countDistinct(delegatedAccessAccounts.delegateUserId),
@@ -126,49 +154,40 @@ export class McpProcessesHealthIndicator {
             OR ${delegatedAccessAccounts.lastVerifiedAt} < ${stalenessThreshold}
           THEN ${delegatedAccessAccounts.delegateUserId}
         END)`,
-        withValidAccessToken: sql<number>`COUNT(DISTINCT ${delegateProfiles.id})`,
       })
-      .from(delegatedAccessAccounts)
-      .leftJoin(
-        delegateProfiles,
-        and(
-          eq(delegateProfiles.id, delegatedAccessAccounts.delegateUserId),
-          isNotNull(delegateProfiles.accessToken),
-        ),
-      )
-      .where(inArray(delegatedAccessAccounts.delegateUserId, this.usersWithValidTokenSubquery()));
+      .from(delegatedAccessAccounts);
 
     const total = row?.totalDelegated ?? 0;
     const stale = Number(row?.stale ?? 0);
-    const withValidAccessToken = Number(row?.withValidAccessToken ?? 0);
     const ratio = total > 0 ? stale / total : 0;
-
-    const scan = await this.persistentCacheService.get(
-      DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
-      'DelegatedAccessDiscovery',
-    );
-    const lastProgressRegisteredAt = scan?.payload.lastProgressRegisteredAt;
 
     const details = {
       threshold: failureThreshold,
       eligibleUsers: total,
       failingUsers: stale,
-      usersWithValidAccessToken: withValidAccessToken,
       ratio,
-      scanStatus: scan?.payload.state ?? 'unknown',
-      scanLastRunAt: lastProgressRegisteredAt
-        ? new Date(lastProgressRegisteredAt).toISOString()
-        : null,
     };
     return ratio > failureThreshold ? indicator.down(details) : indicator.up(details);
   }
 
-  private usersWithValidTokenSubquery() {
-    // Mirrors the delegate candidate set in DiscoverDelegatedAccessCommand.fetchBatch:
-    // delegates are always OAuth profiles that hold an access token.
+  private eligibleUsersForSyncSubquery() {
     return this.db
-      .selectDistinct({ userProfileId: userProfiles.id })
-      .from(userProfiles)
-      .where(and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)));
+      .selectDistinct({ userProfileId: inboxConfigurations.userProfileId })
+      .from(inboxConfigurations)
+      .innerJoin(
+        userProfiles,
+        and(
+          eq(userProfiles.id, inboxConfigurations.userProfileId),
+          isNotNull(userProfiles.accessToken),
+          eq(userProfiles.source, 'oauth'),
+        ),
+      )
+      .innerJoin(
+        subscriptions,
+        and(
+          eq(subscriptions.userProfileId, inboxConfigurations.userProfileId),
+          gt(subscriptions.expiresAt, sql`NOW()`),
+        ),
+      );
   }
 }
