@@ -3,17 +3,12 @@
 
 # Recordings & Transcripts
 
-!!! danger "Experimental Software Disclaimer"
-    **Recordings & Transcripts is experimental software.**
+!!! note "Beta"
+    **Recordings & Transcripts is in beta.** It is suitable for production use, with the following caveats:
 
-    - **No SLA/SSLA**: No service level agreements or support level agreements apply
-    - **No Support**: No guaranteed support, response times, or issue resolution
-    - **Breaking Changes**: APIs, configurations, and behavior may change without notice between versions
-    - **No Stability Guarantees**: Features may be incomplete, modified, or removed at any time
-    - **Data Loss Risk**: Bugs or changes may result in data loss or corruption
-    - **Use at Your Own Risk**: This software is provided "as-is" without warranties of any kind
-
-    Experimental software is intended for evaluation and testing purposes only. Do not rely on this software for production workloads without understanding these limitations.
+    - **Breaking changes**: APIs, configuration, and behaviour may still change between versions; review release notes before upgrading
+    - **Evolving feature set**: capabilities may be added, changed, or removed as the feature matures
+    - **Support**: no formal SLA applies to beta software; issues are handled on a best-effort basis
 
 ## Is this feature for you?
 
