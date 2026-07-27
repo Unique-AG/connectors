@@ -131,7 +131,7 @@ flowchart TB
     end
 
     subgraph TeamsMCP["Teams MCP Server"]
-        API["REST API"]
+        MCPEndpoint["MCP Endpoint"]
         OAuth["OAuth Module"]
         Chat["Chat Module"]
     end
@@ -144,7 +144,8 @@ flowchart TB
     EntraID --> OAuth
     OAuth --> PostgreSQL
 
-    API --> Chat
+    Client["MCP Client"] -->|"tool calls"| MCPEndpoint
+    MCPEndpoint --> Chat
     Chat --> MSGraph
 ```
 
