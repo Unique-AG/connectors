@@ -8,10 +8,11 @@ Before deploying the Teams MCP Server, ensure you have:
 - Kubernetes cluster (1.25+)
 - Helm 3.x installed
 - PostgreSQL 14+ database
-- RabbitMQ 3.12+ instance
 - Kong Gateway with public access configured
 - Microsoft Entra ID app registration ([Authentication Guide](./authentication.md))
-- Public DNS hostname for webhook callbacks
+- Public DNS hostname for the MCP endpoint
+
+Meeting transcript capture (`UNIQUE_INTEGRATION=enabled`) additionally requires RabbitMQ 3.12+, a publicly reachable webhook URL, and Unique knowledge-base setup — see the [Recordings & Transcripts Operator Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual).
 
 ## Helm Chart
 
@@ -53,24 +54,25 @@ metadata:
 type: Opaque
 stringData:
   DATABASE_URL: "postgresql://user:password@host:5432/teams_mcp"
-  AMQP_URL: "amqp://user:password@rabbitmq:5672/teams-mcp"
   MICROSOFT_CLIENT_SECRET: "<from-entra-app-registration>"
-  MICROSOFT_WEBHOOK_SECRET: "<128-char-random-string>"
   AUTH_HMAC_SECRET: "<64-char-hex-string>"
   ENCRYPTION_KEY: "<64-char-hex-string>"
+  # Only with transcript capture enabled:
+  # AMQP_URL: "amqp://user:password@rabbitmq:5672/teams-mcp"
+  # MICROSOFT_WEBHOOK_SECRET: "<128-char-random-string>"
 ```
 
 ### Generating Secrets
 
 ```bash
-# Generate MICROSOFT_WEBHOOK_SECRET (128 characters)
-openssl rand -hex 64
-
 # Generate AUTH_HMAC_SECRET (64 characters hex = 256 bits)
 openssl rand -hex 32
 
 # Generate ENCRYPTION_KEY (64 characters hex = 256 bits)
 openssl rand -hex 32
+
+# Generate MICROSOFT_WEBHOOK_SECRET (128 characters) - transcript capture only
+openssl rand -hex 64
 ```
 
 ## Minimal Values Configuration
@@ -89,8 +91,7 @@ mcpConfig:
     clientId: "12345678-1234-1234-1234-123456789012"
 
   unique:
-    apiBaseUrl: http://api-gateway.unique:8080
-    ingestionServiceBaseUrl: http://node-ingestion.unique:8091
+    integration: disabled
 ```
 
 **Note:** Ingress is disabled by default. Traffic routing is handled by Kong Gateway via HTTPRoute or KongIngress resources configured separately.

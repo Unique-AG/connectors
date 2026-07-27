@@ -235,4 +235,5 @@ Application permissions would require tenant administrators to pre-configure acc
 
 - [Architecture](./architecture.md) - System components and infrastructure
 - [Security](./security.md) - Encryption, PKCE, and threat model
-- [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing
+- [Flows](./flows.md) - User connection, OAuth, token refresh, and chat tool sequences
+- [Recordings & Transcripts - Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual) - Where the meeting scopes are used

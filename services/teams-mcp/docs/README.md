@@ -15,21 +15,26 @@
 
 ## Overview
 
-The Teams MCP Server is a cloud-native application that automatically captures meeting transcripts and recordings from Microsoft Teams and ingests them into the Unique knowledge base. This guide provides administrators with essential information about requirements, features, and limitations.
+The Teams MCP Server gives Unique AI access to Microsoft Teams chats and channels. It exposes eight MCP tools for listing teams, channels, and chats, reading and searching messages, and sending messages — all executed live against the [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) on behalf of the signed-in user.
 
-**Note:** This is a connector-style MCP server that does two things. First, it automatically ingests meeting **transcripts and recordings** into the Unique knowledge base in the background, where they are then queried **from within Unique**. Second, it exposes an interactive tool surface of 12 MCP tools — 8 chat/messaging tools and 4 transcript/KB management tools. Through these tools, **chat and channel messages are accessible in Unique on demand, but are never ingested into it** — they are fetched live from the Microsoft Graph API and exist only in Microsoft, whereas transcripts and recordings are copied into the Unique knowledge base. This ingested-vs-live distinction is the key thing to understand; see [Where the data lives](#where-the-data-lives-ingested-vs-live). Chat and channel tools take ids obtained from the `list_*` tools. See [Technical Reference — Tools](./technical/tools.md) for the full tool reference.
+!!! important "Nothing is copied into Unique in the default configuration"
+    Teams chat and channel messages are **never** ingested into the Unique knowledge base. Every tool call fetches from Microsoft Graph on demand, so the data continues to live only in Microsoft. This is true regardless of configuration.
 
-For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md).
+    The server has one optional capability that *does* store data in Unique: capturing meeting transcripts and recordings into the knowledge base. It is **off by default** (`UNIQUE_INTEGRATION=disabled`) and documented separately under [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts). If you do not enable it, this page describes everything the server does.
+
+This guide provides administrators with essential information about requirements, features, and limitations. For deployment, configuration, and operational details, see the [IT Operator Guide](./operator/README.md). For the full tool reference, see [Technical Reference — Tools](./technical/tools.md).
 
 ## Quick Summary
 
-**What it does:** Two things. (1) Automatically captures meeting transcripts and recordings from Microsoft Teams and **ingests them into Unique's AI knowledge base** with participant-based access controls, where they are queried from within Unique. (2) Exposes interactive tools that make Teams chat and channel messages **accessible in Unique on demand — fetched live from the Microsoft Graph API and never ingested** (they exist only in Microsoft, not in the Unique knowledge base).
+**What it does:** Makes Teams chats and channels accessible to Unique AI through MCP tools — reading, searching, and sending messages, fetched live from Microsoft Graph on every call and never stored in Unique.
+
+**Optional add-on:** Meeting transcript and recording capture into the Unique knowledge base — see [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts).
 
 **Deployment:** Kubernetes-based NestJS microservice
 
 **Authentication:** Uses delegated OAuth2 with Microsoft Entra ID (user signs in and consents)
 
-**Processing:** Real-time webhook-driven (notifications received immediately when transcripts are available)
+**Processing:** Synchronous — each tool call queries Microsoft Graph and returns immediately
 
 ## Requirements
 
@@ -37,104 +42,46 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 | Requirement | Details |
 |-------------|---------|
-| **Microsoft Teams** | Active tenant with transcription enabled for meetings |
+| **Microsoft Teams** | Active tenant |
 | **Microsoft Entra ID** | Tenant with Application Administrator rights for app registration |
-| **License** | Microsoft 365 license with Teams meeting transcription capabilities |
+| **License** | Microsoft 365 license covering Teams |
 
 **Prerequisites:**
 
 - Access to Microsoft Entra ID for app registration
-- Microsoft Teams meetings with transcription enabled by policy
 - Users must be able to consent to delegated permissions (or admin consent granted)
+
+Enabling transcript capture adds requirements of its own — meeting transcription enabled by policy, admin consent for the meeting scopes, RabbitMQ, and a knowledge-base root scope. See the [Recordings & Transcripts Operator Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual).
 
 ### Permissions
 
 All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to.
 
-| Permission | Type | Admin Consent | Required |
-|------------|------|---------------|----------|
-| `User.Read` | Delegated | No | Yes |
-| `Calendars.Read` | Delegated | No | Yes |
-| `OnlineMeetings.Read` | Delegated | No | Yes |
-| `OnlineMeetingRecording.Read.All` | Delegated | Yes | Yes |
-| `OnlineMeetingTranscript.Read.All` | Delegated | Yes | Yes |
-| `offline_access` | Delegated | No | Yes |
-| `ChannelMessage.Send` | Delegated | No | Yes |
-| `ChatMessage.Send` | Delegated | No | Yes |
-| `Chat.ReadBasic` | Delegated | No | Yes |
-| `Chat.Read` | Delegated | No | Yes |
-| `Team.ReadBasic.All` | Delegated | No | Yes |
-| `Channel.ReadBasic.All` | Delegated | No | Yes |
-| `ChannelMessage.Read.All` | Delegated | Yes | Yes |
+| Permission | Type | Admin Consent | Chat-only | With transcript capture |
+|------------|------|---------------|-----------|-------------------------|
+| `User.Read` | Delegated | No | Yes | Yes |
+| `offline_access` | Delegated | No | Yes | Yes |
+| `ChannelMessage.Send` | Delegated | No | Yes | Yes |
+| `ChatMessage.Send` | Delegated | No | Yes | Yes |
+| `Chat.ReadBasic` | Delegated | No | Yes | Yes |
+| `Chat.Read` | Delegated | No | Yes | Yes |
+| `Team.ReadBasic.All` | Delegated | No | Yes | Yes |
+| `Channel.ReadBasic.All` | Delegated | No | Yes | Yes |
+| `ChannelMessage.Read.All` | Delegated | Yes | Yes | Yes |
+| `Calendars.Read` | Delegated | No | No | Yes |
+| `OnlineMeetings.Read` | Delegated | No | No | Yes |
+| `OnlineMeetingRecording.Read.All` | Delegated | Yes | No | Yes |
+| `OnlineMeetingTranscript.Read.All` | Delegated | Yes | No | Yes |
+
+The four scopes at the bottom are requested only when transcript capture is enabled. In a chat-only deployment, `ChannelMessage.Read.All` is the sole permission needing admin consent.
 
 For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md#least-privilege-justification).
 
 ## Features
 
-The server offers **two independent capability tracks**:
-
-- **[Meeting Transcripts & Recordings](#meeting-transcripts--recordings)** — background ingestion of meeting transcripts (and their recordings) into the Unique knowledge base, plus tools to search and manage that ingestion. Webhook-driven and asynchronous.
-- **[Chats & Channels Messaging](#chats--channels-messaging)** — an interactive tool surface for reading, searching, and sending Teams chat and channel messages live via Microsoft Graph. Synchronous and on-demand.
-
-The two tracks are described separately below, followed by the [cross-cutting capabilities](#cross-cutting-capabilities) that apply to both.
-
-### Where the Data Lives: Ingested vs. Live
-
-This is the single most important distinction between the two tracks. **Both are accessible through Unique — the difference is where the data is stored.**
-
-!!! important "Both are accessible in Unique; only transcripts are ingested"
-    **Meeting transcripts and recordings are ingested — copied into the Unique knowledge base — and queried from that stored copy. Teams chat and channel messages are also accessible in Unique, through this server's MCP tools, but they are never ingested: they are fetched live from the Microsoft Graph API on demand and exist only in Microsoft, never as a copy in Unique.**
-
-    Messages being "not ingested" means only that Unique keeps no copy of them — **not** that they are inaccessible. The Unique AI can read, search, and send them at any time via the tools; it just reaches back to Microsoft each time instead of reading a stored copy.
-
-| | Meeting transcripts & recordings | Chats & channels messages |
-|---|---|---|
-| **Accessible through Unique?** | **Yes** — via Unique AI and the transcript tools | **Yes** — via the MCP messaging tools |
-| **Ingested (copied) into Unique?** | **Yes** — stored in the knowledge base | **No** — never copied; the data lives only in Microsoft |
-| **How it is served** | Queried from the **stored copy in Unique** — indexed and searchable from within Unique | Fetched **live from the Microsoft Graph API** on every call (`get_*_messages`, `search_messages`) |
-| **Freshness** | Point-in-time snapshot captured at ingestion | Always current — reflects Teams in real time |
-| **If this server is disconnected** | The copy remains in Unique and stays queryable | No longer reachable — nothing was stored, so there is no copy to fall back on |
-| **Data flow** | Teams → Unique knowledge base (once) → query the copy | Teams → live fetch on each call → returned to the caller (no copy kept) |
-
-### Meeting Transcripts & Recordings
-
-This is the connector track: once a user connects, meeting transcripts (and recordings) are captured automatically and ingested into Unique. Chat and channel messages are **not** part of this track — they are never ingested.
-
-**Real-time Transcript and Recording Capture**
-
-- Webhook-based notifications from [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview)
-- Automatic capture when meeting transcripts become available
-- VTT format transcript content ingested into Unique
-- MP4 recording files stored alongside transcripts (with `SKIP_INGESTION` mode)
-- Both artifacts linked via `content_correlation_id` in metadata
-
-**Participant-Based Access Control**
-
-- Meeting organizer receives **write + read** access in Unique
-- Meeting participants receive **read** access in Unique
-- Users resolved by email or username in Unique platform
-
-**Automatic Subscription Management**
-
-- Microsoft Graph webhook subscriptions created automatically on user connection
-- Subscriptions renewed automatically before expiration
-- Failed renewals handled gracefully with user reconnection required
-
-**Reliability**
-
-- RabbitMQ message queue for asynchronous webhook processing
-- Dead Letter Exchange (DLX) for failed message inspection and retry
-- Meets Microsoft's strict webhook response requirements (< 10 seconds)
-- See [FAQ - Why use RabbitMQ for webhook processing?](./faq.md#why-use-rabbitmq-for-webhook-processing) for details
-
-**Ingestion & management tools** (see [Technical Reference — Tools](./technical/tools.md#transcript--knowledge-base-management)):
-
-- `ingest_meeting`: Ingest a specific meeting's transcript on demand
-- `start_kb_integration` / `stop_kb_integration` / `verify_kb_integration_status`: Manage and inspect the ingestion subscription
-
 ### Chats & Channels Messaging
 
-This is the interactive track: tools that read, search, and send Teams messages live through Microsoft Graph. These messages are fetched on every call and are **never** ingested into the Unique knowledge base.
+Tools that read, search, and send Teams messages live through Microsoft Graph. Messages are fetched on every call and are **never** ingested into the Unique knowledge base.
 
 Chat and messaging tools target chats and channels by id: call a `list_*` tool to obtain an id (and distinguishing metadata), then pass that id to a read, write, or search tool. See [Technical Reference — Tools](./technical/tools.md#teams--channels).
 
@@ -147,9 +94,13 @@ Chat and messaging tools target chats and channels by id: call a `list_*` tool t
 - `send_channel_message`: Send a plain text message to a Teams channel (by team id + channel id)
 - `send_chat_message`: Send a plain text message to a Teams chat (by chat id)
 
-### Cross-Cutting Capabilities
+### Meeting Transcripts & Recordings (optional)
 
-These apply to both tracks.
+When `UNIQUE_INTEGRATION=enabled`, the server additionally captures meeting transcripts and recordings into the Unique knowledge base with participant-based access control, and registers four tools to manage that capture (`ingest_meeting`, `start_kb_integration`, `stop_kb_integration`, `verify_kb_integration_status`).
+
+This capability, its infrastructure requirements, its Microsoft Graph limitations, and the Recordings area in Unique that presents the captured meetings are documented in [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts).
+
+### Cross-Cutting Capabilities
 
 **Self-Service User Connection**
 
@@ -171,7 +122,6 @@ These apply to both tracks.
 **Configuration**
 
 - Configurable token TTLs
-- Automatic subscription renewal via Microsoft lifecycle webhooks
 - Rate limiting support
 
 ## How It Works
@@ -188,31 +138,22 @@ flowchart TB
     subgraph TeamsMCP["Teams MCP Server"]
         API["REST API"]
         OAuth["OAuth Module"]
-        Processor["Transcript Processor"]
+        Chat["Chat Module"]
     end
 
     subgraph Infrastructure["Infrastructure"]
-        RabbitMQ["RabbitMQ"]
         PostgreSQL["PostgreSQL"]
-    end
-
-    subgraph Unique["Unique Platform"]
-        UniqueAPI["Unique API"]
-        Storage["Knowledge Base"]
     end
 
     User["Teams User"] --> EntraID
     EntraID --> OAuth
     OAuth --> PostgreSQL
 
-    MSGraph -->|"Webhook Notifications"| API
-    API --> RabbitMQ
-    RabbitMQ --> Processor
-
-    Processor --> MSGraph
-    Processor --> UniqueAPI
-    UniqueAPI --> Storage
+    API --> Chat
+    Chat --> MSGraph
 ```
+
+Enabling transcript capture adds a webhook controller, a RabbitMQ queue, and a transcript processor to this picture — see the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#architecture).
 
 See [Architecture Documentation](./technical/architecture.md#components) for detailed component diagrams.
 
@@ -225,7 +166,6 @@ sequenceDiagram
     participant MCPClient as MCP Client
     participant TeamsMCP as Teams MCP Server
     participant EntraID as Microsoft Entra ID
-    participant MSGraph as Microsoft Graph API
     participant DB as PostgreSQL
 
     User->>MCPClient: Connect to MCP server
@@ -240,92 +180,26 @@ sequenceDiagram
     TeamsMCP->>DB: Store encrypted tokens
     TeamsMCP->>MCPClient: Opaque JWT for auth
 
-    Note over User,MCPClient: User starts KB integration via tool
-    User->>MCPClient: Call start_kb_integration tool
-    MCPClient->>TeamsMCP: Tool invocation
-    TeamsMCP->>MSGraph: POST /subscriptions
-    MSGraph->>TeamsMCP: Subscription created (ID, expiry)
-    TeamsMCP->>DB: Store subscription record
-    TeamsMCP->>MCPClient: Success response
-
-    Note over TeamsMCP: Now listening for meeting transcripts
+    Note over User,MCPClient: Chat and messaging tools are now available
 ```
 
 See [User Connection Flow](./technical/flows.md#user-connection-flow) for additional details.
 
-### Transcript Processing Flow
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Graph as Microsoft Graph
-    participant API as Webhook Controller
-    participant Queue as RabbitMQ
-    participant Processor as Transcript Processor
-    participant Unique as Unique Platform
-
-    Note over Graph: Meeting transcript available
-    Graph->>API: POST /transcript/notification
-    API->>API: Validate clientState
-    API->>Queue: Enqueue notification
-    API->>Graph: 202 Accepted
-
-    Queue->>Processor: Process transcript event
-
-    par Fetch meeting data
-        Processor->>Graph: GET meeting details
-        Graph->>Processor: Meeting + participants
-    and Fetch transcript
-        Processor->>Graph: GET transcript content
-        Graph->>Processor: VTT content
-    end
-
-    opt Recording available
-        Processor->>Graph: GET recording by correlationId
-        Graph->>Processor: MP4 stream
-    end
-
-    Processor->>Unique: Resolve participants
-    Processor->>Unique: Create scope (folder)
-    Processor->>Unique: Set access permissions
-    Processor->>Unique: Upload transcript
-    opt Recording fetched
-        Processor->>Unique: Upload recording (SKIP_INGESTION)
-    end
-```
-
-See [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow) for additional details.
-
 ### Messaging Flow
 
-The two flows above cover the transcript track, which is webhook-driven and asynchronous. The messaging track works differently: chat and channel tools are handled **synchronously and inline** — each tool call queries Microsoft Graph and returns immediately, with no queue, background worker, or ingestion. The caller discovers an id with a `list_*` tool, then passes it to a read, search, or send tool.
+Chat and channel tools are handled **synchronously and inline** — each tool call queries Microsoft Graph and returns immediately, with no queue, background worker, or ingestion. The caller discovers an id with a `list_*` tool, then passes it to a read, search, or send tool.
 
 See [Chat Flows](./technical/flows.md#chat-flows) for the read, search, and send sequence diagrams.
 
-### User Workflows
+### User Workflow
 
-Both tracks begin with the same one-time connection, then diverge — because their data models differ (see [Where the data lives](#where-the-data-lives-ingested-vs-live)).
-
-**One-time setup (both tracks)**
+**One-time setup**
 
 1. Open MCP client and connect to Teams MCP Server
 2. Sign in with Microsoft account
 3. Grant required permissions
 
-#### Transcripts & Recordings Workflow — ingest once, then query in Unique
-
-1. **Enable ingestion** (One-time) — call `start_kb_integration` (or rely on `UNIQUE_AUTO_START_INGESTION` if the operator enabled it)
-2. **Automatic capture** (Ongoing)
-   - Attend Microsoft Teams meetings with transcription enabled
-   - Meeting ends and transcript becomes available
-   - Teams MCP automatically receives a webhook notification
-   - Transcript and recording (if available) are captured and **ingested into the Unique knowledge base**
-3. **Query in Unique** (Ongoing)
-   - Meeting content lives in the Unique knowledge base — organizer gets write + read, participants get read
-   - Search and query it **from within Unique** via Unique AI
-   - Content remains available in Unique even after the user disconnects
-
-#### Chats & Channels Workflow — always query live from the API
+**Using the chat and channel tools — always live from the API**
 
 1. **Discover the target** (Each use) — call a `list_*` tool (`list_chats`, `list_teams` → `list_channels`) or `search_messages` to obtain the chat/channel id
 2. **Read, search, or send** (Each use)
@@ -344,7 +218,7 @@ Both tracks begin with the same one-time connection, then diverge — because th
 | **Delegated permissions only** | Requires user sign-in; application-only access would need admin-configured policies per user |
 | **No certificate auth** | Certificate auth only works with Client Credentials flow, incompatible with delegated permissions |
 | **Single app registration** | Each MCP server deployment uses one Entra ID app registration (multi-tenant capable) |
-| **Admin consent required** | `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` need admin approval |
+| **Admin consent required** | `ChannelMessage.Read.All` needs admin approval; enabling transcript capture adds two more |
 
 See [Authentication Architecture - Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture) for details.
 
@@ -353,8 +227,6 @@ See [Authentication Architecture - Single App Registration Architecture](./techn
 | Constraint | Impact | Mitigation |
 |------------|--------|------------|
 | **90-day token expiry** | User must reconnect after ~90 days of inactivity | Monitor for disconnected users |
-| **Webhook timeout** | Microsoft requires response in <10 seconds | RabbitMQ decouples reception from processing |
-| **Subscription expiry** | Graph subscriptions expire after 3 days max | Automatic renewal via lifecycle notifications |
 | **Encryption key change** | All stored tokens become unreadable | Users must reconnect; plan for maintenance window |
 
 ### Scaling Considerations
@@ -362,78 +234,22 @@ See [Authentication Architecture - Single App Registration Architecture](./techn
 | Factor | Limit | Notes |
 |--------|-------|-------|
 | **Microsoft Graph rate limits** | ~10,000 requests/10 min per app | Shared across all users of the app registration |
-| **Concurrent user lookups** | Configurable (default: 5) | Set via `UNIQUE_USER_FETCH_CONCURRENCY` |
 | **Database connections** | PostgreSQL pool size | Monitor connection usage under load |
 
 ### Not Supported
-
-**Meeting transcripts & recordings:**
-
-- **Real-time transcription**: Only processes completed transcripts, not live captions
-- **Meeting creation**: Read-only access; cannot create or modify meetings
-- **Selective meeting capture**: All meetings with transcription enabled are captured (no organizer-only or meeting-type filter)
-- **Historical/full sync**: No mechanism to backfill transcripts from meetings that took place before the user connected; see [Why can't historical transcripts be synced?](./faq.md#why-cant-historical-transcripts-be-synced)
-- **Delta/incremental sync**: No ability to poll for missed or updated transcripts since a given point in time; see [Why is there no delta sync?](./faq.md#why-is-there-no-delta-sync)
-- **Missed-notification recovery**: If a subscription lapses, any transcripts produced during the gap are permanently lost — there is no catch-up or replay mechanism
-- **Transcript format variants**: Only VTT-format transcripts are processed; meetings with transcripts in other formats are silently skipped
-- **Recording size assurance**: No application-level size check on recordings; very large files (e.g., multi-hour all-hands) may time out during download and be skipped, while the transcript is still ingested
 
 **Chats & channels messaging:**
 
 - **Rich message sends**: `send_chat_message` and `send_channel_message` send plain text only — no `@mentions`, no rich content (bold, tables, adaptive cards), and no attachment upload
 - **Message threading/replies**: There is no tool for replying to a specific message in a thread; only new top-level messages can be sent
-- **Chat/channel message ingestion**: Messages read or searched via the messaging tools are fetched live from Microsoft Graph on every call and are **not** ingested into the Unique knowledge base; only meeting transcripts are ingested
+- **Chat/channel message ingestion**: Messages read or searched via the messaging tools are fetched live from Microsoft Graph on every call and are **never** ingested into the Unique knowledge base
 
 **General:**
 
 - **Token introspection**: Tokens validated locally with short TTLs for performance
 - **Multi-tenant in one session**: A user belonging to multiple Microsoft tenants must authenticate separately for each tenant; one OAuth session covers exactly one tenant
 
-### Microsoft Graph API Constraints
-
-The following limitations originate directly from the Microsoft Graph API and cannot be worked around while using **delegated permissions**.
-
-#### No Delta Sync with Delegated Permissions
-
-Microsoft Graph does expose a delta API for transcripts and recordings:
-
-```
-GET /users/{userId}/onlineMeetings/getAllTranscripts(...)/delta
-GET /users/{userId}/onlineMeetings/getAllRecordings(...)/delta
-```
-
-These APIs support both full initial synchronization and incremental sync (returning only transcripts added since the last `$deltaToken`). However, the official permission table is:
-
-| Permission type | Support |
-|---|---|
-| Delegated (work or school account) | **Not supported** |
-| Delegated (personal Microsoft account) | **Not supported** |
-| Application | `OnlineMeetingTranscript.Read.All` / `OnlineMeetingRecording.Read.All` |
-
-Source: [callTranscript: delta — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/calltranscript-delta) · [callRecording: delta — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/callrecording-delta)
-
-Teams MCP uses delegated permissions so that users can connect their own Microsoft account without IT administrator involvement. Switching to application permissions would enable delta sync, but would require tenant administrators to configure [Application Access Policies](https://learn.microsoft.com/en-us/graph/cloud-communication-online-meeting-application-access-policy) via PowerShell for every user — defeating the self-service connection model.
-
-#### No Historical/Full Sync with Delegated Permissions
-
-The only Microsoft Graph API capable of listing transcripts across all of a user's meetings (without knowing individual meeting IDs in advance) is `getAllTranscripts`:
-
-```
-GET /users/{userId}/onlineMeetings/getAllTranscripts(meetingOrganizerUserId='{userId}',startDateTime=...)
-```
-
-This API also requires **application permissions only** — delegated permissions are explicitly not supported.
-
-Source: [onlineMeeting: getAllTranscripts — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/onlinemeeting-getalltranscripts)
-
-With delegated permissions, the only available path to read transcripts is `GET /users/{userId}/onlineMeetings/{meetingId}/transcripts`, which requires knowing the meeting ID in advance. There is no delegated-permission API that enumerates past meetings and their transcripts in bulk. As a result, Teams MCP can only capture transcripts going forward from the moment the user connects — not from any earlier meetings.
-
-**Additional constraints on historical data (even with application permissions):**
-
-- Transcripts are only accessible for meetings that have not expired. One-time meetings expire 60 days after their scheduled time; recurring meetings with no end date expire 1 year after the last activity.
-- Recording and transcript files are subject to the tenant's admin-configured expiration policy (Microsoft default: 120 days after creation).
-
-Source: [Limits and specifications for Microsoft Teams — Meeting expiration](https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams)
+Limitations that apply to transcript capture — forward-only capture, no delta sync, VTT only — are listed in [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts#limitations-and-constraints).
 
 ### Single App Registration Architecture
 
@@ -475,6 +291,7 @@ Planned enhancements will be documented here.
 ## Related Documentation
 
 - [FAQ](./faq.md) - Frequently asked questions
+- [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts) - The optional meeting transcript and recording capture, and the Recordings area in Unique
 
 ### For IT Operators
 
@@ -488,9 +305,10 @@ Planned enhancements will be documented here.
 
 - [Technical Reference](./technical/README.md) - Architecture, flows, and design decisions
   - [Architecture](./technical/architecture.md) - System components and infrastructure
-  - [Flows](./technical/flows.md) - User connection, subscription lifecycle, transcript processing
+  - [Flows](./technical/flows.md) - User connection, OAuth, token refresh, and chat flows
   - [Permissions](./technical/permissions.md) - Microsoft Graph permissions with justification
   - [Security](./technical/security.md) - Encryption, authentication, and threat model
+  - [Tools](./technical/tools.md) - Full reference for the chat and messaging tools
 
 ## Standard References
 

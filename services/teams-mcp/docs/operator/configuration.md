@@ -12,9 +12,9 @@ These must be provided via Kubernetes secrets:
 | Variable | Description | Format |
 |----------|-------------|--------|
 | `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host:5432/db` |
-| `AMQP_URL` | RabbitMQ connection string | `amqp://user:pass@host:5672/vhost` |
+| `AMQP_URL` | RabbitMQ connection string — only required with transcript capture enabled | `amqp://user:pass@host:5672/vhost` |
 | `MICROSOFT_CLIENT_SECRET` | Entra app client secret | String from Azure portal |
-| `MICROSOFT_WEBHOOK_SECRET` | Webhook validation secret | 128-character random string |
+| `MICROSOFT_WEBHOOK_SECRET` | Webhook validation secret — only required with transcript capture enabled | 128-character random string |
 | `AUTH_HMAC_SECRET` | JWT signing key | 64-character hex string |
 | `ENCRYPTION_KEY` | Token encryption key | 64-character hex string |
 
@@ -33,25 +33,17 @@ Set via `mcpConfig.microsoft` in Helm values:
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
-| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | `SELF_URL` | Webhook URL if different from SELF_URL |
+| `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | `SELF_URL` | Webhook URL if different from SELF_URL. Only used by transcript capture |
 
 ### Unique API Configuration
 
 Set via `mcpConfig.unique` in Helm values.
 
-When `UNIQUE_INTEGRATION=disabled`, other Unique variables are not required (chat-only mode). Knowledge-base tools and the transcript ingestion pipeline are not registered.
-
 | Variable | Helm Path | Default | Description |
 |----------|-----------|---------|-------------|
-| `UNIQUE_INTEGRATION` | `mcpConfig.unique.integration` | (required) | `enabled` or `disabled`. When disabled, Unique/Zitadel config is optional |
-| `UNIQUE_SERVICE_AUTH_MODE` | `mcpConfig.unique.serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` (required when enabled) |
-| `UNIQUE_API_BASE_URL` | `mcpConfig.unique.apiBaseUrl` | (required when enabled) | Unique API endpoint |
-| `UNIQUE_API_VERSION` | `mcpConfig.unique.apiVersion` | `2023-12-06` | API version |
-| `UNIQUE_ROOT_SCOPE_ID` | `mcpConfig.unique.rootScopeId` | (required when enabled) | Root scope ID for uploads |
-| `UNIQUE_USER_FETCH_CONCURRENCY` | `mcpConfig.unique.userFetchConcurrency` | `5` | Parallel user lookups |
-| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `mcpConfig.unique.ingestionServiceBaseUrl` | (required when enabled + cluster_local) | Ingestion service endpoint |
-| `UNIQUE_SERVICE_EXTRA_HEADERS` | `mcpConfig.unique.serviceExtraHeaders` | (required when enabled) | Zitadel service account headers (`x-company-id`, `x-user-id`, …) |
-| `UNIQUE_AUTO_START_INGESTION` | `mcpConfig.unique.autoStartIngestion` | `false` | When enabled, auto-enqueue a transcript subscription for every user at login (skips the `start_kb_integration` tool) |
+| `UNIQUE_INTEGRATION` | `mcpConfig.unique.integration` | (required) | `enabled` or `disabled`. `disabled` is chat-only: no knowledge-base tools, no ingestion pipeline, and no other Unique or Zitadel configuration required |
+
+Setting this to `enabled` turns on meeting transcript capture and makes a further set of variables mandatory — the Unique API endpoint, a root scope, and Zitadel service account headers. Those variables, the service account roles, and the root scope setup are documented in the [Recordings & Transcripts Operator Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual).
 
 ### Authentication Configuration
 
@@ -97,7 +89,8 @@ server:
       cpu: 1
       memory: 1984Mi
 
-  # Temporary storage for processing
+  # Temporary storage — sized for transcript and recording downloads;
+  # a chat-only deployment needs far less
   volumes:
     - name: tmp
       emptyDir:
@@ -118,13 +111,9 @@ mcpConfig:
     # publicWebhookUrl: https://teams.mcp.example.com  # optional
 
   unique:
-    integration: enabled
-    serviceAuthMode: cluster_local
-    apiBaseUrl: http://api-gateway.unique:8080
-    apiVersion: "2023-12-06"
-    rootScopeId: folder_abc123  # Your root scope ID from Unique
-    userFetchConcurrency: 5
-    ingestionServiceBaseUrl: http://node-ingestion.unique:8091
+    # Chat-only. Set to "enabled" only to add meeting transcript capture,
+    # which requires additional configuration — see Recordings & Transcripts.
+    integration: disabled
 
   auth:
     accessTokenExpiresInSeconds: 60
@@ -149,152 +138,9 @@ alerts:
       enabled: true
 ```
 
-### Service Auth Modes
+### Unique Service Auth Modes
 
-#### cluster_local (Default)
-
-For deployments within the same Kubernetes cluster as Unique:
-
-```yaml
-mcpConfig:
-  unique:
-    serviceAuthMode: cluster_local
-    apiBaseUrl: http://api-gateway.unique:8080
-    ingestionServiceBaseUrl: http://node-ingestion.unique:8091
-    serviceExtraHeaders:
-      x-company-id: "company-id"
-      x-user-id: "service-user-id"
-```
-
-#### external
-
-For deployments outside the Unique cluster:
-
-```yaml
-mcpConfig:
-  unique:
-    serviceAuthMode: external
-    apiBaseUrl: https://api.unique.app
-    serviceExtraHeaders:
-      authorization: "Bearer <api-key>"
-      x-app-id: "app-id"
-      x-user-id: "user-id"
-      x-company-id: "company-id"
-```
-
-## Zitadel Service Account
-
-### Why a Zitadel Service Account is Required
-
-When `UNIQUE_INTEGRATION=enabled`, the Teams MCP Server requires a Zitadel service account to authenticate with the Unique Public API. This service account is used to:
-
-1. **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants
-2. **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts and recordings
-3. **Set access permissions** - Grant appropriate read/write permissions to meeting organizers and participants
-4. **Upload transcript and recording data** - Ingest transcript content and recordings into the Unique knowledge base
-
-The service account credentials are passed via the `x-company-id` and `x-user-id` headers in all API requests to ensure proper access control and authorization.
-
-### Creating a Zitadel Service Account
-
-1. **Navigate to Zitadel**
-
-   - Log in to your Zitadel instance
-   - Select the organization where you want to ingest transcripts
-
-2. **Create Service Account**
-
-   - Go to **Service Accounts** in the organization settings
-   - Click **New Service Account**
-   - Provide a descriptive name (e.g., "Teams MCP Server Service Account")
-   - Set appropriate permissions for the service account
-
-3. **Note the Service Account Details**
-
-   - **Company ID**: The organization ID where the service account was created
-   - **User ID**: The service account user ID
-
-4. **Configure in Helm Values**
-   ```yaml
-   mcpConfig:
-     unique:
-       serviceAuthMode: cluster_local  # or external
-       serviceExtraHeaders:
-         x-company-id: "<your-company-id>"
-         x-user-id: "<your-service-account-user-id>"
-   ```
-
-### Service Account Roles
-
-The Teams MCP Server calls the Unique Public API, whose downstream services
-(`node-ingestion`, `node-scope-management`) authorize each request against the
-Zitadel roles granted to the calling user. Grant the following roles to the
-service account in the target organization:
-
-| Role | Why it is required |
-|------|--------------------|
-| `chat.admin.all` | **Mandatory.** The only role accepted when updating a scope (setting its `externalId`/name, `PATCH /folder/{id}`) — there is no alternative. It also covers creating scope access (`PATCH /folder/add-access`), upserting content (`POST /content/upsert`), and resolving participants (`GET /users`). |
-| `chat.knowledge.read` | **Mandatory.** Required to query existing content (`POST /content/infos`), which the server uses to deduplicate and list already-ingested meetings. `chat.admin.all` is **not** accepted by this endpoint, so this role must be granted in addition. |
-
-Each API operation maps to a downstream role check as follows:
-
-| Operation | Endpoint | Accepted roles |
-|-----------|----------|----------------|
-| Resolve meeting participant | `GET /users` | `chat.admin.all`, `admin.space.write`, `chat.knowledge.write` |
-| Create meeting scope | `POST /folder` | Service-identity only (no user role required) |
-| Grant participant scope access | `PATCH /folder/add-access` | `chat.admin.all`, `chat.knowledge.write` |
-| Set scope `externalId` / name | `PATCH /folder/{id}` | `chat.admin.all` **only** |
-| Upsert transcript / recording content | `POST /content/upsert` | `chat.admin.all`, `chat.knowledge.write` |
-| Query existing content | `POST /content/infos` | `chat.knowledge.read`, `admin.space.write` |
-| Search content | `POST /search/search` | None (header auth only) |
-| Upload blob | `PUT /scoped/upload` | None (secured by encrypted key) |
-
-> **Note — participant roles.** When the server grants scope access to a meeting
-> participant, Unique additionally requires that *participant's* own Zitadel
-> account to already hold `chat.knowledge.write` (or `chat.admin.all`) for write
-> access, or `chat.knowledge.read` for read access. A participant with no roles
-> assigned in Zitadel is rejected. This is a property of the users being granted
-> access, not of the service account.
-
-> **Note — role enforcement toggle.** Downstream role checks are only enforced
-> when `unique-api` runs with `ENABLE_ROLE_AUTHORIZATION=true` (the platform
-> default). When disabled, `unique-api` calls downstream services with a service
-> identity that bypasses these checks, and the roles above are not required.
-
-## Root Scope
-
-### Why a Root Scope is Required
-
-The Teams MCP Server requires a root scope (folder) in the Unique platform. All meeting transcripts and recordings are ingested as child scopes under this root, providing a single organizational entry point and making it easy to manage permissions and visibility for Teams content.
-
-### Creating the Root Scope
-
-The root scope must be created **manually** in the Unique platform before deploying the Teams MCP Server. There is no automated provisioning for this step.
-
-1. **Log in to the Unique platform** as an administrator
-
-2. **Create a new scope (folder)**
-
-   - Navigate to the scope/folder management area
-   - Create a new top-level scope with a descriptive name (e.g., "Teams MCP")
-   - Note the scope ID — it starts with `scope_` (e.g., `scope_abc123xyz`)
-
-3. **Grant the service account access**
-
-   - Grant the Zitadel service account (see above) `MANAGE`, `READ`, and `WRITE` on the root scope through the Unique platform. This remains a required manual step — the server does not provision access on a scope it has no rights to.
-   - On startup the server (re-)issues these three grants for the service user (the `x-user-id` from the API headers) against the configured root scope via the Public API `folder/add-access` endpoint. The call is additive, so re-affirming existing access on every boot is safe. If it is rejected — a wrong/missing `rootScopeId`, or a service account that was never granted management of the scope — the pod **hard-fails at boot** rather than surfacing the error mid-ingestion. Check the startup logs for `root scope <id> permission bootstrap failed`.
-
-4. **Configure in Helm Values**
-   ```yaml
-   mcpConfig:
-     unique:
-       integration: enabled
-       rootScopeId: "scope_abc123xyz"
-   ```
-
-### One Scope Per Environment
-
-Each environment (QA, prod, etc.) requires its own root scope. Do not reuse the same scope ID across environments.
+When transcript capture is enabled, the server talks to the Unique Public API either in `cluster_local` mode (same Kubernetes cluster) or `external` mode (API key). Both are configured under `mcpConfig.unique` and documented, with examples, in the [Recordings & Transcripts Operator Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual).
 
 ## Database Configuration
 
@@ -309,6 +155,8 @@ postgresql://username:password@hostname:port/database?sslmode=require
 The PostgreSQL database requires no special extensions. Migrations create all necessary tables and indexes.
 
 ## RabbitMQ Configuration
+
+RabbitMQ is only used by the transcript capture pipeline. Chat-only deployments do not need it.
 
 ### Connection String Format
 

@@ -5,42 +5,31 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Teams MCP Server is both a **connector** and an **interactive MCP server**. It does two things simultaneously: it automatically ingests meeting transcripts into the Unique knowledge base in the background, and it exposes an interactive tool surface of 12 MCP tools that AI clients can call on demand.
+**Answer:** The Teams MCP Server is an **interactive MCP server**. It exposes a tool surface that AI clients call on demand to read, search, and send Microsoft Teams chat and channel messages. Every call is served live from the Microsoft Graph API — **nothing is copied into the Unique knowledge base**.
 
 **What it does:**
 
-- Once a user connects their Microsoft account, the connector automatically ingests meeting transcripts into the Unique knowledge base via real-time webhook notifications from Microsoft Graph
-- Exposes **8 chat/messaging tools**: `list_teams`, `list_channels`, `list_chats`, `get_chat_messages`, `get_channel_messages`, `search_messages`, `send_channel_message`, `send_chat_message`
-- Exposes **4 transcript/KB management tools** when `UNIQUE_INTEGRATION=enabled`: `ingest_meeting`, `verify_kb_integration_status`, `start_kb_integration`, `stop_kb_integration`
-- Chat tools are always registered; KB tools are only registered when Unique integration is enabled
+- Exposes **8 chat and messaging tools**: `list_teams`, `list_channels`, `list_chats`, `get_chat_messages`, `get_channel_messages`, `search_messages`, `send_channel_message`, `send_chat_message`
 - Chat and channel tools take ids obtained from the `list_*` tools (e.g. `list_chats` → `chatId` → `get_chat_messages`)
 
 **What the user sees:**
 
 - An initial OAuth consent screen to connect their Microsoft account
-- Chat/messaging MCP tools available immediately after connection; KB tools only when Unique integration is enabled
-- Automatic transcript ingestion in the background for all meetings with transcription enabled, once `start_kb_integration` is called (requires Unique integration)
+- All chat and messaging tools available immediately after connection
 
-**Design rationale:**
-
-- The connector model provides automatic, continuous transcript ingestion without requiring user interaction after setup
-- The interactive tool surface gives AI assistants live access to Teams chats, channels, and transcript management — on demand
+**Optional: meeting transcript capture.** Deployments that set `UNIQUE_INTEGRATION=enabled` additionally capture meeting transcripts and recordings into the Unique knowledge base and register four more tools. That is a separate, opt-in capability — see [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts). Most deployments do not enable it.
 
 **See also:** [Technical Reference — Tools](./technical/tools.md)
 
 ## Authentication & Permissions
 
-### Why do I need admin consent?
+### Do I need admin consent?
 
-**Answer:** `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` require admin consent because they access sensitive meeting content (audio/video recordings and transcripts). This is a Microsoft requirement, not a Teams MCP requirement.
+**Answer:** Not for chat and messaging. All scopes a chat-only deployment uses are user-consentable, so users can connect without IT involvement.
 
-**What to do:**
+Admin consent is only required if you enable meeting transcript capture, which needs `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` — Microsoft requires admin consent for these because they access sensitive meeting content. See [Recordings & Transcripts — Operator Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual).
 
-1. Go to Azure Portal → App Registration → API permissions
-2. Click "Grant admin consent for [Your Organization]"
-3. Users can then connect and grant their own consent
-
-**See also:** [Understanding Admin Consent](./operator/authentication.md#understanding-microsoft-consent-flows)
+**See also:** [Understanding Admin Consent](./operator/authentication.md#understanding-consent-flows)
 
 ### Why do users still need to consent after admin consent?
 
@@ -54,7 +43,7 @@
 
 **Answer:** After a user has connected once, Microsoft Entra ID uses silent authentication on subsequent connections. The browser quickly redirects through the OAuth flow to validate the existing session, creating a brief "flicker" effect. This is **normal Microsoft OAuth behavior**, not a bug.
 
-**See also:** [User Reconnection Experience](./operator/authentication.md#user-reconnection-experience-the-login-flicker)
+**See also:** [User Reconnection Experience](./operator/authentication.md#understanding-consent-flows)
 
 ### Why can't I use certificate authentication?
 
@@ -124,33 +113,6 @@ This design uses a single OAuth application that can serve users across multiple
 
 ## Configuration
 
-### Why do I need a Zitadel service account?
-
-**Answer:** The Teams MCP Server requires a Zitadel service account to authenticate with the Unique Public API and perform operations on behalf of the server.
-
-**What the service account is used for:**
-
-- **Retrieve matching user information** - Look up users in Unique by email or username to resolve meeting participants from Microsoft Teams
-- **Create scopes (folders)** - Create organizational folders in Unique for storing meeting transcripts and recordings
-- **Set access permissions** - Grant appropriate read/write permissions to meeting organizers and participants based on their role in the meeting
-- **Upload transcript and recording data** - Ingest transcript content (VTT files) and recordings (MP4 files) into the Unique knowledge base
-
-**How it works:**
-
-- The service account credentials are passed via the `x-company-id` and `x-user-id` headers in all API requests to the Unique Public API
-- This ensures proper access control and authorization for all operations
-- The service account must be created in the Zitadel organization where you want to ingest transcripts
-
-**How to create:**
-
-1. Log in to Zitadel and select the target organization
-2. Navigate to **Service Accounts** in the organization settings
-3. Create a new service account with appropriate permissions
-4. Note the company ID (organization ID) and user ID (service account ID)
-5. Configure these values in Helm values under `mcpConfig.unique.serviceExtraHeaders`
-
-**See also:** [Zitadel Service Account](./operator/configuration.md#zitadel-service-account)
-
 ### What's the redirect URI format?
 
 **Answer:** The redirect URI must match exactly:
@@ -168,7 +130,7 @@ https://<your-domain>/auth/callback
 
 ### Why do I need a webhook secret?
 
-**Answer:** The `MICROSOFT_WEBHOOK_SECRET` validates that incoming webhook notifications are actually from Microsoft Graph, not from an attacker. It's sent to Microsoft when creating subscriptions and returned in every webhook payload for validation.
+**Answer:** `MICROSOFT_WEBHOOK_SECRET` is only used by meeting transcript capture. It validates that incoming webhook notifications really come from Microsoft Graph: the value is sent to Microsoft as `clientState` when creating a subscription and returned in every notification for validation. A chat-only deployment receives no webhooks and does not need it.
 
 **Generate:** `openssl rand -hex 64` (128 characters)
 
@@ -194,17 +156,11 @@ https://<your-domain>/auth/callback
 4. Verify authentication works
 5. Delete old secret from Entra ID
 
-**See also:** [Client Secret Management](./operator/authentication.md#client-secret-management)
+**See also:** [Client Secret Management](./operator/authentication.md#client-secret)
 
 ### What happens if I change the webhook secret?
 
-**Answer:** **Rotation is currently not possible** - There is no easy way to invalidate all existing subscriptions that were created with the old secret. The `MICROSOFT_WEBHOOK_SECRET` is sent to Microsoft as `clientState` when creating subscriptions. When the secret changes, all existing subscriptions will fail webhook validation because they contain the old secret, but there's no automated mechanism to recreate all subscriptions.
-
-> **Note:** Automated rotation might be part of a future release.
-
-If rotation becomes necessary, it would require manually deleting all subscriptions and having all users reconnect, which may miss transcripts created during the gap.
-
-**See also:** [MICROSOFT_WEBHOOK_SECRET Rotation](./technical/security.md#rotation-procedures)
+**Answer:** Rotation is currently not possible, because every existing transcript subscription carries the old value. This only affects deployments with transcript capture enabled — see [Recordings & Transcripts — FAQ](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535129116/Recordings+Transcripts+-+FAQ#what-happens-if-the-webhook-secret-changes).
 
 ## Architecture & Design
 
@@ -250,14 +206,6 @@ Hashing reduces attack surface (no decryption key needed for MCP tokens), while 
 
 **See also:** [Refresh Token Rotation](./technical/security.md#refresh-token-rotation)
 
-### Why are subscriptions renewed instead of recreated?
-
-**Answer:** The biggest reason is that recreation may miss transcripts. Microsoft Graph only sends notifications for transcripts created while a subscription is active. When recreating a subscription (DELETE + POST), there's a gap where no subscription exists. Any transcripts created during that gap will never generate notifications—those transcripts are lost forever.
-
-Renewal (PATCH) keeps the subscription continuously active, eliminating this gap. Additionally, renewal is more efficient than recreation—it preserves the subscription ID and reduces API calls. Renewal happens automatically before expiration (default: 3 AM UTC daily) to ensure token validity is checked consistently.
-
-**See also:** [Subscription Lifecycle](./technical/flows.md#subscription-lifecycle)
-
 ## Token Management
 
 ### What happens if token refresh fails?
@@ -282,7 +230,7 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 
 **See also:**
 
-- [Architecture - Token Family Tracking](./technical/architecture.md#key-design-decisions)
+- [Architecture - Token Family Tracking](./technical/architecture.md#postgresql)
 - [Security - Refresh Token Rotation](./technical/security.md#refresh-token-rotation)
 
 ### What happens if the encryption key changes?
@@ -303,130 +251,9 @@ Renewal (PATCH) keeps the subscription continuously active, eliminating this gap
 - [Authentication Architecture - MCP OAuth (Internal)](./technical/architecture.md#mcp-oauth-internal)
 - [MCP Authorization](https://modelcontextprotocol.io/specification/2025-03-26/basic/authorization) - MCP protocol authorization spec
 
-## Data Sync
-
-### Why can't historical transcripts be synced?
-
-**Answer:** Microsoft Graph does not provide a way to list transcripts across all past meetings using delegated permissions. The only cross-meeting transcript listing API is `getAllTranscripts`:
-
-```
-GET /users/{userId}/onlineMeetings/getAllTranscripts(meetingOrganizerUserId='{userId}',startDateTime=...)
-```
-
-This API requires **application permissions** (`OnlineMeetingTranscript.Read.All`). Microsoft explicitly marks delegated (user) permissions as **Not supported** for this endpoint.
-
-Teams MCP uses delegated permissions so users can connect their own Microsoft account without IT administrator involvement. With delegated permissions the only supported path is `GET /users/{userId}/onlineMeetings/{meetingId}/transcripts`, which requires knowing the meeting ID in advance — making bulk historical enumeration impossible.
-
-As a result, Teams MCP can only capture transcripts for meetings that occur **after** the user connects. Any meetings that took place before the subscription was created are inaccessible.
-
-**Additional historical limits (even with application permissions):**
-
-- One-time meetings expire 60 days after their scheduled time; the transcript API returns an error for expired meetings.
-- Recording/transcript files are deleted after the tenant's expiration policy window (Microsoft default: 120 days).
-
-**See also:**
-
-- [onlineMeeting: getAllTranscripts — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/onlinemeeting-getalltranscripts)
-- [Limits and specifications for Microsoft Teams — Meeting expiration](https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams)
-- [Microsoft Graph Constraints](./README.md#microsoft-graph-api-constraints)
-
-### Why is there no delta sync?
-
-**Answer:** Microsoft Graph does expose delta APIs for transcripts and recordings — `callTranscript: delta` and `callRecording: delta` — which support both full initial sync and incremental sync (returning only items added since a `$deltaToken`). However, these APIs require **application permissions**. Microsoft explicitly marks delegated permissions as **Not supported**:
-
-| Permission type | Support |
-|---|---|
-| Delegated (work or school account) | **Not supported** |
-| Delegated (personal Microsoft account) | **Not supported** |
-| Application | `OnlineMeetingTranscript.Read.All` |
-
-Because Teams MCP uses delegated permissions, delta sync is unavailable. The service instead relies on real-time webhook notifications (change notifications), which deliver new transcript events as they occur. This covers all meetings going forward but cannot recover transcripts missed due to a subscription gap.
-
-Switching to application permissions would unlock delta sync, but would require tenant administrators to configure [Application Access Policies](https://learn.microsoft.com/en-us/graph/cloud-communication-online-meeting-application-access-policy) via PowerShell for each individual user — defeating the self-service connection model.
-
-**See also:**
-
-- [callTranscript: delta — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/calltranscript-delta)
-- [callRecording: delta — Microsoft Graph API reference](https://learn.microsoft.com/en-us/graph/api/callrecording-delta)
-- [Microsoft Graph Constraints](./README.md#microsoft-graph-api-constraints)
-
-### What happens if I miss transcripts during a subscription gap?
-
-**Answer:** They are permanently lost. Microsoft Graph only delivers webhook notifications for transcripts created while a subscription is active. If a subscription expires (or is deleted and recreated), any transcripts produced during the gap will never generate a notification.
-
-This is a fundamental limitation of the change notification model combined with the unavailability of delta sync under delegated permissions. There is no catch-up or replay mechanism.
-
-To minimise the risk:
-
-- Ensure the renewal cron runs reliably (default: 3 AM UTC daily).
-- Monitor for `subscription_renewal_failed` log events — a failed renewal is the most common cause of gaps.
-- Use subscription **renewal** (PATCH) rather than recreation (DELETE + POST). See [Why are subscriptions renewed instead of recreated?](./faq.md#why-are-subscriptions-renewed-instead-of-recreated)
-
-**See also:** [Subscription Lifecycle](./technical/flows.md#subscription-lifecycle)
-
-## Subscriptions & Processing
-
-### Why do subscriptions expire?
-
-**Answer:** Microsoft Graph subscriptions expire after a maximum of 3 days. Teams MCP automatically renews subscriptions before they expire (default: 3 AM UTC daily). This ensures token validity is checked consistently.
-
-**See also:** [Subscription Lifecycle](./technical/flows.md#subscription-lifecycle)
-
-### What happens if a subscription renewal fails?
-
-**Answer:** The subscription is deleted and the user must reconnect to the MCP server to re-authenticate. This can happen if:
-- Microsoft refresh token expired (~90 days of inactivity)
-- User revoked app consent
-- Network issues reaching Microsoft
-
-Any transcripts produced between the failed renewal and the user reconnecting are **permanently lost** — there is no backfill or catch-up mechanism once a subscription lapses.
-
-**See also:**
-
-- [Subscription Lifecycle](./technical/flows.md#subscription-lifecycle)
-- [What happens if I miss transcripts during a subscription gap?](./faq.md#what-happens-if-i-miss-transcripts-during-a-subscription-gap)
-
-### Why aren't transcripts appearing in Unique?
-
-**Answer:** Check the following:
-
-1. **User has active subscription** - Verify the user successfully connected and subscription was created
-2. **Webhook notifications received** - Check if Microsoft is sending notifications
-3. **RabbitMQ queue processing** - Verify messages are being processed
-4. **No processing errors** - Check logs for any failures during transcript processing
-
-**See also:** [Transcript Processing Flow](./technical/flows.md#transcript-processing-flow)
-
 ## Webhooks & Processing
 
-### Why use RabbitMQ for webhook processing?
-
-**Answer:** Microsoft requires webhook endpoints to respond within **10 seconds**, or it considers the delivery failed and retries. However, processing transcript notifications involves database lookups, multiple Microsoft Graph API calls, user resolution, and content ingestion, which can take **30+ seconds**.
-
-RabbitMQ decouples webhook reception from processing:
-
-- **Webhook Controller** receives the notification, validates it, publishes to RabbitMQ, and returns `202 Accepted` immediately
-- **RabbitMQ** durably stores the message until a consumer processes it
-- **Transcript Service** consumes messages and performs the slow processing asynchronously
-
-This ensures we meet Microsoft's strict timeout requirements while processing transcripts reliably.
-
-**Benefits:**
-
-- Meets Microsoft's 10-second webhook response requirement
-- Avoids Microsoft retry storms from failed deliveries
-- Provides reliability via Dead Letter Exchange for failed message inspection and retry
-- Enables horizontal scaling with multiple service replicas
-- Handles burst traffic gracefully with message buffering
-
-**See also:**
-
-- [Microsoft Graph Webhooks](https://learn.microsoft.com/en-us/graph/webhooks) - Microsoft webhook documentation
-- [Microsoft Graph Change Notifications](https://learn.microsoft.com/en-us/graph/webhooks#change-notifications) - Change notification requirements
-
-### Can I deploy without RabbitMQ?
-
-**Answer:** No. RabbitMQ is required to meet Microsoft's webhook response time requirements. Without it, webhook processing would timeout and Microsoft would stop sending notifications.
+Webhooks are only used by meeting transcript capture. A chat-only deployment exposes no webhook endpoint and needs no RabbitMQ. For the queue, dead-letter handling, and processing pipeline, see [Recordings & Transcripts — Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-pipeline).
 
 ### How does webhook validation work?
 
@@ -439,14 +266,6 @@ This ensures we meet Microsoft's strict timeout requirements while processing tr
 **Answer:** The request is rejected with 401 Unauthorized. Microsoft will retry the notification. If validation consistently fails, Microsoft may stop sending notifications for that subscription.
 
 **See also:** [Webhook Validation](./technical/security.md#webhook-validation)
-
-### What happens to messages that fail processing?
-
-**Answer:** Failed transcript processing messages are nacked and routed to a Dead Letter Exchange (DLX). Messages accumulate there indefinitely — there is no automatic TTL or retry from the DLQ.
-
-An operator must inspect the DLQ manually (e.g., via the RabbitMQ management UI) to decide whether to republish a message for retry or discard it. Because there is no delta sync available, a message in the DLQ represents the only copy of that webhook notification — if discarded without successful processing, the transcript will not be ingested.
-
-**See also:** [Why use RabbitMQ for webhook processing?](./faq.md#why-use-rabbitmq-for-webhook-processing)
 
 ## Deployment
 
@@ -464,7 +283,7 @@ An operator must inspect the DLQ manually (e.g., via the RabbitMQ management UI)
 
 **Answer:** Token family tracking enables theft detection. Each OAuth session has a `token_family` identifier. If a refresh token is reused (indicating possible theft), the entire family is revoked. This prevents attackers from using stolen tokens while the legitimate client continues working.
 
-**See also:** [Token Family Tracking](./technical/architecture.md#key-design-decisions)
+**See also:** [Token Family Tracking](./technical/architecture.md#postgresql)
 
 ### Why store MCP tokens as hashes?
 
@@ -552,9 +371,9 @@ An operator must inspect the DLQ manually (e.g., via the RabbitMQ management UI)
 
 ### Can a user connect multiple Microsoft tenants?
 
-**Answer:** Not in a single session. One OAuth login covers exactly one Microsoft tenant. If a user belongs to multiple tenants (e.g., their home tenant plus a guest tenant), they must authenticate separately for each tenant they want to capture meetings from.
+**Answer:** Not in a single session. One OAuth login covers exactly one Microsoft tenant. If a user belongs to multiple tenants (e.g., their home tenant plus a guest tenant), they must authenticate separately for each tenant they want to reach.
 
-Each tenant authentication creates an independent user profile in Teams MCP. Transcripts from each tenant are ingested separately under the identity used to connect that tenant.
+Each tenant authentication creates an independent user profile in Teams MCP, and every tool call is scoped to the identity used to connect that tenant.
 
 **See also:** [Single App Registration Architecture](./technical/architecture.md#single-app-registration-architecture)
 
@@ -568,15 +387,16 @@ Each tenant authentication creates an independent user profile in Teams MCP. Tra
 - Enterprise Application management: Each tenant admin controls user assignment
 - Compliance: Some organizations may require dedicated infrastructure
 
-**See also:** [Multi-Tenant App Registration](./operator/authentication.md#multi-tenant-app-registration)
+**See also:** [Multi-Tenant App Registration](./operator/authentication.md#multi-tenant)
 
 ## Related Documentation
 
 - [Architecture](./technical/architecture.md) - System components and infrastructure
 - [Security](./technical/security.md) - Encryption, authentication, and threat model
-- [Flows](./technical/flows.md) - User connection, subscription lifecycle, transcript processing
+- [Flows](./technical/flows.md) - User connection, OAuth, token refresh, and chat tool sequences
 - [Permissions](./technical/permissions.md) - Required scopes and least-privilege justification
 - [Operator Guide](./operator/README.md) - Deployment and operations
+- [Recordings & Transcripts - FAQ](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535129116/Recordings+Transcripts+-+FAQ) - Meeting transcript capture, subscriptions, and the Recordings area
 
 ## Standard References
 
