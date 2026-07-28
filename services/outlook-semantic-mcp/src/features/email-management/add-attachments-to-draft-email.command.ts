@@ -89,7 +89,7 @@ export class AddAttachmentsToDraftEmailCommand {
           const { failedInfo } = processResult;
           this.logger.warn({
             ...logInfoForFile,
-            err: new Error(failedInfo.reason),
+            err: failedInfo.reason,
             msg: 'Attachment failed',
           });
           attachmentsFailed.push(failedInfo);
