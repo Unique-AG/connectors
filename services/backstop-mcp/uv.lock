@@ -76,6 +76,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
+    { name = "httpx" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-prometheus" },
     { name = "opentelemetry-instrumentation-asgi" },
@@ -90,7 +91,6 @@ dependencies = [
 [package.optional-dependencies]
 dev = [
     { name = "basedpyright" },
-    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -100,7 +100,7 @@ dev = [
 requires-dist = [
     { name = "basedpyright", marker = "extra == 'dev'" },
     { name = "fastmcp", specifier = "~=2.12" },
-    { name = "httpx", marker = "extra == 'dev'" },
+    { name = "httpx", specifier = "~=0.28" },
     { name = "opentelemetry-api", specifier = "~=1.29" },
     { name = "opentelemetry-exporter-prometheus", specifier = "~=0.50b0" },
     { name = "opentelemetry-instrumentation-asgi", specifier = "~=0.50b0" },

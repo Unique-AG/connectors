@@ -29,3 +29,18 @@ class AppConfig(BaseSettings):
     version: str = PKG_VERSION
     port: int = Field(default=8000, ge=0, le=65535)
     log_level: LogLevel = LogLevel.INFO
+
+
+class BackstopConfig(BaseSettings):
+    """Where to reach the Backstop REST API.
+
+    Credentials are NOT configured here: each connecting MCP client authenticates as
+    themselves by sending their own Backstop `Authorization: Basic ...` (and, for SSO
+    users, `token: true`) header, which is forwarded to Backstop unchanged. See
+    `backstop_client.py`, and https://backstopsolutions.elevio.help/en/articles/1018 /
+    .../236.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="BACKSTOP_")
+
+    base_url: str = "https://api.backstopsolutions.com"

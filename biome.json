@@ -20,7 +20,9 @@
       "!**/drizzle",
       "!**/helm-charts/**/values.schema.json",
       "!**/scripts",
-      "!**/local-scripts"
+      "!**/local-scripts",
+      "!**/services/backstop-mcp",
+      "!**/.venv"
     ]
   },
   "formatter": {
