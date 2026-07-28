@@ -19,6 +19,11 @@ on:
         description: "Path to the docs directory relative to repo root (optional)"
         required: false
         type: string
+      service-path:
+        description: "Path to the service directory relative to repo root (e.g., services/teams-mcp or python/hello-mcp). Defaults to services/<service-name>."
+        required: false
+        type: string
+        default: ""
 
 jobs:
   # Build and push container to registry
@@ -29,11 +34,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      # Empty service-path defaults to services/<service-name> (existing TS callers unchanged).
+      SERVICE_PATH: ${{ inputs.service-path || format('services/{0}', inputs.service-name) }}
       GHCR_REGISTRY: ghcr.io
-      GHCR_REPO: unique-ag/connectors/services/${{ inputs.service-name }}
+      GHCR_REPO: unique-ag/connectors/${{ inputs.service-path || format('services/{0}', inputs.service-name) }}
       GHCR_CHART_REPO: unique-ag/connectors/helm
       UNIQUECR_REGISTRY: uniquecr.azurecr.io
-      UNIQUECR_REPO: connectors/services/${{ inputs.service-name }}
+      UNIQUECR_REPO: connectors/${{ inputs.service-path || format('services/{0}', inputs.service-name) }}
       UNIQUECR_CHART_REPO: connectors/helm
       GETUNIQUE_REGISTRY: getunique.azurecr.io
       GETUNIQUE_CHART_REPO: helm
@@ -151,7 +158,7 @@ jobs:
           --allow-read \
           --allow-write=${{ env.DESTINATION }} \
           scripts/helm-package-push.ts \
-          --chart services/${{ inputs.service-name }}/deploy/helm-charts/${{ inputs.service-name }} \
+          --chart ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ inputs.service-name }} \
           --destination ${{ env.DESTINATION }} \
           --registry oci://${{ env.UNIQUECR_REGISTRY }}/${{ env.UNIQUECR_CHART_REPO }} \
           --registry oci://${{ env.GHCR_REGISTRY }}/${{ env.GHCR_CHART_REPO }} \

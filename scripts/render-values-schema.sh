@@ -25,6 +25,7 @@ CHART_DIRS=(
   "services/sharepoint-connector/deploy/helm-charts/sharepoint-connector"
   "services/teams-mcp/deploy/helm-charts/teams-mcp"
   "services/outlook-semantic-mcp/deploy/helm-charts/outlook-semantic-mcp"
+  "python/hello-mcp/deploy/helm-charts/hello-mcp"
 )
 
 had_drift=false

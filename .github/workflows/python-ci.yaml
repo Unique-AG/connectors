@@ -1,0 +1,159 @@
+name: "Python CI"
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "python/**"
+      - ".github/workflows/python-ci.yaml"
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: 'Python packages to run CI for (comma-separated, e.g., "hello-mcp" or "all")'
+        required: true
+        default: "all"
+
+concurrency:
+  group: python-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read # required for helm OCI chart dependency pulls from GHCR
+
+jobs:
+  detect-changes:
+    name: Detect changes
+    runs-on: ubuntu-slim
+    outputs:
+      packages: ${{ steps.build-matrix.outputs.packages }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        with:
+          list-files: json
+          filters: |
+            python:
+              - 'python/**'
+
+      - name: Build package matrix
+        id: build-matrix
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PACKAGES: ${{ github.event.inputs.packages }}
+          PYTHON_CHANGED: ${{ steps.filter.outputs.python }}
+          PYTHON_FILES: ${{ steps.filter.outputs.python_files }}
+        run: |
+          available=$(find python -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$INPUT_PACKAGES" = "all" ]; then
+              packages=$(echo "$available" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            else
+              IFS=',' read -ra requested <<< "$INPUT_PACKAGES"
+              valid=()
+              for pkg in "${requested[@]}"; do
+                pkg=$(echo "$pkg" | xargs)
+                if echo "$available" | grep -qx "$pkg"; then
+                  valid+=("$pkg")
+                else
+                  echo "::warning::Unknown python package: $pkg"
+                fi
+              done
+              packages=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            fi
+          elif [ "$PYTHON_CHANGED" = "true" ]; then
+            packages=$(echo "$PYTHON_FILES" | jq -r '.[]' | sed -n 's|^python/\([^/]*\)/.*|\1|p' | sort -u | while read -r pkg; do
+              if [ -d "python/$pkg" ]; then
+                echo "$pkg"
+              fi
+            done | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          else
+            packages='[]'
+          fi
+
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "Matrix: $packages"
+
+  test:
+    name: Test ${{ matrix.package }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.packages != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: python/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Run tests
+        run: uv run pytest
+
+  validate-helm:
+    name: Helm ${{ matrix.package }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.packages != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+    permissions:
+      contents: read
+      packages: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SERVICE_PATH: python/${{ matrix.package }}
+      SERVICE_NAME: ${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Check if Helm charts exist
+        id: check-helm
+        run: |
+          if [ -d "${{ env.SERVICE_PATH }}/deploy/helm-charts" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
+        if: steps.check-helm.outputs.exists == 'true'
+        with:
+          version: v3.19.0
+
+      - name: Login to GHCR (for OCI chart dependencies)
+        if: steps.check-helm.outputs.exists == 'true'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
+
+      - name: Render chart
+        if: steps.check-helm.outputs.exists == 'true'
+        working-directory: ${{ env.SERVICE_PATH }}/deploy/helm-charts/${{ env.SERVICE_NAME }}
+        run: |
+          helm dependency update
+          VALUES_FLAG=""
+          if [ -f ci-values.yaml ]; then
+            VALUES_FLAG="--values ci-values.yaml"
+          fi
+          helm template . ${VALUES_FLAG}
