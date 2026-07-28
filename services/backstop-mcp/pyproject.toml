@@ -1,0 +1,54 @@
+[project]
+name = "backstop-mcp"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp~=2.12",
+    "uvicorn[standard]~=0.34",
+    "pydantic~=2.10",
+    "pydantic-settings~=2.7",
+    "python-dotenv~=1.0",
+    "structlog~=25.1",
+    "opentelemetry-api~=1.29",
+    "opentelemetry-sdk~=1.29",
+    "opentelemetry-exporter-prometheus~=0.50b0",
+    "opentelemetry-instrumentation-asgi~=0.50b0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "basedpyright",
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+    "ruff",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/backstop_mcp"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN2"]
+
+[tool.basedpyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+extraPaths = ["src"]
+typeCheckingMode = "all"
+reportUnusedCallResult = false
+reportMissingTypeStubs = false
+reportUnusedFunction = false
