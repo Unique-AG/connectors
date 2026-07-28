@@ -14,11 +14,7 @@ For technical details about the OAuth flow, see [Microsoft OAuth Setup Flow](../
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. Which scopes are requested depends on `UNIQUE_INTEGRATION`.
-
-### Chat-only (`UNIQUE_INTEGRATION=disabled`)
-
-Only identity + Teams messaging scopes. `ChannelMessage.Read.All` requires admin consent.
+All permissions are **delegated** — they act on behalf of the signed-in user. Identity and Teams messaging scopes only; `ChannelMessage.Read.All` is the one that requires admin consent.
 
 | Permission | Type | Admin Consent |
 |------------|------|---------------|
@@ -32,27 +28,10 @@ Only identity + Teams messaging scopes. `ChannelMessage.Read.All` requires admin
 | `Channel.ReadBasic.All` | Delegated | No |
 | `ChannelMessage.Read.All` | Delegated | **Yes** |
 
-### With meeting transcript capture (`UNIQUE_INTEGRATION=enabled`)
+No calendar, meeting, transcript, or recording scope is requested. For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
 
-Chat scopes plus calendar/meeting/transcript/recording scopes. Three permissions require admin consent before users can connect. Only enable this mode if you intend to store meeting content in the Unique knowledge base — see [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts).
-
-| Permission | Type | Admin Consent |
-|------------|------|---------------|
-| `User.Read` | Delegated | No |
-| `Calendars.Read` | Delegated | No |
-| `OnlineMeetings.Read` | Delegated | No |
-| `OnlineMeetingRecording.Read.All` | Delegated | **Yes** |
-| `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** |
-| `offline_access` | Delegated | No |
-| `ChannelMessage.Send` | Delegated | No |
-| `ChatMessage.Send` | Delegated | No |
-| `Chat.ReadBasic` | Delegated | No |
-| `Chat.Read` | Delegated | No |
-| `Team.ReadBasic.All` | Delegated | No |
-| `Channel.ReadBasic.All` | Delegated | No |
-| `ChannelMessage.Read.All` | Delegated | **Yes** |
-
-For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
+!!! note "Transcript capture adds four scopes"
+    A deployment with `UNIQUE_INTEGRATION=enabled` additionally requests `Calendars.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All`, and `OnlineMeetingRecording.Read.All`, the last two of which require admin consent. Only enable that mode if you intend to store meeting content in the Unique knowledge base — see [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts).
 
 ## Unique SaaS
 
@@ -64,7 +43,7 @@ https://login.microsoftonline.com/organizations/v2.0/adminconsent?client_id=7c4f
 
 After approving, you are redirected to a Unique confirmation page.
 
-The consent prompt lists the [chat-only permissions](#chat-only-unique_integrationdisabled) above, of which `ChannelMessage.Read.All` is the one that needs admin consent. Without it, users will see an error when trying to connect.
+The consent prompt lists the [Required Permissions](#required-permissions) above, of which `ChannelMessage.Read.All` is the one that needs admin consent. Without it, users will see an error when trying to connect.
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `7c4f0aab-b24e-48c4-9b2d-d1c22dfdf99f`.
 

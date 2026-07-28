@@ -5,26 +5,24 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 
 ## Permission Summary
 
-Scopes requested at login depend on `UNIQUE_INTEGRATION`:
+These are all the scopes a Teams MCP server requests. Only one of them, `ChannelMessage.Read.All`, needs admin consent.
 
-- **`disabled` (chat-only)** — identity + Teams chat/channel messaging scopes
-- **`enabled`** — chat scopes plus calendar/meeting/transcript/recording scopes for KB ingestion
+| Permission | Type | ID | Admin Consent | Used For |
+|------------|------|-----|---------------|----------|
+| `User.Read` | Delegated | `e1fe6dd8-ba31-4d61-89e7-88639da4683d` | No | Identify the signed-in user |
+| `offline_access` | Delegated | `7427e0e9-2fba-42fe-b0c0-848c9e6a8182` | No | Refresh tokens for long-lived sessions |
+| `ChannelMessage.Send` | Delegated | `ebf0f66e-9fb1-49e4-a278-222f76911cf4` | No | `send_channel_message` |
+| `ChatMessage.Send` | Delegated | `116b7235-2ffd-4103-963e-baec9c8e5c8b` | No | `send_chat_message` |
+| `Chat.ReadBasic` | Delegated | `9547fcb5-d03f-419d-9948-5928bbf71b0f` | No | `list_chats` |
+| `Chat.Read` | Delegated | `f501c180-9344-439a-bca0-6cbf209fd270` | No | `get_chat_messages`, `search_messages` |
+| `Team.ReadBasic.All` | Delegated | `2280dda6-0bfd-44ee-a2f4-cb867cfc4c1e` | No | `list_teams` |
+| `Channel.ReadBasic.All` | Delegated | `3aeca27b-ee3a-4c2b-8ded-80376e2134a4` | No | `list_channels` |
+| `ChannelMessage.Read.All` | Delegated | `767156cb-16ae-4d10-8f8b-41b657c8c8c8` | **Yes** | `get_channel_messages`, `search_messages` |
 
-| Permission | Type | ID | Admin Consent | Chat-only | Unique enabled |
-|------------|------|-----|---------------|-----------|----------------|
-| `User.Read` | Delegated | `e1fe6dd8-ba31-4d61-89e7-88639da4683d` | No | Yes | Yes |
-| `Calendars.Read` | Delegated | `465a38f9-76ea-45b9-9f34-9e8b0d4b0b42` | No | No | Yes |
-| `OnlineMeetings.Read` | Delegated | `9be106e1-f4e3-4df5-bdff-e4bc531cbe43` | No | No | Yes |
-| `OnlineMeetingRecording.Read.All` | Delegated | `190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3` | Yes | No | Yes |
-| `OnlineMeetingTranscript.Read.All` | Delegated | `30b87d18-ebb1-45db-97f8-82ccb1f0190c` | Yes | No | Yes |
-| `offline_access` | Delegated | `7427e0e9-2fba-42fe-b0c0-848c9e6a8182` | No | Yes | Yes |
-| `ChannelMessage.Send` | Delegated | `ebf0f66e-9fb1-49e4-a278-222f76911cf4` | No | Yes | Yes |
-| `ChatMessage.Send` | Delegated | `116b7235-2ffd-4103-963e-baec9c8e5c8b` | No | Yes | Yes |
-| `Chat.ReadBasic` | Delegated | `9547fcb5-d03f-419d-9948-5928bbf71b0f` | No | Yes | Yes |
-| `Chat.Read` | Delegated | `f501c180-9344-439a-bca0-6cbf209fd270` | No | Yes | Yes |
-| `Team.ReadBasic.All` | Delegated | `2280dda6-0bfd-44ee-a2f4-cb867cfc4c1e` | No | Yes | Yes |
-| `Channel.ReadBasic.All` | Delegated | `3aeca27b-ee3a-4c2b-8ded-80376e2134a4` | No | Yes | Yes |
-| `ChannelMessage.Read.All` | Delegated | `767156cb-16ae-4d10-8f8b-41b657c8c8c8` | Yes | Yes | Yes |
+No calendar, meeting, transcript, or recording scope is requested. The server reads and sends chat and channel messages, and nothing else.
+
+!!! note "Deployments with transcript capture request more"
+    Setting `UNIQUE_INTEGRATION=enabled` adds four calendar and meeting scopes on top of this set, two of which need admin consent. They are documented with the feature that uses them — see [Recordings & Transcripts — Required Microsoft Graph permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#required-microsoft-graph-permissions).
 
 ## Understanding Consent Requirements
 
@@ -35,10 +33,8 @@ Scopes requested at login depend on `UNIQUE_INTEGRATION`:
 1. **Admin adds the app and grants admin-required permissions**
 
    - Organization-wide OR per-user
-   - For Teams MCP with Unique enabled: `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` require admin consent
-   - These chat messaging permissions do **not** require admin consent and can be approved by individual users: `ChannelMessage.Send`, `ChatMessage.Send`, `Chat.ReadBasic`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`.
-   - `ChannelMessage.Read.All` **does** require admin consent (required for `get_channel_messages` to read channel message content).
-   - Chat-only deployments (`UNIQUE_INTEGRATION=disabled`) do not request calendar/meeting/transcript/recording scopes, so only `ChannelMessage.Read.All` needs admin consent among the requested permissions.
+   - `ChannelMessage.Read.All` **does** require admin consent (required for `get_channel_messages` to read channel message content). It is the only one in the set above that does.
+   - Every other permission can be approved by individual users: `User.Read`, `offline_access`, `Chat.ReadBasic`, `Chat.Read`, `ChatMessage.Send`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Send`.
 
 2. **Admin approval workflow (if tenant has it enabled)**
 
@@ -66,47 +62,9 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | Retrieve the signed-in user's profile (ID, email, display name) |
-| **Used For** | Identifying the user when storing tokens and creating subscriptions |
+| **Used For** | Identifying the user when storing tokens |
 | **Why Not Less** | This is the minimum permission to read any user data |
 | **Why Not `User.ReadBasic.All`** | That permission reads other users; we only need the signed-in user |
-
-### `Calendars.Read`
-
-| Aspect | Detail |
-|--------|--------|
-| **Purpose** | Read the user's calendar events |
-| **Used For** | Determining if a meeting is recurring by querying the calendar event associated with an online meeting |
-| **Why Not Less** | No narrower permission exists for reading calendar events |
-| **Why Not `Calendars.ReadWrite`** | We don't create or modify calendar events, only read them |
-
-### `OnlineMeetings.Read`
-
-| Aspect | Detail |
-|--------|--------|
-| **Purpose** | Read meeting metadata (subject, start/end time, participants) |
-| **Used For** | Fetching meeting details when a transcript notification arrives |
-| **Why Not Less** | No narrower permission exists for reading meeting data |
-| **Why Not `OnlineMeetings.ReadWrite`** | We don't create or modify meetings, only read them |
-
-### `OnlineMeetingRecording.Read.All`
-
-| Aspect | Detail |
-|--------|--------|
-| **Purpose** | Read recordings from all meetings the user can access |
-| **Used For** | Downloading MP4 recording files to store alongside transcripts |
-| **Why Not Less** | No per-meeting recording permission exists; `.All` is the minimum |
-| **Why Not Application Permission** | Would require tenant admin to create Application Access Policies per-user; impractical for self-service MCP connections |
-| **Admin Consent** | Required because recordings contain audio/video of meetings |
-
-### `OnlineMeetingTranscript.Read.All`
-
-| Aspect | Detail |
-|--------|--------|
-| **Purpose** | Read transcripts from all meetings the user can access |
-| **Used For** | Downloading VTT transcript content for ingestion |
-| **Why Not Less** | No per-meeting transcript permission exists; `.All` is the minimum |
-| **Why Not Application Permission** | Would require tenant admin to create Application Access Policies per-user; impractical for self-service MCP connections |
-| **Admin Consent** | Required because transcripts may contain sensitive meeting content |
 
 ### `offline_access`
 
@@ -226,9 +184,8 @@ Application permissions would require tenant administrators to pre-configure acc
 ## Permission Reference Links
 
 - [Microsoft Graph Permissions Reference](https://learn.microsoft.com/en-us/graph/permissions-reference) - Official Microsoft documentation
-- [Calendars.Read](https://graphpermissions.merill.net/permission/Calendars.Read) - Third-party permission explorer
-- [OnlineMeetingRecording.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingRecording.Read.All) - Third-party permission explorer
-- [OnlineMeetingTranscript.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingTranscript.Read.All) - Third-party permission explorer
+- [ChannelMessage.Read.All](https://graphpermissions.merill.net/permission/ChannelMessage.Read.All) - Third-party permission explorer
+- [Chat.Read](https://graphpermissions.merill.net/permission/Chat.Read) - Third-party permission explorer
 - [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/overview) - Graph API overview
 
 ## Related Documentation
@@ -236,4 +193,4 @@ Application permissions would require tenant administrators to pre-configure acc
 - [Architecture](./architecture.md) - System components and infrastructure
 - [Security](./security.md) - Encryption, PKCE, and threat model
 - [Flows](./flows.md) - User connection, OAuth, token refresh, and chat tool sequences
-- [Recordings & Transcripts - Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual) - Where the meeting scopes are used
+- [Recordings & Transcripts - Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual) - The four additional calendar and meeting scopes, and where they are used

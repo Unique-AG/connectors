@@ -52,23 +52,19 @@ Enabling transcript capture adds requirements of its own — meeting transcripti
 
 All permissions are **Delegated** (not Application), meaning they act on behalf of the signed-in user and can only access data that user has access to.
 
-| Permission | Type | Admin Consent | Chat-only | With transcript capture |
-|------------|------|---------------|-----------|-------------------------|
-| `User.Read` | Delegated | No | Yes | Yes |
-| `offline_access` | Delegated | No | Yes | Yes |
-| `ChannelMessage.Send` | Delegated | No | Yes | Yes |
-| `ChatMessage.Send` | Delegated | No | Yes | Yes |
-| `Chat.ReadBasic` | Delegated | No | Yes | Yes |
-| `Chat.Read` | Delegated | No | Yes | Yes |
-| `Team.ReadBasic.All` | Delegated | No | Yes | Yes |
-| `Channel.ReadBasic.All` | Delegated | No | Yes | Yes |
-| `ChannelMessage.Read.All` | Delegated | Yes | Yes | Yes |
-| `Calendars.Read` | Delegated | No | No | Yes |
-| `OnlineMeetings.Read` | Delegated | No | No | Yes |
-| `OnlineMeetingRecording.Read.All` | Delegated | Yes | No | Yes |
-| `OnlineMeetingTranscript.Read.All` | Delegated | Yes | No | Yes |
+| Permission | Type | Admin Consent |
+|------------|------|---------------|
+| `User.Read` | Delegated | No |
+| `offline_access` | Delegated | No |
+| `ChannelMessage.Send` | Delegated | No |
+| `ChatMessage.Send` | Delegated | No |
+| `Chat.ReadBasic` | Delegated | No |
+| `Chat.Read` | Delegated | No |
+| `Team.ReadBasic.All` | Delegated | No |
+| `Channel.ReadBasic.All` | Delegated | No |
+| `ChannelMessage.Read.All` | Delegated | **Yes** |
 
-The four scopes at the bottom are requested only when transcript capture is enabled. In a chat-only deployment, `ChannelMessage.Read.All` is the sole permission needing admin consent.
+Nothing calendar-, meeting-, transcript-, or recording-related is requested, and `ChannelMessage.Read.All` is the sole permission needing admin consent. Transcript capture adds four further scopes, documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#required-microsoft-graph-permissions).
 
 For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md#least-privilege-justification).
 

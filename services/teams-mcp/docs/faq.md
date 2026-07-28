@@ -25,9 +25,9 @@
 
 ### Do I need admin consent?
 
-**Answer:** Not for chat and messaging. All scopes a chat-only deployment uses are user-consentable, so users can connect without IT involvement.
+**Answer:** Yes, for one scope. `ChannelMessage.Read.All` — which `get_channel_messages` and `search_messages` need to read channel message content — requires admin consent because channel messages may contain sensitive organisational content. Every other chat and messaging scope is user-consentable.
 
-Admin consent is only required if you enable meeting transcript capture, which needs `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` — Microsoft requires admin consent for these because they access sensitive meeting content. See [Recordings & Transcripts — Operator Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual).
+Enabling meeting transcript capture adds two more admin-consent scopes, `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All`. See [Recordings & Transcripts — Operator Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual).
 
 **See also:** [Understanding Admin Consent](./operator/authentication.md#understanding-consent-flows)
 

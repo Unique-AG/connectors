@@ -439,16 +439,58 @@ Source: [Limits and specifications for Microsoft Teams](https://learn.microsoft.
 
 ## Required Microsoft Graph permissions
 
-Capture requires four delegated scopes beyond the chat-only set, two of which need admin consent:
+Capture requires four delegated scopes **in addition to** the chat and messaging scopes every Teams MCP server requests. A chat-only deployment requests none of these four — they exist only when `UNIQUE_INTEGRATION=enabled`.
 
-| Permission | Admin consent | Why it is needed |
-|------------|---------------|------------------|
-| `Calendars.Read` | No | Resolve meeting details and participants for a transcript |
-| `OnlineMeetings.Read` | No | Read online meeting metadata by id |
-| `OnlineMeetingTranscript.Read.All` | **Yes** | Read transcript content |
-| `OnlineMeetingRecording.Read.All` | **Yes** | Read recording content |
+| Permission | Type | ID | Admin consent | Why it is needed |
+|------------|------|-----|---------------|------------------|
+| `Calendars.Read` | Delegated | `465a38f9-76ea-45b9-9f34-9e8b0d4b0b42` | No | Resolve meeting details and participants for a transcript |
+| `OnlineMeetings.Read` | Delegated | `9be106e1-f4e3-4df5-bdff-e4bc531cbe43` | No | Read online meeting metadata by id |
+| `OnlineMeetingTranscript.Read.All` | Delegated | `30b87d18-ebb1-45db-97f8-82ccb1f0190c` | **Yes** | Read transcript content |
+| `OnlineMeetingRecording.Read.All` | Delegated | `190c2bb6-1fdd-4fec-9aa2-7d571b5e1fe3` | **Yes** | Read recording content |
 
-Full least-privilege justification for every scope, including the chat-only set, is in [Teams MCP - Permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802240023/Teams+MCP+-+Permissions).
+Grant admin consent for the two privileged scopes with the URL in [Grant admin consent](./operator.md#grant-admin-consent).
+
+### Least-privilege justification
+
+#### `Calendars.Read`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Read the user's calendar events |
+| **Used For** | Determining if a meeting is recurring by querying the calendar event associated with an online meeting |
+| **Why Not Less** | No narrower permission exists for reading calendar events |
+| **Why Not `Calendars.ReadWrite`** | We don't create or modify calendar events, only read them |
+
+#### `OnlineMeetings.Read`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Read meeting metadata (subject, start/end time, participants) |
+| **Used For** | Fetching meeting details when a transcript notification arrives |
+| **Why Not Less** | No narrower permission exists for reading meeting data |
+| **Why Not `OnlineMeetings.ReadWrite`** | We don't create or modify meetings, only read them |
+
+#### `OnlineMeetingTranscript.Read.All`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Read transcripts from all meetings the user can access |
+| **Used For** | Downloading VTT transcript content for ingestion |
+| **Why Not Less** | No per-meeting transcript permission exists; `.All` is the minimum |
+| **Why Not Application Permission** | Would require tenant admin to create Application Access Policies per-user; impractical for self-service MCP connections |
+| **Admin Consent** | Required because transcripts may contain sensitive meeting content |
+
+#### `OnlineMeetingRecording.Read.All`
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Read recordings from all meetings the user can access |
+| **Used For** | Downloading MP4 recording files to store alongside transcripts |
+| **Why Not Less** | No per-meeting recording permission exists; `.All` is the minimum |
+| **Why Not Application Permission** | Would require tenant admin to create Application Access Policies per-user; impractical for self-service MCP connections |
+| **Admin Consent** | Required because recordings contain audio/video of meetings |
+
+The chat and messaging scopes, and the rationale for using delegated rather than application permissions throughout, are in [Teams MCP - Permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802240023/Teams+MCP+-+Permissions).
 
 ## Related Documentation
 
@@ -464,3 +506,6 @@ Full least-privilege justification for every scope, including the chat-only set,
 - [Microsoft Graph Change Notifications](https://learn.microsoft.com/en-us/graph/webhooks) - Subscription and notification model
 - [Microsoft Graph Webhooks - Lifecycle Notifications](https://learn.microsoft.com/en-us/graph/webhooks#lifecycle-notifications) - Renewal and lifecycle events
 - [Microsoft Graph Permissions Reference](https://learn.microsoft.com/en-us/graph/permissions-reference) - Permission details
+- [OnlineMeetingTranscript.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingTranscript.Read.All) - Third-party permission explorer
+- [OnlineMeetingRecording.Read.All](https://graphpermissions.merill.net/permission/OnlineMeetingRecording.Read.All) - Third-party permission explorer
+- [Calendars.Read](https://graphpermissions.merill.net/permission/Calendars.Read) - Third-party permission explorer
