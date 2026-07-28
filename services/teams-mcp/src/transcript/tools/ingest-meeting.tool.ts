@@ -162,15 +162,14 @@ export class IngestMeetingTool {
     // 3. Optionally narrow by date (UTC day of the transcript creation time).
     let candidates = transcripts;
     if (input.date) {
-      this.logger.debug({
-        msg: `No Transcripts found for specified date`,
-        date: input.date,
-        meetingId: meeting.id,
-        userProfileId,
-      });
       candidates = candidates.filter(
         (t) => t.createdDateTime.toISOString().slice(0, 10) === input.date,
       );
+      this.logger.debug({
+        msg: `Found ${candidates.length} by using the specified date: "${input.date}"`,
+        meetingId: meeting.id,
+        userProfileId,
+      });
 
       if (candidates.length === 0) {
         const availableDates = [
