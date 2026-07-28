@@ -98,6 +98,10 @@ export class AddAttachmentsToDraftEmailCommand {
       total: attachments.length,
       succeeded: attachments.length - attachmentsFailed.length,
       failed: attachmentsFailed.length,
+      failedAttachementsDetails: attachmentsFailed.map((item) => ({
+        fileName: createSmeared(item.fileName),
+        failedReason: item.reason,
+      })),
     });
 
     return { attachmentsFailed };
