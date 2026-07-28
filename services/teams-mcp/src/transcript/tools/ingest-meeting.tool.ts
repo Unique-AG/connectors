@@ -164,6 +164,7 @@ export class IngestMeetingTool {
     if (input.date) {
       this.logger.debug({
         msg: `No Transcripts found for specified date`,
+        date: input.date,
         meetingId: meeting.id,
         userProfileId,
       });
@@ -273,7 +274,7 @@ export class IngestMeetingTool {
       msg: `Queing transcripts for ingestion`,
       userProfileId,
       meetingId: meeting.id,
-      transcriptIds: transcripts.map((item) => item.id),
+      transcriptIds: selected.map((item) => item.id),
     });
     for (const transcript of selected) {
       await this.transcriptCreated.enqueueIngestRequested({
