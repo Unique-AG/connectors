@@ -95,16 +95,22 @@ export class IngestMeetingTool {
     // Escape single quotes by doubling them so a crafted URL cannot break out of the OData
     // string literal and inject filter predicates.
     const escapedJoinUrl = input.joinUrl.replace(/'/g, "''");
+    this.logger.debug({ msg: `Finding online meetings`, userProfileId });
     const meetingResponse = await client
       .api('/me/onlineMeetings')
       .filter(`JoinWebUrl eq '${escapedJoinUrl}'`)
       .get();
     const meetings = await MeetingCollection.parseAsync(meetingResponse);
     const meeting = meetings.value[0];
+    this.logger.debug({
+      msg: `Total meetings found ${meetings.value.length} using first meeting`,
+      meetingId: meeting?.id,
+      userProfileId,
+    });
 
     if (!meeting) {
       span?.addEvent('meeting_not_found');
-      this.logger.debug({ userProfileId }, 'No meeting matched the provided join URL');
+      this.logger.debug({ msg: 'No meeting matched the provided join URL', userProfileId });
       return {
         success: false,
         message: 'Meeting not found, or you do not have access to it.',
@@ -124,6 +130,7 @@ export class IngestMeetingTool {
     // 2. List the meeting's transcripts. A meeting rarely has more than a page
     // of transcripts, but page through them anyway for consistency with the
     // other Graph collections.
+    this.logger.debug({ msg: `Finding transcripts`, meetingId: meeting.id, userProfileId });
     const transcriptsResponse = await client
       .api(`/me/onlineMeetings/${meeting.id}/transcripts`)
       .top(GRAPH_PAGE_SIZE)
@@ -132,6 +139,12 @@ export class IngestMeetingTool {
       label: 'ingestMeeting.transcripts',
     });
     const transcripts = z.array(Transcript).parse(items);
+    this.logger.debug({
+      msg: `Total Transcripts found: ${transcripts.length}`,
+      meetingId: meeting.id,
+      date: input.date,
+      userProfileId,
+    });
 
     span?.setAttribute('transcript_count', transcripts.length);
 
@@ -149,6 +162,11 @@ export class IngestMeetingTool {
     // 3. Optionally narrow by date (UTC day of the transcript creation time).
     let candidates = transcripts;
     if (input.date) {
+      this.logger.debug({
+        msg: `No Transcripts found for specified date`,
+        meetingId: meeting.id,
+        userProfileId,
+      });
       candidates = candidates.filter(
         (t) => t.createdDateTime.toISOString().slice(0, 10) === input.date,
       );
@@ -175,6 +193,11 @@ export class IngestMeetingTool {
     } else {
       const caps = context.mcpServer.server.getClientCapabilities();
       if (!caps?.elicitation) {
+        this.logger.debug({
+          msg: `Server does not support elicitation`,
+          meetingId: meeting.id,
+          userProfileId,
+        });
         span?.addEvent('elicitation_unsupported');
         return {
           success: false,
@@ -185,6 +208,11 @@ export class IngestMeetingTool {
         };
       }
 
+      this.logger.debug({
+        msg: `Requesting elicitation for ${candidates.length} candidate transcripts`,
+        meetingId: meeting.id,
+        userProfileId,
+      });
       const result = await context.mcpServer.server.elicitInput({
         mode: 'form',
         message: `This meeting has ${candidates.length} transcripts. Which do you want to ingest?`,
@@ -206,6 +234,11 @@ export class IngestMeetingTool {
 
       if (result.action !== 'accept') {
         span?.addEvent('elicitation_cancelled', { action: result.action });
+        this.logger.debug({
+          msg: `Elicitation canceled transcripts not queued for ingestion`,
+          meetingId: meeting.id,
+          userProfileId,
+        });
         return {
           success: false,
           message: 'Selection cancelled.',
@@ -218,6 +251,11 @@ export class IngestMeetingTool {
       const chosen = candidates.find((t) => t.id === chosenId);
       if (!chosen) {
         span?.addEvent('elicitation_invalid_selection');
+        this.logger.debug({
+          msg: `The selected transcript is no longer available`,
+          meetingId: meeting.id,
+          userProfileId,
+        });
         return {
           success: false,
           message: 'The selected transcript is no longer available.',
@@ -231,6 +269,12 @@ export class IngestMeetingTool {
     // 5. Enqueue an ingest event per selected transcript (async — the upload happens downstream).
     const userProfileTypeid = convertUserProfileIdToTypeId(userProfileId);
 
+    this.logger.debug({
+      msg: `Queing transcripts for ingestion`,
+      userProfileId,
+      meetingId: meeting.id,
+      transcriptIds: transcripts.map((item) => item.id),
+    });
     for (const transcript of selected) {
       await this.transcriptCreated.enqueueIngestRequested({
         userProfileId: userProfileTypeid,
