@@ -59,12 +59,17 @@ For full justifications, see [Microsoft Graph Permissions](../technical/permissi
 **Recommended for most clients.** When Unique runs Teams MCP, Unique provisions the Entra ID app registration for you. You only need to grant admin consent:
 
 ```
-https://login.microsoftonline.com/organizations/adminconsent?client_id=8ddffb12-1579-4fa8-8844-ca122e4308bc
+https://login.microsoftonline.com/organizations/v2.0/adminconsent?client_id=7c4f0aab-b24e-48c4-9b2d-d1c22dfdf99f&scope=https://graph.microsoft.com/.default&redirect_uri=https%3A%2F%2Fwww.unique.ai%2Fsetup%2Fconsent-completed%2Fentra-id
 ```
 
-The consent prompt lists the [Required Permissions](#required-permissions) for your mode. `ChannelMessage.Read.All` always requires admin consent; with transcript capture enabled, `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` do too. The URL above handles them in one step. Without it, users will see an error when trying to connect.
+After approving, you are redirected to a Unique confirmation page.
 
-If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `8ddffb12-1579-4fa8-8844-ca122e4308bc`.
+The consent prompt lists the [chat-only permissions](#chat-only-unique_integrationdisabled) above, of which `ChannelMessage.Read.All` is the one that needs admin consent. Without it, users will see an error when trying to connect.
+
+If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `7c4f0aab-b24e-48c4-9b2d-d1c22dfdf99f`.
+
+!!! note "Transcript capture uses a different app registration"
+    The URL above consents to the chat-only app. A deployment with `UNIQUE_INTEGRATION=enabled` runs on its own app registration, which additionally requests the meeting-content scopes — grant consent for it with the URL in [Recordings & Transcripts — Grant admin consent](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual#grant-admin-consent).
 
 ## Self-Hosted
 

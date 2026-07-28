@@ -14,10 +14,28 @@ Enabling Recordings & Transcripts means configuring **two** systems: the [Teams 
 |---|---|
 | **Teams MCP Server deployed** | See [Teams MCP - Deployment](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802141709/Teams+MCP+-+Deployment) |
 | **RabbitMQ** | Required for the ingestion pipeline; chat-only deployments do not need it |
-| **Admin consent granted** | `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` — see [Teams MCP - Authentication](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1803026436/Teams+MCP+-+Authentication) |
+| **Admin consent granted** | `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` — see [Grant admin consent](#grant-admin-consent) |
 | **Zitadel service account** | With the roles listed below — see [Zitadel service account](#zitadel-service-account) |
 | **Root scope created** | Created manually in Unique before deployment — see [Root scope](#root-scope) |
 | **Teams transcription enabled** | By Microsoft Teams meeting policy, otherwise there is nothing to capture |
+
+## Grant admin consent
+
+Transcript capture needs two Microsoft Graph scopes that Microsoft classes as privileged, because they read meeting content: `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All`. Both require **admin consent** — users cannot approve them for themselves. Until an administrator has granted it, users see an error when they try to connect.
+
+Capture runs on a **different Entra ID app registration** than a chat-only Teams MCP deployment, so consent granted for the chat-only app does not cover this feature. Use the URL below.
+
+**Recommended for most clients.** When Unique runs Teams MCP with capture enabled, Unique provisions the Entra ID app registration for you. You only need to grant admin consent:
+
+```
+https://login.microsoftonline.com/organizations/adminconsent?client_id=8ddffb12-1579-4fa8-8844-ca122e4308bc
+```
+
+The consent prompt lists every scope the capture-enabled server requests — the chat and messaging scopes plus `Calendars.Read`, `OnlineMeetings.Read`, and the two meeting-content scopes above. The URL handles them in one step. For the full list with least-privilege justification, see [Teams MCP - Permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802240023/Teams+MCP+-+Permissions).
+
+If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `8ddffb12-1579-4fa8-8844-ca122e4308bc`.
+
+Self-hosted deployments provision their own app registration instead — see [Teams MCP - Authentication](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1803026436/Teams+MCP+-+Authentication#self-hosted), and add the two meeting-content scopes to it.
 
 ## Enable ingestion on the Teams MCP Server
 
@@ -167,7 +185,7 @@ For Unique SaaS deployments, Unique applies the flag and both settings for you; 
     - [ ] Service account granted `MANAGE`, `READ`, `WRITE` on the root scope
 2. **Microsoft Entra ID**
     - [ ] `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` added
-    - [ ] Admin consent granted for both
+    - [ ] Admin consent granted for both — see [Grant admin consent](#grant-admin-consent)
     - [ ] Teams meeting policy has transcription enabled
 3. **Teams MCP Server**
     - [ ] RabbitMQ reachable

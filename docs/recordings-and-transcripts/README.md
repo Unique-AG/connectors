@@ -55,7 +55,7 @@ flowchart LR
 |-------------|---------|
 | **Teams MCP Server** | Deployed with `UNIQUE_INTEGRATION=enabled`, a dedicated root scope, and a Zitadel service account — see the [Operator Manual](./operator.md) |
 | **Microsoft Teams** | Meeting transcription enabled by policy; recordings require the meeting to actually be recorded |
-| **Microsoft Entra ID** | Admin consent for `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` |
+| **Microsoft Entra ID** | Admin consent for `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` — see [Grant admin consent](./operator.md#grant-admin-consent) |
 | **Unique platform** | The Recordings area enabled via feature flag, pointed at the same root scope Teams MCP ingests into |
 | **Knowledge-base storage** | Capacity for VTT transcripts and MP4 recordings; recordings are the dominant cost |
 
