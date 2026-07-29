@@ -1,5 +1,2 @@
-# CI-only overrides for `helm template`.
-# Defaults in values.yaml are already lean — add keys here only when
-# values.yaml grows heavy defaults that break secret-free CI renders.
-ingress:
-  enabled: false
+# Intentionally empty — chart defaults are CI-safe.
+{}

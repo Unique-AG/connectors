@@ -1,6 +1,6 @@
 # hello-mcp chart defaults — portable app only.
-# Unique hostname / TLS / NP-on live in the monorepo Argo overlay.
-# Third parties: helm install + expose however they want (LB, Ingress, Mesh…).
+# Unique hostname / TLS / NP-on live in the monorepo Argo overlay (Gateway API routes).
+# Third parties: helm install + expose however they want (LB, Ingress controller, Mesh…).
 
 nameOverride: hello-mcp
 fullnameOverride: hello-mcp
@@ -64,30 +64,33 @@ service:
   port: 80
 
 # Who may call this service (used by base NetworkPolicy generators).
-# Overlay Unique keeps this; third parties can drop/override.
 internalServices:
   dependents:
     ingressGateway:
       name: gateway
       namespace: system
 
-# Gateway API (HTTPRoute) — off by default. Unique overlay sets hostname + paths.
+# Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
+# Unique QA example overlay:
+#   routes:
+#     hostname: hello.mcp.qa.unique.app
+#     auth:
+#       jwt: false
+#     paths:
+#       default:
+#         enabled: true
+#       probe:
+#         enabled: true
 routes:
   hostname: ""
-
-# Optional classic Ingress — off by default (customers / legacy MCP wildcard cases).
-ingress:
-  enabled: false
-  ingressClassName: kong
-  hosts: []
-  tls: []
+  auth:
+    jwt: false
 
 hooks:
   migration:
     enabled: false
 
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
-# Shape mirrors monorepo mcp/hello network-policy.values.yaml.
 networkPolicy:
   enabled: false
   flavor: cilium
@@ -100,14 +103,12 @@ networkPolicy:
     ephemeralPorts:
       enabled: false
   ingress:
-    # kubelet probes
     - fromEntities:
         - host
       toPorts:
         - ports:
             - port: "8000"
               protocol: TCP
-    # Kong gateway (also covered via internalServices.dependents.ingressGateway)
     - fromEndpoints:
         - matchLabels:
             "k8s:io.kubernetes.pod.namespace": system
