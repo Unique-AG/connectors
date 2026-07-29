@@ -7,11 +7,8 @@ on:
     branches:
       - main
     paths:
-      - "services/**/pyproject.toml"
-      - "services/**/uv.lock"
-      - "services/**/src/**"
-      - "services/**/tests/**"
-      - "services/**/deploy/**"
+      # Explicit service paths — avoid services/**/{src,tests,deploy}/** which also match Node services.
+      - "services/hello-mcp/**"
       - ".github/workflows/python-ci.yaml"
   workflow_dispatch:
     inputs:
@@ -44,11 +41,7 @@ jobs:
           list-files: json
           filters: |
             python:
-              - 'services/**/pyproject.toml'
-              - 'services/**/uv.lock'
-              - 'services/**/src/**'
-              - 'services/**/tests/**'
-              - 'services/**/deploy/**'
+              - 'services/hello-mcp/**'
 
       - name: Build package matrix
         id: build-matrix
