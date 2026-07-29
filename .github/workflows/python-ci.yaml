@@ -1,4 +1,5 @@
-# Python CI — services under services/ that use pyproject.toml (ignored by pnpm/turbo).
+# Python CI — services under services/ that have pyproject.toml (ignored by pnpm/turbo).
+# Mirrors services-ci: trigger on services/**, matrix only dirs with pyproject.toml.
 
 name: "Python CI"
 
@@ -7,8 +8,7 @@ on:
     branches:
       - main
     paths:
-      # Explicit service paths — avoid services/**/{src,tests,deploy}/** which also match Node services.
-      - "services/hello-mcp/**"
+      - "services/**"
       - ".github/workflows/python-ci.yaml"
   workflow_dispatch:
     inputs:
@@ -40,20 +40,29 @@ jobs:
         with:
           list-files: json
           filters: |
-            python:
-              - 'services/hello-mcp/**'
+            services:
+              - 'services/**'
 
+      # Builds a JSON array of Python service names to fan out into parallel CI matrix jobs.
+      # Handles:
+      #   1. workflow_dispatch: user input (comma-separated or "all"), validated against pyproject.toml services
+      #   2. PR with service changes: unique service names from changed paths that have pyproject.toml
+      # Node/TS services (package.json only) are never included — they use services-ci.yaml.
       - name: Build package matrix
         id: build-matrix
         env:
           EVENT_NAME: ${{ github.event_name }}
           INPUT_PACKAGES: ${{ github.event.inputs.packages }}
-          PYTHON_CHANGED: ${{ steps.filter.outputs.python }}
-          PYTHON_FILES: ${{ steps.filter.outputs.python_files }}
+          SERVICES_CHANGED: ${{ steps.filter.outputs.services }}
+          SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
         run: |
-          available=$(find services -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/pyproject.toml' \; -print | xargs -n1 basename | sort)
+          list_python_services() {
+            find services -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/pyproject.toml' \; -print | xargs -n1 basename | sort
+          }
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            available=$(list_python_services)
+
             if [ "$INPUT_PACKAGES" = "all" ]; then
               packages=$(echo "$available" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             else
@@ -64,23 +73,23 @@ jobs:
                 if echo "$available" | grep -qx "$pkg"; then
                   valid+=("$pkg")
                 else
-                  echo "::warning::Unknown python package: $pkg"
+                  echo "::error::Unknown python package: $pkg"
+                  echo "Available python packages: $available"
+                  exit 1
                 fi
               done
               packages=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             fi
-          elif [ "$PYTHON_CHANGED" = "true" ]; then
-            packages=$(echo "$PYTHON_FILES" | jq -r '.[]' | sed -n 's|^services/\([^/]*\)/.*|\1|p' | sort -u | while read -r pkg; do
-              if [ -f "services/$pkg/pyproject.toml" ]; then
-                echo "$pkg"
-              fi
+          elif [ "$SERVICES_CHANGED" = "true" ]; then
+            packages=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r pkg; do
+              [ -f "services/$pkg/pyproject.toml" ] && echo "$pkg"
             done | jq -R -s -c 'split("\n") | map(select(length > 0))')
           else
             packages='[]'
           fi
 
           echo "packages=$packages" >> "$GITHUB_OUTPUT"
-          echo "Matrix: $packages"
+          echo "Python packages to validate: $packages"
 
   test:
     name: Test ${{ matrix.package }}
