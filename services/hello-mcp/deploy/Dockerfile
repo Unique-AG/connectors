@@ -1,4 +1,3 @@
-# services/hello-mcp/deploy/Dockerfile
 # syntax=docker/dockerfile:1.7
 
 # Builder: Astral's image with uv + Python 3.12 already installed
