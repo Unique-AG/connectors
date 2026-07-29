@@ -6,6 +6,7 @@ export interface ListUsersQueryInput {
   where?: {
     email?: {
       equals: string;
+      mode?: 'insensitive';
     };
     active?: {
       equals: boolean;

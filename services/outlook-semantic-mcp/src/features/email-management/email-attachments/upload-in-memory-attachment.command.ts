@@ -28,19 +28,20 @@ export class UploadInMemoryAttachmentCommand {
   }): Promise<{ status: 'success' }> {
     const prefix = mailbox ? `/users/${mailbox}` : '/me';
     if (totalSize <= 3 * 1024 * 1024) {
-      this.logger.log({
-        msg: 'Uploading attachment via simple POST',
+      const logInfo = {
         userProfileId,
         draftId,
         fileName,
         sizeBytes: totalSize,
-      });
+      };
+      this.logger.log({ ...logInfo, msg: 'Uploading attachment via simple POST' });
       await client.api(`${prefix}/messages/${draftId}/attachments`).post({
         '@odata.type': '#microsoft.graph.fileAttachment',
         name: fileName.value,
         contentBytes: data.toString('base64'),
         contentType: mimeType,
       });
+      this.logger.log({ ...logInfo, msg: 'Uploading attachment via simple POST succeded' });
       return { status: 'success' };
     }
 

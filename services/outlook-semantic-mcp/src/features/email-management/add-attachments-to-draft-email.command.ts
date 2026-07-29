@@ -63,12 +63,21 @@ export class AddAttachmentsToDraftEmailCommand {
 
     // This function is here because we cache the result.
     const resolveUniqueIdentity = this.createUniqueIdentityResolver(profile.email);
+    const logInfo = {
+      userProfileId: userProfileIdString,
+      draftId,
+      chatId,
+      ...(mailbox ? { mailbox: createSmeared(mailbox) } : {}),
+    };
 
-    for (const { data, fileName } of attachments) {
+    for (const { data, fileName: fileNameRaw } of attachments) {
+      const fileName = createSmeared(fileNameRaw);
+      const logInfoForFile = { ...logInfo, fileName };
+
       try {
         const processResult = await this.processAttachment({
           data,
-          fileName: createSmeared(fileName),
+          fileName,
           userProfileId: userProfileIdString,
           client,
           draftId,
@@ -77,24 +86,28 @@ export class AddAttachmentsToDraftEmailCommand {
           mailbox,
         });
         if (processResult.status === 'failed') {
-          attachmentsFailed.push(processResult.reason);
+          const { failedInfo } = processResult;
+          this.logger.warn({
+            ...logInfoForFile,
+            err: failedInfo.reason,
+            msg: 'Attachment failed',
+          });
+          attachmentsFailed.push(failedInfo);
         }
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         this.logger.warn({
+          ...logInfoForFile,
           err,
-          userProfileId: userProfileIdString,
-          draftId,
           msg: 'Attachment failed',
         });
-        attachmentsFailed.push({ fileName, reason });
+        attachmentsFailed.push({ fileName: fileName.value, reason });
       }
     }
 
     this.logger.log({
+      ...logInfo,
       msg: 'Attachment upload run complete',
-      userProfileId: userProfileIdString,
-      draftId,
       total: attachments.length,
       succeeded: attachments.length - attachmentsFailed.length,
       failed: attachmentsFailed.length,
@@ -156,7 +169,7 @@ export class AddAttachmentsToDraftEmailCommand {
       default:
         return {
           status: 'failed',
-          reason: { fileName: fileName.value, reason: 'Unrecognised attachment type' },
+          failedInfo: { fileName: fileName.value, reason: 'Unrecognised attachment type' },
         };
     }
   }

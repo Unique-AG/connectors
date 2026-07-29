@@ -66,6 +66,7 @@ export class UsersService implements UniqueUsersFacade {
       where: {
         email: {
           equals: email,
+          mode: 'insensitive',
         },
         active: {
           equals: true,

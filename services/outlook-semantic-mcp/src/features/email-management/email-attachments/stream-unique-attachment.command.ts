@@ -40,7 +40,7 @@ export class StreamUniqueAttachmentCommand {
     if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
       return {
         status: 'failed',
-        reason: {
+        failedInfo: {
           fileName: fileName.value,
           reason: 'App is not running in cluster local',
         },
@@ -49,7 +49,7 @@ export class StreamUniqueAttachmentCommand {
     if (!uniqueIdentity) {
       return {
         status: 'failed',
-        reason: {
+        failedInfo: {
           fileName: fileName.value,
           reason: 'Could not resolve unique identity',
         },
@@ -88,7 +88,7 @@ export class StreamUniqueAttachmentCommand {
       });
       return {
         status: 'failed',
-        reason: {
+        failedInfo: {
           fileName: fileName.value,
           reason: `Unique content download failed (${response.status}): ${text}`,
         },
@@ -100,7 +100,7 @@ export class StreamUniqueAttachmentCommand {
       await response.body?.cancel();
       return {
         status: 'failed',
-        reason: {
+        failedInfo: {
           fileName: fileName.value,
           reason: 'Missing content-length header or empty body from content service',
         },
