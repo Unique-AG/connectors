@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.1.0...outlook-semantic-mcp@3.2.0) (2026-07-29)
+
+
+### Features
+
+* **outlook-semantic-mcp,unique-api:** add more logs around attachments upload, resolve users case insensitive in unique by email ([#711](https://github.com/Unique-AG/connectors/issues/711)) ([71885a1](https://github.com/Unique-AG/connectors/commit/71885a14c536453d60304c66af1f39bbdb22f6bf))
+
 ## [3.1.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.0.1...outlook-semantic-mcp@3.1.0) (2026-07-24)
 
 
