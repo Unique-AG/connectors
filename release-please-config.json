@@ -103,7 +103,7 @@
         }
       ]
     },
-    "python/hello-mcp": {
+    "services/hello-mcp": {
       "release-type": "python",
       "extra-files": [
         {

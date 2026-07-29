@@ -31,7 +31,7 @@ sharepoint-connector = services/sharepoint-connector/**
 confluence-connector = services/confluence-connector/**
 teams-mcp = services/teams-mcp/**
 temenos-mcp = services/temenos-mcp/**
-hello-mcp = python/hello-mcp/**
+hello-mcp = services/hello-mcp/**
 
 # Packages
 aes-gcm-encryption = packages/aes-gcm-encryption/**

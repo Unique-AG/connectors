@@ -5,7 +5,7 @@ Minimal no-auth FastMCP Hello World server.
 ## Run locally
 
 ```bash
-cd python/hello-mcp
+cd services/hello-mcp
 uv sync
 uv run hello-mcp
 ```

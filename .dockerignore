@@ -15,7 +15,6 @@
 
 !packages/**
 !services/**
-!python/**
 
 # keep the whole content of these always ignored no matter where they are
 **/node_modules/

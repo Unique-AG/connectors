@@ -19,6 +19,5 @@ jobs:
     secrets: inherit
     with:
       service-name: hello-mcp
-      service-path: python/hello-mcp
       service-version: ${{ inputs.existing-version }}
-      dockerfile: python/hello-mcp/deploy/Dockerfile
+      dockerfile: services/hello-mcp/deploy/Dockerfile

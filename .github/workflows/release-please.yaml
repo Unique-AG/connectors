@@ -30,8 +30,8 @@ jobs:
       "services/confluence-connector--version": ${{ steps.release.outputs['services/confluence-connector--version'] }}
       "services/outlook-semantic-mcp--release_created": ${{ steps.release.outputs['services/outlook-semantic-mcp--release_created'] }}
       "services/outlook-semantic-mcp--version": ${{ steps.release.outputs['services/outlook-semantic-mcp--version'] }}
-      "python/hello-mcp--release_created": ${{ steps.release.outputs['python/hello-mcp--release_created'] }}
-      "python/hello-mcp--version": ${{ steps.release.outputs['python/hello-mcp--version'] }}
+      "services/hello-mcp--release_created": ${{ steps.release.outputs['services/hello-mcp--release_created'] }}
+      "services/hello-mcp--version": ${{ steps.release.outputs['services/hello-mcp--version'] }}
 
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
@@ -92,11 +92,10 @@ jobs:
 
   release-hello-mcp:
     needs: release-please
-    if: ${{ needs.release-please.outputs['python/hello-mcp--release_created'] == 'true' }}
+    if: ${{ needs.release-please.outputs['services/hello-mcp--release_created'] == 'true' }}
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
       service-name: hello-mcp
-      service-path: python/hello-mcp
-      service-version: ${{ needs.release-please.outputs['python/hello-mcp--version'] }}
-      dockerfile: python/hello-mcp/deploy/Dockerfile
+      service-version: ${{ needs.release-please.outputs['services/hello-mcp--version'] }}
+      dockerfile: services/hello-mcp/deploy/Dockerfile

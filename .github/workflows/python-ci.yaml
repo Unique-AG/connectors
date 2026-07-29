@@ -1,3 +1,5 @@
+# Python CI — services under services/ that use pyproject.toml (ignored by pnpm/turbo).
+
 name: "Python CI"
 
 on:
@@ -5,7 +7,11 @@ on:
     branches:
       - main
     paths:
-      - "python/**"
+      - "services/**/pyproject.toml"
+      - "services/**/uv.lock"
+      - "services/**/src/**"
+      - "services/**/tests/**"
+      - "services/**/deploy/**"
       - ".github/workflows/python-ci.yaml"
   workflow_dispatch:
     inputs:
@@ -31,14 +37,18 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+      - uses: dorny/paths-filter@fbd0ab8f3e86593af611ebaee6363fc25e6d187d # v4.0.1
         if: github.event_name != 'workflow_dispatch'
         id: filter
         with:
           list-files: json
           filters: |
             python:
-              - 'python/**'
+              - 'services/**/pyproject.toml'
+              - 'services/**/uv.lock'
+              - 'services/**/src/**'
+              - 'services/**/tests/**'
+              - 'services/**/deploy/**'
 
       - name: Build package matrix
         id: build-matrix
@@ -48,7 +58,7 @@ jobs:
           PYTHON_CHANGED: ${{ steps.filter.outputs.python }}
           PYTHON_FILES: ${{ steps.filter.outputs.python_files }}
         run: |
-          available=$(find python -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+          available=$(find services -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/pyproject.toml' \; -print | xargs -n1 basename | sort)
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ "$INPUT_PACKAGES" = "all" ]; then
@@ -67,8 +77,8 @@ jobs:
               packages=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             fi
           elif [ "$PYTHON_CHANGED" = "true" ]; then
-            packages=$(echo "$PYTHON_FILES" | jq -r '.[]' | sed -n 's|^python/\([^/]*\)/.*|\1|p' | sort -u | while read -r pkg; do
-              if [ -d "python/$pkg" ]; then
+            packages=$(echo "$PYTHON_FILES" | jq -r '.[]' | sed -n 's|^services/\([^/]*\)/.*|\1|p' | sort -u | while read -r pkg; do
+              if [ -f "services/$pkg/pyproject.toml" ]; then
                 echo "$pkg"
               fi
             done | jq -R -s -c 'split("\n") | map(select(length > 0))')
@@ -91,7 +101,7 @@ jobs:
     timeout-minutes: 15
     defaults:
       run:
-        working-directory: python/${{ matrix.package }}
+        working-directory: services/${{ matrix.package }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -123,7 +133,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      SERVICE_PATH: python/${{ matrix.package }}
+      SERVICE_PATH: services/${{ matrix.package }}
       SERVICE_NAME: ${{ matrix.package }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
