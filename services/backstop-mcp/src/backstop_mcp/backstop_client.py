@@ -1,8 +1,13 @@
 import base64
+from collections.abc import Awaitable, Callable
 
 import httpx
 
-from backstop_mcp.auth.context import get_current_backstop_credential
+from backstop_mcp.auth.context import (
+    current_subject,
+    get_current_backstop_credential,
+    revoke_tokens_for_subject,
+)
 from backstop_mcp.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.config import BackstopConfig
 
@@ -12,6 +17,8 @@ _TOKEN_HEADER = "token"
 # GET /system-info takes no parameters and returns no business data — the cheapest real
 # Backstop call that still requires a valid credential, so it doubles as a login-time check.
 _VERIFICATION_PATH = "/system-info"
+
+type AuthFailureHook = Callable[[], Awaitable[None]]
 
 
 class BackstopUnreachableError(Exception):
@@ -31,18 +38,28 @@ class BackstopAuthError(Exception):
     """
 
 
-async def _raise_for_backstop_status(response: httpx.Response) -> None:
-    """`httpx` response event hook: auto-raise on every Backstop error response.
+def _make_raise_for_backstop_status(
+    on_auth_failure: AuthFailureHook | None = None,
+) -> Callable[[httpx.Response], Awaitable[None]]:
+    """Build an `httpx` response event hook that auto-raises on Backstop error responses.
 
     A 401 means the stored credential itself was revoked/expired in Backstop — raised as
     `BackstopAuthError` so tool code can tell it apart from "this specific call failed"
-    (any other 4xx/5xx, raised via the normal `httpx.HTTPStatusError`). Attached to every
-    client `create_backstop_client` builds, so tool implementations never check status
-    codes themselves — see `tools/system_info.py` for an example.
+    (any other 4xx/5xx, raised via the normal `httpx.HTTPStatusError`). When
+    `on_auth_failure` is provided (the authenticated tool path), it runs first so MCP
+    tokens for that user are revoked before the error surfaces.
     """
-    if response.status_code == 401:
-        raise BackstopAuthError("Backstop rejected the stored credential — please reconnect.")
-    response.raise_for_status()
+
+    async def raise_for_backstop_status(response: httpx.Response) -> None:
+        if response.status_code == 401:
+            if on_auth_failure is not None:
+                await on_auth_failure()
+            raise BackstopAuthError(
+                "Backstop rejected the stored credential — please reconnect."
+            )
+        response.raise_for_status()
+
+    return raise_for_backstop_status
 
 
 def build_auth_headers(username: str, api_token: str) -> dict[str, str]:
@@ -56,13 +73,16 @@ def build_auth_headers(username: str, api_token: str) -> dict[str, str]:
 
 
 def create_backstop_client(
-    base_url: str, credential: BackstopCredentialSecret
+    base_url: str,
+    credential: BackstopCredentialSecret,
+    *,
+    on_auth_failure: AuthFailureHook | None = None,
 ) -> httpx.AsyncClient:
     headers = build_auth_headers(credential.username, credential.api_token.get_secret_value())
     return httpx.AsyncClient(
         base_url=base_url,
         headers=headers,
-        event_hooks={"response": [_raise_for_backstop_status]},
+        event_hooks={"response": [_make_raise_for_backstop_status(on_auth_failure)]},
     )
 
 
@@ -72,10 +92,19 @@ async def get_backstop_client() -> httpx.AsyncClient:
     Call this from within a tool implementation, where an authenticated request is active.
     Resolves the caller's own stored credential via `auth.context` — raises
     `auth.context.NotConnectedError` if they haven't completed the login flow. Every
-    response the returned client makes is auto-checked (see `_raise_for_backstop_status`).
+    response the returned client makes is auto-checked; a mid-session Backstop 401 also
+    revokes that caller's MCP tokens so the next request forces a re-login.
     """
     credential = await get_current_backstop_credential()
-    return create_backstop_client(BackstopConfig().base_url, credential)
+    subject = current_subject()
+
+    async def on_auth_failure() -> None:
+        if subject is not None:
+            await revoke_tokens_for_subject(subject)
+
+    return create_backstop_client(
+        BackstopConfig().base_url, credential, on_auth_failure=on_auth_failure
+    )
 
 
 async def verify_credential(username: str, api_token: str, base_url: str) -> bool:

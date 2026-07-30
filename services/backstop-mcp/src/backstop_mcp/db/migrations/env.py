@@ -23,7 +23,8 @@ if config.config_file_name is not None:
 
 # Backstop-mcp reads its DB connection from env vars (DB_URL or DB_HOST/DB_NAME/...),
 # same as the running app — not from the static `sqlalchemy.url` in alembic.ini.
-config.set_main_option("sqlalchemy.url", DatabaseConfig().connection_url)
+_db_config = DatabaseConfig()
+config.set_main_option("sqlalchemy.url", _db_config.connection_url)
 
 target_metadata = Base.metadata
 
@@ -74,6 +75,7 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=_db_config.connect_args,
     )
 
     async with connectable.connect() as connection:

@@ -13,6 +13,10 @@ from backstop_mcp.auth.crypto import BackstopCredentialSecret
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 
+async def _noop_revoke(_subject: str) -> None:
+    return None
+
+
 def _access_token(subject: str | None) -> AccessToken:
     return AccessToken(token="access-token", client_id="client-1", scopes=[], subject=subject)
 
@@ -25,7 +29,11 @@ class TestGetCurrentBackstopCredential:
         _, factory = db
         key = os.urandom(32)
         auth_context.configure(
-            auth_context.BackstopAuthContext(session_factory=factory, encryption_key=key)
+            auth_context.BackstopAuthContext(
+                session_factory=factory,
+                encryption_key=key,
+                revoke_tokens_for_subject=_noop_revoke,
+            )
         )
         async with factory() as session:
             await save_credential(
@@ -51,7 +59,11 @@ class TestGetCurrentBackstopCredential:
     ) -> None:
         _, factory = db
         auth_context.configure(
-            auth_context.BackstopAuthContext(session_factory=factory, encryption_key=os.urandom(32))
+            auth_context.BackstopAuthContext(
+                session_factory=factory,
+                encryption_key=os.urandom(32),
+                revoke_tokens_for_subject=_noop_revoke,
+            )
         )
         monkeypatch.setattr("backstop_mcp.auth.context.get_access_token", lambda: None)
 
@@ -64,7 +76,11 @@ class TestGetCurrentBackstopCredential:
     ) -> None:
         _, factory = db
         auth_context.configure(
-            auth_context.BackstopAuthContext(session_factory=factory, encryption_key=os.urandom(32))
+            auth_context.BackstopAuthContext(
+                session_factory=factory,
+                encryption_key=os.urandom(32),
+                revoke_tokens_for_subject=_noop_revoke,
+            )
         )
         monkeypatch.setattr(
             "backstop_mcp.auth.context.get_access_token", lambda: _access_token(None)
@@ -79,7 +95,11 @@ class TestGetCurrentBackstopCredential:
     ) -> None:
         _, factory = db
         auth_context.configure(
-            auth_context.BackstopAuthContext(session_factory=factory, encryption_key=os.urandom(32))
+            auth_context.BackstopAuthContext(
+                session_factory=factory,
+                encryption_key=os.urandom(32),
+                revoke_tokens_for_subject=_noop_revoke,
+            )
         )
         monkeypatch.setattr(
             "backstop_mcp.auth.context.get_access_token",

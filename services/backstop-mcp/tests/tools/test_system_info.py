@@ -22,8 +22,16 @@ _BASE_URL = "https://example.backstopsolutions.com"
 async def _connect_user(db: DatabaseFixture, subject: str, username: str, api_token: str) -> bytes:
     _, factory = db
     key = os.urandom(32)
+
+    async def _noop_revoke(_subject: str) -> None:
+        return None
+
     auth_context.configure(
-        auth_context.BackstopAuthContext(session_factory=factory, encryption_key=key)
+        auth_context.BackstopAuthContext(
+            session_factory=factory,
+            encryption_key=key,
+            revoke_tokens_for_subject=_noop_revoke,
+        )
     )
     async with factory() as session:
         await save_credential(
@@ -61,8 +69,16 @@ class TestGetSystemInfo:
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _, factory = db
+
+        async def _noop_revoke(_subject: str) -> None:
+            return None
+
         auth_context.configure(
-            auth_context.BackstopAuthContext(session_factory=factory, encryption_key=os.urandom(32))
+            auth_context.BackstopAuthContext(
+                session_factory=factory,
+                encryption_key=os.urandom(32),
+                revoke_tokens_for_subject=_noop_revoke,
+            )
         )
         monkeypatch.setattr(
             "backstop_mcp.auth.context.get_access_token",
@@ -77,7 +93,30 @@ class TestGetSystemInfo:
     async def test_raises_backstop_auth_error_when_credential_revoked(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        await _connect_user(db, "user-tool-2", "tool-carol.diaz", "revoked-token")
+        revoked_subjects: list[str] = []
+
+        async def _record_revoke(subject: str) -> None:
+            revoked_subjects.append(subject)
+
+        _, factory = db
+        key = os.urandom(32)
+        auth_context.configure(
+            auth_context.BackstopAuthContext(
+                session_factory=factory,
+                encryption_key=key,
+                revoke_tokens_for_subject=_record_revoke,
+            )
+        )
+        async with factory() as session:
+            await save_credential(
+                session,
+                "user-tool-2",
+                BackstopCredentialSecret(
+                    username="tool-carol.diaz", api_token=SecretStr("revoked-token")
+                ),
+                key,
+            )
+            await session.commit()
         monkeypatch.setattr(
             "backstop_mcp.auth.context.get_access_token",
             lambda: _fake_access_token("user-tool-2"),
@@ -87,6 +126,8 @@ class TestGetSystemInfo:
 
         with pytest.raises(BackstopAuthError):
             await get_system_info()
+
+        assert revoked_subjects == ["user-tool-2"]
 
 
 def _fake_access_token(subject: str) -> AccessToken:

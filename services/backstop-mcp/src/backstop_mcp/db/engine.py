@@ -14,6 +14,7 @@ from backstop_mcp.config import DatabaseConfig
 def create_engine(config: DatabaseConfig) -> AsyncEngine:
     return create_async_engine(
         config.connection_url,
+        connect_args=config.connect_args,
         echo=False,
         pool_size=5,
         max_overflow=10,

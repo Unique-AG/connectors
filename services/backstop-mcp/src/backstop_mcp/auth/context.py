@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from fastmcp.exceptions import ToolError
@@ -13,7 +14,7 @@ class NotConnectedError(ToolError):
     """Raised when the caller isn't authenticated, or has no Backstop credential on file.
 
     Surfaced to the MCP client as a tool error telling them to (re)connect this server —
-    see `docs/plans/2026-07-30-backstop-mcp-oauth-design.md` for the login flow this refers to.
+    see `docs/plans/2026-07-27-backstop-mcp-scaffold-design.md` for the login flow this refers to.
     """
 
 
@@ -23,6 +24,7 @@ class BackstopAuthContext:
 
     session_factory: async_sessionmaker[AsyncSession]
     encryption_key: bytes
+    revoke_tokens_for_subject: Callable[[str], Awaitable[None]]
 
 
 _context: BackstopAuthContext | None = None
@@ -32,6 +34,18 @@ def configure(context: BackstopAuthContext) -> None:
     """Set the process-wide auth context. Call once, during `create_app()`."""
     global _context
     _context = context
+
+
+def current_subject() -> str | None:
+    """Return the MCP access-token subject for the active request, if any."""
+    access_token = get_access_token()
+    return access_token.subject if access_token is not None else None
+
+
+async def revoke_tokens_for_subject(subject: str) -> None:
+    """Revoke MCP access/refresh tokens for `subject` after a mid-session Backstop 401."""
+    assert _context is not None, "auth.context.configure() must be called during app startup"
+    await _context.revoke_tokens_for_subject(subject)
 
 
 async def get_current_backstop_credential() -> BackstopCredentialSecret:
@@ -45,15 +59,15 @@ async def get_current_backstop_credential() -> BackstopCredentialSecret:
     """
     assert _context is not None, "auth.context.configure() must be called during app startup"
 
-    access_token = get_access_token()
-    if access_token is None or access_token.subject is None:
+    subject = current_subject()
+    if subject is None:
         raise NotConnectedError(
             "Not connected to Backstop yet — add this MCP server to your client and "
             + "complete the login flow first."
         )
 
     async with get_session(_context.session_factory) as session:
-        credential = await get_credential(session, access_token.subject, _context.encryption_key)
+        credential = await get_credential(session, subject, _context.encryption_key)
 
     if credential is None:
         raise NotConnectedError(

@@ -1,13 +1,23 @@
 import os
+import ssl
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
-from typing import ClassVar, cast
-from urllib.parse import quote_plus
+from typing import ClassVar, TypedDict, cast
+from urllib.parse import parse_qsl, quote_plus, urlencode, urlparse, urlunparse
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, PrivateAttr, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PKG_VERSION = pkg_version("backstop-mcp")
+
+# libpq sslmode values that require certificate verification.
+_SSLMODE_VERIFY = frozenset({"verify", "verify-ca", "verify-full"})
+# Encrypt the connection but do not verify the server certificate.
+_SSLMODE_ENCRYPT = frozenset({"require", "prefer"})
+
+
+class AsyncpgConnectArgs(TypedDict, total=False):
+    ssl: ssl.SSLContext
 
 
 def _validate_required_fields(fields: dict[str, str | None], url_field: str = "URL") -> None:
@@ -23,6 +33,44 @@ def _validate_required_fields(fields: dict[str, str | None], url_field: str = "U
     missing = [name for name, val in fields.items() if val is None]
     if missing:
         raise ValueError(f"{url_field} not set; missing required fields: {', '.join(missing)}")
+
+
+def _ssl_connect_arg(sslmode: str) -> ssl.SSLContext | None:
+    """Map a libpq `sslmode` value to an asyncpg `ssl` connect argument."""
+    if sslmode in ("disable", "allow"):
+        return None
+    if sslmode in _SSLMODE_ENCRYPT:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    if sslmode in _SSLMODE_VERIFY:
+        return ssl.create_default_context()
+    raise ValueError(f"Unsupported sslmode={sslmode!r} in database URL")
+
+
+def normalize_asyncpg_url(url: str) -> tuple[str, AsyncpgConnectArgs]:
+    """Rewrite a libpq Postgres URL for SQLAlchemy/asyncpg.
+
+    Helm injects `DATABASE_URL` with libpq query params (`sslmode=...`). asyncpg rejects
+    those params, so strip them and return equivalent `connect_args` instead.
+    """
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    parsed = urlparse(url)
+    params = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    sslmode = params.pop("sslmode", None)
+    # Also libpq-only; asyncpg does not accept it in the query string.
+    params.pop("channel_binding", None)
+
+    clean_url = urlunparse(parsed._replace(query=urlencode(params)))
+    connect_args: AsyncpgConnectArgs = {}
+    if sslmode is not None:
+        ssl_arg = _ssl_connect_arg(sslmode)
+        if ssl_arg is not None:
+            connect_args["ssl"] = ssl_arg
+    return clean_url, connect_args
 
 
 class AppEnv(StrEnum):
@@ -56,9 +104,10 @@ class AppConfig(BaseSettings):
 class BackstopConfig(BaseSettings):
     """Where to reach the Backstop REST API.
 
-    Credentials are NOT configured here: each connecting MCP client authenticates as
-    themselves by sending their own Backstop `Authorization: Basic ...` (and, for SSO
-    users, `token: true`) header, which is forwarded to Backstop unchanged. See
+    Credentials are NOT configured here: each connecting MCP client completes the hosted
+    login form (username + personal API token), which is verified against Backstop and then
+    stored encrypted in Postgres. Tool calls load that per-user credential and send
+    `Authorization: Basic ...` + `token: true` to Backstop. See `auth/provider.py`,
     `backstop_client.py`, and https://backstopsolutions.elevio.help/en/articles/1018 /
     .../236.
     """
@@ -79,6 +128,7 @@ class DatabaseConfig(BaseSettings):
     name: str | None = None
     user: str | None = None
     password: str | None = None
+    _connect_args: AsyncpgConnectArgs = PrivateAttr(default_factory=lambda: AsyncpgConnectArgs())
 
     @model_validator(mode="before")
     @classmethod
@@ -98,8 +148,7 @@ class DatabaseConfig(BaseSettings):
         if self.url is not None:
             if not self.url.startswith(("postgresql://", "postgresql+")):
                 raise ValueError("DB_URL must be a PostgreSQL connection string (postgresql://...)")
-            if self.url.startswith("postgresql://"):
-                self.url = self.url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            self.url, self._connect_args = normalize_asyncpg_url(self.url)
             return self
 
         _validate_required_fields(
@@ -118,6 +167,7 @@ class DatabaseConfig(BaseSettings):
             f"postgresql+asyncpg://{quote_plus(self.user)}:{quote_plus(self.password)}"
             f"@{self.host}:{self.port}/{self.name}"
         )
+        self._connect_args = AsyncpgConnectArgs()
         return self
 
     @property
@@ -126,6 +176,11 @@ class DatabaseConfig(BaseSettings):
         if self.url is None:
             raise RuntimeError("URL should be set after validation")
         return self.url
+
+    @property
+    def connect_args(self) -> AsyncpgConnectArgs:
+        """asyncpg connect args derived from libpq query params (e.g. sslmode)."""
+        return self._connect_args
 
 
 class EncryptionConfig(BaseSettings):

@@ -4,58 +4,45 @@
 
 ## Problem
 
-UN-22647 is the investigation/concept spike for a Backstop MCP wrapper: Capstone's Backstop CRM exposes a REST API (bidirectional, read + write-back, Party ID as the universal join key across Organizations/Persons/Accounts). Before the domain tools can be designed, we need a new service, `backstop-mcp`, scaffolded in `services/` with the same operational baseline (logging, config, metrics, health checks, deployment) that the rest of the MCP fleet uses, so that whichever engineer picks up the follow-up ticket can start writing Backstop tools immediately instead of re-solving app-shell plumbing.
+UN-22647 is the investigation/concept spike for a Backstop MCP wrapper: Capstone's Backstop CRM exposes a REST API (bidirectional, read + write-back, Party ID as the universal join key across Organizations/Persons/Accounts). Before domain tools can be designed, we need `backstop-mcp` scaffolded in `services/` with the same operational baseline as the rest of the MCP fleet (logging, config, metrics, health checks, deployment), plus the auth bridge required because Backstop has no native OAuth — only username + personal API token Basic auth.
 
 ## Solution
 
 ### Overview
 
-Build directly on FastMCP's own idioms — a single `FastMCP` instance, `@mcp.tool` for future domain tools, `@mcp.custom_route` for operational HTTP endpoints — rather than wrapping it in FastAPI. `services/edgar-mcp` (an unmerged branch, `edgar-mcp/feat/UN-16706-initial-setup`) is the only local precedent for structlog logging + OpenTelemetry/Prometheus metrics + dotenv config in this repo, but it was never merged and isn't an established pattern to mirror wholesale. We reuse the *pattern* from it — not the FastAPI-mounting approach, and not the Postgres/RabbitMQ pieces, which nothing in backstop-mcp needs yet.
+Build on FastMCP idioms — a single `FastMCP` instance, `@mcp.tool` for tools, `@mcp.custom_route` for operational HTTP endpoints — rather than wrapping in FastAPI. Auth is an OAuth 2.1 authorization server (FastMCP `OAuthProvider`) whose "login" step is a hosted form that collects Backstop credentials, verifies them against Backstop, encrypts them at rest in Postgres, and mints MCP access/refresh tokens. Tool calls resolve the caller's stored credential and call Backstop as that user.
 
 ### Architecture
 
-- `config.py` — `AppConfig` via `pydantic-settings`: `app_env` (development/production/test), `port`, `log_level`, `version` (from package metadata). No `DatabaseConfig`/`RabbitMqConfig` — nothing to connect to yet.
-- `logging.py` — structlog configured for JSON output in production, console (colored) in development, driven by `AppConfig.log_level`/`app_env`. Same shape as edgar-mcp's, renamed/generalized, no edgar-specific naming.
-- `metrics.py` — OpenTelemetry `MeterProvider` with `PrometheusMetricReader`; exposed via `prometheus_client.generate_latest` behind an `@mcp.custom_route("/metrics")`.
-- `middleware.py` — trace-context middleware that clears structlog contextvars per request and binds the current OTel trace ID, so logs and traces correlate. Added to the ASGI app via `mcp.http_app(middleware=[...])`.
-- `app.py` — builds the `FastMCP("Backstop MCP")` instance, registers `/health` (liveness — static "ok") and `/probe` (readiness — no dependencies to check yet, always healthy) via `@mcp.custom_route`, configures logging + metrics, and returns `mcp.http_app(middleware=[OTel ASGI middleware, TraceContextMiddleware])`.
-- `main.py` — loads `.env` via `python-dotenv`, builds the app, runs it with `uvicorn` on `AppConfig.port`.
-
-No FastAPI dependency. No database, no message queue, no Terraform secrets (no Backstop credentials wired up yet — that's part of the follow-up implementation ticket once the API investigation concludes).
+- `config.py` — `AppConfig` (env/port/log/public_base_url), `BackstopConfig` (API base URL only — no shared credentials), `DatabaseConfig` (Postgres URL; accepts Helm `DATABASE_URL` and rewrites libpq `sslmode` for asyncpg), `EncryptionConfig` (Fernet key for credential ciphertext).
+- `logging.py` / `metrics.py` / `middleware.py` — structlog (JSON in prod), OTel Prometheus metrics at `/metrics`, request trace-context binding.
+- `db/` — SQLAlchemy async engine + Alembic migrations for OAuth clients/tokens, pending authorizations, and encrypted Backstop credentials.
+- `auth/` — `BackstopOAuthProvider` (login form → verify → store credential → auth code → tokens), credential crypto/store, and request-scoped credential resolution. Mid-session Backstop `401` revokes that subject's MCP token family so the client must re-login.
+- `backstop_client.py` — per-user `httpx.AsyncClient` with Basic + `token: true` headers; auto-raises `BackstopAuthError` on 401 (and triggers token revocation on the tool path).
+- `app.py` — wires FastMCP + OAuth provider, `/health`, `/probe`, `/metrics`, login routes, and the example `get_system_info` tool.
+- `main.py` — dotenv + uvicorn on `AppConfig.port`.
 
 ### Error Handling
 
-`AppConfig` validation happens at import/startup time via pydantic — invalid env vars fail fast before the server starts. `/probe` returns `200`/"healthy" unconditionally for now since there are no dependencies to check; the shape (a `checks` dict, `503` on failure) mirrors what edgar-mcp does so that adding a real check later (e.g. Backstop API reachability) is a small diff, not a redesign. No custom domain exception hierarchy yet — there's no I/O against Backstop in this scaffold.
+Config validation fails fast at startup. `/probe` returns healthy with an empty `checks` dict for now (shape ready for a DB/Backstop check later). Backstop `401` mid-session → `BackstopAuthError` + MCP token family revocation. Login-time unreachable Backstop → `BackstopUnreachableError` (shown as a form error, not "invalid credentials").
 
 ### Testing Strategy
 
-Mirror edgar-mcp's test shape for the pieces we keep:
-- `test_config.py` — env var parsing/validation for `AppConfig`.
-- `test_logging.py` — renderer selection (console vs JSON) by `app_env`.
-- `test_probes.py` — `/health` and `/probe` responses via `httpx.AsyncClient` against the ASGI app directly (no FastAPI `TestClient` needed).
-- `test_metrics.py` — `/metrics` returns Prometheus exposition format.
-
-No integration/testcontainers setup — there's no DB or queue to spin up.
+- Config (including `DATABASE_URL` / `sslmode` rewrite), logging, probes, metrics.
+- Auth provider, credential store/crypto, context resolution, login form.
+- Backstop client + `get_system_info` tool (including 401 → revoke path) via testcontainers Postgres + respx.
 
 ## Out of Scope
 
-- Any Backstop domain tools (contacts, opportunities, accounts, activities, targeting).
-- Auth against the Backstop REST API.
-- Party-ID data model / any Backstop-specific schema.
+- Broader Backstop domain tools (contacts, opportunities, accounts, activities, targeting).
+- Party-ID data model / Backstop-specific schema beyond what auth needs.
 - RabbitMQ or any event/write-back queue plumbing.
-- Postgres or any caching/staleness-tracking layer.
-- Terraform-managed secrets (no credentials to store yet).
-- CI wiring beyond what's needed to lint/test the new package (assumed to follow the repo's existing per-service CI pattern).
+- Terraform-managed secrets beyond Helm/env wiring already in the chart.
 
 ## Tasks
 
-1. **Scaffold `pyproject.toml` and package layout** - Create `services/backstop-mcp/pyproject.toml` (name `backstop-mcp`, FastMCP + OTel/Prometheus + structlog + pydantic-settings + python-dotenv deps, ruff + basedpyright + pytest dev deps) and `src/backstop_mcp/` package skeleton (`__init__.py`, `py.typed`).
-2. **Add `AppConfig`** - Implement `config.py` with `AppEnv`/`LogLevel` enums and the `AppConfig` settings class (env, port, log_level, version from package metadata).
-3. **Add structlog logging setup** - Implement `logging.py` with `configure_logging(config)` and `get_logger(name)`, JSON in production / console in development.
-4. **Add OTel + Prometheus metrics** - Implement `metrics.py`: `MeterProvider` with `PrometheusMetricReader`, and a `/metrics` handler returning `generate_latest(REGISTRY)`.
-5. **Add trace-context middleware** - Implement `middleware.py`: binds OTel trace ID into structlog contextvars per request, excluding `/health`, `/probe`, `/metrics`.
-6. **Build the FastMCP app** - Implement `app.py`: `FastMCP("Backstop MCP")` instance, `/health` and `/probe` custom routes, wires logging + metrics, returns the ASGI app with OTel ASGI instrumentation + trace-context middleware attached.
-7. **Add entrypoint** - Implement `main.py`: `load_dotenv()`, build the app, run via `uvicorn` on `AppConfig.port`. Add `.env.example` documenting `APP_ENV`, `PORT`, `LOG_LEVEL`.
-8. **Add tests** - `test_config.py`, `test_logging.py`, `test_probes.py`, `test_metrics.py` per the testing strategy above.
-9. **Add deployment scaffolding** - `deploy/Dockerfile` and a minimal Helm chart skeleton (`Chart.yaml`, `values.yaml`, templates) under `services/backstop-mcp/deploy/`, generic (no Backstop-specific secrets/env baked in).
-10. **Register the new service scope** - Add `backstop-mcp = services/backstop-mcp/**` to `.gitcommitizen`'s `[scopes]` section so commits/PRs for this service validate correctly.
+1. Scaffold `pyproject.toml`, package layout, logging/metrics/middleware, health/probe routes.
+2. Add Postgres + Alembic models for OAuth + encrypted credentials; Helm Postgres + migration hook.
+3. Implement Backstop OAuth login form, credential verification/storage, and token lifecycle (including mid-session 401 revocation).
+4. Add authenticated `get_system_info` example tool.
+5. Dockerfile, Helm chart (base chart + Postgres), release-please/CI/commitizen wiring.

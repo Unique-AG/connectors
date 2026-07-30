@@ -42,7 +42,9 @@ def create_app(
     )
     auth_context.configure(
         auth_context.BackstopAuthContext(
-            session_factory=session_factory, encryption_key=encryption_key
+            session_factory=session_factory,
+            encryption_key=encryption_key,
+            revoke_tokens_for_subject=auth_provider.revoke_token_family_for_subject,
         )
     )
 
