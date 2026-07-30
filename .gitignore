@@ -100,3 +100,6 @@ factset-auth.json
 services/**/src/tenant-configs/*
 !services/**/src/tenant-configs/examples/
 !services/**/src/tenant-configs/examples/*
+
+# Local docs used by llm for apis which give us no other option
+*.docs-local
