@@ -122,6 +122,26 @@
           "path": "deploy/helm-charts/hello-mcp/values.yaml"
         }
       ]
+    },
+    "services/kb-search-mcp": {
+      "release-type": "python",
+      "component": "kb-search-mcp",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/kb-search-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/kb-search-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/kb-search-mcp/values.yaml"
+        }
+      ]
     }
   }
 }
