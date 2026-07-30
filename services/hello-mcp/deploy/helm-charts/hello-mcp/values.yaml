@@ -54,6 +54,16 @@ probes:
 serviceAccount:
   enabled: true
 
+# Writable /tmp — base chart defaults to readOnlyRootFilesystem: true.
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
 postgresql:
   enabled: false
 
