@@ -105,6 +105,7 @@
     },
     "services/hello-mcp": {
       "release-type": "python",
+      "component": "hello-mcp",
       "extra-files": [
         {
           "type": "yaml",
