@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, override
 
-from fastmcp.server.auth.auth import AccessToken, OAuthProvider
+from fastmcp.server.auth import AccessToken, OAuthProvider
 from mcp.server.auth.provider import (
     AuthorizationCode,
     AuthorizationParams,
