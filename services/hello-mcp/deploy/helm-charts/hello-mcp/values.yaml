@@ -91,6 +91,7 @@ hooks:
     enabled: false
 
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
+# Kong ingress allow is generated from internalServices.dependents.ingressGateway.
 networkPolicy:
   enabled: false
   flavor: cilium
@@ -102,19 +103,3 @@ networkPolicy:
       enabled: false
     ephemeralPorts:
       enabled: false
-  ingress:
-    - fromEntities:
-        - host
-      toPorts:
-        - ports:
-            - port: "8000"
-              protocol: TCP
-    - fromEndpoints:
-        - matchLabels:
-            "k8s:io.kubernetes.pod.namespace": system
-            "k8s:app.kubernetes.io/name": gateway
-            "k8s:app.kubernetes.io/instance": kong
-      toPorts:
-        - ports:
-            - port: "8000"
-              protocol: TCP
