@@ -100,3 +100,9 @@ factset-auth.json
 services/**/src/tenant-configs/*
 !services/**/src/tenant-configs/examples/
 !services/**/src/tenant-configs/examples/*
+
+# Python
+**/__pycache__/
+**/.venv/
+**/.pytest_cache/
+*.py[cod]

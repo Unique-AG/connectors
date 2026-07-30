@@ -21,3 +21,6 @@
 **/dist/
 **/coverage/
 **/.turbo/
+**/__pycache__/
+**/.venv/
+**/.pytest_cache/

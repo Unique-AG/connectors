@@ -65,8 +65,13 @@ jobs:
           PACKAGES_CHANGED: ${{ steps.filter.outputs.packages }}
           LOCKFILE_CHANGED: ${{ steps.filter.outputs.lockfile }}
         run: |
+          # Node/TS workspace services only (package.json). Python services use python-ci.yaml.
+          list_node_services() {
+            find services -mindepth 1 -maxdepth 1 -type d -exec test -f '{}/package.json' \; -print | xargs -n1 basename | sort
+          }
+
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            available=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
+            available=$(list_node_services)
 
             if [ "$INPUT_SERVICES" = "all" ]; then
               services=$(echo "$available" | jq -R -s -c 'split("\n") | map(select(length > 0))')
@@ -86,10 +91,12 @@ jobs:
               services=$(printf '%s\n' "${valid[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
             fi
           elif [ "$PACKAGES_CHANGED" = "true" ] || [ "$LOCKFILE_CHANGED" = "true" ]; then
-            # Packages or lockfile changed — run CI for all services to catch breakage
-            services=$(find services -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            # Packages or lockfile changed — run CI for all Node services to catch breakage
+            services=$(list_node_services | jq -R -s -c 'split("\n") | map(select(length > 0))')
           elif [ "$SERVICES_CHANGED" = "true" ]; then
-            services=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r s; do [ -d "services/$s" ] && echo "$s"; done | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            services=$(echo "$SERVICES_FILES" | jq -r '.[]' | grep -E '^services/[^/]+/' | cut -d'/' -f2 | sort -u | while read -r s; do
+              [ -f "services/$s/package.json" ] && echo "$s"
+            done | jq -R -s -c 'split("\n") | map(select(length > 0))')
           else
             services='[]'
           fi
