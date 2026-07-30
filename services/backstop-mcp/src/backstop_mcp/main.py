@@ -12,7 +12,7 @@ app = create_app()
 
 def main() -> None:
     config = AppConfig()
-    uvicorn.run("backstop_mcp.main:app", host="0.0.0.0", port=config.port, log_config=None)
+    uvicorn.run("backstop_mcp.main:app", host="0.0.0.0", port=config.port)
 
 
 if __name__ == "__main__":

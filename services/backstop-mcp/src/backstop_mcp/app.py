@@ -5,19 +5,49 @@ from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from backstop_mcp.config import AppConfig
+from backstop_mcp.auth import context as auth_context
+from backstop_mcp.auth.crypto import load_key
+from backstop_mcp.auth.provider import BackstopOAuthProvider
+from backstop_mcp.config import AppConfig, BackstopConfig, DatabaseConfig, EncryptionConfig
+from backstop_mcp.db.engine import create_engine, create_session_factory
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics, metrics_endpoint
 from backstop_mcp.middleware import TraceContextMiddleware
+from backstop_mcp.tools.system_info import get_system_info
 
 
-def create_app(config: AppConfig | None = None) -> Starlette:
+def create_app(
+    config: AppConfig | None = None,
+    backstop_config: BackstopConfig | None = None,
+    database_config: DatabaseConfig | None = None,
+    encryption_config: EncryptionConfig | None = None,
+) -> Starlette:
     config = config or AppConfig()
+    backstop_config = backstop_config or BackstopConfig()
+    database_config = database_config or DatabaseConfig()
+    encryption_config = encryption_config or EncryptionConfig()
 
     configure_logging(config)
     configure_metrics(config)
 
-    mcp = FastMCP("Backstop MCP", version=config.version)
+    engine = create_engine(database_config)
+    session_factory = create_session_factory(engine)
+    encryption_key = load_key(encryption_config)
+
+    auth_provider = BackstopOAuthProvider(
+        base_url=config.public_base_url,
+        session_factory=session_factory,
+        encryption_key=encryption_key,
+        backstop_base_url=backstop_config.base_url,
+    )
+    auth_context.configure(
+        auth_context.BackstopAuthContext(
+            session_factory=session_factory, encryption_key=encryption_key
+        )
+    )
+
+    mcp = FastMCP("Backstop MCP", version=config.version, auth=auth_provider)
+    mcp.tool(get_system_info)
 
     @mcp.custom_route("/health", methods=["GET"])
     async def health(_request: Request) -> JSONResponse:
@@ -30,6 +60,14 @@ def create_app(config: AppConfig | None = None) -> Starlette:
     @mcp.custom_route("/metrics", methods=["GET"])
     async def metrics_route(request: Request) -> Response:
         return await metrics_endpoint(request)
+
+    @mcp.custom_route(auth_provider.login_path, methods=["GET"])
+    async def login_get(request: Request) -> Response:
+        return await auth_provider.handle_login_get(request)
+
+    @mcp.custom_route(auth_provider.login_path, methods=["POST"])
+    async def login_post(request: Request) -> Response:
+        return await auth_provider.handle_login_post(request)
 
     return mcp.http_app(
         middleware=[
