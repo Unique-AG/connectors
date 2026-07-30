@@ -161,21 +161,21 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "alembic", specifier = "~=1.14" },
-    { name = "asyncpg", specifier = "~=0.30" },
-    { name = "cryptography", specifier = ">=44" },
+    { name = "alembic", specifier = "==1.18.5" },
+    { name = "asyncpg", specifier = "==0.31.0" },
+    { name = "cryptography", specifier = "==49.0.0" },
     { name = "fastmcp", specifier = "==3.4.5" },
-    { name = "httpx", specifier = "~=0.28" },
-    { name = "opentelemetry-api", specifier = "~=1.29" },
-    { name = "opentelemetry-exporter-prometheus", specifier = "~=0.50b0" },
-    { name = "opentelemetry-instrumentation-asgi", specifier = "~=0.50b0" },
-    { name = "opentelemetry-sdk", specifier = "~=1.29" },
-    { name = "pydantic", specifier = "~=2.10" },
-    { name = "pydantic-settings", specifier = "~=2.7" },
-    { name = "python-dotenv", specifier = "~=1.0" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = "~=2.0" },
-    { name = "structlog", specifier = "~=25.1" },
-    { name = "uvicorn", extras = ["standard"], specifier = "~=0.34" },
+    { name = "httpx", specifier = "==0.28.1" },
+    { name = "opentelemetry-api", specifier = "==1.44.0" },
+    { name = "opentelemetry-exporter-prometheus", specifier = "==0.65b0" },
+    { name = "opentelemetry-instrumentation-asgi", specifier = "==0.65b0" },
+    { name = "opentelemetry-sdk", specifier = "==1.44.0" },
+    { name = "pydantic", specifier = "==2.13.4" },
+    { name = "pydantic-settings", specifier = "==2.14.2" },
+    { name = "python-dotenv", specifier = "==1.2.2" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.51" },
+    { name = "structlog", specifier = "==26.1.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = "==0.52.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -1790,11 +1790,11 @@ wheels = [
 
 [[package]]
 name = "structlog"
-version = "25.5.0"
+version = "26.1.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/ef/52/9ba0f43b686e7f3ddfeaa78ac3af750292662284b3661e91ad5494f21dbc/structlog-25.5.0.tar.gz", hash = "sha256:098522a3bebed9153d4570c6d0288abf80a031dfdb2048d59a49e9dc2190fc98", size = 1460830, upload-time = "2025-10-27T08:28:23.028Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/89/b4a0bcfdf4f71a3dea31379f095929613d7e4528a0996bca6aa964cd0dca/structlog-26.1.0.tar.gz", hash = "sha256:f63a716cbd1b1291cf7661de7794b455acfa4c43c5bcf1630e6ad5ddc1adb3b7", size = 1459881, upload-time = "2026-06-06T07:33:39.348Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a8/45/a132b9074aa18e799b891b91ad72133c98d8042c70f6240e4c5f9dabee2f/structlog-25.5.0-py3-none-any.whl", hash = "sha256:a8453e9b9e636ec59bd9e79bbd4a72f025981b3ba0f5837aebf48f02f37a7f9f", size = 72510, upload-time = "2025-10-27T08:28:21.535Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/18/489c97b834dfff9cf2fc2507cede4bcd4b11e67f84bc462acd1992496f86/structlog-26.1.0-py3-none-any.whl", hash = "sha256:e081a26d6c373e6d201eca24eede26d8ffab07f88f477822e679183428d3d91e", size = 73764, upload-time = "2026-06-06T07:33:38.046Z" },
 ]
 
 [[package]]
@@ -1863,15 +1863,15 @@ wheels = [
 
 [[package]]
 name = "uvicorn"
-version = "0.51.0"
+version = "0.52.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "h11" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a2/65/b7c6c443ccc58678c91e1e973bbe2a878591538655d6e1d47f24ba1c51f3/uvicorn-0.51.0.tar.gz", hash = "sha256:f6f4b69b657c312f516dd2d268ab9ae6f254b11e4bac504f37b2ab58b24dd0b0", size = 94412, upload-time = "2026-07-08T10:59:05.962Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/05/c8/2d307868453a4bca6e64fa3581d122ae0748a0869c53f159339def179c7c/uvicorn-0.52.0.tar.gz", hash = "sha256:ca8876ad6c1983f394157c168b39d52f6dd56dabf5602fa0982751cffc2293ae", size = 97504, upload-time = "2026-07-29T08:45:34.065Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/45/ec/dbb7e5a6b91f86bfb9eb7d2988a2730907b6a729875b949c7f022e8b88fa/uvicorn-0.51.0-py3-none-any.whl", hash = "sha256:5d38af6cd620f2ae3849fb44fd4879e0890aa1febe8d47eb355fb45d93fe6a5b", size = 73219, upload-time = "2026-07-08T10:59:04.44Z" },
+    { url = "https://files.pythonhosted.org/packages/39/e6/b5c0630ace9757232aec07112be8146b812787db52141ff9d50674aa7634/uvicorn-0.52.0-py3-none-any.whl", hash = "sha256:3d887809810b89ed33501bcf0a9aba469b06ecd608158efce04bd6b48d8c9b08", size = 79058, upload-time = "2026-07-29T08:45:32.492Z" },
 ]
 
 [package.optional-dependencies]

@@ -6,7 +6,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-from testcontainers.postgres import PostgresContainer
+from testcontainers.community.postgres import PostgresContainer
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
