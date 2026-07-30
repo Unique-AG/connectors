@@ -121,6 +121,25 @@
           "path": "deploy/helm-charts/hello-mcp/values.yaml"
         }
       ]
+    },
+    "services/backstop-mcp": {
+      "release-type": "python",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/backstop-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/backstop-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/backstop-mcp/values.yaml"
+        }
+      ]
     }
   }
 }

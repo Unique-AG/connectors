@@ -1,6 +1,7 @@
+import os
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
-from typing import ClassVar
+from typing import ClassVar, cast
 from urllib.parse import quote_plus
 
 from pydantic import Field, SecretStr, model_validator
@@ -78,6 +79,19 @@ class DatabaseConfig(BaseSettings):
     name: str | None = None
     user: str | None = None
     password: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_database_url(cls, data: object) -> object:
+        """Accept DATABASE_URL (injected by the base Helm chart) as an alias for DB_URL."""
+        if not isinstance(data, dict):
+            return data
+        values = cast(dict[str, object], data)
+        if values.get("url") is None:
+            database_url = os.environ.get("DATABASE_URL")
+            if database_url:
+                return {**values, "url": database_url}
+        return values
 
     @model_validator(mode="after")
     def build_url(self) -> "DatabaseConfig":

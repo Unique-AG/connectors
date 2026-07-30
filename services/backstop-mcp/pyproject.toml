@@ -1,6 +1,7 @@
 [project]
 name = "backstop-mcp"
 version = "0.1.0"
+description = "Backstop CRM FastMCP server with OAuth credential bridging"
 requires-python = ">=3.12"
 dependencies = [
     "fastmcp~=2.12",
@@ -20,32 +21,41 @@ dependencies = [
     "cryptography>=44",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "basedpyright",
-    "pytest",
-    "pytest-asyncio",
-    "ruff",
-    "respx",
-    "testcontainers[postgres]",
-]
+[project.scripts]
+backstop-mcp = "backstop_mcp.main:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.31.0"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/backstop_mcp"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/backstop_mcp" = "backstop_mcp"
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "hatchling==1.31.0",
+    "ruff==0.16.0",
+    "basedpyright==1.39.9",
+    "respx==0.23.1",
+    "testcontainers[postgres]==4.15.0",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
+pythonpath = ["src"]
 filterwarnings = ["ignore::DeprecationWarning:testcontainers"]
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/backstop_mcp"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+exclude = [".venv"]
 
 [tool.ruff.lint]
 # ANN: requires type annotations on function arguments (ANN001-003) and return
@@ -56,8 +66,9 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"
-extraPaths = ["src"]
 typeCheckingMode = "all"
+include = ["src", "tests"]
+extraPaths = ["src"]
 reportUnusedCallResult = false
 reportMissingTypeStubs = false
 reportUnusedFunction = false
