@@ -3,10 +3,9 @@
 
 # Teams MCP - Tools
 
-The Teams MCP Server exposes **chat & messaging tools** always, and **transcript & knowledge-base tools** only when `UNIQUE_INTEGRATION=enabled`:
+The Teams MCP Server always exposes **8 chat & messaging tools**, which interact with Microsoft Teams chats and channels synchronously through the Microsoft Graph API: list teams/channels/chats, read messages, search across messages, and send messages.
 
-- **Chat & messaging tools** (8) interact with Microsoft Teams chats and channels synchronously through the Microsoft Graph API: list teams/channels/chats, read messages, search across messages, and send messages.
-- **Transcript & knowledge-base tools** (4) manage meeting-transcript ingestion into the Unique knowledge base. These tools are registered only when Unique integration is enabled.
+Four further tools exist only in deployments with meeting-transcript capture enabled — see [Transcript & Knowledge-Base Management](#transcript--knowledge-base-management) below.
 
 Chat and messaging tools target chats and channels by id: you discover the id with a `list_*` tool (or `search_messages`), then pass it to the tool that reads or writes:
 
@@ -28,27 +27,16 @@ The `list_*` tools return distinguishing metadata (creation dates, last-message 
 | [`send_chat_message`](#send_chat_message) | Messages | Yes | Send a plain-text message to a chat |
 | [`send_channel_message`](#send_channel_message) | Messages | Yes | Send a plain-text message to a channel |
 | [`search_messages`](#search_messages) | Search | No | Search messages across chats and channels |
-| [`ingest_meeting`](#ingest_meeting) | Transcript & KB | Yes | Ingest a specific meeting's transcript on demand |
-| [`verify_kb_integration_status`](#verify_kb_integration_status) | Transcript & KB | No | Check transcript-ingestion subscription status |
-| [`start_kb_integration`](#start_kb_integration) | Transcript & KB | Yes | Start automatic transcript ingestion |
-| [`stop_kb_integration`](#stop_kb_integration) | Transcript & KB | Yes | Stop automatic transcript ingestion |
 
-**Mutating** means the tool writes data to at least one of the following:
-
-- **Microsoft Teams** — posts a new message to a chat or channel via Microsoft Graph, on behalf of the signed-in user
-- **Internal database** — persists or removes state managed by this server (e.g. the transcript-ingestion subscription record)
-- **Unique knowledge base** — queues meeting-transcript content for indexing into the knowledge base
+**Mutating** means the tool posts a new message to a chat or channel via Microsoft Graph, on behalf of the signed-in user.
 
 | Tool | What it mutates |
 |------|----------------|
 | `send_chat_message` | Posts a new plain-text message to the target chat via Microsoft Graph as the signed-in user |
 | `send_channel_message` | Posts a new plain-text message to the target channel via Microsoft Graph as the signed-in user |
-| `start_kb_integration` | Creates a Microsoft Graph webhook subscription for new transcripts and writes the subscription record to the internal database |
-| `stop_kb_integration` | Cancels the Microsoft Graph webhook subscription and removes the subscription record from the internal database |
-| `ingest_meeting` | Queues the selected meeting transcript(s) for asynchronous ingestion into the Unique knowledge base |
 
 !!! warning "Chat and channel messages are not ingested"
-    The message tools read and write Teams messages live through Microsoft Graph. Unlike meeting transcripts, **chat and channel messages are never copied into the Unique knowledge base** — `get_*_messages` and `search_messages` query Microsoft Graph on every call. Only meeting transcripts are ingested (via `start_kb_integration` / `ingest_meeting`).
+    The message tools read and write Teams messages live through Microsoft Graph. **Chat and channel messages are never copied into the Unique knowledge base** — `get_*_messages` and `search_messages` query Microsoft Graph on every call.
 
 ---
 
@@ -349,78 +337,16 @@ Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messag
 
 ## Transcript & Knowledge-Base Management
 
-These tools manage the ingestion of **meeting transcripts** into the Unique knowledge base, where they are then searched and queried from within Unique. This is distinct from the message tools above — chat and channel messages are never ingested.
+When `UNIQUE_INTEGRATION=enabled`, four additional tools manage meeting-transcript capture into the Unique knowledge base: `ingest_meeting`, `verify_kb_integration_status`, `start_kb_integration`, and `stop_kb_integration`. They are not registered in a chat-only deployment.
 
-### `ingest_meeting`
-
-Ingest a specific Teams meeting's transcript on demand, identified by its join URL. Use this to ingest a meeting that predates the knowledge-base integration, or to re-pull a single occurrence. You must be the organizer or an invited attendee. Ingestion runs asynchronously; the tool returns once the transcript is queued.
-
-!!! note "Interactive transcript selection"
-    When a recurring meeting has multiple transcripts and no `date` is given, the tool prompts the user to choose via MCP elicitation. If the client does not support elicitation, pass an explicit `date` (`YYYY-MM-DD`).
-
-**Input parameters:**
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `joinUrl` | string (URL) | Yes | — | The Teams meeting join URL (`joinWebUrl`). You must be the organizer or an invited attendee. |
-| `date` | string (ISO date) | No | — | Day (`YYYY-MM-DD`, UTC) to pick a transcript when a recurring meeting has several. |
-
-**Returns:** `success`, a human-readable `message`, `meeting` (`id`, `subject`, `joinUrl` — or `null` if not found), and `queued` (array of `{ transcriptId, createdDate }` for each transcript queued for ingestion).
-
-**Example:**
-
-```json
-{
-  "success": true,
-  "message": "Queued 1 transcript(s) for ingestion. They will appear in the knowledge base shortly.",
-  "meeting": { "id": "MSo...", "subject": "Q2 Planning", "joinUrl": "https://teams.microsoft.com/l/meetup-join/..." },
-  "queued": [{ "transcriptId": "MSMjMCMj...", "createdDate": "2024-06-01T10:05:00.000Z" }]
-}
-```
-
----
-
-### `verify_kb_integration_status`
-
-Check the status of the transcript-ingestion knowledge-base integration: whether automatic ingestion is active, expiring soon, expired, or not configured.
-
-**Input parameters:** None
-
-**Returns:** `status` (`active` \| `expiring_soon` \| `expired` \| `not_configured`), a `message`, and `subscription` (`id`, `expiresAt`, `minutesUntilExpiration`, `createdAt`, `updatedAt` — or `null` when not configured).
-
-| Status | Meaning | Action |
-|--------|---------|--------|
-| `active` | Ingestion subscription is valid | None required |
-| `expiring_soon` | Expires within 15 minutes | Renewal is automatic; no action needed |
-| `expired` | Subscription has lapsed | Call `start_kb_integration` |
-| `not_configured` | No subscription exists | Call `start_kb_integration` |
-
----
-
-### `start_kb_integration`
-
-Start automatic ingestion of meeting transcripts into the knowledge base. Creates a Microsoft Graph webhook subscription so new transcripts are ingested as they become available. Safe to call when already active — it returns `already_active` without creating a duplicate.
-
-**Input parameters:** None
-
-**Returns:** `success`, a `message`, and `subscription` (`id`, `expiresAt`, `minutesUntilExpiration`, `status` — one of `created`, `already_active`, `expiring_soon`).
-
----
-
-### `stop_kb_integration`
-
-Stop automatic ingestion of meeting transcripts. Removes the Microsoft Graph webhook subscription; previously ingested transcripts remain in the knowledge base.
-
-**Input parameters:** None
-
-**Returns:** `success`, a `message`, and `subscription` (`id`, `status` — `removed` or `not_found` — or `null` when nothing was active).
+Their full reference — parameters, return values, and the subscription behaviour behind them — is in [Recordings & Transcripts — Ingestion tools](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-tools).
 
 ---
 
 ## Related Documentation
 
-- [Architecture](./architecture.md) - System components, including the chat and transcript modules
-- [Flows](./flows.md) - Sequence diagrams for the read, search, send, and transcript flows
-- [Subscription Management](./subscription-management.md) - Lifecycle behind `start_kb_integration` / `stop_kb_integration` / `verify_kb_integration_status`
+- [Architecture](./architecture.md) - System components, including the chat module
+- [Flows](./flows.md) - Sequence diagrams for the read, search, and send flows
 - [Permissions](./permissions.md) - Microsoft Graph permissions required by these tools
 - [Security](./security.md) - Token isolation, delegated access, and the message-send write surface
+- [Recordings & Transcripts - Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual) - The transcript and knowledge-base tools, and the capture pipeline behind them

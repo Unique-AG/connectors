@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.1...teams-mcp@0.4.2) (2026-07-28)
+
+
+### Features
+
+* **teams-mcp:** add more logging for transcript ingestion ([#709](https://github.com/Unique-AG/connectors/issues/709)) ([94fe47e](https://github.com/Unique-AG/connectors/commit/94fe47edf5ce001a9cb413e5174309b3847ee96a))
+
 ## [0.4.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.0...teams-mcp@0.4.1) (2026-07-23)
 
 

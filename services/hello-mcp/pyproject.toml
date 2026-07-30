@@ -1,0 +1,51 @@
+[project]
+name = "hello-mcp"
+version = "0.0.1"
+description = "Minimal no-auth FastMCP Hello World server"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp==3.4.5",
+]
+
+[project.scripts]
+hello-mcp = "hello_mcp.main:main"
+
+[build-system]
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hello_mcp"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src/hello_mcp" = "hello_mcp"
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "hatchling==1.31.0",
+    "ruff==0.16.0",
+    "basedpyright==1.39.9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+exclude = [".venv"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.basedpyright]
+pythonVersion = "3.12"
+typeCheckingMode = "recommended"
+include = ["src", "tests"]
+reportMissingTypeStubs = "none"
+reportAny = "none"
+reportExplicitAny = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownVariableType = "none"

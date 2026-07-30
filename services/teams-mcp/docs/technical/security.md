@@ -159,7 +159,7 @@ This detects scenarios where an attacker obtains a refresh token and uses it, bu
 
 ## Webhook Validation
 
-Microsoft Graph webhooks are validated using `clientState`:
+Webhooks are only received by deployments with meeting transcript capture enabled (`UNIQUE_INTEGRATION=enabled`); a chat-only deployment exposes no webhook endpoint. Microsoft Graph webhooks are validated using `clientState`:
 
 ```mermaid
 sequenceDiagram
@@ -244,7 +244,7 @@ If rotation becomes necessary, it would require:
 3. Having all users reconnect to MCP server to trigger subscription recreation
 4. Updating Kubernetes secret and deploying
 
-**Important:** Recreation may miss transcripts created during the gap between deletion and recreation. See [Why are subscriptions renewed instead of recreated?](../faq.md#why-are-subscriptions-renewed-instead-of-recreated) for details.
+**Important:** Recreation may miss transcripts created during the gap between deletion and recreation. See [Recordings & Transcripts — Why are subscriptions renewed instead of recreated?](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535129116/Recordings+Transcripts+-+FAQ#why-are-subscriptions-renewed-instead-of-recreated) for details.
 
 ## Security Checklist for Operators
 

@@ -1,18 +1,16 @@
 <!-- confluence-page-id: 1802502170 -->
 <!-- confluence-space-key: PUBDOC -->
 
-The Teams MCP Server is a NestJS-based microservice that integrates Microsoft Teams with the Unique platform through the Model Context Protocol (MCP). It captures meeting transcripts and recordings from Microsoft Teams, ingests them into Unique with proper access controls, and exposes synchronous MCP tools for reading and sending messages across chats and channels.
+The Teams MCP Server is a NestJS-based microservice that gives Unique AI access to Microsoft Teams chats and channels through the Model Context Protocol (MCP). Every tool call is served synchronously and live from the Microsoft Graph API on behalf of the signed-in user; **nothing is copied into the Unique knowledge base**.
 
 **Core Capabilities:**
 
-- Captures Microsoft Teams meeting transcripts and recordings in real-time
-- Manages webhook subscriptions to Microsoft Graph API for notifications
-- Handles OAuth2 authentication with Microsoft Entra ID
-- Ingests content into the Unique platform with participant-based access controls
-- Manages subscription lifecycle (create, renew, remove) with scheduled synchronization
+- Handles OAuth2 authentication with Microsoft Entra ID, including token encryption and refresh
 - Reads messages from personal chats and team channels via synchronous MCP tools
 - Searches across chats and channels using the Microsoft Search API
 - Sends messages to chats and channels via synchronous MCP tools
+
+**Optional add-on:** with `UNIQUE_INTEGRATION=enabled` the server also runs a webhook-driven pipeline that captures meeting transcripts and recordings into the Unique knowledge base, adding a webhook controller, a RabbitMQ queue, a transcript processor, and a Unique API client. That architecture is documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#architecture); this page covers the always-present core.
 
 ## High-Level Architecture
 
@@ -23,19 +21,15 @@ flowchart TB
         User["Teams User"]
         EntraID["Microsoft Entra ID"]
         MSGraph["Microsoft Graph"]
-        Unique["Unique Platform"]
     end
 
     subgraph TeamsMCP["Teams MCP Server"]
         OAuth["OAuth Module"]
-        API["REST API"]
         ChatTools["Chat Tools<br/>(synchronous)"]
-        Processor["Transcript Processor<br/>(asynchronous)"]
         GraphClient["Graph Client"]
     end
 
     subgraph Infrastructure["Infrastructure"]
-        Queue["RabbitMQ"]
         DB["PostgreSQL"]
     end
 
@@ -46,15 +40,8 @@ flowchart TB
     User -->|"MCP tool calls"| ChatTools
     ChatTools --> GraphClient
 
-    MSGraph -->|"Webhooks"| API
-    API --> Queue
-    Queue --> Processor
-
-    Processor --> GraphClient
     GraphClient --> DB
     GraphClient --> MSGraph
-
-    Processor --> Unique
 ```
 
 ## Components
@@ -73,25 +60,12 @@ flowchart TB
         ChatToolLayer["Tool Layer<br/>(8 MCP tools)"]
     end
 
-    subgraph Transcript["Transcript Module"]
-        Webhook["Webhook Controller"]
-        Services["Subscription & Processing Services"]
-    end
-
     subgraph GraphModule["Microsoft Graph"]
         GraphClient["Graph Client Factory<br/>Token Provider, Middleware"]
     end
 
     subgraph Data["Data Layer"]
-        DB[("PostgreSQL<br/>users, subscriptions, tokens")]
-    end
-
-    subgraph Queue["Message Queue"]
-        RabbitMQ["RabbitMQ<br/>Exchanges & Queues"]
-    end
-
-    subgraph UniqueIntegration["Unique Integration"]
-        UniqueService["Unique Service"]
+        DB[("PostgreSQL<br/>users, tokens, subscriptions")]
     end
 
     AuthModule --> DB
@@ -102,10 +76,6 @@ flowchart TB
     ChatSvc --> GraphClient
     ChannelSvc --> GraphClient
     SearchSvc --> GraphClient
-    Webhook --> RabbitMQ
-    RabbitMQ --> Services
-    Services --> GraphClient
-    Services --> UniqueService
     GraphClient --> DB
     GraphClient --> MSGraph["Microsoft Graph API"]
 ```
@@ -118,17 +88,15 @@ flowchart TB
 | **MCP OAuth Store** | Stores encrypted JWT tokens in PostgreSQL |
 | **Token Provider** | Manages access/refresh tokens with automatic refresh |
 | **Graph Client Factory** | Creates authenticated Microsoft Graph API clients |
-| **Webhook Controller** | Receives notifications from Microsoft Graph |
-| **Subscription Services** | Manages Graph API subscription lifecycle |
-| **Transcript Created Service** | Processes new transcripts and fetches recordings |
-| **Unique Service** | Interfaces with Unique Public API for content ingestion |
-| **AMQP Module** | RabbitMQ integration for async message processing |
+| **Chat Module** | Chat, channel, and search services plus the 8-tool MCP surface |
+
+The Transcript Module — webhook controller, subscription services, transcript processor, Unique API client, and the AMQP module they depend on — is registered only when transcript capture is enabled. See the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#architecture).
 
 ### Chat Module
 
-The Chat Module (`src/chat/`) exposes a synchronous request/response tool surface over MCP, distinct from the asynchronous webhook/transcript ingestion path. Tool calls are handled inline — there is no queue or background worker.
+The Chat Module (`src/chat/`) exposes a synchronous request/response tool surface over MCP. Tool calls are handled inline — there is no queue or background worker.
 
-**Chat and channel messages are accessible through these tools but are never ingested into Unique.** The Unique AI can read, search, and send them on demand, but each call is served **live from the Microsoft Graph API** — Unique keeps no knowledge-base copy, and the messages exist only in Microsoft. This is the opposite of the Transcript Module, whose output *is* ingested into Unique and later queried from that stored copy. "Not ingested" refers to storage, not accessibility. See [README — Where the Data Lives](../README.md#where-the-data-lives-ingested-vs-live).
+**Chat and channel messages are accessible through these tools but are never ingested into Unique.** The Unique AI can read, search, and send them on demand, but each call is served **live from the Microsoft Graph API** — Unique keeps no knowledge-base copy, and the messages exist only in Microsoft. "Not ingested" refers to storage, not accessibility.
 
 **Services:**
 
@@ -230,7 +198,7 @@ erDiagram
 | Table | Purpose |
 |-------|---------|
 | `user_profiles` | User identity and encrypted Microsoft tokens |
-| `subscriptions` | Active Graph API webhook subscriptions |
+| `subscriptions` | Active Graph API webhook subscriptions (only populated with transcript capture enabled) |
 | `oauth_clients` | Registered MCP OAuth clients |
 | `oauth_sessions` | Active OAuth sessions with token family tracking |
 | `tokens` | MCP access and refresh tokens (hashed) |
@@ -244,18 +212,7 @@ erDiagram
 
 ### RabbitMQ
 
-Enables asynchronous processing of webhook notifications. See [FAQ - Why use RabbitMQ for webhook processing?](../faq.md#why-use-rabbitmq-for-webhook-processing) for details.
-
-| Exchange | Type | Purpose |
-|----------|------|---------|
-| `unique.teams-mcp.main` | topic | Primary message routing |
-| `unique.teams-mcp.dead` | topic | Failed message storage (DLX) |
-
-| Queue | Purpose |
-|-------|---------|
-| `unique.teams-mcp.transcript.change-notifications` | Transcript processing |
-| `unique.teams-mcp.transcript.lifecycle-notifications` | Subscription management |
-| `unique.teams-mcp.dead` | Dead letter collection |
+Used **only** by transcript capture, to process webhook notifications asynchronously. A chat-only deployment does not need RabbitMQ at all. The rationale, exchanges, queues, and dead-letter behaviour are documented in the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-pipeline).
 
 ## Authentication Architecture
 
@@ -330,7 +287,7 @@ For detailed explanation, see [Permissions - Why Delegated (Not Application)](./
 | `CLIENT_SECRET` | Application credential | Proves the server is the legitimate app (not an imposter) |
 | **Redirect URI** | OAuth callback endpoint | Prevents authorization code interception |
 | **API Permissions** | Graph scopes | Limits what data the app can access |
-| **Admin Consent** | Privileged scopes | Required for transcript and recording access |
+| **Admin Consent** | Privileged scopes | Required for `ChannelMessage.Read.All`, and for the meeting scopes when transcript capture is enabled |
 
 Without proper app registration, Microsoft Graph API will reject all authentication attempts with `invalid_client` errors.
 
@@ -376,9 +333,10 @@ The MCP OAuth layer implements the [MCP Authorization specification](https://mod
 
 ## Related Documentation
 
-- [Flows](./flows.md) - User connection, subscription lifecycle, transcript processing, chat read/search/send
+- [Flows](./flows.md) - User connection, OAuth, token refresh, chat read/search/send
 - [Security](./security.md) - Encryption, authentication, and threat model
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
+- [Recordings & Transcripts - Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual) - The optional transcript capture pipeline and its infrastructure
 
 ## Standard References
 

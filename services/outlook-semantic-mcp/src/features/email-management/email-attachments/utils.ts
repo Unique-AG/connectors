@@ -15,5 +15,5 @@ export interface AttachmentFailure {
 }
 
 export type AttachmentUploadResult =
-  | { status: 'failed'; reason: AttachmentFailure }
+  | { status: 'failed'; failedInfo: AttachmentFailure }
   | { status: 'success' };
