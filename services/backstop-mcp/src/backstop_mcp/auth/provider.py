@@ -331,6 +331,7 @@ class BackstopOAuthProvider(OAuthProvider):
         # `raise`/`return` happens after the session block has closed.
         reused = False
         unknown = False
+        invalid_scope = False
         new_access_token = ""
         new_refresh_token = ""
         effective_scopes: list[str] = []
@@ -355,25 +356,29 @@ class BackstopOAuthProvider(OAuthProvider):
                     .values(revoked_at=now)
                 )
             else:
-                new_access_token = secrets.token_urlsafe(32)
-                new_refresh_token = secrets.token_urlsafe(32)
-                effective_scopes = scopes or row.scopes
+                # Refresh may only keep or narrow the originally granted scopes — never widen.
+                if scopes and not set(scopes).issubset(row.scopes):
+                    invalid_scope = True
+                else:
+                    new_access_token = secrets.token_urlsafe(32)
+                    new_refresh_token = secrets.token_urlsafe(32)
+                    effective_scopes = scopes or row.scopes
 
-                row.revoked_at = now
-                session.add(
-                    OAuthTokenRow(
-                        family_id=row.family_id,
-                        access_token_hash=_hash_token(new_access_token),
-                        refresh_token_hash=_hash_token(new_refresh_token),
-                        client_id=row.client_id,
-                        scopes=effective_scopes,
-                        resource=row.resource,
-                        subject=row.subject,
-                        access_token_expires_at=now + self.ACCESS_TOKEN_TTL,
-                        refresh_token_expires_at=now + self.REFRESH_TOKEN_TTL,
-                        rotated_from=row.id,
+                    row.revoked_at = now
+                    session.add(
+                        OAuthTokenRow(
+                            family_id=row.family_id,
+                            access_token_hash=_hash_token(new_access_token),
+                            refresh_token_hash=_hash_token(new_refresh_token),
+                            client_id=row.client_id,
+                            scopes=effective_scopes,
+                            resource=row.resource,
+                            subject=row.subject,
+                            access_token_expires_at=now + self.ACCESS_TOKEN_TTL,
+                            refresh_token_expires_at=now + self.REFRESH_TOKEN_TTL,
+                            rotated_from=row.id,
+                        )
                     )
-                )
 
         if unknown:
             raise TokenError(error="invalid_grant", error_description="Unknown refresh token")
@@ -381,6 +386,11 @@ class BackstopOAuthProvider(OAuthProvider):
             raise TokenError(
                 error="invalid_grant",
                 error_description="Refresh token has already been used",
+            )
+        if invalid_scope:
+            raise TokenError(
+                error="invalid_scope",
+                error_description="Requested scope exceeds originally granted scopes",
             )
 
         return OAuthTokenResponse(

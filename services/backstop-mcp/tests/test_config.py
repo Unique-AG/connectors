@@ -7,9 +7,7 @@ from backstop_mcp.config import DatabaseConfig, normalize_asyncpg_url
 
 class TestNormalizeAsyncpgUrl:
     def test_adds_asyncpg_driver_prefix(self) -> None:
-        url, connect_args = normalize_asyncpg_url(
-            "postgresql://user:pass@db:5432/backstop"
-        )
+        url, connect_args = normalize_asyncpg_url("postgresql://user:pass@db:5432/backstop")
 
         assert url == "postgresql+asyncpg://user:pass@db:5432/backstop"
         assert connect_args == {}
@@ -44,9 +42,7 @@ class TestNormalizeAsyncpgUrl:
 
 
 class TestDatabaseConfigSsl:
-    def test_rewrites_helm_database_url_with_sslmode(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_rewrites_helm_database_url_with_sslmode(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv(
             "DATABASE_URL",
             "postgresql://user:pass@db:5432/backstop?sslmode=verify-full",

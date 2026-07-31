@@ -44,7 +44,7 @@ def upgrade() -> None:
         op.f("ix_backstop_credentials_backstop_username"),
         "backstop_credentials",
         ["backstop_username"],
-        unique=False,
+        unique=True,
     )
     op.create_table(
         "oauth_clients",

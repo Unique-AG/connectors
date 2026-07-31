@@ -54,9 +54,7 @@ def _make_raise_for_backstop_status(
         if response.status_code == 401:
             if on_auth_failure is not None:
                 await on_auth_failure()
-            raise BackstopAuthError(
-                "Backstop rejected the stored credential — please reconnect."
-            )
+            raise BackstopAuthError("Backstop rejected the stored credential — please reconnect.")
         response.raise_for_status()
 
     return raise_for_backstop_status

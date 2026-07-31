@@ -242,6 +242,35 @@ class TestTokenLifecycle:
         assert await provider.load_access_token(rotated_tokens.access_token) is None
 
     @pytest.mark.asyncio
+    async def test_refresh_token_rejects_scope_escalation(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_valid)
+        provider = _make_provider(db)
+        client_info = await _register_client(provider, "provider-client-7b")
+        redirect_url = await provider.authorize(client_info, _authorization_params())
+        request_id = parse_qs(urlparse(redirect_url).query)["request_id"][0]
+        login_response = await provider.handle_login_post(
+            _login_post_request(request_id, "pv-scope.escalation", "token-scope")
+        )
+        code = parse_qs(urlparse(login_response.headers["location"]).query)["code"][0]
+        auth_code = await provider.load_authorization_code(client_info, code)
+        assert auth_code is not None
+        tokens = await provider.exchange_authorization_code(client_info, auth_code)
+        assert tokens.refresh_token is not None
+        refresh = await provider.load_refresh_token(client_info, tokens.refresh_token)
+        assert refresh is not None
+
+        with pytest.raises(TokenError) as exc_info:
+            await provider.exchange_refresh_token(client_info, refresh, ["backstop", "admin"])
+        assert exc_info.value.error == "invalid_scope"
+
+        # Original refresh token remains usable after a rejected escalation attempt.
+        narrowed = await provider.exchange_refresh_token(client_info, refresh, ["backstop"])
+        assert narrowed.access_token
+        assert narrowed.scope == "backstop"
+
+    @pytest.mark.asyncio
     async def test_revoke_token_invalidates_access_token(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
