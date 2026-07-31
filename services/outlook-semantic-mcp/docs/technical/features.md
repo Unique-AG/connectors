@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2258862199 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP – Features
-
 This page describes user-facing features of the Outlook Semantic MCP Server: what is supported, what is not, and any setup required. For per-tool input/output reference, see [Tools](./tools.md). For environment variables and deployment configuration, see [Configuration](../operator/configuration.md).
 
 ### Deployment modes

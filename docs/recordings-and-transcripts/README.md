@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2534866977 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Recordings & Transcripts
-
 !!! note "Beta"
     **Recordings & Transcripts is in beta.** It is suitable for production use, with the following caveats:
 

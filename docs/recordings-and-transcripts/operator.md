@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2535522323 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Recordings & Transcripts - Operator Manual
-
 Enabling Recordings & Transcripts means configuring **two** systems: the [Teams MCP Server](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802633229/Teams-MCP), which captures meeting transcripts into the knowledge base, and the **Unique platform**, which presents them in the Recordings area. Both must point at the same knowledge-base root scope — that single shared value is the most common source of misconfiguration.
 
 !!! warning "Read the eligibility section first"

@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2074345526 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP - Disaster Recovery
-
 This runbook covers recovery procedures for the three stateful components the Outlook Semantic MCP Server depends on: the local PostgreSQL database, RabbitMQ, and the Unique Knowledge Base. Each component has a distinct failure mode and recovery path.
 
 Automatic recovery schedulers (a 2-minute full-sync retry, a live catch-up recovery scheduler that retriggers within 5 minutes on failure or after 30 minutes of inactivity, and an inbox-deletion recovery scheduler) handle transient failures. The scenarios below require explicit operator action because the automatic schedulers are insufficient for total data loss.

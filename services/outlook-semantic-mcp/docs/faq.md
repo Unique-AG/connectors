@@ -1,9 +1,6 @@
 <!-- confluence-page-id: 2061107213 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Outlook Semantic MCP - FAQ
-
-
 ## Table of Contents
 
 - [General](#General)
