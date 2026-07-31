@@ -4,14 +4,14 @@ from typing import cast
 import structlog
 from structlog.typing import Processor
 
-from backstop_mcp.config import AppConfig
+from backstop_mcp.config import AppConfig, LogLevel
 
-LOG_LEVEL_MAP = {
-    "fatal": logging.CRITICAL,
-    "error": logging.ERROR,
-    "warn": logging.WARNING,
-    "info": logging.INFO,
-    "debug": logging.DEBUG,
+LOG_LEVEL_MAP: dict[LogLevel, int] = {
+    LogLevel.FATAL: logging.CRITICAL,
+    LogLevel.ERROR: logging.ERROR,
+    LogLevel.WARN: logging.WARNING,
+    LogLevel.INFO: logging.INFO,
+    LogLevel.DEBUG: logging.DEBUG,
 }
 
 
