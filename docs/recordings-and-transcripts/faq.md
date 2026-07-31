@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2535129116 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Recordings & Transcripts - FAQ
-
 Questions about capturing meeting transcripts and recordings into the Unique knowledge base, and about the Recordings area that presents them. For questions about the Teams MCP Server itself — OAuth, consent, tokens, chat and channel tools — see the [Teams MCP - FAQ](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1801846803/Teams+MCP+-+FAQ).
 
 ## Eligibility & Scope

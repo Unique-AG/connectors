@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2399993877 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Recordings & Transcripts - Technical Manual
-
 This page documents how meeting transcripts and recordings get from Microsoft Teams into the Unique knowledge base, and how the Recordings area reads them back out. For the server that performs the capture — its OAuth model, token handling, chat tools, and deployment — see the [Teams MCP - Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802633247/Teams+MCP+-+Technical+Manual).
 
 ## Architecture

@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2398519349 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Teams MCP - Tools
-
 The Teams MCP Server always exposes **8 chat & messaging tools**, which interact with Microsoft Teams chats and channels synchronously through the Microsoft Graph API: list teams/channels/chats, read messages, search across messages, and send messages.
 
 Four further tools exist only in deployments with meeting-transcript capture enabled — see [Transcript & Knowledge-Base Management](#transcript--knowledge-base-management) below.

@@ -1,8 +1,6 @@
 <!-- confluence-page-id: 2061664301 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Authentication
-
 How the app registration is provisioned depends on your deployment model.
 
 ## Required Permissions
