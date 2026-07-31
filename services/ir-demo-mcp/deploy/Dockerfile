@@ -5,10 +5,7 @@ ARG APP_NAME=ir-demo-mcp
 FROM node:26.5.0-trixie@sha256:0473e7dc433a1310f436edee02aa79737ec78a4b345433ab0963d4a256f9ad85 AS base
 ENV CI=1 \
     PNPM_STORE_DIR=/root/.local/share/pnpm/store
-# Install pnpm directly. Node 25+ no longer bundles corepack.
 # Keep the version in sync with "packageManager" in the root and service package.json.
-# Store dir is pinned to the path docker-base/nestjs/26 uses, so the cache mounts
-# below actually hit. PNPM_HOME is the global bin dir, not the store.
 RUN npm install -g pnpm@10.34.5 \
  && pnpm config set store-dir "$PNPM_STORE_DIR"
 
@@ -39,13 +36,11 @@ RUN --mount=type=cache,target=/root/.cache/turbo \
 
 FROM node:26.5.0-trixie-slim@sha256:715e55e4b84e4bb0ff48e49b398a848f08e55daed8eb6a0ea1839ae53bc57583 AS runner
 WORKDIR /app
-# Baseline runtime packages, same set as docker-base/nestjs/26:
+# Baseline runtime packages:
 #   - procps/dumb-init/openssl/ca-certificates: signal forwarding, TLS, trust store
 #   - apt-get upgrade: pull newest OS security patches at build time
-# curl is deliberately not installed. All chart probes are httpGet, nothing execs curl.
-# pnpm is kept in every runtime for homogeneity; teams-mcp and outlook-semantic-mcp
-# need it for the chart migration hook (`pnpm run db:migrate`). npm and npx are removed
-# afterwards to shrink the runtime attack surface.
+# pnpm is kept in every runtime for homogeneity. npm and npx are removed afterwards
+# to shrink the runtime attack surface.
 RUN --mount=type=cache,target=/var/cache/apt \
     apt-get update \
  && apt-get upgrade -y \
