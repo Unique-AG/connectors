@@ -27,3 +27,12 @@ uv run alembic upgrade head
 ```bash
 uv run pytest
 ```
+
+## Lint & type-check
+
+```bash
+uv run ruff check .          # lint
+uv run ruff format --check . # format check (no changes)
+uv run ruff format .         # auto-fix formatting
+uv run basedpyright .        # type check
+```

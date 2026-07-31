@@ -110,11 +110,32 @@ class BackstopConfig(BaseSettings):
     `Authorization: Basic ...` + `token: true` to Backstop. See `auth/provider.py`,
     `backstop_client.py`, and https://backstopsolutions.elevio.help/en/articles/1018 /
     .../236.
+
+    Also carries the tuning knobs for the shared HTTP client: timeouts, per-user concurrency
+    limits, retry behavior for 429s, and default pagination sizes.
     """
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="BACKSTOP_")
 
     base_url: str = "https://api.backstopsolutions.com"
+
+    # httpx's undocumented default is ~5s; ordinary CRUD calls get a saner explicit timeout.
+    default_timeout_seconds: float = Field(default=30.0, gt=0)
+    # /reports and /{entity}/{id}/analytics can legitimately take up to ~30s per 500 records.
+    reports_timeout_seconds: float = Field(default=120.0, gt=0)
+
+    # Backstop hard-limits each user token to 5 concurrent connections.
+    max_concurrent_requests_per_user: int = Field(default=5, ge=1)
+
+    # Retry tuning for 429 (rate-limit) responses.
+    max_retry_attempts: int = Field(default=5, ge=1)
+    max_retry_wait_ms: int = Field(default=30_000, ge=0)
+
+    # Default page size for `.paginate()` on ordinary CRUD collections.
+    default_page_size: int = Field(default=100, ge=1)
+    # Default page size for /reports and /analytics pagination; Backstop recommends not
+    # exceeding 500 records per report page.
+    report_page_size: int = Field(default=500, ge=1, le=500)
 
 
 class DatabaseConfig(BaseSettings):

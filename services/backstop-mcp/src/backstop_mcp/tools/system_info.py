@@ -1,8 +1,4 @@
-from pydantic import TypeAdapter
-
 from backstop_mcp.backstop_client import get_backstop_client
-
-_RESPONSE_ADAPTER = TypeAdapter(dict[str, object])
 
 
 async def get_system_info() -> dict[str, object]:
@@ -11,11 +7,10 @@ async def get_system_info() -> dict[str, object]:
     An example tool showing the full authenticated-call path end to end: FastMCP has
     already validated the caller's MCP access token; `get_backstop_client` resolves *their*
     stored Backstop credential via `auth/context.py` (not a shared service account) and
-    builds an `httpx.AsyncClient` authenticated as them. That client auto-raises on any
-    error response (a revoked credential surfaces as `BackstopAuthError`; anything else as
-    `httpx.HTTPStatusError`), so this tool doesn't need to check status codes itself.
+    builds a `BackstopClient` authenticated as them. That client auto-raises on any error
+    response (a revoked credential surfaces as `BackstopAuthError`; anything else as
+    `BackstopApiError`/`BackstopRateLimitError`), so this tool doesn't need to check status
+    codes itself.
     """
     async with await get_backstop_client() as client:
-        response = await client.get("/system-info")
-
-    return _RESPONSE_ADAPTER.validate_json(response.text)
+        return await client.get("/system-info")

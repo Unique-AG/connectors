@@ -8,9 +8,22 @@ from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
+from backstop_mcp.backstop_client.client import reset_shared_backstop_state_for_tests
+
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 _SERVICE_ROOT = Path(__file__).parent.parent
+
+
+@pytest.fixture(autouse=True)
+async def _reset_backstop_client_singletons() -> AsyncGenerator[None]:
+    """Every test function runs on its own event loop (`asyncio_default_fixture_loop_scope
+    = "function"`); the shared httpx client and per-username semaphores in
+    `backstop_client.client` bind to whichever loop first touches them, so leftover state
+    from a previous test would raise "bound to a different event loop" here.
+    """
+    yield
+    await reset_shared_backstop_state_for_tests()
 
 
 @pytest.fixture(scope="session")
