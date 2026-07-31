@@ -6,6 +6,7 @@ export const RESOURCE_NAMES = [
   'diligence',
   'tasks',
   'activities',
+  'outlookTasks',
   'calendarEvents',
   'messages',
 ] as const;

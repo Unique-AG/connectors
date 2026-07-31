@@ -1,5 +1,5 @@
 import { UniqueApiClient } from '@unique-ag/unique-api';
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { isNullish } from 'remeda';
@@ -43,7 +43,7 @@ export class ExecuteInboxDeletionCommand {
     const logContext: Readonly<Record<string, string>> = Object.freeze({
       userProfileId,
       providerUserId: userProfile.providerUserId,
-      userEmail: createSmeared(userProfile.email ?? '').toString(),
+      userEmail: smearEmail(createSmeared(userProfile.email ?? '')),
       source: userProfile.source,
     });
 

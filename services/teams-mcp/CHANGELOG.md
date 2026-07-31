@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.4.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.1...teams-mcp@0.4.2) (2026-07-28)
+
+
+### Features
+
+* **teams-mcp:** add more logging for transcript ingestion ([#709](https://github.com/Unique-AG/connectors/issues/709)) ([94fe47e](https://github.com/Unique-AG/connectors/commit/94fe47edf5ce001a9cb413e5174309b3847ee96a))
+
+## [0.4.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.0...teams-mcp@0.4.1) (2026-07-23)
+
+
+### Features
+
+* **teams-mcp:** request fewer Graph scopes when Unique is disabled ([#703](https://github.com/Unique-AG/connectors/issues/703)) ([b24256f](https://github.com/Unique-AG/connectors/commit/b24256fecd31c23d25866275bab4a2a9e4b1847b))
+
+## [0.4.0](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.5...teams-mcp@0.4.0) (2026-07-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **teams-mcp:** move autoStartIngestion to unique config ([#699](https://github.com/Unique-AG/connectors/issues/699))
+
+### Features
+
+* **teams-mcp:** move autoStartIngestion to unique config ([#699](https://github.com/Unique-AG/connectors/issues/699)) ([b770528](https://github.com/Unique-AG/connectors/commit/b7705282504b55936f3b9706983ddb16ccae5626))
+
+## [0.3.5](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.4...teams-mcp@0.3.5) (2026-07-22)
+
+
+### Features
+
+* **teams-mcp:** make Unique integration optional via UNIQUE_INTEGRATION ([#697](https://github.com/Unique-AG/connectors/issues/697)) ([9c6dd2d](https://github.com/Unique-AG/connectors/commit/9c6dd2d94a6cc95b0601e8fa11653bc2f467adc6))
+
 ## [0.3.4](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.3.3...teams-mcp@0.3.4) (2026-07-16)
 
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert';
-import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { UniqueConfigNamespaced } from '~/config';
+import { Inject, Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
+import type { EnabledUniqueConfig } from '~/config';
+import { KB_INTEGRATION_ENABLED_CONFIG } from '~/kb-integration/kb-integration-config.module';
 import { normalizeError } from '~/utils/normalize-error';
 import { ScopeAccessEntityType, ScopeAccessType } from './unique.dtos';
 import { UniqueScopeService } from './unique-scope.service';
@@ -18,18 +18,20 @@ import { UniqueScopeService } from './unique-scope.service';
  * not a from-zero provisioner: granting still requires the service user to be
  * permitted to manage the scope (the manual grant documented in the operator
  * configuration guide), so a truly unconfigured root scope fails fast here.
+ *
+ * Only runs when UniqueModule is loaded (UNIQUE_INTEGRATION=enabled).
  */
 @Injectable()
 export class RootScopeBootstrapService implements OnApplicationBootstrap {
   private readonly logger = new Logger(RootScopeBootstrapService.name);
 
   public constructor(
-    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
+    @Inject(KB_INTEGRATION_ENABLED_CONFIG) private readonly config: EnabledUniqueConfig,
     private readonly scopeService: UniqueScopeService,
   ) {}
 
   public async onApplicationBootstrap(): Promise<void> {
-    const { rootScopeId, serviceExtraHeaders } = this.config.get('unique', { infer: true });
+    const { rootScopeId, serviceExtraHeaders } = this.config;
     const serviceUserId = serviceExtraHeaders['x-user-id'];
     // The config schema already requires x-user-id in both auth modes; this guards
     // that invariant before we build the access grants.

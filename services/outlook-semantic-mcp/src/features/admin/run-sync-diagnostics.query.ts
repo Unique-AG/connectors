@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -72,7 +72,7 @@ export class RunSyncDiagnosticsQuery {
     this.logger.log({
       userProfileId: userProfile.id,
       providerUserId: userProfile.providerUserId,
-      email: createSmeared(userProfile.email ?? '').toString(),
+      email: smearEmail(createSmeared(userProfile.email ?? '')),
       ...result,
     });
 

@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   type FetchFn,
   pipeline,
@@ -7,7 +6,8 @@ import {
   withHeaders,
   withResponseError,
 } from '@qfetch/qfetch';
-import type { UniqueConfigNamespaced } from '~/config';
+import type { EnabledUniqueConfig } from '~/config';
+import { KB_INTEGRATION_ENABLED_CONFIG } from '~/kb-integration/kb-integration-config.module';
 import { DrizzleModule } from '../drizzle/drizzle.module';
 import { RootScopeBootstrapService } from './root-scope-bootstrap.service';
 import { UNIQUE_FETCH } from './unique.consts';
@@ -22,9 +22,8 @@ import { UniqueUserMappingService } from './unique-user-mapping.service';
   providers: [
     {
       provide: UNIQUE_FETCH,
-      inject: [ConfigService],
-      useFactory(config: ConfigService<UniqueConfigNamespaced, true>): FetchFn {
-        const uniqueConfig = config.get('unique', { infer: true });
+      inject: [KB_INTEGRATION_ENABLED_CONFIG],
+      useFactory(uniqueConfig: EnabledUniqueConfig): FetchFn {
         return pipeline(
           withBaseUrl(uniqueConfig.apiBaseUrl),
           withHeaders({

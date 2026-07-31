@@ -16,6 +16,7 @@ export {
   isSmearingActive,
   LogsDiagnosticDataPolicy,
   Smeared,
+  smearEmail,
   smearPath,
 } from './smeared';
 export {

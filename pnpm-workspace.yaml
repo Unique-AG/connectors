@@ -1,5 +1,6 @@
 packages:
   - services/*
+  - "!services/hello-mcp"
   - packages/*
 
 injectWorkspacePackages: true

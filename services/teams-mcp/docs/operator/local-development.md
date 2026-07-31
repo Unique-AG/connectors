@@ -9,7 +9,7 @@ This guide walks through setting up the Teams MCP Server for local development a
 |-------------|---------|---------|
 | Node.js | 20+ | Runtime |
 | pnpm | 9+ | Package manager |
-| Docker | 24+ | Run PostgreSQL and RabbitMQ |
+| Docker | 24+ | Run PostgreSQL, and RabbitMQ when working on transcript capture |
 | Azure CLI | Latest | Configure Entra app registration |
 | MCP Inspector | 0.17.2 | MCP Client |
 
@@ -85,23 +85,31 @@ SELF_URL=http://localhost:<port>
 # Database
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/teams_mcp
 
-# RabbitMQ
-AMQP_URL=amqp://guest:guest@localhost:5672
-
 # Microsoft (from Entra app registration)
 MICROSOFT_CLIENT_ID=<your-client-id>
 MICROSOFT_CLIENT_SECRET=<your-client-secret>
-MICROSOFT_WEBHOOK_SECRET=<generate-128-char-hex>
-MICROSOFT_PUBLIC_WEBHOOK_URL=<your-tunnel-url>  # See webhook testing below
 
 # Security (generate with: openssl rand -hex 32)
 AUTH_HMAC_SECRET=<64-char-hex>
 ENCRYPTION_KEY=<64-char-hex>
 
-# Unique API (for local testing, use external mode)
+# Chat-only
+UNIQUE_INTEGRATION=disabled
+```
+
+### Additional Variables for Transcript Capture
+
+Only needed when working on meeting transcript capture (`UNIQUE_INTEGRATION=enabled`):
+
+```env
+AMQP_URL=amqp://guest:guest@localhost:5672
+MICROSOFT_WEBHOOK_SECRET=<generate-128-char-hex>
+MICROSOFT_PUBLIC_WEBHOOK_URL=<your-tunnel-url>  # See webhook testing below
+
 UNIQUE_SERVICE_AUTH_MODE=external
 UNIQUE_API_BASE_URL=http://localhost:8092/public/
 UNIQUE_INGESTION_SERVICE_BASE_URL=http://localhost:8091
+UNIQUE_ROOT_SCOPE_ID=<your-root-scope-id>
 ```
 
 ### Generating Secrets
@@ -115,6 +123,8 @@ openssl rand -hex 32
 ```
 
 ## Webhook Testing
+
+Webhooks only apply to meeting transcript capture — see the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-pipeline) for what the pipeline does with them.
 
 Microsoft Graph webhooks require a publicly accessible HTTPS endpoint. For local development, use Azure Dev Tunnels:
 

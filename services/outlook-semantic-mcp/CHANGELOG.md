@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.2.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.1.0...outlook-semantic-mcp@3.2.0) (2026-07-29)
+
+
+### Features
+
+* **outlook-semantic-mcp,unique-api:** add more logs around attachments upload, resolve users case insensitive in unique by email ([#711](https://github.com/Unique-AG/connectors/issues/711)) ([71885a1](https://github.com/Unique-AG/connectors/commit/71885a14c536453d60304c66af1f39bbdb22f6bf))
+
+## [3.1.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.0.1...outlook-semantic-mcp@3.1.0) (2026-07-24)
+
+
+### Features
+
+* **outlook-semantic-mcp,utils:** smear emails in logs and refine delegated-access health metrics, fix directory sync ([#706](https://github.com/Unique-AG/connectors/issues/706)) ([b9f90e6](https://github.com/Unique-AG/connectors/commit/b9f90e6cc98a89c74a273e4b87df7aa356bbd9c3))
+
+## [3.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@3.0.0...outlook-semantic-mcp@3.0.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** stop filtering shared mailboxes by accountEnabled ([#701](https://github.com/Unique-AG/connectors/issues/701)) ([b164ba7](https://github.com/Unique-AG/connectors/commit/b164ba7fe0d6c7d0c8050ccf159f785fe5f230e8))
+
 ## [3.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@2.0.2...outlook-semantic-mcp@3.0.0) (2026-07-07)
 
 

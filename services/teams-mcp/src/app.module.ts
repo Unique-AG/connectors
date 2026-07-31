@@ -17,7 +17,7 @@ import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
 import { AMQPModule } from './amqp/amqp.module';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
-import { MicrosoftOAuthProvider } from './auth/microsoft.provider';
+import { createMicrosoftOAuthProvider } from './auth/microsoft.provider';
 import { ChatModule } from './chat/chat.module';
 import {
   type AppConfig,
@@ -32,14 +32,15 @@ import {
   healthConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
+  type UniqueConfigNamespaced,
   uniqueConfig,
 } from './config';
 import { DRIZZLE, DrizzleDatabase, DrizzleModule } from './drizzle/drizzle.module';
 import { HealthModule } from './health/health.module';
+import { registerKbIntegrationModule } from './kb-integration/kb-integration.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
-import { TranscriptModule } from './transcript/transcript.module';
 import { GraphErrorFilter } from './utils/graph-error.filter';
 
 @Module({
@@ -107,7 +108,10 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
       ],
       useFactory: async (
         configService: ConfigService<
-          AppConfigNamespaced & MicrosoftConfigNamespaced & AuthConfigNamespaced,
+          AppConfigNamespaced &
+            MicrosoftConfigNamespaced &
+            AuthConfigNamespaced &
+            UniqueConfigNamespaced,
           true
         >,
         aesService: AesGcmEncryptionService,
@@ -116,7 +120,9 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         metricService: MetricService,
         amqpConnection: AmqpConnection,
       ) => ({
-        provider: MicrosoftOAuthProvider,
+        provider: createMicrosoftOAuthProvider(
+          configService.get('unique.integration', { infer: true }),
+        ),
 
         clientId: configService.get('microsoft.clientId', { infer: true }),
         clientSecret: configService.get('microsoft.clientSecret', { infer: true }).value,
@@ -150,7 +156,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     MsGraphModule,
     AMQPModule,
-    TranscriptModule,
+    ...registerKbIntegrationModule(),
     ChatModule,
     HealthModule,
   ],

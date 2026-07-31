@@ -1,0 +1,21 @@
+name: "[recordings-and-transcripts] Publish Docs to Confluence"
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  workflow_call:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/recordings-and-transcripts/**"
+
+jobs:
+  publish-docs:
+    uses: ./.github/workflows/_template-docs-confluence.yaml
+    secrets: inherit
+    with:
+      service-name: recordings-and-transcripts
+      docs-path: docs/recordings-and-transcripts

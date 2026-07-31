@@ -8,7 +8,8 @@ import { serializeError } from 'serialize-error-cjs';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { UserAuthorizedEventDto } from '~/auth/dtos/user-authorized-event.dto';
-import { type MicrosoftConfig, microsoftConfig } from '~/config';
+import type { EnabledUniqueConfig } from '~/config';
+import { KB_INTEGRATION_ENABLED_CONFIG } from '~/kb-integration/kb-integration-config.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { normalizeError } from '~/utils/normalize-error';
 import { SubscriptionCreateService } from './subscription-create.service';
@@ -18,7 +19,7 @@ export class PostAuthorizationListener {
   private readonly logger = new Logger(PostAuthorizationListener.name);
 
   public constructor(
-    @Inject(microsoftConfig.KEY) private readonly config: MicrosoftConfig,
+    @Inject(KB_INTEGRATION_ENABLED_CONFIG) private readonly config: EnabledUniqueConfig,
     private readonly subscriptionCreate: SubscriptionCreateService,
   ) {}
 

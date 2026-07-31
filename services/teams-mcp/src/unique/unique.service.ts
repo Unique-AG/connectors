@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import pLimit from 'p-limit';
-import type { UniqueConfigNamespaced } from '~/config';
+import type { EnabledUniqueConfig } from '~/config';
+import { KB_INTEGRATION_ENABLED_CONFIG } from '~/kb-integration/kb-integration-config.module';
 import { buildMeetingExternalId, buildOccurrenceExternalId } from './scope-external-id';
 import {
   RECORDING_MIME_TYPE,
@@ -28,7 +28,7 @@ export class UniqueService {
   private readonly logger = new Logger(UniqueService.name);
 
   public constructor(
-    private readonly config: ConfigService<UniqueConfigNamespaced, true>,
+    @Inject(KB_INTEGRATION_ENABLED_CONFIG) private readonly config: EnabledUniqueConfig,
     private readonly trace: TraceService,
     private readonly userService: UniqueUserService,
     private readonly scopeService: UniqueScopeService,
@@ -77,7 +77,7 @@ export class UniqueService {
       'Beginning processing of meeting transcript for ingestion',
     );
 
-    const concurrency = this.config.get('unique.userFetchConcurrency', { infer: true });
+    const { rootScopeId, userFetchConcurrency: concurrency } = this.config;
     const limit = pLimit(concurrency);
     const participantsPromises = meeting.participants.map((p) =>
       limit(() => this.userService.findUserByEmail(p.email)),
@@ -104,8 +104,6 @@ export class UniqueService {
       { foundParticipants: participants.length, totalParticipants: meeting.participants.length },
       'Successfully resolved meeting participant accounts in Unique system',
     );
-
-    const rootScopeId = this.config.get('unique.rootScopeId', { infer: true });
     const { subjectPath, datePath } = this.mapMeetingToRelativePaths(
       meeting.subject,
       meeting.meetingId,

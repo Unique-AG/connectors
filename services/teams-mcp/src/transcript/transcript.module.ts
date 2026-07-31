@@ -17,6 +17,10 @@ import { TranscriptCreatedService } from './transcript-created.service';
 import { TranscriptRecordingService } from './transcript-recording.service';
 import { TranscriptUtilsService } from './transcript-utils.service';
 
+/**
+ * Transcript ingestion + KB MCP tools. Only imported via KbIntegrationModule
+ * when UNIQUE_INTEGRATION=enabled — do not import from AppModule directly.
+ */
 @Module({
   imports: [DrizzleModule, MsGraphModule, UniqueModule],
   providers: [
@@ -26,7 +30,7 @@ import { TranscriptUtilsService } from './transcript-utils.service';
     SubscriptionReauthorizeService,
     SubscriptionRemoveService,
     TranscriptCreatedService,
-    // Auto-start ingestion at login (gated by MICROSOFT_AUTO_START_INGESTION)
+    // Auto-start ingestion at login (gated by UNIQUE_AUTO_START_INGESTION)
     PostAuthorizationListener,
     // KB Integration MCP Tools
     VerifyKbIntegrationStatusTool,

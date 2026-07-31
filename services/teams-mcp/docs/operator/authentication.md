@@ -14,15 +14,11 @@ For technical details about the OAuth flow, see [Microsoft OAuth Setup Flow](../
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. Three permissions require admin consent before users can connect.
+All permissions are **delegated** — they act on behalf of the signed-in user. Identity and Teams messaging scopes only; `ChannelMessage.Read.All` is the one that requires admin consent.
 
 | Permission | Type | Admin Consent |
 |------------|------|---------------|
 | `User.Read` | Delegated | No |
-| `Calendars.Read` | Delegated | No |
-| `OnlineMeetings.Read` | Delegated | No |
-| `OnlineMeetingRecording.Read.All` | Delegated | **Yes** |
-| `OnlineMeetingTranscript.Read.All` | Delegated | **Yes** |
 | `offline_access` | Delegated | No |
 | `ChannelMessage.Send` | Delegated | No |
 | `ChatMessage.Send` | Delegated | No |
@@ -32,19 +28,27 @@ All permissions are **delegated** — they act on behalf of the signed-in user. 
 | `Channel.ReadBasic.All` | Delegated | No |
 | `ChannelMessage.Read.All` | Delegated | **Yes** |
 
-For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
+No calendar, meeting, transcript, or recording scope is requested. For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
+
+!!! note "Transcript capture adds four scopes"
+    A deployment with `UNIQUE_INTEGRATION=enabled` additionally requests `Calendars.Read`, `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All`, and `OnlineMeetingRecording.Read.All`, the last two of which require admin consent. Only enable that mode if you intend to store meeting content in the Unique knowledge base — see [Recordings & Transcripts](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2534866977/Recordings+Transcripts).
 
 ## Unique SaaS
 
 **Recommended for most clients.** When Unique runs Teams MCP, Unique provisions the Entra ID app registration for you. You only need to grant admin consent:
 
 ```
-https://login.microsoftonline.com/organizations/adminconsent?client_id=8ddffb12-1579-4fa8-8844-ca122e4308bc
+https://login.microsoftonline.com/organizations/v2.0/adminconsent?client_id=7c4f0aab-b24e-48c4-9b2d-d1c22dfdf99f&scope=https://graph.microsoft.com/.default&redirect_uri=https%3A%2F%2Fwww.unique.ai%2Fsetup%2Fconsent-completed%2Fentra-id
 ```
 
-The consent prompt lists the [Required Permissions](#required-permissions) above. Note that `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ChannelMessage.Read.All` require admin consent — the URL above handles all three in one step. Without it, users will see an error when trying to connect.
+After approving, you are redirected to a Unique confirmation page.
 
-If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `8ddffb12-1579-4fa8-8844-ca122e4308bc`.
+The consent prompt lists the [Required Permissions](#required-permissions) above, of which `ChannelMessage.Read.All` is the one that needs admin consent. Without it, users will see an error when trying to connect.
+
+If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `7c4f0aab-b24e-48c4-9b2d-d1c22dfdf99f`.
+
+!!! note "Transcript capture uses a different app registration"
+    The URL above consents to the chat-only app. A deployment with `UNIQUE_INTEGRATION=enabled` runs on its own app registration, which additionally requests the meeting-content scopes — grant consent for it with the URL in [Recordings & Transcripts — Grant admin consent](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual#grant-admin-consent).
 
 ## Self-Hosted
 
@@ -60,7 +64,8 @@ module "teams_mcp_app" {
 
   display_name     = "Teams MCP Server"
   sign_in_audience = "AzureADMyOrg"  # Single tenant
-  notes            = "MCP server for Teams transcript capture"
+  notes              = "MCP server for Teams chats and channels"
+  unique_integration = "disabled" # chat-only: omits calendar/meeting/transcript scopes
 
   redirect_uris = [
     "https://teams.mcp.example.com/auth/callback"
@@ -89,7 +94,7 @@ module "teams_mcp_app" {
    - Add all permissions listed under [Required Permissions](#required-permissions)
 
 3. Click **Grant admin consent for [Tenant]** and confirm.
-   `OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ChannelMessage.Read.All` require this step — without it users cannot connect.
+   Chat-only deployments only need admin consent for `ChannelMessage.Read.All`. With transcript capture enabled, `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` need it too.
 
 4. Go to **Certificates & secrets** → **New client secret**:
    - Set description and expiration
@@ -163,7 +168,7 @@ See [Authentication Architecture - Single App Registration Architecture](../tech
 
 #### Webhook Secret
 
-The `MICROSOFT_WEBHOOK_SECRET` validates incoming webhook notifications from Microsoft Graph:
+The `MICROSOFT_WEBHOOK_SECRET` validates incoming webhook notifications from Microsoft Graph. It is only needed with transcript capture enabled; a chat-only deployment receives no webhooks.
 
 - **Length**: 128 characters (recommended)
 - **Format**: Random alphanumeric string
@@ -175,9 +180,9 @@ This secret is passed to Microsoft when creating Graph subscriptions and returne
 
 **This is standard Microsoft behavior, not Teams MCP specific.** All Microsoft 365 apps use the same consent model.
 
-Because three permissions require admin consent (`OnlineMeetingRecording.Read.All`, `OnlineMeetingTranscript.Read.All`, and `ChannelMessage.Read.All`), the consent sequence is:
+Because admin-consent scopes depend on deployment mode (`ChannelMessage.Read.All` always; plus `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` when transcript capture is enabled), the consent sequence is:
 
-1. **Admin grants consent** for those three permissions (organisation-wide or per-user). The remaining 10 permissions — including all other chat scopes (`ChannelMessage.Send`, `ChatMessage.Send`, `Chat.ReadBasic`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`) — are user-consentable and do not require admin action.
+1. **Admin grants consent** for the admin-required permissions for your mode (organisation-wide or per-user). Remaining permissions — including other chat scopes (`ChannelMessage.Send`, `ChatMessage.Send`, `Chat.ReadBasic`, `Chat.Read`, `Team.ReadBasic.All`, `Channel.ReadBasic.All`) — are user-consentable and do not require admin action.
 2. **User consent** — on first connection, the user sees the Microsoft consent screen and approves the remaining permissions
 
 **How to grant admin consent:**

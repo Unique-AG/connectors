@@ -29,7 +29,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/teams-mcp
-  tag: 0.3.4 # x-release-please-version
+  tag: 0.4.2 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
@@ -287,14 +287,15 @@ mcpConfig:
     # Optional - defaults to SELF_URL if not provided.
     # example: https://teams.mcp.unique.app
     # publicWebhookUrl: ""
-    # -- When enabled, automatically enqueue a transcript subscription for every user at login
-    # (skips the start_kb_integration tool).
-    autoStartIngestion: false
     # clientSecret is loaded from a secret, see envVars
     # webhookSecret is loaded from a secret, see envVars
 
   # -- Unique API configuration
   unique:
+    # -- Enable Unique knowledge-base integration (transcript ingestion).
+    # When disabled, chat tools work without Unique/Zitadel configuration.
+    # possible values: enabled, disabled
+    integration: enabled
     # -- Authentication mode for Unique API services
     # possible values: cluster_local, external
     # cluster_local: communicates using in-cluster URLs with service headers
@@ -316,7 +317,8 @@ mcpConfig:
     # -- The Public API version to use
     apiVersion: "2023-12-06"
     # -- The root scope ID under which to create transcript and recording folders
-    # @default -- (required)
+    # Required when integration is enabled
+    # @default -- (required when integration=enabled)
     rootScopeId: ""
     # -- Concurrency limit for fetching users when resolving scope accesses
     userFetchConcurrency: 5
@@ -324,6 +326,10 @@ mcpConfig:
     # -- Base URL for Unique ingestion service; auto-derived from internalServices.dependencies.ingestion
     # override with an explicit URL when serviceAuthMode is external, e.g. https://api.unique.app/ingestion
     ingestionServiceBaseUrl: '{{ include "base.internalService.url" (dict "root" . "dep" .Values.internalServices.dependencies.ingestion) }}'
+
+    # -- When enabled, automatically enqueue a transcript subscription for every user at login
+    # (skips the start_kb_integration tool).
+    autoStartIngestion: false
 
   # -- Authentication configuration for the MCP server
   auth:

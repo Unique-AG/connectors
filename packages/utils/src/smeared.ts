@@ -18,10 +18,11 @@ export class Smeared {
   public constructor(
     public readonly value: string,
     public readonly active: boolean,
+    public readonly smearEnd: boolean = false,
   ) {}
 
   public toString(): string {
-    return this.active ? smear(this.value) : this.value;
+    return this.active ? smear(this.value, { smearEnd: this.smearEnd }) : this.value;
   }
 
   public toJSON(): string {
@@ -29,7 +30,7 @@ export class Smeared {
   }
 
   public transform(transformer: (value: string) => string): Smeared {
-    return new Smeared(transformer(this.value), this.active);
+    return new Smeared(transformer(this.value), this.active, this.smearEnd);
   }
 }
 
@@ -54,6 +55,24 @@ export function smearPath(path: Smeared) {
     .join('/');
 }
 
+const SMEAR_CONSTS = {
+  error: '__erroneous__',
+  totallySmeared: '[Smeared]',
+};
+
+export function smearEmail(email: Smeared) {
+  const emailParts = email.value.split('@');
+
+  return emailParts
+    .map((part, index) => {
+      if (index + 1 === emailParts.length) {
+        return new Smeared(part, email.active, true);
+      }
+      return new Smeared(part, email.active).toString();
+    })
+    .join('@');
+}
+
 /**
  * @description
  * Smear function should be used to obfuscate logs like emails / names basically details
@@ -66,24 +85,38 @@ export function smearPath(path: Smeared) {
  * @example
  * smear('password');        // "****word"
  * smear('mySecret123');     // "*******t123"
- * smear('hello', 2);        // "***lo"
+ * smear('hello', {leaveOver: 2});        // "***lo"
  * smear('ab');               // "[Smeared]"
  * smear(null);               // "__erroneous__"
  */
-export function smear(text: string | null | undefined, leaveOver = 4) {
+export function smear(
+  text: string | null | undefined,
+  options?: { leaveOver?: number; smearEnd?: boolean },
+) {
+  const leaveOver = options?.leaveOver ?? 4;
+  const smearFront = options?.smearEnd ?? false;
+
   if (text === undefined || text === null) {
-    return '__erroneous__';
+    return SMEAR_CONSTS.error;
   }
   if (!text.length || text.length <= leaveOver) {
-    return '[Smeared]';
+    return SMEAR_CONSTS.totallySmeared;
   }
 
   const charsToSmear = text.length - leaveOver;
   if (charsToSmear < 3) {
-    return '[Smeared]';
+    return SMEAR_CONSTS.totallySmeared;
+  }
+
+  const replaceRegex = /[a-zA-Z0-9_]/g;
+
+  if (smearFront) {
+    const start = text.substring(0, leaveOver);
+    const toSmear = text.substring(leaveOver, text.length);
+    return `${start}${toSmear.replaceAll(replaceRegex, '*')}`;
   }
 
   const end = text.substring(text.length - leaveOver, text.length);
   const toSmear = text.substring(0, text.length - leaveOver);
-  return `${toSmear.replaceAll(/[a-zA-Z0-9_]/g, '*')}${end}`;
+  return `${toSmear.replaceAll(replaceRegex, '*')}${end}`;
 }

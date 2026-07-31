@@ -89,3 +89,20 @@ variable "service_principal_configuration" {
   })
   default = {}
 }
+
+variable "unique_integration" {
+  description = <<-EOT
+    Whether the Teams MCP deployment enables Unique knowledge-base integration.
+    When "enabled" (default), Graph scopes include calendar/meeting/transcript/recording
+    permissions needed for KB ingestion.
+    When "disabled" (chat-only), only identity + Teams chat/channel messaging scopes are
+    registered — matching UNIQUE_INTEGRATION=disabled on the MCP server.
+  EOT
+  type        = string
+  default     = "enabled"
+
+  validation {
+    condition     = contains(["enabled", "disabled"], var.unique_integration)
+    error_message = "The unique_integration must be one of: 'enabled', or 'disabled'."
+  }
+}

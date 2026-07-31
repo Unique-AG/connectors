@@ -1,5 +1,5 @@
 import assert from 'node:assert';
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Attributes } from '@opentelemetry/api';
@@ -38,7 +38,7 @@ export class SyncDirectoriesCommand {
 
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
     traceAttrs({ userProfileId: userProfile.id });
-    const userEmail = createSmeared(userProfile.email);
+    const userEmail = smearEmail(createSmeared(userProfile.email));
     this.logger.log({
       userProfileId: userProfile.id,
       userEmail,

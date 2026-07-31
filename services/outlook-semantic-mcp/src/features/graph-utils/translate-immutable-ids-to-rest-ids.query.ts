@@ -1,4 +1,4 @@
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { Injectable, Logger } from '@nestjs/common';
 import { filter, isNonNullish, pipe, unique } from 'remeda';
 import z from 'zod';
@@ -53,7 +53,7 @@ export class TranslateImmutableIdsToRestIdsQuery {
         err,
         msg: `Failed to translate immutable ids to rest ids`,
         userProfileId,
-        ...(ownerEmail ? { ownerEmail: createSmeared(ownerEmail) } : {}),
+        ...(ownerEmail ? { ownerEmail: smearEmail(createSmeared(ownerEmail)) } : {}),
       });
       return new Map<string, string>();
     }

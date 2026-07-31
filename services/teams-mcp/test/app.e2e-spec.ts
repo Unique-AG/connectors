@@ -3,20 +3,26 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
+import { shouldRegisterKbIntegrationModule } from '../src/kb-integration/kb-integration.module';
 import { RootScopeBootstrapService } from '../src/unique/root-scope-bootstrap.service';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
 
   beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    let testingModule = Test.createTestingModule({
       imports: [AppModule],
-    })
-      // The bootstrap hook grants root-scope access against the Unique API at boot;
-      // stub it so app.init() does not require a live Unique API for these e2e tests.
-      .overrideProvider(RootScopeBootstrapService)
-      .useValue({ onApplicationBootstrap: () => Promise.resolve() })
-      .compile();
+    });
+
+    // The bootstrap hook grants root-scope access against the Unique API at boot;
+    // stub it so app.init() does not require a live Unique API for these e2e tests.
+    if (shouldRegisterKbIntegrationModule()) {
+      testingModule = testingModule
+        .overrideProvider(RootScopeBootstrapService)
+        .useValue({ onApplicationBootstrap: () => Promise.resolve() });
+    }
+
+    const moduleFixture: TestingModule = await testingModule.compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();

@@ -33,7 +33,7 @@ describe('smear', () => {
   });
 
   it('works with custom leaveOver parameter', () => {
-    expect(smear('hello', 2)).toBe('***lo');
-    expect(smear('password', 3)).toBe('*****ord');
+    expect(smear('hello', { leaveOver: 2 })).toBe('***lo');
+    expect(smear('password', { leaveOver: 3 })).toBe('*****ord');
   });
 });

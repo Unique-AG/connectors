@@ -14,8 +14,12 @@ import {
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MetricService } from 'nestjs-otel';
-import type { AppConfigNamespaced, MicrosoftConfigNamespaced } from '~/config';
-import { SCOPES } from '../auth/microsoft.provider';
+import type {
+  AppConfigNamespaced,
+  MicrosoftConfigNamespaced,
+  UniqueConfigNamespaced,
+} from '~/config';
+import { resolveMicrosoftScopes } from '../auth/microsoft.provider';
 import { DRIZZLE, DrizzleDatabase } from '../drizzle/drizzle.module';
 import { MetricsMiddleware } from './metrics.middleware';
 import { TokenProvider } from './token.provider';
@@ -29,7 +33,7 @@ export class GraphClientFactory {
 
   public constructor(
     private readonly configService: ConfigService<
-      AppConfigNamespaced & MicrosoftConfigNamespaced,
+      AppConfigNamespaced & MicrosoftConfigNamespaced & UniqueConfigNamespaced,
       true
     >,
     @Inject(DRIZZLE) private readonly drizzle: DrizzleDatabase,
@@ -38,7 +42,9 @@ export class GraphClientFactory {
   ) {
     this.clientId = this.configService.get('microsoft.clientId', { infer: true });
     this.clientSecret = this.configService.get('microsoft.clientSecret', { infer: true }).value;
-    this.scopes = SCOPES;
+    this.scopes = resolveMicrosoftScopes(
+      this.configService.get('unique.integration', { infer: true }),
+    );
   }
 
   public createClientForUser(userProfileId: string): Client {

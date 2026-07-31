@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { HealthIndicatorResult, HealthIndicatorService } from '@nestjs/terminus';
-import { and, count, countDistinct, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, count, countDistinct, eq, gt, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import {
   DelegatedAccessConfig,
   delegatedAccessConfig,
@@ -15,6 +15,7 @@ import {
   inboxConfigurations,
   subscriptions,
   tokens,
+  userProfiles,
 } from '~/db';
 import { FAILED_HEARTBEAT_MINUTES } from '~/features/sync/full-sync/full-sync.command';
 import { FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES } from '~/features/sync/live-catch-up/live-catch-up.command';
@@ -46,7 +47,7 @@ export class McpProcessesHealthIndicator {
           THEN 1 ELSE 0 END), 0)`,
       })
       .from(inboxConfigurations)
-      .where(inArray(inboxConfigurations.userProfileId, this.eligibleSubquery()));
+      .where(inArray(inboxConfigurations.userProfileId, this.eligibleUsersForSyncSubquery()));
 
     const eligible = row?.totalEligible ?? 0;
     const failing = Number(row?.failing ?? 0);
@@ -78,7 +79,7 @@ export class McpProcessesHealthIndicator {
           THEN 1 ELSE 0 END), 0)`,
       })
       .from(inboxConfigurations)
-      .where(inArray(inboxConfigurations.userProfileId, this.eligibleSubquery()));
+      .where(inArray(inboxConfigurations.userProfileId, this.eligibleUsersForSyncSubquery()));
 
     const eligible = row?.totalEligible ?? 0;
     const failing = Number(row?.failing ?? 0);
@@ -91,6 +92,55 @@ export class McpProcessesHealthIndicator {
       ratio,
     };
     return ratio > syncFailureThreshold ? indicator.down(details) : indicator.up(details);
+  }
+
+  public async checkSharedMailboxesDatabaseSync(key: string): Promise<HealthIndicatorResult> {
+    if (this.delegatedAccessCfg.scan === 'disabled') {
+      throw new Error(`${key} requires delegated access to be enabled`);
+    }
+    const indicator = this.healthIndicatorService.check(key);
+    const usersWhichCanOptainAnMcpSessionWithoutLogin = await this.db
+      .select({ totalUsers: countDistinct(tokens.userProfileId) })
+      .from(tokens)
+      .where(
+        or(
+          and(eq(tokens.type, 'ACCESS'), gt(tokens.expiresAt, sql`now()`)),
+          and(eq(tokens.token, 'REFRESH'), gt(tokens.expiresAt, sql`now()`)),
+        ),
+      )
+      .then((rows) => rows[0]?.totalUsers ?? 0);
+
+    const usersWithOauthAndMicrosoftToken = await this.db
+      .select({ totalUsers: count(userProfiles.id) })
+      .from(userProfiles)
+      .where(and(eq(userProfiles.source, 'oauth'), isNotNull(userProfiles.accessToken)))
+      .then((rows) => rows[0]?.totalUsers);
+
+    const details = {
+      sharedMailboxEmailsSyncronizedToDatabase: 0,
+      sharedMailboxEmailsCount: this.delegatedAccessCfg.sharedMailboxEmails.length,
+      usersWithOauthAndMicrosoftToken,
+      usersWhichCanOptainAnMcpSessionWithoutLogin,
+    };
+
+    if (details.sharedMailboxEmailsCount === 0) {
+      return indicator.up(details);
+    }
+
+    details.sharedMailboxEmailsSyncronizedToDatabase = await this.db
+      .select({ total: countDistinct(userProfiles.id) })
+      .from(userProfiles)
+      .where(
+        inArray(
+          sql`lower(${userProfiles.email})`,
+          this.delegatedAccessCfg.sharedMailboxEmails.map((item) => item.trim().toLowerCase()),
+        ),
+      )
+      .then((rows) => rows[0]?.total ?? 0);
+
+    return details.sharedMailboxEmailsSyncronizedToDatabase < details.sharedMailboxEmailsCount
+      ? indicator.down(details)
+      : indicator.up(details);
   }
 
   public async checkDelegatedAccess(key: string): Promise<HealthIndicatorResult> {
@@ -111,7 +161,8 @@ export class McpProcessesHealthIndicator {
         END)`,
       })
       .from(delegatedAccessAccounts)
-      .where(inArray(delegatedAccessAccounts.delegateUserId, this.eligibleSubquery()));
+      .innerJoin(userProfiles, eq(userProfiles.id, delegatedAccessAccounts.delegateUserId))
+      .where(and(eq(userProfiles.source, 'oauth')));
 
     const total = row?.totalDelegated ?? 0;
     const stale = Number(row?.stale ?? 0);
@@ -126,16 +177,16 @@ export class McpProcessesHealthIndicator {
     return ratio > failureThreshold ? indicator.down(details) : indicator.up(details);
   }
 
-  private eligibleSubquery() {
+  private eligibleUsersForSyncSubquery() {
     return this.db
       .selectDistinct({ userProfileId: inboxConfigurations.userProfileId })
       .from(inboxConfigurations)
       .innerJoin(
-        tokens,
+        userProfiles,
         and(
-          eq(tokens.userProfileId, inboxConfigurations.userProfileId),
-          eq(tokens.type, 'REFRESH'),
-          gt(tokens.expiresAt, sql`NOW()`),
+          eq(userProfiles.id, inboxConfigurations.userProfileId),
+          isNotNull(userProfiles.accessToken),
+          eq(userProfiles.source, 'oauth'),
         ),
       )
       .innerJoin(

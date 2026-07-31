@@ -31,6 +31,7 @@ sharepoint-connector = services/sharepoint-connector/**
 confluence-connector = services/confluence-connector/**
 teams-mcp = services/teams-mcp/**
 temenos-mcp = services/temenos-mcp/**
+hello-mcp = services/hello-mcp/**
 
 # Packages
 aes-gcm-encryption = packages/aes-gcm-encryption/**
@@ -41,6 +42,9 @@ mcp-server-module = packages/mcp-server-module/**
 probe = packages/probe/**
 utils = packages/utils/**
 unique-api = packages/unique-api/**
+
+# Docs
+recordings-and-transcripts = docs/recordings-and-transcripts/**
 
 # Special scopes
 ci = .github/**, .gitcommitizen, biome.json, turbo.json, tsconfig.json, vitest.config.ts, pnpm-workspace.yaml, Makefile, docker-compose.yaml, flake.nix, flake.lock, .dockerignore, .nvmrc, release-please-config.json, .release-please-manifest.json, .syncpackrc.json

@@ -3,7 +3,9 @@
 
 ## User Connection Flow
 
-Everything starts when a user connects to the MCP server. This triggers OAuth authentication. After authentication, the user can start the KB integration via the `start_kb_integration` tool to begin receiving meeting notifications. Alternatively, operators can enable `MICROSOFT_AUTO_START_INGESTION`, in which case every login automatically enqueues a transcript subscription (no tool call required).
+Everything starts when a user connects to the MCP server. This triggers OAuth authentication. Once tokens are stored, the chat and messaging tools are immediately available.
+
+Deployments with transcript capture enabled have an additional per-user step after this flow — creating the Microsoft Graph subscription. See [Recordings & Transcripts — Subscription lifecycle](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#subscription-lifecycle).
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -21,17 +23,9 @@ flowchart LR
         Store["Store encrypted tokens"]
     end
 
-    subgraph Setup["Subscription Setup"]
-        AutoStart["Auto-enqueue subscription (flag on)"]
-        StartTool["User calls start_kb_integration (manual)"]
-        Enqueue["Publish subscription-requested"]
-        CreateSub["Create Graph subscription"]
-        StoreSub["Store subscription record"]
-    end
-
-    subgraph Ready["Ready for Notifications"]
-        Active["Subscription Active"]
-        Listen["Listening for transcripts"]
+    subgraph Ready["Ready"]
+        Issue["Issue opaque MCP tokens"]
+        Tools["Chat and messaging tools available"]
     end
 
     Connect --> MCPEndpoint
@@ -40,14 +34,8 @@ flowchart LR
     Consent --> Callback
     Callback --> Exchange
     Exchange --> Store
-    Store -->|MICROSOFT_AUTO_START_INGESTION on| AutoStart
-    Store -.->|manual| StartTool
-    AutoStart --> Enqueue
-    Enqueue --> CreateSub
-    StartTool --> CreateSub
-    CreateSub --> StoreSub
-    StoreSub --> Active
-    Active --> Listen
+    Store --> Issue
+    Issue --> Tools
 ```
 
 ```mermaid
@@ -58,7 +46,6 @@ sequenceDiagram
     participant MCPClient as MCP Client
     participant TeamsMCP as Teams MCP Server
     participant EntraID as Microsoft Entra ID
-    participant MSGraph as Microsoft Graph API
     participant DB as PostgreSQL
 
     User->>MCPClient: Connect to MCP server
@@ -74,15 +61,7 @@ sequenceDiagram
     TeamsMCP->>DB: Store encrypted Microsoft tokens
     TeamsMCP->>MCPClient: Issue opaque JWT tokens<br/>(MCP access + refresh tokens)
 
-    Note over User,MCPClient: User starts KB integration via tool
-    User->>MCPClient: Call start_kb_integration tool
-    MCPClient->>TeamsMCP: Tool invocation
-    TeamsMCP->>MSGraph: POST /subscriptions<br/>(using Microsoft access token)
-    MSGraph->>TeamsMCP: Subscription created (ID, expiry)
-    TeamsMCP->>DB: Store subscription record
-    TeamsMCP->>MCPClient: Success response
-
-    Note over TeamsMCP: Now listening for meeting transcripts
+    Note over User,MCPClient: Chat and messaging tools are now available
 ```
 
 **OAuth Scopes Required:** See [Microsoft Graph Permissions](./permissions.md) for detailed justification.
@@ -156,197 +135,16 @@ sequenceDiagram
     MW-->>GC: Return success
 ```
 
-## Subscription Lifecycle
+## Transcript Capture Flows
 
-Subscriptions are **renewed** (not recreated) before they expire. If renewal fails for any reason, the subscription is deleted and the user must reconnect to the MCP server to re-authenticate.
+When `UNIQUE_INTEGRATION=enabled`, the server also runs a webhook-driven capture pipeline: a Microsoft Graph subscription per user, lifecycle-notification renewal, and asynchronous transcript and recording ingestion into the Unique knowledge base. Those sequence diagrams live with the feature they belong to:
 
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-stateDiagram-v2
-    [*] --> Creating: User connects to MCP
-
-    Creating --> Active: Subscription created
-    Active --> Renewing: Lifecycle notification<br/>(before expiry)
-    Renewing --> Active: Renewal successful
-    Renewing --> Deleted: Renewal failed
-    Active --> Deleted: User disconnects
-    Deleted --> [*]: User must reconnect
-
-    note right of Creating
-        Creates subscription for:
-        users/{id}/onlineMeetings/getAllTranscripts
-    end note
-
-    note right of Deleted
-        User must reconnect to
-        MCP server and re-authenticate
-    end note
-```
-
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-sequenceDiagram
-    autonumber
-    participant TeamsMCP as Teams MCP Server
-    participant RabbitMQ
-    participant MSGraph as Microsoft Graph API
-    participant DB as PostgreSQL
-
-    Note over TeamsMCP: User connected, subscription active
-
-    rect rgb(200, 230, 200)
-        Note over MSGraph: Before expiry - Lifecycle notification
-        MSGraph->>TeamsMCP: POST /transcript/lifecycle
-        TeamsMCP->>RabbitMQ: Enqueue reauthorization event
-        RabbitMQ->>TeamsMCP: Process reauthorization
-        TeamsMCP->>MSGraph: PATCH /subscriptions/{id} (renew)
-        MSGraph->>TeamsMCP: Subscription renewed
-        TeamsMCP->>DB: Update expiration time
-    end
-
-    rect rgb(255, 200, 200)
-        Note over TeamsMCP: If renewal fails
-        TeamsMCP->>MSGraph: DELETE /subscriptions/{id}
-        TeamsMCP->>DB: Delete subscription record
-        Note over TeamsMCP: User must reconnect to MCP server
-    end
-```
-
-**Subscription Scheduling:**
-
-- Subscriptions are set to expire at a configured UTC hour (default: 3 AM)
-- This batches all renewals to a single time window
-- Daily renewal ensures token validity is checked consistently
-- Minimum 2-hour subscription lifetime required for lifecycle notifications
-- **If renewal fails**: Subscription is deleted and user must reconnect to MCP server
-- See [Microsoft Graph Webhooks - Lifecycle Notifications](https://learn.microsoft.com/en-us/graph/webhooks#lifecycle-notifications) for details
-
-## Transcript Processing Flow
-
-When a meeting transcript becomes available, Microsoft Graph sends a webhook notification. The recording is fetched if available (correlated by `contentCorrelationId`).
-
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-sequenceDiagram
-    autonumber
-    participant MSGraph as Microsoft Graph API
-    participant Controller as Webhook Controller
-    participant RabbitMQ
-    participant Service as Transcript Created Service
-    participant Unique as Unique Platform
-
-    Note over MSGraph: Meeting transcript available
-    MSGraph->>Controller: POST /transcript/notification
-    Controller->>Controller: Validate clientState
-    Controller->>RabbitMQ: Enqueue change notification
-
-    RabbitMQ->>Service: Process transcript.created event
-
-    par Fetch meeting data
-        Service->>MSGraph: GET /onlineMeetings/{id}
-        MSGraph->>Service: Meeting details + participants
-    and Fetch transcript
-        Service->>MSGraph: GET /transcripts/{id}
-        MSGraph->>Service: Transcript metadata
-        Service->>MSGraph: GET /transcripts/{id}/content
-        MSGraph->>Service: VTT content stream
-    end
-
-    opt Recording available
-        Service->>MSGraph: GET /recordings?filter=contentCorrelationId
-        MSGraph->>Service: Recording metadata + stream
-    end
-
-    Service->>Unique: Resolve participants to user IDs
-    Service->>Unique: Create scope (folder)
-    Service->>Unique: Set access permissions
-    Service->>Unique: Upload transcript (VTT)
-
-    opt Recording was fetched
-        Service->>Unique: Upload recording (MP4, SKIP_INGESTION)
-    end
-```
-
-```mermaid
-%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
-flowchart TB
-    subgraph Input["Microsoft Graph Webhook"]
-        Notification["Change Notification"]
-    end
-
-    subgraph Validation["Validation"]
-        ClientState["clientState Validation"]
-    end
-
-    subgraph Queue["Message Queue"]
-        Exchange{{"teams-mcp.exchange"}}
-        DLX{{"Dead Letter Exchange"}}
-    end
-
-    subgraph Processing["Transcript Processing"]
-        FetchMeeting["Fetch Meeting Details"]
-        FetchTranscript["Fetch Transcript Content"]
-        CheckRecording{"Recording<br/>available?"}
-        FetchRecording["Fetch Recording"]
-        SkipRecording["Skip Recording"]
-        ResolveUsers["Resolve Participants"]
-    end
-
-    subgraph Ingestion["Unique Ingestion"]
-        CreateScope["Create Scope"]
-        SetAccess["Set Permissions"]
-        UploadVTT["Upload Transcript"]
-        HasRecording{"Recording<br/>fetched?"}
-        UploadMP4["Upload Recording"]
-        Done["Done"]
-    end
-
-    Notification --> ClientState
-    ClientState -->|Valid| Exchange
-    ClientState -->|Invalid| Reject["Reject Request"]
-
-    Exchange --> FetchMeeting
-    Exchange -.->|Failed| DLX
-
-    FetchMeeting --> FetchTranscript
-    FetchTranscript --> CheckRecording
-    CheckRecording -->|Yes| FetchRecording
-    CheckRecording -->|No| SkipRecording
-    FetchRecording --> ResolveUsers
-    SkipRecording --> ResolveUsers
-
-    ResolveUsers --> CreateScope
-    CreateScope --> SetAccess
-    SetAccess --> UploadVTT
-    UploadVTT --> HasRecording
-    HasRecording -->|Yes| UploadMP4
-    HasRecording -->|No| Done
-    UploadMP4 --> Done
-```
-
-**Webhook Validation:**
-
-- Microsoft Graph sends a `clientState` value with each notification
-- The server validates this matches the secret configured during subscription creation
-- Invalid `clientState` results in request rejection
-
-**Recording Handling:**
-
-- Recording fetch uses `contentCorrelationId` to find the matching recording for a transcript
-- If the recording is not available, only the transcript is captured
-- Recording failures are logged but don't fail transcript processing
-- Recordings are stored with `SKIP_INGESTION` mode (no RAG processing)
-- Both transcript and recording share the same `content_correlation_id` in metadata
-
-**Access Control:**
-
-- Meeting organizer receives **write + read** access
-- Meeting participants receive **read** access
-- Users are resolved by email or username in Unique platform
+- [Ingestion pipeline](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-pipeline)
+- [Subscription lifecycle](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#subscription-lifecycle)
 
 ## Chat Flows
 
-The Chat Module exposes a **synchronous request/response** tool surface. Each tool call is handled inline — there is no queue or background worker. This is distinct from the async webhook/transcript ingestion path above.
+The Chat Module exposes a **synchronous request/response** tool surface. Each tool call is handled inline — there is no queue or background worker, and nothing is stored in Unique.
 
 Each tool targets a chat or channel by id: `list_*` tools return identifiers that the caller passes to subsequent `get_*_messages` or `send_*_message` calls. See also: [Tools Reference](./tools.md).
 
@@ -482,6 +280,7 @@ sequenceDiagram
 - [Architecture](./architecture.md) - System components and infrastructure
 - [Security](./security.md) - Encryption, PKCE, and threat model
 - [Microsoft Graph Permissions](./permissions.md) - Required scopes and least-privilege justification
+- [Recordings & Transcripts - Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual) - Subscription lifecycle and transcript ingestion flows
 
 ## Standard References
 

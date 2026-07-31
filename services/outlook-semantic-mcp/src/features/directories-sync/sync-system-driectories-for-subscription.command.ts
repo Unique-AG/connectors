@@ -1,4 +1,4 @@
-import { createSmeared } from '@unique-ag/utils';
+import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
@@ -63,7 +63,7 @@ export class SyncSystemDirectoriesForSubscriptionCommand {
     if (isNoDelegatesResult(microsoftGraphDirectories)) {
       this.logger.warn({
         userProfileId: userProfile.id,
-        userEmail: createSmeared(userProfile.email),
+        userEmail: smearEmail(createSmeared(userProfile.email)),
         msg: `No delegates found for shared mailbox, skipping directory sync`,
       });
       return;

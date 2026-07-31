@@ -60,7 +60,6 @@ spec:
 | env.OTEL_EXPORTER_PROMETHEUS_PORT | string | `"51346"` |  |
 | env.OTEL_METRICS_EXPORTER | string | `"prometheus"` |  |
 | envVars | list | `[]` | Environment variables from secrets (required secrets listed at bottom of file) |
-| extraEnvCM | list | `["teams-mcp-config"]` | ConfigMap(s) to load environment variables from (must match release name + '-config') |
 | fullnameOverride | string | `"teams-mcp"` |  |
 | grafana.dashboard.enabled | bool | `true` | Enable Grafana dashboard ConfigMap creation |
 | grafana.dashboard.folder | string | `"mcp-servers"` | Grafana folder where the dashboard will be placed |
@@ -69,7 +68,7 @@ spec:
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.registry | string | `"ghcr.io"` |  |
 | image.repository | string | `"unique-ag/connectors/services/teams-mcp"` |  |
-| image.tag | string | `"0.2.22"` |  |
+| image.tag | string | `"0.3.5"` |  |
 | ingress.additionalLabels | object | `{}` | Additional labels for the ingress resource |
 | ingress.annotations | object | `{"konghq.com/plugins":"unique-route-metrics"}` | Annotations for the ingress resource |
 | ingress.enabled | bool | `false` | Enable ingress resource creation |
@@ -84,21 +83,21 @@ spec:
 | internalServices.dependencies.ingestion.servicePort | int | `8091` |  |
 | internalServices.dependents.ingressGateway.name | string | `"gateway"` |  |
 | internalServices.dependents.ingressGateway.namespace | string | `"system"` |  |
-| mcpConfig | object | `{"app":{"selfUrl":"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"},"auth":{"accessTokenExpiresInSeconds":60,"refreshTokenExpiresInSeconds":2592000},"enabled":true,"microsoft":{"autoStartIngestion":false,"clientId":"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"},"unique":{"apiBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.chat) }}/public/","apiVersion":"2023-12-06","ingestionServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}","rootScopeId":"","serviceAuthMode":"cluster_local","serviceExtraHeaders":{},"userFetchConcurrency":5}}` | Configuration for the deployed Teams MCP Server, will be mapped to environment variables Users preferring setting all variables by hand disable the enabled flag and set the extraEnvCM to [] |
+| mcpConfig | object | `{"app":{"selfUrl":"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"},"auth":{"accessTokenExpiresInSeconds":60,"refreshTokenExpiresInSeconds":2592000},"enabled":true,"microsoft":{"clientId":"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"},"unique":{"apiBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.chat) }}/public/","apiVersion":"2023-12-06","autoStartIngestion":false,"ingestionServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}","integration":"enabled","rootScopeId":"","serviceAuthMode":"cluster_local","serviceExtraHeaders":{},"userFetchConcurrency":5}}` | Configuration for the deployed Teams MCP Server, will be mapped to environment variables |
 | mcpConfig.app | object | `{"selfUrl":"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"}` | Application configuration |
 | mcpConfig.app.selfUrl | string | `"{{ fail \"mcpConfig.app.selfUrl is mandatory. Override in your deployment values.\" }}"` | The URL of the MCP Server. Used for OAuth callbacks. The URL must be reachable from the redirect location, e.g. must be publicly accessible. example: https://teams.mcp.unique.app |
 | mcpConfig.auth | object | `{"accessTokenExpiresInSeconds":60,"refreshTokenExpiresInSeconds":2592000}` | Authentication configuration for the MCP server |
 | mcpConfig.auth.accessTokenExpiresInSeconds | int | `60` | Access token expiration time in seconds |
 | mcpConfig.auth.refreshTokenExpiresInSeconds | int | `2592000` | Refresh token expiration time in seconds (default: 30 days) |
-| mcpConfig.enabled | bool | `true` | if disabled, extraEnvCM must be set to [] |
-| mcpConfig.microsoft | object | `{"autoStartIngestion":false,"clientId":"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"}` | Microsoft Graph API configuration |
-| mcpConfig.microsoft.autoStartIngestion | bool | `false` | When enabled, automatically enqueue a transcript subscription for every user at login (skips the start_kb_integration tool). |
+| mcpConfig.microsoft | object | `{"clientId":"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"}` | Microsoft Graph API configuration |
 | mcpConfig.microsoft.clientId | string | `"{{ fail \"mcpConfig.microsoft.clientId is mandatory. Override in your deployment values.\" }}"` | The client ID of the Microsoft App Registration example: 12345678-1234-1234-1234-123456789012 |
-| mcpConfig.unique | object | `{"apiBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.chat) }}/public/","apiVersion":"2023-12-06","ingestionServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}","rootScopeId":"","serviceAuthMode":"cluster_local","serviceExtraHeaders":{},"userFetchConcurrency":5}` | Unique API configuration |
+| mcpConfig.unique | object | `{"apiBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.chat) }}/public/","apiVersion":"2023-12-06","autoStartIngestion":false,"ingestionServiceBaseUrl":"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}","integration":"enabled","rootScopeId":"","serviceAuthMode":"cluster_local","serviceExtraHeaders":{},"userFetchConcurrency":5}` | Unique API configuration |
 | mcpConfig.unique.apiBaseUrl | string | `"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.chat) }}/public/"` | The Public API URL; auto-derived from internalServices.dependencies.chat with /public/ suffix override with an explicit URL when serviceAuthMode is external, e.g. https://gateway.unique.app/public/chat/ |
 | mcpConfig.unique.apiVersion | string | `"2023-12-06"` | The Public API version to use |
+| mcpConfig.unique.autoStartIngestion | bool | `false` | When enabled, automatically enqueue a transcript subscription for every user at login (skips the start_kb_integration tool). |
 | mcpConfig.unique.ingestionServiceBaseUrl | string | `"{{ include \"base.internalService.url\" (dict \"root\" . \"dep\" .Values.internalServices.dependencies.ingestion) }}"` | Base URL for Unique ingestion service; auto-derived from internalServices.dependencies.ingestion override with an explicit URL when serviceAuthMode is external, e.g. https://api.unique.app/ingestion |
-| mcpConfig.unique.rootScopeId | string | (required) | The root scope ID under which to create transcript and recording folders |
+| mcpConfig.unique.integration | string | `"enabled"` | Enable Unique knowledge-base integration (transcript ingestion). When disabled, chat tools work without Unique/Zitadel configuration. possible values: enabled, disabled |
+| mcpConfig.unique.rootScopeId | string | (required when integration=enabled) | The root scope ID under which to create transcript and recording folders Required when integration is enabled |
 | mcpConfig.unique.serviceAuthMode | string | `"cluster_local"` | Authentication mode for Unique API services possible values: cluster_local, external cluster_local: communicates using in-cluster URLs with service headers external: communicates using external URLs with app key authentication |
 | mcpConfig.unique.serviceExtraHeaders | object | `{}` | Extra headers to send with requests to Unique API services (JSON string) For cluster_local mode: '{"x-company-id": "...", "x-user-id": "..."}' |
 | mcpConfig.unique.userFetchConcurrency | int | `5` | Concurrency limit for fetching users when resolving scope accesses |
@@ -168,4 +167,3 @@ spec:
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)
-
