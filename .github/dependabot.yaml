@@ -13,9 +13,6 @@ updates:
           - minor
           - patch
 
-  # Service Dockerfiles. Same cadence as the docker-base rebuilds in the platform
-  # monorepo (Friday morning), so base image patches and connectors patches land in
-  # the same review slot.
   - package-ecosystem: docker
     directories:
       - services/**/*
@@ -26,47 +23,17 @@ updates:
       day: friday
       time: "06:00"
       timezone: Europe/Berlin
-    # `dependencies` must stay, the gatekeeper workflow skips PR title validation on it.
-    # `dependabot-docker` is the filter label for base image reviews.
     labels:
       - dependencies
       - dependabot-docker
-    # One PR for all seven services instead of one per directory, which would blow
-    # through open-pull-requests-limit on a single node bump.
     groups:
       service-base-images:
         patterns:
           - "*"
-    # Node majors are a deliberate decision (new base image line in docker-base),
-    # never an automated PR. Patch and minor inside the pinned major flow normally.
     ignore:
       - dependency-name: node
         update-types:
           - version-update:semver-major
-    # Freeze each PR on the digest it had when opened, so "wait N days before merging"
-    # actually ages the artifact under review instead of silently re-pointing it.
-    rebase-strategy: disabled
-
-  # Local development and demo compose files (postgres, rabbitmq, otel-lgtm). Separate
-  # ecosystem from `docker`, which only reads Dockerfiles, so these were unmanaged.
-  - package-ecosystem: docker-compose
-    directories:
-      - /
-      - services/**/*
-    cooldown:
-      default-days: 3
-    schedule:
-      interval: weekly
-      day: friday
-      time: "06:00"
-      timezone: Europe/Berlin
-    labels:
-      - dependencies
-      - dependabot-docker
-    groups:
-      compose-images:
-        patterns:
-          - "*"
     rebase-strategy: disabled
 
   - package-ecosystem: helm
