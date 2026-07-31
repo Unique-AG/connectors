@@ -1,4 +1,4 @@
-name: "[kb-search-mcp] Manual Release Re-Run"
+name: "[kb-mcp] Manual Release Re-Run"
 
 permissions:
   contents: read
@@ -18,6 +18,6 @@ jobs:
     uses: ./.github/workflows/_template-cd.yaml
     secrets: inherit
     with:
-      service-name: kb-search-mcp
+      service-name: kb-mcp
       service-version: ${{ inputs.existing-version }}
-      dockerfile: services/kb-search-mcp/deploy/Dockerfile
+      dockerfile: services/kb-mcp/deploy/Dockerfile

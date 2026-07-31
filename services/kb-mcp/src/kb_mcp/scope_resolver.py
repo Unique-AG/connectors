@@ -9,7 +9,7 @@ from unique_toolkit.app.unique_settings import UniqueSettings
 from unique_toolkit.content.functions import search_contents_async
 from unique_toolkit.content.schemas import ContentChunk
 
-from kb_search.references import scope_id_from_chunk, scope_id_from_metadata
+from kb_mcp.references import scope_id_from_chunk, scope_id_from_metadata
 
 _LOGGER = logging.getLogger(__name__)
 

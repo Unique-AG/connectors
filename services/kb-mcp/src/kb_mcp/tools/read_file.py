@@ -30,8 +30,8 @@ from unique_toolkit.content.functions import (
 from unique_toolkit.content.schemas import Content, ContentChunk
 from unique_toolkit.content.utils import sort_content_chunks
 
-from kb_search.references import file_reference_url, markdown_citation_link
-from kb_search.settings import KbSearchServerSettings
+from kb_mcp.references import file_reference_url, markdown_citation_link
+from kb_mcp.settings import KbMcpServerSettings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ def _with_reference_header(result: CallToolResult, content: Content) -> CallTool
     url = file_reference_url(
         content.id,
         metadata=content.metadata,
-        frontend_base_url=KbSearchServerSettings().frontend_base_url_str(),
+        frontend_base_url=KbMcpServerSettings().frontend_base_url_str(),
     )
     header = markdown_citation_link(content.title or content.key, url)
     first.text = f"{header}\n\n{first.text}"

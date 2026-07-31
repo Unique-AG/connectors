@@ -29,14 +29,14 @@ from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchService,
 )
 
-from kb_search.config import SearchToolConfig
-from kb_search.references import (
+from kb_mcp.config import SearchToolConfig
+from kb_mcp.references import (
     REFERENCE_FORMAT_INFORMATION,
     chunk_to_text_content,
     citation_instruction_content,
 )
-from kb_search.scope_resolver import resolve_scope_ids
-from kb_search.settings import KbSearchServerSettings
+from kb_mcp.scope_resolver import resolve_scope_ids
+from kb_mcp.settings import KbMcpServerSettings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ async def search(
             isError=True, content=[TextContent(type="text", text=str(exc))]
         )
 
-    frontend_base_url = KbSearchServerSettings().frontend_base_url_str()
+    frontend_base_url = KbMcpServerSettings().frontend_base_url_str()
     scope_by_content_id: dict[str, str] = {}
     if frontend_base_url and chunks:
         try:

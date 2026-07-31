@@ -30,8 +30,8 @@ from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
     AsyncTTLCache,
 )
 
-from kb_search.references import file_reference_url, markdown_citation_link
-from kb_search.settings import KbSearchServerSettings
+from kb_mcp.references import file_reference_url, markdown_citation_link
+from kb_mcp.settings import KbMcpServerSettings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -315,7 +315,7 @@ async def content_tree(
                 ]
             effective_limit = limit if limit is not None else config.default_limit
             rows = rows[:effective_limit]
-            frontend_base_url = KbSearchServerSettings().frontend_base_url_str()
+            frontend_base_url = KbMcpServerSettings().frontend_base_url_str()
             lines = [
                 f"{_file_link(content_info, segments, frontend_base_url)} "
                 f"(content_id={content_info.id})"
@@ -338,7 +338,7 @@ async def content_tree(
             metadata_filter=metadata_filter,
             max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
         )
-        frontend_base_url = KbSearchServerSettings().frontend_base_url_str()
+        frontend_base_url = KbMcpServerSettings().frontend_base_url_str()
         lines = [
             f"{_file_link(m.content_info, m.path_segments, frontend_base_url)} "
             f"(score={m.score:.2f}, content_id={m.content_info.id})"

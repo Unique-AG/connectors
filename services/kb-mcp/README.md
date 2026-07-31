@@ -1,4 +1,4 @@
-# kb-search-mcp
+# kb-mcp
 
 Knowledge Base Search MCP — search Unique knowledge bases, browse the content
 tree, and read files. Migrated from `unique-ag/ai` tutorials (`mcp_search`).
@@ -9,11 +9,11 @@ KB APIs come from [`unique-toolkit`](https://pypi.org/project/unique-toolkit/).
 ## Run locally
 
 ```bash
-cd services/kb-search-mcp
+cd services/kb-mcp
 cp .env.example .env
 # fill in Unique + Zitadel credentials, then:
 uv sync
-uv run kb-search-mcp
+uv run kb-mcp
 ```
 
 HTTP MCP on `/mcp`, probe on `GET /probe`. Bind URL is `UNIQUE_MCP_LOCAL_BASE_URL`
@@ -38,6 +38,6 @@ uv run basedpyright
 ## Deploy
 
 Same path as other connectors Python services: Dockerfile under `deploy/`, Helm
-chart under `deploy/helm-charts/kb-search-mcp`, release-please + CD template.
+chart under `deploy/helm-charts/kb-mcp`, release-please + CD template.
 Secrets are injected via `envVars` (Argo overlay), not baked into chart defaults.
 Exposure uses Gateway API routes (no custom Ingress), matching `hello-mcp`.

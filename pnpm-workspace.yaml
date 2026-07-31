@@ -1,7 +1,7 @@
 packages:
   - services/*
   - "!services/hello-mcp"
-  - "!services/kb-search-mcp"
+  - "!services/kb-mcp"
   - packages/*
 
 injectWorkspacePackages: true

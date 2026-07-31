@@ -5,4 +5,4 @@ __pycache__/
 .env
 *.egg-info/
 dist/
-deploy/helm-charts/kb-search-mcp/charts/
+deploy/helm-charts/kb-mcp/charts/

@@ -14,7 +14,7 @@ from unique_mcp.auth.zitadel.oidc_proxy import (
 from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
 from unique_mcp.settings import ServerSettings
 
-from kb_search.references import SERVER_CITATION_INSTRUCTIONS
+from kb_mcp.references import SERVER_CITATION_INSTRUCTIONS
 
 
 def main() -> None:

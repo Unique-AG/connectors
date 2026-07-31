@@ -1,10 +1,10 @@
-"""kb_search-specific server settings (extends unique_mcp ServerSettings)."""
+"""kb_mcp-specific server settings (extends unique_mcp ServerSettings)."""
 
 from pydantic import Field, HttpUrl
 from unique_mcp.settings import ServerSettings
 
 
-class KbSearchServerSettings(ServerSettings):
+class KbMcpServerSettings(ServerSettings):
     """ServerSettings plus optional frontend origin for knowledge-upload deep links."""
 
     frontend_base_url: HttpUrl | None = Field(

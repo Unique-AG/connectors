@@ -123,23 +123,23 @@
         }
       ]
     },
-    "services/kb-search-mcp": {
+    "services/kb-mcp": {
       "release-type": "python",
-      "component": "kb-search-mcp",
+      "component": "kb-mcp",
       "extra-files": [
         {
           "type": "yaml",
-          "path": "deploy/helm-charts/kb-search-mcp/Chart.yaml",
+          "path": "deploy/helm-charts/kb-mcp/Chart.yaml",
           "jsonpath": "$.version"
         },
         {
           "type": "yaml",
-          "path": "deploy/helm-charts/kb-search-mcp/Chart.yaml",
+          "path": "deploy/helm-charts/kb-mcp/Chart.yaml",
           "jsonpath": "$.appVersion"
         },
         {
           "type": "generic",
-          "path": "deploy/helm-charts/kb-search-mcp/values.yaml"
+          "path": "deploy/helm-charts/kb-mcp/values.yaml"
         }
       ]
     }

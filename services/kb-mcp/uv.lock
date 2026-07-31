@@ -1055,7 +1055,7 @@ wheels = [
 ]
 
 [[package]]
-name = "kb-search-mcp"
+name = "kb-mcp"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
