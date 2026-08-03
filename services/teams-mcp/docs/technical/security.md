@@ -244,7 +244,7 @@ If rotation becomes necessary, it would require:
 3. Having all users reconnect to MCP server to trigger subscription recreation
 4. Updating Kubernetes secret and deploying
 
-**Important:** Recreation may miss transcripts created during the gap between deletion and recreation. See [Recordings & Transcripts — Why are subscriptions renewed instead of recreated?](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535129116/Recordings+Transcripts+-+FAQ#why-are-subscriptions-renewed-instead-of-recreated) for details.
+**Important:** Recreation may miss transcripts created during the gap between deletion and recreation. See [Recordings & Transcripts — Why are subscriptions renewed instead of recreated?](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535129116/Recordings+Transcripts+-+FAQ#Why-are-subscriptions-renewed-instead-of-recreated?) for details.
 
 ## Security Checklist for Operators
 

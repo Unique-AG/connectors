@@ -219,7 +219,7 @@ Because every read is a normal knowledge-base read, standard access control appl
 
 ## Subscription lifecycle
 
-A Microsoft Graph webhook subscription must be active for meetings to be captured automatically. The server manages the whole lifecycle and exposes it through the tools described in [Ingestion tools](#ingestion-tools).
+A Microsoft Graph webhook subscription must be active for meetings to be captured automatically. The server manages the whole lifecycle and exposes it through the tools described in [Ingestion tools](#Ingestion-tools).
 
 !!! note "Transcripts only"
     This subscription covers meeting transcript capture. Teams chat and channel messages are read live through Microsoft Graph and are never subscribed to or ingested. The `ingest_meeting` tool does not require a subscription — it pulls a single meeting's transcript on demand.
@@ -363,7 +363,7 @@ Check whether automatic capture is active, expiring soon, expired, or not config
 
 **Input parameters:** None
 
-**Returns:** `status` (`active` \| `expiring_soon` \| `expired` \| `not_configured`), a `message`, and `subscription` (`id`, `expiresAt`, `minutesUntilExpiration`, `createdAt`, `updatedAt` — or `null` when not configured). See [Status](#status) for the meaning of each value.
+**Returns:** `status` (`active` \| `expiring_soon` \| `expired` \| `not_configured`), a `message`, and `subscription` (`id`, `expiresAt`, `minutesUntilExpiration`, `createdAt`, `updatedAt` — or `null` when not configured). See [Status](#Status) for the meaning of each value.
 
 ### `start_kb_integration`
 

@@ -160,7 +160,7 @@ https://<your-domain>/auth/callback
 
 ### What happens if I change the webhook secret?
 
-**Answer:** Rotation is currently not possible, because every existing transcript subscription carries the old value. This only affects deployments with transcript capture enabled — see [Recordings & Transcripts — FAQ](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535129116/Recordings+Transcripts+-+FAQ#what-happens-if-the-webhook-secret-changes).
+**Answer:** Rotation is currently not possible, because every existing transcript subscription carries the old value. This only affects deployments with transcript capture enabled — see [Recordings & Transcripts — FAQ](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535129116/Recordings+Transcripts+-+FAQ#What-happens-if-the-webhook-secret-changes?).
 
 ## Architecture & Design
 
@@ -253,7 +253,7 @@ Hashing reduces attack surface (no decryption key needed for MCP tokens), while 
 
 ## Webhooks & Processing
 
-Webhooks are only used by meeting transcript capture. A chat-only deployment exposes no webhook endpoint and needs no RabbitMQ. For the queue, dead-letter handling, and processing pipeline, see [Recordings & Transcripts — Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-pipeline).
+Webhooks are only used by meeting transcript capture. A chat-only deployment exposes no webhook endpoint and needs no RabbitMQ. For the queue, dead-letter handling, and processing pipeline, see [Recordings & Transcripts — Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Ingestion-pipeline).
 
 ### How does webhook validation work?
 

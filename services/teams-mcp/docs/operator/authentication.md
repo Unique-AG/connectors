@@ -43,12 +43,12 @@ https://login.microsoftonline.com/organizations/v2.0/adminconsent?client_id=7c4f
 
 After approving, you are redirected to a Unique confirmation page.
 
-The consent prompt lists the [Required Permissions](#required-permissions) above, of which `ChannelMessage.Read.All` is the one that needs admin consent. Without it, users will see an error when trying to connect.
+The consent prompt lists the [Required Permissions](#Required-Permissions) above, of which `ChannelMessage.Read.All` is the one that needs admin consent. Without it, users will see an error when trying to connect.
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `7c4f0aab-b24e-48c4-9b2d-d1c22dfdf99f`.
 
 !!! note "Transcript capture uses a different app registration"
-    The URL above consents to the chat-only app. A deployment with `UNIQUE_INTEGRATION=enabled` runs on its own app registration, which additionally requests the meeting-content scopes — grant consent for it with the URL in [Recordings & Transcripts — Grant admin consent](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual#grant-admin-consent).
+    The URL above consents to the chat-only app. A deployment with `UNIQUE_INTEGRATION=enabled` runs on its own app registration, which additionally requests the meeting-content scopes — grant consent for it with the URL in [Recordings & Transcripts — Grant admin consent](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual#Grant-admin-consent).
 
 ## Self-Hosted
 
@@ -91,7 +91,7 @@ module "teams_mcp_app" {
    - **Redirect URI**: Web — `https://teams.mcp.example.com/auth/callback`
 
 2. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
-   - Add all permissions listed under [Required Permissions](#required-permissions)
+   - Add all permissions listed under [Required Permissions](#Required-Permissions)
 
 3. Click **Grant admin consent for [Tenant]** and confirm.
    Chat-only deployments only need admin consent for `ChannelMessage.Read.All`. With transcript capture enabled, `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All` need it too.

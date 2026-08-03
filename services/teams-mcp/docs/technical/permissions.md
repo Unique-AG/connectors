@@ -22,7 +22,7 @@ These are all the scopes a Teams MCP server requests. Only one of them, `Channel
 No calendar, meeting, transcript, or recording scope is requested. The server reads and sends chat and channel messages, and nothing else.
 
 !!! note "Deployments with transcript capture request more"
-    Setting `UNIQUE_INTEGRATION=enabled` adds four calendar and meeting scopes on top of this set, two of which need admin consent. They are documented with the feature that uses them — see [Recordings & Transcripts — Required Microsoft Graph permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#required-microsoft-graph-permissions).
+    Setting `UNIQUE_INTEGRATION=enabled` adds four calendar and meeting scopes on top of this set, two of which need admin consent. They are documented with the feature that uses them — see [Recordings & Transcripts — Required Microsoft Graph permissions](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Required-Microsoft-Graph-permissions).
 
 ## Understanding Consent Requirements
 

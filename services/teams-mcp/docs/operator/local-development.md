@@ -124,7 +124,7 @@ openssl rand -hex 32
 
 ## Webhook Testing
 
-Webhooks only apply to meeting transcript capture — see the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-pipeline) for what the pipeline does with them.
+Webhooks only apply to meeting transcript capture — see the [Recordings & Transcripts Technical Manual](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Ingestion-pipeline) for what the pipeline does with them.
 
 Microsoft Graph webhooks require a publicly accessible HTTPS endpoint. For local development, use Azure Dev Tunnels:
 
