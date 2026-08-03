@@ -105,7 +105,11 @@ def _parse_error_detail(response: httpx.Response) -> _JsonApiError | None:
 
 
 def _fallback_message(response: httpx.Response) -> str:
-    logger.debug("backstop.error_body.unparseable", body=response.text)
+    logger.debug(
+        "backstop.error_body.unparseable",
+        status_code=response.status_code,
+        body_length=len(response.content),
+    )
     return f"Backstop returned status {response.status_code} with an unparseable response body"
 
 

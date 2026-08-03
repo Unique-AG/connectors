@@ -345,8 +345,8 @@ class BackstopClient:
         logger.debug("backstop.request.start", method=method, path=path)
         try:
             response: httpx.Response = await retrying(make_request)
-        except Exception as exc:
-            logger.error("backstop.request.failed", method=method, path=path, error=str(exc))
+        except Exception:
+            logger.exception("backstop.request.failed", method=method, path=path)
             raise
         return response
 

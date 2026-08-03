@@ -257,25 +257,41 @@ class BackstopOAuthProvider(OAuthProvider):
         refresh_token = secrets.token_urlsafe(32)
         now = datetime.now(UTC)
 
+        # Same frozen-dataclass-exception caveat as `exchange_refresh_token` below: decide,
+        # then raise/return only after the session block has closed.
+        already_consumed = False
+
         async with get_session(self._session_factory) as session:
-            session.add(
-                OAuthTokenRow(
-                    family_id=uuid.uuid4(),
-                    access_token_hash=_hash_token(access_token),
-                    refresh_token_hash=_hash_token(refresh_token),
-                    client_id=client.client_id,
-                    scopes=authorization_code.scopes,
-                    resource=authorization_code.resource,
-                    subject=authorization_code.subject,
-                    access_token_expires_at=now + self.ACCESS_TOKEN_TTL,
-                    refresh_token_expires_at=now + self.REFRESH_TOKEN_TTL,
-                )
-            )
-            # Authorization codes are single-use.
-            await session.execute(
+            # Authorization codes are single-use. `DELETE ... WHERE code = ...` claims the
+            # row atomically — under concurrent exchanges of the same code, only one
+            # transaction's delete affects a row; the other sees `rowcount == 0` and must
+            # not mint a token pair.
+            result = await session.execute(
                 delete(AuthorizationCodeRow).where(
                     AuthorizationCodeRow.code == authorization_code.code
                 )
+            )
+            if result.rowcount == 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+                already_consumed = True
+            else:
+                session.add(
+                    OAuthTokenRow(
+                        family_id=uuid.uuid4(),
+                        access_token_hash=_hash_token(access_token),
+                        refresh_token_hash=_hash_token(refresh_token),
+                        client_id=client.client_id,
+                        scopes=authorization_code.scopes,
+                        resource=authorization_code.resource,
+                        subject=authorization_code.subject,
+                        access_token_expires_at=now + self.ACCESS_TOKEN_TTL,
+                        refresh_token_expires_at=now + self.REFRESH_TOKEN_TTL,
+                    )
+                )
+
+        if already_consumed:
+            raise TokenError(
+                error="invalid_grant",
+                error_description="Authorization code has already been used",
             )
 
         return OAuthTokenResponse(
@@ -299,9 +315,15 @@ class BackstopOAuthProvider(OAuthProvider):
             )
             row = result.scalar_one_or_none()
 
-        if row is None or row.client_id != client.client_id or row.revoked_at is not None:
+        if row is None or row.client_id != client.client_id:
             return None
 
+        # Deliberately NOT gating on `row.revoked_at` here: an already-rotated-away row is
+        # exactly the "someone is replaying a stolen refresh token" case, and
+        # `exchange_refresh_token` below is what detects that and revokes the token family.
+        # Returning `None` for revoked rows would make the real token-exchange handler reject
+        # the request as "unknown" before `exchange_refresh_token` ever runs, leaving reuse
+        # detection dead code.
         return RefreshToken(
             token=refresh_token,
             client_id=row.client_id,
@@ -331,6 +353,7 @@ class BackstopOAuthProvider(OAuthProvider):
         # `raise`/`return` happens after the session block has closed.
         reused = False
         unknown = False
+        expired = False
         invalid_scope = False
         new_access_token = ""
         new_refresh_token = ""
@@ -355,30 +378,59 @@ class BackstopOAuthProvider(OAuthProvider):
                     )
                     .values(revoked_at=now)
                 )
+            elif row.refresh_token_expires_at is not None and row.refresh_token_expires_at < now:
+                # Enforced here too (not just by the caller) so this holds regardless of
+                # which entry point reaches `exchange_refresh_token`.
+                expired = True
             else:
                 # Refresh may only keep or narrow the originally granted scopes — never widen.
                 if scopes and not set(scopes).issubset(row.scopes):
                     invalid_scope = True
                 else:
-                    new_access_token = secrets.token_urlsafe(32)
-                    new_refresh_token = secrets.token_urlsafe(32)
-                    effective_scopes = scopes or row.scopes
-
-                    row.revoked_at = now
-                    session.add(
-                        OAuthTokenRow(
-                            family_id=row.family_id,
-                            access_token_hash=_hash_token(new_access_token),
-                            refresh_token_hash=_hash_token(new_refresh_token),
-                            client_id=row.client_id,
-                            scopes=effective_scopes,
-                            resource=row.resource,
-                            subject=row.subject,
-                            access_token_expires_at=now + self.ACCESS_TOKEN_TTL,
-                            refresh_token_expires_at=now + self.REFRESH_TOKEN_TTL,
-                            rotated_from=row.id,
+                    # Claim the row atomically before minting replacement tokens: an
+                    # `UPDATE ... WHERE revoked_at IS NULL` only ever succeeds for one of two
+                    # concurrent refreshes of the same token. Mutating `row.revoked_at` via the
+                    # ORM instead (load-then-write) would let both concurrent requests believe
+                    # they won, minting two valid descendants from one token.
+                    claim = await session.execute(
+                        update(OAuthTokenRow)
+                        .where(
+                            OAuthTokenRow.id == row.id,
+                            OAuthTokenRow.revoked_at.is_(None),
                         )
+                        .values(revoked_at=now)
                     )
+                    if claim.rowcount == 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+                        # Lost the race to another concurrent refresh of the same token —
+                        # treat exactly like replaying an already-rotated token.
+                        reused = True
+                        await session.execute(
+                            update(OAuthTokenRow)
+                            .where(
+                                OAuthTokenRow.family_id == row.family_id,
+                                OAuthTokenRow.revoked_at.is_(None),
+                            )
+                            .values(revoked_at=now)
+                        )
+                    else:
+                        new_access_token = secrets.token_urlsafe(32)
+                        new_refresh_token = secrets.token_urlsafe(32)
+                        effective_scopes = scopes or row.scopes
+
+                        session.add(
+                            OAuthTokenRow(
+                                family_id=row.family_id,
+                                access_token_hash=_hash_token(new_access_token),
+                                refresh_token_hash=_hash_token(new_refresh_token),
+                                client_id=row.client_id,
+                                scopes=effective_scopes,
+                                resource=row.resource,
+                                subject=row.subject,
+                                access_token_expires_at=now + self.ACCESS_TOKEN_TTL,
+                                refresh_token_expires_at=now + self.REFRESH_TOKEN_TTL,
+                                rotated_from=row.id,
+                            )
+                        )
 
         if unknown:
             raise TokenError(error="invalid_grant", error_description="Unknown refresh token")
@@ -387,6 +439,8 @@ class BackstopOAuthProvider(OAuthProvider):
                 error="invalid_grant",
                 error_description="Refresh token has already been used",
             )
+        if expired:
+            raise TokenError(error="invalid_grant", error_description="Refresh token has expired")
         if invalid_scope:
             raise TokenError(
                 error="invalid_scope",

@@ -14,7 +14,7 @@ class NotConnectedError(ToolError):
     """Raised when the caller isn't authenticated, or has no Backstop credential on file.
 
     Surfaced to the MCP client as a tool error telling them to (re)connect this server —
-    see `docs/plans/2026-07-27-backstop-mcp-scaffold-design.md` for the login flow this refers to.
+    see `auth/provider.py` for the login flow this refers to.
     """
 
 
