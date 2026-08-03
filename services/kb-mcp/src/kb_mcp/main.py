@@ -5,14 +5,15 @@ from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.requests import Request
-from starlette.responses import JSONResponse
 from unique_mcp.auth.zitadel.oidc_proxy import (
     ZitadelOIDCProxySettings,
     create_zitadel_oidc_proxy,
 )
 from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
+from unique_mcp.logging import configure_logging
+from unique_mcp.monitoring import setup_ops
 from unique_mcp.settings import ServerSettings
+from unique_toolkit.monitoring import configure_tracing
 
 from kb_mcp.references import SERVER_CITATION_INSTRUCTIONS
 
@@ -22,6 +23,9 @@ def main() -> None:
     # own names — loading into the process env covers all of them).
     # override=True so service .env wins over stale shell UNIQUE_MCP_* exports.
     load_dotenv(Path.cwd() / ".env", override=True)
+    # Opt-in via OTEL_* (e.g. OTEL_TRACES_EXPORTER=console locally).
+    configure_tracing(service_name="kb-mcp")
+    configure_logging()
 
     server_settings = ServerSettings()
 
@@ -45,10 +49,6 @@ def main() -> None:
         providers=[FileSystemProvider(Path(__file__).parent / "tools")],
     )
 
-    @mcp.custom_route("/probe", methods=["GET"])
-    async def probe(_request: Request) -> JSONResponse:
-        return JSONResponse({"status": "ok"})
-
     middleware = [
         Middleware(
             CORSMiddleware,
@@ -56,7 +56,9 @@ def main() -> None:
             allow_origins=["*"],
             allow_methods=["*"],
             allow_headers=["*"],
-        )
+        ),
+        # HTTP Prometheus metrics; MCP tool spans come from FastMCP + configure_tracing.
+        setup_ops(mcp),
     ]
 
     # FastMCP Host allowlist (DNS-rebinding guard). Use PUBLIC host when set

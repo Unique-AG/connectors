@@ -8,9 +8,9 @@ dependencies = [
     "pydantic==2.12.5",
     "python-dotenv==1.2.1",
     "tiktoken==0.12.0",
-    "unique-mcp==2026.32.0rc1",
-    "unique-toolkit==2026.32.0rc1",
-    "unique-sdk==2026.32.0rc1",
+    "unique-mcp==2026.34.0.dev3",
+    "unique-toolkit[monitoring,otel]==2026.34.0.dev5",
+    "unique-sdk==2026.34.0.dev2",
 ]
 
 [project.scripts]
