@@ -1,4 +1,5 @@
 from typing import ClassVar, Literal
+from urllib.parse import quote
 
 from fastmcp import Context
 from pydantic import BaseModel, ConfigDict
@@ -66,7 +67,7 @@ async def get_organization(
 
         party = result.party
         document = await client.get(
-            f"/organizations/{party.id}",
+            f"/organizations/{quote(party.id, safe='')}",
             schema=BackstopApiDocument[OrganizationAttributes],
         )
 

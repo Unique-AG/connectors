@@ -42,6 +42,12 @@ def _normalize_party_id_or_search(
     normalized_search = (search or "").strip() or None
     if (normalized_party_id is None) == (normalized_search is None):
         raise ValueError("Exactly one of party_id or search must be provided")
+    # `party_id` is a caller-trusted shortcut that skips any existence check and later gets
+    # interpolated into a Backstop request path (e.g. `/organizations/{id}`) — reject a
+    # value containing '/' so a crafted party_id can't redirect the request to an
+    # unintended path/endpoint.
+    if normalized_party_id is not None and "/" in normalized_party_id:
+        raise ValueError(f"party_id {normalized_party_id!r} must not contain '/'")
     return normalized_party_id, normalized_search
 
 

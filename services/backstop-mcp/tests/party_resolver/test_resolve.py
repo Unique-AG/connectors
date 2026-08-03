@@ -396,6 +396,19 @@ class TestInvalidArgs:
                 search_type="organizations",
             )
 
+    @pytest.mark.asyncio
+    async def test_rejects_party_id_containing_slash(self, client: BackstopClient) -> None:
+        # A trusted party_id is never existence-checked and later gets interpolated into a
+        # request path (e.g. `/organizations/{id}`) — a '/' could redirect that request to
+        # an unintended path/endpoint, so it's rejected here rather than trusted blindly.
+        with pytest.raises(ValueError, match="must not contain '/'"):
+            await resolve_party(
+                ctx_never_elicit(),
+                client,
+                search_type="organizations",
+                party_id="../admin",
+            )
+
     def test_party_resolve_item_rejects_both(self) -> None:
         with pytest.raises(ValueError, match="Exactly one of party_id or search"):
             PartyResolveItem(party_id="o1", search="Capstone")

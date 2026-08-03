@@ -166,6 +166,52 @@ class TestGetOrganization:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_trusted_party_id_is_percent_encoded_in_request_path(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Defense in depth alongside the '/' rejection in resolve.py: any character that
+        # could otherwise change the request's structure (here, a space) must be encoded
+        # rather than interpolated raw into the path.
+        await _connect_user(db, "user-org-5", "org-frank.oz", "token-5")
+        monkeypatch.setattr(
+            "backstop_mcp.auth.context.get_access_token",
+            lambda: _fake_access_token("user-org-5"),
+        )
+        monkeypatch.setenv("BACKSTOP_BASE_URL", BASE_URL)
+
+        org_body = {
+            "data": {
+                "type": "organizations",
+                "id": "trusted 9",
+                "attributes": {"name": "From Body"},
+            }
+        }
+        org_get = respx.get(f"{BASE_URL}/organizations/trusted%209").mock(
+            return_value=httpx.Response(200, json=org_body)
+        )
+
+        result = await get_organization(ctx_never_elicit(), party_id="trusted 9")
+
+        assert isinstance(result, OrganizationResolvedResponse)
+        assert org_get.call_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_trusted_party_id_containing_slash_is_rejected(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        await _connect_user(db, "user-org-6", "org-grace.hopper", "token-6")
+        monkeypatch.setattr(
+            "backstop_mcp.auth.context.get_access_token",
+            lambda: _fake_access_token("user-org-6"),
+        )
+        monkeypatch.setenv("BACKSTOP_BASE_URL", BASE_URL)
+
+        with pytest.raises(ValueError, match="must not contain '/'"):
+            await get_organization(ctx_never_elicit(), party_id="../admin")
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_malformed_organization_body_raises_schema_error(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
