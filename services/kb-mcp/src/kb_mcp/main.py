@@ -49,10 +49,11 @@ def main() -> None:
         providers=[FileSystemProvider(Path(__file__).parent / "tools")],
     )
 
+    # Bearer auth (Authorization header) — no cookies, so no allow_credentials.
+    # Wildcard + credentials would reflect any Origin (credentialed CORS hole).
     middleware = [
         Middleware(
             CORSMiddleware,
-            allow_credentials=True,
             allow_origins=["*"],
             allow_methods=["*"],
             allow_headers=["*"],

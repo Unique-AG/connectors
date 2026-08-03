@@ -43,8 +43,8 @@ async def resolve_scope_ids(
     if not missing:
         return resolved
 
-    user_id = settings.auth.get_confidential_user_id()
-    company_id = settings.auth.get_confidential_company_id()
+    user_id = settings.authcontext.get_confidential_user_id()
+    company_id = settings.authcontext.get_confidential_company_id()
     semaphore = asyncio.Semaphore(_LOOKUP_CONCURRENCY)
 
     async def _lookup(content_id: str) -> tuple[str, str | None]:
