@@ -1,10 +1,34 @@
 import httpx
+from pydantic import BaseModel, ValidationError
 
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
     BackstopRateLimitError,
+    BackstopResponseSchemaError,
     parse_json_api_error,
 )
+
+
+class _Schema(BaseModel):
+    name: str
+
+
+class TestBackstopResponseSchemaError:
+    def test_message_includes_path_and_schema_name(self) -> None:
+        try:
+            _Schema.model_validate({})
+        except ValidationError as exc:
+            cause = exc
+        else:
+            raise AssertionError("expected ValidationError")
+
+        error = BackstopResponseSchemaError("/parties/123", _Schema.__name__, cause)
+
+        assert error.path == "/parties/123"
+        assert error.schema_name == "_Schema"
+        assert error.cause is cause
+        assert "/parties/123" in str(error)
+        assert "_Schema" in str(error)
 
 
 class TestParseJsonApiErrorWellFormed:

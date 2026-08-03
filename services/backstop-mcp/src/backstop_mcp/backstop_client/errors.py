@@ -70,6 +70,30 @@ class BackstopRateLimitError(BackstopApiError):
         self.retry_after_seconds = retry_after_seconds
 
 
+class BackstopResponseSchemaError(ToolError):
+    """Raised when a successful Backstop response body fails caller-supplied schema validation.
+
+    Unlike `BackstopApiError`, this isn't an HTTP-level failure — the request succeeded,
+    but the response body doesn't match the shape the caller expected. Wraps the underlying
+    `pydantic.ValidationError` as `cause`, along with the request `path` and `schema_name`,
+    so the failure can be logged with enough context to diagnose (today it isn't logged at all).
+    """
+
+    path: str
+    schema_name: str
+    cause: ValidationError
+
+    def __init__(self, path: str, schema_name: str, cause: ValidationError) -> None:
+        message = (
+            f"Backstop response for {path!r} failed schema validation "
+            + f"against {schema_name!r}: {cause}"
+        )
+        super().__init__(message)
+        self.path = path
+        self.schema_name = schema_name
+        self.cause = cause
+
+
 def _parse_error_detail(response: httpx.Response) -> _JsonApiError | None:
     try:
         body = _ERROR_BODY_ADAPTER.validate_json(response.content)
