@@ -5,7 +5,7 @@ import time
 import httpx
 import pytest
 import respx
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, SecretStr, ValidationError
 
 from backstop_mcp.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.backstop_client import (
@@ -18,6 +18,8 @@ from backstop_mcp.backstop_client import (
     GetRequest,
     PageResult,
     PaginateRequest,
+    PatchRequest,
+    PostRequest,
     build_auth_headers,
     create_backstop_client,
     verify_credential,
@@ -331,59 +333,215 @@ class _Record(BaseModel):
     id: str
 
 
+class _Widget(BaseModel):
+    id: str
+    label: str
+
+
 class TestSchemaAwareDeserialization:
-    """Smoke tests proving `schema` opts into typed responses end to end — the dedicated
-    schema-behavior test task will flesh out coverage further."""
+    """`get`/`post`/`patch`/`delete` all funnel through the same `_deserialize` helper, so each
+    verb gets the same three cases: `schema=None` returns a plain dict unchanged, a schema with
+    a matching body returns a parsed model, and a schema with a mismatched body raises
+    `BackstopResponseSchemaError` wrapping the underlying `pydantic.ValidationError`.
+
+    `schema=None` regression coverage for GET already exists in
+    `TestBackstopClientAutoRaises.test_does_not_raise_on_200` — not duplicated here.
+    """
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_post_without_schema_returns_dict(self) -> None:
+        respx.post(f"{_BASE_URL}/widgets").mock(
+            return_value=httpx.Response(200, json={"id": "1", "label": "Widget One"})
+        )
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            result = await client.post(PostRequest(path="/widgets"))
+
+        assert result == {"id": "1", "label": "Widget One"}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_patch_without_schema_returns_dict(self) -> None:
+        respx.patch(f"{_BASE_URL}/widgets/1").mock(
+            return_value=httpx.Response(200, json={"id": "1", "label": "Widget One"})
+        )
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            result = await client.patch(PatchRequest(path="/widgets/1"))
+
+        assert result == {"id": "1", "label": "Widget One"}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_delete_without_schema_returns_dict(self) -> None:
+        respx.delete(f"{_BASE_URL}/widgets/1").mock(
+            return_value=httpx.Response(200, json={"id": "1", "label": "Widget One"})
+        )
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            result = await client.delete(DeleteRequest(path="/widgets/1"))
+
+        assert result == {"id": "1", "label": "Widget One"}
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_get_with_schema_returns_parsed_model(self) -> None:
-        respx.get(f"{_BASE_URL}/system-info").mock(
-            return_value=httpx.Response(200, json={"version": "1.0"})
+        respx.get(f"{_BASE_URL}/widgets/1").mock(
+            return_value=httpx.Response(200, json={"id": "1", "label": "Widget One"})
         )
 
-        class SystemInfo(BaseModel):
-            version: str
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            result = await client.get(GetRequest(path="/widgets/1", schema=_Widget))
+
+        assert isinstance(result, _Widget)
+        assert result.id == "1"
+        assert result.label == "Widget One"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_post_with_schema_returns_parsed_model(self) -> None:
+        respx.post(f"{_BASE_URL}/widgets").mock(
+            return_value=httpx.Response(200, json={"id": "1", "label": "Widget One"})
+        )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.get(GetRequest(path="/system-info", schema=SystemInfo))
+            result = await client.post(PostRequest(path="/widgets", schema=_Widget))
 
-        assert result == SystemInfo(version="1.0")
+        assert isinstance(result, _Widget)
+        assert result.id == "1"
+        assert result.label == "Widget One"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_patch_with_schema_returns_parsed_model(self) -> None:
+        respx.patch(f"{_BASE_URL}/widgets/1").mock(
+            return_value=httpx.Response(200, json={"id": "1", "label": "Widget One"})
+        )
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            result = await client.patch(PatchRequest(path="/widgets/1", schema=_Widget))
+
+        assert isinstance(result, _Widget)
+        assert result.id == "1"
+        assert result.label == "Widget One"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_delete_with_schema_returns_parsed_model(self) -> None:
+        respx.delete(f"{_BASE_URL}/widgets/1").mock(
+            return_value=httpx.Response(200, json={"id": "1", "label": "Widget One"})
+        )
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            result = await client.delete(DeleteRequest(path="/widgets/1", schema=_Widget))
+
+        assert isinstance(result, _Widget)
+        assert result.id == "1"
+        assert result.label == "Widget One"
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_get_with_schema_mismatch_raises_schema_error(self) -> None:
-        respx.get(f"{_BASE_URL}/system-info").mock(
-            return_value=httpx.Response(200, json={"unexpected": "shape"})
+        # Missing the required `label` field.
+        respx.get(f"{_BASE_URL}/widgets/1").mock(
+            return_value=httpx.Response(200, json={"id": "1"})
         )
-
-        class SystemInfo(BaseModel):
-            version: str
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopResponseSchemaError) as exc_info:
-                await client.get(GetRequest(path="/system-info", schema=SystemInfo))
+                await client.get(GetRequest(path="/widgets/1", schema=_Widget))
 
-        assert exc_info.value.path == "/system-info"
-        assert exc_info.value.schema_name == "SystemInfo"
+        assert exc_info.value.path == "/widgets/1"
+        assert exc_info.value.schema_name == "_Widget"
+        assert isinstance(exc_info.value.cause, ValidationError)
         assert exc_info.value.__cause__ is exc_info.value.cause
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_paginate_with_schema_returns_parsed_items(self) -> None:
+    async def test_post_with_schema_mismatch_raises_schema_error(self) -> None:
+        # `label` is the wrong type (int, not str).
+        respx.post(f"{_BASE_URL}/widgets").mock(
+            return_value=httpx.Response(200, json={"id": "1", "label": 123})
+        )
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            with pytest.raises(BackstopResponseSchemaError) as exc_info:
+                await client.post(PostRequest(path="/widgets", schema=_Widget))
+
+        assert exc_info.value.path == "/widgets"
+        assert exc_info.value.schema_name == "_Widget"
+        assert isinstance(exc_info.value.cause, ValidationError)
+        assert exc_info.value.__cause__ is exc_info.value.cause
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_patch_with_schema_mismatch_raises_schema_error(self) -> None:
+        # Missing the required `id` field.
+        respx.patch(f"{_BASE_URL}/widgets/1").mock(
+            return_value=httpx.Response(200, json={"label": "Widget One"})
+        )
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            with pytest.raises(BackstopResponseSchemaError) as exc_info:
+                await client.patch(PatchRequest(path="/widgets/1", schema=_Widget))
+
+        assert exc_info.value.path == "/widgets/1"
+        assert exc_info.value.schema_name == "_Widget"
+        assert isinstance(exc_info.value.cause, ValidationError)
+        assert exc_info.value.__cause__ is exc_info.value.cause
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_delete_with_schema_mismatch_raises_schema_error(self) -> None:
+        # `id` is the wrong type (int, not str).
+        respx.delete(f"{_BASE_URL}/widgets/1").mock(
+            return_value=httpx.Response(200, json={"id": 1, "label": "Widget One"})
+        )
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            with pytest.raises(BackstopResponseSchemaError) as exc_info:
+                await client.delete(DeleteRequest(path="/widgets/1", schema=_Widget))
+
+        assert exc_info.value.path == "/widgets/1"
+        assert exc_info.value.schema_name == "_Widget"
+        assert isinstance(exc_info.value.cause, ValidationError)
+        assert exc_info.value.__cause__ is exc_info.value.cause
+
+
+class TestPaginateSchemaAwareDeserialization:
+    """`schema=None` regression coverage for `paginate` already exists in
+    `TestPaginate.test_delegates_to_paginate_all_across_multiple_pages` — not duplicated here.
+    """
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_multi_page_walk_parses_every_item(self) -> None:
         respx.get(f"{_BASE_URL}/records").mock(
-            return_value=httpx.Response(200, json={"data": [{"id": "1"}], "links": {}})
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        "data": [{"id": "1"}, {"id": "2"}],
+                        "links": {"next": "/records?page[cursor]=abc"},
+                    },
+                ),
+                httpx.Response(200, json={"data": [{"id": "3"}], "links": {}}),
+            ]
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             result = await client.paginate(PaginateRequest(path="/records", schema=_Record))
 
-        assert result == PageResult(items=[_Record(id="1")], total_count=None, truncated=False)
+        assert [item.id for item in result.items] == ["1", "2", "3"]
+        assert all(isinstance(item, _Record) for item in result.items)
+        assert result.total_count is None
+        assert result.truncated is False
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_paginate_with_schema_mismatch_on_any_page_raises(self) -> None:
-        respx.get(f"{_BASE_URL}/records").mock(
+    async def test_mismatch_on_later_page_raises_for_whole_call(self) -> None:
+        route = respx.get(f"{_BASE_URL}/records").mock(
             side_effect=[
                 httpx.Response(
                     200,
@@ -394,8 +552,14 @@ class TestSchemaAwareDeserialization:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            with pytest.raises(BackstopResponseSchemaError):
+            with pytest.raises(BackstopResponseSchemaError) as exc_info:
                 await client.paginate(PaginateRequest(path="/records", schema=_Record))
+
+        assert route.call_count == 2
+        assert exc_info.value.path == "/records"
+        assert exc_info.value.schema_name == "_Record"
+        assert isinstance(exc_info.value.cause, ValidationError)
+        assert exc_info.value.__cause__ is exc_info.value.cause
 
 
 class TestDeleteEmptyBody:
