@@ -6,6 +6,11 @@ nameOverride: kb-mcp
 fullnameOverride: kb-mcp
 selectorComponentLabel: server
 
+# Loki scrapes use this label to parse stderr as pino-json
+# (unique_mcp.configure_logging).
+podLabels:
+  logging.unique.app/format: pino-json
+
 env:
   LOG_LEVEL: info
   # In-pod bind only (not the public URL). Leave as-is in Argo overlays.
