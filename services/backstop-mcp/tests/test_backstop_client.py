@@ -14,12 +14,7 @@ from backstop_mcp.backstop_client import (
     BackstopRateLimitError,
     BackstopResponseSchemaError,
     BackstopUnreachableError,
-    DeleteRequest,
-    GetRequest,
     PageResult,
-    PaginateRequest,
-    PatchRequest,
-    PostRequest,
     build_auth_headers,
     create_backstop_client,
     verify_credential,
@@ -52,7 +47,7 @@ class TestCreateBackstopClient:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            await client.get(GetRequest(path="/system-info"))
+            await client.get("/system-info")
 
         sent_request = route.calls.last.request
         assert sent_request.headers["authorization"] == _BASIC_AUTH
@@ -70,7 +65,7 @@ class TestBackstopClientAutoRaises:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopAuthError):
-                await client.get(GetRequest(path="/system-info"))
+                await client.get("/system-info")
 
     @pytest.mark.asyncio
     @respx.mock
@@ -81,7 +76,7 @@ class TestBackstopClientAutoRaises:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopApiError) as exc_info:
-                await client.get(GetRequest(path="/system-info"))
+                await client.get("/system-info")
 
         assert exc_info.value.detail == "Something broke"
 
@@ -93,7 +88,7 @@ class TestBackstopClientAutoRaises:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.get(GetRequest(path="/system-info"))
+            result = await client.get("/system-info")
 
         assert result == {"version": "1.0"}
 
@@ -107,7 +102,7 @@ class TestHeaders:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            await client.get(GetRequest(path="/system-info"))
+            await client.get("/system-info")
 
         sent_request = route.calls.last.request
         assert sent_request.headers["token"] == "true"
@@ -137,7 +132,7 @@ class TestTimeoutProfiles:
         monkeypatch.setattr(shared_client, "request", spy_request)
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            await client.get(GetRequest(path="/reports"))
+            await client.get("/reports")
 
         assert captured_timeouts == [BackstopConfig().reports_timeout_seconds]
 
@@ -159,7 +154,7 @@ class TestTimeoutProfiles:
         monkeypatch.setattr(shared_client, "request", spy_request)
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            await client.get(GetRequest(path="/deals/1"))
+            await client.get("/deals/1")
 
         assert captured_timeouts == [BackstopConfig().default_timeout_seconds]
 
@@ -185,7 +180,7 @@ class TestConcurrencySemaphore:
 
         async def call() -> dict[str, object]:
             async with create_backstop_client(_BASE_URL, credential) as client:
-                return await client.get(GetRequest(path="/system-info"))
+                return await client.get("/system-info")
 
         tasks = [asyncio.create_task(call()) for _ in range(6)]
         await asyncio.sleep(0.05)
@@ -218,7 +213,7 @@ class TestConcurrencySemaphore:
 
         async def call(credential: BackstopCredentialSecret) -> dict[str, object]:
             async with create_backstop_client(_BASE_URL, credential) as client:
-                return await client.get(GetRequest(path="/system-info"))
+                return await client.get("/system-info")
 
         tasks = [asyncio.create_task(call(credential_a)) for _ in range(5)]
         tasks += [asyncio.create_task(call(credential_b)) for _ in range(5)]
@@ -256,7 +251,7 @@ class TestRetryIntegration:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.get(GetRequest(path="/system-info"))
+            result = await client.get("/system-info")
 
         assert result == {"version": "1.0"}
         assert route.call_count == 3
@@ -272,7 +267,7 @@ class TestRetryIntegration:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopRateLimitError) as exc_info:
-                await client.get(GetRequest(path="/system-info"))
+                await client.get("/system-info")
 
         assert exc_info.value.limit_kind == "day"
         assert route.call_count == 1
@@ -297,7 +292,7 @@ class TestRetryIntegration:
 
         start = time.monotonic()
         with pytest.raises(BackstopRateLimitError):
-            await client.get(GetRequest(path="/system-info"))
+            await client.get("/system-info")
         elapsed = time.monotonic() - start
 
         assert route.call_count == 1
@@ -322,7 +317,7 @@ class TestPaginate:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.paginate(PaginateRequest(path="/records"))
+            result = await client.paginate("/records")
 
         assert result == PageResult(
             items=[{"id": "1"}, {"id": "2"}], total_count=None, truncated=False
@@ -356,7 +351,7 @@ class TestSchemaAwareDeserialization:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.post(PostRequest(path="/widgets"))
+            result = await client.post("/widgets")
 
         assert result == {"id": "1", "label": "Widget One"}
 
@@ -368,7 +363,7 @@ class TestSchemaAwareDeserialization:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.patch(PatchRequest(path="/widgets/1"))
+            result = await client.patch("/widgets/1")
 
         assert result == {"id": "1", "label": "Widget One"}
 
@@ -380,7 +375,7 @@ class TestSchemaAwareDeserialization:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.delete(DeleteRequest(path="/widgets/1"))
+            result = await client.delete("/widgets/1")
 
         assert result == {"id": "1", "label": "Widget One"}
 
@@ -392,7 +387,7 @@ class TestSchemaAwareDeserialization:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.get(GetRequest(path="/widgets/1", schema=_Widget))
+            result = await client.get("/widgets/1", schema=_Widget)
 
         assert isinstance(result, _Widget)
         assert result.id == "1"
@@ -406,7 +401,7 @@ class TestSchemaAwareDeserialization:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.post(PostRequest(path="/widgets", schema=_Widget))
+            result = await client.post("/widgets", schema=_Widget)
 
         assert isinstance(result, _Widget)
         assert result.id == "1"
@@ -420,7 +415,7 @@ class TestSchemaAwareDeserialization:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.patch(PatchRequest(path="/widgets/1", schema=_Widget))
+            result = await client.patch("/widgets/1", schema=_Widget)
 
         assert isinstance(result, _Widget)
         assert result.id == "1"
@@ -434,7 +429,7 @@ class TestSchemaAwareDeserialization:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.delete(DeleteRequest(path="/widgets/1", schema=_Widget))
+            result = await client.delete("/widgets/1", schema=_Widget)
 
         assert isinstance(result, _Widget)
         assert result.id == "1"
@@ -450,7 +445,7 @@ class TestSchemaAwareDeserialization:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopResponseSchemaError) as exc_info:
-                await client.get(GetRequest(path="/widgets/1", schema=_Widget))
+                await client.get("/widgets/1", schema=_Widget)
 
         assert exc_info.value.path == "/widgets/1"
         assert exc_info.value.schema_name == "_Widget"
@@ -467,7 +462,7 @@ class TestSchemaAwareDeserialization:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopResponseSchemaError) as exc_info:
-                await client.post(PostRequest(path="/widgets", schema=_Widget))
+                await client.post("/widgets", schema=_Widget)
 
         assert exc_info.value.path == "/widgets"
         assert exc_info.value.schema_name == "_Widget"
@@ -484,7 +479,7 @@ class TestSchemaAwareDeserialization:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopResponseSchemaError) as exc_info:
-                await client.patch(PatchRequest(path="/widgets/1", schema=_Widget))
+                await client.patch("/widgets/1", schema=_Widget)
 
         assert exc_info.value.path == "/widgets/1"
         assert exc_info.value.schema_name == "_Widget"
@@ -501,7 +496,7 @@ class TestSchemaAwareDeserialization:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopResponseSchemaError) as exc_info:
-                await client.delete(DeleteRequest(path="/widgets/1", schema=_Widget))
+                await client.delete("/widgets/1", schema=_Widget)
 
         assert exc_info.value.path == "/widgets/1"
         assert exc_info.value.schema_name == "_Widget"
@@ -531,7 +526,7 @@ class TestPaginateSchemaAwareDeserialization:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.paginate(PaginateRequest(path="/records", schema=_Record))
+            result = await client.paginate("/records", schema=_Record)
 
         assert [item.id for item in result.items] == ["1", "2", "3"]
         assert all(isinstance(item, _Record) for item in result.items)
@@ -553,7 +548,7 @@ class TestPaginateSchemaAwareDeserialization:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopResponseSchemaError) as exc_info:
-                await client.paginate(PaginateRequest(path="/records", schema=_Record))
+                await client.paginate("/records", schema=_Record)
 
         assert route.call_count == 2
         assert exc_info.value.path == "/records"
@@ -569,7 +564,7 @@ class TestDeleteEmptyBody:
         respx.delete(f"{_BASE_URL}/records/1").mock(return_value=httpx.Response(204))
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.delete(DeleteRequest(path="/records/1"))
+            result = await client.delete("/records/1")
 
         assert result is None
 

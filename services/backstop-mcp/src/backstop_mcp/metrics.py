@@ -26,7 +26,3 @@ def configure_metrics(config: AppConfig) -> MeterProvider:
 async def metrics_endpoint(_request: Request) -> Response:
     data = generate_latest(REGISTRY)
     return Response(data, media_type=CONTENT_TYPE_LATEST)
-
-
-def get_meter(name: str) -> metrics.Meter:
-    return metrics.get_meter(name)

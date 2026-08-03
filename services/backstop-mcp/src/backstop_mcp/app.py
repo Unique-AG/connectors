@@ -13,6 +13,7 @@ from backstop_mcp.db.engine import create_engine, create_session_factory
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics, metrics_endpoint
 from backstop_mcp.middleware import TraceContextMiddleware
+from backstop_mcp.tools.get_organization import get_organization
 from backstop_mcp.tools.system_info import get_system_info
 
 
@@ -50,6 +51,7 @@ def create_app(
 
     mcp = FastMCP("Backstop MCP", version=config.version, auth=auth_provider)
     mcp.tool(get_system_info)
+    mcp.tool(get_organization)
 
     @mcp.custom_route("/health", methods=["GET"])
     async def health(_request: Request) -> JSONResponse:

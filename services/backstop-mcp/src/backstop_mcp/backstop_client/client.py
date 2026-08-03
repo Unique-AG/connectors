@@ -2,8 +2,6 @@ import asyncio
 import base64
 from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
-from dataclasses import dataclass
-from typing import Generic
 
 import httpx
 from pydantic import TypeAdapter, ValidationError
@@ -39,55 +37,10 @@ type AuthFailureHook = Callable[[], Awaitable[None]]
 _DICT_ADAPTER = TypeAdapter(dict[str, object])
 
 # `typing_extensions.TypeVar` (not stdlib) so `T` can carry a PEP 696 default: native PEP 695
-# `class Foo[T]:` syntax can't express a default until Python 3.13, but this repo targets 3.12.
-# The default lets every schema-less call site (e.g. `GetRequest(path="/system-info")`) infer
+# generic-method syntax can't express a default until Python 3.13, but this repo targets 3.12.
+# The default lets every schema-less call site (e.g. `client.get("/system-info")`) infer
 # `dict[str, object]` without an explicit subscript, matching today's untyped behavior exactly.
 T = TypeVar("T", default=dict[str, object])
-
-
-@dataclass(frozen=True)
-class GetRequest(Generic[T]):
-    """Inputs for `BackstopClient.get` — `schema` opts into typed deserialization."""
-
-    path: str
-    params: dict[str, object] | None = None
-    schema: type[T] | None = None
-
-
-@dataclass(frozen=True)
-class PostRequest(Generic[T]):
-    """Inputs for `BackstopClient.post` — `schema` opts into typed deserialization."""
-
-    path: str
-    json: dict[str, object] | None = None
-    schema: type[T] | None = None
-
-
-@dataclass(frozen=True)
-class PatchRequest(Generic[T]):
-    """Inputs for `BackstopClient.patch` — `schema` opts into typed deserialization."""
-
-    path: str
-    json: dict[str, object] | None = None
-    schema: type[T] | None = None
-
-
-@dataclass(frozen=True)
-class DeleteRequest(Generic[T]):
-    """Inputs for `BackstopClient.delete` — `schema` opts into typed deserialization."""
-
-    path: str
-    schema: type[T] | None = None
-
-
-@dataclass(frozen=True)
-class PaginateRequest(Generic[T]):
-    """Inputs for `BackstopClient.paginate` — `schema` validates each accumulated item."""
-
-    path: str
-    params: dict[str, object] | None = None
-    max_records: int = 10_000
-    schema: type[T] | None = None
 
 
 def _deserialize(content: bytes, schema: type[T] | None, *, path: str) -> T:
@@ -236,39 +189,52 @@ class BackstopClient:
         self._config: BackstopConfig = config
         self._on_auth_failure: AuthFailureHook | None = on_auth_failure
 
-    async def get(self, request: GetRequest[T]) -> T:
-        response = await self._request("GET", request.path, params=request.params)
-        return _deserialize(response.content, request.schema, path=request.path)
+    async def get(
+        self, path: str, *, params: dict[str, object] | None = None, schema: type[T] | None = None
+    ) -> T:
+        response = await self._request("GET", path, params=params)
+        return _deserialize(response.content, schema, path=path)
 
-    async def post(self, request: PostRequest[T]) -> T:
-        response = await self._request("POST", request.path, json=request.json)
-        return _deserialize(response.content, request.schema, path=request.path)
+    async def post(
+        self, path: str, *, json: dict[str, object] | None = None, schema: type[T] | None = None
+    ) -> T:
+        response = await self._request("POST", path, json=json)
+        return _deserialize(response.content, schema, path=path)
 
-    async def patch(self, request: PatchRequest[T]) -> T:
-        response = await self._request("PATCH", request.path, json=request.json)
-        return _deserialize(response.content, request.schema, path=request.path)
+    async def patch(
+        self, path: str, *, json: dict[str, object] | None = None, schema: type[T] | None = None
+    ) -> T:
+        response = await self._request("PATCH", path, json=json)
+        return _deserialize(response.content, schema, path=path)
 
-    async def delete(self, request: DeleteRequest[T]) -> T | None:
-        response = await self._request("DELETE", request.path)
+    async def delete(self, path: str, *, schema: type[T] | None = None) -> T | None:
+        response = await self._request("DELETE", path)
         if not response.content:
             return None
-        return _deserialize(response.content, request.schema, path=request.path)
+        return _deserialize(response.content, schema, path=path)
 
-    async def paginate(self, request: PaginateRequest[T]) -> PageResult[T]:
+    async def paginate(
+        self,
+        path: str,
+        *,
+        params: dict[str, object] | None = None,
+        max_records: int = 10_000,
+        schema: type[T] | None = None,
+    ) -> PageResult[T]:
         """Walk a `links.next` chain, applying `params` (plus a default page size) to the
         first page only — every later page is driven entirely by the literal URL/path
         Backstop returns, which already encodes its own query params.
 
         `paginate_all` keeps producing raw `dict[str, object]` items after validating the
         envelope (`links`/`meta`) exactly as before schema support existed; each accumulated
-        item is re-validated against `request.schema` here — only if one was given — so a
-        malformed item on any page fails the whole call rather than silently skipping it.
+        item is re-validated against `schema` here — only if one was given — so a malformed
+        item on any page fails the whole call rather than silently skipping it.
         """
-        first_page_params = dict(request.params) if request.params is not None else {}
+        first_page_params = dict(params) if params is not None else {}
         if _PAGE_SIZE_PARAM not in first_page_params:
             first_page_params[_PAGE_SIZE_PARAM] = (
                 self._config.report_page_size
-                if _is_extended_profile_path(request.path)
+                if _is_extended_profile_path(path)
                 else self._config.default_page_size
             )
 
@@ -280,22 +246,20 @@ class BackstopClient:
         raw_result = await paginate_all(
             PaginationRequest(
                 fetch_page=fetch_page,
-                first_path=request.path,
-                max_records=request.max_records,
+                first_path=path,
+                max_records=max_records,
                 first_page_params=first_page_params,
             )
         )
 
-        if request.schema is None:
+        if schema is None:
             return raw_result  # pyright: ignore[reportReturnType]
 
         try:
-            items = [TypeAdapter(request.schema).validate_python(item) for item in raw_result.items]
+            items = [TypeAdapter(schema).validate_python(item) for item in raw_result.items]
         except ValidationError as exc:
-            logger.error(
-                "backstop.response.schema_error", path=request.path, schema=request.schema.__name__
-            )
-            raise BackstopResponseSchemaError(request.path, request.schema.__name__, exc) from exc
+            logger.error("backstop.response.schema_error", path=path, schema=schema.__name__)
+            raise BackstopResponseSchemaError(path, schema.__name__, exc) from exc
 
         return PageResult(
             items=items, total_count=raw_result.total_count, truncated=raw_result.truncated

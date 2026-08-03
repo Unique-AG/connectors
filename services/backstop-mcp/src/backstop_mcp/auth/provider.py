@@ -30,6 +30,9 @@ from backstop_mcp.db.models import AuthorizationCode as AuthorizationCodeRow
 from backstop_mcp.db.models import OAuthClient as OAuthClientRow
 from backstop_mcp.db.models import OAuthToken as OAuthTokenRow
 from backstop_mcp.db.models import PendingAuthorization
+from backstop_mcp.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _hash_token(token: str) -> str:
@@ -169,7 +172,8 @@ class BackstopOAuthProvider(OAuthProvider):
 
         try:
             valid = await verify_credential(username, api_token, self._backstop_base_url)
-        except BackstopUnreachableError:
+        except BackstopUnreachableError as exc:
+            logger.warning("auth.login.backstop_unreachable", error=str(exc))
             return HTMLResponse(
                 render_login_form(
                     request_id,

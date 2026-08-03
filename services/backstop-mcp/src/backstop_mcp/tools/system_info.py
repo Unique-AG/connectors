@@ -1,4 +1,4 @@
-from backstop_mcp.backstop_client import GetRequest, get_backstop_client
+from backstop_mcp.backstop_client import get_backstop_client
 
 
 async def get_system_info() -> dict[str, object]:
@@ -13,4 +13,4 @@ async def get_system_info() -> dict[str, object]:
     codes itself.
     """
     async with await get_backstop_client() as client:
-        return await client.get(GetRequest(path="/system-info"))
+        return await client.get("/system-info")

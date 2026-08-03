@@ -97,7 +97,12 @@ class BackstopResponseSchemaError(ToolError):
 def _parse_error_detail(response: httpx.Response) -> _JsonApiError | None:
     try:
         body = _ERROR_BODY_ADAPTER.validate_json(response.content)
-    except ValidationError:
+    except ValidationError as exc:
+        logger.warning(
+            "backstop.error_body.schema_error",
+            status_code=response.status_code,
+            error=str(exc),
+        )
         return None
     if not body.errors:
         return None
@@ -130,6 +135,7 @@ def _parse_retry_after(response: httpx.Response) -> float | None:
     try:
         return float(retry_after)
     except ValueError:
+        logger.warning("backstop.retry_after.unparseable", retry_after=retry_after)
         return None
 
 
