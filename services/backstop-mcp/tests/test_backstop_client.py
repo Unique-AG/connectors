@@ -5,15 +5,19 @@ import time
 import httpx
 import pytest
 import respx
-from pydantic import SecretStr
+from pydantic import BaseModel, SecretStr
 
 from backstop_mcp.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopAuthError,
     BackstopRateLimitError,
+    BackstopResponseSchemaError,
     BackstopUnreachableError,
+    DeleteRequest,
+    GetRequest,
     PageResult,
+    PaginateRequest,
     build_auth_headers,
     create_backstop_client,
     verify_credential,
@@ -46,7 +50,7 @@ class TestCreateBackstopClient:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            await client.get("/system-info")
+            await client.get(GetRequest(path="/system-info"))
 
         sent_request = route.calls.last.request
         assert sent_request.headers["authorization"] == _BASIC_AUTH
@@ -64,7 +68,7 @@ class TestBackstopClientAutoRaises:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopAuthError):
-                await client.get("/system-info")
+                await client.get(GetRequest(path="/system-info"))
 
     @pytest.mark.asyncio
     @respx.mock
@@ -75,7 +79,7 @@ class TestBackstopClientAutoRaises:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopApiError) as exc_info:
-                await client.get("/system-info")
+                await client.get(GetRequest(path="/system-info"))
 
         assert exc_info.value.detail == "Something broke"
 
@@ -87,7 +91,7 @@ class TestBackstopClientAutoRaises:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.get("/system-info")
+            result = await client.get(GetRequest(path="/system-info"))
 
         assert result == {"version": "1.0"}
 
@@ -101,7 +105,7 @@ class TestHeaders:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            await client.get("/system-info")
+            await client.get(GetRequest(path="/system-info"))
 
         sent_request = route.calls.last.request
         assert sent_request.headers["token"] == "true"
@@ -131,7 +135,7 @@ class TestTimeoutProfiles:
         monkeypatch.setattr(shared_client, "request", spy_request)
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            await client.get("/reports")
+            await client.get(GetRequest(path="/reports"))
 
         assert captured_timeouts == [BackstopConfig().reports_timeout_seconds]
 
@@ -153,7 +157,7 @@ class TestTimeoutProfiles:
         monkeypatch.setattr(shared_client, "request", spy_request)
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            await client.get("/deals/1")
+            await client.get(GetRequest(path="/deals/1"))
 
         assert captured_timeouts == [BackstopConfig().default_timeout_seconds]
 
@@ -179,7 +183,7 @@ class TestConcurrencySemaphore:
 
         async def call() -> dict[str, object]:
             async with create_backstop_client(_BASE_URL, credential) as client:
-                return await client.get("/system-info")
+                return await client.get(GetRequest(path="/system-info"))
 
         tasks = [asyncio.create_task(call()) for _ in range(6)]
         await asyncio.sleep(0.05)
@@ -212,7 +216,7 @@ class TestConcurrencySemaphore:
 
         async def call(credential: BackstopCredentialSecret) -> dict[str, object]:
             async with create_backstop_client(_BASE_URL, credential) as client:
-                return await client.get("/system-info")
+                return await client.get(GetRequest(path="/system-info"))
 
         tasks = [asyncio.create_task(call(credential_a)) for _ in range(5)]
         tasks += [asyncio.create_task(call(credential_b)) for _ in range(5)]
@@ -250,7 +254,7 @@ class TestRetryIntegration:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.get("/system-info")
+            result = await client.get(GetRequest(path="/system-info"))
 
         assert result == {"version": "1.0"}
         assert route.call_count == 3
@@ -266,7 +270,7 @@ class TestRetryIntegration:
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopRateLimitError) as exc_info:
-                await client.get("/system-info")
+                await client.get(GetRequest(path="/system-info"))
 
         assert exc_info.value.limit_kind == "day"
         assert route.call_count == 1
@@ -291,7 +295,7 @@ class TestRetryIntegration:
 
         start = time.monotonic()
         with pytest.raises(BackstopRateLimitError):
-            await client.get("/system-info")
+            await client.get(GetRequest(path="/system-info"))
         elapsed = time.monotonic() - start
 
         assert route.call_count == 1
@@ -316,11 +320,82 @@ class TestPaginate:
         )
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.paginate("/records")
+            result = await client.paginate(PaginateRequest(path="/records"))
 
         assert result == PageResult(
             items=[{"id": "1"}, {"id": "2"}], total_count=None, truncated=False
         )
+
+
+class _Record(BaseModel):
+    id: str
+
+
+class TestSchemaAwareDeserialization:
+    """Smoke tests proving `schema` opts into typed responses end to end — the dedicated
+    schema-behavior test task will flesh out coverage further."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_with_schema_returns_parsed_model(self) -> None:
+        respx.get(f"{_BASE_URL}/system-info").mock(
+            return_value=httpx.Response(200, json={"version": "1.0"})
+        )
+
+        class SystemInfo(BaseModel):
+            version: str
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            result = await client.get(GetRequest(path="/system-info", schema=SystemInfo))
+
+        assert result == SystemInfo(version="1.0")
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_get_with_schema_mismatch_raises_schema_error(self) -> None:
+        respx.get(f"{_BASE_URL}/system-info").mock(
+            return_value=httpx.Response(200, json={"unexpected": "shape"})
+        )
+
+        class SystemInfo(BaseModel):
+            version: str
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            with pytest.raises(BackstopResponseSchemaError) as exc_info:
+                await client.get(GetRequest(path="/system-info", schema=SystemInfo))
+
+        assert exc_info.value.path == "/system-info"
+        assert exc_info.value.schema_name == "SystemInfo"
+        assert exc_info.value.__cause__ is exc_info.value.cause
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_paginate_with_schema_returns_parsed_items(self) -> None:
+        respx.get(f"{_BASE_URL}/records").mock(
+            return_value=httpx.Response(200, json={"data": [{"id": "1"}], "links": {}})
+        )
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            result = await client.paginate(PaginateRequest(path="/records", schema=_Record))
+
+        assert result == PageResult(items=[_Record(id="1")], total_count=None, truncated=False)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_paginate_with_schema_mismatch_on_any_page_raises(self) -> None:
+        respx.get(f"{_BASE_URL}/records").mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={"data": [{"id": "1"}], "links": {"next": "/records?page[cursor]=abc"}},
+                ),
+                httpx.Response(200, json={"data": [{"not_id": "2"}], "links": {}}),
+            ]
+        )
+
+        async with create_backstop_client(_BASE_URL, _credential()) as client:
+            with pytest.raises(BackstopResponseSchemaError):
+                await client.paginate(PaginateRequest(path="/records", schema=_Record))
 
 
 class TestDeleteEmptyBody:
@@ -330,7 +405,7 @@ class TestDeleteEmptyBody:
         respx.delete(f"{_BASE_URL}/records/1").mock(return_value=httpx.Response(204))
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
-            result = await client.delete("/records/1")
+            result = await client.delete(DeleteRequest(path="/records/1"))
 
         assert result is None
 

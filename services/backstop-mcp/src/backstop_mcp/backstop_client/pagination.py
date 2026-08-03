@@ -1,10 +1,14 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from typing import Generic
 
 import httpx
 from pydantic import BaseModel, TypeAdapter
+from typing_extensions import TypeVar
 
 FetchPage = Callable[[str, dict[str, object] | None], Awaitable[httpx.Response]]
+
+T = TypeVar("T", default=dict[str, object])
 
 
 class _PageLinks(BaseModel):
@@ -25,10 +29,10 @@ _PAGE_ADAPTER = TypeAdapter(_Page)
 
 
 @dataclass
-class PageResult:
+class PageResult(Generic[T]):
     """Accumulated result of walking a JSON:API `links.next` chain."""
 
-    items: list[dict[str, object]] = field(default_factory=list)
+    items: list[T] = field(default_factory=list)
     total_count: int | None = None
     truncated: bool = False
 
