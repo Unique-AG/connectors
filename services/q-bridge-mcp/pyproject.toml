@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.2",
     "python-dotenv>=1.2.2",
+    "unique-sdk==2026.32.2",
 ]
 
 [project.scripts]
