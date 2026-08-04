@@ -2,10 +2,12 @@
 
 ARG APP_NAME=ir-demo-mcp
 
-FROM node:26.4.0-trixie@sha256:b46a10d964ad15136ebdf9012142131481caa0697d7a4d4eafe4bbabd818f876 AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN npm install -g pnpm@10.28.1
+FROM node:26.5.0-trixie@sha256:0473e7dc433a1310f436edee02aa79737ec78a4b345433ab0963d4a256f9ad85 AS base
+ENV CI=1 \
+    PNPM_STORE_DIR=/root/.local/share/pnpm/store
+# Keep the version in sync with "packageManager" in the root and service package.json.
+RUN npm install -g pnpm@10.34.5 \
+ && pnpm config set store-dir "$PNPM_STORE_DIR"
 
 FROM base AS pruner
 ARG APP_NAME
@@ -18,7 +20,7 @@ WORKDIR /app
 COPY --from=pruner /app/out/json/ .
 COPY ./pnpm-lock.yaml ./pnpm-lock.yaml
 COPY ./pnpm-workspace.yaml ./pnpm-workspace.yaml
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
 FROM base AS builder
@@ -32,24 +34,33 @@ RUN --mount=type=cache,target=/root/.cache/turbo \
     pnpm turbo build --filter=@unique-ag/${APP_NAME}... && \
     pnpm --filter=@unique-ag/${APP_NAME} deploy out
 
-FROM node:26.4.0-trixie-slim@sha256:a1d9d671994fc2d26e297ac56b4b1522a8bc7fa71c43b14cd1b1fe6c5116f7dc AS runner
+FROM node:26.5.0-trixie-slim@sha256:715e55e4b84e4bb0ff48e49b398a848f08e55daed8eb6a0ea1839ae53bc57583 AS runner
 WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
-    dumb-init \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system --gid 1001 nodejs \
-    && useradd --system --uid 1001 --gid nodejs --shell /bin/bash --create-home nestjs
+# Baseline runtime packages:
+#   - procps/dumb-init/openssl/ca-certificates: signal forwarding, TLS, trust store
+#   - apt-get upgrade: pull newest OS security patches at build time
+# pnpm is kept in every runtime for homogeneity. npm and npx are removed afterwards
+# to shrink the runtime attack surface.
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update \
+ && apt-get upgrade -y \
+ && apt-get install -y --no-install-recommends \
+      procps \
+      dumb-init \
+      openssl \
+      ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && npm install -g pnpm@10.34.5 \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 ENV NODE_ENV=production
 ENV PORT=9542
 
-COPY --from=builder --chown=nestjs:nodejs /app/services/ir-demo-mcp/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/out/node_modules ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/out/package.json ./package.json
+COPY --from=builder --chown=node:node /app/services/ir-demo-mcp/dist ./dist
+COPY --from=builder --chown=node:node /app/out/node_modules ./node_modules
+COPY --from=builder --chown=node:node /app/out/package.json ./package.json
 
-USER nestjs
+USER node
 EXPOSE 9542
 
 ENTRYPOINT ["dumb-init", "--"]
