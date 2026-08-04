@@ -62,19 +62,19 @@ def main() -> None:
         setup_ops(mcp),
     ]
 
-    # FastMCP Host allowlist (DNS-rebinding guard). Use PUBLIC host when set
-    # (ingress / ngrok / localhost). That is the Host clients hit — not the
-    # Unique frontend Origin. Without PUBLIC matching the client URL, OAuth
-    # and Host checks use the wrong base (421/403 / broken token swap).
-    public = server_settings.public_base_url
-    public_host = public.host if public else None
+    # Host/Origin DNS-rebinding guard is opt-in in FastMCP 3.4.x
+    # (host_origin_protection defaults to False). Passing allowed_hosts alone
+    # is a no-op. Enabling protection in-cluster also needs probe Host headers
+    # (kubelet Host is the pod IP, not PUBLIC), e.g.
+    # FASTMCP_HTTP_HOST_ORIGIN_PROTECTION=auto + chart probe httpHeaders.
+    # OAuth redirect / token-swap base still comes from UNIQUE_MCP_PUBLIC_BASE_URL
+    # via ServerSettings — not from this Host allowlist.
     mcp.run(
         transport=server_settings.transport_scheme,
         host=server_settings.local_base_url.host,
         port=server_settings.local_base_url.port,
         log_level="info",
         middleware=middleware,
-        allowed_hosts=[public_host] if public_host else None,
     )
 
 
