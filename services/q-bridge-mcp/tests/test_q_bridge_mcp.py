@@ -1,15 +1,36 @@
 import asyncio
 from unittest.mock import MagicMock, patch
 
+from fastmcp.server.auth import AccessToken
+
 from q_bridge_mcp.auth.setup import REQUIRED_SCOPES, setup_auth
 from q_bridge_mcp.config.settings import settings
+from q_bridge_mcp.dependencies import get_company_id, get_user_id
 from q_bridge_mcp.main import main
 from q_bridge_mcp.server import create_server
 from q_bridge_mcp.tools.hello import hello_world
 
 
 def test_hello_world_greets_authenticated_user() -> None:
-    assert hello_world("Ada Lovelace") == "Hello, Ada Lovelace!"
+    assert (
+        hello_world("Ada Lovelace", "user-123", "company-456")
+        == "Hello, Ada Lovelace! (user-id: user-123, company-id: company-456)"
+    )
+
+
+def test_dependencies_extract_zitadel_claims() -> None:
+    token = AccessToken(
+        token="test-token",
+        client_id="test-client",
+        scopes=["openid", "profile"],
+        claims={
+            "sub": "user-123",
+            "urn:zitadel:iam:user:resourceowner:id": "company-456",
+        },
+    )
+
+    assert get_user_id(token) == "user-123"
+    assert get_company_id(token) == "company-456"
 
 
 @patch("q_bridge_mcp.server.setup_auth", return_value=None)
@@ -18,6 +39,11 @@ def test_registers_only_hello_world_tool(setup_auth: MagicMock) -> None:
     tools = asyncio.run(server.list_tools())
 
     assert [tool.name for tool in tools] == ["hello_world"]
+    assert tools[0].parameters == {
+        "additionalProperties": False,
+        "properties": {},
+        "type": "object",
+    }
     setup_auth.assert_called_once_with()
 
 

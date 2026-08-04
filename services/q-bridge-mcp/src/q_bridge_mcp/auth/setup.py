@@ -5,7 +5,11 @@ from fastmcp.server.auth.oidc_proxy import OIDCProxy
 from q_bridge_mcp.auth.storage import create_storage
 from q_bridge_mcp.config.settings import settings
 
-REQUIRED_SCOPES = ["openid", "profile"]
+REQUIRED_SCOPES = [
+    "openid",
+    "profile",
+    "urn:zitadel:iam:user:resourceowner",
+]
 
 
 def setup_auth() -> OIDCProxy:
