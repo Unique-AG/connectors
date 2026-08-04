@@ -63,6 +63,7 @@ def _configure_service(db: DatabaseFixture, *, base_url: str = BASE_URL) -> None
         create_custom_fields_service(
             session_factory=factory,
             base_url=base_url,
+            ttl_minutes=60,
             overrides={
                 "organizations:is1": CustomFieldOverrideConfig(
                     display_name="Investor Status",
@@ -181,6 +182,4 @@ class TestGetOrganizationCustomFieldTool:
         assert isinstance(result, OrganizationCustomFieldResolvedResponse)
         assert result.value == "Active LP"
         assert result.definition.definition_id == "99"
-        assert result.resolved == ResolvedPartyEcho(
-            id="o42", type="organizations", name="Capstone"
-        )
+        assert result.resolved == ResolvedPartyEcho(id="o42", type="organizations", name="Capstone")

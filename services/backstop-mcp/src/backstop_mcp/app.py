@@ -1,3 +1,6 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
 from fastmcp import FastMCP
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from starlette.applications import Starlette
@@ -14,6 +17,7 @@ from backstop_mcp.custom_fields import (
     create_custom_fields_service,
 )
 from backstop_mcp.custom_fields.middleware import CustomFieldGlossaryMiddleware
+from backstop_mcp.custom_fields.warmup import warmup_lifespan
 from backstop_mcp.db.engine import create_engine, create_session_factory
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics, metrics_endpoint
@@ -55,19 +59,25 @@ def create_app(
             revoke_tokens_for_subject=auth_provider.revoke_token_family_for_subject,
         )
     )
-    configure_custom_fields_service(
-        create_custom_fields_service(
-            session_factory=session_factory,
-            base_url=backstop_config.base_url,
-            overrides=backstop_config.custom_field_overrides,
-        )
+    custom_fields_service = create_custom_fields_service(
+        session_factory=session_factory,
+        base_url=backstop_config.base_url,
+        overrides=backstop_config.custom_field_overrides,
+        ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
     )
+    configure_custom_fields_service(custom_fields_service)
+
+    @asynccontextmanager
+    async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:
+        async with warmup_lifespan(custom_fields_service, backstop_config):
+            yield
 
     mcp = FastMCP(
         "Backstop MCP",
         version=config.version,
         auth=auth_provider,
         middleware=[CustomFieldGlossaryMiddleware()],
+        lifespan=lifespan,
     )
     mcp.tool(get_system_info)
     mcp.tool(get_organization)

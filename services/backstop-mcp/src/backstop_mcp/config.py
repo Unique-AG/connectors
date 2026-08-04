@@ -155,6 +155,27 @@ class BackstopConfig(BaseSettings):
     # definitionId (which is opaque and differs per Backstop instance).
     custom_field_overrides: dict[str, CustomFieldOverrideConfig] = Field(default_factory=dict)
 
+    # How long a persisted custom-field schema snapshot stays usable before it's re-fetched.
+    # Field definitions change rarely (a CRM admin adding a field), so the default is a week;
+    # lower it if an instance's schema churns and stale glossaries start misleading callers.
+    custom_field_schema_ttl_minutes: int = Field(default=7 * 24 * 60, ge=1)
+
+    # Optional service account used ONLY to warm the custom-field schema snapshot at startup,
+    # so the very first user's tools/list already carries the glossary. Without it the schema
+    # is fetched lazily by the first authenticated caller instead. This token sees instance-wide
+    # custom-field metadata, so treat it like any other shared secret.
+    service_username: str | None = None
+    service_api_token: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _require_complete_service_account(self) -> "BackstopConfig":
+        """Reject a half-configured service account rather than silently skipping warming."""
+        if (self.service_username is None) != (self.service_api_token is None):
+            raise ValueError(
+                "BACKSTOP_SERVICE_USERNAME and BACKSTOP_SERVICE_API_TOKEN must be set together"
+            )
+        return self
+
 
 class DatabaseConfig(BaseSettings):
     """Where backstop-mcp stores OAuth clients/tokens and encrypted Backstop credentials."""

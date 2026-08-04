@@ -7,8 +7,31 @@ import mcp.types as mt
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import Tool
 
+from backstop_mcp.backstop_client import get_backstop_client
 from backstop_mcp.custom_fields.registry import TOOL_ENTITY_GLOSSARY
-from backstop_mcp.custom_fields.service import get_custom_fields_service
+from backstop_mcp.custom_fields.service import CustomFieldsService, get_custom_fields_service
+from backstop_mcp.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+async def _warm_from_caller(service: CustomFieldsService) -> None:
+    """Fetch the schema using the listing caller's own credential.
+
+    `tools/list` is authenticated (the whole MCP endpoint is), so a real client is available
+    here — but only callers who find the snapshot missing or past its TTL pay for it, since it
+    is shared across every user of one Backstop instance. Configure a service account
+    (`BACKSTOP_SERVICE_USERNAME`) to move that cost to startup instead.
+
+    Any failure is swallowed: the glossary is advisory, and no listing should break because
+    schema enrichment couldn't run. Callers fall back to `resolve_custom_field`, which is
+    what its docstring already tells them to do when the glossary is missing.
+    """
+    try:
+        async with await get_backstop_client() as client:
+            await service.ensure_fresh(client)
+    except Exception:
+        logger.warning("custom_fields.glossary.warm_failed", exc_info=True)
 
 
 class CustomFieldGlossaryMiddleware(Middleware):
@@ -23,8 +46,10 @@ class CustomFieldGlossaryMiddleware(Middleware):
         tools = await call_next(context)
         service = get_custom_fields_service()
 
-        # Best-effort: use in-memory/overrides state without requiring auth on list.
-        await service.ensure_loaded(client=None)
+        # Cheap path first: a DB read needs no credential and no Backstop round trip.
+        await service.load_cached()
+        if not service.is_fresh:
+            await _warm_from_caller(service)
 
         enriched: list[Tool] = []
         for tool in tools:
@@ -33,6 +58,9 @@ class CustomFieldGlossaryMiddleware(Middleware):
                 enriched.append(tool)
                 continue
             glossary = "".join(service.glossary_for(entity) for entity in entity_types)
+            if not glossary:
+                enriched.append(tool)
+                continue
             base = tool.description or ""
             enriched.append(tool.model_copy(update={"description": base + glossary}))
         return enriched

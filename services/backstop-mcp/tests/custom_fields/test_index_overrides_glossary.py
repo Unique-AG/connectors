@@ -47,6 +47,10 @@ class TestOverridesParsing:
         with pytest.raises(ValueError, match="entityType:crmName"):
             parse_override_key("organizations")
 
+    def test_parse_override_key_splits_on_first_colon_only(self) -> None:
+        """crmName may itself contain colons, so only the first separator is significant."""
+        assert parse_override_key("organizations:1:is1") == ("organizations", "1:is1")
+
     def test_normalize_entity_type(self) -> None:
         assert normalize_entity_type("Organization") == "organizations"
         assert normalize_entity_type("people") == "people"
@@ -115,6 +119,9 @@ class TestResolveInIndex:
 
 
 class TestGlossary:
+    def test_empty_definitions_render_nothing(self) -> None:
+        assert format_glossary([], entity_type="organizations") == ""
+
     def test_includes_allowed_values_and_truncates(self) -> None:
         definitions = [
             _def(

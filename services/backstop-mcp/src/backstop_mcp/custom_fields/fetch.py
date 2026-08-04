@@ -141,29 +141,6 @@ def definition_from_resource(
     )
 
 
-def definitions_from_overrides_only(
-    overrides: dict[str, CustomFieldOverrideConfig],
-) -> list[CustomFieldDefinition]:
-    """Seed definitions from env overrides when CRM snapshot is not yet loaded."""
-    result: list[CustomFieldDefinition] = []
-    for (entity_type, crm_name), override in index_overrides(overrides).items():
-        display = (override.display_name or crm_name).strip()
-        result.append(
-            CustomFieldDefinition(
-                definition_id=crm_name,
-                entity_type=entity_type,
-                crm_name=crm_name,
-                display_name=display,
-                aliases=tuple(a.strip() for a in override.aliases if a.strip()),
-                description=override.description,
-                is_time_series=False,
-                allowed_values=(),
-                raw={},
-            )
-        )
-    return result
-
-
 async def fetch_custom_field_definitions(
     client: BackstopClient,
     overrides: dict[str, CustomFieldOverrideConfig],

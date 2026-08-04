@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import httpx
 import pytest
 import respx
@@ -12,8 +14,8 @@ from backstop_mcp.custom_fields import (
     create_custom_fields_service,
 )
 from backstop_mcp.custom_fields.fetch import extract_allowed_values
-from backstop_mcp.custom_fields.store import load_snapshot
-from backstop_mcp.custom_fields.types import FieldResolved
+from backstop_mcp.custom_fields.store import load_snapshot, save_snapshot
+from backstop_mcp.custom_fields.types import CustomFieldDefinition, FieldResolved
 from backstop_mcp.db.engine import get_session
 from tests.party_resolver.helpers import BASE_URL, resource
 
@@ -57,6 +59,7 @@ class TestFetchStoreResolve:
             session_factory=factory,
             base_url=BASE_URL,
             overrides=overrides,
+            ttl_minutes=60,
         )
         configure_custom_fields_service(service)
 
@@ -91,11 +94,14 @@ class TestFetchStoreResolve:
         async with get_session(factory) as session:
             loaded = await load_snapshot(session, BASE_URL.rstrip("/"))
         assert loaded is not None
-        assert loaded[0].definition_id == "99"
+        assert loaded.definitions[0].definition_id == "99"
 
-        result = await service.resolve(
-            entity_type="organizations", query="Investor Status", client=None
-        )
+        # Resolving again hits the just-refreshed in-memory index, not Backstop — the route
+        # mock above would have been called a second time otherwise.
+        async with create_backstop_client(BASE_URL, _credential()) as client:
+            result = await service.resolve(
+                entity_type="organizations", query="Investor Status", client=client
+            )
         assert isinstance(result, FieldResolved)
         assert result.definition.crm_name == "is1"
 
@@ -107,6 +113,7 @@ class TestFetchStoreResolve:
             session_factory=factory,
             base_url=f"{BASE_URL}/tenant-a",
             overrides={},
+            ttl_minutes=60,
         )
         configure_custom_fields_service(service)
 
@@ -134,3 +141,120 @@ class TestFetchStoreResolve:
             await service.resolve(entity_type="organizations", query="Grade", client=client)
 
         assert route.call_count == 1
+
+
+class TestSnapshotStaleness:
+    """A persisted snapshot is a cache with a TTL, not a permanent record."""
+
+    @staticmethod
+    async def _seed_snapshot(
+        factory: async_sessionmaker[AsyncSession], base_url: str, age: timedelta
+    ) -> None:
+        async with get_session(factory) as session:
+            await save_snapshot(
+                session,
+                base_url,
+                [
+                    CustomFieldDefinition(
+                        definition_id="old-1",
+                        entity_type="organizations",
+                        crm_name="Stale Field",
+                        display_name="Stale Field",
+                    )
+                ],
+                datetime.now(UTC) - age,
+            )
+            await session.commit()
+
+    @staticmethod
+    def _fresh_definitions_route(base_url: str) -> respx.Route:
+        return respx.get(f"{base_url}/custom-field-definitions").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        resource(
+                            "new-1",
+                            "custom-field-definitions",
+                            name="Fresh Field",
+                            entityType="organizations",
+                            fieldType="text",
+                            isTimeSeries=False,
+                        )
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_snapshot_within_ttl_is_not_refetched(self, db: DatabaseFixture) -> None:
+        _, factory = db
+        base_url = f"{BASE_URL}/ttl-fresh"
+        await self._seed_snapshot(factory, base_url, timedelta(minutes=5))
+        service = create_custom_fields_service(
+            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+        )
+        route = self._fresh_definitions_route(base_url)
+
+        async with create_backstop_client(base_url, _credential()) as client:
+            await service.ensure_fresh(client)
+
+        assert route.call_count == 0
+        assert [d.display_name for d in service.definitions_for("organizations")] == ["Stale Field"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_snapshot_past_ttl_is_refetched(self, db: DatabaseFixture) -> None:
+        _, factory = db
+        base_url = f"{BASE_URL}/ttl-expired"
+        await self._seed_snapshot(factory, base_url, timedelta(minutes=90))
+        service = create_custom_fields_service(
+            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+        )
+        route = self._fresh_definitions_route(base_url)
+
+        async with create_backstop_client(base_url, _credential()) as client:
+            await service.ensure_fresh(client)
+
+        assert route.call_count == 1
+        assert [d.display_name for d in service.definitions_for("organizations")] == ["Fresh Field"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_load_cached_reports_stale_without_fetching(self, db: DatabaseFixture) -> None:
+        """The credential-free path still surfaces stale data, but flags it as not fresh."""
+        _, factory = db
+        base_url = f"{BASE_URL}/ttl-cached-only"
+        await self._seed_snapshot(factory, base_url, timedelta(minutes=90))
+        service = create_custom_fields_service(
+            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+        )
+        route = self._fresh_definitions_route(base_url)
+
+        await service.load_cached()
+
+        assert route.call_count == 0
+        assert service.is_fresh is False
+        assert [d.display_name for d in service.definitions_for("organizations")] == ["Stale Field"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_stale_snapshot_survives_a_failed_refresh(self, db: DatabaseFixture) -> None:
+        """Serving a stale glossary beats serving none when Backstop is unreachable."""
+        _, factory = db
+        base_url = f"{BASE_URL}/ttl-refresh-fails"
+        await self._seed_snapshot(factory, base_url, timedelta(minutes=90))
+        service = create_custom_fields_service(
+            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+        )
+        respx.get(f"{base_url}/custom-field-definitions").mock(
+            side_effect=httpx.ConnectError("backstop down")
+        )
+
+        with pytest.raises(httpx.ConnectError):
+            async with create_backstop_client(base_url, _credential()) as client:
+                await service.ensure_fresh(client)
+
+        assert [d.display_name for d in service.definitions_for("organizations")] == ["Stale Field"]

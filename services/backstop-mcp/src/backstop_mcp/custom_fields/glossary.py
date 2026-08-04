@@ -12,12 +12,15 @@ def format_glossary(
     entity_type: str,
     budget_chars: int = DEFAULT_GLOSSARY_BUDGET_CHARS,
 ) -> str:
-    """Compact glossary block for one entity type, truncated to `budget_chars`."""
+    """Compact glossary block for one entity type, truncated to `budget_chars`.
+
+    Returns `""` when there's nothing to advertise, so tool descriptions are left untouched
+    rather than carrying a placeholder. Definitions only ever come from a real Backstop
+    fetch (see `CustomFieldsService`), so "empty" means "schema not fetched yet" — and a
+    guess assembled from env overrides alone would be worse than saying nothing.
+    """
     if not definitions:
-        return (
-            f"\n\nCustom field glossary ({entity_type}): (none cached yet — "
-            + "call resolve_custom_field with refresh=true after connecting.)"
-        )
+        return ""
 
     header = f"\n\nCustom field glossary ({entity_type}):"
     lines = [header]

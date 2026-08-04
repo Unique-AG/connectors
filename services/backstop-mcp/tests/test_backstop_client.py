@@ -439,9 +439,7 @@ class TestSchemaAwareDeserialization:
     @respx.mock
     async def test_get_with_schema_mismatch_raises_schema_error(self) -> None:
         # Missing the required `label` field.
-        respx.get(f"{_BASE_URL}/widgets/1").mock(
-            return_value=httpx.Response(200, json={"id": "1"})
-        )
+        respx.get(f"{_BASE_URL}/widgets/1").mock(return_value=httpx.Response(200, json={"id": "1"}))
 
         async with create_backstop_client(_BASE_URL, _credential()) as client:
             with pytest.raises(BackstopResponseSchemaError) as exc_info:

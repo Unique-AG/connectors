@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import datetime
 from typing import cast
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backstop_mcp.custom_fields.types import AllowedValue, CustomFieldDefinition
@@ -33,9 +33,7 @@ def definition_to_payload(definition: CustomFieldDefinition) -> dict[str, object
         "field_type": definition.field_type,
         "field_type_display": definition.field_type_display,
         "is_time_series": definition.is_time_series,
-        "allowed_values": [
-            {"id": v.id, "label": v.label} for v in definition.allowed_values
-        ],
+        "allowed_values": [{"id": v.id, "label": v.label} for v in definition.allowed_values],
         "raw": definition.raw,
     }
 
@@ -57,9 +55,7 @@ def definition_from_payload(payload: dict[str, object]) -> CustomFieldDefinition
             )
         )
 
-    aliases = tuple(
-        a for a in _as_object_list(payload.get("aliases")) if isinstance(a, str)
-    )
+    aliases = tuple(a for a in _as_object_list(payload.get("aliases")) if isinstance(a, str))
 
     raw_dict = _as_object_dict(payload.get("raw"))
     return CustomFieldDefinition(
@@ -83,9 +79,15 @@ def definition_from_payload(payload: dict[str, object]) -> CustomFieldDefinition
     )
 
 
-async def load_snapshot(
-    session: AsyncSession, base_url: str
-) -> list[CustomFieldDefinition] | None:
+@dataclass(frozen=True)
+class StoredSnapshot:
+    """A persisted schema snapshot plus when it was fetched, so callers can judge staleness."""
+
+    definitions: list[CustomFieldDefinition]
+    fetched_at: datetime
+
+
+async def load_snapshot(session: AsyncSession, base_url: str) -> StoredSnapshot | None:
     row = await session.get(CustomFieldSchemaSnapshot, base_url)
     if row is None:
         return None
@@ -94,30 +96,26 @@ async def load_snapshot(
         item_dict = _as_object_dict(item)
         if item_dict is not None:
             definitions.append(definition_from_payload(item_dict))
-    return definitions
+    return StoredSnapshot(definitions=definitions, fetched_at=row.fetched_at)
 
 
 async def save_snapshot(
     session: AsyncSession,
     base_url: str,
     definitions: list[CustomFieldDefinition],
+    fetched_at: datetime,
 ) -> None:
+    """Upsert the snapshot for `base_url`, stamped with the caller's fetch time.
+
+    `fetched_at` is passed in rather than read from the clock here so the caller that also
+    tracks freshness in memory stamps both from a single reading.
+    """
     payload: object = [definition_to_payload(d) for d in definitions]
     row = await session.get(CustomFieldSchemaSnapshot, base_url)
-    now = datetime.now(UTC)
     if row is None:
         session.add(
-            CustomFieldSchemaSnapshot(base_url=base_url, payload=payload, fetched_at=now)
+            CustomFieldSchemaSnapshot(base_url=base_url, payload=payload, fetched_at=fetched_at)
         )
     else:
         row.payload = payload
-        row.fetched_at = now
-
-
-async def snapshot_exists(session: AsyncSession, base_url: str) -> bool:
-    result = await session.execute(
-        select(CustomFieldSchemaSnapshot.base_url).where(
-            CustomFieldSchemaSnapshot.base_url == base_url
-        )
-    )
-    return result.scalar_one_or_none() is not None
+        row.fetched_at = fetched_at
