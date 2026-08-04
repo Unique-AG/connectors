@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import cast
 
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backstop_mcp.custom_fields.types import AllowedValue, CustomFieldDefinition
@@ -109,13 +111,19 @@ async def save_snapshot(
 
     `fetched_at` is passed in rather than read from the clock here so the caller that also
     tracks freshness in memory stamps both from a single reading.
+
+    A single `ON CONFLICT DO UPDATE` rather than read-then-insert-or-update: replicas that
+    expire together race to write the same row, and the read-first form lets both see no row
+    and both INSERT, failing one on the primary key. Last writer wins, which is fine — they
+    fetched the same schema.
     """
     payload: object = [definition_to_payload(d) for d in definitions]
-    row = await session.get(CustomFieldSchemaSnapshot, base_url)
-    if row is None:
-        session.add(
-            CustomFieldSchemaSnapshot(base_url=base_url, payload=payload, fetched_at=fetched_at)
+    statement = pg_insert(CustomFieldSchemaSnapshot).values(
+        base_url=base_url, payload=payload, fetched_at=fetched_at
+    )
+    await session.execute(
+        statement.on_conflict_do_update(
+            index_elements=[CustomFieldSchemaSnapshot.base_url],
+            set_={"payload": payload, "fetched_at": fetched_at, "updated_at": func.now()},
         )
-    else:
-        row.payload = payload
-        row.fetched_at = fetched_at
+    )

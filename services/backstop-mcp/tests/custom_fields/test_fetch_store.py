@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -14,6 +15,7 @@ from backstop_mcp.custom_fields import (
     create_custom_fields_service,
 )
 from backstop_mcp.custom_fields.fetch import extract_allowed_values
+from backstop_mcp.custom_fields.service import CustomFieldsService
 from backstop_mcp.custom_fields.store import load_snapshot, save_snapshot
 from backstop_mcp.custom_fields.types import CustomFieldDefinition, FieldResolved
 from backstop_mcp.db.engine import get_session
@@ -238,6 +240,58 @@ class TestSnapshotStaleness:
         assert route.call_count == 0
         assert service.is_fresh is False
         assert [d.display_name for d in service.definitions_for("organizations")] == ["Stale Field"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_replica_picks_up_a_siblings_refresh_without_refetching(
+        self, db: DatabaseFixture
+    ) -> None:
+        """Freshness lives in the DB row, so one replica's fetch spares the others."""
+        _, factory = db
+        base_url = f"{BASE_URL}/ttl-two-replicas"
+        await self._seed_snapshot(factory, base_url, timedelta(minutes=90))
+        route = self._fresh_definitions_route(base_url)
+
+        def replica() -> CustomFieldsService:
+            return create_custom_fields_service(
+                session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+            )
+
+        first, second = replica(), replica()
+        # Both load the same expired snapshot into memory, as two pods would.
+        await first.load_cached()
+        await second.load_cached()
+        assert first.is_fresh is False
+        assert second.is_fresh is False
+
+        async with create_backstop_client(base_url, _credential()) as client:
+            await first.ensure_fresh(client)
+            await second.ensure_fresh(client)
+
+        assert route.call_count == 1
+        assert [d.display_name for d in second.definitions_for("organizations")] == ["Fresh Field"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_concurrent_first_writes_do_not_collide(self, db: DatabaseFixture) -> None:
+        """Two replicas cold-starting together must not race each other onto the primary key."""
+        _, factory = db
+        base_url = f"{BASE_URL}/ttl-write-race"
+        self._fresh_definitions_route(base_url)
+
+        async def warm() -> None:
+            service = create_custom_fields_service(
+                session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+            )
+            async with create_backstop_client(base_url, _credential()) as client:
+                await service.ensure_fresh(client)
+
+        await asyncio.gather(warm(), warm(), warm())
+
+        async with get_session(factory) as session:
+            stored = await load_snapshot(session, base_url)
+        assert stored is not None
+        assert [d.display_name for d in stored.definitions] == ["Fresh Field"]
 
     @pytest.mark.asyncio
     @respx.mock

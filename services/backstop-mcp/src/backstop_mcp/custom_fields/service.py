@@ -40,7 +40,6 @@ class CustomFieldsService:
     ttl: timedelta
     _index: dict[str, list[CustomFieldDefinition]]
     _lock: asyncio.Lock
-    _loaded_from_db: bool
     _fetched_at: datetime | None
 
     @property
@@ -63,18 +62,22 @@ class CustomFieldsService:
     async def load_cached(self) -> None:
         """Populate the index from the persisted snapshot. Never contacts Backstop.
 
-        Safe for callers with no credential (e.g. enriching a tool listing). Says nothing
-        about freshness — check `is_fresh` afterwards and call `ensure_fresh` if it matters.
+        Safe for callers with no credential (e.g. enriching a tool listing). Re-reads the row
+        whenever the in-memory copy isn't fresh, so a replica picks up a sibling's refresh
+        instead of trusting its own aged copy; once fresh it's a pure memory read.
         """
         async with self._lock:
-            if not self._loaded_from_db:
+            if not self.is_fresh:
                 await self._load_from_db_unlocked()
 
     async def ensure_fresh(self, client: BackstopClient) -> None:
-        """Fetch from Backstop unless the current snapshot is still within `ttl`."""
+        """Fetch from Backstop unless the snapshot — in memory or in the DB — is within `ttl`."""
         async with self._lock:
-            if not self._loaded_from_db:
-                await self._load_from_db_unlocked()
+            if self.is_fresh:
+                return
+            # Another replica may have refreshed since this process last looked; a primary-key
+            # lookup is far cheaper than re-paginating the whole schema.
+            await self._load_from_db_unlocked()
             if self.is_fresh:
                 return
             await self._refresh_unlocked(client)
@@ -103,7 +106,6 @@ class CustomFieldsService:
             snapshot = await load_snapshot(session, self.base_url)
         self._index = build_index(snapshot.definitions if snapshot is not None else [])
         self._fetched_at = snapshot.fetched_at if snapshot is not None else None
-        self._loaded_from_db = True
 
     async def _refresh_unlocked(self, client: BackstopClient) -> list[CustomFieldDefinition]:
         definitions = await fetch_custom_field_definitions(client, self.overrides)
@@ -112,7 +114,6 @@ class CustomFieldsService:
             await save_snapshot(session, self.base_url, definitions, fetched_at)
         self._index = build_index(definitions)
         self._fetched_at = fetched_at
-        self._loaded_from_db = True
         return definitions
 
 
@@ -145,7 +146,6 @@ def create_custom_fields_service(
         ttl=timedelta(minutes=ttl_minutes),
         _index={},
         _lock=asyncio.Lock(),
-        _loaded_from_db=False,
         _fetched_at=None,
     )
 
