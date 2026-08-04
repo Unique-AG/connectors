@@ -12,9 +12,9 @@ Enabling Recordings & Transcripts means configuring **two** systems: the [Teams 
 |---|---|
 | **Teams MCP Server deployed** | See [Teams MCP - Deployment](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1802141709/Teams+MCP+-+Deployment) |
 | **RabbitMQ** | Required for the ingestion pipeline; chat-only deployments do not need it |
-| **Admin consent granted** | `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` — see [Grant admin consent](#grant-admin-consent) |
-| **Zitadel service account** | With the roles listed below — see [Zitadel service account](#zitadel-service-account) |
-| **Root scope created** | Created manually in Unique before deployment — see [Root scope](#root-scope) |
+| **Admin consent granted** | `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` — see [Grant admin consent](#Grant-admin-consent) |
+| **Zitadel service account** | With the roles listed below — see [Zitadel service account](#Zitadel-service-account) |
+| **Root scope created** | Created manually in Unique before deployment — see [Root scope](#Root-scope) |
 | **Teams transcription enabled** | By Microsoft Teams meeting policy, otherwise there is nothing to capture |
 
 ## Grant admin consent
@@ -33,7 +33,7 @@ The consent prompt lists every scope the capture-enabled server requests — the
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `8ddffb12-1579-4fa8-8844-ca122e4308bc`.
 
-Self-hosted deployments provision their own app registration instead — see [Teams MCP - Authentication](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1803026436/Teams+MCP+-+Authentication#self-hosted), and add the two meeting-content scopes to it.
+Self-hosted deployments provision their own app registration instead — see [Teams MCP - Authentication](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1803026436/Teams+MCP+-+Authentication#Self-Hosted), and add the two meeting-content scopes to it.
 
 ## Enable ingestion on the Teams MCP Server
 
@@ -183,7 +183,7 @@ For Unique SaaS deployments, Unique applies the flag and both settings for you; 
     - [ ] Service account granted `MANAGE`, `READ`, `WRITE` on the root scope
 2. **Microsoft Entra ID**
     - [ ] `OnlineMeetingTranscript.Read.All` and `OnlineMeetingRecording.Read.All` added
-    - [ ] Admin consent granted for both — see [Grant admin consent](#grant-admin-consent)
+    - [ ] Admin consent granted for both — see [Grant admin consent](#Grant-admin-consent)
     - [ ] Teams meeting policy has transcription enabled
 3. **Teams MCP Server**
     - [ ] RabbitMQ reachable

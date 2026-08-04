@@ -3,7 +3,7 @@
 
 The Teams MCP Server always exposes **8 chat & messaging tools**, which interact with Microsoft Teams chats and channels synchronously through the Microsoft Graph API: list teams/channels/chats, read messages, search across messages, and send messages.
 
-Four further tools exist only in deployments with meeting-transcript capture enabled — see [Transcript & Knowledge-Base Management](#transcript--knowledge-base-management) below.
+Four further tools exist only in deployments with meeting-transcript capture enabled — see [Transcript & Knowledge-Base Management](#Transcript-&-Knowledge-Base-Management) below.
 
 Chat and messaging tools target chats and channels by id: you discover the id with a `list_*` tool (or `search_messages`), then pass it to the tool that reads or writes:
 
@@ -337,7 +337,7 @@ Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messag
 
 When `UNIQUE_INTEGRATION=enabled`, four additional tools manage meeting-transcript capture into the Unique knowledge base: `ingest_meeting`, `verify_kb_integration_status`, `start_kb_integration`, and `stop_kb_integration`. They are not registered in a chat-only deployment.
 
-Their full reference — parameters, return values, and the subscription behaviour behind them — is in [Recordings & Transcripts — Ingestion tools](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#ingestion-tools).
+Their full reference — parameters, return values, and the subscription behaviour behind them — is in [Recordings & Transcripts — Ingestion tools](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2399993877/Recordings+Transcripts+-+Technical+Manual#Ingestion-tools).
 
 ---
 
