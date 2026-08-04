@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
 from backstop_mcp.backstop_client.client import reset_shared_backstop_state_for_tests
+from backstop_mcp.custom_fields import reset_custom_fields_service_for_tests
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
@@ -24,6 +25,7 @@ async def _reset_backstop_client_singletons() -> AsyncGenerator[None]:
     """
     yield
     await reset_shared_backstop_state_for_tests()
+    reset_custom_fields_service_for_tests()
 
 
 @pytest.fixture(scope="session")

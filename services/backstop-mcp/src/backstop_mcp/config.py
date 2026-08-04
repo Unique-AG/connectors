@@ -5,8 +5,19 @@ from importlib.metadata import version as pkg_version
 from typing import ClassVar, TypedDict, cast
 from urllib.parse import parse_qsl, quote_plus, urlencode, urlparse, urlunparse
 
-from pydantic import Field, PrivateAttr, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class CustomFieldOverrideConfig(BaseModel):
+    """Human-facing overlay for a CRM custom-field definition (env JSON value)."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+    display_name: str | None = None
+    aliases: list[str] = Field(default_factory=list)
+    description: str | None = None
+
 
 PKG_VERSION = pkg_version("backstop-mcp")
 
@@ -136,6 +147,13 @@ class BackstopConfig(BaseSettings):
     # Default page size for /reports and /analytics pagination; Backstop recommends not
     # exceeding 500 records per report page.
     report_page_size: int = Field(default=500, ge=1, le=500)
+
+    # Optional human overlays for weird CRM custom-field names (e.g. `is1` → Investor Status).
+    # Env value is JSON: {"organizations:is1": {"display_name": "...", "aliases": [...]}}.
+    # Keys are entityType:crmName — see custom_fields/overrides.py. crmName is the CRM's own
+    # field identifier, unique per entity type and stable across tenants, unlike the numeric
+    # definitionId (which is opaque and differs per Backstop instance).
+    custom_field_overrides: dict[str, CustomFieldOverrideConfig] = Field(default_factory=dict)
 
 
 class DatabaseConfig(BaseSettings):

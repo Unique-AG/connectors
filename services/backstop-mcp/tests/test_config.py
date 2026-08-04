@@ -56,6 +56,7 @@ class TestBackstopConfigDefaults:
         assert config.max_retry_wait_ms == 30_000
         assert config.default_page_size == 100
         assert config.report_page_size == 500
+        assert config.custom_field_overrides == {}
 
     def test_env_vars_override_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKSTOP_DEFAULT_TIMEOUT_SECONDS", "45.5")

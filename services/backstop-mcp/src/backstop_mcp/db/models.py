@@ -116,3 +116,17 @@ class BackstopCredential(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class CustomFieldSchemaSnapshot(Base):
+    """Cached Backstop custom-field definitions for one API base_url (one instance)."""
+
+    __tablename__: str = "custom_field_schema_snapshots"
+
+    base_url: Mapped[str] = mapped_column(String, primary_key=True)
+    payload: Mapped[object] = mapped_column(JSON)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

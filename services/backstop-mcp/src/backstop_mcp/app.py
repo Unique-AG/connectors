@@ -9,11 +9,18 @@ from backstop_mcp.auth import context as auth_context
 from backstop_mcp.auth.crypto import load_key
 from backstop_mcp.auth.provider import BackstopOAuthProvider
 from backstop_mcp.config import AppConfig, BackstopConfig, DatabaseConfig, EncryptionConfig
+from backstop_mcp.custom_fields import (
+    configure_custom_fields_service,
+    create_custom_fields_service,
+)
+from backstop_mcp.custom_fields.middleware import CustomFieldGlossaryMiddleware
 from backstop_mcp.db.engine import create_engine, create_session_factory
 from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics, metrics_endpoint
 from backstop_mcp.middleware import TraceContextMiddleware
 from backstop_mcp.tools.get_organization import get_organization
+from backstop_mcp.tools.get_organization_custom_field import get_organization_custom_field
+from backstop_mcp.tools.resolve_custom_field import resolve_custom_field
 from backstop_mcp.tools.system_info import get_system_info
 
 
@@ -48,10 +55,24 @@ def create_app(
             revoke_tokens_for_subject=auth_provider.revoke_token_family_for_subject,
         )
     )
+    configure_custom_fields_service(
+        create_custom_fields_service(
+            session_factory=session_factory,
+            base_url=backstop_config.base_url,
+            overrides=backstop_config.custom_field_overrides,
+        )
+    )
 
-    mcp = FastMCP("Backstop MCP", version=config.version, auth=auth_provider)
+    mcp = FastMCP(
+        "Backstop MCP",
+        version=config.version,
+        auth=auth_provider,
+        middleware=[CustomFieldGlossaryMiddleware()],
+    )
     mcp.tool(get_system_info)
     mcp.tool(get_organization)
+    mcp.tool(resolve_custom_field)
+    mcp.tool(get_organization_custom_field)
 
     @mcp.custom_route("/health", methods=["GET"])
     async def health(_request: Request) -> JSONResponse:
