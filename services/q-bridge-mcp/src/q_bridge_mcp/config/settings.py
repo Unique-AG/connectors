@@ -53,6 +53,10 @@ class Settings(BaseSettings):
         min_length=44,
         description="Fernet key used to encrypt OAuth storage",
     )
+    unique_api_base_url: AnyHttpUrl = Field(
+        default=AnyHttpUrl("https://gateway.unique.app/public/chat-gen2"),
+        description="Base URL of the Unique Public API",
+    )
 
     redis_host: str | None = Field(
         default=None,

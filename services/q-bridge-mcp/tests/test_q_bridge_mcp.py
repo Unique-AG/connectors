@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from fastmcp.server.auth import AccessToken
@@ -7,13 +8,25 @@ from q_bridge_mcp.auth.setup import REQUIRED_SCOPES, setup_auth
 from q_bridge_mcp.config.settings import settings
 from q_bridge_mcp.dependencies import get_company_id, get_user_id
 from q_bridge_mcp.main import main
+from q_bridge_mcp.profiles.dependencies import QBridgeConfiguration
+from q_bridge_mcp.profiles.models import OrganizationCredentials, UserProfile
 from q_bridge_mcp.server import create_server
 from q_bridge_mcp.tools.hello import hello_world
 
 
 def test_hello_world_greets_authenticated_user() -> None:
+    configuration = QBridgeConfiguration(
+        profile=UserProfile(skillsRootFolder="Skills"),
+        credentials=OrganizationCredentials(
+            appId="app-123",
+            apiKey="secret",
+            configuredBy="user-123",
+            updatedAt=datetime(2026, 8, 4, tzinfo=UTC),
+        ),
+    )
+
     assert (
-        hello_world("Ada Lovelace", "user-123", "company-456")
+        hello_world("Ada Lovelace", "user-123", "company-456", configuration)
         == "Hello, Ada Lovelace! (user-id: user-123, company-id: company-456)"
     )
 
@@ -34,16 +47,51 @@ def test_dependencies_extract_zitadel_claims() -> None:
 
 
 @patch("q_bridge_mcp.server.setup_auth", return_value=None)
-def test_registers_only_hello_world_tool(setup_auth: MagicMock) -> None:
+def test_registers_hello_world_and_profile_settings_tools(
+    setup_auth: MagicMock,
+) -> None:
     server = create_server()
     tools = asyncio.run(server.list_tools())
 
-    assert [tool.name for tool in tools] == ["hello_world"]
+    assert [tool.name for tool in tools] == [
+        "hello_world",
+        "save_profile",
+        "save_organization_credentials",
+        "profile_settings",
+    ]
     assert tools[0].parameters == {
         "additionalProperties": False,
         "properties": {},
         "type": "object",
     }
+    assert tools[1].parameters == {
+        "additionalProperties": False,
+        "properties": {"skills_root_folder": {"type": "string"}},
+        "required": ["skills_root_folder"],
+        "type": "object",
+    }
+    assert tools[1].meta is not None
+    assert tools[1].meta["ui"]["visibility"] == ["app"]
+    assert tools[2].parameters == {
+        "additionalProperties": False,
+        "properties": {
+            "api_key": {"type": "string"},
+            "app_id": {"type": "string"},
+        },
+        "required": ["app_id", "api_key"],
+        "type": "object",
+    }
+    assert tools[2].meta is not None
+    assert tools[2].meta["ui"]["visibility"] == ["app"]
+    assert tools[3].parameters == {
+        "additionalProperties": False,
+        "properties": {},
+        "type": "object",
+    }
+    assert tools[3].meta is not None
+    assert tools[3].meta["ui"]["visibility"] == ["model"]
+    assert server.instructions is not None
+    assert "profile_settings" in server.instructions
     setup_auth.assert_called_once_with()
 
 
