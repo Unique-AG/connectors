@@ -352,30 +352,43 @@ class BackstopOAuthProvider(OAuthProvider):
         code = secrets.token_urlsafe(32)
         code_expires_at = (datetime.now(UTC) + self.AUTHORIZATION_CODE_TTL).timestamp()
 
+        # Same frozen-decision pattern as `exchange_authorization_code`: decide inside the
+        # transaction, return only after it closes.
+        already_claimed = False
+
         async with transaction(self._session_factory) as session:
-            user_id = await find_user_id_by_username(session, username) or str(uuid.uuid4())
-            await save_credential(
-                session,
-                user_id,
-                BackstopCredentialSecret(username=username, api_token=SecretStr(api_token)),
-                self._encryption_key,
-            )
-            session.add(
-                AuthorizationCodeRow(
-                    code=code,
-                    client_id=pending.client_id,
-                    scopes=pending.scopes,
-                    code_challenge=pending.code_challenge,
-                    redirect_uri=pending.redirect_uri,
-                    redirect_uri_provided_explicitly=pending.redirect_uri_provided_explicitly,
-                    resource=pending.resource,
-                    subject=user_id,
-                    expires_at=code_expires_at,
-                )
-            )
-            await session.execute(
+            # Pending authorizations are single-use. `DELETE ... WHERE request_id = ...`
+            # claims the row atomically — under concurrent submits for the same request,
+            # only one transaction's delete affects a row; the other must not mint a code.
+            claim = await session.execute(
                 delete(PendingAuthorization).where(PendingAuthorization.request_id == request_id)
             )
+            if claim.rowcount == 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+                already_claimed = True
+            else:
+                user_id = await find_user_id_by_username(session, username) or str(uuid.uuid4())
+                await save_credential(
+                    session,
+                    user_id,
+                    BackstopCredentialSecret(username=username, api_token=SecretStr(api_token)),
+                    self._encryption_key,
+                )
+                session.add(
+                    AuthorizationCodeRow(
+                        code=code,
+                        client_id=pending.client_id,
+                        scopes=pending.scopes,
+                        code_challenge=pending.code_challenge,
+                        redirect_uri=pending.redirect_uri,
+                        redirect_uri_provided_explicitly=pending.redirect_uri_provided_explicitly,
+                        resource=pending.resource,
+                        subject=user_id,
+                        expires_at=code_expires_at,
+                    )
+                )
+
+        if already_claimed:
+            return self._expired_link_response()
 
         redirect_url = construct_redirect_uri(pending.redirect_uri, code=code, state=pending.state)
         response = RedirectResponse(redirect_url, status_code=302, headers=_LOGIN_SECURITY_HEADERS)

@@ -36,9 +36,8 @@ _TOKEN_HEADER = "token"
 
 
 def _errors_for_log(errors: tuple[BackstopErrorDetail, ...]) -> list[dict[str, str | None]]:
-    return [
-        {"code": error.code, "title": error.title, "detail": error.detail} for error in errors
-    ]
+    return [{"code": error.code, "title": error.title, "detail": error.detail} for error in errors]
+
 
 type AuthFailureHook = Callable[[], Awaitable[None]]
 type HttpClientProvider = Callable[[], Awaitable[httpx.AsyncClient]]

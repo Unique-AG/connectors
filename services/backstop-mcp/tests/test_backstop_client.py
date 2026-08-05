@@ -576,7 +576,8 @@ class TestUntrustedNextLink:
         with pytest.raises(BackstopUntrustedUrlError) as exc_info:
             await factory.for_credential(_credential()).paginate("/records")
 
-        assert "evil.example.com" in str(exc_info.value)
+        assert exc_info.value.url == "https://evil.example.com/records"
+        assert exc_info.value.expected_host == httpx.URL(_BASE_URL).netloc.decode("ascii")
 
     @pytest.mark.asyncio
     @respx.mock

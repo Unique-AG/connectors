@@ -209,6 +209,36 @@ class TestLoginFormSubmission:
             pending = await session.get(PendingAuthorization, request_id)
         assert pending is not None
 
+    @pytest.mark.asyncio
+    async def test_concurrent_login_only_mints_one_code(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
+        provider = _make_provider(db)
+        client_info = await _register_client(provider, "provider-client-login-race")
+        redirect_url = await provider.authorize(client_info, _authorization_params())
+        request_id = parse_qs(urlparse(redirect_url).query)["request_id"][0]
+
+        results = await asyncio.gather(
+            provider.handle_login_post(
+                _login_post_request(request_id, "pv-login.race", "token-login-race")
+            ),
+            provider.handle_login_post(
+                _login_post_request(request_id, "pv-login.race", "token-login-race")
+            ),
+        )
+
+        redirects = [response for response in results if response.status_code == 302]
+        rejected = [response for response in results if response.status_code == 400]
+        assert len(redirects) == 1
+        assert len(rejected) == 1
+        assert "code" in parse_qs(urlparse(redirects[0].headers["location"]).query)
+
+        _, factory = db
+        async with factory() as session:
+            pending = await session.get(PendingAuthorization, request_id)
+        assert pending is None
+
 
 class TestLoginCsrf:
     """Double-submit CSRF protection on the login POST — see `auth/login_csrf.py`.
