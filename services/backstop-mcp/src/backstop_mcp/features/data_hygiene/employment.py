@@ -455,3 +455,49 @@ def _person_id(*, attrs: EntityRelationshipAttributes) -> str | None:
     else:
         return None
     return as_clean_str(person.resource_id)
+
+
+def build_person_employment_index(
+    *,
+    relationships: list[dict[str, object]],
+    relationship_types: list[dict[str, object]],
+    rules: EmploymentRules,
+    today: date,
+) -> EmploymentIndex:
+    """The `EmploymentIndex` for `entityRelationships` side-loaded off a person's own GET.
+
+    A person's own GET puts the person at `sourceEntity`, so `person_side=True`. The rest is
+    exactly `build_organization_employment_index`'s work: `person_side` carries no behavior yet
+    (see `_employment_edges`), so the only real difference between the two builders is which
+    literal value they pass.
+    """
+    edges = _employment_edges(
+        relationships=relationships,
+        relationship_types=relationship_types,
+        rules=rules,
+        today=today,
+        person_side=True,
+    )
+    return EmploymentIndex(edges)
+
+
+def build_organization_employment_index(
+    *,
+    relationships: list[dict[str, object]],
+    relationship_types: list[dict[str, object]],
+    rules: EmploymentRules,
+    today: date,
+) -> EmploymentIndex:
+    """The `EmploymentIndex` for `entityRelationships` side-loaded off an organization's own GET.
+
+    An organization's own GET puts the person at `destinationEntity`, so `person_side=False` —
+    the mirror image of `build_person_employment_index`.
+    """
+    edges = _employment_edges(
+        relationships=relationships,
+        relationship_types=relationship_types,
+        rules=rules,
+        today=today,
+        person_side=False,
+    )
+    return EmploymentIndex(edges)
