@@ -3,6 +3,7 @@ from typing import Annotated
 from pydantic import BaseModel, Field, StringConstraints
 
 from backstop_mcp.backstop_client.errors import BackstopUnexpectedCollectionError
+from backstop_mcp.coerce import as_clean_str
 
 # PEP 695 generic syntax (not typing.Generic/TypeVar) — pydantic 2.13 resolves
 # `BackstopApiResource[SomeModel]` to a concrete model at runtime either way, but this form
@@ -47,6 +48,10 @@ class BackstopApiResource[AttrT](BaseModel):
 
 class BackstopApiDocument[AttrT](BaseModel):
     data: BackstopApiResource[AttrT] | list[BackstopApiResource[AttrT]] | None
+    # JSON:API puts `?include=`d resources here — same field pagination keeps on each page.
+    # Without it, a by-id GET with `?include=entityRelationships` would silently drop the
+    # side-loaded resources the caller paid a request to fetch.
+    included: list[dict[str, object]] = Field(default_factory=list)
 
 
 def single_resource[AttrT](
@@ -61,3 +66,36 @@ def single_resource[AttrT](
     if isinstance(document.data, list):
         raise BackstopUnexpectedCollectionError(path)
     return document.data
+
+
+def included_for_relationship[AttrT](
+    document: BackstopApiDocument[AttrT],
+    resource: BackstopApiResource[AttrT],
+    relationship_name: str,
+) -> list[dict[str, object]]:
+    """Side-loaded resources linked from `resource` via `relationship_name`.
+
+    Matches `included` entries by id against `resource.related_ids(relationship_name)`. Order
+    follows the relationship linkage, not the `included` array order.
+    """
+    wanted = resource.related_ids(relationship_name)
+    if not wanted:
+        return []
+    by_id = {
+        item_id: item
+        for item in document.included
+        if (item_id := as_clean_str(item.get("id"))) is not None
+    }
+    return [by_id[related_id] for related_id in wanted if related_id in by_id]
+
+
+def included_of_type[AttrT](
+    document: BackstopApiDocument[AttrT], resource_type: str
+) -> list[dict[str, object]]:
+    """Every side-loaded resource carrying one JSON:API `type`.
+
+    Selected by `type` rather than followed from a linkage, because a nested include
+    (`entityRelationships.entityRelationshipType`) puts the second hop's resources in the same
+    `included` array with nothing on the primary resource pointing at them.
+    """
+    return [item for item in document.included if as_clean_str(item.get("type")) == resource_type]

@@ -2,8 +2,7 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
-from backstop_mcp.backstop_client.factory import BackstopClientFactory
+from backstop_mcp.backstop_client import BackstopClientFactory, BackstopCredentialSecret
 from backstop_mcp.features.custom_fields.service import CustomFieldsService
 from backstop_mcp.logging import get_logger
 

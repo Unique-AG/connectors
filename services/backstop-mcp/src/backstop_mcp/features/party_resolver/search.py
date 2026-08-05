@@ -2,8 +2,7 @@ import asyncio
 from collections.abc import Mapping, Sequence
 from urllib.parse import quote
 
-from backstop_mcp.backstop_client.client import BackstopClient
-from backstop_mcp.backstop_client.json_api import BackstopApiDocument, BackstopApiResource
+from backstop_mcp.backstop_client import BackstopApiDocument, BackstopApiResource, BackstopClient
 from backstop_mcp.features.party_resolver.email import looks_like_email
 from backstop_mcp.features.party_resolver.types import (
     PartyAttributes,

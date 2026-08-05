@@ -24,8 +24,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from backstop_mcp.db.engine import read_session, transaction
-from backstop_mcp.db.models import LoginAttempt
+from backstop_mcp.db import LoginAttempt, read_session, transaction
 from backstop_mcp.logging import get_logger
 
 logger = get_logger(__name__)

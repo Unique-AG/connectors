@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from backstop_mcp.features.entity_types import KNOWN_ENTITY_TYPES
 from backstop_mcp.server.tools.get_organization import get_organization
 from backstop_mcp.server.tools.get_organization_custom_field import get_organization_custom_field
+from backstop_mcp.server.tools.get_person import get_person
 from backstop_mcp.server.tools.resolve_custom_field import resolve_custom_field
 from backstop_mcp.server.tools.system_info import get_system_info
 
@@ -40,6 +41,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
     ToolSpec(get_system_info),
     ToolSpec(get_organization, glossary_entities=("organizations",)),
     ToolSpec(get_organization_custom_field, glossary_entities=("organizations",)),
+    ToolSpec(get_person, glossary_entities=("people",)),
     ToolSpec(resolve_custom_field, glossary_entities=KNOWN_ENTITY_TYPES),
 )
 

@@ -104,6 +104,40 @@ class TestWiring:
         _ = app_client
         assert get_services().backstop.settings.base_url == _BASE_URL
 
+    def test_the_departed_detector_owns_the_employment_types_create_app_was_given(
+        self, postgres_container: PostgresContainer, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`get_person` used to build `BackstopConfig()` itself, discarding what was injected.
+
+        Same failure as `test_the_factory_owns_the_settings_create_app_was_given`, and just as
+        silent: a tenant's configured relationship types would be ignored while the env-parsed
+        defaults quietly took over. The env var is set to something else entirely so a re-read
+        would produce a visibly different answer.
+        """
+        monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "from the environment")
+        monkeypatch.setenv(
+            "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "from the environment"
+        )
+        configs = {
+            **_configs(postgres_container),
+            "backstop_config": BackstopConfig(
+                base_url=_BASE_URL,
+                employment_relationship_type_ids=("ert-9",),
+                employment_relationship_type_markers=("placement at",),
+                former_employment_relationship_type_ids=("ert-10",),
+                former_employment_relationship_type_markers=("placement ended",),
+            ),
+        }
+        app = create_app(**configs)  # pyright: ignore[reportArgumentType]
+
+        with TestClient(app):
+            rules = get_services().departed_contacts.rules
+
+        assert rules.employment.type_ids == frozenset({"ert-9"})
+        assert rules.employment.name_markers == frozenset({"placement at"})
+        assert rules.former.type_ids == frozenset({"ert-10"})
+        assert rules.former.name_markers == frozenset({"placement ended"})
+
     def test_services_are_installed_for_tools_to_reach(self, app_client: TestClient) -> None:
         _ = app_client
         services = get_services()

@@ -7,7 +7,7 @@ never prompts the user.
 
 from fastmcp import Context
 
-from backstop_mcp.backstop_client.client import BackstopClient
+from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.custom_fields.index import FieldResolution, resolve_in_index
 from backstop_mcp.features.custom_fields.service import CustomFieldsService
 from backstop_mcp.features.resolution import Ambiguous, elicit_choice

@@ -1,4 +1,4 @@
-"""The two structural rules this package's layout depends on.
+"""The structural rules this package's layout depends on.
 
 1. **`features/` must not import `server/`.** `features/` is what the connector does; `server/`
    is how it's exposed over MCP. The server wires features together, so it imports them freely —
@@ -21,7 +21,24 @@
    deliberately *not* subject to this rule: it may read config freely (see `features/__init__.py`),
    because a feature is allowed to be configured — a transport is only allowed to be told.
 
-All three are asserted by walking the AST rather than importing anything, so a violation is
+4. **A package is entered through its `__init__`, never through its modules.** From outside,
+   `from backstop_mcp.features.data_hygiene import DepartedContactDetector` — not
+   `...data_hygiene.service import ...`, and certainly not `...data_hygiene.departed import
+   detect_departed_employment`. Each package's `__all__` is then the whole of what it promises,
+   and everything else is free to move.
+
+   This is what makes a package able to say "call it this way". `data_hygiene/departed.py`
+   decides nothing until it is handed an employment vocabulary, the side-loaded relationship
+   types and a clock; `DepartedContactDetector` supplies all three, from configuration, once.
+   Reaching past it is how the original bug happened — `get_person` assembled its own vocabulary
+   with `BackstopConfig()`, so whatever `create_app` had been given was silently ignored.
+   `__all__` alone is only a convention; this rule is what makes it hold.
+
+   Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
+   not among them: they are groupings whose `__init__` is documentation, so `features.resolution`
+   and `server.runtime` are themselves the unit being imported.
+
+All four are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
 """
 
@@ -37,6 +54,21 @@ _BACKSTOP_CLIENT = _SRC / "backstop_client"
 _SERVER_PREFIX = "backstop_mcp.server"
 _FEATURES_PREFIX = "backstop_mcp.features"
 _CONFIG_MODULE = "backstop_mcp.config"
+
+# Packages that publish a surface: outside code imports the package, never a module inside it.
+# Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
+# directly testable without being callable from production code that should go through the front
+# door. A new package belongs here as soon as its `__init__` exports anything.
+_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
+    "backstop_mcp.backstop_client",
+    "backstop_mcp.db",
+    "backstop_mcp.features.auth",
+    "backstop_mcp.features.custom_fields",
+    "backstop_mcp.features.data_hygiene",
+    "backstop_mcp.features.party_resolver",
+    "backstop_mcp.server.middleware",
+    "backstop_mcp.server.tools",
+)
 
 
 def _imported_modules(tree: ast.AST) -> list[tuple[str, int]]:
@@ -71,6 +103,39 @@ def _violations(source: pathlib.Path, prefix: str) -> list[str]:
         f"{source.relative_to(_SRC)}:{line} imports {module}"
         for module, line in _imported_modules(tree)
         if module == prefix or module.startswith(f"{prefix}.")
+    ]
+
+
+def _package_directory(package: str) -> pathlib.Path:
+    """`backstop_mcp.features.data_hygiene` → the directory that package's modules live in."""
+    return _SRC.joinpath(*package.split(".")[1:])
+
+
+def _is_inside(directory: pathlib.Path, package: str) -> bool:
+    return directory == _package_directory(package) or directory.is_relative_to(
+        _package_directory(package)
+    )
+
+
+def _internal_imports(source: str, directory: pathlib.Path) -> list[tuple[str, int]]:
+    """Modules of a public-surface package that `source` reaches past the `__init__` for.
+
+    A file inside a package may import its own package's modules freely — that is the package
+    composing itself — so the directory the file lives in, not its name, decides.
+    """
+    return [
+        (module, line)
+        for package in _PUBLIC_SURFACE_PACKAGES
+        if not _is_inside(directory, package)
+        for module, line in _imported_modules(ast.parse(source))
+        if module.startswith(f"{package}.")
+    ]
+
+
+def _internal_module_violations(source: pathlib.Path) -> list[str]:
+    return [
+        f"{source.relative_to(_SRC)}:{line} imports {module}"
+        for module, line in _internal_imports(source.read_text(), source.parent)
     ]
 
 
@@ -110,6 +175,35 @@ class TestTheDetectionItself:
         assert _imports_under("from backstop_mcp.config import BackstopConfig", _CONFIG_MODULE) == [
             "backstop_mcp.config"
         ]
+
+    def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
+        # Verbatim shape of the import `get_person.py` used to carry, alongside a
+        # `BackstopConfig()` it built itself.
+        assert _internal_imports(
+            "from backstop_mcp.features.data_hygiene.departed import detect_departed_employment",
+            _SRC / "server" / "tools",
+        ) == [("backstop_mcp.features.data_hygiene.departed", 1)]
+
+    def test_the_same_import_is_fine_inside_the_feature(self) -> None:
+        assert not _internal_imports(
+            "from backstop_mcp.features.data_hygiene.departed import detect_departed_employment",
+            _package_directory("backstop_mcp.features.data_hygiene"),
+        )
+
+    def test_catches_reaching_past_the_init_for_a_service_too(self) -> None:
+        """Not only the pure pieces: `service` is behind the front door as well."""
+        assert _internal_imports(
+            "from backstop_mcp.features.custom_fields.service import CustomFieldsService",
+            _SRC / "server",
+        ) == [("backstop_mcp.features.custom_fields.service", 1)]
+
+    def test_does_not_fire_on_the_package_root(self) -> None:
+        assert not _internal_imports(
+            "from backstop_mcp.features.data_hygiene import DepartedContactDetector\n"
+            + "from backstop_mcp.server.runtime import get_services\n"
+            + "from backstop_mcp.features.resolution import Resolved\n",
+            _SRC / "server" / "tools",
+        )
 
     def test_does_not_fire_on_a_name_that_merely_starts_with_the_prefix(self) -> None:
         assert not _imports_under("from backstop_mcp.serverless import thing", _SERVER_PREFIX)
@@ -168,5 +262,42 @@ class TestBackstopClientDoesNotImportConfig:
             + "from backstop_client/settings.py, which create_app translates BackstopConfig "
             + "into. Add the field to BackstopTransportSettings (or RetrySettings) and map it "
             + "in app.transport_settings instead:\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestPackagesAreEnteredThroughTheirInit:
+    def test_every_listed_package_actually_publishes_something(self) -> None:
+        """Guards the guard: a package with no `__all__` has no front door to insist on."""
+        for package in _PUBLIC_SURFACE_PACKAGES:
+            init = _package_directory(package) / "__init__.py"
+            assert init.is_file(), f"no __init__.py for {package}"
+            exported = [
+                node
+                for node in ast.walk(ast.parse(init.read_text()))
+                if isinstance(node, ast.Assign)
+                and any(
+                    isinstance(target, ast.Name) and target.id == "__all__"
+                    for target in node.targets
+                )
+            ]
+            assert exported, f"{package}/__init__.py declares no __all__"
+
+    def test_a_package_still_composes_its_own_modules(self) -> None:
+        """The rule is only meaningful if something inside the package assembles the parts."""
+        service = _package_directory("backstop_mcp.features.data_hygiene") / "service.py"
+        imported = {module for module, _line in _imported_modules(ast.parse(service.read_text()))}
+
+        assert "backstop_mcp.features.data_hygiene.departed" in imported
+
+    @pytest.mark.parametrize("source", sorted(_SRC.rglob("*.py")), ids=_source_id)
+    def test_no_module_reaches_past_another_packages_init(self, source: pathlib.Path) -> None:
+        violations = _internal_module_violations(source)
+        assert not violations, (
+            "import the package, not a module inside it — a package's __all__ is the whole of "
+            + "what it promises, and reaching past it means assembling collaborators the package "
+            + "is responsible for assembling (which is how a tool came to re-read "
+            + "BackstopConfig() and ignore what create_app was given). Export the name from that "
+            + "package's __init__ and import it from there:\n  "
             + "\n  ".join(violations)
         )

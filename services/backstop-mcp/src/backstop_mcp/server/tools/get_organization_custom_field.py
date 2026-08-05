@@ -11,6 +11,7 @@ from backstop_mcp.features.custom_fields import (
     resolve_field,
     unresolved_field_response,
 )
+from backstop_mcp.features.data_hygiene import AsOfEcho, as_of_echo
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyEcho,
@@ -27,6 +28,7 @@ class OrganizationCustomFieldResolvedResponse(BaseModel):
     value: object | None = None
     definition: CustomFieldDefinitionEcho
     resolved: ResolvedPartyEcho
+    as_of: AsOfEcho | None = None
 
 
 type GetOrganizationCustomFieldResponse = (
@@ -49,6 +51,9 @@ async def get_organization_custom_field(
     the custom field by human name/alias against the live instance schema and read its value
     via the correct regular or time-series path.
     Exactly one of party_id or search must be provided.
+
+    Regular-field reads include `as_of` provenance from the same entity GET. Relay it; do not
+    treat record age as a staleness verdict. Time-series reads omit `as_of` (no extra round trip).
     """
     client = await get_backstop_client()
 
@@ -77,7 +82,7 @@ async def get_organization_custom_field(
         return unresolved_field_response(field_result)
 
     party = party_result.value
-    value = await read_custom_field_value(
+    read = await read_custom_field_value(
         client,
         entity_type="organizations",
         entity_id=party.id,
@@ -85,7 +90,8 @@ async def get_organization_custom_field(
     )
 
     return OrganizationCustomFieldResolvedResponse(
-        value=value,
+        value=read.value,
         definition=definition_echo(field_result.value),
         resolved=party_echo(party),
+        as_of=as_of_echo(read.as_of),
     )

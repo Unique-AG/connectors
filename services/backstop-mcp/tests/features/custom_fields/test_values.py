@@ -60,16 +60,17 @@ class TestReadCustomFieldValue:
             )
         )
 
-        value = await read_custom_field_value(
+        read = await read_custom_field_value(
             client,
             entity_type="organizations",
             entity_id="o1",
             definition=_definition("55", is_time_series=False),
         )
 
-        assert value == "A"
+        assert read.value == "A"
         sent_url = str(route.calls.last.request.url)
         assert "regularCustomFieldValues" in sent_url
+        assert "modifiedTimestamp" in sent_url
         assert "timeSeriesCustomFieldValues" not in sent_url
 
     @pytest.mark.asyncio
@@ -88,14 +89,15 @@ class TestReadCustomFieldValue:
             )
         )
 
-        value = await read_custom_field_value(
+        read = await read_custom_field_value(
             client,
             entity_type="organizations",
             entity_id="o1",
             definition=_definition("77", is_time_series=True, name="Status History"),
         )
 
-        assert value == "Hot"
+        assert read.value == "Hot"
+        assert read.as_of is None
         sent_url = str(route.calls.last.request.url)
         assert "timeSeriesCustomFieldValues" in sent_url
         assert (
@@ -131,14 +133,14 @@ class TestReadCustomFieldValue:
             ]
         )
 
-        value = await read_custom_field_value(
+        read = await read_custom_field_value(
             client,
             entity_type="organizations",
             entity_id="o1",
             definition=_definition("77", is_time_series=True),
         )
 
-        assert value == "Hot"
+        assert read.value == "Hot"
         assert route.call_count == 2
 
     @pytest.mark.asyncio
@@ -163,14 +165,14 @@ class TestReadCustomFieldValue:
             )
         )
 
-        value = await read_custom_field_value(
+        read = await read_custom_field_value(
             client,
             entity_type="organizations",
             entity_id="o1",
             definition=_definition("77", is_time_series=True),
         )
 
-        assert value == "October"
+        assert read.value == "October"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -188,14 +190,14 @@ class TestReadCustomFieldValue:
             )
         )
 
-        value = await read_custom_field_value(
+        read = await read_custom_field_value(
             client,
             entity_type="organizations",
             entity_id="o1",
             definition=_definition("77", is_time_series=True),
         )
 
-        assert value == "Dated"
+        assert read.value == "Dated"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -204,14 +206,15 @@ class TestReadCustomFieldValue:
             return_value=httpx.Response(200, json={"data": [], "links": {}})
         )
 
-        value = await read_custom_field_value(
+        read = await read_custom_field_value(
             client,
             entity_type="organizations",
             entity_id="o1",
             definition=_definition("77", is_time_series=True),
         )
 
-        assert value is None
+        assert read.value is None
+        assert read.as_of is None
 
     @pytest.mark.asyncio
     @respx.mock
@@ -231,11 +234,43 @@ class TestReadCustomFieldValue:
             )
         )
 
-        value = await read_custom_field_value(
+        read = await read_custom_field_value(
             client,
             entity_type="organizations",
             entity_id="o1",
             definition=_definition("55", is_time_series=False),
         )
 
-        assert value is None
+        assert read.value is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_regular_path_extracts_as_of_from_same_get(self, client: BackstopClient) -> None:
+        respx.get(f"{BASE_URL}/organizations/o1").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "organizations",
+                        "id": "o1",
+                        "attributes": {
+                            "regularCustomFieldValues": [{"definitionId": "55", "value": "A"}],
+                            "modifiedTimestamp": "2024-06-01T12:00:00Z",
+                            "modifiedBy": "alice",
+                        },
+                    }
+                },
+            )
+        )
+
+        read = await read_custom_field_value(
+            client,
+            entity_type="organizations",
+            entity_id="o1",
+            definition=_definition("55", is_time_series=False),
+        )
+
+        assert read.value == "A"
+        assert read.as_of is not None
+        assert read.as_of.modified_timestamp == "2024-06-01T12:00:00Z"
+        assert read.as_of.modified_by == "alice"

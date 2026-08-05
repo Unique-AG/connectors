@@ -2,6 +2,7 @@ from backstop_mcp.features.custom_fields.entity_types import (
     KNOWN_ENTITY_TYPES,
     normalize_entity_type,
 )
+from backstop_mcp.features.custom_fields.glossary import format_glossaries
 from backstop_mcp.features.custom_fields.index import FieldCandidate, FieldResolution
 from backstop_mcp.features.custom_fields.overrides import FieldOverride
 from backstop_mcp.features.custom_fields.resolve import resolve_field
@@ -19,7 +20,8 @@ from backstop_mcp.features.custom_fields.service import (
     create_custom_fields_service,
 )
 from backstop_mcp.features.custom_fields.types import AllowedValue, CustomFieldDefinition
-from backstop_mcp.features.custom_fields.values import read_custom_field_value
+from backstop_mcp.features.custom_fields.values import CustomFieldValueRead, read_custom_field_value
+from backstop_mcp.features.custom_fields.warmup import warmup_lifespan
 
 __all__ = [
     "KNOWN_ENTITY_TYPES",
@@ -27,6 +29,7 @@ __all__ = [
     "AllowedValueEcho",
     "CustomFieldDefinition",
     "CustomFieldDefinitionEcho",
+    "CustomFieldValueRead",
     "CustomFieldsService",
     "FieldAmbiguousResponse",
     "FieldCandidate",
@@ -36,8 +39,10 @@ __all__ = [
     "create_custom_fields_service",
     "definition_echo",
     "field_candidate_echo",
+    "format_glossaries",
     "normalize_entity_type",
     "read_custom_field_value",
     "resolve_field",
     "unresolved_field_response",
+    "warmup_lifespan",
 ]

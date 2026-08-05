@@ -4,8 +4,8 @@ from typing import ClassVar
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from backstop_mcp.backstop_client.client import BackstopClient
-from backstop_mcp.db.engine import read_session, transaction
+from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.db import read_session, transaction
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
 from backstop_mcp.features.custom_fields.glossary import format_glossary

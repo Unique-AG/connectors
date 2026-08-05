@@ -5,8 +5,8 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import get_access_token
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
-from backstop_mcp.db.engine import read_session
+from backstop_mcp.backstop_client import BackstopCredentialSecret
+from backstop_mcp.db import read_session
 from backstop_mcp.features.auth.credential_store import get_credential
 
 

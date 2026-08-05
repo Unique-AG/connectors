@@ -12,6 +12,7 @@ from backstop_mcp.backstop_client.client import (
     BackstopAuthError,
     BackstopClient,
     BackstopUnreachableError,
+    CallerClientProvider,
     build_auth_headers,
 )
 from backstop_mcp.backstop_client.credential import (
@@ -30,11 +31,20 @@ from backstop_mcp.backstop_client.factory import (
     BackstopClientFactory,
     create_backstop_client_factory,
 )
+from backstop_mcp.backstop_client.json_api import (
+    BackstopApiDocument,
+    BackstopApiResource,
+    included_for_relationship,
+    included_of_type,
+    single_resource,
+)
 from backstop_mcp.backstop_client.pagination import PageResult
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
 
 __all__ = [
+    "BackstopApiDocument",
     "BackstopApiError",
+    "BackstopApiResource",
     "BackstopAuthError",
     "BackstopClient",
     "BackstopClientFactory",
@@ -47,8 +57,12 @@ __all__ = [
     "BackstopUnreachableError",
     "BackstopUntrustedUrlError",
     "CallerAuthContext",
+    "CallerClientProvider",
     "PageResult",
     "RetrySettings",
     "build_auth_headers",
     "create_backstop_client_factory",
+    "included_for_relationship",
+    "included_of_type",
+    "single_resource",
 ]

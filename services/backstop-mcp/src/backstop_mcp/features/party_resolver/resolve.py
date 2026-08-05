@@ -3,7 +3,7 @@ from collections.abc import Sequence
 
 from fastmcp import Context
 
-from backstop_mcp.backstop_client.client import BackstopClient
+from backstop_mcp.backstop_client import BackstopClient
 from backstop_mcp.features.party_resolver.email import looks_like_email
 from backstop_mcp.features.party_resolver.search import (
     fetch_party_name,

@@ -10,9 +10,12 @@ from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
-from backstop_mcp.backstop_client.factory import create_backstop_client_factory
-from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
+from backstop_mcp.backstop_client import (
+    BackstopCredentialSecret,
+    BackstopTransportSettings,
+    RetrySettings,
+    create_backstop_client_factory,
+)
 from backstop_mcp.config import (
     AppConfig,
     AuthConfig,
@@ -21,20 +24,25 @@ from backstop_mcp.config import (
     DatabaseConfig,
     EncryptionConfig,
 )
-from backstop_mcp.db.engine import create_engine, create_session_factory
-from backstop_mcp.features.auth.cleanup import cleanup_lifespan
-from backstop_mcp.features.auth.context import BackstopAuthContext
-from backstop_mcp.features.auth.crypto import load_key
-from backstop_mcp.features.auth.provider import BackstopOAuthProvider
-from backstop_mcp.features.auth.throttle import ThrottleConfig
-from backstop_mcp.features.custom_fields import FieldOverride, create_custom_fields_service
-from backstop_mcp.features.custom_fields.warmup import warmup_lifespan
+from backstop_mcp.db import create_engine, create_session_factory
+from backstop_mcp.features.auth import (
+    BackstopAuthContext,
+    BackstopOAuthProvider,
+    ThrottleConfig,
+    cleanup_lifespan,
+    load_key,
+)
+from backstop_mcp.features.custom_fields import (
+    FieldOverride,
+    create_custom_fields_service,
+    warmup_lifespan,
+)
+from backstop_mcp.features.data_hygiene import create_departed_contact_detector
 from backstop_mcp.logging import configure_logging, get_logger
 from backstop_mcp.metrics import configure_metrics, metrics_endpoint
-from backstop_mcp.server.middleware.custom_field_glossary import CustomFieldGlossaryMiddleware
-from backstop_mcp.server.middleware.trace_context import TraceContextMiddleware
+from backstop_mcp.server.middleware import CustomFieldGlossaryMiddleware, TraceContextMiddleware
 from backstop_mcp.server.runtime import Services, configure_services, reset_services
-from backstop_mcp.server.tools.registry import TOOL_SPECS, glossary_entities_by_tool_name
+from backstop_mcp.server.tools import TOOL_SPECS, glossary_entities_by_tool_name
 
 logger = get_logger(__name__)
 
@@ -98,7 +106,19 @@ def create_app(
         overrides=_field_overrides(backstop_config.custom_field_overrides),
         ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
     )
-    configure_services(Services(backstop=backstop_clients, custom_fields=custom_fields_service))
+    departed_contacts = create_departed_contact_detector(
+        employment_type_ids=backstop_config.employment_relationship_type_ids,
+        employment_type_markers=backstop_config.employment_relationship_type_markers,
+        former_type_ids=backstop_config.former_employment_relationship_type_ids,
+        former_type_markers=backstop_config.former_employment_relationship_type_markers,
+    )
+    configure_services(
+        Services(
+            backstop=backstop_clients,
+            custom_fields=custom_fields_service,
+            departed_contacts=departed_contacts,
+        )
+    )
 
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:

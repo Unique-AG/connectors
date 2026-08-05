@@ -1,0 +1,181 @@
+from collections.abc import Callable
+
+import httpx
+import pytest
+import respx
+
+from backstop_mcp.features.data_hygiene import AsOfEcho
+from backstop_mcp.features.party_resolver import (
+    PartyAmbiguousResponse,
+    PartyCandidateEcho,
+    ResolvedPartyEcho,
+)
+from backstop_mcp.server.tools.get_person import PersonResolvedResponse, get_person
+from tests.features.party_resolver.helpers import (
+    BASE_URL,
+    collection,
+    ctx_decline,
+    ctx_never_elicit,
+    resource,
+)
+
+type ConnectUser = Callable[..., object]
+
+
+EMPLOYEE_TYPE = "456439"
+FORMER_TYPE = "459795"
+
+_TYPE_NAMES = {EMPLOYEE_TYPE: "is employee of", FORMER_TYPE: "is a former employee of"}
+
+
+def _person_document(*type_ids: str) -> dict[str, object]:
+    """A person GET shaped like the real nested-include response.
+
+    One relationship per type id, all pointing at the same organization, with each type's own
+    resource side-loaded alongside them — which is where the type name comes from now.
+    """
+    relationships = [
+        {
+            "type": "entity-relationships",
+            "id": f"er{index}",
+            "attributes": {
+                "sourceEntity": {"resourceId": "p9", "resourceType": "people"},
+                "destinationEntity": {"resourceId": "o1", "resourceType": "organizations"},
+            },
+            "relationships": {
+                "entityRelationshipType": {
+                    "data": {"type": "entity-relationship-types", "id": type_id}
+                }
+            },
+        }
+        for index, type_id in enumerate(type_ids)
+    ]
+    types = [
+        {
+            "type": "entity-relationship-types",
+            "id": type_id,
+            "attributes": {"name": _TYPE_NAMES[type_id]},
+        }
+        for type_id in dict.fromkeys(type_ids)
+    ]
+    return {
+        "data": {
+            "type": "people",
+            "id": "p9",
+            "attributes": {
+                "name": "Jane Doe",
+                "modifiedTimestamp": "2023-01-01T00:00:00Z",
+                "modifiedBy": "crm-admin",
+            },
+            "relationships": {
+                "entityRelationships": {
+                    "data": [
+                        {"type": "entity-relationships", "id": item["id"]} for item in relationships
+                    ]
+                }
+            },
+        },
+        "included": [*relationships, *types],
+    }
+
+
+class TestGetPerson:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_unique_search_fetches_person_and_flags_departed(
+        self, connect_user: ConnectUser
+    ) -> None:
+        await connect_user("user-person-1", "person-bob")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("p9", "people", name="Jane Doe")),
+            )
+        )
+        person_get = respx.get(f"{BASE_URL}/people/p9").mock(
+            return_value=httpx.Response(200, json=_person_document(FORMER_TYPE))
+        )
+        types_get = respx.get(f"{BASE_URL}/entity-relationship-types").mock(
+            return_value=httpx.Response(200, json={"data": [], "links": {}})
+        )
+
+        result = await get_person(ctx_never_elicit(), search="Jane Doe")
+
+        assert isinstance(result, PersonResolvedResponse)
+        assert result.resolved == ResolvedPartyEcho(id="p9", type="people", name="Jane Doe")
+        assert result.departed is True
+        assert result.departed_detail is not None
+        assert result.departed_detail.signal == "former_relationship_type"
+        assert result.departed_detail.relationship_type_name == "is a former employee of"
+        assert result.departed_detail.organization_id == "o1"
+        # The type carried the signal; this tenant recorded no date.
+        assert result.departed_detail.end_date is None
+        assert result.as_of == AsOfEcho(
+            modified_timestamp="2023-01-01T00:00:00Z", modified_by="crm-admin"
+        )
+        # The nested hop is what populates each relationship's own type linkage, and it has to
+        # arrive on this one GET: without it the detector has no type id to classify.
+        sent = str(person_get.calls.last.request.url).replace("%3D", "=").replace("%2C", ",")
+        assert "include=entityRelationships,entityRelationships.entityRelationshipType" in sent
+        assert types_get.call_count == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_current_employment_at_the_same_org_is_not_departed(
+        self, connect_user: ConnectUser
+    ) -> None:
+        """The real shape that used to answer by array position: a person carrying both
+        `is a former employee of` and `is employee of` against one organization is current."""
+        await connect_user("user-person-3", "person-dave")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(resource("p9", "people", name="Jane Doe")),
+            )
+        )
+        respx.get(f"{BASE_URL}/people/p9").mock(
+            return_value=httpx.Response(200, json=_person_document(FORMER_TYPE, EMPLOYEE_TYPE))
+        )
+
+        result = await get_person(ctx_never_elicit(), search="Jane Doe")
+
+        assert isinstance(result, PersonResolvedResponse)
+        assert result.departed is False
+        assert result.departed_detail is None
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_ambiguous_search_skips_person_get(self, connect_user: ConnectUser) -> None:
+        await connect_user("user-person-2", "person-carol")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource("p1", "people", name="Jane A"),
+                    resource("p2", "people", name="Jane B"),
+                ),
+            )
+        )
+        person_get = respx.get(url__regex=rf"{BASE_URL}/people/\w+").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        result = await get_person(ctx_decline(), search="Jane")
+
+        assert result == PartyAmbiguousResponse(
+            query="Jane",
+            scope="people",
+            candidates=[
+                PartyCandidateEcho(key="p1", label="Jane A", id="p1", name="Jane A"),
+                PartyCandidateEcho(key="p2", label="Jane B", id="p2", name="Jane B"),
+            ],
+        )
+        assert person_get.call_count == 0
+
+    def test_docstring_instructs_model_to_relay_departed_flag(self) -> None:
+        doc = get_person.__doc__ or ""
+        assert "departed" in doc
+        assert "relay" in doc.lower()

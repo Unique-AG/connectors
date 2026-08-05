@@ -67,6 +67,15 @@ class TestBackstopConfigDefaults:
         assert config.report_page_size == 500
         assert config.custom_field_overrides == {}
         assert config.custom_field_schema_ttl_minutes == 7 * 24 * 60
+        assert config.employment_relationship_type_ids == ()
+        assert config.employment_relationship_type_markers == ("employ",)
+        assert config.former_employment_relationship_type_ids == ()
+        assert config.former_employment_relationship_type_markers == (
+            "former",
+            "previous",
+            "ex-",
+            "no longer",
+        )
 
     def test_env_vars_override_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKSTOP_DEFAULT_TIMEOUT_SECONDS", "45.5")
@@ -86,6 +95,29 @@ class TestBackstopConfigDefaults:
         assert config.max_retry_wait_ms == 5000
         assert config.default_page_size == 50
         assert config.report_page_size == 250
+
+    def test_employment_relationship_types_parse_csv(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_IDS", "1, 2,3")
+        monkeypatch.setenv("BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "Employment, Works At")
+        monkeypatch.setenv("BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS", "9")
+        monkeypatch.setenv("BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "Used To Work")
+
+        config = BackstopConfig()
+
+        assert config.employment_relationship_type_ids == ("1", "2", "3")
+        assert config.employment_relationship_type_markers == ("Employment", "Works At")
+        assert config.former_employment_relationship_type_ids == ("9",)
+        assert config.former_employment_relationship_type_markers == ("Used To Work",)
+
+    def test_configured_markers_replace_the_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A tenant's phrasing is the whole vocabulary; an empty value leaves ids to decide."""
+        monkeypatch.setenv(
+            "BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "Placement Ended"
+        )
+        assert BackstopConfig().former_employment_relationship_type_markers == ("Placement Ended",)
+
+        monkeypatch.setenv("BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS", "")
+        assert BackstopConfig().former_employment_relationship_type_markers == ()
 
     def test_report_page_size_rejects_values_over_500(self) -> None:
         with pytest.raises(ValueError, match="report_page_size"):

@@ -24,13 +24,13 @@ from sqlalchemy.engine import Result
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backstop_mcp.config import AuthConfig
-from backstop_mcp.db.engine import transaction
-from backstop_mcp.db.models import (
+from backstop_mcp.db import (
     AuthorizationCode,
     LoginAttempt,
     OAuthClient,
     OAuthToken,
     PendingAuthorization,
+    transaction,
 )
 from backstop_mcp.logging import get_logger
 

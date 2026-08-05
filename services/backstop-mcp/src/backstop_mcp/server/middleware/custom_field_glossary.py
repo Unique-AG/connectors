@@ -1,4 +1,4 @@
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, override
 
@@ -6,18 +6,11 @@ import mcp.types as mt
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import Tool
 
-from backstop_mcp.backstop_client.client import BackstopClient
-from backstop_mcp.features.custom_fields.glossary import format_glossaries
-from backstop_mcp.features.custom_fields.service import CustomFieldsService
+from backstop_mcp.backstop_client import CallerClientProvider
+from backstop_mcp.features.custom_fields import CustomFieldsService, format_glossaries
 from backstop_mcp.logging import get_logger
 
 logger = get_logger(__name__)
-
-# Resolves a client authenticated as the in-flight MCP caller — in practice
-# `BackstopClientFactory.for_current_caller`. Injected as a callable rather than taking the
-# factory itself, matching how `BackstopClient` receives its own collaborators
-# (`HttpClientProvider`, `AuthFailureHook`).
-type CallerClientProvider = Callable[[], Awaitable[BackstopClient]]
 
 
 class CustomFieldGlossaryMiddleware(Middleware):

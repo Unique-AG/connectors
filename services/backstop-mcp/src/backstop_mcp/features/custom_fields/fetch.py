@@ -1,5 +1,4 @@
-from backstop_mcp.backstop_client.client import BackstopClient
-from backstop_mcp.backstop_client.json_api import BackstopApiResource
+from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.lov import (
     LovEntryIndex,

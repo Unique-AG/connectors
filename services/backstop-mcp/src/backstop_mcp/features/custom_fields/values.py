@@ -1,16 +1,27 @@
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import ClassVar
 from urllib.parse import quote
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backstop_mcp.backstop_client.client import BackstopClient
-from backstop_mcp.backstop_client.json_api import BackstopApiDocument, BackstopApiResource
+from backstop_mcp.backstop_client import BackstopApiDocument, BackstopApiResource, BackstopClient
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
+from backstop_mcp.features.data_hygiene import AsOf, extract_as_of
 from backstop_mcp.logging import get_logger
 
 logger = get_logger(__name__)
+
+_REGULAR_FIELDS = "regularCustomFieldValues,modifiedTimestamp,modifiedBy"
+
+
+@dataclass(frozen=True)
+class CustomFieldValueRead:
+    """One custom-field value plus optional entity-level provenance from the same GET."""
+
+    value: object | None
+    as_of: AsOf | None = None
 
 
 class RegularCustomFieldValueAttributes(BaseModel):
@@ -26,6 +37,8 @@ class EntityWithRegularCustomFieldsAttributes(BaseModel):
     regular_custom_field_values: list[RegularCustomFieldValueAttributes] | None = Field(
         default=None, alias="regularCustomFieldValues"
     )
+    modified_timestamp: str | None = Field(default=None, alias="modifiedTimestamp")
+    modified_by: object | None = Field(default=None, alias="modifiedBy")
 
 
 class TimeSeriesCustomFieldValueAttributes(BaseModel):
@@ -102,19 +115,21 @@ async def read_custom_field_value(
     entity_type: str,
     entity_id: str,
     definition: CustomFieldDefinition,
-) -> object | None:
+) -> CustomFieldValueRead:
     """Read one custom field's current value, via the path selected by `isTimeSeries`.
 
     Choosing the wrong path returns nothing for a field that does exist, which is why the flag
-    is honoured rather than guessed at.
+    is honoured rather than guessed at. Regular reads piggyback entity `as_of` on the same GET;
+    time-series leaves `as_of` None rather than adding a second round trip.
     """
     entity = normalize_entity_type(entity_type)
     safe_id = quote(entity_id, safe="")
 
     if definition.is_time_series:
-        return await _read_time_series_value(
+        value = await _read_time_series_value(
             client, entity=entity, safe_id=safe_id, definition=definition
         )
+        return CustomFieldValueRead(value=value, as_of=None)
     return await _read_regular_value(client, entity=entity, safe_id=safe_id, definition=definition)
 
 
@@ -150,16 +165,23 @@ async def _read_regular_value(
     entity: str,
     safe_id: str,
     definition: CustomFieldDefinition,
-) -> object | None:
+) -> CustomFieldValueRead:
     document = await client.get(
         f"/{entity}/{safe_id}",
-        params={"fields": "regularCustomFieldValues"},
+        params={"fields": _REGULAR_FIELDS},
         schema=BackstopApiDocument[EntityWithRegularCustomFieldsAttributes],
     )
     if document.data is None or isinstance(document.data, list):
-        return None
-    values = document.data.attributes.regular_custom_field_values or []
+        return CustomFieldValueRead(value=None, as_of=None)
+    attrs = document.data.attributes
+    as_of = extract_as_of(
+        {
+            "modifiedTimestamp": attrs.modified_timestamp,
+            "modifiedBy": attrs.modified_by,
+        }
+    )
+    values = attrs.regular_custom_field_values or []
     for entry in values:
         if entry.definition_id == definition.definition_id:
-            return entry.value
-    return None
+            return CustomFieldValueRead(value=entry.value, as_of=as_of)
+    return CustomFieldValueRead(value=None, as_of=as_of)

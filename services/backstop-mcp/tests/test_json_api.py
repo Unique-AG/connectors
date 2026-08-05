@@ -5,6 +5,7 @@ from backstop_mcp.backstop_client.errors import BackstopUnexpectedCollectionErro
 from backstop_mcp.backstop_client.json_api import (
     BackstopApiDocument,
     BackstopApiResource,
+    included_for_relationship,
     single_resource,
 )
 
@@ -42,6 +43,62 @@ class TestBackstopApiDocument:
         doc = BackstopApiDocument[_Attrs].model_validate({"data": None})
 
         assert doc.data is None
+
+    def test_preserves_included_side_loads(self) -> None:
+        doc = BackstopApiDocument[_Attrs].model_validate(
+            {
+                "data": {
+                    "id": "1",
+                    "type": "people",
+                    "attributes": {"name": "Jane"},
+                    "relationships": {
+                        "entityRelationships": {
+                            "data": [{"type": "entity-relationships", "id": "er1"}]
+                        }
+                    },
+                },
+                "included": [
+                    {
+                        "type": "entity-relationships",
+                        "id": "er1",
+                        "attributes": {"endDate": "2020-01-01"},
+                    }
+                ],
+            }
+        )
+
+        assert len(doc.included) == 1
+        assert doc.included[0]["id"] == "er1"
+
+
+class TestIncludedForRelationship:
+    def test_resolves_side_loaded_resources_in_linkage_order(self) -> None:
+        document = BackstopApiDocument[_Attrs].model_validate(
+            {
+                "data": {
+                    "id": "1",
+                    "type": "people",
+                    "attributes": {"name": "Jane"},
+                    "relationships": {
+                        "entityRelationships": {
+                            "data": [
+                                {"type": "entity-relationships", "id": "er2"},
+                                {"type": "entity-relationships", "id": "er1"},
+                            ]
+                        }
+                    },
+                },
+                "included": [
+                    {"type": "entity-relationships", "id": "er1", "attributes": {}},
+                    {"type": "entity-relationships", "id": "er2", "attributes": {}},
+                ],
+            }
+        )
+        assert isinstance(document.data, BackstopApiResource)
+
+        related = included_for_relationship(document, document.data, "entityRelationships")
+
+        assert [item["id"] for item in related] == ["er2", "er1"]
 
 
 class TestBackstopApiResourceIdValidation:

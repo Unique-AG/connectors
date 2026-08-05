@@ -6,6 +6,9 @@ need a client go through the factory exactly as production does, so the concurre
 config injection under test are the real ones.
 """
 
+from collections.abc import Sequence
+from datetime import date
+
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -19,9 +22,18 @@ from backstop_mcp.features.custom_fields import (
     FieldOverride,
     create_custom_fields_service,
 )
+from backstop_mcp.features.data_hygiene import (
+    DepartedContactDetector,
+    DepartureRules,
+    TypeVocabulary,
+)
 from backstop_mcp.server.runtime import Services, configure_services
 
 BASE_URL = "https://example.backstopsolutions.com"
+
+# Fixed "today" for departed-contact detection, so an end date in a fixture never becomes
+# past-or-future depending on when the suite runs.
+FIXED_TODAY = date(2026, 8, 5)
 
 
 def credential(username: str = "bob.smith", token: str = "token") -> BackstopCredentialSecret:
@@ -58,10 +70,52 @@ def install_services(
     *,
     backstop: BackstopClientFactory,
     custom_fields: CustomFieldsService,
+    departed_contacts: DepartedContactDetector | None = None,
 ) -> Services:
-    services = Services(backstop=backstop, custom_fields=custom_fields)
+    services = Services(
+        backstop=backstop,
+        custom_fields=custom_fields,
+        departed_contacts=departed_contacts or departed_contact_detector(),
+    )
     configure_services(services)
     return services
+
+
+def departed_contact_detector(
+    *,
+    employment_type_ids: Sequence[str] = (),
+    employment_markers: Sequence[str] | None = None,
+    former_type_ids: Sequence[str] = (),
+    former_markers: Sequence[str] | None = None,
+    today: date = FIXED_TODAY,
+) -> DepartedContactDetector:
+    """A detector with the configured defaults and a fixed clock.
+
+    Markers default to `BackstopConfig`'s rather than to empty, so a test that doesn't tune them
+    exercises what a deployment actually runs.
+    """
+    config = backstop_config()
+    return DepartedContactDetector(
+        rules=DepartureRules(
+            employment=TypeVocabulary(
+                type_ids=frozenset(employment_type_ids),
+                name_markers=frozenset(
+                    config.employment_relationship_type_markers
+                    if employment_markers is None
+                    else employment_markers
+                ),
+            ),
+            former=TypeVocabulary(
+                type_ids=frozenset(former_type_ids),
+                name_markers=frozenset(
+                    config.former_employment_relationship_type_markers
+                    if former_markers is None
+                    else former_markers
+                ),
+            ),
+        ),
+        clock=lambda: today,
+    )
 
 
 def custom_fields_service(

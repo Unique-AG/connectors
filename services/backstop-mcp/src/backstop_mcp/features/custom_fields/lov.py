@@ -23,8 +23,7 @@ So allowed values are assembled from three sources, in order of reliability:
 
 from dataclasses import dataclass
 
-from backstop_mcp.backstop_client.client import BackstopClient
-from backstop_mcp.backstop_client.json_api import BackstopApiResource
+from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.coerce import as_clean_str, as_object_dict, as_object_list
 from backstop_mcp.features.custom_fields.types import AllowedValue, LovEntryAttributes
 from backstop_mcp.logging import get_logger

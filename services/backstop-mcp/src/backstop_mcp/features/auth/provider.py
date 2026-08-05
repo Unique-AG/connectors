@@ -28,11 +28,10 @@ from backstop_mcp.backstop_client import (
     BackstopCredentialSecret,
     BackstopUnreachableError,
 )
-from backstop_mcp.db.engine import read_session, transaction
-from backstop_mcp.db.models import AuthorizationCode as AuthorizationCodeRow
-from backstop_mcp.db.models import OAuthClient as OAuthClientRow
-from backstop_mcp.db.models import OAuthToken as OAuthTokenRow
-from backstop_mcp.db.models import PendingAuthorization
+from backstop_mcp.db import AuthorizationCode as AuthorizationCodeRow
+from backstop_mcp.db import OAuthClient as OAuthClientRow
+from backstop_mcp.db import OAuthToken as OAuthTokenRow
+from backstop_mcp.db import PendingAuthorization, read_session, transaction
 from backstop_mcp.features.auth.credential_store import find_user_id_by_username, save_credential
 from backstop_mcp.features.auth.login_csrf import (
     clear_csrf_cookie,

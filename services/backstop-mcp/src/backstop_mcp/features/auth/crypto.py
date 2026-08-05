@@ -5,7 +5,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pydantic import BaseModel, SecretStr, ValidationError
 
-from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
+from backstop_mcp.backstop_client import BackstopCredentialSecret
 from backstop_mcp.config import EncryptionConfig
 
 _NONCE_SIZE = 12

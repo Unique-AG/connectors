@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backstop_mcp.db.models import CustomFieldSchemaSnapshot
+from backstop_mcp.db import CustomFieldSchemaSnapshot
 from backstop_mcp.features.custom_fields.snapshot import (
     StoredSnapshot,
     dump_definitions,
