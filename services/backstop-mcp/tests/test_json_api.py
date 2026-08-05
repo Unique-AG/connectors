@@ -100,6 +100,42 @@ class TestIncludedForRelationship:
 
         assert [item["id"] for item in related] == ["er2", "er1"]
 
+    def test_matches_by_type_and_id_when_ids_collide_across_types(self) -> None:
+        """Backstop reuses numeric ids across resource types in one `included` array."""
+        document = BackstopApiDocument[_Attrs].model_validate(
+            {
+                "data": {
+                    "id": "1",
+                    "type": "people",
+                    "attributes": {"name": "Jane"},
+                    "relationships": {
+                        "entityRelationships": {
+                            "data": [{"type": "entity-relationships", "id": "42"}]
+                        }
+                    },
+                },
+                "included": [
+                    {
+                        "type": "entity-relationship-types",
+                        "id": "42",
+                        "attributes": {"name": "Employment"},
+                    },
+                    {
+                        "type": "entity-relationships",
+                        "id": "42",
+                        "attributes": {"endDate": "2020-01-01"},
+                    },
+                ],
+            }
+        )
+        assert isinstance(document.data, BackstopApiResource)
+
+        related = included_for_relationship(document, document.data, "entityRelationships")
+
+        assert len(related) == 1
+        assert related[0]["type"] == "entity-relationships"
+        assert related[0]["attributes"] == {"endDate": "2020-01-01"}
+
 
 class TestBackstopApiResourceIdValidation:
     def test_id_is_stripped(self) -> None:

@@ -75,18 +75,28 @@ def included_for_relationship[AttrT](
 ) -> list[dict[str, object]]:
     """Side-loaded resources linked from `resource` via `relationship_name`.
 
-    Matches `included` entries by id against `resource.related_ids(relationship_name)`. Order
-    follows the relationship linkage, not the `included` array order.
+    Matches `included` entries by JSON:API identity `(type, id)` — ids alone are not unique
+    across resource types in the same `included` array (e.g. entity-relationships and
+    entity-relationship-types can share numeric ids). Order follows the relationship
+    linkage, not the `included` array order.
     """
-    wanted = resource.related_ids(relationship_name)
+    relationship = resource.relationships.get(relationship_name)
+    if relationship is None or relationship.data is None:
+        return []
+    refs = relationship.data if isinstance(relationship.data, list) else [relationship.data]
+    wanted = tuple(
+        (as_clean_str(ref.type), related_id)
+        for ref in refs
+        if (related_id := as_clean_str(ref.id)) is not None
+    )
     if not wanted:
         return []
-    by_id = {
-        item_id: item
+    by_identity = {
+        (as_clean_str(item.get("type")), item_id): item
         for item in document.included
         if (item_id := as_clean_str(item.get("id"))) is not None
     }
-    return [by_id[related_id] for related_id in wanted if related_id in by_id]
+    return [by_identity[key] for key in wanted if key in by_identity]
 
 
 def included_of_type[AttrT](
