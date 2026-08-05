@@ -1,10 +1,16 @@
-"""Departed-contact detection from side-loaded `entityRelationships`.
+"""Employment detection from side-loaded `entityRelationships`.
 
 The scan and the type classification it rests on, pure and fully parameterised. Tools do not call
 any of it directly — they go through `service.DepartedContactDetector.verify`, which owns the
 employment vocabulary. List/org-contact tools should use that verdict to exclude departed people
 from "who do we contact at X" answers unless the user asked for historical contacts; a by-id
 person fetch returns the person with the flag set rather than hiding the record.
+
+`_employment_edges` is the shared building block for reading employment off *either* side of a
+relationship — a person's own GET or an organization's own GET — with `person_side` as the only
+difference between the two directions. It is one step below `EmploymentIndex` (a later addition):
+it normalises the raw payload into edges, but does not yet reduce several edges for the same pair
+down to one winner.
 """
 
 from dataclasses import dataclass
@@ -20,8 +26,9 @@ from backstop_mcp.features.data_hygiene.types import (
     ORG_SIDE_TYPES,
     PERSON_SIDE_TYPES,
     DepartedEmployment,
-    DepartureRules,
     DepartureSignal,
+    EmploymentEdge,
+    EmploymentRules,
     EmploymentStatus,
     EntityRefAttributes,
     EntityRelationshipAttributes,
@@ -42,7 +49,7 @@ def detect_departed_employment(
     *,
     relationships: list[dict[str, object]],
     relationship_types: list[dict[str, object]],
-    rules: DepartureRules,
+    rules: EmploymentRules,
     today: date,
 ) -> DepartedEmployment | None:
     """The person's departed employment, or None while employment at that organization is current.
@@ -62,11 +69,11 @@ def detect_departed_employment(
     silently — nothing parses, so every person reads as current.
     """
     type_names = _relationship_type_names(resources=relationship_types)
-    departures: dict[str, DepartedEmployment] = {}
-    current: set[str] = set()
+    departures_by_organization_id: dict[str, DepartedEmployment] = {}
+    currently_employed_organization_ids: set[str] = set()
 
     for raw in relationships:
-        parsed = _parse_relationship(raw=raw)
+        parsed = _safe_parse_relationship(raw=raw)
         if parsed is None:
             continue
         attrs, type_id = parsed
@@ -82,36 +89,37 @@ def detect_departed_employment(
 
         # Parsed whichever way the type classified, so a former-employment record that also
         # carries a date still reports it rather than dropping it.
-        ended = _parse_date(raw=attrs.end_date)
-        if status is EmploymentStatus.FORMER or (ended is not None and ended < today):
-            signal = (
-                DepartureSignal.FORMER_TYPE
-                if status is EmploymentStatus.FORMER
-                else DepartureSignal.END_DATE
-            )
-            departures.setdefault(
-                employer.organization_id,
-                DepartedEmployment(
-                    signal=signal,
-                    organization_id=employer.organization_id,
-                    organization_type=employer.organization_type,
-                    end_date=ended.isoformat() if ended is not None else None,
-                    relationship_type_id=type_id,
-                    relationship_type_name=type_name,
-                ),
-            )
+        ended = _safe_parse_date(raw=attrs.end_date)
+        if status is EmploymentStatus.FORMER:
+            signal = DepartureSignal.FORMER_TYPE
+        elif ended is not None and ended < today:
+            signal = DepartureSignal.END_DATE
+        else:
+            currently_employed_organization_ids.add(employer.organization_id)
             continue
 
-        current.add(employer.organization_id)
+        departures_by_organization_id.setdefault(
+            employer.organization_id,
+            DepartedEmployment(
+                signal=signal,
+                organization_id=employer.organization_id,
+                organization_type=employer.organization_type,
+                end_date=ended.isoformat() if ended is not None else None,
+                relationship_type_id=type_id,
+                relationship_type_name=type_name,
+            ),
+        )
 
-    return _strongest_departure(departures=departures, current=current)
+    return _strongest_departure(
+        departures=departures_by_organization_id, current=currently_employed_organization_ids
+    )
 
 
 def classify_employment(
     *,
     type_id: str | None,
     type_name: str | None,
-    rules: DepartureRules,
+    rules: EmploymentRules,
 ) -> EmploymentStatus:
     """What one relationship's type says about employment at the organization.
 
@@ -127,7 +135,7 @@ def classify_employment(
         return EmploymentStatus.FORMER
     if rules.employment.is_empty:
         # No employment vocabulary configured, so every person→org type is admitted. See
-        # `DepartureRules` for what that costs.
+        # `EmploymentRules` for what that costs.
         return EmploymentStatus.CURRENT
     if rules.employment.matches(type_id=type_id, type_name=type_name):
         return EmploymentStatus.CURRENT
@@ -180,7 +188,7 @@ def _relationship_type_names(*, resources: list[dict[str, object]]) -> dict[str,
     return names
 
 
-def _parse_relationship(
+def _safe_parse_relationship(
     *, raw: dict[str, object]
 ) -> tuple[EntityRelationshipAttributes, str | None] | None:
     try:
@@ -231,8 +239,9 @@ def _is_organization(side_type: str | None) -> TypeGuard[str]:
     return side_type in ORG_SIDE_TYPES
 
 
-def _parse_date(*, raw: str | None) -> date | None:
-    """The calendar day an `endDate` names, however the instance spelled it.
+def _safe_parse_date(*, raw: str | None) -> date | None:
+    """The calendar day an `endDate` (or `startDate` / `createdTimestamp`) names, however the
+    instance spelled it.
 
     The leading ten characters cover both a plain `YYYY-MM-DD` and the full timestamp Backstop
     actually writes into this date field; the second attempt is for compact ISO forms
@@ -251,3 +260,127 @@ def _parse_date(*, raw: str | None) -> date | None:
         return datetime.fromisoformat(text).date()
     except ValueError:
         return None
+
+
+def _employment_edges(
+    *,
+    relationships: list[dict[str, object]],
+    relationship_types: list[dict[str, object]],
+    rules: EmploymentRules,
+    today: date,
+    person_side: bool,
+) -> list[EmploymentEdge]:
+    """Every person↔organization relationship, normalised into one `EmploymentEdge` each.
+
+    `person_side` names which literal JSON side is "self" when the payload came from the
+    person's own GET (`sourceEntity`) versus the organization's own GET (`destinationEntity`).
+    Structural matching itself stays direction-agnostic: `_employer_side`'s type-based check
+    already tells the organization side from the person side regardless of which literal key
+    each landed on, so both `person_id` and `organization_id` are pulled from whichever side
+    matched — `person_side` only needs to be threaded through for callers building an index (a
+    later addition) that must record which id belongs to which entity type.
+
+    `IRRELEVANT` edges are dropped, same as in `detect_departed_employment`. An edge with no
+    usable date at all (`effective_date=None`) is kept: it sorts last downstream rather than
+    being dropped outright, so it still wins when it is the only edge for its pair.
+    """
+    type_names = _relationship_type_names(resources=relationship_types)
+    edges: list[EmploymentEdge] = []
+
+    for raw in relationships:
+        parsed = _safe_parse_relationship(raw=raw)
+        if parsed is None:
+            continue
+        attrs, type_id = parsed
+        employer = _employer_side(attrs=attrs)
+        if employer is None:
+            continue
+        person_id = _person_id(attrs=attrs)
+        if person_id is None:
+            continue
+
+        type_name = type_names.get(type_id) if type_id is not None else None
+        status = classify_employment(type_id=type_id, type_name=type_name, rules=rules)
+        if status is EmploymentStatus.IRRELEVANT:
+            continue
+
+        created = _safe_parse_date(raw=attrs.created_timestamp)
+        started = _safe_parse_date(raw=attrs.start_date)
+        ended = _safe_parse_date(raw=attrs.end_date)
+
+        if status is EmploymentStatus.FORMER:
+            effective_date = ended if ended is not None else created
+            evidence = DepartedEmployment(
+                signal=DepartureSignal.FORMER_TYPE,
+                organization_id=employer.organization_id,
+                organization_type=employer.organization_type,
+                end_date=ended.isoformat() if ended is not None else None,
+                relationship_type_id=type_id,
+                relationship_type_name=type_name,
+            )
+        elif ended is not None and ended < today:
+            # A `CURRENT`-type relationship whose own end date has already passed: rewritten to a
+            # departure dated at that `endDate`, same as `detect_departed_employment`'s END_DATE
+            # branch, so the two paths agree on what "departed" means.
+            status = EmploymentStatus.FORMER
+            effective_date = ended
+            evidence = DepartedEmployment(
+                signal=DepartureSignal.END_DATE,
+                organization_id=employer.organization_id,
+                organization_type=employer.organization_type,
+                end_date=ended.isoformat(),
+                relationship_type_id=type_id,
+                relationship_type_name=type_name,
+            )
+        else:
+            effective_date = started if started is not None else created
+            # `evidence` is only ever read by the resolver (a later addition) for a `FORMER`
+            # edge; a plain `CURRENT` edge has no departure to describe, so `signal`/`end_date`
+            # here are a placeholder to satisfy the required field, not a claim about anything.
+            evidence = DepartedEmployment(
+                signal=DepartureSignal.END_DATE,
+                organization_id=employer.organization_id,
+                organization_type=employer.organization_type,
+                end_date=None,
+                relationship_type_id=type_id,
+                relationship_type_name=type_name,
+            )
+
+        edges.append(
+            EmploymentEdge(
+                person_id=person_id,
+                organization_id=employer.organization_id,
+                organization_type=employer.organization_type,
+                status=status,
+                effective_date=effective_date,
+                evidence=evidence,
+            )
+        )
+
+    return edges
+
+
+def _person_id(*, attrs: EntityRelationshipAttributes) -> str | None:
+    """The person side's id, whichever literal JSON key (`sourceEntity`/`destinationEntity`) it
+    landed on.
+
+    Mirrors `_employer_side`'s type-based matching rather than trusting a `person_side` flag for
+    structural matching, so the two functions never disagree about which side is which. A person
+    side with no `resourceId` is skipped for the same reason an unidentified organization is: an
+    id-less side would collide every such relationship into one bucket.
+    """
+    sides = [
+        (side, _side_type(side=side))
+        for side in (attrs.source_entity, attrs.destination_entity)
+        if side is not None
+    ]
+    if len(sides) != 2:
+        return None
+    (first, first_type), (second, second_type) = sides
+    if first_type in PERSON_SIDE_TYPES and _is_organization(second_type):
+        person = first
+    elif second_type in PERSON_SIDE_TYPES and _is_organization(first_type):
+        person = second
+    else:
+        return None
+    return as_clean_str(person.resource_id)

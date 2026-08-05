@@ -1,6 +1,7 @@
 """Internal types for read-response provenance and departed-contact detection."""
 
 from dataclasses import dataclass
+from datetime import date
 from enum import StrEnum
 from typing import ClassVar
 
@@ -36,6 +37,8 @@ class EntityRelationshipAttributes(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     end_date: str | None = Field(default=None, alias="endDate")
+    start_date: str | None = Field(default=None, alias="startDate")
+    created_timestamp: str | None = Field(default=None, alias="createdTimestamp")
     source_entity: EntityRefAttributes | None = Field(default=None, alias="sourceEntity")
     destination_entity: EntityRefAttributes | None = Field(default=None, alias="destinationEntity")
 
@@ -124,7 +127,35 @@ class TypeVocabulary:
 
 
 @dataclass(frozen=True)
-class DepartureRules:
+class EmploymentEdge:
+    """One person→org relationship, normalised out of the raw Backstop payload.
+
+    `status` comes from `classify_employment` (`CURRENT` / `FORMER`; `IRRELEVANT` edges never
+    reach this shape at all). `effective_date` is whichever date on the relationship is
+    comparable across edges — a `None` here means the edge has no usable date and must sort
+    last rather than being mistaken for the oldest or newest edge. `evidence` reuses the
+    existing `DepartedEmployment` payload so tool responses keep their current shape even for a
+    `CURRENT` edge, where the payload describes the relationship rather than an actual departure.
+    """
+
+    person_id: str
+    organization_id: str
+    organization_type: str
+    status: EmploymentStatus
+    effective_date: date | None
+    evidence: DepartedEmployment
+
+
+@dataclass(frozen=True)
+class EmploymentRecord:
+    """The resolved answer for one person/organization pair, after edges are reduced to one."""
+
+    status: EmploymentStatus
+    departure: DepartedEmployment | None
+
+
+@dataclass(frozen=True)
+class EmploymentRules:
     """Everything about reading a tenant's `entityRelationships` that a deployment can set.
 
     Both halves are tenant vocabulary rather than anything Backstop guarantees. `employment`

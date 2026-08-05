@@ -24,7 +24,7 @@ from backstop_mcp.features.custom_fields import (
 )
 from backstop_mcp.features.data_hygiene import (
     DepartedContactDetector,
-    DepartureRules,
+    EmploymentRules,
     TypeVocabulary,
 )
 from backstop_mcp.server.runtime import Services, configure_services
@@ -96,7 +96,7 @@ def departed_contact_detector(
     """
     config = backstop_config()
     return DepartedContactDetector(
-        rules=DepartureRules(
+        rules=EmploymentRules(
             employment=TypeVocabulary(
                 type_ids=frozenset(employment_type_ids),
                 name_markers=frozenset(

@@ -1,10 +1,10 @@
 from collections.abc import Callable, Sequence
 from datetime import date
 
-from backstop_mcp.features.data_hygiene.departed import detect_departed_employment
+from backstop_mcp.features.data_hygiene.employment import detect_departed_employment
 from backstop_mcp.features.data_hygiene.types import (
     DepartedEmployment,
-    DepartureRules,
+    EmploymentRules,
     TypeVocabulary,
 )
 
@@ -23,14 +23,14 @@ class DepartedContactDetector:
     def __init__(
         self,
         *,
-        rules: DepartureRules,
+        rules: EmploymentRules,
         clock: Callable[[], date] = date.today,
     ) -> None:
-        self._rules: DepartureRules = rules
+        self._rules: EmploymentRules = rules
         self._clock: Callable[[], date] = clock
 
     @property
-    def rules(self) -> DepartureRules:
+    def rules(self) -> EmploymentRules:
         """The vocabulary this detector was built with. Read-only; set once at composition."""
         return self._rules
 
@@ -63,7 +63,7 @@ def create_departed_contact_detector(
 ) -> DepartedContactDetector:
     """Build the detector from configured values, translating them into the feature's own type."""
     return DepartedContactDetector(
-        rules=DepartureRules(
+        rules=EmploymentRules(
             employment=TypeVocabulary(
                 type_ids=frozenset(employment_type_ids),
                 name_markers=frozenset(employment_type_markers),

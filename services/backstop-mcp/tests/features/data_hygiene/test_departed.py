@@ -3,7 +3,7 @@
 Each test below is meant to read as a mini walkthrough:
 
 1. **Configure the checks** — which relationship types count as employment / former
-   employment (`DepartureRules` / `TypeVocabulary`).
+   employment (`EmploymentRules` / `TypeVocabulary`).
 2. **Prepare the side-loaded record** — `entityRelationships` plus their types.
 3. **Run verification** — `detect_departed_employment` (what `DepartedContactDetector.verify`
    delegates to) or `classify_employment` for a single type.
@@ -18,11 +18,11 @@ import pytest
 
 from backstop_mcp.features.data_hygiene import (
     DepartedEmployment,
-    DepartureRules,
     DepartureSignal,
+    EmploymentRules,
     TypeVocabulary,
 )
-from backstop_mcp.features.data_hygiene.departed import (
+from backstop_mcp.features.data_hygiene.employment import (
     classify_employment,
     detect_departed_employment,
 )
@@ -51,9 +51,9 @@ def configure_checks(
     employment_markers: frozenset[str] = DEFAULT_EMPLOYMENT_MARKERS,
     former_type_ids: frozenset[str] = EMPTY_TYPE_IDS,
     former_markers: frozenset[str] = DEFAULT_FORMER_MARKERS,
-) -> DepartureRules:
+) -> EmploymentRules:
     """Build the vocabulary the scan uses — same shape create_app injects."""
-    return DepartureRules(
+    return EmploymentRules(
         employment=TypeVocabulary(type_ids=employment_type_ids, name_markers=employment_markers),
         former=TypeVocabulary(type_ids=former_type_ids, name_markers=former_markers),
     )
@@ -62,7 +62,7 @@ def configure_checks(
 def verify(
     relationships: list[dict[str, object]],
     *,
-    checks: DepartureRules,
+    checks: EmploymentRules,
     types: list[dict[str, object]] | None = None,
     today: date = TODAY,
 ) -> DepartedEmployment | None:

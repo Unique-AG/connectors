@@ -23,11 +23,11 @@
 
 4. **A package is entered through its `__init__`, never through its modules.** From outside,
    `from backstop_mcp.features.data_hygiene import DepartedContactDetector` — not
-   `...data_hygiene.service import ...`, and certainly not `...data_hygiene.departed import
+   `...data_hygiene.service import ...`, and certainly not `...data_hygiene.employment import
    detect_departed_employment`. Each package's `__all__` is then the whole of what it promises,
    and everything else is free to move.
 
-   This is what makes a package able to say "call it this way". `data_hygiene/departed.py`
+   This is what makes a package able to say "call it this way". `data_hygiene/employment.py`
    decides nothing until it is handed an employment vocabulary, the side-loaded relationship
    types and a clock; `DepartedContactDetector` supplies all three, from configuration, once.
    Reaching past it is how the original bug happened — `get_person` assembled its own vocabulary
@@ -288,7 +288,7 @@ class TestPackagesAreEnteredThroughTheirInit:
         service = _package_directory("backstop_mcp.features.data_hygiene") / "service.py"
         imported = {module for module, _line in _imported_modules(ast.parse(service.read_text()))}
 
-        assert "backstop_mcp.features.data_hygiene.departed" in imported
+        assert "backstop_mcp.features.data_hygiene.employment" in imported
 
     @pytest.mark.parametrize("source", sorted(_SRC.rglob("*.py")), ids=_source_id)
     def test_no_module_reaches_past_another_packages_init(self, source: pathlib.Path) -> None:

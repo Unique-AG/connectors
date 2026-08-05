@@ -22,8 +22,8 @@ from backstop_mcp.features.data_hygiene.types import (
     ENTITY_RELATIONSHIPS_RELATIONSHIP,
     AsOf,
     DepartedEmployment,
-    DepartureRules,
     DepartureSignal,
+    EmploymentRules,
     TypeVocabulary,
 )
 
@@ -36,8 +36,8 @@ __all__ = [
     "DepartedContactDetector",
     "DepartedContactEcho",
     "DepartedEmployment",
-    "DepartureRules",
     "DepartureSignal",
+    "EmploymentRules",
     "TypeVocabulary",
     "as_of_echo",
     "create_departed_contact_detector",
