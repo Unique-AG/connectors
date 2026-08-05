@@ -1,4 +1,5 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backstop_mcp.backstop_client import BackstopCredentialSecret
@@ -20,24 +21,32 @@ async def find_user_id_by_username(session: AsyncSession, username: str) -> str 
 
 async def save_credential(
     session: AsyncSession, user_id: str, credential: BackstopCredentialSecret, key: bytes
-) -> None:
-    """Encrypt and upsert a user's Backstop credential.
+) -> str:
+    """Encrypt and upsert a user's Backstop credential, keyed by username.
+
+    Returns the durable `user_id` for this username. Concurrent first logins for the same
+    username both propose a fresh id; `ON CONFLICT (backstop_username)` keeps a single row and
+    returns whichever id won, so the unique index never surfaces as an unhandled error and both
+    callers agree on the subject for the minted authorization code.
 
     Does not commit — the caller owns the transaction boundary (`db/engine.py::transaction`).
     """
     encrypted_blob = encrypt_credential(credential, key)
-    existing = await session.get(BackstopCredential, user_id)
-    if existing is not None:
-        existing.backstop_username = credential.username
-        existing.encrypted_blob = encrypted_blob
-    else:
-        session.add(
-            BackstopCredential(
-                user_id=user_id,
-                backstop_username=credential.username,
-                encrypted_blob=encrypted_blob,
-            )
+    statement = (
+        pg_insert(BackstopCredential)
+        .values(
+            user_id=user_id,
+            backstop_username=credential.username,
+            encrypted_blob=encrypted_blob,
         )
+        .on_conflict_do_update(
+            index_elements=[BackstopCredential.backstop_username],
+            set_={"encrypted_blob": encrypted_blob, "updated_at": func.now()},
+        )
+        .returning(BackstopCredential.user_id)
+    )
+    result = await session.execute(statement)
+    return result.scalar_one()
 
 
 async def get_credential(

@@ -7,11 +7,13 @@ import pytest
 from mcp.server.auth.provider import AuthorizationParams, TokenError
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from pydantic import AnyUrl
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
 from backstop_mcp.backstop_client import BackstopClientFactory, BackstopUnreachableError
+from backstop_mcp.db.models import AuthorizationCode as AuthorizationCodeRow
+from backstop_mcp.db.models import BackstopCredential
 from backstop_mcp.db.models import LoginAttempt as LoginAttemptRow
 from backstop_mcp.db.models import OAuthToken as OAuthTokenRow
 from backstop_mcp.db.models import PendingAuthorization
@@ -238,6 +240,60 @@ class TestLoginFormSubmission:
         async with factory() as session:
             pending = await session.get(PendingAuthorization, request_id)
         assert pending is None
+
+    @pytest.mark.asyncio
+    async def test_concurrent_first_logins_for_same_username_share_one_credential(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Two OAuth flows finishing a first login for the same username must not race.
+
+        Distinct `request_id`s (so each pending claim succeeds) both propose a fresh
+        `user_id`; the credential upsert keeps one row and both codes get that subject.
+        """
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
+        provider = _make_provider(db)
+        client_a = await _register_client(provider, "provider-client-username-race-a")
+        client_b = await _register_client(provider, "provider-client-username-race-b")
+        redirect_a = await provider.authorize(client_a, _authorization_params(state="a"))
+        redirect_b = await provider.authorize(client_b, _authorization_params(state="b"))
+        request_id_a = parse_qs(urlparse(redirect_a).query)["request_id"][0]
+        request_id_b = parse_qs(urlparse(redirect_b).query)["request_id"][0]
+        username = "pv-first.login.race"
+
+        results = await asyncio.gather(
+            provider.handle_login_post(
+                _login_post_request(request_id_a, username, "token-first-race-a")
+            ),
+            provider.handle_login_post(
+                _login_post_request(request_id_b, username, "token-first-race-b")
+            ),
+        )
+
+        assert all(response.status_code == 302 for response in results)
+
+        _, factory = db
+        async with factory() as session:
+            credential_count = await session.scalar(
+                select(func.count())
+                .select_from(BackstopCredential)
+                .where(BackstopCredential.backstop_username == username)
+            )
+            subjects = (
+                await session.scalars(
+                    select(AuthorizationCodeRow.subject).where(
+                        AuthorizationCodeRow.client_id.in_(
+                            (
+                                "provider-client-username-race-a",
+                                "provider-client-username-race-b",
+                            )
+                        )
+                    )
+                )
+            ).all()
+
+        assert credential_count == 1
+        assert len(subjects) == 2
+        assert len(set(subjects)) == 1
 
 
 class TestLoginCsrf:

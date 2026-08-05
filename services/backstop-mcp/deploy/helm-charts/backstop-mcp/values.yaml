@@ -36,10 +36,12 @@ resources:
 
 probes:
   enabled: true
+  # /health is process-up only; /probe checks Postgres. Liveness must not restart the pod
+  # when the database is briefly unreachable — readiness alone keeps it out of service.
   liveness:
     failureThreshold: 6
     httpGet:
-      path: /probe
+      path: /health
       port: http
     initialDelaySeconds: 5
     periodSeconds: 5
@@ -53,7 +55,7 @@ probes:
   startup:
     failureThreshold: 30
     httpGet:
-      path: /probe
+      path: /health
       port: http
     initialDelaySeconds: 5
     periodSeconds: 5

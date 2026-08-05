@@ -1,10 +1,13 @@
+import asyncio
 import os
 
 import pytest
 from pydantic import SecretStr
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
+from backstop_mcp.db import BackstopCredential, transaction
 from backstop_mcp.features.auth.credential_store import (
     find_user_id_by_username,
     get_credential,
@@ -28,8 +31,10 @@ class TestSaveAndGetCredential:
         )
 
         async with factory() as session:
-            await save_credential(session, "user-1", credential, key)
+            user_id = await save_credential(session, "user-1", credential, key)
             await session.commit()
+
+        assert user_id == "user-1"
 
         async with factory() as session:
             recovered = await get_credential(session, "user-1", key)
@@ -63,14 +68,52 @@ class TestSaveAndGetCredential:
             await session.commit()
 
         async with factory() as session:
-            await save_credential(session, "user-2", new_credential, key)
+            # A concurrent first login proposes a different id; username conflict keeps user-2.
+            durable_id = await save_credential(session, "user-2-other", new_credential, key)
             await session.commit()
+
+        assert durable_id == "user-2"
 
         async with factory() as session:
             recovered = await get_credential(session, "user-2", key)
 
         assert recovered is not None
         assert recovered.api_token.get_secret_value() == "new-token"
+
+    @pytest.mark.asyncio
+    async def test_concurrent_first_saves_share_one_user_id(self, db: DatabaseFixture) -> None:
+        """Two first logins for the same username must not collide on the unique index."""
+        _, factory = db
+        key = _random_key()
+        username = "cs-race.user"
+
+        async def save_once(proposed_id: str, token: str) -> str:
+            async with transaction(factory) as session:
+                return await save_credential(
+                    session,
+                    proposed_id,
+                    BackstopCredentialSecret(username=username, api_token=SecretStr(token)),
+                    key,
+                )
+
+        durable_ids = await asyncio.gather(
+            save_once("cs-race-a", "token-a"),
+            save_once("cs-race-b", "token-b"),
+            save_once("cs-race-c", "token-c"),
+        )
+
+        assert len(set(durable_ids)) == 1
+        async with factory() as session:
+            count = await session.scalar(
+                select(func.count())
+                .select_from(BackstopCredential)
+                .where(BackstopCredential.backstop_username == username)
+            )
+        assert count == 1
+        async with factory() as session:
+            recovered = await get_credential(session, durable_ids[0], key)
+        assert recovered is not None
+        assert recovered.username == username
 
 
 class TestFindUserIdByUsername:

@@ -32,7 +32,7 @@ from backstop_mcp.db import AuthorizationCode as AuthorizationCodeRow
 from backstop_mcp.db import OAuthClient as OAuthClientRow
 from backstop_mcp.db import OAuthToken as OAuthTokenRow
 from backstop_mcp.db import PendingAuthorization, read_session, transaction
-from backstop_mcp.features.auth.credential_store import find_user_id_by_username, save_credential
+from backstop_mcp.features.auth.credential_store import save_credential
 from backstop_mcp.features.auth.login_csrf import (
     clear_csrf_cookie,
     csrf_token_is_valid,
@@ -365,10 +365,11 @@ class BackstopOAuthProvider(OAuthProvider):
             if claim.rowcount == 0:  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
                 already_claimed = True
             else:
-                user_id = await find_user_id_by_username(session, username) or str(uuid.uuid4())
-                await save_credential(
+                # Propose a fresh id; `save_credential` upserts on `backstop_username` and
+                # returns the durable id (existing row wins under concurrent first logins).
+                user_id = await save_credential(
                     session,
-                    user_id,
+                    str(uuid.uuid4()),
                     BackstopCredentialSecret(username=username, api_token=SecretStr(api_token)),
                     self._encryption_key,
                 )
