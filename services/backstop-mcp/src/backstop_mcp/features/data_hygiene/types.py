@@ -80,11 +80,16 @@ class DepartureSignal(StrEnum):
 
 @dataclass(frozen=True)
 class DepartedEmployment:
-    """A hard signal that the person is no longer employed at an organization."""
+    """A hard signal that the person is no longer employed at an organization.
+
+    The organization is always identified: a relationship whose organization side carries no
+    `resourceId` is skipped rather than reported, because a departure nobody can attribute to a
+    company is not a usable answer — see `departed._employer_side`.
+    """
 
     signal: DepartureSignal
-    organization_id: str | None = None
-    organization_type: str | None = None
+    organization_id: str
+    organization_type: str
     end_date: str | None = None
     relationship_type_id: str | None = None
     relationship_type_name: str | None = None

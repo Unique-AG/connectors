@@ -5,43 +5,19 @@ The scan and classifier it delegates to are covered in `test_departed.py`.
 """
 
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 
 from backstop_mcp.features.data_hygiene import (
     DepartedContactDetector,
     DepartureSignal,
     create_departed_contact_detector,
 )
-
-
-def _relationship(
-    *, type_id: str | None = "456439", end_date: str | None = None
-) -> dict[str, object]:
-    attributes: dict[str, object] = {
-        "sourceEntity": {"resourceId": "p1", "resourceType": "people"},
-        "destinationEntity": {"resourceId": "o1", "resourceType": "organizations"},
-    }
-    if end_date is not None:
-        attributes["endDate"] = end_date
-    relationships: dict[str, object] = {}
-    if type_id is not None:
-        relationships["entityRelationshipType"] = {
-            "data": {"type": "entity-relationship-types", "id": type_id}
-        }
-    return {
-        "type": "entity-relationships",
-        "id": "er1",
-        "attributes": attributes,
-        "relationships": relationships,
-    }
-
-
-def _type(type_id: str, name: str) -> dict[str, object]:
-    return {
-        "type": "entity-relationship-types",
-        "id": type_id,
-        "attributes": {"name": name},
-    }
+from tests.features.data_hygiene.helpers import (
+    EMPLOYEE_TYPE,
+    FORMER_TYPE,
+    person_org,
+    relationship_types,
+)
 
 
 def _detector(
@@ -62,8 +38,8 @@ def _detector(
 class TestCreateDepartedContactDetector:
     def test_configured_markers_reach_the_verdict(self) -> None:
         departed = _detector().verify(
-            relationships=[_relationship(type_id="459795")],
-            relationship_types=[_type("459795", "is a former employee of")],
+            relationships=[person_org("er1", type_id=FORMER_TYPE)],
+            relationship_types=relationship_types(FORMER_TYPE),
         )
 
         assert departed is not None
@@ -74,7 +50,7 @@ class TestCreateDepartedContactDetector:
         detector = _detector(former_type_ids=("custom-7",), former_type_markers=())
 
         departed = detector.verify(
-            relationships=[_relationship(type_id="custom-7")], relationship_types=[]
+            relationships=[person_org("er1", type_id="custom-7")], relationship_types=[]
         )
 
         assert departed is not None
@@ -87,12 +63,17 @@ class TestCreateDepartedContactDetector:
 
 
 class TestVerify:
-    def test_no_relationships_short_circuits(self) -> None:
-        """A person with nothing side-loaded can't be departed — don't classify anything."""
+    def test_a_person_with_no_relationships_is_not_departed(self) -> None:
+        assert (
+            _detector().verify(relationships=[], relationship_types=relationship_types(FORMER_TYPE))
+            is None
+        )
+
+    def test_a_current_employee_is_not_departed(self) -> None:
         assert (
             _detector().verify(
-                relationships=[],
-                relationship_types=[_type("459795", "is a former employee of")],
+                relationships=[person_org("er1", type_id=EMPLOYEE_TYPE)],
+                relationship_types=relationship_types(EMPLOYEE_TYPE),
             )
             is None
         )
@@ -100,7 +81,7 @@ class TestVerify:
     def test_the_clock_defaults_to_today(self) -> None:
         """A real deployment gets `date.today`; only tests pin it."""
         departed = _detector().verify(
-            relationships=[_relationship(type_id=None, end_date="2000-01-01")],
+            relationships=[person_org("er1", type_id=None, end_date="2000-01-01")],
             relationship_types=[],
         )
 
@@ -108,12 +89,23 @@ class TestVerify:
         assert departed.end_date == "2000-01-01"
 
     def test_an_end_date_after_today_is_not_departed(self) -> None:
-        next_year = date.today().replace(year=date.today().year + 1).isoformat()
+        # Days rather than `replace(year=...)`, which raises on a leap day.
+        next_year = (date.today() + timedelta(days=366)).isoformat()
 
         assert (
             _detector().verify(
-                relationships=[_relationship(type_id=None, end_date=next_year)],
+                relationships=[person_org("er1", type_id=None, end_date=next_year)],
                 relationship_types=[],
             )
             is None
         )
+
+    def test_an_injected_clock_decides_whether_an_end_date_has_passed(self) -> None:
+        rules = _detector().rules
+        relationships = [person_org("er1", type_id=None, end_date="2026-08-05")]
+
+        before = DepartedContactDetector(rules=rules, clock=lambda: date(2026, 8, 4))
+        after = DepartedContactDetector(rules=rules, clock=lambda: date(2026, 8, 6))
+
+        assert before.verify(relationships=relationships, relationship_types=[]) is None
+        assert after.verify(relationships=relationships, relationship_types=[]) is not None

@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from backstop_mcp.features.data_hygiene.types import AsOf, DepartedEmployment
+from backstop_mcp.features.data_hygiene.types import AsOf, DepartedEmployment, DepartureSignal
 
 
 class AsOfEcho(BaseModel):
@@ -15,14 +15,16 @@ class AsOfEcho(BaseModel):
 class DepartedContactEcho(BaseModel):
     """Hard signal that employment at an organization has ended. Always relay this flag."""
 
-    signal: str = Field(
+    # Typed as the enum, not `str`, so the tool schema publishes the two possible values instead
+    # of a free-form string the caller has to read a description to interpret.
+    signal: DepartureSignal = Field(
         description=(
             "Which evidence this rests on: 'former_relationship_type' (the CRM links the person"
             " to the organization as a past employee) or 'end_date_passed'."
         )
     )
-    organization_id: str | None = None
-    organization_type: str | None = None
+    organization_id: str
+    organization_type: str
     end_date: str | None = Field(
         default=None, description="Employment end date as YYYY-MM-DD, when the CRM records one"
     )

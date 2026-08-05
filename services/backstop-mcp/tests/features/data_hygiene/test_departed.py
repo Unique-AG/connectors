@@ -8,9 +8,8 @@ Each test below is meant to read as a mini walkthrough:
 3. **Run verification** — `detect_departed_employment` (what `DepartedContactDetector.verify`
    delegates to) or `classify_employment` for a single type.
 
-The type names are the ones a real instance uses: `is employee of` and `is a former employee of`
-against the same organization, plus `has portal access to` as a person→org link that is not
-employment at all. The detector that assembles this from configuration is in `test_service.py`.
+The record builders and the type vocabulary a real instance uses live in `helpers.py`. The
+detector that assembles the rules from configuration is in `test_service.py`.
 """
 
 from datetime import date
@@ -28,18 +27,16 @@ from backstop_mcp.features.data_hygiene.departed import (
     detect_departed_employment,
 )
 from backstop_mcp.features.data_hygiene.types import EmploymentStatus
+from tests.features.data_hygiene.helpers import (
+    EMPLOYEE_TYPE,
+    FORMER_TYPE,
+    PORTAL_TYPE,
+    TYPE_NAMES,
+    person_org,
+    relationship_types,
+)
 
 TODAY = date(2026, 8, 5)
-
-EMPLOYEE_TYPE = "456439"
-FORMER_TYPE = "459795"
-PORTAL_TYPE = "633147"
-
-TYPE_NAMES = {
-    EMPLOYEE_TYPE: "is employee of",
-    FORMER_TYPE: "is a former employee of",
-    PORTAL_TYPE: "has portal access to",
-}
 
 # Defaults mirror BackstopConfig: employment marker "employ", former markers
 # "former" / "previous" / "ex-" / "no longer", no hard-coded type ids.
@@ -60,48 +57,6 @@ def configure_checks(
         employment=TypeVocabulary(type_ids=employment_type_ids, name_markers=employment_markers),
         former=TypeVocabulary(type_ids=former_type_ids, name_markers=former_markers),
     )
-
-
-def relationship_types(*type_ids: str) -> list[dict[str, object]]:
-    """Side-loaded `entity-relationship-types` resources (id → name)."""
-    return [
-        {
-            "type": "entity-relationship-types",
-            "id": type_id,
-            "attributes": {"name": TYPE_NAMES[type_id]},
-        }
-        for type_id in type_ids
-    ]
-
-
-def person_org(
-    er_id: str,
-    *,
-    end_date: str | None = None,
-    source_type: str = "people",
-    source_id: str = "p1",
-    dest_type: str = "organizations",
-    dest_id: str = "o1",
-    type_id: str | None = EMPLOYEE_TYPE,
-) -> dict[str, object]:
-    """One `entityRelationships` resource linking a person side to an org side."""
-    attributes: dict[str, object] = {
-        "sourceEntity": {"resourceId": source_id, "resourceType": source_type},
-        "destinationEntity": {"resourceId": dest_id, "resourceType": dest_type},
-    }
-    if end_date is not None:
-        attributes["endDate"] = end_date
-    relationships: dict[str, object] = {}
-    if type_id is not None:
-        relationships["entityRelationshipType"] = {
-            "data": {"type": "entity-relationship-types", "id": type_id}
-        }
-    return {
-        "type": "entity-relationships",
-        "id": er_id,
-        "attributes": attributes,
-        "relationships": relationships,
-    }
 
 
 def verify(
@@ -240,6 +195,36 @@ class TestCurrentOutranksFormer:
         assert verify(relationships, checks=checks) is None
 
 
+class TestSeveralDepartures:
+    """One flag, several ended employments: the pick can't come from array position."""
+
+    def test_the_same_organization_is_reported_whatever_the_order(self) -> None:
+        checks = configure_checks()
+        left_a = person_org("1", type_id=FORMER_TYPE, dest_id="oA")
+        left_b = person_org("2", type_id=FORMER_TYPE, dest_id="oB")
+
+        first = verify([left_a, left_b], checks=checks)
+        reversed_order = verify([left_b, left_a], checks=checks)
+
+        assert first is not None
+        assert reversed_order is not None
+        assert first.organization_id == reversed_order.organization_id == "oA"
+
+    def test_a_former_type_outranks_an_elapsed_end_date(self) -> None:
+        """`is a former employee of` is the CRM saying so; an end date is only a date."""
+        checks = configure_checks()
+        relationships = [
+            person_org("1", dest_id="oA", end_date="2020-01-01"),
+            person_org("2", type_id=FORMER_TYPE, dest_id="oB"),
+        ]
+
+        departed = verify(relationships, checks=checks)
+
+        assert departed is not None
+        assert departed.signal is DepartureSignal.FORMER_TYPE
+        assert departed.organization_id == "oB"
+
+
 class TestEndDate:
     def test_past_end_date_is_a_departure(self) -> None:
         checks = configure_checks()
@@ -269,6 +254,22 @@ class TestEndDate:
         relationships = [person_org("1", end_date="not-a-date")]
 
         assert verify(relationships, checks=checks) is None
+
+    def test_blank_end_date_is_ignored(self) -> None:
+        checks = configure_checks()
+        relationships = [person_org("1", end_date="   ")]
+
+        assert verify(relationships, checks=checks) is None
+
+    def test_a_compact_timestamp_still_parses(self) -> None:
+        """Not the shape this instance writes, but its date part isn't the leading ten chars."""
+        checks = configure_checks()
+        relationships = [person_org("1", end_date="20221231T101530")]
+
+        departed = verify(relationships, checks=checks)
+
+        assert departed is not None
+        assert departed.end_date == "2022-12-31"
 
     def test_an_ended_relationship_does_not_clear_a_former_one(self) -> None:
         checks = configure_checks()
@@ -340,6 +341,42 @@ class TestPersonToOrgGate:
 
         assert verify(relationships, checks=checks) is None
 
+    def test_a_side_without_a_type_is_skipped(self) -> None:
+        checks = configure_checks()
+        relationships = [person_org("1", type_id=FORMER_TYPE, dest_type=None)]
+
+        assert verify(relationships, checks=checks) is None
+
+
+class TestUnidentifiableOrganization:
+    """An org side with no `resourceId` names no company, so it decides nothing."""
+
+    def test_a_departure_from_an_unidentified_organization_is_skipped(self) -> None:
+        checks = configure_checks()
+        relationships = [person_org("1", type_id=FORMER_TYPE, dest_id=None)]
+
+        assert verify(relationships, checks=checks) is None
+
+    def test_a_blank_organization_id_counts_as_none(self) -> None:
+        checks = configure_checks()
+        relationships = [person_org("1", type_id=FORMER_TYPE, dest_id="   ")]
+
+        assert verify(relationships, checks=checks) is None
+
+    def test_one_cannot_clear_a_departure_from_another_company(self) -> None:
+        """Keyed on a shared placeholder, this employment would vouch for a person who left
+        somewhere else entirely."""
+        checks = configure_checks()
+        relationships = [
+            person_org("1", type_id=FORMER_TYPE, dest_id="oA"),
+            person_org("2", type_id=EMPLOYEE_TYPE, dest_id=None),
+        ]
+
+        departed = verify(relationships, checks=checks)
+
+        assert departed is not None
+        assert departed.organization_id == "oA"
+
 
 class TestMalformedInput:
     def test_no_relationships_at_all(self) -> None:
@@ -384,6 +421,16 @@ class TestMalformedInput:
         relationships = [person_org("1", type_id=FORMER_TYPE)]
         types: list[dict[str, object]] = [
             {"type": "entity-relationship-types", "id": FORMER_TYPE, "attributes": {}}
+        ]
+
+        assert verify(relationships, checks=checks, types=types) is None
+
+    def test_unreadable_type_resource_is_dropped(self) -> None:
+        """No id to key the name under, so the relationship is left with no type signal."""
+        checks = configure_checks()
+        relationships = [person_org("1", type_id=FORMER_TYPE)]
+        types: list[dict[str, object]] = [
+            {"type": "entity-relationship-types", "attributes": {"name": TYPE_NAMES[FORMER_TYPE]}}
         ]
 
         assert verify(relationships, checks=checks, types=types) is None

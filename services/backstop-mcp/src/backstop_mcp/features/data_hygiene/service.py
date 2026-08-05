@@ -12,12 +12,9 @@ from backstop_mcp.features.data_hygiene.types import (
 class DepartedContactDetector:
     """Answers one question — has this person's employment ended? — and owns what that needs.
 
-    The employment vocabulary used to be re-read from `BackstopConfig` inside a tool, and the
-    relationship-type name map used to be a module-level cache fed by its own request to
-    `/entity-relationship-types`. Both are gone. The vocabulary is a constructor dependency, and
-    the type names arrive side-loaded on the caller's own GET, so `verify` needs no client, no
-    cache and no lock — it is synchronous, and every caller gets the same verdict for the same
-    record.
+    The employment vocabulary is a constructor dependency and the relationship-type names arrive
+    side-loaded on the caller's own GET, so `verify` needs no client, no cache and no lock: it is
+    synchronous, and every caller gets the same verdict for the same record.
 
     Built by `create_departed_contact_detector` in `create_app()` and reached via
     `runtime.get_departed_contact_detector()`.
@@ -45,13 +42,10 @@ class DepartedContactDetector:
     ) -> DepartedEmployment | None:
         """The departed-employment signal for one person, or None when they are current.
 
-        Both arguments are side-loaded from the person's own GET — no second fetch of the person,
-        no per-relationship fetch of its type, and nothing fetched at all when there is nothing
-        to classify. Keyword-only because the two are the same type and transposing them would
-        silently report every person as current.
+        Both arguments are side-loaded from the person's own GET — no second fetch of the person
+        and no per-relationship fetch of its type. Keyword-only because the two are the same type
+        and transposing them would silently report every person as current.
         """
-        if not relationships:
-            return None
         return detect_departed_employment(
             relationships=relationships,
             relationship_types=relationship_types,

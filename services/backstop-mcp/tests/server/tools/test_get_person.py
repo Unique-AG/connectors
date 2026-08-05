@@ -11,6 +11,12 @@ from backstop_mcp.features.party_resolver import (
     ResolvedPartyEcho,
 )
 from backstop_mcp.server.tools.get_person import PersonResolvedResponse, get_person
+from tests.features.data_hygiene.helpers import (
+    EMPLOYEE_TYPE,
+    FORMER_TYPE,
+    person_org,
+    relationship_types,
+)
 from tests.features.party_resolver.helpers import (
     BASE_URL,
     collection,
@@ -22,12 +28,6 @@ from tests.features.party_resolver.helpers import (
 type ConnectUser = Callable[..., object]
 
 
-EMPLOYEE_TYPE = "456439"
-FORMER_TYPE = "459795"
-
-_TYPE_NAMES = {EMPLOYEE_TYPE: "is employee of", FORMER_TYPE: "is a former employee of"}
-
-
 def _person_document(*type_ids: str) -> dict[str, object]:
     """A person GET shaped like the real nested-include response.
 
@@ -35,29 +35,10 @@ def _person_document(*type_ids: str) -> dict[str, object]:
     resource side-loaded alongside them — which is where the type name comes from now.
     """
     relationships = [
-        {
-            "type": "entity-relationships",
-            "id": f"er{index}",
-            "attributes": {
-                "sourceEntity": {"resourceId": "p9", "resourceType": "people"},
-                "destinationEntity": {"resourceId": "o1", "resourceType": "organizations"},
-            },
-            "relationships": {
-                "entityRelationshipType": {
-                    "data": {"type": "entity-relationship-types", "id": type_id}
-                }
-            },
-        }
+        person_org(f"er{index}", type_id=type_id, source_id="p9")
         for index, type_id in enumerate(type_ids)
     ]
-    types = [
-        {
-            "type": "entity-relationship-types",
-            "id": type_id,
-            "attributes": {"name": _TYPE_NAMES[type_id]},
-        }
-        for type_id in dict.fromkeys(type_ids)
-    ]
+    types = relationship_types(*dict.fromkeys(type_ids))
     return {
         "data": {
             "type": "people",

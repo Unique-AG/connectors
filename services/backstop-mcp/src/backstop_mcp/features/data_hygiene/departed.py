@@ -5,14 +5,11 @@ any of it directly — they go through `service.DepartedContactDetector.verify`,
 employment vocabulary. List/org-contact tools should use that verdict to exclude departed people
 from "who do we contact at X" answers unless the user asked for historical contacts; a by-id
 person fetch returns the person with the flag set rather than hiding the record.
-
-`classify_employment` used to live in its own module, opposite a `type_names.py` that fetched the
-vocabulary over HTTP — pure classifier on one side, I/O on the other. The nested include
-(`types.ENTITY_RELATIONSHIPS_INCLUDE`) removed that fetch, so what is left is one algorithm whose
-steps have a single caller each, and it reads better in one place.
 """
 
+from dataclasses import dataclass
 from datetime import date, datetime
+from typing import TypeGuard
 
 from pydantic import ValidationError
 
@@ -33,6 +30,14 @@ from backstop_mcp.features.data_hygiene.types import (
 from backstop_mcp.features.entity_types import normalize_entity_type
 
 
+@dataclass(frozen=True)
+class _Employer:
+    """The organization side of one person→org relationship, once it is known to have both."""
+
+    organization_id: str
+    organization_type: str
+
+
 def detect_departed_employment(
     *,
     relationships: list[dict[str, object]],
@@ -49,6 +54,9 @@ def detect_departed_employment(
 
     Departed when the relationship's type says past employment, or when its `endDate` has passed.
 
+    One departure is reported even when the person has left several organizations, chosen by
+    `_strongest_departure` so the answer never depends on the order of `included`.
+
     Keyword-only throughout: `relationships` and `relationship_types` are both
     `list[dict[str, object]]` and would transpose without a type error, and a swap fails
     silently — nothing parses, so every person reads as current.
@@ -62,12 +70,9 @@ def detect_departed_employment(
         if parsed is None:
             continue
         attrs, type_id = parsed
-        if not _is_person_to_org(attrs=attrs):
+        employer = _employer_side(attrs=attrs)
+        if employer is None:
             continue
-
-        organization = _organization_side(attrs=attrs)
-        assert organization is not None, "person→org relationship has no organization side"
-        organization_key = organization.resource_id or ""
 
         type_name = type_names.get(type_id) if type_id is not None else None
         status = classify_employment(type_id=type_id, type_name=type_name, rules=rules)
@@ -85,11 +90,11 @@ def detect_departed_employment(
                 else DepartureSignal.END_DATE
             )
             departures.setdefault(
-                organization_key,
+                employer.organization_id,
                 DepartedEmployment(
                     signal=signal,
-                    organization_id=organization.resource_id,
-                    organization_type=organization.resource_type,
+                    organization_id=employer.organization_id,
+                    organization_type=employer.organization_type,
                     end_date=ended.isoformat() if ended is not None else None,
                     relationship_type_id=type_id,
                     relationship_type_name=type_name,
@@ -97,12 +102,9 @@ def detect_departed_employment(
             )
             continue
 
-        current.add(organization_key)
+        current.add(employer.organization_id)
 
-    for organization_key, departure in departures.items():
-        if organization_key not in current:
-            return departure
-    return None
+    return _strongest_departure(departures=departures, current=current)
 
 
 def classify_employment(
@@ -138,6 +140,28 @@ def classify_employment(
     return EmploymentStatus.IRRELEVANT
 
 
+def _strongest_departure(
+    *, departures: dict[str, DepartedEmployment], current: set[str]
+) -> DepartedEmployment | None:
+    """The one departure to report, out of every organization the person has left.
+
+    The response carries a single signal, so a person with two ended employments needs a rule
+    that does not read off array position. Stronger evidence first — the CRM naming someone a past
+    employee outranks an end date that merely elapsed — then the lowest organization id, which is
+    arbitrary but fixed for a given record.
+    """
+    unresolved = [departure for key, departure in departures.items() if key not in current]
+    if not unresolved:
+        return None
+    return min(
+        unresolved,
+        key=lambda departure: (
+            departure.signal is not DepartureSignal.FORMER_TYPE,
+            departure.organization_id,
+        ),
+    )
+
+
 def _relationship_type_names(*, resources: list[dict[str, object]]) -> dict[str, str]:
     """`id → name` for the side-loaded relationship types. Unnamed and malformed ones are dropped.
 
@@ -167,30 +191,53 @@ def _parse_relationship(
     return resource.attributes, type_ids[0] if type_ids else None
 
 
-def _side_type(*, side: EntityRefAttributes | None) -> str | None:
-    if side is None or side.resource_type is None:
+def _side_type(*, side: EntityRefAttributes) -> str | None:
+    if side.resource_type is None:
         return None
     return normalize_entity_type(side.resource_type)
 
 
-def _is_person_to_org(*, attrs: EntityRelationshipAttributes) -> bool:
-    source = _side_type(side=attrs.source_entity)
-    destination = _side_type(side=attrs.destination_entity)
-    if source is None or destination is None:
-        return False
-    return (source in PERSON_SIDE_TYPES and destination in ORG_SIDE_TYPES) or (
-        destination in PERSON_SIDE_TYPES and source in ORG_SIDE_TYPES
-    )
+def _employer_side(*, attrs: EntityRelationshipAttributes) -> _Employer | None:
+    """The organization a relationship could attribute employment to, when there is one.
+
+    Needs a person on one side and an organization on the other, in either direction, and needs
+    that organization to be identifiable. An organization side with no `resourceId` is skipped
+    rather than keyed on a placeholder: every such side would share one bucket, so a live
+    relationship to one unnamed company would clear a departure from a different one.
+    """
+    sides = [
+        (side, _side_type(side=side))
+        for side in (attrs.source_entity, attrs.destination_entity)
+        if side is not None
+    ]
+    if len(sides) != 2:
+        return None
+    (first, first_type), (second, second_type) = sides
+    if first_type in PERSON_SIDE_TYPES and _is_organization(second_type):
+        organization, organization_type = second, second_type
+    elif second_type in PERSON_SIDE_TYPES and _is_organization(first_type):
+        organization, organization_type = first, first_type
+    else:
+        return None
+
+    organization_id = as_clean_str(organization.resource_id)
+    if organization_id is None:
+        return None
+    return _Employer(organization_id=organization_id, organization_type=organization_type)
 
 
-def _organization_side(*, attrs: EntityRelationshipAttributes) -> EntityRefAttributes | None:
-    for side in (attrs.source_entity, attrs.destination_entity):
-        if side is not None and _side_type(side=side) in ORG_SIDE_TYPES:
-            return side
-    return None
+def _is_organization(side_type: str | None) -> TypeGuard[str]:
+    """`TypeGuard` rather than a bare `in`, so the matched side's type reads as the `str` it is."""
+    return side_type in ORG_SIDE_TYPES
 
 
 def _parse_date(*, raw: str | None) -> date | None:
+    """The calendar day an `endDate` names, however the instance spelled it.
+
+    The leading ten characters cover both a plain `YYYY-MM-DD` and the full timestamp Backstop
+    actually writes into this date field; the second attempt is for compact ISO forms
+    (`20221231T101530`), whose date part is not ten characters long.
+    """
     if raw is None:
         return None
     text = raw.strip()
