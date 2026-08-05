@@ -15,6 +15,7 @@ from backstop_mcp.backstop_client import BackstopClientFactory, BackstopUnreacha
 from backstop_mcp.db.models import LoginAttempt as LoginAttemptRow
 from backstop_mcp.db.models import OAuthToken as OAuthTokenRow
 from backstop_mcp.db.models import PendingAuthorization
+from backstop_mcp.features.auth.login_csrf import csrf_cookie_name
 from backstop_mcp.features.auth.provider import BackstopOAuthProvider
 from backstop_mcp.features.auth.throttle import (
     MAX_USERNAME_LENGTH,
@@ -71,13 +72,31 @@ def _authorization_params(
     )
 
 
-def _login_post_request(request_id: str, username: str, api_token: str) -> Request:
-    body = f"request_id={request_id}&username={username}&api_token={api_token}".encode()
-    scope = {
-        "type": "http",
-        "method": "POST",
-        "headers": [(b"content-type", b"application/x-www-form-urlencoded")],
-    }
+_CSRF_TOKEN = "provider-test-csrf-token"
+
+
+def _login_post_request(
+    request_id: str,
+    username: str,
+    api_token: str,
+    *,
+    form_csrf_token: str = _CSRF_TOKEN,
+    cookie_csrf_token: str | None = _CSRF_TOKEN,
+) -> Request:
+    """A form POST carrying a matching CSRF cookie/field pair by default.
+
+    Every real submission has both halves — the form is only ever rendered with a cookie set,
+    see `auth/login_csrf.py` — so the happy path is the default here. The two overrides exist
+    for `TestLoginCsrf`, which drops or corrupts one half.
+    """
+    body = (
+        f"request_id={request_id}&username={username}"
+        f"&api_token={api_token}&csrf_token={form_csrf_token}"
+    ).encode()
+    headers = [(b"content-type", b"application/x-www-form-urlencoded")]
+    if cookie_csrf_token is not None:
+        headers.append((b"cookie", f"{csrf_cookie_name(request_id)}={cookie_csrf_token}".encode()))
+    scope = {"type": "http", "method": "POST", "headers": headers}
 
     async def receive() -> dict[str, object]:
         return {"type": "http.request", "body": body, "more_body": False}
@@ -189,6 +208,131 @@ class TestLoginFormSubmission:
         async with factory() as session:
             pending = await session.get(PendingAuthorization, request_id)
         assert pending is not None
+
+
+class TestLoginCsrf:
+    """Double-submit CSRF protection on the login POST — see `auth/login_csrf.py`.
+
+    The endpoint takes a Backstop credential and, on success, mints an authorization code, so a
+    cross-site POST a victim could be tricked into submitting has to be refused.
+    """
+
+    @staticmethod
+    async def _pending_request_id(provider: BackstopOAuthProvider, client_id: str) -> str:
+        client_info = await _register_client(provider, client_id)
+        redirect_url = await provider.authorize(client_info, _authorization_params())
+        return parse_qs(urlparse(redirect_url).query)["request_id"][0]
+
+    @pytest.mark.asyncio
+    async def test_login_get_sets_the_cookie_the_form_will_be_checked_against(
+        self, db: DatabaseFixture
+    ) -> None:
+        provider = _make_provider(db)
+        request_id = await self._pending_request_id(provider, "provider-client-csrf-1")
+
+        request = Request(
+            {"type": "http", "method": "GET", "query_string": f"request_id={request_id}".encode()}
+        )
+        response = await provider.handle_login_get(request)
+
+        set_cookie = response.headers["set-cookie"]
+        assert csrf_cookie_name(request_id) in set_cookie
+        # The three attributes the protection actually rests on: SameSite is what keeps the
+        # cookie off a cross-site POST, HttpOnly keeps script from reading it, and Secure
+        # follows from the https base URL this provider was built with.
+        assert "HttpOnly" in set_cookie
+        assert "samesite=lax" in set_cookie.lower()
+        assert "Secure" in set_cookie
+        assert f"Path={provider.login_path}" in set_cookie
+
+    @pytest.mark.asyncio
+    async def test_login_get_does_not_leak_the_request_id_via_referrer(
+        self, db: DatabaseFixture
+    ) -> None:
+        """The request_id travels in the URL, so the page must not forward it onward."""
+        provider = _make_provider(db)
+        request_id = await self._pending_request_id(provider, "provider-client-csrf-2")
+
+        request = Request(
+            {"type": "http", "method": "GET", "query_string": f"request_id={request_id}".encode()}
+        )
+        response = await provider.handle_login_get(request)
+
+        assert response.headers["referrer-policy"] == "no-referrer"
+        assert response.headers["cache-control"] == "no-store"
+
+    @pytest.mark.asyncio
+    async def test_submission_without_the_cookie_never_reaches_backstop(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """What a cross-site POST looks like: `SameSite=Lax` means no cookie is attached."""
+        calls: list[str] = []
+
+        async def _record(_self: object, username: str, _api_token: str) -> bool:
+            calls.append(username)
+            return True
+
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _record)
+        provider = _make_provider(db)
+        request_id = await self._pending_request_id(provider, "provider-client-csrf-3")
+
+        response = await provider.handle_login_post(
+            _login_post_request(request_id, "pv-bob.smith", "token-123", cookie_csrf_token=None)
+        )
+
+        assert response.status_code == 400
+        assert calls == []
+
+    @pytest.mark.asyncio
+    async def test_submission_with_a_mismatched_token_is_refused(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
+        provider = _make_provider(db)
+        request_id = await self._pending_request_id(provider, "provider-client-csrf-4")
+
+        response = await provider.handle_login_post(
+            _login_post_request(
+                request_id, "pv-bob.smith", "token-123", form_csrf_token="not-the-cookie"
+            )
+        )
+
+        assert response.status_code == 400
+        # Nothing was consumed: no code minted, the pending row survives for a real attempt.
+        _, factory = db
+        async with factory() as session:
+            assert await session.get(PendingAuthorization, request_id) is not None
+
+    @pytest.mark.asyncio
+    async def test_a_refused_submission_re_renders_a_usable_form(self, db: DatabaseFixture) -> None:
+        """A user whose cookie expired with the form open must be able to just submit again."""
+        provider = _make_provider(db)
+        request_id = await self._pending_request_id(provider, "provider-client-csrf-5")
+
+        response = await provider.handle_login_post(
+            _login_post_request(request_id, "pv-bob.smith", "token-123", cookie_csrf_token=None)
+        )
+
+        assert b'name="csrf_token"' in response.body
+        assert csrf_cookie_name(request_id) in response.headers["set-cookie"]
+
+    @pytest.mark.asyncio
+    async def test_a_successful_login_clears_the_cookie(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
+        provider = _make_provider(db)
+        request_id = await self._pending_request_id(provider, "provider-client-csrf-6")
+
+        response = await provider.handle_login_post(
+            _login_post_request(request_id, "pv-bob.smith", "token-123")
+        )
+
+        assert response.status_code == 302
+        set_cookie = response.headers["set-cookie"]
+        assert csrf_cookie_name(request_id) in set_cookie
+        # Starlette expresses deletion as an immediate expiry.
+        assert "Max-Age=0" in set_cookie or "1970" in set_cookie
 
 
 class TestLoginThrottling:

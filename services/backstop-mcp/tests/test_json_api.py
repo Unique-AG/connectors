@@ -1,7 +1,12 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from backstop_mcp.backstop_client.json_api import BackstopApiDocument, BackstopApiResource
+from backstop_mcp.backstop_client.errors import BackstopUnexpectedCollectionError
+from backstop_mcp.backstop_client.json_api import (
+    BackstopApiDocument,
+    BackstopApiResource,
+    single_resource,
+)
 
 
 class _Attrs(BaseModel):
@@ -59,3 +64,46 @@ class TestBackstopApiResourceIdValidation:
         )
 
         assert resource.type == ""
+
+
+class TestSingleResource:
+    """A by-id read that comes back as a list is a malformed upstream response.
+
+    `get_organization` used to `assert` on this, which would have surfaced an `AssertionError`
+    (not a `ToolError`) to the MCP client — and asserting on data from a system boundary is
+    exactly what the repo's own guidance reserves `throw` for.
+    """
+
+    def test_returns_the_resource_for_a_single_document(self) -> None:
+        document = BackstopApiDocument[_Attrs].model_validate(
+            {"data": {"id": "1", "type": "organizations", "attributes": {"name": "Capstone"}}}
+        )
+
+        resource = single_resource(document, path="/organizations/1")
+
+        assert resource is not None
+        assert resource.id == "1"
+
+    def test_returns_none_for_a_document_describing_nothing(self) -> None:
+        document = BackstopApiDocument[_Attrs].model_validate({"data": None})
+
+        assert single_resource(document, path="/organizations/1") is None
+
+    def test_raises_a_typed_error_for_a_collection(self) -> None:
+        document = BackstopApiDocument[_Attrs].model_validate(
+            {"data": [{"id": "1", "type": "organizations", "attributes": {"name": "Capstone"}}]}
+        )
+
+        with pytest.raises(BackstopUnexpectedCollectionError) as excinfo:
+            _ = single_resource(document, path="/organizations/1")
+
+        # The path is carried so the failure names the request that produced it.
+        assert excinfo.value.path == "/organizations/1"
+        assert "/organizations/1" in str(excinfo.value)
+
+    def test_raises_for_an_empty_collection_too(self) -> None:
+        """An empty list is still the wrong *shape*, not merely an absent record."""
+        document = BackstopApiDocument[_Attrs].model_validate({"data": []})
+
+        with pytest.raises(BackstopUnexpectedCollectionError):
+            _ = single_resource(document, path="/organizations/1")

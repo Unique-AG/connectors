@@ -8,6 +8,7 @@ from backstop_mcp.features.custom_fields import (
     FieldAmbiguousResponse,
     definition_echo,
     read_custom_field_value,
+    resolve_field,
     unresolved_field_response,
 )
 from backstop_mcp.features.party_resolver import (
@@ -65,10 +66,11 @@ async def get_organization_custom_field(
     if not isinstance(party_result, Resolved):
         return unresolved_party_response(party_result)
 
-    field_result = await get_custom_fields_service().resolve(
+    field_result = await resolve_field(
+        get_custom_fields_service(),
+        client,
         entity_type="organizations",
         query=field,
-        client=client,
         ctx=ctx,
     )
     if not isinstance(field_result, Resolved):

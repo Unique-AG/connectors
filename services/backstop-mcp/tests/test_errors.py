@@ -44,6 +44,9 @@ class TestParseJsonApiErrorWellFormed:
         assert error.status_code == 404
         assert error.detail == "No such record"
         assert error.code == "not_found"
+        assert len(error.errors) == 1
+        assert error.errors[0].detail == "No such record"
+        assert error.errors[0].code == "not_found"
 
     def test_ignores_code_when_absent(self) -> None:
         response = httpx.Response(400, json={"errors": [{"detail": "Bad request"}]})
@@ -52,6 +55,57 @@ class TestParseJsonApiErrorWellFormed:
 
         assert error.detail == "Bad request"
         assert error.code is None
+        assert error.errors[0].detail == "Bad request"
+
+    def test_falls_back_to_title_when_detail_absent(self) -> None:
+        response = httpx.Response(
+            400,
+            json={
+                "errors": [
+                    {
+                        "code": "UnsupportedRequestException",
+                        "title": "Find all lov-entries is not allowed.",
+                    }
+                ]
+            },
+        )
+
+        error = parse_json_api_error(response)
+
+        assert error.detail == "Find all lov-entries is not allowed."
+        assert error.code == "UnsupportedRequestException"
+        assert error.errors[0].title == "Find all lov-entries is not allowed."
+        assert error.errors[0].detail is None
+
+    def test_prefers_detail_over_title(self) -> None:
+        response = httpx.Response(
+            400,
+            json={"errors": [{"title": "Short title", "detail": "Longer detail"}]},
+        )
+
+        error = parse_json_api_error(response)
+
+        assert error.detail == "Longer detail"
+
+    def test_joins_all_errors(self) -> None:
+        response = httpx.Response(
+            400,
+            json={
+                "errors": [
+                    {"code": "a", "detail": "First problem"},
+                    {"code": "b", "title": "Second problem"},
+                ]
+            },
+        )
+
+        error = parse_json_api_error(response)
+
+        assert error.detail == "First problem; Second problem"
+        assert error.code == "a"
+        assert len(error.errors) == 2
+        assert error.errors[0].code == "a"
+        assert error.errors[1].code == "b"
+        assert error.errors[1].message == "Second problem"
 
 
 class TestParseJsonApiErrorMalformedBody:
@@ -63,6 +117,7 @@ class TestParseJsonApiErrorMalformedBody:
         assert error.status_code == 500
         assert error.detail == "Backstop returned status 500 with an unparseable response body"
         assert error.code is None
+        assert error.errors == ()
 
     def test_empty_body_falls_back(self) -> None:
         response = httpx.Response(500)
@@ -70,6 +125,7 @@ class TestParseJsonApiErrorMalformedBody:
         error = parse_json_api_error(response)
 
         assert error.detail == "Backstop returned status 500 with an unparseable response body"
+        assert error.errors == ()
 
     def test_empty_errors_array_falls_back(self) -> None:
         response = httpx.Response(500, json={"errors": []})
@@ -77,13 +133,16 @@ class TestParseJsonApiErrorMalformedBody:
         error = parse_json_api_error(response)
 
         assert error.detail == "Backstop returned status 500 with an unparseable response body"
+        assert error.errors == ()
 
-    def test_missing_detail_key_falls_back(self) -> None:
+    def test_errors_without_message_fields_fall_back(self) -> None:
         response = httpx.Response(500, json={"errors": [{"status": "500"}]})
 
         error = parse_json_api_error(response)
 
         assert error.detail == "Backstop returned status 500 with an unparseable response body"
+        assert len(error.errors) == 1
+        assert error.errors[0].message is None
 
 
 class TestParseJsonApiErrorRateLimit:

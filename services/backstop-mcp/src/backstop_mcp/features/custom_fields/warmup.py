@@ -11,22 +11,24 @@ logger = get_logger(__name__)
 
 
 async def warm_custom_field_schema(
-    service: CustomFieldsService, clients: BackstopClientFactory
+    service: CustomFieldsService,
+    clients: BackstopClientFactory,
+    credential: BackstopCredentialSecret | None,
 ) -> None:
     """Fetch the custom-field schema once using the configured service account.
 
-    Errors are logged and swallowed: a Backstop outage at boot must not stop this service
-    from serving, and the schema will be fetched lazily by the first authenticated caller
-    instead. No service account configured is the normal case, not a failure.
+    `credential` is assembled by `create_app` (see `_service_account_credential`) rather than
+    read back off the client factory: whether a service account exists is a configuration
+    question, and this module has no business holding a config object to answer it. `None` is
+    the normal case, not a failure.
+
+    Errors are logged and swallowed: a Backstop outage at boot must not stop this service from
+    serving, and the schema will be fetched lazily by the first authenticated caller instead.
     """
-    config = clients.config
-    if config.service_username is None or config.service_api_token is None:
+    if credential is None:
         logger.info("custom_fields.warmup.skipped", reason="no_service_account")
         return
 
-    credential = BackstopCredentialSecret(
-        username=config.service_username, api_token=config.service_api_token
-    )
     try:
         await service.ensure_fresh(clients.for_credential(credential))
     except Exception:
@@ -37,7 +39,9 @@ async def warm_custom_field_schema(
 
 @asynccontextmanager
 async def warmup_lifespan(
-    service: CustomFieldsService, clients: BackstopClientFactory
+    service: CustomFieldsService,
+    clients: BackstopClientFactory,
+    credential: BackstopCredentialSecret | None,
 ) -> AsyncGenerator[None, None]:
     """Run schema warming in the background for the lifetime of the app.
 
@@ -45,7 +49,7 @@ async def warmup_lifespan(
     `/custom-field-definitions` pagination can take seconds, and readiness shouldn't wait on
     an optional cache fill. Cancelled on shutdown if still in flight.
     """
-    task = asyncio.create_task(warm_custom_field_schema(service, clients))
+    task = asyncio.create_task(warm_custom_field_schema(service, clients, credential))
     try:
         yield
     finally:

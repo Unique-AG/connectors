@@ -7,6 +7,7 @@ from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client import BackstopClientFactory
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.features.custom_fields import create_custom_fields_service
 from backstop_mcp.features.custom_fields.warmup import warm_custom_field_schema, warmup_lifespan
 from tests.helpers import client_factory, resource
@@ -17,12 +18,12 @@ WARMUP_BASE_URL = "https://example.backstopsolutions.com/warmup"
 
 
 def _service_account_factory(base_url: str) -> BackstopClientFactory:
-    """A factory whose config carries the optional startup service account."""
-    return client_factory(
-        base_url,
-        service_username="svc-bot",
-        service_api_token=SecretStr("svc-token"),
-    )
+    return client_factory(base_url)
+
+
+def _service_credential() -> BackstopCredentialSecret:
+    """The credential `create_app` assembles from BACKSTOP_SERVICE_* when both are set."""
+    return BackstopCredentialSecret(username="svc-bot", api_token=SecretStr("svc-token"))
 
 
 def _lov_entries_route(base_url: str) -> respx.Route:
@@ -67,8 +68,7 @@ class TestWarmCustomFieldSchema:
         )
 
         await warm_custom_field_schema(
-            service,
-            _service_account_factory(base_url),
+            service, _service_account_factory(base_url), _service_credential()
         )
 
         assert route.call_count == 1
@@ -91,7 +91,7 @@ class TestWarmCustomFieldSchema:
             return_value=_definitions_response()
         )
 
-        await warm_custom_field_schema(service, client_factory(base_url))
+        await warm_custom_field_schema(service, client_factory(base_url), None)
 
         assert route.call_count == 0
         assert service.definitions_for("organizations") == []
@@ -113,8 +113,7 @@ class TestWarmCustomFieldSchema:
         )
 
         await warm_custom_field_schema(
-            service,
-            _service_account_factory(base_url),
+            service, _service_account_factory(base_url), _service_credential()
         )
 
         assert service.definitions_for("organizations") == []
@@ -137,7 +136,7 @@ class TestWarmupLifespan:
         )
         clients = _service_account_factory(base_url)
 
-        async with warmup_lifespan(service, clients):
+        async with warmup_lifespan(service, clients, _service_credential()):
             # Startup handed control back before the fetch could even be issued.
             assert route.call_count == 0
             async with asyncio.timeout(10):
@@ -166,7 +165,7 @@ class TestWarmupLifespan:
         )
         clients = _service_account_factory(base_url)
 
-        async with warmup_lifespan(service, clients):
+        async with warmup_lifespan(service, clients, _service_credential()):
             pass
 
         assert route.call_count == 0
@@ -188,7 +187,7 @@ class TestWarmupLifespan:
         )
         clients = _service_account_factory(base_url)
 
-        async with warmup_lifespan(service, clients):
+        async with warmup_lifespan(service, clients, _service_credential()):
             async with asyncio.timeout(10):
                 while route.call_count == 0:
                     await asyncio.sleep(0.01)

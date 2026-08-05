@@ -37,7 +37,13 @@ def format_glossary(
 
     for definition in sorted(definitions, key=lambda d: d.display_name.lower()):
         line = _definition_line(definition)
-        if used + len(line) > budget_chars:
+        # The truncation notice is reserved up front rather than appended on top afterwards: it
+        # is part of what this block will occupy, and adding it after the budget check let a
+        # block overrun by its length — which in `format_glossaries` handed the next entity type
+        # a negative remainder and silently dropped it for a reason unrelated to its content.
+        # Costs up to `len(_TRUNCATION_NOTICE)` of glossary in the exactly-fits case; never
+        # overruns.
+        if used + len(line) + len(_TRUNCATION_NOTICE) > budget_chars:
             truncated = True
             break
         lines.append(line)
@@ -63,6 +69,8 @@ def format_glossaries(
     remaining = budget_chars
 
     for entity_type, definitions in definitions_by_entity:
+        if remaining <= 0:
+            break
         block = format_glossary(definitions, entity_type=entity_type, budget_chars=remaining)
         if not block:
             continue

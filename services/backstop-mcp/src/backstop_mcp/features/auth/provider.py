@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Literal, override
+from urllib.parse import urlparse
 
 from fastmcp.server.auth import AccessToken, OAuthProvider
 from mcp.server.auth.provider import (
@@ -33,6 +34,12 @@ from backstop_mcp.db.models import OAuthClient as OAuthClientRow
 from backstop_mcp.db.models import OAuthToken as OAuthTokenRow
 from backstop_mcp.db.models import PendingAuthorization
 from backstop_mcp.features.auth.credential_store import find_user_id_by_username, save_credential
+from backstop_mcp.features.auth.login_csrf import (
+    clear_csrf_cookie,
+    csrf_token_is_valid,
+    issue_csrf_token,
+    set_csrf_cookie,
+)
 from backstop_mcp.features.auth.login_form import render_login_form
 from backstop_mcp.features.auth.throttle import (
     MAX_USERNAME_LENGTH,
@@ -93,6 +100,21 @@ _INVALID_SCOPE = _RefreshRejected(
     "invalid_scope", "Requested scope exceeds originally granted scopes"
 )
 
+# Applied to every login-endpoint response. `Referrer-Policy` is the load-bearing one: the
+# `request_id` travels in the login URL's query string, and without this the browser would
+# forward it in the `Referer` of anything the page links to or loads. `no-store` keeps it out of
+# shared caches and the back/forward cache for the same reason.
+_LOGIN_SECURITY_HEADERS = {
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+}
+
+_EXPIRED_LINK_MESSAGE = (
+    "This login link is invalid or has expired. Please reconnect from your MCP client."
+)
+
 
 class BackstopOAuthProvider(OAuthProvider):
     """FastMCP OAuth 2.1 authorization server whose "login" step is a Backstop credential form.
@@ -136,6 +158,10 @@ class BackstopOAuthProvider(OAuthProvider):
         self._backstop_clients = backstop_clients
         self._throttle = throttle
         self.login_path = login_path
+        # Drives the CSRF cookie's `Secure` flag. Derived from the configured public base URL
+        # rather than hardcoded so a local http:// development deploy still has a working form,
+        # while every real deploy (https, enforced for production by `AppConfig`) gets the flag.
+        self._secure_cookies: bool = urlparse(base_url).scheme == "https"
 
     # -- Dynamic client registration -----------------------------------------------------
 
@@ -188,14 +214,54 @@ class BackstopOAuthProvider(OAuthProvider):
 
     # -- Login form: our replacement for the third-party OAuth redirect ---------------------
 
+    def _expired_link_response(self) -> Response:
+        return PlainTextResponse(
+            _EXPIRED_LINK_MESSAGE, status_code=400, headers=_LOGIN_SECURITY_HEADERS
+        )
+
+    def _form_response(
+        self,
+        request_id: str,
+        *,
+        status_code: int = 200,
+        client_name: str | None = None,
+        username: str = "",
+        error: str | None = None,
+    ) -> Response:
+        """Render the login form with a freshly-issued CSRF token and matching cookie.
+
+        Every render goes through here, including the re-renders after a failed submission, so
+        the cookie and the hidden field can't drift apart. A fresh token per render (rather than
+        echoing the one just submitted) means an error page never reflects an attacker-supplied
+        value back into the form.
+        """
+        csrf_token = issue_csrf_token()
+        response = HTMLResponse(
+            render_login_form(
+                request_id,
+                csrf_token,
+                client_name=client_name,
+                username=username,
+                error=error,
+            ),
+            status_code=status_code,
+            headers=_LOGIN_SECURITY_HEADERS,
+        )
+        set_csrf_cookie(
+            response,
+            request_id,
+            csrf_token,
+            path=self.login_path,
+            max_age_seconds=int(self.PENDING_AUTHORIZATION_TTL.total_seconds()),
+            secure=self._secure_cookies,
+        )
+        return response
+
     async def handle_login_get(self, request: Request) -> Response:
         request_id = request.query_params.get("request_id", "")
         pending = await self._load_pending(request_id)
         if pending is None:
-            return PlainTextResponse(
-                "This login link is invalid or has expired. Please reconnect from your MCP client.",
-                status_code=400,
-            )
+            return self._expired_link_response()
 
         client_name = None
         async with read_session(self._session_factory) as session:
@@ -206,28 +272,38 @@ class BackstopOAuthProvider(OAuthProvider):
             )
             client_name = client_info.client_name
 
-        return HTMLResponse(render_login_form(request_id, client_name=client_name))
+        return self._form_response(request_id, client_name=client_name)
 
     async def handle_login_post(self, request: Request) -> Response:
         form = await request.form()
         request_id = str(form.get("request_id", ""))
         username = str(form.get("username", "")).strip()
         api_token = str(form.get("api_token", ""))
+        csrf_token = str(form.get("csrf_token", ""))
 
         pending = await self._load_pending(request_id)
         if pending is None:
-            return PlainTextResponse(
-                "This login link is invalid or has expired. Please reconnect from your MCP client.",
+            return self._expired_link_response()
+
+        # Before anything else, and in particular before the credential reaches Backstop: a
+        # submission that can't prove it came from the browser this form was served to is not a
+        # login attempt worth forwarding. Re-rendering (rather than a bare 400) issues a fresh
+        # token, so the legitimate case — a user whose cookie expired while the form sat open —
+        # recovers by simply submitting again.
+        if not csrf_token_is_valid(request, request_id, csrf_token):
+            logger.warning("auth.login.csrf_mismatch")
+            return self._form_response(
+                request_id,
                 status_code=400,
+                username=username,
+                error="This form expired before it was submitted. Please try again.",
             )
 
         if not username or not api_token:
-            return HTMLResponse(
-                render_login_form(
-                    request_id,
-                    username=username,
-                    error="Username and API token are both required.",
-                )
+            return self._form_response(
+                request_id,
+                username=username,
+                error="Username and API token are both required.",
             )
 
         # Rejected before any storage or upstream call: the submitted username is
@@ -235,23 +311,19 @@ class BackstopOAuthProvider(OAuthProvider):
         # Treated as an ordinary invalid credential — no Backstop username is this long — so the
         # response is indistinguishable from any other bad submission.
         if len(username) > MAX_USERNAME_LENGTH:
-            return HTMLResponse(
-                render_login_form(request_id, error="Invalid username or API token.")
-            )
+            return self._form_response(request_id, error="Invalid username or API token.")
 
         # Checked before contacting Backstop — the point of the limit is to stop this endpoint
         # being used to test credentials against Backstop at all.
         if await is_throttled(self._session_factory, username, config=self._throttle):
-            return HTMLResponse(
-                render_login_form(
-                    request_id,
-                    username=username,
-                    error=(
-                        "Too many failed attempts for this username. "
-                        + "Please wait a few minutes and try again."
-                    ),
-                ),
+            return self._form_response(
+                request_id,
                 status_code=429,
+                username=username,
+                error=(
+                    "Too many failed attempts for this username. "
+                    + "Please wait a few minutes and try again."
+                ),
             )
 
         try:
@@ -260,22 +332,18 @@ class BackstopOAuthProvider(OAuthProvider):
             # Not recorded as a failed attempt: nothing was learned about the credential, so
             # counting it would let a Backstop outage lock users out.
             logger.warning("auth.login.backstop_unreachable", error=str(exc))
-            return HTMLResponse(
-                render_login_form(
-                    request_id,
-                    username=username,
-                    error="Backstop is unreachable right now — please try again shortly.",
-                )
+            return self._form_response(
+                request_id,
+                username=username,
+                error="Backstop is unreachable right now — please try again shortly.",
             )
 
         if not valid:
             await record_failure(self._session_factory, username, source_ip=_source_ip(request))
-            return HTMLResponse(
-                render_login_form(
-                    request_id,
-                    username=username,
-                    error="Invalid username or API token.",
-                )
+            return self._form_response(
+                request_id,
+                username=username,
+                error="Invalid username or API token.",
             )
 
         # Authenticated, so the guessing budget is irrelevant for this username.
@@ -310,7 +378,10 @@ class BackstopOAuthProvider(OAuthProvider):
             )
 
         redirect_url = construct_redirect_uri(pending.redirect_uri, code=code, state=pending.state)
-        return RedirectResponse(redirect_url, status_code=302)
+        response = RedirectResponse(redirect_url, status_code=302, headers=_LOGIN_SECURITY_HEADERS)
+        # The pending authorization is gone, so its CSRF cookie has nothing left to protect.
+        clear_csrf_cookie(response, request_id, path=self.login_path)
+        return response
 
     async def _load_pending(self, request_id: str) -> PendingAuthorization | None:
         if not request_id:

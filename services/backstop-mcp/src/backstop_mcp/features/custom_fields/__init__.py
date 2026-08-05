@@ -4,6 +4,7 @@ from backstop_mcp.features.custom_fields.entity_types import (
 )
 from backstop_mcp.features.custom_fields.index import FieldCandidate, FieldResolution
 from backstop_mcp.features.custom_fields.overrides import FieldOverride
+from backstop_mcp.features.custom_fields.resolve import resolve_field
 from backstop_mcp.features.custom_fields.responses import (
     AllowedValueEcho,
     CustomFieldDefinitionEcho,
@@ -37,5 +38,6 @@ __all__ = [
     "field_candidate_echo",
     "normalize_entity_type",
     "read_custom_field_value",
+    "resolve_field",
     "unresolved_field_response",
 ]

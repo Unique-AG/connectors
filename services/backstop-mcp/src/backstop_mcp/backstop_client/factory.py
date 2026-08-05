@@ -2,8 +2,8 @@
 
 One `BackstopClientFactory` is built in `create_app()` and reached through
 `runtime.get_services().backstop`. It holds the shared connection pool, the per-user
-concurrency gates, and the one `BackstopConfig` — nothing here re-reads the environment, so
-what `create_app` was handed is what every request uses.
+concurrency gates, the one set of transport settings, and the one retry policy — nothing here
+re-reads the environment, so what `create_app` was handed is what every request uses.
 """
 
 import asyncio
@@ -20,7 +20,8 @@ from backstop_mcp.backstop_client.client import (
     build_auth_headers,
 )
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret, CallerAuthContext
-from backstop_mcp.config import BackstopConfig
+from backstop_mcp.backstop_client.retry import RetryPolicy, build_retry_policy
+from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
 from backstop_mcp.logging import get_logger
 
 logger = get_logger(__name__)
@@ -97,19 +98,24 @@ class BackstopClientFactory:
 
     def __init__(
         self,
-        config: BackstopConfig,
+        settings: BackstopTransportSettings,
+        retry_settings: RetrySettings,
         *,
         auth: CallerAuthContext | None = None,
     ) -> None:
-        self._config: BackstopConfig = config
+        self._settings: BackstopTransportSettings = settings
         self._auth: CallerAuthContext | None = auth
-        self._gates: _GateRegistry = _GateRegistry(limit=config.max_concurrent_requests_per_user)
+        self._gates: _GateRegistry = _GateRegistry(limit=settings.max_concurrent_requests_per_user)
+        # Built once, here, rather than per request: the predicate and wait strategy are pure
+        # closures over immutable settings. See `retry.RetryPolicy` for why the `AsyncRetrying`
+        # wrapper it hands out is still per-request.
+        self._retry_policy: RetryPolicy = build_retry_policy(retry_settings)
         self._http_client: httpx.AsyncClient | None = None
         self._http_client_lock: asyncio.Lock = asyncio.Lock()
 
     @property
-    def config(self) -> BackstopConfig:
-        return self._config
+    def settings(self) -> BackstopTransportSettings:
+        return self._settings
 
     def attach_auth(self, auth: CallerAuthContext) -> None:
         """Supply the auth context after construction.
@@ -137,9 +143,10 @@ class BackstopClientFactory:
         """
         return BackstopClient(
             credential,
-            self._config,
+            self._settings,
             http_client=self._shared_http_client,
             gate=self._gates.hold,
+            retry_policy=self._retry_policy,
             on_auth_failure=on_auth_failure,
         )
 
@@ -170,16 +177,16 @@ class BackstopClientFactory:
         failure mode as "wrong token" and should be shown to the user differently.
         """
         client = await self._shared_http_client()
-        url = self._config.base_url.rstrip("/") + _VERIFICATION_PATH
+        url = self._settings.base_url.rstrip("/") + _VERIFICATION_PATH
         try:
             response = await client.get(
                 url,
                 headers=build_auth_headers(username, api_token),
-                timeout=self._config.default_timeout_seconds,
+                timeout=self._settings.default_timeout_seconds,
             )
         except httpx.RequestError as exc:
             raise BackstopUnreachableError(
-                f"Could not reach Backstop at {self._config.base_url}"
+                f"Could not reach Backstop at {self._settings.base_url}"
             ) from exc
 
         if response.status_code == 200:
@@ -214,8 +221,9 @@ class BackstopClientFactory:
 
 
 def create_backstop_client_factory(
-    config: BackstopConfig,
+    settings: BackstopTransportSettings,
+    retry_settings: RetrySettings,
     *,
     auth: CallerAuthContext | None = None,
 ) -> BackstopClientFactory:
-    return BackstopClientFactory(config, auth=auth)
+    return BackstopClientFactory(settings, retry_settings, auth=auth)

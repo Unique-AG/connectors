@@ -151,7 +151,7 @@ class BackstopConfig(BaseSettings):
     login form (username + personal API token), which is verified against Backstop and then
     stored encrypted in Postgres. Tool calls load that per-user credential and send
     `Authorization: Basic ...` + `token: true` to Backstop. See `auth/provider.py`,
-    `backstop_client.py`, and https://backstopsolutions.elevio.help/en/articles/1018 /
+    `backstop_client/`, and https://backstopsolutions.elevio.help/en/articles/1018 /
     .../236.
 
     Also carries the tuning knobs for the shared HTTP client: timeouts, per-user concurrency
@@ -297,6 +297,15 @@ class AuthConfig(BaseSettings):
     # trail of one grant's rotations, so they outlive their usefulness as credentials.
     token_retention_days: int = Field(default=30, ge=1)
 
+    # How long a registered OAuth client with nothing left referencing it is kept. Dynamic client
+    # registration is open (RFC 7591), so every client that ever connected — and anyone who
+    # merely called /register — leaves an `oauth_clients` row behind. A client in use always has a
+    # live token family and so is never reachable by the sweep; this bounds registration spam and
+    # clients that registered but never finished a login. Comfortably longer than
+    # `BackstopOAuthProvider.PENDING_AUTHORIZATION_TTL`, so a client waiting on its user to fill
+    # in the login form can't be swept mid-handshake.
+    unused_client_retention_hours: float = Field(default=24.0, gt=0)
+
     # How often the sweep runs. Rows are unusable the moment they expire, so this bounds only
     # how long dead rows linger — never whether an expired token is accepted.
     cleanup_interval_hours: float = Field(default=6.0, gt=0)
@@ -310,6 +319,10 @@ class AuthConfig(BaseSettings):
     @property
     def token_retention(self) -> timedelta:
         return timedelta(days=self.token_retention_days)
+
+    @property
+    def unused_client_retention(self) -> timedelta:
+        return timedelta(hours=self.unused_client_retention_hours)
 
     @property
     def cleanup_interval(self) -> timedelta:

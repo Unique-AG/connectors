@@ -89,6 +89,7 @@ class TestPurgeExpiredAuthRows:
             session_factory,
             token_retention=AUTH_CONFIG.token_retention,
             login_attempt_window=AUTH_CONFIG.login_attempt_window,
+            unused_client_retention=AUTH_CONFIG.unused_client_retention,
         )
 
         async with read_session(session_factory) as session:
@@ -124,6 +125,7 @@ class TestPurgeExpiredAuthRows:
             session_factory,
             token_retention=AUTH_CONFIG.token_retention,
             login_attempt_window=AUTH_CONFIG.login_attempt_window,
+            unused_client_retention=AUTH_CONFIG.unused_client_retention,
         )
 
         async with read_session(session_factory) as session:
@@ -154,6 +156,7 @@ class TestPurgeExpiredAuthRows:
             session_factory,
             token_retention=AUTH_CONFIG.token_retention,
             login_attempt_window=AUTH_CONFIG.login_attempt_window,
+            unused_client_retention=AUTH_CONFIG.unused_client_retention,
         )
 
         assert await _token_ids(session_factory) == before
@@ -190,6 +193,7 @@ class TestPurgeExpiredAuthRows:
             session_factory,
             token_retention=AUTH_CONFIG.token_retention,
             login_attempt_window=AUTH_CONFIG.login_attempt_window,
+            unused_client_retention=AUTH_CONFIG.unused_client_retention,
         )
 
         async with read_session(session_factory) as session:
@@ -231,6 +235,7 @@ class TestPurgeExpiredAuthRows:
             session_factory,
             token_retention=AUTH_CONFIG.token_retention,
             login_attempt_window=AUTH_CONFIG.login_attempt_window,
+            unused_client_retention=AUTH_CONFIG.unused_client_retention,
         )
 
         async with read_session(session_factory) as session:
@@ -256,11 +261,13 @@ class TestPurgeExpiredAuthRows:
             session_factory,
             token_retention=AUTH_CONFIG.token_retention,
             login_attempt_window=AUTH_CONFIG.login_attempt_window,
+            unused_client_retention=AUTH_CONFIG.unused_client_retention,
         )
         await purge_expired_auth_rows(
             session_factory,
             token_retention=AUTH_CONFIG.token_retention,
             login_attempt_window=AUTH_CONFIG.login_attempt_window,
+            unused_client_retention=AUTH_CONFIG.unused_client_retention,
         )
 
 
@@ -297,6 +304,7 @@ class TestPurgeLoginAttempts:
             session_factory,
             token_retention=AUTH_CONFIG.token_retention,
             login_attempt_window=window,
+            unused_client_retention=AUTH_CONFIG.unused_client_retention,
         )
 
         assert await self._remaining(session_factory, username) == 0
@@ -313,6 +321,147 @@ class TestPurgeLoginAttempts:
             session_factory,
             token_retention=AUTH_CONFIG.token_retention,
             login_attempt_window=window,
+            unused_client_retention=AUTH_CONFIG.unused_client_retention,
         )
 
         assert await self._remaining(session_factory, username) == 1
+
+
+class TestPurgeUnreferencedClients:
+    """Dynamic client registration is open, so `oauth_clients` is the one table an
+    unauthenticated caller can grow directly — and nothing used to remove a row from it."""
+
+    @staticmethod
+    async def _client_ids(session_factory: async_sessionmaker[AsyncSession]) -> set[str]:
+        async with read_session(session_factory) as session:
+            result = await session.execute(select(OAuthClient.client_id))
+            return set(result.scalars().all())
+
+    @staticmethod
+    async def _backdate_client(
+        session_factory: async_sessionmaker[AsyncSession], client_id: str, *, age: timedelta
+    ) -> None:
+        """Age a client past the retention floor.
+
+        `created_at` is a `server_default`, so a freshly-inserted row is always 'now' and no
+        amount of sweeping would touch it — the age has to be written explicitly.
+        """
+        async with transaction(session_factory) as session:
+            client = await session.get(OAuthClient, client_id)
+            assert client is not None
+            client.created_at = datetime.now(UTC) - age
+
+    async def _sweep(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        await purge_expired_auth_rows(
+            session_factory,
+            token_retention=AUTH_CONFIG.token_retention,
+            login_attempt_window=AUTH_CONFIG.login_attempt_window,
+            unused_client_retention=AUTH_CONFIG.unused_client_retention,
+        )
+
+    @pytest.mark.asyncio
+    async def test_drops_a_client_that_registered_and_never_came_back(
+        self, db: DatabaseFixture
+    ) -> None:
+        _, session_factory = db
+        client_id = "cleanup-client-abandoned"
+        await _register_client(session_factory, client_id)
+        await self._backdate_client(
+            session_factory, client_id, age=AUTH_CONFIG.unused_client_retention + timedelta(hours=1)
+        )
+
+        await self._sweep(session_factory)
+
+        assert client_id not in await self._client_ids(session_factory)
+
+    @pytest.mark.asyncio
+    async def test_keeps_a_client_that_only_just_registered(self, db: DatabaseFixture) -> None:
+        """The floor is what stops a client being swept mid-handshake, before its first token."""
+        _, session_factory = db
+        client_id = "cleanup-client-fresh"
+        await _register_client(session_factory, client_id)
+
+        await self._sweep(session_factory)
+
+        assert client_id in await self._client_ids(session_factory)
+
+    @pytest.mark.asyncio
+    async def test_keeps_an_old_client_that_still_holds_a_live_token(
+        self, db: DatabaseFixture
+    ) -> None:
+        """A client in continuous use is old *and* referenced.
+
+        Only the second of those may spare it, which is what the `not_in` guards are for.
+        """
+        _, session_factory = db
+        client_id = "cleanup-client-in-use"
+        await _register_client(session_factory, client_id)
+        await self._backdate_client(
+            session_factory, client_id, age=AUTH_CONFIG.unused_client_retention + timedelta(days=30)
+        )
+        async with transaction(session_factory) as session:
+            session.add(
+                _token(
+                    client_id,
+                    family_id=uuid.uuid4(),
+                    access_expires_at=NOW + timedelta(minutes=15),
+                    refresh_expires_at=NOW + timedelta(days=30),
+                )
+            )
+
+        await self._sweep(session_factory)
+
+        assert client_id in await self._client_ids(session_factory)
+
+    @pytest.mark.asyncio
+    async def test_reclaims_a_client_in_the_same_sweep_that_purges_its_last_token(
+        self, db: DatabaseFixture
+    ) -> None:
+        """Why the client sweep runs last: the token delete above is what unreferences it."""
+        _, session_factory = db
+        client_id = "cleanup-client-last-token"
+        await _register_client(session_factory, client_id)
+        await self._backdate_client(
+            session_factory, client_id, age=AUTH_CONFIG.unused_client_retention + timedelta(days=1)
+        )
+        async with transaction(session_factory) as session:
+            session.add(
+                _token(
+                    client_id,
+                    family_id=uuid.uuid4(),
+                    access_expires_at=LONG_AGO,
+                    refresh_expires_at=LONG_AGO,
+                )
+            )
+
+        await self._sweep(session_factory)
+
+        assert client_id not in await self._client_ids(session_factory)
+
+    @pytest.mark.asyncio
+    async def test_keeps_a_client_with_an_authorization_still_in_flight(
+        self, db: DatabaseFixture
+    ) -> None:
+        """A pending row is a foreign key: sweeping the client would violate it."""
+        _, session_factory = db
+        client_id = "cleanup-client-inflight"
+        await _register_client(session_factory, client_id)
+        await self._backdate_client(
+            session_factory, client_id, age=AUTH_CONFIG.unused_client_retention + timedelta(days=1)
+        )
+        async with transaction(session_factory) as session:
+            session.add(
+                PendingAuthorization(
+                    request_id="cleanup-client-inflight-request",
+                    client_id=client_id,
+                    scopes=[],
+                    code_challenge="challenge",
+                    redirect_uri="https://client.example/callback",
+                    redirect_uri_provided_explicitly=True,
+                    expires_at=NOW + timedelta(minutes=10),
+                )
+            )
+
+        await self._sweep(session_factory)
+
+        assert client_id in await self._client_ids(session_factory)

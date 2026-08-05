@@ -1,10 +1,16 @@
 """Periodic deletion of auth rows that can no longer be used.
 
-Without this, three tables grow without bound: abandoned logins leave `pending_authorizations`
-rows, unexchanged codes leave `authorization_codes` rows, and — the one that actually
-accumulates — every refresh rotation adds an `oauth_tokens` row that is never removed. With a
-15-minute access-token TTL that is roughly 2,900 rows per active user per month, all of them in
-the table `load_access_token` queries on every single MCP request.
+Without this, four tables grow without bound: abandoned logins leave `pending_authorizations`
+rows, unexchanged codes leave `authorization_codes` rows, dynamic client registration leaves
+`oauth_clients` rows, and — the one that actually accumulates — every refresh rotation adds an
+`oauth_tokens` row that is never removed. With a 15-minute access-token TTL that is roughly
+2,900 rows per active user per month, all of them in the table `load_access_token` queries on
+every single MCP request. (`login_attempts` is swept too, but it is the throttle's own storage
+rather than something the OAuth flow leaves behind.)
+
+Sweep order matters: `oauth_clients` is only removable once nothing references it, so the client
+sweep runs last, after the three child tables have given up their expired rows in the same
+transaction.
 """
 
 import asyncio
@@ -22,6 +28,7 @@ from backstop_mcp.db.engine import transaction
 from backstop_mcp.db.models import (
     AuthorizationCode,
     LoginAttempt,
+    OAuthClient,
     OAuthToken,
     PendingAuthorization,
 )
@@ -86,11 +93,39 @@ async def _delete_old_login_attempts(session: AsyncSession, cutoff: datetime) ->
     return _deleted(result)
 
 
+async def _delete_unreferenced_clients(session: AsyncSession, cutoff: datetime) -> int:
+    """Drop registered clients that nothing references any more.
+
+    Client registration is open (RFC 7591), so this is the one table an unauthenticated caller
+    can grow directly, and nothing else ever removed a row from it.
+
+    All three child tables carry a foreign key to `client_id`, so a client is only removable once
+    the sweeps above have cleared its last pending authorization, code and token family — which is
+    why this runs last, and why the `not_in` guards are per-table rather than one union: each is a
+    plain anti-join the planner can satisfy from the child table directly. A client in active use
+    always has a live token row and so never matches.
+
+    The `created_at` floor is what keeps a client that registered moments ago from being swept
+    before it has finished its first authorization round trip, when it legitimately has no
+    children yet.
+    """
+    result = await session.execute(
+        delete(OAuthClient).where(
+            OAuthClient.created_at < cutoff,
+            OAuthClient.client_id.not_in(select(PendingAuthorization.client_id)),
+            OAuthClient.client_id.not_in(select(AuthorizationCode.client_id)),
+            OAuthClient.client_id.not_in(select(OAuthToken.client_id)),
+        )
+    )
+    return _deleted(result)
+
+
 async def purge_expired_auth_rows(
     session_factory: async_sessionmaker[AsyncSession],
     *,
     token_retention: timedelta,
     login_attempt_window: timedelta,
+    unused_client_retention: timedelta,
 ) -> None:
     """Run one sweep. Safe to run concurrently on several replicas — every delete is idempotent."""
     now = datetime.now(UTC)
@@ -101,14 +136,19 @@ async def purge_expired_auth_rows(
         # Kept for a couple of windows rather than exactly one, so a sweep landing mid-window
         # can't shorten anyone's effective limit.
         attempts = await _delete_old_login_attempts(session, now - 2 * login_attempt_window)
+        # Last: the three deletes above are what make a client unreferenced, and doing this in
+        # the same transaction means one sweep reclaims a client whose final token just expired
+        # rather than leaving it for the next one.
+        clients = await _delete_unreferenced_clients(session, now - unused_client_retention)
 
-    if pending or codes or tokens or attempts:
+    if pending or codes or tokens or attempts or clients:
         logger.info(
             "auth.cleanup.purged",
             pending_authorizations=pending,
             authorization_codes=codes,
             oauth_tokens=tokens,
             login_attempts=attempts,
+            oauth_clients=clients,
         )
 
 
@@ -126,6 +166,7 @@ async def _sweep_forever(
                 session_factory,
                 token_retention=config.token_retention,
                 login_attempt_window=config.login_attempt_window,
+                unused_client_retention=config.unused_client_retention,
             )
         except Exception:
             logger.exception("auth.cleanup.failed")

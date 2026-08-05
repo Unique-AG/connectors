@@ -2,16 +2,18 @@
 
 from pydantic import BaseModel
 
-from backstop_mcp.features.party_resolver.types import PartyCandidate, ResolvedParty, SearchType
+from backstop_mcp.features.entity_types import SearchType
+from backstop_mcp.features.party_resolver.types import PartyCandidate, ResolvedParty
 from backstop_mcp.features.resolution import (
     AmbiguousResponse,
     BatchAmbiguous,
     BatchAmbiguousResponse,
+    BatchResolvedEcho,
     BatchUnresolvedEcho,
     CandidateEcho,
     NotFoundResponse,
     Unresolved,
-    batch_unresolved_response,
+    batch_ambiguous_response,
     unresolved_response,
 )
 
@@ -21,13 +23,6 @@ class PartyCandidateEcho(CandidateEcho):
 
     id: str
     name: str | None = None
-
-
-# Concrete parameterizations of the shared models. Plain assignments, not subclasses: pydantic
-# resolves the subscript to a real model class, which is what FastMCP needs for output schemas.
-PartyAmbiguousResponse = AmbiguousResponse[PartyCandidateEcho]
-PartyBatchUnresolvedEcho = BatchUnresolvedEcho[PartyCandidateEcho]
-PartyBatchAmbiguousResponse = BatchAmbiguousResponse[PartyCandidateEcho]
 
 
 class ResolvedPartyEcho(BaseModel):
@@ -40,6 +35,14 @@ class ResolvedPartyEcho(BaseModel):
     id: str
     type: SearchType
     name: str | None = None
+
+
+# Concrete parameterizations of the shared models. Plain assignments, not subclasses: pydantic
+# resolves the subscript to a real model class, which is what FastMCP needs for output schemas.
+PartyAmbiguousResponse = AmbiguousResponse[PartyCandidateEcho]
+PartyBatchUnresolvedEcho = BatchUnresolvedEcho[PartyCandidateEcho]
+PartyBatchResolvedEcho = BatchResolvedEcho[ResolvedPartyEcho]
+PartyBatchAmbiguousResponse = BatchAmbiguousResponse[PartyCandidateEcho, ResolvedPartyEcho]
 
 
 def party_echo(party: ResolvedParty) -> ResolvedPartyEcho:
@@ -71,17 +74,20 @@ def unresolved_parties_response(
     result: BatchAmbiguous[ResolvedParty],
 ) -> PartyBatchAmbiguousResponse:
     """One combined payload for a batch where at least one party didn't resolve."""
-    return batch_unresolved_response(
+    return batch_ambiguous_response(
         result,
         batch_model=PartyBatchAmbiguousResponse,
         unresolved_model=PartyBatchUnresolvedEcho,
+        resolved_model=PartyBatchResolvedEcho,
         to_echo=party_candidate_echo,
+        to_resolved=party_echo,
     )
 
 
 __all__ = [
     "PartyAmbiguousResponse",
     "PartyBatchAmbiguousResponse",
+    "PartyBatchResolvedEcho",
     "PartyBatchUnresolvedEcho",
     "PartyCandidateEcho",
     "ResolvedPartyEcho",

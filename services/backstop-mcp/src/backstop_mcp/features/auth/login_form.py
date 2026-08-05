@@ -7,6 +7,7 @@ _PROFILE_INSTRUCTIONS = (
 
 def render_login_form(
     request_id: str,
+    csrf_token: str,
     *,
     client_name: str | None = None,
     username: str = "",
@@ -16,11 +17,14 @@ def render_login_form(
 
     `request_id` identifies the pending `PendingAuthorization` row (see `db/models.py`) this
     submission belongs to; it's carried as a hidden field and round-tripped by the POST handler
-    in `auth/provider.py`. `username` is re-filled on a failed attempt so the user doesn't have
-    to retype it — the API token never is. All values are HTML-escaped since `client_name`
-    comes from a dynamically-registered (and therefore untrusted) OAuth client.
+    in `auth/provider.py`. `csrf_token` is the other half of the double-submit check in
+    `auth/login_csrf.py` — required, not optional, so a new render path can't quietly ship a
+    form the POST handler will reject. `username` is re-filled on a failed attempt so the user
+    doesn't have to retype it — the API token never is. All values are HTML-escaped since
+    `client_name` comes from a dynamically-registered (and therefore untrusted) OAuth client.
     """
     safe_request_id = html.escape(request_id, quote=True)
+    safe_csrf_token = html.escape(csrf_token, quote=True)
     safe_username = html.escape(username, quote=True)
     client_label = f"{html.escape(client_name)} wants to connect to" if client_name else "Connect"
 
@@ -49,6 +53,7 @@ def render_login_form(
   {error_html}
   <form method="post">
     <input type="hidden" name="request_id" value="{safe_request_id}">
+    <input type="hidden" name="csrf_token" value="{safe_csrf_token}">
     <label for="username">Backstop username</label>
     <input type="text" id="username" name="username" value="{safe_username}"
            autocomplete="username" required>

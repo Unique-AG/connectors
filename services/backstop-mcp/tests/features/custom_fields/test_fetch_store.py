@@ -11,6 +11,7 @@ from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
 from backstop_mcp.db.engine import read_session, transaction
 from backstop_mcp.features.custom_fields import FieldOverride
 from backstop_mcp.features.custom_fields.lov import inline_allowed_values
+from backstop_mcp.features.custom_fields.resolve import resolve_field
 from backstop_mcp.features.custom_fields.service import (
     CustomFieldsService,
     create_custom_fields_service,
@@ -142,8 +143,11 @@ class TestFetchStoreResolve:
 
         # Resolving again hits the just-refreshed in-memory index, not Backstop — the route
         # mock above would have been called a second time otherwise.
-        result = await service.resolve(
-            entity_type="organizations", query="Investor Status", client=clients(base_url)
+        result = await resolve_field(
+            service,
+            clients(base_url),
+            entity_type="organizations",
+            query="Investor Status",
         )
         assert isinstance(result, Resolved)
         assert result.value.crm_name == "is1"
@@ -183,8 +187,8 @@ class TestFetchStoreResolve:
         )
 
         client = clients(base_url)
-        await service.resolve(entity_type="organizations", query="Grade", client=client)
-        await service.resolve(entity_type="organizations", query="Grade", client=client)
+        await resolve_field(service, client, entity_type="organizations", query="Grade")
+        await resolve_field(service, client, entity_type="organizations", query="Grade")
 
         assert route.call_count == 1
 
@@ -694,3 +698,89 @@ class TestSnapshotCodec:
 
         assert loaded is not None
         assert loaded.definitions == [definition]
+
+
+class TestRefreshFloor:
+    """`resolve_custom_field` hands the model a `refresh` flag, and one refresh is two uncapped
+    paginations taken under the lock every other caller's cold path waits on."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_second_forced_refresh_inside_the_floor_does_not_hit_backstop(
+        self, db: DatabaseFixture, clients: ClientBuilder
+    ) -> None:
+        _, factory = db
+        base_url = f"{BASE_URL}/refresh-floor"
+        lov_entries_route(base_url)
+        route = respx.get(f"{base_url}/custom-field-definitions").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        resource(
+                            "900",
+                            "custom-field-definitions",
+                            name="Investor Status",
+                            entityType="Organization",
+                        )
+                    ],
+                    "links": {"next": None},
+                },
+            )
+        )
+        service = create_custom_fields_service(
+            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+        )
+
+        first = await service.refresh(clients(base_url))
+        second = await service.refresh(clients(base_url))
+
+        assert route.call_count == 1
+        # The floored call still answers coherently — with what is already indexed, not nothing.
+        assert [d.display_name for d in second] == [d.display_name for d in first]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_forced_refresh_past_the_floor_fetches_again(
+        self, db: DatabaseFixture, clients: ClientBuilder
+    ) -> None:
+        _, factory = db
+        base_url = f"{BASE_URL}/refresh-floor-elapsed"
+        lov_entries_route(base_url)
+        route = respx.get(f"{base_url}/custom-field-definitions").mock(
+            return_value=httpx.Response(200, json={"data": [], "links": {"next": None}})
+        )
+        service = create_custom_fields_service(
+            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+        )
+
+        _ = await service.refresh(clients(base_url))
+        # Reach in and age the attempt rather than sleeping out a real minute.
+        service._refresh_attempted_at = (  # pyright: ignore[reportPrivateUsage]
+            datetime.now(UTC) - service.MIN_REFRESH_INTERVAL - timedelta(seconds=1)
+        )
+        _ = await service.refresh(clients(base_url))
+
+        assert route.call_count == 2
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_a_failed_refresh_still_counts_against_the_floor(
+        self, db: DatabaseFixture, clients: ClientBuilder
+    ) -> None:
+        """Otherwise an unreachable Backstop is re-dialled on every single request."""
+        _, factory = db
+        base_url = f"{BASE_URL}/refresh-floor-failure"
+        lov_entries_route(base_url)
+        route = respx.get(f"{base_url}/custom-field-definitions").mock(
+            side_effect=httpx.ConnectError("backstop down")
+        )
+        service = create_custom_fields_service(
+            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
+        )
+
+        with pytest.raises(httpx.ConnectError):
+            _ = await service.refresh(clients(base_url))
+        assert await service.refresh(clients(base_url)) == []
+
+        assert route.call_count == 1

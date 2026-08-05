@@ -8,7 +8,7 @@ silently detach a tool from its glossary. `create_app` registers from this list;
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
-from backstop_mcp.features.custom_fields.entity_types import KNOWN_ENTITY_TYPES
+from backstop_mcp.features.entity_types import KNOWN_ENTITY_TYPES
 from backstop_mcp.server.tools.get_organization import get_organization
 from backstop_mcp.server.tools.get_organization_custom_field import get_organization_custom_field
 from backstop_mcp.server.tools.resolve_custom_field import resolve_custom_field

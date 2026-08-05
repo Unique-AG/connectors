@@ -85,7 +85,7 @@ class TestForCredential:
         monkeypatch.setenv("BACKSTOP_DEFAULT_PAGE_SIZE", "7")
         built = client_factory(default_page_size=250)
 
-        assert built.config.default_page_size == 250
+        assert built.settings.default_page_size == 250
 
 
 class TestBackstopClientAutoRaises:

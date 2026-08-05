@@ -1,7 +1,7 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
+from typing import ClassVar
 
-from fastmcp import Context
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client.client import BackstopClient
@@ -9,16 +9,10 @@ from backstop_mcp.db.engine import read_session, transaction
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
 from backstop_mcp.features.custom_fields.glossary import format_glossary
-from backstop_mcp.features.custom_fields.index import (
-    DefinitionIndex,
-    FieldResolution,
-    build_index,
-    resolve_in_index,
-)
+from backstop_mcp.features.custom_fields.index import DefinitionIndex, build_index
 from backstop_mcp.features.custom_fields.overrides import FieldOverride
 from backstop_mcp.features.custom_fields.store import load_snapshot, save_snapshot
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
-from backstop_mcp.features.resolution import Ambiguous, elicit_choice
 from backstop_mcp.logging import get_logger
 from backstop_mcp.metrics import CUSTOM_FIELD_SCHEMA_LOADS
 
@@ -26,15 +20,26 @@ logger = get_logger(__name__)
 
 
 class CustomFieldsService:
-    """Process-wide custom-field schema cache + resolution.
+    """Process-wide custom-field schema cache.
 
     Definitions only ever come from a real Backstop fetch, persisted as a snapshot keyed by
     `base_url` (so one instance's schema is shared across every user of it). `overrides` are
     a display overlay applied to fetched fields — never a source of fields on their own, so
     until a fetch succeeds this service serves nothing and the glossary stays absent.
 
-    Constructed by `create_app()` and reached via `runtime.get_services().custom_fields`.
+    Name → definition resolution (including elicitation) lives in `resolve.py`, mirroring
+    `party_resolver.resolve`. Constructed by `create_app()` and reached via
+    `runtime.get_services().custom_fields`.
     """
+
+    # Floor on how often an upstream fetch can be attempted, whatever the caller asked for.
+    # `resolve_custom_field` exposes `refresh` to the model, and one refresh is two uncapped
+    # paginations taken under the lock every other caller's cold path waits on — so without a
+    # floor a model that habitually passes `refresh=true` serializes every concurrent caller
+    # behind repeated full re-fetches and spends the user's Backstop concurrency budget on a
+    # schema that changes when an admin adds a field. Well below `ttl`, so it only ever bounds
+    # forced refreshes, never the ordinary TTL-driven one.
+    MIN_REFRESH_INTERVAL: ClassVar[timedelta] = timedelta(minutes=1)
 
     def __init__(
         self,
@@ -51,6 +56,10 @@ class CustomFieldsService:
         self._index: DefinitionIndex = {}
         self._lock: asyncio.Lock = asyncio.Lock()
         self._fetched_at: datetime | None = None
+        # When an upstream fetch was last *attempted*, as opposed to when the index was last
+        # successfully filled (`_fetched_at`, which a snapshot read also sets). Tracked
+        # separately so a failing Backstop can't be hammered either.
+        self._refresh_attempted_at: datetime | None = None
 
     @property
     def is_fresh(self) -> bool:
@@ -66,6 +75,11 @@ class CustomFieldsService:
     def has_definitions(self) -> bool:
         """Whether anything is loaded at all, fresh or stale."""
         return bool(self._index)
+
+    @property
+    def index(self) -> DefinitionIndex:
+        """The in-memory schema index. Read-only for resolvers; mutated only by this service."""
+        return self._index
 
     def glossary_for(self, entity_type: str) -> str:
         entity = normalize_entity_type(entity_type)
@@ -126,41 +140,34 @@ class CustomFieldsService:
                 CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "stale"})
 
     async def refresh(self, client: BackstopClient) -> list[CustomFieldDefinition]:
-        """Fetch from Backstop unconditionally, ignoring `ttl`. Raises on failure."""
+        """Fetch from Backstop, ignoring `ttl` but not `MIN_REFRESH_INTERVAL`. Raises on failure.
+
+        The loud path: unlike `ensure_fresh` a failure propagates, because the caller explicitly
+        asked for new data and serving them a stale answer as if it were fresh would be a lie.
+        Inside the floor the fetch is skipped and the current definitions are returned — the
+        caller still gets a coherent answer, just not a newer one.
+        """
         async with self._lock:
+            if self._within_refresh_floor():
+                logger.info(
+                    "custom_fields.schema.refresh_floored",
+                    attempted_at=(
+                        self._refresh_attempted_at.isoformat()
+                        if self._refresh_attempted_at
+                        else None
+                    ),
+                    min_interval_seconds=self.MIN_REFRESH_INTERVAL.total_seconds(),
+                )
+                return self._all_definitions()
             return await self._refresh_unlocked(client)
 
-    async def resolve(
-        self,
-        *,
-        entity_type: str,
-        query: str,
-        client: BackstopClient,
-        refresh: bool = False,
-        ctx: Context | None = None,
-    ) -> FieldResolution:
-        """Resolve one field by name, applying the shared ambiguity policy.
+    def _within_refresh_floor(self) -> bool:
+        if self._refresh_attempted_at is None:
+            return False
+        return datetime.now(UTC) - self._refresh_attempted_at < self.MIN_REFRESH_INTERVAL
 
-        When `ctx` is supplied and several fields match, the user is asked to pick one — the
-        same policy party resolution uses (see `resolution.py`). Without a `ctx` the ambiguity
-        is returned for the caller to surface.
-        """
-        if refresh:
-            await self.refresh(client)
-        else:
-            await self.ensure_fresh(client)
-
-        result = resolve_in_index(self._index, entity_type=entity_type, query=query)
-        if ctx is not None and isinstance(result, Ambiguous):
-            return await elicit_choice(
-                ctx,
-                result,
-                prompt=(
-                    f'Several {result.scope} fields matched "{result.query}". '
-                    + "Which one did you mean?"
-                ),
-            )
-        return result
+    def _all_definitions(self) -> list[CustomFieldDefinition]:
+        return [definition for group in self._index.values() for definition in group]
 
     async def _load_from_db_unlocked(self) -> None:
         async with read_session(self._session_factory) as session:
@@ -174,6 +181,9 @@ class CustomFieldsService:
         CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "snapshot"})
 
     async def _refresh_unlocked(self, client: BackstopClient) -> list[CustomFieldDefinition]:
+        # Stamped before the call, not after, so a fetch that fails or hangs still counts against
+        # the floor — otherwise an unreachable Backstop would be retried on every request.
+        self._refresh_attempted_at = datetime.now(UTC)
         definitions = await fetch_custom_field_definitions(client, self._overrides)
         fetched_at = datetime.now(UTC)
         async with transaction(self._session_factory) as session:

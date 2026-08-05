@@ -36,18 +36,23 @@ def postgres_container() -> Generator[PostgresContainer]:
     `DB_URL` from the environment — so migrations are pointed at the test container by
     setting that env var directly (rather than via `Config.set_main_option`, which
     `env.py` would immediately overwrite).
+
+    The whole environment is snapshotted and restored around the upgrade, not just `DB_URL`:
+    `env.py` also calls `load_dotenv()`, which is right for an operator running
+    `alembic upgrade head` by hand but here would push the developer's own `.env` into this
+    process for the rest of the session. Every test that constructs a bare `Config()` would
+    then be asserting against local values — silently, and depending on test order, since this
+    fixture is session-scoped and the suite is randomly ordered.
     """
     with PostgresContainer("postgres:17-alpine") as postgres:
         url = postgres.get_connection_url().replace("+psycopg2", "+asyncpg")
-        previous_db_url = os.environ.get("DB_URL")
+        environment_before_migrations = os.environ.copy()
         os.environ["DB_URL"] = url
         try:
             command.upgrade(Config(str(_SERVICE_ROOT / "alembic.ini")), "head")
         finally:
-            if previous_db_url is None:
-                os.environ.pop("DB_URL", None)
-            else:
-                os.environ["DB_URL"] = previous_db_url
+            os.environ.clear()
+            os.environ.update(environment_before_migrations)
         yield postgres
 
 

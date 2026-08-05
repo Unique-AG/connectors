@@ -290,14 +290,27 @@ class BatchUnresolvedEcho[EchoT: CandidateEcho](BaseModel):
     candidates: list[EchoT] = Field(default_factory=list)
 
 
-class BatchAmbiguousResponse[EchoT: CandidateEcho](BaseModel):
-    """One combined payload for a batch where at least one input didn't resolve."""
+class BatchResolvedEcho[ResolvedT](BaseModel):
+    """One batch input that did resolve, kept so the model can continue with it."""
+
+    index: int
+    value: ResolvedT
+
+
+class BatchAmbiguousResponse[EchoT: CandidateEcho, ResolvedT](BaseModel):
+    """One combined payload for a batch where at least one input didn't resolve.
+
+    `resolved` carries the inputs that did settle (policy step 3), so the model can keep those
+    and ask once about the rest — dropping them would force re-resolution of work already done.
+    """
 
     status: Literal["ambiguous"] = "ambiguous"
     unresolved: list[BatchUnresolvedEcho[EchoT]] = Field(default_factory=list)
+    resolved: list[BatchResolvedEcho[ResolvedT]] = Field(default_factory=list)
 
 
 type ToEcho[T, EchoT] = Callable[[Candidate[T]], EchoT]
+type ToResolved[T, ResolvedT] = Callable[[T], ResolvedT]
 
 
 def unresolved_response[T, EchoT: CandidateEcho](
@@ -320,13 +333,16 @@ def unresolved_response[T, EchoT: CandidateEcho](
     )
 
 
-def batch_unresolved_response[T, EchoT: CandidateEcho](
+def batch_ambiguous_response[T, EchoT: CandidateEcho, ResolvedT](
     result: BatchAmbiguous[T],
     *,
-    batch_model: type[BatchAmbiguousResponse[EchoT]],
+    batch_model: type[BatchAmbiguousResponse[EchoT, ResolvedT]],
     unresolved_model: type[BatchUnresolvedEcho[EchoT]],
+    resolved_model: type[BatchResolvedEcho[ResolvedT]],
     to_echo: ToEcho[T, EchoT],
-) -> BatchAmbiguousResponse[EchoT]:
+    to_resolved: ToResolved[T, ResolvedT],
+) -> BatchAmbiguousResponse[EchoT, ResolvedT]:
+    """Convert a `BatchAmbiguous` into the wire payload, including already-resolved items."""
     return batch_model(
         unresolved=[
             unresolved_model(
@@ -336,5 +352,9 @@ def batch_unresolved_response[T, EchoT: CandidateEcho](
                 candidates=[to_echo(candidate) for candidate in item.candidates],
             )
             for item in result.unresolved
-        ]
+        ],
+        resolved=[
+            resolved_model(index=item.index, value=to_resolved(item.value))
+            for item in result.resolved
+        ],
     )

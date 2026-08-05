@@ -12,8 +12,10 @@ one that actually binds, because the attacker cannot choose a different username
 attacking the same account. Spraying across many usernames stays possible, but each account gets
 at most `max_attempts` guesses per window, which is the property that matters.
 
-Storage is a row per failed attempt (see `db/models.LoginAttempt`) so the window is a pure read
-and the limit holds across replicas with no coordination.
+Storage is a row per failed attempt (see `db/models.LoginAttempt`) so the sliding window is
+shared across replicas with no coordination. The check-then-insert path is not atomic, so a
+concurrent burst can briefly exceed `max_attempts` by a few; that is acceptable for a
+credential-guessing bound, not a hard quota.
 """
 
 from dataclasses import dataclass

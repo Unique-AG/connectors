@@ -4,7 +4,7 @@ from urllib.parse import quote
 from fastmcp import Context
 from pydantic import BaseModel, ConfigDict
 
-from backstop_mcp.backstop_client.json_api import BackstopApiDocument
+from backstop_mcp.backstop_client.json_api import BackstopApiDocument, single_resource
 from backstop_mcp.coerce import as_clean_str
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
@@ -71,19 +71,13 @@ async def get_organization(
         return unresolved_party_response(result)
 
     party = result.value
-    document = await client.get(
-        f"/organizations/{quote(party.id, safe='')}",
-        schema=BackstopApiDocument[OrganizationAttributes],
-    )
+    path = f"/organizations/{quote(party.id, safe='')}"
+    document = await client.get(path, schema=BackstopApiDocument[OrganizationAttributes])
 
-    assert not isinstance(document.data, list), (
-        f"Backstop returned a collection for organization {party.id!r}; "
-        + "expected a single resource"
-    )
-
-    attributes = (
-        document.data.attributes.model_dump(exclude_none=True) if document.data is not None else {}
-    )
+    # A collection here would be a malformed upstream response, so it raises a typed transport
+    # error rather than being asserted on — this is a system boundary, not an internal invariant.
+    resource = single_resource(document, path=path)
+    attributes = resource.attributes.model_dump(exclude_none=True) if resource is not None else {}
     # `confirm_name` isn't used here: the organization is fetched anyway, so the name comes
     # from that response rather than an extra request.
     resolved = party if party.name is not None else _with_name(party, attributes.get("name"))

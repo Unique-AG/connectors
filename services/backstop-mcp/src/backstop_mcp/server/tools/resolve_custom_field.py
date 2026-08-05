@@ -8,6 +8,7 @@ from backstop_mcp.features.custom_fields import (
     FieldAmbiguousResponse,
     definition_echo,
     normalize_entity_type,
+    resolve_field,
     unresolved_field_response,
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
@@ -38,10 +39,11 @@ async def resolve_custom_field(
     """
     entity = normalize_entity_type(entity_type)
     client = await get_backstop_client()
-    result = await get_custom_fields_service().resolve(
+    result = await resolve_field(
+        get_custom_fields_service(),
+        client,
         entity_type=entity,
         query=query,
-        client=client,
         refresh=refresh,
         ctx=ctx,
     )

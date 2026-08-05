@@ -10,7 +10,9 @@ from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.backstop_client.factory import create_backstop_client_factory
+from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
 from backstop_mcp.config import (
     AppConfig,
     AuthConfig,
@@ -47,9 +49,11 @@ def create_app(
     """The composition root.
 
     Every config object and every long-lived collaborator is built exactly once here and then
-    injected. Nothing downstream re-reads the environment — in particular `BackstopConfig` is
-    owned by `BackstopClientFactory`, so the tuning knobs a deployment sets are the ones every
-    request actually uses.
+    injected. Nothing downstream re-reads the environment, and no layer below this one sees a
+    `config` type at all: each env-parsed shape is translated into the owning layer's own domain
+    type here (`BackstopTransportSettings`, `RetrySettings`, `FieldOverride`,
+    `BackstopCredentialSecret`), so the tuning knobs a deployment sets are the ones every request
+    actually uses.
     """
     config = config or AppConfig()
     backstop_config = backstop_config or BackstopConfig()
@@ -67,7 +71,9 @@ def create_app(
     # One factory, therefore one connection pool. The provider needs it (to verify credentials
     # at login) and it needs the provider (for the token-revocation hook inside the auth
     # context), so the cycle is closed with a single `attach_auth` step.
-    backstop_clients = create_backstop_client_factory(backstop_config)
+    backstop_clients = create_backstop_client_factory(
+        transport_settings(backstop_config), retry_settings(backstop_config)
+    )
     auth_provider = BackstopOAuthProvider(
         base_url=config.public_base_url,
         session_factory=session_factory,
@@ -97,7 +103,11 @@ def create_app(
     @asynccontextmanager
     async def lifespan(_server: FastMCP) -> AsyncGenerator[None, None]:
         async with (
-            warmup_lifespan(custom_fields_service, backstop_clients),
+            warmup_lifespan(
+                custom_fields_service,
+                backstop_clients,
+                _service_account_credential(backstop_config),
+            ),
             cleanup_lifespan(session_factory, auth_config),
         ):
             try:
@@ -131,7 +141,7 @@ def create_app(
     @mcp.custom_route("/probe", methods=["GET"])
     async def probe(_request: Request) -> JSONResponse:
         return await _probe_response(
-            engine, custom_fields_schema_loaded=bool(custom_fields_service.has_definitions)
+            engine, custom_fields_schema_loaded=custom_fields_service.has_definitions
         )
 
     @mcp.custom_route("/metrics", methods=["GET"])
@@ -151,6 +161,45 @@ def create_app(
             Middleware(OpenTelemetryMiddleware),
             Middleware(TraceContextMiddleware),
         ]
+    )
+
+
+def transport_settings(config: BackstopConfig) -> BackstopTransportSettings:
+    """Translate the env-parsed Backstop config into the transport's own settings type.
+
+    Field-for-field, and deliberately explicit rather than derived by reflection: adding a knob
+    to `BackstopConfig` that the transport should see is then a visible edit here, and one it
+    should *not* see (the service account, the custom-field overrides) simply never appears.
+    """
+    return BackstopTransportSettings(
+        base_url=config.base_url,
+        default_timeout_seconds=config.default_timeout_seconds,
+        reports_timeout_seconds=config.reports_timeout_seconds,
+        max_concurrent_requests_per_user=config.max_concurrent_requests_per_user,
+        default_page_size=config.default_page_size,
+        report_page_size=config.report_page_size,
+        page_limit_param=config.page_limit_param,
+        page_offset_param=config.page_offset_param,
+    )
+
+
+def retry_settings(config: BackstopConfig) -> RetrySettings:
+    return RetrySettings(
+        max_attempts=config.max_retry_attempts, max_wait_ms=config.max_retry_wait_ms
+    )
+
+
+def _service_account_credential(config: BackstopConfig) -> BackstopCredentialSecret | None:
+    """The optional startup-warming credential, or None when none is configured.
+
+    Assembled here so `custom_fields/warmup.py` is handed a credential rather than reaching
+    through the client factory for a config object — `BackstopConfig` validates that the two
+    halves are set together, so one `None` check covers both.
+    """
+    if config.service_username is None or config.service_api_token is None:
+        return None
+    return BackstopCredentialSecret(
+        username=config.service_username, api_token=config.service_api_token
     )
 
 

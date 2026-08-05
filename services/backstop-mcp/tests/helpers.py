@@ -9,6 +9,7 @@ config injection under test are the real ones.
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from backstop_mcp.app import retry_settings, transport_settings
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.backstop_client.factory import BackstopClientFactory
 from backstop_mcp.config import BackstopConfig
@@ -43,7 +44,14 @@ def client_factory(
     auth: BackstopAuthContext | None = None,
     **overrides: object,
 ) -> BackstopClientFactory:
-    return BackstopClientFactory(backstop_config(base_url, **overrides), auth=auth)
+    """Build a factory the way `create_app` does: config in, transport settings out.
+
+    Goes through the same `app.transport_settings` / `app.retry_settings` translation as
+    production rather than constructing settings directly, so a knob that stops being propagated
+    at the composition root fails these tests too.
+    """
+    config = backstop_config(base_url, **overrides)
+    return BackstopClientFactory(transport_settings(config), retry_settings(config), auth=auth)
 
 
 def install_services(

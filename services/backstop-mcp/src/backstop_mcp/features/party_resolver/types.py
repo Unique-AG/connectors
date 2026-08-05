@@ -1,11 +1,20 @@
 from dataclasses import dataclass
-from typing import Annotated, ClassVar, Literal
+from typing import Annotated, ClassVar
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StringConstraints
 
+from backstop_mcp.features.entity_types import SearchType
 from backstop_mcp.features.resolution import BatchResolution, Candidate, Resolution
 
-type SearchType = Literal["organizations", "contacts", "people", "employees"]
+__all__ = [
+    "BatchPartyResolution",
+    "PartyCandidate",
+    "PartyResolution",
+    "PartyResolveItem",
+    "QuickSearchOptions",
+    "ResolvedParty",
+    "SearchType",
+]
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 

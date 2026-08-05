@@ -9,6 +9,8 @@ from typing_extensions import TypeVar
 
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.backstop_client.errors import (
+    BackstopApiError,
+    BackstopErrorDetail,
     BackstopResponseSchemaError,
     BackstopUntrustedUrlError,
     parse_json_api_error,
@@ -18,8 +20,8 @@ from backstop_mcp.backstop_client.pagination import (
     PaginationRequest,
     paginate_all,
 )
-from backstop_mcp.backstop_client.retry import build_retrying
-from backstop_mcp.config import BackstopConfig
+from backstop_mcp.backstop_client.retry import RetryPolicy
+from backstop_mcp.backstop_client.settings import BackstopTransportSettings
 from backstop_mcp.logging import get_logger
 from backstop_mcp.metrics import (
     BACKSTOP_CONCURRENCY_WAIT,
@@ -31,6 +33,12 @@ logger = get_logger(__name__)
 
 _AUTHORIZATION_HEADER = "authorization"
 _TOKEN_HEADER = "token"
+
+
+def _errors_for_log(errors: tuple[BackstopErrorDetail, ...]) -> list[dict[str, str | None]]:
+    return [
+        {"code": error.code, "title": error.title, "detail": error.detail} for error in errors
+    ]
 
 type AuthFailureHook = Callable[[], Awaitable[None]]
 type HttpClientProvider = Callable[[], Awaitable[httpx.AsyncClient]]
@@ -139,7 +147,7 @@ class BackstopClient:
     """Async wrapper hiding httpx behind `.get/.post/.patch/.delete/.paginate()`.
 
     Built by `BackstopClientFactory` — tool implementations never construct this themselves,
-    and never construct a `BackstopConfig` either (the factory owns the one built by
+    and never construct settings either (the factory owns the one set translated from config by
     `create_app`). All cross-cutting concerns — auth headers, the per-user concurrency gate,
     endpoint-aware timeouts, 401/429/error mapping, rate-limit-aware retry, metrics — live in
     `_request()`, which every public method funnels through.
@@ -148,16 +156,18 @@ class BackstopClient:
     def __init__(
         self,
         credential: BackstopCredentialSecret,
-        config: BackstopConfig,
+        settings: BackstopTransportSettings,
         *,
         http_client: HttpClientProvider,
         gate: RequestGate,
+        retry_policy: RetryPolicy,
         on_auth_failure: AuthFailureHook | None = None,
     ) -> None:
         self._credential: BackstopCredentialSecret = credential
-        self._config: BackstopConfig = config
+        self._settings: BackstopTransportSettings = settings
         self._http_client: HttpClientProvider = http_client
         self._gate: RequestGate = gate
+        self._retry_policy: RetryPolicy = retry_policy
         self._on_auth_failure: AuthFailureHook | None = on_auth_failure
 
     async def get(
@@ -199,7 +209,7 @@ class BackstopClient:
 
         Page size defaults to `report_page_size` for the slow report/analytics endpoints and
         `default_page_size` elsewhere; `page_size` overrides both. The parameter *names* come
-        from config (`page_limit_param` / `page_offset_param`) because a wrong name here fails
+        from settings (`page_limit_param` / `page_offset_param`) because a wrong name here fails
         silently — Backstop just ignores it and picks its own page size.
 
         `max_records=None` walks the chain to the end, which is what callers reading a
@@ -209,8 +219,8 @@ class BackstopClient:
         so a malformed item on any page fails the whole call rather than silently skipping it.
         """
         first_page_params = dict(params) if params is not None else {}
-        limit_param = self._config.page_limit_param
-        offset_param = self._config.page_offset_param
+        limit_param = self._settings.page_limit_param
+        offset_param = self._settings.page_offset_param
         if limit_param not in first_page_params:
             first_page_params[limit_param] = (
                 page_size if page_size is not None else self._default_page_size(path)
@@ -252,8 +262,8 @@ class BackstopClient:
 
     def _default_page_size(self, path: str) -> int:
         if is_extended_profile_path(path):
-            return self._config.report_page_size
-        return self._config.default_page_size
+            return self._settings.report_page_size
+        return self._settings.default_page_size
 
     async def _request(
         self,
@@ -267,13 +277,13 @@ class BackstopClient:
             self._credential.username, self._credential.api_token.get_secret_value()
         )
         timeout = (
-            self._config.reports_timeout_seconds
+            self._settings.reports_timeout_seconds
             if is_extended_profile_path(path)
-            else self._config.default_timeout_seconds
+            else self._settings.default_timeout_seconds
         )
-        url = build_url(self._config.base_url, path)
+        url = build_url(self._settings.base_url, path)
         shared_client = await self._http_client()
-        retrying = build_retrying(self._config)
+        retrying = self._retry_policy.build_retrying()
         route = _metric_route(path)
 
         async def make_request() -> httpx.Response:
@@ -316,6 +326,20 @@ class BackstopClient:
         logger.debug("backstop.request.start", method=method, path=path)
         try:
             response: httpx.Response = await retrying(make_request)
+        except BackstopApiError as exc:
+            # Expected upstream failures — surface the full JSON:API `errors[]` in the
+            # console without a traceback. Unexpected transport errors still use
+            # `logger.exception` below.
+            logger.error(
+                "backstop.request.failed",
+                method=method,
+                path=path,
+                status_code=exc.status_code,
+                detail=exc.detail,
+                code=exc.code,
+                errors=_errors_for_log(exc.errors),
+            )
+            raise
         except Exception:
             logger.exception("backstop.request.failed", method=method, path=path)
             raise

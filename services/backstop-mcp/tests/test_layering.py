@@ -13,8 +13,16 @@
    cycle that only worked because `features/auth/__init__.py` is empty. Those two types now live
    in `backstop_client/credential.py` (the context as a Protocol), so the direction is one-way.
 
-Both are asserted by walking the AST rather than importing anything, so a violation is reported
-as a failing test with a file and line instead of an ImportError at collection time.
+3. **`backstop_client/` must not import `config`.** The transport takes
+   `BackstopTransportSettings`/`RetrySettings` — its own frozen types, translated from
+   `BackstopConfig` by `create_app`. It used to take the `pydantic-settings` model directly, which
+   coupled the layer to the env-parsing shape and to every knob on it, including the ones it has
+   no business seeing (the service account, the custom-field overrides). `features/` is
+   deliberately *not* subject to this rule: it may read config freely (see `features/__init__.py`),
+   because a feature is allowed to be configured — a transport is only allowed to be told.
+
+All three are asserted by walking the AST rather than importing anything, so a violation is
+reported as a failing test with a file and line instead of an ImportError at collection time.
 """
 
 import ast
@@ -28,6 +36,7 @@ _FEATURES = _SRC / "features"
 _BACKSTOP_CLIENT = _SRC / "backstop_client"
 _SERVER_PREFIX = "backstop_mcp.server"
 _FEATURES_PREFIX = "backstop_mcp.features"
+_CONFIG_MODULE = "backstop_mcp.config"
 
 
 def _imported_modules(tree: ast.AST) -> list[tuple[str, int]]:
@@ -96,9 +105,16 @@ class TestTheDetectionItself:
             _SERVER_PREFIX,
         )
 
+    def test_catches_the_violation_the_config_rule_exists_for(self) -> None:
+        # Verbatim shape of the import `client.py`/`factory.py`/`retry.py` used to carry.
+        assert _imports_under("from backstop_mcp.config import BackstopConfig", _CONFIG_MODULE) == [
+            "backstop_mcp.config"
+        ]
+
     def test_does_not_fire_on_a_name_that_merely_starts_with_the_prefix(self) -> None:
         assert not _imports_under("from backstop_mcp.serverless import thing", _SERVER_PREFIX)
         assert not _imports_under("from backstop_mcp.featureset import thing", _FEATURES_PREFIX)
+        assert not _imports_under("from backstop_mcp.configuration import thing", _CONFIG_MODULE)
 
 
 class TestFeaturesDoNotImportServer:
@@ -135,5 +151,22 @@ class TestBackstopClientDoesNotImportFeatures:
             + "consume, and importing one back is a package cycle. Put the shared type in "
             + "backstop_client/credential.py (a Protocol, if features owns the "
             + "implementation):\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestBackstopClientDoesNotImportConfig:
+    def test_the_settings_module_is_actually_there(self) -> None:
+        """Guards the guard: without somewhere to put them, the rule below is unsatisfiable."""
+        assert (_BACKSTOP_CLIENT / "settings.py").is_file()
+
+    @pytest.mark.parametrize("source", sorted(_BACKSTOP_CLIENT.rglob("*.py")), ids=_source_id)
+    def test_no_client_module_imports_config(self, source: pathlib.Path) -> None:
+        violations = _violations(source, _CONFIG_MODULE)
+        assert not violations, (
+            "backstop_client/ must not import config — it takes its own frozen settings types "
+            + "from backstop_client/settings.py, which create_app translates BackstopConfig "
+            + "into. Add the field to BackstopTransportSettings (or RetrySettings) and map it "
+            + "in app.transport_settings instead:\n  "
             + "\n  ".join(violations)
         )

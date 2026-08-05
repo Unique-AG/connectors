@@ -357,6 +357,12 @@ class TestBatchResolve:
         assert result.unresolved[1].index == 2
         assert len(result.unresolved[1].candidates) == 2
 
+        response = unresolved_parties_response(result)
+        assert [item.index for item in response.resolved] == [0]
+        assert response.resolved[0].value.id == "trusted-1"
+        assert response.resolved[0].value.name == "Trusted Org"
+        assert [item.index for item in response.unresolved] == [1, 2]
+
     @pytest.mark.asyncio
     @respx.mock
     async def test_batch_all_resolved_returns_batch_resolved(self, client: BackstopClient) -> None:
@@ -444,6 +450,7 @@ class TestBatchResolve:
         assert response.unresolved[0].candidates == []
         assert [c.id for c in response.unresolved[1].candidates] == ["o2", "o3"]
         assert response.unresolved[1].scope == "organizations"
+        assert response.resolved == []
 
 
 class TestConfirmName:

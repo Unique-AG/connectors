@@ -2,6 +2,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
+from backstop_mcp.backstop_client.errors import BackstopUnexpectedCollectionError
+
 # PEP 695 generic syntax (not typing.Generic/TypeVar) — pydantic 2.13 resolves
 # `BackstopApiResource[SomeModel]` to a concrete model at runtime either way, but this form
 # is what basedpyright's strict mode type-checks cleanly for a generic pydantic BaseModel.
@@ -45,3 +47,17 @@ class BackstopApiResource[AttrT](BaseModel):
 
 class BackstopApiDocument[AttrT](BaseModel):
     data: BackstopApiResource[AttrT] | list[BackstopApiResource[AttrT]] | None
+
+
+def single_resource[AttrT](
+    document: BackstopApiDocument[AttrT], *, path: str
+) -> BackstopApiResource[AttrT] | None:
+    """The one resource a by-id fetch returned, or None if the document describes none.
+
+    Raises `BackstopUnexpectedCollectionError` for a collection: `data` is a union because one
+    document shape covers both list and by-id reads, but a caller that asked for `/{entity}/{id}`
+    has no use for a list and every such caller wants the same typed failure.
+    """
+    if isinstance(document.data, list):
+        raise BackstopUnexpectedCollectionError(path)
+    return document.data

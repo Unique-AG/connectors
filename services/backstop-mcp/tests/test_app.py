@@ -8,6 +8,7 @@ These tests drive the app through Starlette's `TestClient` so the lifespan actua
 """
 
 import base64
+import dataclasses
 import os
 from collections.abc import Iterator
 from typing import Protocol, cast
@@ -16,7 +17,7 @@ import pytest
 from starlette.testclient import TestClient
 from testcontainers.community.postgres import PostgresContainer
 
-from backstop_mcp.app import create_app
+from backstop_mcp.app import create_app, retry_settings, transport_settings
 from backstop_mcp.coerce import as_clean_str, as_object_dict
 from backstop_mcp.config import (
     AppConfig,
@@ -96,10 +97,12 @@ class TestWiring:
         # closed during construction.
         assert factory._auth is not None  # pyright: ignore[reportPrivateUsage]
 
-    def test_the_factory_owns_the_config_create_app_was_given(self, app_client: TestClient) -> None:
+    def test_the_factory_owns_the_settings_create_app_was_given(
+        self, app_client: TestClient
+    ) -> None:
         """A second `BackstopConfig()` read from the environment would silently ignore the knobs."""
         _ = app_client
-        assert get_services().backstop.config.base_url == _BASE_URL
+        assert get_services().backstop.settings.base_url == _BASE_URL
 
     def test_services_are_installed_for_tools_to_reach(self, app_client: TestClient) -> None:
         _ = app_client
@@ -184,3 +187,52 @@ class TestToolRegistration:
 
         assert len(names) == len(set(names))
         assert names
+
+
+class TestConfigTranslation:
+    """`create_app` is the only place a `config` shape becomes a transport one.
+
+    A field that stops being propagated here fails silently — the transport would just use the
+    dataclass value it was constructed with — so the mapping is asserted rather than eyeballed.
+    """
+
+    def test_every_transport_setting_carries_the_configured_value(self) -> None:
+        config = BackstopConfig(
+            base_url="https://tenant.backstopsolutions.com",
+            default_timeout_seconds=11.0,
+            reports_timeout_seconds=222.0,
+            max_concurrent_requests_per_user=3,
+            default_page_size=33,
+            report_page_size=444,
+            page_limit_param="limit",
+            page_offset_param="offset",
+        )
+
+        settings = transport_settings(config)
+
+        # Every field of the settings type is named after the config field it comes from, so the
+        # whole mapping can be checked at once — and a newly-added field is covered automatically.
+        for field in dataclasses.fields(settings):
+            assert getattr(settings, field.name) == getattr(config, field.name), field.name
+
+    def test_retry_settings_carry_the_configured_values(self) -> None:
+        """Checked by hand because these two are the only renamed pair."""
+        config = BackstopConfig(max_retry_attempts=2, max_retry_wait_ms=5_000)
+
+        settings = retry_settings(config)
+
+        assert settings.max_attempts == config.max_retry_attempts
+        assert settings.max_wait_ms == config.max_retry_wait_ms
+
+    def test_the_transport_is_not_handed_the_service_account(self) -> None:
+        """The knobs it has no business seeing must not have leaked in with the rest."""
+        field_names = {
+            field.name for field in dataclasses.fields(transport_settings(BackstopConfig()))
+        }
+
+        assert not field_names & {
+            "service_username",
+            "service_api_token",
+            "custom_field_overrides",
+            "custom_field_schema_ttl_minutes",
+        }

@@ -2,11 +2,12 @@
 
 Layering decision, stated once here because it shapes every module: this service is MCP-only,
 so a transport error *is* a tool error. These types subclass `fastmcp.exceptions.ToolError` and
-propagate straight to the MCP client with `errors[].detail` intact, rather than being translated
-at a boundary. The cost is that `backstop_client` depends on fastmcp and that non-tool callers
-(startup warming, login-form credential verification) can see a `ToolError`; both already handle
-their own failures. The benefit is that no tool has to catch-and-rewrap, and no upstream detail is
-lost on the way out. `auth.context.NotConnectedError` follows the same rule.
+propagate straight to the MCP client with the joined error messages intact, rather than being
+translated at a boundary. The cost is that `backstop_client` depends on fastmcp and that
+non-tool callers (startup warming, login-form credential verification) can see a `ToolError`;
+both already handle their own failures. The benefit is that no tool has to catch-and-rewrap,
+and no upstream detail is lost on the way out. `auth.context.NotConnectedError` follows the
+same rule.
 
 Exceptions that are *not* meant for the MCP client — `BackstopAuthError`,
 `BackstopUnreachableError` in `client.py` — stay plain `Exception`s, because each has a caller
@@ -14,6 +15,7 @@ that must react to it (revoke tokens, re-render the login form) rather than surf
 """
 
 import re
+from dataclasses import dataclass
 from typing import Literal, cast
 
 import httpx
@@ -35,7 +37,14 @@ _LIMIT_KIND_KEYWORDS: dict[LimitKind, tuple[str, ...]] = {
 
 
 class _JsonApiError(BaseModel):
-    detail: str
+    """One JSON:API error object.
+
+    Backstop is inconsistent: some responses use `detail`, others only `title` (and `code`).
+    Both are optional so we can accept either shape.
+    """
+
+    detail: str | None = None
+    title: str | None = None
     code: str | None = None
 
 
@@ -46,18 +55,44 @@ class _JsonApiErrorBody(BaseModel):
 _ERROR_BODY_ADAPTER = TypeAdapter(_JsonApiErrorBody)
 
 
+@dataclass(frozen=True, slots=True)
+class BackstopErrorDetail:
+    """One entry from a Backstop JSON:API `errors[]` array."""
+
+    code: str | None = None
+    title: str | None = None
+    detail: str | None = None
+
+    @property
+    def message(self) -> str | None:
+        """Best available human-readable text, preferring `detail` then `title` then `code`."""
+        for candidate in (self.detail, self.title, self.code):
+            if candidate is not None and (text := candidate.strip()):
+                return text
+        return None
+
+
 class BackstopApiError(ToolError):
-    """Raised for a Backstop 4xx/5xx response, carrying the JSON:API error detail verbatim."""
+    """Raised for a Backstop 4xx/5xx response, carrying the JSON:API error(s) verbatim."""
 
     status_code: int
     detail: str
     code: str | None
+    errors: tuple[BackstopErrorDetail, ...]
 
-    def __init__(self, status_code: int, detail: str, code: str | None = None) -> None:
+    def __init__(
+        self,
+        status_code: int,
+        detail: str,
+        code: str | None = None,
+        *,
+        errors: tuple[BackstopErrorDetail, ...] = (),
+    ) -> None:
         super().__init__(f"Backstop API error ({status_code}): {detail}")
         self.status_code = status_code
         self.detail = detail
         self.code = code
+        self.errors = errors
 
 
 class BackstopRateLimitError(BackstopApiError):
@@ -77,10 +112,11 @@ class BackstopRateLimitError(BackstopApiError):
         detail: str,
         code: str | None = None,
         *,
+        errors: tuple[BackstopErrorDetail, ...] = (),
         limit_kind: LimitKind | None = None,
         retry_after_seconds: float | None = None,
     ) -> None:
-        super().__init__(status_code, detail, code)
+        super().__init__(status_code, detail, code, errors=errors)
         self.limit_kind = limit_kind
         self.retry_after_seconds = retry_after_seconds
 
@@ -129,7 +165,28 @@ class BackstopResponseSchemaError(ToolError):
         self.cause = cause
 
 
-def _parse_error_detail(response: httpx.Response) -> _JsonApiError | None:
+class BackstopUnexpectedCollectionError(ToolError):
+    """Raised when a fetch-by-id came back as a JSON:API collection instead of one resource.
+
+    `BackstopApiDocument.data` is a union because the same document shape covers both a
+    `/{entity}` list and a `/{entity}/{id}` read. A collection on the by-id path is a malformed
+    upstream response, so it belongs with the other transport failures rather than being
+    asserted on at the call site — an `AssertionError` there would surface as an internal error
+    instead of a `ToolError`, and every caller would have to hand-roll the same check.
+    """
+
+    path: str
+
+    def __init__(self, path: str) -> None:
+        super().__init__(f"Backstop returned a collection for {path!r}; expected a single resource")
+        self.path = path
+
+
+def _to_error_detail(error: _JsonApiError) -> BackstopErrorDetail:
+    return BackstopErrorDetail(code=error.code, title=error.title, detail=error.detail)
+
+
+def _parse_error_details(response: httpx.Response) -> tuple[BackstopErrorDetail, ...] | None:
     try:
         body = _ERROR_BODY_ADAPTER.validate_json(response.content)
     except ValidationError as exc:
@@ -141,7 +198,21 @@ def _parse_error_detail(response: httpx.Response) -> _JsonApiError | None:
         return None
     if not body.errors:
         return None
-    return body.errors[0]
+    return tuple(_to_error_detail(error) for error in body.errors)
+
+
+def _join_messages(errors: tuple[BackstopErrorDetail, ...]) -> str | None:
+    messages = tuple(message for error in errors if (message := error.message) is not None)
+    if not messages:
+        return None
+    return "; ".join(messages)
+
+
+def _first_code(errors: tuple[BackstopErrorDetail, ...]) -> str | None:
+    for error in errors:
+        if error.code is not None and error.code.strip():
+            return error.code
+    return None
 
 
 def _fallback_message(response: httpx.Response) -> str:
@@ -177,22 +248,24 @@ def _parse_retry_after(response: httpx.Response) -> float | None:
 def parse_json_api_error(response: httpx.Response) -> BackstopApiError:
     """Turn a 4xx/5xx `httpx.Response` into the right `BackstopApiError` subclass.
 
-    Parses the JSON:API `errors[]` body, falling back to a distinct unparseable-body
-    message rather than crashing on malformed/empty responses. 429s are further
-    classified into `BackstopRateLimitError` with a best-effort `limit_kind`.
+    Parses the full JSON:API `errors[]` body (accepting `detail` and/or `title`), falling back
+    to a distinct unparseable-body message rather than crashing on malformed/empty responses.
+    429s are further classified into `BackstopRateLimitError` with a best-effort `limit_kind`.
     """
-    error = _parse_error_detail(response)
-    detail = error.detail if error is not None else _fallback_message(response)
-    code = error.code if error is not None else None
+    parsed_errors = _parse_error_details(response) or ()
+    joined = _join_messages(parsed_errors)
+    detail = joined if joined is not None else _fallback_message(response)
+    code = _first_code(parsed_errors)
 
     if response.status_code == 429:
-        limit_kind = _classify_limit_kind(detail, code) if error is not None else None
+        limit_kind = _classify_limit_kind(detail, code) if joined is not None else None
         return BackstopRateLimitError(
             response.status_code,
             detail,
             code,
+            errors=parsed_errors,
             limit_kind=limit_kind,
             retry_after_seconds=_parse_retry_after(response),
         )
 
-    return BackstopApiError(response.status_code, detail, code)
+    return BackstopApiError(response.status_code, detail, code, errors=parsed_errors)
