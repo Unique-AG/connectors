@@ -1,6 +1,7 @@
 packages:
   - services/*
   - "!services/hello-mcp"
+  - "!services/q-bridge-mcp"
   - packages/*
 
 injectWorkspacePackages: true
