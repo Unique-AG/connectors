@@ -1,7 +1,9 @@
 import asyncio
+import logging
 from datetime import UTC, datetime
 
 import pytest
+from fastmcp.exceptions import ToolError
 from key_value.aio.stores.memory import MemoryStore
 from prefab_ui.app import ResolvedTool
 
@@ -221,7 +223,9 @@ def test_save_profile__uses_injected_identity() -> None:
 
 
 @pytest.mark.ai
-def test_save_organization_credentials__validates_before_persisting() -> None:
+def test_save_organization_credentials__validates_before_persisting(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     """Purpose: Verify organization credentials are validated and tenant-scoped.
     Why this matters: Invalid or cross-tenant credentials must not enter shared storage.
     Setup summary: Save through an accepting validator and inspect the safe response.
@@ -229,6 +233,7 @@ def test_save_organization_credentials__validates_before_persisting() -> None:
     repository = OrganizationCredentialsRepository(MemoryStore())
     validator = AcceptingCredentialsValidator()
     prewarmer = RecordingCatalogPrewarmer()
+    caplog.set_level(logging.INFO)
 
     result = asyncio.run(
         save_organization_credentials(
@@ -253,6 +258,9 @@ def test_save_organization_credentials__validates_before_persisting() -> None:
         "organizationConfigured": True,
     }
     assert "very-secret-api-key" not in str(result)
+    assert "very-secret-api-key" not in caplog.text
+    assert "user_id=user-123" in caplog.text
+    assert "company_id=company-456" in caplog.text
 
 
 @pytest.mark.ai
@@ -264,7 +272,7 @@ def test_require_configuration__rejects_incomplete_setup() -> None:
     profile_repository = UserProfileRepository(MemoryStore())
     credentials_repository = OrganizationCredentialsRepository(MemoryStore())
 
-    with pytest.raises(ConfigurationRequiredError, match="profile_settings"):
+    with pytest.raises(ConfigurationRequiredError, match="profile_settings") as error:
         _ = asyncio.run(
             require_configuration(
                 profile_repository,
@@ -273,6 +281,8 @@ def test_require_configuration__rejects_incomplete_setup() -> None:
                 "company-456",
             )
         )
+    assert isinstance(error.value, ToolError)
+    assert error.value.log_level == logging.INFO
 
 
 @pytest.mark.ai

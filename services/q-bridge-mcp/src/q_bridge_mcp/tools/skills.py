@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import base64
+import logging
 from typing import Any
 
 from fastmcp.dependencies import Depends
+from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
 
+from q_bridge_mcp.dependencies import get_company_id, get_user_id
+from q_bridge_mcp.profiles.dependencies import ConfigurationRequiredError
 from q_bridge_mcp.skills.service import CatalogAccessor, get_catalog_accessor
+
+logger = logging.getLogger(__name__)
 
 
 @tool(
@@ -23,6 +29,8 @@ async def get_skill_guide(
     accessor: CatalogAccessor = Depends(  # noqa: B008  # pyright: ignore[reportCallInDefaultInitializer]
         get_catalog_accessor
     ),
+    user_id: str = Depends(get_user_id),  # pyright: ignore[reportCallInDefaultInitializer]
+    company_id: str = Depends(get_company_id),  # pyright: ignore[reportCallInDefaultInitializer]
 ) -> dict[str, Any]:
     """Run the mandatory Q Bridge skill preflight and read a skill resource.
 
@@ -31,10 +39,50 @@ async def get_skill_guide(
     read one file. Set force_refresh to bypass and replace the authenticated
     user's cached skill catalog.
     """
-    catalog = await accessor.get_catalog(force_refresh=force_refresh)
+    if skill is None:
+        logger.info(
+            "Discovering Q Bridge skills (user_id=%s, company_id=%s)",
+            user_id,
+            company_id,
+        )
+    elif file is None:
+        logger.info(
+            "Listing files for a Q Bridge skill (user_id=%s, company_id=%s)",
+            user_id,
+            company_id,
+        )
+    else:
+        logger.info(
+            "Reading a Q Bridge skill file (user_id=%s, company_id=%s)",
+            user_id,
+            company_id,
+        )
+
+    try:
+        catalog = await accessor.get_catalog(force_refresh=force_refresh)
+    except ConfigurationRequiredError:
+        raise
+    except Exception as error:
+        logger.warning(
+            "Unable to load Q Bridge skills (error_type=%s, user_id=%s, company_id=%s)",
+            type(error).__name__,
+            user_id,
+            company_id,
+        )
+        raise ToolError(
+            "Unable to load Q Bridge skills. Try again later.",
+            log_level=logging.WARNING,
+        ) from error
+
     if skill is None:
         if file is not None:
-            raise ValueError("file requires skill")
+            raise ToolError("file requires skill", log_level=logging.INFO)
+        logger.info(
+            "Discovered Q Bridge skills (skill_count=%d, user_id=%s, company_id=%s)",
+            len(catalog.skills),
+            user_id,
+            company_id,
+        )
         return {
             "success": True,
             "skills": [
@@ -59,7 +107,7 @@ async def get_skill_guide(
 
     available_skill = catalog.skills.get(skill)
     if available_skill is None:
-        raise ValueError(f"Unknown skill: {skill}")
+        raise ToolError("Requested skill is not available", log_level=logging.INFO)
     if file is None:
         return {
             "success": True,
@@ -79,7 +127,10 @@ async def get_skill_guide(
 
     skill_file = available_skill.files.get(file)
     if skill_file is None:
-        raise ValueError(f"Unknown file {file!r} in skill {skill!r}")
+        raise ToolError(
+            "Requested skill file is not available",
+            log_level=logging.INFO,
+        )
 
     try:
         content = skill_file.content.decode("utf-8")

@@ -457,14 +457,20 @@ def test_remote_skill_resource__revalidates_catalog_when_read() -> None:
 def test_get_skill_guide__forces_refresh_and_supports_progressive_disclosure() -> None:
     accessor = FakeCatalogAccessor(make_catalog())
 
-    listing = asyncio.run(get_skill_guide(None, None, True, accessor))
-    files = asyncio.run(get_skill_guide("report-writer", None, False, accessor))
+    listing = asyncio.run(
+        get_skill_guide(None, None, True, accessor, "user-1", "company-1")
+    )
+    files = asyncio.run(
+        get_skill_guide("report-writer", None, False, accessor, "user-1", "company-1")
+    )
     content = asyncio.run(
         get_skill_guide(
             "report-writer",
             "references/format.md",
             False,
             accessor,
+            "user-1",
+            "company-1",
         )
     )
 

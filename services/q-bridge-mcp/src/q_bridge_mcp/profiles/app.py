@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 from fastmcp import FastMCPApp
@@ -44,6 +45,8 @@ from q_bridge_mcp.skills.service import (
     get_skill_catalog_service,
 )
 
+logger = logging.getLogger(__name__)
+
 profile_app = FastMCPApp("user-profile")
 
 
@@ -65,6 +68,11 @@ async def save_profile(
         company_id=company_id,
         user_id=user_id,
         profile=profile,
+    )
+    logger.info(
+        "Saved Q Bridge user profile (user_id=%s, company_id=%s)",
+        user_id,
+        company_id,
     )
     _ = await catalog_prewarmer.prewarm(user_id=user_id, company_id=company_id)
     return profile.model_dump(by_alias=True, exclude_none=True)
@@ -98,7 +106,17 @@ async def save_organization_credentials(
         user_id=user_id,
         company_id=company_id,
     )
+    logger.info(
+        "Validated Q Bridge organization credentials (user_id=%s, company_id=%s)",
+        user_id,
+        company_id,
+    )
     await repository.save(company_id=company_id, credentials=credentials)
+    logger.info(
+        "Saved Q Bridge organization credentials (user_id=%s, company_id=%s)",
+        user_id,
+        company_id,
+    )
     _ = await catalog_prewarmer.prewarm(user_id=user_id, company_id=company_id)
     return {
         "appId": credentials.app_id,

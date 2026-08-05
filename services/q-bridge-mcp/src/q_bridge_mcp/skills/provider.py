@@ -64,11 +64,12 @@ class UniqueSkillsProvider(Provider):
     @override
     async def _list_resources(self) -> Sequence[Resource]:
         catalog = await self._accessor.get_catalog()
-        return [
+        resources = [
             resource
             for skill in catalog.skills.values()
             for resource in _resources_for_skill(skill, self._accessor)
         ]
+        return resources
 
     @override
     async def _get_resource(

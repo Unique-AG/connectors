@@ -86,6 +86,11 @@ class SkillCatalogService:
         )
         credentials = await self._credentials_repository.get(company_id=company_id)
         if profile.skills_root_folder is None or credentials is None:
+            logger.info(
+                "Skill catalog unavailable because Q Bridge setup is incomplete (user_id=%s, company_id=%s)",
+                user_id,
+                company_id,
+            )
             raise ConfigurationRequiredError(
                 "Q Bridge setup is incomplete. Open profile_settings before loading skills."
             )
@@ -99,31 +104,67 @@ class SkillCatalogService:
         )
 
         async def load() -> SkillCatalog:
+            logger.info(
+                "Loading skill catalog from the Unique Knowledge Base (force_refresh=%s, user_id=%s, company_id=%s)",
+                force_refresh,
+                user_id,
+                company_id,
+            )
             client = self._client_factory(user_id, company_id, credentials)
-            return await build_skill_catalog(
+            catalog = await build_skill_catalog(
                 client,
                 root_folder=root_folder,
                 user_id=user_id,
             )
+            logger.info(
+                "Loaded skill catalog from the Unique Knowledge Base (skill_count=%d, user_id=%s, company_id=%s)",
+                len(catalog.skills),
+                user_id,
+                company_id,
+            )
+            return catalog
 
-        return await self._cache.get(
+        catalog = await self._cache.get(
             key,
             load,
             force_refresh=force_refresh,
         )
+        logger.info(
+            "Served skill catalog (skill_count=%d, user_id=%s, company_id=%s)",
+            len(catalog.skills),
+            user_id,
+            company_id,
+        )
+        return catalog
 
     async def prewarm(self, *, user_id: str, company_id: str) -> bool:
         try:
-            _ = await self.get_catalog(
+            catalog = await self.get_catalog(
                 user_id=user_id,
                 company_id=company_id,
                 force_refresh=True,
             )
         except ConfigurationRequiredError:
+            logger.info(
+                "Skipped skill catalog prewarm because setup is incomplete (user_id=%s, company_id=%s)",
+                user_id,
+                company_id,
+            )
             return False
-        except Exception:
-            logger.warning("Unable to prewarm the skill catalog", exc_info=True)
+        except Exception as error:  # noqa: BLE001  # prewarm must not block profile saves
+            logger.warning(
+                "Unable to prewarm the skill catalog (error_type=%s, user_id=%s, company_id=%s)",
+                type(error).__name__,
+                user_id,
+                company_id,
+            )
             return False
+        logger.info(
+            "Prewarmed skill catalog from the Unique Knowledge Base (skill_count=%d, user_id=%s, company_id=%s)",
+            len(catalog.skills),
+            user_id,
+            company_id,
+        )
         return True
 
 
