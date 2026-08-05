@@ -1,5 +1,6 @@
 import os
 import ssl
+from datetime import timedelta
 from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from typing import ClassVar, TypedDict, cast
@@ -148,6 +149,15 @@ class BackstopConfig(BaseSettings):
     # exceeding 500 records per report page.
     report_page_size: int = Field(default=500, ge=1, le=500)
 
+    # JSON:API pagination parameter names. Defaults come from the Backstop swagger, which
+    # spells the only paginated example as
+    # `/quick-search/?...&page[offset]={value4}&page[limit]={value5}`
+    # (.docs-local/backstop/backstop-api-swagger.json). Overridable because getting these
+    # wrong is silent: Backstop ignores an unknown query param, so `report_page_size` would
+    # stop bounding report pages without any error to notice.
+    page_limit_param: str = Field(default="page[limit]", min_length=1)
+    page_offset_param: str = Field(default="page[offset]", min_length=1)
+
     # Optional human overlays for weird CRM custom-field names (e.g. `is1` → Investor Status).
     # Env value is JSON: {"organizations:is1": {"display_name": "...", "aliases": [...]}}.
     # Keys are entityType:crmName — see custom_fields/overrides.py. crmName is the CRM's own
@@ -241,6 +251,32 @@ class DatabaseConfig(BaseSettings):
     def connect_args(self) -> AsyncpgConnectArgs:
         """asyncpg connect args derived from libpq query params (e.g. sslmode)."""
         return self._connect_args
+
+
+class AuthConfig(BaseSettings):
+    """Retention and sweep cadence for the OAuth rows this service issues.
+
+    See `auth/cleanup.py`: without a periodic sweep, `pending_authorizations`,
+    `authorization_codes` and — chiefly — `oauth_tokens` grow without bound.
+    """
+
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="AUTH_")
+
+    # How long a fully-expired token family is kept. `rotated_from` makes those rows an audit
+    # trail of one grant's rotations, so they outlive their usefulness as credentials.
+    token_retention_days: int = Field(default=30, ge=1)
+
+    # How often the sweep runs. Rows are unusable the moment they expire, so this bounds only
+    # how long dead rows linger — never whether an expired token is accepted.
+    cleanup_interval_hours: float = Field(default=6.0, gt=0)
+
+    @property
+    def token_retention(self) -> timedelta:
+        return timedelta(days=self.token_retention_days)
+
+    @property
+    def cleanup_interval(self) -> timedelta:
+        return timedelta(hours=self.cleanup_interval_hours)
 
 
 class EncryptionConfig(BaseSettings):

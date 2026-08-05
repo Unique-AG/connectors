@@ -1,0 +1,78 @@
+"""Shared test construction helpers.
+
+Mirrors what `create_app()` does, minus the web layer: build one `BackstopClientFactory`, and
+install it (plus a `CustomFieldsService`) in the single `runtime.Services` holder. Tests that
+need a client go through the factory exactly as production does, so the concurrency gate and
+config injection under test are the real ones.
+"""
+
+from pydantic import SecretStr
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from backstop_mcp.auth.context import BackstopAuthContext
+from backstop_mcp.auth.crypto import BackstopCredentialSecret
+from backstop_mcp.backstop_client.factory import BackstopClientFactory
+from backstop_mcp.config import BackstopConfig, CustomFieldOverrideConfig
+from backstop_mcp.custom_fields import CustomFieldsService, create_custom_fields_service
+from backstop_mcp.runtime import Services, configure_services
+
+BASE_URL = "https://example.backstopsolutions.com"
+
+
+def credential(username: str = "bob.smith", token: str = "token") -> BackstopCredentialSecret:
+    return BackstopCredentialSecret(username=username, api_token=SecretStr(token))
+
+
+def backstop_config(base_url: str = BASE_URL, **overrides: object) -> BackstopConfig:
+    """Build a config, applying `overrides` on top of the validated defaults.
+
+    `model_copy` rather than passing the overrides to `__init__`: it keeps the helper's
+    signature honest (`**overrides: object`, since a test may tune any field) without
+    surrendering the constructor's own parameter types to `object`.
+    """
+    return BackstopConfig(base_url=base_url).model_copy(update=overrides)
+
+
+def client_factory(
+    base_url: str = BASE_URL,
+    *,
+    auth: BackstopAuthContext | None = None,
+    **overrides: object,
+) -> BackstopClientFactory:
+    return BackstopClientFactory(backstop_config(base_url, **overrides), auth=auth)
+
+
+def install_services(
+    *,
+    backstop: BackstopClientFactory,
+    custom_fields: CustomFieldsService,
+) -> Services:
+    services = Services(backstop=backstop, custom_fields=custom_fields)
+    configure_services(services)
+    return services
+
+
+def custom_fields_service(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    base_url: str = BASE_URL,
+    overrides: dict[str, CustomFieldOverrideConfig] | None = None,
+    ttl_minutes: int = 60,
+) -> CustomFieldsService:
+    return create_custom_fields_service(
+        session_factory=session_factory,
+        base_url=base_url,
+        overrides=overrides or {},
+        ttl_minutes=ttl_minutes,
+    )
+
+
+def resource(id: str, type: str, name: str | None = None, **attrs: object) -> dict[str, object]:
+    attributes: dict[str, object] = {**attrs}
+    if name is not None:
+        attributes["name"] = name
+    return {"type": type, "id": id, "attributes": attributes}
+
+
+def collection(*resources: dict[str, object]) -> dict[str, object]:
+    return {"data": list(resources)}

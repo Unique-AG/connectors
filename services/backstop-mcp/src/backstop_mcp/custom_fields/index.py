@@ -1,85 +1,68 @@
-from __future__ import annotations
-
 import re
 
-from backstop_mcp.custom_fields.overrides import normalize_entity_type
-from backstop_mcp.custom_fields.types import (
-    CustomFieldDefinition,
-    FieldAmbiguous,
-    FieldCandidate,
-    FieldNotFound,
-    FieldResolved,
-    FieldResolveResult,
-)
+from backstop_mcp.custom_fields.entity_types import normalize_entity_type
+from backstop_mcp.custom_fields.types import CustomFieldDefinition
+from backstop_mcp.resolution import Candidate, NotFound, Resolution, from_candidates
 
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
+
+type DefinitionIndex = dict[str, list[CustomFieldDefinition]]
+type FieldResolution = Resolution[CustomFieldDefinition]
 
 
 def normalize_query(value: str) -> str:
     return _NON_ALNUM.sub(" ", value.strip().lower()).strip()
 
 
-def build_index(
-    definitions: list[CustomFieldDefinition],
-) -> dict[str, list[CustomFieldDefinition]]:
+def build_index(definitions: list[CustomFieldDefinition]) -> DefinitionIndex:
     """Group definitions by normalized entity type."""
-    index: dict[str, list[CustomFieldDefinition]] = {}
+    index: DefinitionIndex = {}
     for definition in definitions:
         key = normalize_entity_type(definition.entity_type)
         index.setdefault(key, []).append(definition)
     return index
 
 
-def _exact_names(definition: CustomFieldDefinition) -> set[str]:
+def _searchable_names(definition: CustomFieldDefinition) -> set[str]:
     names = {definition.crm_name, definition.display_name, *definition.aliases}
     return {normalize_query(n) for n in names if n and normalize_query(n)}
 
 
-def resolve_in_index(
-    index: dict[str, list[CustomFieldDefinition]],
-    *,
-    entity_type: str,
-    query: str,
-) -> FieldResolveResult:
-    entity = normalize_entity_type(entity_type)
-    needle = normalize_query(query)
-    if not needle:
-        return FieldNotFound(query=query, entity_type=entity)
-
-    definitions = index.get(entity, [])
-    exact = [d for d in definitions if needle in _exact_names(d)]
-    if len(exact) == 1:
-        return FieldResolved(definition=exact[0])
-    if len(exact) > 1:
-        return FieldAmbiguous(
-            query=query,
-            entity_type=entity,
-            candidates=tuple(_candidate(d) for d in exact),
-        )
-
-    fuzzy = [
-        d for d in definitions if any(needle in name or name in needle for name in _exact_names(d))
-    ]
-    if len(fuzzy) == 1:
-        return FieldResolved(definition=fuzzy[0])
-    if len(fuzzy) > 1:
-        return FieldAmbiguous(
-            query=query,
-            entity_type=entity,
-            candidates=tuple(_candidate(d) for d in fuzzy),
-        )
-
-    return FieldNotFound(query=query, entity_type=entity)
-
-
-def _candidate(definition: CustomFieldDefinition) -> FieldCandidate:
+def candidate_for(definition: CustomFieldDefinition) -> Candidate[CustomFieldDefinition]:
     label = definition.display_name
     if definition.crm_name and definition.crm_name != definition.display_name:
         label = f"{definition.display_name} (crm: {definition.crm_name})"
-    return FieldCandidate(
-        definition_id=definition.definition_id,
-        display_name=definition.display_name,
-        crm_name=definition.crm_name,
-        entity_type=definition.entity_type,
-        label=label,
-    )
+    return Candidate(key=definition.definition_id, label=label, value=definition)
+
+
+def resolve_in_index(
+    index: DefinitionIndex,
+    *,
+    entity_type: str,
+    query: str,
+) -> FieldResolution:
+    """Resolve a field by human name or alias, exact matches outranking partial ones.
+
+    Two tiers, and the first non-empty one decides: an exact (normalized) name match, then a
+    substring match either way. Tiering matters because a user's short phrase ("grade") is a
+    substring of several instance field names ("Investor Grade", "Grade Review Date") while
+    being an exact match for at most one — without the tiers, the exact hit would be drowned
+    in its own near-misses and every lookup would prompt.
+    """
+    entity = normalize_entity_type(entity_type)
+    needle = normalize_query(query)
+    if not needle:
+        return NotFound(query=query, scope=entity)
+
+    definitions = index.get(entity, [])
+
+    exact = [d for d in definitions if needle in _searchable_names(d)]
+    if exact:
+        return from_candidates([candidate_for(d) for d in exact], query=query, scope=entity)
+
+    partial = [
+        d
+        for d in definitions
+        if any(needle in name or name in needle for name in _searchable_names(d))
+    ]
+    return from_candidates([candidate_for(d) for d in partial], query=query, scope=entity)

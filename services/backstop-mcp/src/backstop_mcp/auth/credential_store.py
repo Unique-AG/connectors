@@ -26,8 +26,7 @@ async def save_credential(
 ) -> None:
     """Encrypt and upsert a user's Backstop credential.
 
-    Does not commit — the caller controls the transaction boundary (see `db/engine.py`'s
-    `get_session`).
+    Does not commit — the caller owns the transaction boundary (`db/engine.py::transaction`).
     """
     encrypted_blob = encrypt_credential(credential, key)
     existing = await session.get(BackstopCredential, user_id)

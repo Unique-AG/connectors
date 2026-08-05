@@ -3,6 +3,8 @@ from typing import Annotated, ClassVar, Literal
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StringConstraints
 
+from backstop_mcp.resolution import BatchResolution, Candidate, Resolution
+
 type SearchType = Literal["organizations", "contacts", "people", "employees"]
 
 _StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
@@ -38,13 +40,11 @@ class ResolvedParty:
     name: str | None = None
 
 
-@dataclass(frozen=True)
-class PartyCandidate:
-    """One ambiguous match; `label` is the human-facing string used for elicit enums."""
-
-    id: str
-    name: str | None
-    label: str
+# Party resolution is one instance of the shared algebra in `resolution.py`: same result types,
+# same ambiguity policy, same status strings as custom-field resolution.
+type PartyCandidate = Candidate[ResolvedParty]
+type PartyResolution = Resolution[ResolvedParty]
+type BatchPartyResolution = BatchResolution[ResolvedParty]
 
 
 @dataclass(frozen=True)
@@ -82,74 +82,3 @@ class QuickSearchOptions:
     show_all: bool = False
     enhance_search_types: bool = False
     filter_type: str | None = None
-
-
-@dataclass(frozen=True)
-class Resolved:
-    """Single-entity resolve succeeded."""
-
-    party: ResolvedParty
-    status: Literal["resolved"] = "resolved"
-
-
-@dataclass(frozen=True)
-class NeedsDisambiguation:
-    """Single-entity search returned 2+ candidates (or elicit was declined/unsupported)."""
-
-    candidates: tuple[PartyCandidate, ...]
-    search: str
-    search_type: SearchType
-    status: Literal["needs_disambiguation"] = "needs_disambiguation"
-
-
-@dataclass(frozen=True)
-class NotFound:
-    """Single-entity search returned zero matches."""
-
-    search: str
-    search_type: SearchType
-    status: Literal["not_found"] = "not_found"
-
-
-type PartyResolveResult = Resolved | NeedsDisambiguation | NotFound
-
-
-@dataclass(frozen=True)
-class ResolvedItem:
-    """One successfully resolved input from a batch, keyed by original index."""
-
-    item_index: int
-    party: ResolvedParty
-
-
-@dataclass(frozen=True)
-class UnresolvedPartyItem:
-    """One unresolved batch input.
-
-    Empty `candidates` means not found; non-empty means needs disambiguation.
-    """
-
-    item_index: int
-    search: str
-    search_type: SearchType
-    candidates: tuple[PartyCandidate, ...]
-
-
-@dataclass(frozen=True)
-class BatchResolved:
-    """Every batch input resolved successfully. `parties` is ordered by input index."""
-
-    parties: tuple[ResolvedParty, ...]
-    status: Literal["resolved"] = "resolved"
-
-
-@dataclass(frozen=True)
-class BatchNeedsDisambiguation:
-    """At least one batch input did not resolve; includes any that did for continuity."""
-
-    unresolved: tuple[UnresolvedPartyItem, ...]
-    resolved: tuple[ResolvedItem, ...]
-    status: Literal["needs_disambiguation"] = "needs_disambiguation"
-
-
-type BatchPartyResolveResult = BatchResolved | BatchNeedsDisambiguation

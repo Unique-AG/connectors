@@ -1,15 +1,18 @@
 import asyncio
 from collections.abc import Mapping, Sequence
+from urllib.parse import quote
 
-from backstop_mcp.backstop_client import BackstopClient
+from backstop_mcp.backstop_client.client import BackstopClient
 from backstop_mcp.backstop_client.json_api import BackstopApiDocument, BackstopApiResource
 from backstop_mcp.party_resolver.email import looks_like_email
 from backstop_mcp.party_resolver.types import (
     PartyAttributes,
     PartyCandidate,
     QuickSearchOptions,
+    ResolvedParty,
     SearchType,
 )
+from backstop_mcp.resolution import Candidate
 
 # Plain assignments (not `type` statements) — `schema=` needs a real class object, and a PEP 695
 # type alias isn't assignable to `type[T]` even though it resolves to one at runtime.
@@ -32,7 +35,13 @@ async def search_by_email(
 ) -> tuple[PartyCandidate, ...]:
     """Exact-match email lookup across the email fields applicable to `search_type`.
 
-    Queries each field separately (never AND-ed) and dedupes hits by resource id.
+    Queries each field separately (never AND-ed) and dedupes hits by resource id. Backstop
+    stores up to three addresses per person/employee, so checking only `email` would silently
+    miss a match on `email2`/`email3`.
+
+    The fan-out is safe to gather: concurrency is gated per upstream request inside
+    `BackstopClient`, not per client, so these queue against the per-user limit rather than
+    breaching it.
     """
     fields = _EMAIL_FIELDS[search_type]
     responses = await asyncio.gather(
@@ -45,7 +54,7 @@ async def search_by_email(
             for field in fields
         )
     )
-    return _merge_candidates(responses)
+    return _merge_candidates(responses, search_type=search_type)
 
 
 async def quick_search(
@@ -55,7 +64,12 @@ async def quick_search(
     search: str,
     options: QuickSearchOptions | None = None,
 ) -> tuple[PartyCandidate, ...]:
-    """Fuzzy/name lookup via `GET /quick-search`, pinned to a single `search_type`."""
+    """Fuzzy/name lookup via `GET /quick-search`, pinned to a single `search_type`.
+
+    The only fuzzy primitive Backstop offers: its filter operators are `eq, neq, gt, ge, lt, le`,
+    so `filter[name][eq]=Capstone` returns nothing when the stored record is
+    "Capstone Investment Advisors LP".
+    """
     resolved_options = options if options is not None else QuickSearchOptions()
     response = await client.get(
         "/quick-search",
@@ -66,7 +80,26 @@ async def quick_search(
         ),
         schema=_PartyDocument,
     )
-    return _candidates_from_document(response)
+    return _candidates_from_document(response, search_type=search_type)
+
+
+async def fetch_party_name(
+    client: BackstopClient, *, search_type: SearchType, party_id: str
+) -> str | None:
+    """Look up just the display name for a known party id.
+
+    Used to honour "every successful resolution echoes the resolved name + Party ID" on the
+    trusted-`party_id` path, where no search ran and so no name was ever seen.
+    """
+    document = await client.get(
+        f"/{search_type}/{quote(party_id, safe='')}",
+        params={"fields": "name,firstName,lastName"},
+        schema=_PartyDocument,
+    )
+    data = document.data
+    if data is None or isinstance(data, list):
+        return None
+    return _display_name(data.attributes)
 
 
 def _quick_search_params(
@@ -103,19 +136,23 @@ def _bool_param(value: bool) -> str:
     return "true" if value else "false"
 
 
-def _merge_candidates(documents: Sequence[_PartyDocument]) -> tuple[PartyCandidate, ...]:
+def _merge_candidates(
+    documents: Sequence[_PartyDocument], *, search_type: SearchType
+) -> tuple[PartyCandidate, ...]:
     seen_ids: set[str] = set()
     merged: list[PartyCandidate] = []
     for document in documents:
-        for candidate in _candidates_from_document(document):
-            if candidate.id in seen_ids:
+        for candidate in _candidates_from_document(document, search_type=search_type):
+            if candidate.key in seen_ids:
                 continue
-            seen_ids.add(candidate.id)
+            seen_ids.add(candidate.key)
             merged.append(candidate)
     return tuple(merged)
 
 
-def _candidates_from_document(document: _PartyDocument) -> tuple[PartyCandidate, ...]:
+def _candidates_from_document(
+    document: _PartyDocument, *, search_type: SearchType
+) -> tuple[PartyCandidate, ...]:
     data = document.data
     if data is None:
         resources: list[_PartyResource] = []
@@ -123,17 +160,25 @@ def _candidates_from_document(document: _PartyDocument) -> tuple[PartyCandidate,
         resources = data
     else:
         resources = [data]
-    return tuple(_candidate_from_resource(resource) for resource in resources)
+    return tuple(
+        _candidate_from_resource(resource, search_type=search_type) for resource in resources
+    )
 
 
-def _candidate_from_resource(resource: _PartyResource) -> PartyCandidate:
+def _candidate_from_resource(
+    resource: _PartyResource, *, search_type: SearchType
+) -> PartyCandidate:
     # `resource.id` is already stripped and guaranteed non-blank by `BackstopApiResource`'s
     # schema validation; a blank `type` still falls back to "resource" here since that's a
     # caller-side display concern, not a structural defect the schema should reject.
     resource_type = resource.type or "resource"
     name = _display_name(resource.attributes)
     label = name if name is not None else f"{resource_type} #{resource.id}"
-    return PartyCandidate(id=resource.id, name=name, label=label)
+    return Candidate(
+        key=resource.id,
+        label=label,
+        value=ResolvedParty(id=resource.id, type=search_type, name=name),
+    )
 
 
 def _display_name(attributes: PartyAttributes) -> str | None:

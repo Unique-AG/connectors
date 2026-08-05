@@ -1,4 +1,5 @@
 import os
+from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -9,43 +10,74 @@ from mcp.server.auth.provider import AccessToken
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backstop_mcp.auth import context as auth_context
+from backstop_mcp.auth.context import BackstopAuthContext
 from backstop_mcp.auth.credential_store import save_credential
 from backstop_mcp.auth.crypto import BackstopCredentialSecret
+from backstop_mcp.backstop_client import BackstopClientFactory
 from backstop_mcp.config import CustomFieldOverrideConfig
-from backstop_mcp.custom_fields import (
-    configure_custom_fields_service,
-    create_custom_fields_service,
-)
+from backstop_mcp.custom_fields import CustomFieldsService, create_custom_fields_service
 from backstop_mcp.custom_fields.middleware import CustomFieldGlossaryMiddleware
 from backstop_mcp.custom_fields.store import save_snapshot
 from backstop_mcp.custom_fields.types import CustomFieldDefinition
-from backstop_mcp.db.engine import get_session
-from tests.party_resolver.helpers import resource
+from backstop_mcp.db.engine import transaction
+from tests.helpers import client_factory, install_services, resource
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
+type ServiceBuilder = Callable[..., CustomFieldsService]
 
 
-async def _connect_user(db: DatabaseFixture, subject: str) -> None:
-    """Store a Backstop credential for `subject` and point auth.context at this test's DB.
+async def _noop_revoke(_subject: str) -> None:
+    return None
+
+
+@pytest.fixture
+async def wire(db: DatabaseFixture) -> AsyncGenerator[ServiceBuilder]:
+    """Wire up the runtime the way `create_app` does, for one Backstop base URL.
+
+    Middleware reaches its collaborators through `runtime.get_services()`, so the test installs
+    a real `Services` — there is no longer a separate global per subsystem to configure.
+    """
+    _, session_factory = db
+    built: list[BackstopClientFactory] = []
+
+    def wire_up(
+        base_url: str,
+        *,
+        overrides: dict[str, CustomFieldOverrideConfig] | None = None,
+        encryption_key: bytes | None = None,
+    ) -> CustomFieldsService:
+        factory = client_factory(
+            base_url,
+            auth=BackstopAuthContext(
+                session_factory=session_factory,
+                encryption_key=encryption_key if encryption_key is not None else os.urandom(32),
+                revoke_tokens_for_subject=_noop_revoke,
+            ),
+        )
+        built.append(factory)
+        service = create_custom_fields_service(
+            session_factory=session_factory,
+            base_url=base_url,
+            overrides=overrides or {},
+            ttl_minutes=60,
+        )
+        install_services(backstop=factory, custom_fields=service)
+        return service
+
+    yield wire_up
+    for factory in built:
+        await factory.aclose()
+
+
+async def _store_credential(
+    session_factory: async_sessionmaker[AsyncSession], subject: str, key: bytes
+) -> None:
+    """Store a Backstop credential for `subject`.
 
     `backstop_username` is globally unique and the test Postgres persists across the whole
     session, so the username is derived from `subject` rather than shared.
     """
-    _, factory = db
-    key = os.urandom(32)
-
-    async def _noop_revoke(_subject: str) -> None:
-        return None
-
-    auth_context.configure(
-        auth_context.BackstopAuthContext(
-            session_factory=factory,
-            encryption_key=key,
-            revoke_tokens_for_subject=_noop_revoke,
-        )
-    )
-    async with factory() as session:
+    async with session_factory() as session:
         await save_credential(
             session,
             subject,
@@ -55,6 +87,19 @@ async def _connect_user(db: DatabaseFixture, subject: str) -> None:
             key,
         )
         await session.commit()
+
+
+def _authenticate_as(monkeypatch: pytest.MonkeyPatch, subject: str) -> None:
+    monkeypatch.setattr(
+        "backstop_mcp.auth.context.get_access_token",
+        lambda: AccessToken(token="access-token", client_id="client-1", scopes=[], subject=subject),
+    )
+
+
+def _lov_entries_route(base_url: str) -> respx.Route:
+    return respx.get(f"{base_url}/lov-entries").mock(
+        return_value=httpx.Response(200, json={"data": [], "links": {"next": None}})
+    )
 
 
 async def _one_org_tool(_context: object) -> list[Tool]:
@@ -67,12 +112,25 @@ async def _one_org_tool(_context: object) -> list[Tool]:
     ]
 
 
+def _definition(
+    definition_id: str, display_name: str, entity_type: str = "organizations"
+) -> CustomFieldDefinition:
+    return CustomFieldDefinition(
+        definition_id=definition_id,
+        entity_type=entity_type,
+        crm_name="is1",
+        display_name=display_name,
+    )
+
+
 class TestGlossaryMiddleware:
     @pytest.mark.asyncio
-    async def test_appends_org_glossary_only_to_registered_tools(self, db: DatabaseFixture) -> None:
-        _, factory = db
+    async def test_appends_org_glossary_only_to_registered_tools(
+        self, db: DatabaseFixture, wire: ServiceBuilder
+    ) -> None:
+        _, session_factory = db
         base_url = "https://example.backstopsolutions.com/glossary"
-        async with get_session(factory) as session:
+        async with transaction(session_factory) as session:
             await save_snapshot(
                 session,
                 base_url,
@@ -94,10 +152,8 @@ class TestGlossaryMiddleware:
                 datetime.now(UTC),
             )
 
-        service = create_custom_fields_service(
-            session_factory=factory,
-            base_url=base_url,
-            ttl_minutes=60,
+        wire(
+            base_url,
             overrides={
                 "organizations:1:is1": CustomFieldOverrideConfig(
                     display_name="Investor Status",
@@ -105,10 +161,6 @@ class TestGlossaryMiddleware:
                 )
             },
         )
-        configure_custom_fields_service(service)
-        await service.load_cached()
-
-        middleware = CustomFieldGlossaryMiddleware()
 
         async def call_next(_context: object) -> list[Tool]:
             return [
@@ -124,7 +176,7 @@ class TestGlossaryMiddleware:
                 ),
             ]
 
-        tools = await middleware.on_list_tools(None, call_next)  # pyright: ignore[reportArgumentType]
+        tools = await CustomFieldGlossaryMiddleware().on_list_tools(None, call_next)  # pyright: ignore[reportArgumentType]
 
         org_tool = next(t for t in tools if t.name == "get_organization")
         sys_tool = next(t for t in tools if t.name == "get_system_info")
@@ -137,24 +189,17 @@ class TestGlossaryMiddleware:
     @pytest.mark.asyncio
     @respx.mock
     async def test_cold_cache_warms_from_the_listing_caller(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, db: DatabaseFixture, wire: ServiceBuilder, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """With no snapshot, the first authenticated tools/list fetches the schema itself."""
-        _, factory = db
+        _, session_factory = db
         base_url = "https://example.backstopsolutions.com/list-warm"
-        await _connect_user(db, "user-list-1")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: AccessToken(
-                token="access-token", client_id="client-1", scopes=[], subject="user-list-1"
-            ),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", base_url)
-        service = create_custom_fields_service(
-            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
-        )
-        configure_custom_fields_service(service)
+        key = os.urandom(32)
+        await _store_credential(session_factory, "user-list-1", key)
+        _authenticate_as(monkeypatch, "user-list-1")
+        wire(base_url, encryption_key=key)
 
+        _lov_entries_route(base_url)
         route = respx.get(f"{base_url}/custom-field-definitions").mock(
             return_value=httpx.Response(
                 200,
@@ -184,24 +229,17 @@ class TestGlossaryMiddleware:
     @pytest.mark.asyncio
     @respx.mock
     async def test_warm_failure_degrades_instead_of_failing_the_listing(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, db: DatabaseFixture, wire: ServiceBuilder, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """With nothing cached and Backstop down, descriptions stay bare rather than guessing."""
-        _, factory = db
+        _, session_factory = db
         base_url = "https://example.backstopsolutions.com/list-outage"
-        await _connect_user(db, "user-list-2")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: AccessToken(
-                token="access-token", client_id="client-1", scopes=[], subject="user-list-2"
-            ),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", base_url)
-        service = create_custom_fields_service(
-            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
-        )
-        configure_custom_fields_service(service)
+        key = os.urandom(32)
+        await _store_credential(session_factory, "user-list-2", key)
+        _authenticate_as(monkeypatch, "user-list-2")
+        wire(base_url, encryption_key=key)
 
+        _lov_entries_route(base_url)
         respx.get(f"{base_url}/custom-field-definitions").mock(
             side_effect=httpx.ConnectError("backstop down")
         )
@@ -214,40 +252,26 @@ class TestGlossaryMiddleware:
     @pytest.mark.asyncio
     @respx.mock
     async def test_backstop_outage_falls_back_to_the_stale_db_snapshot(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, db: DatabaseFixture, wire: ServiceBuilder, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """An expired snapshot still beats no glossary when the refresh can't reach Backstop."""
-        _, factory = db
+        _, session_factory = db
         base_url = "https://example.backstopsolutions.com/list-outage-stale"
-        async with get_session(factory) as session:
+        async with transaction(session_factory) as session:
             await save_snapshot(
                 session,
                 base_url,
-                [
-                    CustomFieldDefinition(
-                        definition_id="950",
-                        entity_type="organizations",
-                        crm_name="is1",
-                        display_name="Investor Status",
-                    )
-                ],
+                [_definition("950", "Investor Status")],
                 datetime.now(UTC) - timedelta(days=30),
             )
             await session.commit()
 
-        await _connect_user(db, "user-list-4")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: AccessToken(
-                token="access-token", client_id="client-1", scopes=[], subject="user-list-4"
-            ),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", base_url)
-        service = create_custom_fields_service(
-            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
-        )
-        configure_custom_fields_service(service)
+        key = os.urandom(32)
+        await _store_credential(session_factory, "user-list-4", key)
+        _authenticate_as(monkeypatch, "user-list-4")
+        service = wire(base_url, encryption_key=key)
 
+        _lov_entries_route(base_url)
         route = respx.get(f"{base_url}/custom-field-definitions").mock(
             side_effect=httpx.ConnectError("backstop down")
         )
@@ -264,16 +288,11 @@ class TestGlossaryMiddleware:
     @pytest.mark.asyncio
     @respx.mock
     async def test_unauthenticated_listing_degrades(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, wire: ServiceBuilder, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """No resolvable caller credential is still not a reason to fail the listing."""
-        _, factory = db
-        base_url = "https://example.backstopsolutions.com/list-noauth"
         monkeypatch.setattr("backstop_mcp.auth.context.get_access_token", lambda: None)
-        service = create_custom_fields_service(
-            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
-        )
-        configure_custom_fields_service(service)
+        wire("https://example.backstopsolutions.com/list-noauth")
 
         tools = await CustomFieldGlossaryMiddleware().on_list_tools(None, _one_org_tool)  # pyright: ignore[reportArgumentType]
 
@@ -283,23 +302,17 @@ class TestGlossaryMiddleware:
     @pytest.mark.asyncio
     @respx.mock
     async def test_overrides_alone_never_produce_a_glossary(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, db: DatabaseFixture, wire: ServiceBuilder, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Backstop returning zero definitions must not fall back to env overrides."""
-        _, factory = db
+        _, session_factory = db
         base_url = "https://example.backstopsolutions.com/list-empty"
-        await _connect_user(db, "user-list-3")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: AccessToken(
-                token="access-token", client_id="client-1", scopes=[], subject="user-list-3"
-            ),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", base_url)
-        service = create_custom_fields_service(
-            session_factory=factory,
-            base_url=base_url,
-            ttl_minutes=60,
+        key = os.urandom(32)
+        await _store_credential(session_factory, "user-list-3", key)
+        _authenticate_as(monkeypatch, "user-list-3")
+        wire(
+            base_url,
+            encryption_key=key,
             overrides={
                 "organizations:is1": CustomFieldOverrideConfig(
                     display_name="Investor Status",
@@ -307,8 +320,8 @@ class TestGlossaryMiddleware:
                 )
             },
         )
-        configure_custom_fields_service(service)
 
+        _lov_entries_route(base_url)
         respx.get(f"{base_url}/custom-field-definitions").mock(
             return_value=httpx.Response(200, json={"data": [], "links": {"next": None}})
         )
@@ -321,37 +334,36 @@ class TestGlossaryMiddleware:
     @pytest.mark.asyncio
     @respx.mock
     async def test_existing_snapshot_needs_no_credential(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, db: DatabaseFixture, wire: ServiceBuilder, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """A warm cache must not pay for a credential decrypt on every listing."""
-        _, factory = db
+        _, session_factory = db
         base_url = "https://example.backstopsolutions.com/list-warm-cache"
-        async with get_session(factory) as session:
+        async with transaction(session_factory) as session:
             await save_snapshot(
-                session,
-                base_url,
-                [
-                    CustomFieldDefinition(
-                        definition_id="900",
-                        entity_type="organizations",
-                        crm_name="is1",
-                        display_name="Investor Status",
-                    )
-                ],
-                datetime.now(UTC),
+                session, base_url, [_definition("900", "Investor Status")], datetime.now(UTC)
             )
 
         def _explode() -> AccessToken:
             raise AssertionError("tools/list must not resolve a credential when already warm")
 
         monkeypatch.setattr("backstop_mcp.auth.context.get_access_token", _explode)
-        service = create_custom_fields_service(
-            session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
-        )
-        configure_custom_fields_service(service)
+        wire(base_url)
 
         tools = await CustomFieldGlossaryMiddleware().on_list_tools(None, _one_org_tool)  # pyright: ignore[reportArgumentType]
 
         org_tool = next(t for t in tools if t.name == "get_organization")
         assert org_tool.description is not None
         assert "Investor Status" in org_tool.description
+
+
+class TestGlossaryScopesComeFromTheToolRegistry:
+    def test_registry_derives_names_from_the_functions_it_references(self) -> None:
+        """A renamed tool can't silently lose its glossary: the name is derived, not restated."""
+        from backstop_mcp.tools.get_organization import get_organization
+        from backstop_mcp.tools.registry import TOOL_SPECS, glossary_entities_by_tool_name
+
+        scopes = glossary_entities_by_tool_name()
+        assert scopes["get_organization"] == ("organizations",)
+        assert "get_system_info" not in scopes
+        assert any(spec.fn is get_organization for spec in TOOL_SPECS)

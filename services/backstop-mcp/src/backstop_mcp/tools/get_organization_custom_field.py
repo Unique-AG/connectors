@@ -3,28 +3,21 @@ from typing import Literal
 from fastmcp import Context
 from pydantic import BaseModel
 
-from backstop_mcp.backstop_client import get_backstop_client
-from backstop_mcp.custom_fields import (
-    FieldAmbiguous,
-    FieldNotFound,
-    FieldResolved,
-    get_custom_fields_service,
-    read_custom_field_value,
-)
+from backstop_mcp.custom_fields import read_custom_field_value
 from backstop_mcp.party_resolver import (
-    NeedsDisambiguationResponse,
-    NotFoundResponse,
-    Resolved,
+    PartyAmbiguousResponse,
     ResolvedPartyEcho,
-    early_exit_response,
+    party_echo,
     resolve_party,
+    unresolved_party_response,
 )
+from backstop_mcp.resolution import NotFoundResponse, Resolved
+from backstop_mcp.runtime import get_backstop_client, get_custom_fields_service
 from backstop_mcp.tools.resolve_custom_field import (
     CustomFieldDefinitionEcho,
-    FieldCandidateEcho,
-    ResolveCustomFieldAmbiguousResponse,
-    ResolveCustomFieldNotFoundResponse,
+    FieldAmbiguousResponse,
     definition_echo,
+    unresolved_field_response,
 )
 
 
@@ -36,10 +29,9 @@ class OrganizationCustomFieldResolvedResponse(BaseModel):
 
 
 type GetOrganizationCustomFieldResponse = (
-    NeedsDisambiguationResponse
+    PartyAmbiguousResponse
+    | FieldAmbiguousResponse
     | NotFoundResponse
-    | ResolveCustomFieldAmbiguousResponse
-    | ResolveCustomFieldNotFoundResponse
     | OrganizationCustomFieldResolvedResponse
 )
 
@@ -57,54 +49,41 @@ async def get_organization_custom_field(
     via the correct regular or time-series path.
     Exactly one of party_id or search must be provided.
     """
-    async with await get_backstop_client() as client:
-        party_result = await resolve_party(
-            ctx,
-            client,
-            search_type="organizations",
-            party_id=party_id,
-            search=search,
-        )
-        if not isinstance(party_result, Resolved):
-            return early_exit_response(party_result)
+    client = await get_backstop_client()
 
-        field_result = await get_custom_fields_service().resolve(
-            entity_type="organizations",
-            query=field,
-            client=client,
-        )
-        if isinstance(field_result, FieldAmbiguous):
-            return ResolveCustomFieldAmbiguousResponse(
-                query=field_result.query,
-                entity_type=field_result.entity_type,
-                candidates=[
-                    FieldCandidateEcho(
-                        definition_id=c.definition_id,
-                        display_name=c.display_name,
-                        crm_name=c.crm_name,
-                        entity_type=c.entity_type,
-                        label=c.label,
-                    )
-                    for c in field_result.candidates
-                ],
-            )
-        if isinstance(field_result, FieldNotFound):
-            return ResolveCustomFieldNotFoundResponse(
-                query=field_result.query,
-                entity_type=field_result.entity_type,
-            )
-        assert isinstance(field_result, FieldResolved)
+    # `confirm_name=True`: unlike `get_organization` this tool never fetches the whole record,
+    # so on the trusted-`party_id` path there would otherwise be no name to echo — and the echo
+    # is what makes a wrong id visible rather than silent.
+    party_result = await resolve_party(
+        ctx,
+        client,
+        search_type="organizations",
+        party_id=party_id,
+        search=search,
+        confirm_name=True,
+    )
+    if not isinstance(party_result, Resolved):
+        return unresolved_party_response(party_result)
 
-        value = await read_custom_field_value(
-            client,
-            entity_type="organizations",
-            entity_id=party_result.party.id,
-            definition=field_result.definition,
-        )
+    field_result = await get_custom_fields_service().resolve(
+        entity_type="organizations",
+        query=field,
+        client=client,
+        ctx=ctx,
+    )
+    if not isinstance(field_result, Resolved):
+        return unresolved_field_response(field_result)
 
-    party = party_result.party
+    party = party_result.value
+    value = await read_custom_field_value(
+        client,
+        entity_type="organizations",
+        entity_id=party.id,
+        definition=field_result.value,
+    )
+
     return OrganizationCustomFieldResolvedResponse(
         value=value,
-        definition=definition_echo(field_result.definition),
-        resolved=ResolvedPartyEcho(id=party.id, type=party.type, name=party.name),
+        definition=definition_echo(field_result.value),
+        resolved=party_echo(party),
     )

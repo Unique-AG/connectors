@@ -2,10 +2,10 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.backstop_client import BackstopResponseSchemaError, create_backstop_client
+from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
 from backstop_mcp.party_resolver.email import looks_like_email
 from backstop_mcp.party_resolver.search import search_by_email
-from tests.party_resolver.helpers import BASE_URL, credential
+from tests.party_resolver.helpers import BASE_URL
 
 
 class TestLooksLikeEmail:
@@ -31,7 +31,7 @@ class TestLooksLikeEmail:
 class TestSearchByEmailSchemaValidation:
     @pytest.mark.asyncio
     @respx.mock
-    async def test_malformed_resource_raises_schema_error(self) -> None:
+    async def test_malformed_resource_raises_schema_error(self, client: BackstopClient) -> None:
         email = "ops@capstone.com"
         respx.get(f"{BASE_URL}/organizations", params={"filter[email][eq]": email}).mock(
             return_value=httpx.Response(
@@ -42,9 +42,8 @@ class TestSearchByEmailSchemaValidation:
             )
         )
 
-        async with create_backstop_client(BASE_URL, credential()) as client:
-            with pytest.raises(BackstopResponseSchemaError) as exc_info:
-                await search_by_email(client, search_type="organizations", email=email)
+        with pytest.raises(BackstopResponseSchemaError) as exc_info:
+            await search_by_email(client, search_type="organizations", email=email)
 
         assert exc_info.value.path == "/organizations"
         assert exc_info.value.schema_name == "BackstopApiDocument[PartyAttributes]"

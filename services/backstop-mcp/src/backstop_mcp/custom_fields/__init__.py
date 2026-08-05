@@ -1,33 +1,21 @@
 from backstop_mcp.config import CustomFieldOverrideConfig
+from backstop_mcp.custom_fields.entity_types import KNOWN_ENTITY_TYPES, normalize_entity_type
+from backstop_mcp.custom_fields.index import FieldResolution
 from backstop_mcp.custom_fields.service import (
-    configure_custom_fields_service,
+    CustomFieldsService,
     create_custom_fields_service,
-    get_custom_fields_service,
-    reset_custom_fields_service_for_tests,
 )
-from backstop_mcp.custom_fields.types import (
-    AllowedValue,
-    CustomFieldDefinition,
-    FieldAmbiguous,
-    FieldCandidate,
-    FieldNotFound,
-    FieldResolved,
-    FieldResolveResult,
-)
+from backstop_mcp.custom_fields.types import AllowedValue, CustomFieldDefinition
 from backstop_mcp.custom_fields.values import read_custom_field_value
 
 __all__ = [
+    "KNOWN_ENTITY_TYPES",
     "AllowedValue",
     "CustomFieldDefinition",
     "CustomFieldOverrideConfig",
-    "FieldAmbiguous",
-    "FieldCandidate",
-    "FieldNotFound",
-    "FieldResolveResult",
-    "FieldResolved",
-    "configure_custom_fields_service",
+    "CustomFieldsService",
+    "FieldResolution",
     "create_custom_fields_service",
-    "get_custom_fields_service",
+    "normalize_entity_type",
     "read_custom_field_value",
-    "reset_custom_fields_service_for_tests",
 ]

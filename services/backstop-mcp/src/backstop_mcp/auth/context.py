@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backstop_mcp.auth.credential_store import get_credential
 from backstop_mcp.auth.crypto import BackstopCredentialSecret
-from backstop_mcp.db.engine import get_session
+from backstop_mcp.db.engine import read_session
 
 
 class NotConnectedError(ToolError):
@@ -18,60 +18,52 @@ class NotConnectedError(ToolError):
     """
 
 
-@dataclass(frozen=True)
-class BackstopAuthContext:
-    """The pieces `get_current_backstop_credential` needs, wired up once at app startup."""
-
-    session_factory: async_sessionmaker[AsyncSession]
-    encryption_key: bytes
-    revoke_tokens_for_subject: Callable[[str], Awaitable[None]]
-
-
-_context: BackstopAuthContext | None = None
-
-
-def configure(context: BackstopAuthContext) -> None:
-    """Set the process-wide auth context. Call once, during `create_app()`."""
-    global _context
-    _context = context
-
-
 def current_subject() -> str | None:
     """Return the MCP access-token subject for the active request, if any."""
     access_token = get_access_token()
     return access_token.subject if access_token is not None else None
 
 
-async def revoke_tokens_for_subject(subject: str) -> None:
-    """Revoke MCP access/refresh tokens for `subject` after a mid-session Backstop 401."""
-    assert _context is not None, "auth.context.configure() must be called during app startup"
-    await _context.revoke_tokens_for_subject(subject)
+@dataclass(frozen=True)
+class BackstopAuthContext:
+    """Resolves "whose Backstop credential" for the in-flight MCP request.
 
-
-async def get_current_backstop_credential() -> BackstopCredentialSecret:
-    """Resolve the calling MCP user's stored Backstop credential.
-
-    Reads the access token FastMCP has already validated for the current request (see
-    `fastmcp.server.dependencies.get_access_token`) and uses its `subject` — the `user_id`
-    `auth/provider.py` set when the login form was submitted — to look up and decrypt the
-    matching row from `credential_store`. Call this from within a tool implementation, where
-    an authenticated request is active.
+    Constructed once in `create_app()` and handed to `BackstopClientFactory` — there is no
+    module-level instance.
     """
-    assert _context is not None, "auth.context.configure() must be called during app startup"
 
-    subject = current_subject()
-    if subject is None:
-        raise NotConnectedError(
-            "Not connected to Backstop yet — add this MCP server to your client and "
-            + "complete the login flow first."
-        )
+    session_factory: async_sessionmaker[AsyncSession]
+    encryption_key: bytes
+    revoke_tokens_for_subject: Callable[[str], Awaitable[None]]
 
-    async with get_session(_context.session_factory) as session:
-        credential = await get_credential(session, subject, _context.encryption_key)
+    async def current_credential(self) -> BackstopCredentialSecret:
+        """Resolve the calling MCP user's stored Backstop credential.
 
-    if credential is None:
-        raise NotConnectedError(
-            "No Backstop credential on file for this connection — please reconnect."
-        )
+        Reads the access token FastMCP has already validated for the current request (see
+        `fastmcp.server.dependencies.get_access_token`) and uses its `subject` — the `user_id`
+        `auth/provider.py` set when the login form was submitted — to look up and decrypt the
+        matching row from `credential_store`. Call this from within a tool implementation,
+        where an authenticated request is active.
+        """
+        subject = current_subject()
+        if subject is None:
+            raise NotConnectedError(
+                "Not connected to Backstop yet — add this MCP server to your client and "
+                + "complete the login flow first."
+            )
 
-    return credential
+        async with read_session(self.session_factory) as session:
+            credential = await get_credential(session, subject, self.encryption_key)
+
+        if credential is None:
+            raise NotConnectedError(
+                "No Backstop credential on file for this connection — please reconnect."
+            )
+
+        return credential
+
+    async def revoke_current_subject_tokens(self) -> None:
+        """Revoke MCP tokens for the active subject after a mid-session Backstop 401."""
+        subject = current_subject()
+        if subject is not None:
+            await self.revoke_tokens_for_subject(subject)

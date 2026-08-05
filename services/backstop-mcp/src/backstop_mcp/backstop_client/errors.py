@@ -1,3 +1,18 @@
+"""Backstop HTTP failures, as typed exceptions.
+
+Layering decision, stated once here because it shapes every module: this service is MCP-only,
+so a transport error *is* a tool error. These types subclass `fastmcp.exceptions.ToolError` and
+propagate straight to the MCP client with `errors[].detail` intact, rather than being translated
+at a boundary. The cost is that `backstop_client` depends on fastmcp and that non-tool callers
+(startup warming, login-form credential verification) can see a `ToolError`; both already handle
+their own failures. The benefit is that no tool has to catch-and-rewrap, and no upstream detail is
+lost on the way out. `auth.context.NotConnectedError` follows the same rule.
+
+Exceptions that are *not* meant for the MCP client — `BackstopAuthError`,
+`BackstopUnreachableError` in `client.py` — stay plain `Exception`s, because each has a caller
+that must react to it (revoke tokens, re-render the login form) rather than surface it.
+"""
+
 import re
 from typing import Literal, cast
 
@@ -70,13 +85,33 @@ class BackstopRateLimitError(BackstopApiError):
         self.retry_after_seconds = retry_after_seconds
 
 
+class BackstopUntrustedUrlError(ToolError):
+    """Raised when an upstream-supplied absolute URL points somewhere other than Backstop.
+
+    Pagination follows `links.next` verbatim. Since every request carries
+    `Authorization: Basic ...`, a `links.next` pointing at another origin would leak the
+    caller's Backstop credential there — so the host is pinned to the configured `base_url`.
+    """
+
+    url: str
+    expected_host: str
+
+    def __init__(self, url: str, expected_host: str) -> None:
+        super().__init__(
+            f"Refusing to follow {url!r}: expected host {expected_host!r} (the configured "
+            + "Backstop base URL)"
+        )
+        self.url = url
+        self.expected_host = expected_host
+
+
 class BackstopResponseSchemaError(ToolError):
     """Raised when a successful Backstop response body fails caller-supplied schema validation.
 
     Unlike `BackstopApiError`, this isn't an HTTP-level failure — the request succeeded,
     but the response body doesn't match the shape the caller expected. Wraps the underlying
     `pydantic.ValidationError` as `cause`, along with the request `path` and `schema_name`,
-    so the failure can be logged with enough context to diagnose (today it isn't logged at all).
+    so the failure can be logged with enough context to diagnose.
     """
 
     path: str

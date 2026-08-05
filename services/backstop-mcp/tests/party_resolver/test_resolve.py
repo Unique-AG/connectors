@@ -1,18 +1,23 @@
+import asyncio
+
 import httpx
 import pytest
 import respx
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopResponseSchemaError
 from backstop_mcp.party_resolver import (
-    BatchNeedsDisambiguation,
-    BatchResolved,
-    NeedsDisambiguation,
-    NotFound,
     PartyResolveItem,
     QuickSearchOptions,
-    Resolved,
     resolve_parties,
     resolve_party,
+    unresolved_parties_response,
+)
+from backstop_mcp.resolution import (
+    Ambiguous,
+    BatchAmbiguous,
+    BatchResolved,
+    NotFound,
+    Resolved,
 )
 from tests.party_resolver.helpers import (
     BASE_URL,
@@ -35,9 +40,9 @@ class TestTrustedPartyId:
         )
 
         assert isinstance(result, Resolved)
-        assert result.party.id == "org-123"
-        assert result.party.type == "organizations"
-        assert result.party.name is None
+        assert result.value.id == "org-123"
+        assert result.value.type == "organizations"
+        assert result.value.name is None
         assert len(respx.calls) == 0
 
     @pytest.mark.asyncio
@@ -52,9 +57,9 @@ class TestTrustedPartyId:
         )
 
         assert isinstance(result, Resolved)
-        assert result.party.id == "person-9"
-        assert result.party.type == "people"
-        assert result.party.name == "Ada Lovelace"
+        assert result.value.id == "person-9"
+        assert result.value.type == "people"
+        assert result.value.name == "Ada Lovelace"
         assert len(respx.calls) == 0
 
 
@@ -90,7 +95,7 @@ class TestEmailSearch:
         )
 
         assert isinstance(result, Resolved)
-        assert result.party.id == "p1"
+        assert result.value.id == "p1"
         assert email1.call_count == 1
         assert email2.call_count == 1
         assert email3.call_count == 1
@@ -120,7 +125,7 @@ class TestEmailSearch:
         )
 
         assert isinstance(result, Resolved)
-        assert result.party.id == "o1"
+        assert result.value.id == "o1"
         assert orgs.call_count == 1
         assert orgs.calls.last.request.url.params["filter[email][eq]"] == email
         assert "filter[email2][eq]" not in orgs.calls.last.request.url.params
@@ -146,7 +151,7 @@ class TestQuickSearch:
         )
 
         assert isinstance(result, Resolved)
-        assert result.party.id == "o1"
+        assert result.value.id == "o1"
         params = route.calls.last.request.url.params
         assert params["filter[searchText][eq]"] == "Capstone"
         assert params["filter[searchTypes][eq]"] == "organizations"
@@ -261,8 +266,8 @@ class TestHitCounts:
         )
 
         assert isinstance(result, NotFound)
-        assert result.search == "Unknown Co"
-        assert result.search_type == "organizations"
+        assert result.query == "Unknown Co"
+        assert result.scope == "organizations"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -282,8 +287,8 @@ class TestHitCounts:
         )
 
         assert isinstance(result, Resolved)
-        assert result.party.id == "o1"
-        assert result.party.name == "Capstone"
+        assert result.value.id == "o1"
+        assert result.value.name == "Capstone"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -305,9 +310,9 @@ class TestHitCounts:
             search="Capstone",
         )
 
-        assert isinstance(result, NeedsDisambiguation)
+        assert isinstance(result, Ambiguous)
         assert len(result.candidates) == 2
-        assert result.search == "Capstone"
+        assert result.query == "Capstone"
 
 
 class TestBatchResolve:
@@ -316,21 +321,22 @@ class TestBatchResolve:
     async def test_batch_returns_one_payload_and_never_elicits(
         self, client: BackstopClient
     ) -> None:
-        respx.get(f"{BASE_URL}/quick-search").mock(
-            side_effect=[
-                httpx.Response(200, json=collection()),
-                httpx.Response(
-                    200,
-                    json=collection(
-                        resource("o2", "organizations", name="Alpha"),
-                        resource("o3", "organizations", name="Alpha Holdings"),
-                    ),
+        # Matched on the search text rather than call order: items resolve concurrently, so
+        # `side_effect` ordering would be an assumption about scheduling.
+        respx.get(f"{BASE_URL}/quick-search", params={"filter[searchText][eq]": "Missing Co"}).mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+        respx.get(f"{BASE_URL}/quick-search", params={"filter[searchText][eq]": "Alpha"}).mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource("o2", "organizations", name="Alpha"),
+                    resource("o3", "organizations", name="Alpha Holdings"),
                 ),
-            ]
+            )
         )
 
         result = await resolve_parties(
-            ctx_never_elicit(),
             client,
             search_type="organizations",
             items=[
@@ -340,15 +346,15 @@ class TestBatchResolve:
             ],
         )
 
-        assert isinstance(result, BatchNeedsDisambiguation)
+        assert isinstance(result, BatchAmbiguous)
         assert len(result.resolved) == 1
-        assert result.resolved[0].item_index == 0
-        assert result.resolved[0].party.id == "trusted-1"
-        assert result.resolved[0].party.name == "Trusted Org"
+        assert result.resolved[0].index == 0
+        assert result.resolved[0].value.id == "trusted-1"
+        assert result.resolved[0].value.name == "Trusted Org"
         assert len(result.unresolved) == 2
-        assert result.unresolved[0].item_index == 1
+        assert result.unresolved[0].index == 1
         assert result.unresolved[0].candidates == ()
-        assert result.unresolved[1].item_index == 2
+        assert result.unresolved[1].index == 2
         assert len(result.unresolved[1].candidates) == 2
 
     @pytest.mark.asyncio
@@ -362,7 +368,6 @@ class TestBatchResolve:
         )
 
         result = await resolve_parties(
-            ctx_never_elicit(),
             client,
             search_type="organizations",
             items=[
@@ -372,7 +377,135 @@ class TestBatchResolve:
         )
 
         assert isinstance(result, BatchResolved)
-        assert [party.id for party in result.parties] == ["trusted-1", "o1"]
+        assert [party.id for party in result.values] == ["trusted-1", "o1"]
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_items_resolve_concurrently(self, client: BackstopClient) -> None:
+        """A batch is the fan-out case the concurrency gate exists for — it should fan out."""
+        release = asyncio.Event()
+        in_flight = 0
+        max_in_flight = 0
+
+        async def handler(_request: httpx.Request) -> httpx.Response:
+            nonlocal in_flight, max_in_flight
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
+            await release.wait()
+            in_flight -= 1
+            return httpx.Response(200, json=collection())
+
+        respx.get(f"{BASE_URL}/quick-search").mock(side_effect=handler)
+
+        async def run() -> object:
+            return await resolve_parties(
+                client,
+                search_type="organizations",
+                items=[PartyResolveItem(search=f"Co {i}") for i in range(3)],
+            )
+
+        task = asyncio.create_task(run())
+        await asyncio.sleep(0.05)
+        assert max_in_flight == 3
+
+        release.set()
+        await task
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_batch_response_maps_to_one_structured_payload(
+        self, client: BackstopClient
+    ) -> None:
+        """UN-23676: one combined payload, so the model asks once for the whole batch."""
+        respx.get(f"{BASE_URL}/quick-search", params={"filter[searchText][eq]": "Nope"}).mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+        respx.get(f"{BASE_URL}/quick-search", params={"filter[searchText][eq]": "Alpha"}).mock(
+            return_value=httpx.Response(
+                200,
+                json=collection(
+                    resource("o2", "organizations", name="Alpha"),
+                    resource("o3", "organizations", name="Alpha Holdings"),
+                ),
+            )
+        )
+
+        result = await resolve_parties(
+            client,
+            search_type="organizations",
+            items=[PartyResolveItem(search="Nope"), PartyResolveItem(search="Alpha")],
+        )
+        assert isinstance(result, BatchAmbiguous)
+
+        response = unresolved_parties_response(result)
+
+        assert [item.index for item in response.unresolved] == [0, 1]
+        assert response.unresolved[0].query == "Nope"
+        assert response.unresolved[0].candidates == []
+        assert [c.id for c in response.unresolved[1].candidates] == ["o2", "o3"]
+        assert response.unresolved[1].scope == "organizations"
+
+
+class TestConfirmName:
+    """Every successful resolution must echo the resolved name + Party ID (UN-23676)."""
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_confirm_name_fetches_the_name_for_a_trusted_id(
+        self, client: BackstopClient
+    ) -> None:
+        route = respx.get(f"{BASE_URL}/organizations/org-7").mock(
+            return_value=httpx.Response(
+                200, json={"data": resource("org-7", "organizations", name="Capstone LP")}
+            )
+        )
+
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            party_id="org-7",
+            confirm_name=True,
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.name == "Capstone LP"
+        assert route.call_count == 1
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_confirm_name_is_skipped_when_the_name_is_already_known(
+        self, client: BackstopClient
+    ) -> None:
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            party_id="org-7",
+            name="Already Known",
+            confirm_name=True,
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.name == "Already Known"
+        assert len(respx.calls) == 0
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_default_leaves_the_trusted_id_path_request_free(
+        self, client: BackstopClient
+    ) -> None:
+        """Callers that fetch the record anyway shouldn't pay for a second request."""
+        result = await resolve_party(
+            ctx_never_elicit(),
+            client,
+            search_type="organizations",
+            party_id="org-7",
+        )
+
+        assert isinstance(result, Resolved)
+        assert result.value.name is None
+        assert len(respx.calls) == 0
 
 
 class TestInvalidArgs:

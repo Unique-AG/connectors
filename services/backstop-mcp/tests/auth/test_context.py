@@ -5,8 +5,7 @@ from mcp.server.auth.provider import AccessToken
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backstop_mcp.auth import context as auth_context
-from backstop_mcp.auth.context import NotConnectedError, get_current_backstop_credential
+from backstop_mcp.auth.context import BackstopAuthContext, NotConnectedError
 from backstop_mcp.auth.credential_store import save_credential
 from backstop_mcp.auth.crypto import BackstopCredentialSecret
 
@@ -21,21 +20,27 @@ def _access_token(subject: str | None) -> AccessToken:
     return AccessToken(token="access-token", client_id="client-1", scopes=[], subject=subject)
 
 
-class TestGetCurrentBackstopCredential:
+def _auth(
+    session_factory: async_sessionmaker[AsyncSession], key: bytes | None = None
+) -> BackstopAuthContext:
+    return BackstopAuthContext(
+        session_factory=session_factory,
+        encryption_key=key if key is not None else os.urandom(32),
+        revoke_tokens_for_subject=_noop_revoke,
+    )
+
+
+class TestCurrentCredential:
+    """`BackstopAuthContext` is injected, not installed globally — each test builds its own."""
+
     @pytest.mark.asyncio
     async def test_resolves_stored_credential_for_authenticated_user(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        _, factory = db
+        _, session_factory = db
         key = os.urandom(32)
-        auth_context.configure(
-            auth_context.BackstopAuthContext(
-                session_factory=factory,
-                encryption_key=key,
-                revoke_tokens_for_subject=_noop_revoke,
-            )
-        )
-        async with factory() as session:
+        auth = _auth(session_factory, key)
+        async with session_factory() as session:
             await save_credential(
                 session,
                 "user-context-1",
@@ -48,7 +53,7 @@ class TestGetCurrentBackstopCredential:
             lambda: _access_token("user-context-1"),
         )
 
-        credential = await get_current_backstop_credential()
+        credential = await auth.current_credential()
 
         assert credential.username == "ctx-bob.smith"
         assert credential.api_token.get_secret_value() == "token-1"
@@ -57,54 +62,79 @@ class TestGetCurrentBackstopCredential:
     async def test_raises_when_no_access_token(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        _, factory = db
-        auth_context.configure(
-            auth_context.BackstopAuthContext(
-                session_factory=factory,
-                encryption_key=os.urandom(32),
-                revoke_tokens_for_subject=_noop_revoke,
-            )
-        )
+        _, session_factory = db
         monkeypatch.setattr("backstop_mcp.auth.context.get_access_token", lambda: None)
 
         with pytest.raises(NotConnectedError):
-            await get_current_backstop_credential()
+            await _auth(session_factory).current_credential()
 
     @pytest.mark.asyncio
     async def test_raises_when_access_token_has_no_subject(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        _, factory = db
-        auth_context.configure(
-            auth_context.BackstopAuthContext(
-                session_factory=factory,
-                encryption_key=os.urandom(32),
-                revoke_tokens_for_subject=_noop_revoke,
-            )
-        )
+        _, session_factory = db
         monkeypatch.setattr(
             "backstop_mcp.auth.context.get_access_token", lambda: _access_token(None)
         )
 
         with pytest.raises(NotConnectedError):
-            await get_current_backstop_credential()
+            await _auth(session_factory).current_credential()
 
     @pytest.mark.asyncio
     async def test_raises_when_no_credential_stored_for_subject(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        _, factory = db
-        auth_context.configure(
-            auth_context.BackstopAuthContext(
-                session_factory=factory,
-                encryption_key=os.urandom(32),
-                revoke_tokens_for_subject=_noop_revoke,
-            )
-        )
+        _, session_factory = db
         monkeypatch.setattr(
             "backstop_mcp.auth.context.get_access_token",
             lambda: _access_token("user-with-no-credential"),
         )
 
         with pytest.raises(NotConnectedError):
-            await get_current_backstop_credential()
+            await _auth(session_factory).current_credential()
+
+
+class TestRevokeCurrentSubjectTokens:
+    @pytest.mark.asyncio
+    async def test_revokes_for_the_active_subject(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, session_factory = db
+        revoked: list[str] = []
+
+        async def record(subject: str) -> None:
+            revoked.append(subject)
+
+        auth = BackstopAuthContext(
+            session_factory=session_factory,
+            encryption_key=os.urandom(32),
+            revoke_tokens_for_subject=record,
+        )
+        monkeypatch.setattr(
+            "backstop_mcp.auth.context.get_access_token", lambda: _access_token("user-9")
+        )
+
+        await auth.revoke_current_subject_tokens()
+
+        assert revoked == ["user-9"]
+
+    @pytest.mark.asyncio
+    async def test_is_a_noop_without_a_subject(
+        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _, session_factory = db
+        revoked: list[str] = []
+
+        async def record(subject: str) -> None:
+            revoked.append(subject)
+
+        auth = BackstopAuthContext(
+            session_factory=session_factory,
+            encryption_key=os.urandom(32),
+            revoke_tokens_for_subject=record,
+        )
+        monkeypatch.setattr("backstop_mcp.auth.context.get_access_token", lambda: None)
+
+        await auth.revoke_current_subject_tokens()
+
+        assert revoked == []

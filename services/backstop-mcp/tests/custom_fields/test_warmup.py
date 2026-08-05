@@ -6,14 +6,29 @@ import respx
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backstop_mcp.config import BackstopConfig
+from backstop_mcp.backstop_client import BackstopClientFactory
 from backstop_mcp.custom_fields import create_custom_fields_service
 from backstop_mcp.custom_fields.warmup import warm_custom_field_schema, warmup_lifespan
-from tests.party_resolver.helpers import resource
+from tests.helpers import client_factory, resource
 
 type DatabaseFixture = tuple[AsyncEngine, AsyncSession | async_sessionmaker[AsyncSession]]
 
 WARMUP_BASE_URL = "https://example.backstopsolutions.com/warmup"
+
+
+def _service_account_factory(base_url: str) -> BackstopClientFactory:
+    """A factory whose config carries the optional startup service account."""
+    return client_factory(
+        base_url,
+        service_username="svc-bot",
+        service_api_token=SecretStr("svc-token"),
+    )
+
+
+def _lov_entries_route(base_url: str) -> respx.Route:
+    return respx.get(f"{base_url}/lov-entries").mock(
+        return_value=httpx.Response(200, json={"data": [], "links": {"next": None}})
+    )
 
 
 def _definitions_response() -> httpx.Response:
@@ -46,17 +61,14 @@ class TestWarmCustomFieldSchema:
         service = create_custom_fields_service(
             session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
         )
+        _lov_entries_route(base_url)
         route = respx.get(f"{base_url}/custom-field-definitions").mock(
             return_value=_definitions_response()
         )
 
         await warm_custom_field_schema(
             service,
-            BackstopConfig(
-                base_url=base_url,
-                service_username="svc-bot",
-                service_api_token=SecretStr("svc-token"),
-            ),
+            _service_account_factory(base_url),
         )
 
         assert route.call_count == 1
@@ -74,11 +86,12 @@ class TestWarmCustomFieldSchema:
         service = create_custom_fields_service(
             session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
         )
+        _lov_entries_route(base_url)
         route = respx.get(f"{base_url}/custom-field-definitions").mock(
             return_value=_definitions_response()
         )
 
-        await warm_custom_field_schema(service, BackstopConfig(base_url=base_url))
+        await warm_custom_field_schema(service, client_factory(base_url))
 
         assert route.call_count == 0
         assert service.definitions_for("organizations") == []
@@ -94,17 +107,14 @@ class TestWarmCustomFieldSchema:
         service = create_custom_fields_service(
             session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
         )
+        _lov_entries_route(base_url)
         respx.get(f"{base_url}/custom-field-definitions").mock(
             side_effect=httpx.ConnectError("backstop down")
         )
 
         await warm_custom_field_schema(
             service,
-            BackstopConfig(
-                base_url=base_url,
-                service_username="svc-bot",
-                service_api_token=SecretStr("svc-token"),
-            ),
+            _service_account_factory(base_url),
         )
 
         assert service.definitions_for("organizations") == []
@@ -121,16 +131,13 @@ class TestWarmupLifespan:
         service = create_custom_fields_service(
             session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
         )
+        _lov_entries_route(base_url)
         route = respx.get(f"{base_url}/custom-field-definitions").mock(
             return_value=_definitions_response()
         )
-        config = BackstopConfig(
-            base_url=base_url,
-            service_username="svc-bot",
-            service_api_token=SecretStr("svc-token"),
-        )
+        clients = _service_account_factory(base_url)
 
-        async with warmup_lifespan(service, config):
+        async with warmup_lifespan(service, clients):
             # Startup handed control back before the fetch could even be issued.
             assert route.call_count == 0
             async with asyncio.timeout(10):
@@ -153,16 +160,13 @@ class TestWarmupLifespan:
         service = create_custom_fields_service(
             session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
         )
+        _lov_entries_route(base_url)
         route = respx.get(f"{base_url}/custom-field-definitions").mock(
             return_value=_definitions_response()
         )
-        config = BackstopConfig(
-            base_url=base_url,
-            service_username="svc-bot",
-            service_api_token=SecretStr("svc-token"),
-        )
+        clients = _service_account_factory(base_url)
 
-        async with warmup_lifespan(service, config):
+        async with warmup_lifespan(service, clients):
             pass
 
         assert route.call_count == 0
@@ -178,16 +182,13 @@ class TestWarmupLifespan:
         service = create_custom_fields_service(
             session_factory=factory, base_url=base_url, overrides={}, ttl_minutes=60
         )
+        _lov_entries_route(base_url)
         route = respx.get(f"{base_url}/custom-field-definitions").mock(
             side_effect=httpx.ConnectError("backstop down")
         )
-        config = BackstopConfig(
-            base_url=base_url,
-            service_username="svc-bot",
-            service_api_token=SecretStr("svc-token"),
-        )
+        clients = _service_account_factory(base_url)
 
-        async with warmup_lifespan(service, config):
+        async with warmup_lifespan(service, clients):
             async with asyncio.timeout(10):
                 while route.call_count == 0:
                     await asyncio.sleep(0.01)

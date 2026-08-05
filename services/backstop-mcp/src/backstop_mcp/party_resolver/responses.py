@@ -1,62 +1,92 @@
-from typing import Literal
+"""Party-shaped views of the shared resolution responses (`resolution.py`)."""
 
 from pydantic import BaseModel
 
-from backstop_mcp.party_resolver.types import NeedsDisambiguation, NotFound, SearchType
+from backstop_mcp.party_resolver.types import PartyCandidate, ResolvedParty, SearchType
+from backstop_mcp.resolution import (
+    AmbiguousResponse,
+    BatchAmbiguous,
+    BatchAmbiguousResponse,
+    BatchUnresolvedEcho,
+    CandidateEcho,
+    NotFoundResponse,
+    Unresolved,
+    batch_unresolved_response,
+    unresolved_response,
+)
 
 
-class CandidateEcho(BaseModel):
-    """One ambiguous match, echoed back to the LLM so it can ask the user to pick one."""
+class PartyCandidateEcho(CandidateEcho):
+    """One ambiguous party match, echoed back so the model can ask the user to pick one."""
 
     id: str
-    name: str | None
-    label: str
+    name: str | None = None
+
+
+# Concrete parameterizations of the shared models. Plain assignments, not subclasses: pydantic
+# resolves the subscript to a real model class, which is what FastMCP needs for output schemas.
+PartyAmbiguousResponse = AmbiguousResponse[PartyCandidateEcho]
+PartyBatchUnresolvedEcho = BatchUnresolvedEcho[PartyCandidateEcho]
+PartyBatchAmbiguousResponse = BatchAmbiguousResponse[PartyCandidateEcho]
 
 
 class ResolvedPartyEcho(BaseModel):
     """The id/type/name a caller must pass back verbatim as a trusted `party_id` later.
 
-    Never invent or guess these values — only echo what a prior resolve call returned.
+    Never invent or guess these values — only echo what a prior resolve call returned. Not a
+    `CandidateEcho`: this is the single identity a call settled on, not one option among many.
     """
 
     id: str
     type: SearchType
-    name: str | None
+    name: str | None = None
 
 
-class NeedsDisambiguationResponse(BaseModel):
-    """A resolve-based tool's response when a search matched 2+ candidates."""
-
-    status: Literal["needs_disambiguation"] = "needs_disambiguation"
-    search: str
-    search_type: SearchType
-    candidates: list[CandidateEcho]
+def party_echo(party: ResolvedParty) -> ResolvedPartyEcho:
+    return ResolvedPartyEcho(id=party.id, type=party.type, name=party.name)
 
 
-class NotFoundResponse(BaseModel):
-    """A resolve-based tool's response when a search matched zero candidates."""
+def party_candidate_echo(candidate: PartyCandidate) -> PartyCandidateEcho:
+    party = candidate.value
+    return PartyCandidateEcho(
+        key=candidate.key,
+        label=candidate.label,
+        id=party.id,
+        name=party.name,
+    )
 
-    status: Literal["not_found"] = "not_found"
-    search: str
-    search_type: SearchType
+
+def unresolved_party_response(
+    result: Unresolved[ResolvedParty],
+) -> PartyAmbiguousResponse | NotFoundResponse:
+    """Convert a non-`Resolved` `resolve_party` outcome into the standard tool response."""
+    return unresolved_response(
+        result,
+        ambiguous_model=PartyAmbiguousResponse,
+        to_echo=party_candidate_echo,
+    )
 
 
-def early_exit_response(
-    result: NeedsDisambiguation | NotFound,
-) -> NeedsDisambiguationResponse | NotFoundResponse:
-    """Convert a non-`Resolved` `resolve_party` outcome into the standard tool response.
+def unresolved_parties_response(
+    result: BatchAmbiguous[ResolvedParty],
+) -> PartyBatchAmbiguousResponse:
+    """One combined payload for a batch where at least one party didn't resolve."""
+    return batch_unresolved_response(
+        result,
+        batch_model=PartyBatchAmbiguousResponse,
+        unresolved_model=PartyBatchUnresolvedEcho,
+        to_echo=party_candidate_echo,
+    )
 
-    Callers short-circuit on this before doing any tool-specific fetch: there's nothing
-    left to look up until the caller either supplies a trusted `party_id` from
-    `candidates` or narrows `search`.
-    """
-    if isinstance(result, NeedsDisambiguation):
-        return NeedsDisambiguationResponse(
-            search=result.search,
-            search_type=result.search_type,
-            candidates=[
-                CandidateEcho(id=candidate.id, name=candidate.name, label=candidate.label)
-                for candidate in result.candidates
-            ],
-        )
-    return NotFoundResponse(search=result.search, search_type=result.search_type)
+
+__all__ = [
+    "PartyAmbiguousResponse",
+    "PartyBatchAmbiguousResponse",
+    "PartyBatchUnresolvedEcho",
+    "PartyCandidateEcho",
+    "ResolvedPartyEcho",
+    "party_candidate_echo",
+    "party_echo",
+    "unresolved_parties_response",
+    "unresolved_party_response",
+]

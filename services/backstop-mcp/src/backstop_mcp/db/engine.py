@@ -30,10 +30,23 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 
 
 @asynccontextmanager
-async def get_session(
+async def read_session(
     factory: async_sessionmaker[AsyncSession],
 ) -> AsyncGenerator[AsyncSession, None]:
-    # When using `async with`, the rollback is handled automatically on an error.
+    """A session for reads only. Never commits, so a read costs one round trip.
+
+    Use `transaction()` for anything that writes — the split keeps the transaction boundary
+    visible at the call site instead of having every read open and commit one.
+    """
+    async with factory() as session:
+        yield session
+
+
+@asynccontextmanager
+async def transaction(
+    factory: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[AsyncSession, None]:
+    """A session committed on clean exit. `async with` rolls back automatically on error."""
     async with factory() as session:
         yield session
         await session.commit()

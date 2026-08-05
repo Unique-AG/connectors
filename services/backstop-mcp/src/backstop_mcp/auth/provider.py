@@ -24,8 +24,8 @@ from starlette.responses import HTMLResponse, PlainTextResponse, RedirectRespons
 from backstop_mcp.auth.credential_store import find_user_id_by_username, save_credential
 from backstop_mcp.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.auth.login_form import render_login_form
-from backstop_mcp.backstop_client import BackstopUnreachableError, verify_credential
-from backstop_mcp.db.engine import get_session
+from backstop_mcp.backstop_client import BackstopClientFactory, BackstopUnreachableError
+from backstop_mcp.db.engine import read_session, transaction
 from backstop_mcp.db.models import AuthorizationCode as AuthorizationCodeRow
 from backstop_mcp.db.models import OAuthClient as OAuthClientRow
 from backstop_mcp.db.models import OAuthToken as OAuthTokenRow
@@ -55,7 +55,7 @@ class BackstopOAuthProvider(OAuthProvider):
 
     _session_factory: async_sessionmaker[AsyncSession]
     _encryption_key: bytes
-    _backstop_base_url: str
+    _backstop_clients: BackstopClientFactory
     login_path: str
 
     def __init__(
@@ -64,7 +64,7 @@ class BackstopOAuthProvider(OAuthProvider):
         base_url: str,
         session_factory: async_sessionmaker[AsyncSession],
         encryption_key: bytes,
-        backstop_base_url: str,
+        backstop_clients: BackstopClientFactory,
         login_path: str = "/backstop/login",
     ) -> None:
         super().__init__(
@@ -74,14 +74,16 @@ class BackstopOAuthProvider(OAuthProvider):
         )
         self._session_factory = session_factory
         self._encryption_key = encryption_key
-        self._backstop_base_url = backstop_base_url
+        # Credential verification goes through the shared factory so the login form reuses the
+        # same connection pool, base URL and timeout profile as every tool call.
+        self._backstop_clients = backstop_clients
         self.login_path = login_path
 
     # -- Dynamic client registration -----------------------------------------------------
 
     @override
     async def get_client(self, client_id: str) -> OAuthClientInformationFull | None:
-        async with get_session(self._session_factory) as session:
+        async with read_session(self._session_factory) as session:
             row = await session.get(OAuthClientRow, client_id)
         if row is None:
             return None
@@ -90,7 +92,7 @@ class BackstopOAuthProvider(OAuthProvider):
     @override
     async def register_client(self, client_info: OAuthClientInformationFull) -> None:
         assert client_info.client_id is not None, "client_id must be assigned before registration"
-        async with get_session(self._session_factory) as session:
+        async with transaction(self._session_factory) as session:
             session.add(
                 OAuthClientRow(
                     client_id=client_info.client_id,
@@ -108,7 +110,7 @@ class BackstopOAuthProvider(OAuthProvider):
         request_id = secrets.token_urlsafe(32)
         expires_at = datetime.now(UTC) + self.PENDING_AUTHORIZATION_TTL
 
-        async with get_session(self._session_factory) as session:
+        async with transaction(self._session_factory) as session:
             session.add(
                 PendingAuthorization(
                     request_id=request_id,
@@ -138,7 +140,7 @@ class BackstopOAuthProvider(OAuthProvider):
             )
 
         client_name = None
-        async with get_session(self._session_factory) as session:
+        async with read_session(self._session_factory) as session:
             client_row = await session.get(OAuthClientRow, pending.client_id)
         if client_row is not None:
             client_info = OAuthClientInformationFull.model_validate_json(
@@ -171,7 +173,7 @@ class BackstopOAuthProvider(OAuthProvider):
             )
 
         try:
-            valid = await verify_credential(username, api_token, self._backstop_base_url)
+            valid = await self._backstop_clients.verify_credential(username, api_token)
         except BackstopUnreachableError as exc:
             logger.warning("auth.login.backstop_unreachable", error=str(exc))
             return HTMLResponse(
@@ -194,7 +196,7 @@ class BackstopOAuthProvider(OAuthProvider):
         code = secrets.token_urlsafe(32)
         code_expires_at = (datetime.now(UTC) + self.AUTHORIZATION_CODE_TTL).timestamp()
 
-        async with get_session(self._session_factory) as session:
+        async with transaction(self._session_factory) as session:
             user_id = await find_user_id_by_username(session, username) or str(uuid.uuid4())
             await save_credential(
                 session,
@@ -225,7 +227,7 @@ class BackstopOAuthProvider(OAuthProvider):
     async def _load_pending(self, request_id: str) -> PendingAuthorization | None:
         if not request_id:
             return None
-        async with get_session(self._session_factory) as session:
+        async with read_session(self._session_factory) as session:
             pending = await session.get(PendingAuthorization, request_id)
         if pending is None or pending.expires_at < datetime.now(UTC):
             return None
@@ -237,7 +239,7 @@ class BackstopOAuthProvider(OAuthProvider):
     async def load_authorization_code(
         self, client: OAuthClientInformationFull, authorization_code: str
     ) -> AuthorizationCode | None:
-        async with get_session(self._session_factory) as session:
+        async with read_session(self._session_factory) as session:
             row = await session.get(AuthorizationCodeRow, authorization_code)
         if row is None or row.client_id != client.client_id:
             return None
@@ -265,7 +267,7 @@ class BackstopOAuthProvider(OAuthProvider):
         # then raise/return only after the session block has closed.
         already_consumed = False
 
-        async with get_session(self._session_factory) as session:
+        async with transaction(self._session_factory) as session:
             # Authorization codes are single-use. `DELETE ... WHERE code = ...` claims the
             # row atomically — under concurrent exchanges of the same code, only one
             # transaction's delete affects a row; the other sees `rowcount == 0` and must
@@ -313,7 +315,7 @@ class BackstopOAuthProvider(OAuthProvider):
         self, client: OAuthClientInformationFull, refresh_token: str
     ) -> RefreshToken | None:
         token_hash = _hash_token(refresh_token)
-        async with get_session(self._session_factory) as session:
+        async with read_session(self._session_factory) as session:
             result = await session.execute(
                 select(OAuthTokenRow).where(OAuthTokenRow.refresh_token_hash == token_hash)
             )
@@ -351,7 +353,7 @@ class BackstopOAuthProvider(OAuthProvider):
         now = datetime.now(UTC)
 
         # `TokenError` is a frozen dataclass exception — raising it while an `async with
-        # get_session(...)` block is still open breaks (the context manager's `__aexit__`
+        # transaction(...)` block is still open breaks (the context manager's `__aexit__`
         # tries to set `__traceback__` on the exception, which a frozen dataclass rejects).
         # So every branch below only *decides* what to raise/return here, and the actual
         # `raise`/`return` happens after the session block has closed.
@@ -363,7 +365,7 @@ class BackstopOAuthProvider(OAuthProvider):
         new_refresh_token = ""
         effective_scopes: list[str] = []
 
-        async with get_session(self._session_factory) as session:
+        async with transaction(self._session_factory) as session:
             result = await session.execute(
                 select(OAuthTokenRow).where(OAuthTokenRow.refresh_token_hash == token_hash)
             )
@@ -464,7 +466,7 @@ class BackstopOAuthProvider(OAuthProvider):
     @override
     async def load_access_token(self, token: str) -> AccessToken | None:
         token_hash = _hash_token(token)
-        async with get_session(self._session_factory) as session:
+        async with read_session(self._session_factory) as session:
             result = await session.execute(
                 select(OAuthTokenRow).where(OAuthTokenRow.access_token_hash == token_hash)
             )
@@ -487,7 +489,7 @@ class BackstopOAuthProvider(OAuthProvider):
     @override
     async def revoke_token(self, token: AccessToken | RefreshToken) -> None:
         token_hash = _hash_token(token.token)
-        async with get_session(self._session_factory) as session:
+        async with transaction(self._session_factory) as session:
             result = await session.execute(
                 select(OAuthTokenRow).where(
                     (OAuthTokenRow.access_token_hash == token_hash)
@@ -505,7 +507,7 @@ class BackstopOAuthProvider(OAuthProvider):
         stored Backstop credential is no longer valid, so the MCP-facing tokens tied to it are
         forced to fail too, pushing the client back through the login form on its next call.
         """
-        async with get_session(self._session_factory) as session:
+        async with transaction(self._session_factory) as session:
             await session.execute(
                 update(OAuthTokenRow)
                 .where(

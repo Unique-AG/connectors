@@ -4,44 +4,65 @@ from typing import cast
 from fastmcp import Context
 from fastmcp.server.elicitation import AcceptedElicitation
 from mcp.server.elicitation import CancelledElicitation, DeclinedElicitation
-from pydantic import SecretStr
+from mcp.types import ClientCapabilities
 
-from backstop_mcp.auth.crypto import BackstopCredentialSecret
+from tests.helpers import BASE_URL, collection, credential, resource
 
-BASE_URL = "https://example.backstopsolutions.com"
+__all__ = [
+    "BASE_URL",
+    "collection",
+    "credential",
+    "ctx_accept",
+    "ctx_cancel",
+    "ctx_decline",
+    "ctx_never_elicit",
+    "ctx_no_elicitation_capability",
+    "ctx_unsupported",
+    "resource",
+]
 
 type ElicitFn = Callable[..., Awaitable[object]]
 
 
+class FakeSession:
+    """Stands in for the MCP `ServerSession`'s capability probe.
+
+    `resolution.client_supports_elicitation` goes through FastMCP's public `request_context`
+    → `session.check_client_capability`, so the fake has to provide that rather than rely on
+    the resolver defaulting to "try it and see".
+    """
+
+    _supports_elicitation: bool
+
+    def __init__(self, supports_elicitation: bool) -> None:
+        self._supports_elicitation = supports_elicitation
+
+    def check_client_capability(self, capability: ClientCapabilities) -> bool:
+        if capability.elicitation is not None:
+            return self._supports_elicitation
+        return True
+
+
+class FakeRequestContext:
+    def __init__(self, session: FakeSession) -> None:
+        self.session: FakeSession = session
+
+
 class FakeContext:
-    """Duck-typed stand-in for FastMCP Context; only `elicit` is used by the resolver."""
+    """Duck-typed stand-in for FastMCP Context: a capability probe plus `elicit`."""
 
-    _elicit: ElicitFn
-
-    def __init__(self, elicit: ElicitFn) -> None:
-        self._elicit = elicit
+    def __init__(self, elicit: ElicitFn, *, supports_elicitation: bool = True) -> None:
+        self._elicit: ElicitFn = elicit
+        self.request_context: FakeRequestContext = FakeRequestContext(
+            FakeSession(supports_elicitation)
+        )
 
     async def elicit(self, *, message: str, response_type: object) -> object:
         return await self._elicit(message=message, response_type=response_type)
 
 
 def as_context(fake: FakeContext) -> Context:
-    return cast(Context, cast(object, fake))
-
-
-def credential() -> BackstopCredentialSecret:
-    return BackstopCredentialSecret(username="bob.smith", api_token=SecretStr("token"))
-
-
-def resource(id: str, type: str, name: str | None = None, **attrs: object) -> dict[str, object]:
-    attributes: dict[str, object] = {**attrs}
-    if name is not None:
-        attributes["name"] = name
-    return {"type": type, "id": id, "attributes": attributes}
-
-
-def collection(*resources: dict[str, object]) -> dict[str, object]:
-    return {"data": list(resources)}
+    return cast("Context", cast("object", fake))
 
 
 def ctx_accept(label: str) -> Context:
@@ -69,11 +90,23 @@ def ctx_cancel() -> Context:
 
 
 def ctx_unsupported() -> Context:
+    """A client that advertises elicitation but blows up when actually asked."""
+
     async def elicit(*, message: str, response_type: object) -> object:
         _ = message, response_type
         raise RuntimeError("elicitation not supported")
 
     return as_context(FakeContext(elicit))
+
+
+def ctx_no_elicitation_capability() -> Context:
+    """A client that never advertised the elicitation capability at initialization."""
+
+    async def elicit(*, message: str, response_type: object) -> object:
+        _ = message, response_type
+        raise AssertionError("elicit must not be called without the capability")
+
+    return as_context(FakeContext(elicit, supports_elicitation=False))
 
 
 def ctx_never_elicit() -> Context:

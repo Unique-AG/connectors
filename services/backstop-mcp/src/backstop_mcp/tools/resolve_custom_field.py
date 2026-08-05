@@ -1,16 +1,19 @@
 from typing import Literal
 
+from fastmcp import Context
 from pydantic import BaseModel, Field
 
-from backstop_mcp.backstop_client import get_backstop_client
-from backstop_mcp.custom_fields import (
-    CustomFieldDefinition,
-    FieldAmbiguous,
-    FieldNotFound,
-    FieldResolved,
-    get_custom_fields_service,
+from backstop_mcp.custom_fields import CustomFieldDefinition, normalize_entity_type
+from backstop_mcp.resolution import (
+    AmbiguousResponse,
+    Candidate,
+    CandidateEcho,
+    NotFoundResponse,
+    Resolved,
+    Unresolved,
+    unresolved_response,
 )
-from backstop_mcp.custom_fields.overrides import normalize_entity_type
+from backstop_mcp.runtime import get_backstop_client, get_custom_fields_service
 
 
 class AllowedValueEcho(BaseModel):
@@ -31,12 +34,15 @@ class CustomFieldDefinitionEcho(BaseModel):
     allowed_values: list[AllowedValueEcho] = Field(default_factory=list)
 
 
-class FieldCandidateEcho(BaseModel):
+class FieldCandidateEcho(CandidateEcho):
     definition_id: str
     display_name: str
     crm_name: str
     entity_type: str
-    label: str
+
+
+# Concrete parameterization of the shared model — see `resolution.AmbiguousResponse`.
+FieldAmbiguousResponse = AmbiguousResponse[FieldCandidateEcho]
 
 
 class ResolveCustomFieldResolvedResponse(BaseModel):
@@ -44,23 +50,8 @@ class ResolveCustomFieldResolvedResponse(BaseModel):
     definition: CustomFieldDefinitionEcho
 
 
-class ResolveCustomFieldAmbiguousResponse(BaseModel):
-    status: Literal["ambiguous"] = "ambiguous"
-    query: str
-    entity_type: str
-    candidates: list[FieldCandidateEcho]
-
-
-class ResolveCustomFieldNotFoundResponse(BaseModel):
-    status: Literal["not_found"] = "not_found"
-    query: str
-    entity_type: str
-
-
 type ResolveCustomFieldResponse = (
-    ResolveCustomFieldResolvedResponse
-    | ResolveCustomFieldAmbiguousResponse
-    | ResolveCustomFieldNotFoundResponse
+    ResolveCustomFieldResolvedResponse | FieldAmbiguousResponse | NotFoundResponse
 )
 
 
@@ -81,7 +72,30 @@ def definition_echo(definition: CustomFieldDefinition) -> CustomFieldDefinitionE
     )
 
 
+def field_candidate_echo(candidate: Candidate[CustomFieldDefinition]) -> FieldCandidateEcho:
+    definition = candidate.value
+    return FieldCandidateEcho(
+        key=candidate.key,
+        label=candidate.label,
+        definition_id=definition.definition_id,
+        display_name=definition.display_name,
+        crm_name=definition.crm_name,
+        entity_type=definition.entity_type,
+    )
+
+
+def unresolved_field_response(
+    result: Unresolved[CustomFieldDefinition],
+) -> FieldAmbiguousResponse | NotFoundResponse:
+    return unresolved_response(
+        result,
+        ambiguous_model=FieldAmbiguousResponse,
+        to_echo=field_candidate_echo,
+    )
+
+
 async def resolve_custom_field(
+    ctx: Context,
     entity_type: str,
     query: str,
     refresh: bool = False,
@@ -93,30 +107,15 @@ async def resolve_custom_field(
     entity_type is an API resource name such as organizations, contacts, people.
     """
     entity = normalize_entity_type(entity_type)
-    async with await get_backstop_client() as client:
-        result = await get_custom_fields_service().resolve(
-            entity_type=entity,
-            query=query,
-            client=client,
-            refresh=refresh,
-        )
+    client = await get_backstop_client()
+    result = await get_custom_fields_service().resolve(
+        entity_type=entity,
+        query=query,
+        client=client,
+        refresh=refresh,
+        ctx=ctx,
+    )
 
-    if isinstance(result, FieldResolved):
-        return ResolveCustomFieldResolvedResponse(definition=definition_echo(result.definition))
-    if isinstance(result, FieldAmbiguous):
-        return ResolveCustomFieldAmbiguousResponse(
-            query=result.query,
-            entity_type=result.entity_type,
-            candidates=[
-                FieldCandidateEcho(
-                    definition_id=c.definition_id,
-                    display_name=c.display_name,
-                    crm_name=c.crm_name,
-                    entity_type=c.entity_type,
-                    label=c.label,
-                )
-                for c in result.candidates
-            ],
-        )
-    assert isinstance(result, FieldNotFound)
-    return ResolveCustomFieldNotFoundResponse(query=result.query, entity_type=result.entity_type)
+    if isinstance(result, Resolved):
+        return ResolveCustomFieldResolvedResponse(definition=definition_echo(result.value))
+    return unresolved_field_response(result)

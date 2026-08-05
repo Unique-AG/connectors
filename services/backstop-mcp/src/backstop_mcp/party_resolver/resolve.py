@@ -1,37 +1,26 @@
+import asyncio
 from collections.abc import Sequence
-from dataclasses import dataclass
 
 from fastmcp import Context
 
-from backstop_mcp.backstop_client import BackstopClient
-from backstop_mcp.party_resolver.disambiguate import disambiguate_party
+from backstop_mcp.backstop_client.client import BackstopClient
 from backstop_mcp.party_resolver.email import looks_like_email
-from backstop_mcp.party_resolver.search import quick_search, search_by_email
+from backstop_mcp.party_resolver.search import fetch_party_name, quick_search, search_by_email
 from backstop_mcp.party_resolver.types import (
-    BatchNeedsDisambiguation,
-    BatchPartyResolveResult,
-    BatchResolved,
-    NotFound,
-    PartyCandidate,
+    BatchPartyResolution,
+    PartyResolution,
     PartyResolveItem,
-    PartyResolveResult,
     QuickSearchOptions,
-    Resolved,
-    ResolvedItem,
     ResolvedParty,
     SearchType,
-    UnresolvedPartyItem,
 )
-
-
-@dataclass(frozen=True)
-class _Ambiguous:
-    candidates: tuple[PartyCandidate, ...]
-    search: str
-    search_type: SearchType
-
-
-type _ResolveOneResult = Resolved | NotFound | _Ambiguous
+from backstop_mcp.resolution import (
+    Ambiguous,
+    Resolved,
+    collect_batch,
+    elicit_choice,
+    from_candidates,
+)
 
 
 def _normalize_party_id_or_search(
@@ -58,14 +47,20 @@ async def _resolve_one(
     party_id: str | None = None,
     search: str | None = None,
     name: str | None = None,
+    confirm_name: bool = False,
     quick_search_options: QuickSearchOptions | None = None,
-) -> _ResolveOneResult:
+) -> PartyResolution:
     assert (party_id is None) != (search is None), (
         "Exactly one of party_id or search must be provided"
     )
 
     if party_id is not None:
-        return Resolved(party=ResolvedParty(id=party_id, type=search_type, name=name))
+        resolved_name = name
+        if resolved_name is None and confirm_name:
+            resolved_name = await fetch_party_name(
+                client, search_type=search_type, party_id=party_id
+            )
+        return Resolved(value=ResolvedParty(id=party_id, type=search_type, name=resolved_name))
 
     assert search is not None
     if looks_like_email(search):
@@ -78,14 +73,7 @@ async def _resolve_one(
             options=quick_search_options,
         )
 
-    if len(candidates) == 0:
-        return NotFound(search=search, search_type=search_type)
-    if len(candidates) == 1:
-        candidate = candidates[0]
-        return Resolved(
-            party=ResolvedParty(id=candidate.id, type=search_type, name=candidate.name),
-        )
-    return _Ambiguous(candidates=candidates, search=search, search_type=search_type)
+    return from_candidates(candidates, query=search, scope=search_type)
 
 
 async def resolve_party(
@@ -96,8 +84,16 @@ async def resolve_party(
     party_id: str | None = None,
     search: str | None = None,
     name: str | None = None,
+    confirm_name: bool = False,
     quick_search_options: QuickSearchOptions | None = None,
-) -> PartyResolveResult:
+) -> PartyResolution:
+    """Resolve one party from a name, an email, or a trusted Party ID.
+
+    Set `confirm_name` when the caller has no other way to learn the party's name — it costs
+    one extra `fields=name` request on the trusted-`party_id` path, and buys the echo that
+    makes a wrong id visible instead of silent. Callers that fetch the record anyway (e.g.
+    `get_organization`) leave it off and backfill from their own response.
+    """
     party_id, search = _normalize_party_id_or_search(party_id, search)
     outcome = await _resolve_one(
         client,
@@ -105,63 +101,52 @@ async def resolve_party(
         party_id=party_id,
         search=search,
         name=name,
+        confirm_name=confirm_name,
         quick_search_options=quick_search_options,
     )
-    if isinstance(outcome, _Ambiguous):
-        return await disambiguate_party(
+    if isinstance(outcome, Ambiguous):
+        return await elicit_choice(
             ctx,
-            candidates=outcome.candidates,
-            search=outcome.search,
-            search_type=outcome.search_type,
+            outcome,
+            prompt=(f'Multiple {outcome.scope} matched "{outcome.query}". Which one did you mean?'),
         )
     return outcome
 
 
 async def resolve_parties(
-    ctx: Context,
     client: BackstopClient,
     *,
     search_type: SearchType,
     items: Sequence[PartyResolveItem],
+    confirm_name: bool = False,
     quick_search_options: QuickSearchOptions | None = None,
-) -> BatchPartyResolveResult:
-    _ = ctx
-    resolved: list[ResolvedItem] = []
-    unresolved: list[UnresolvedPartyItem] = []
+) -> BatchPartyResolution:
+    """Resolve several parties, returning one combined payload if anything is unresolved.
 
-    for index, item in enumerate(items):
-        outcome = await _resolve_one(
-            client,
-            search_type=search_type,
-            party_id=item.party_id,
-            search=item.search,
-            name=item.name,
-            quick_search_options=quick_search_options,
-        )
-        if isinstance(outcome, Resolved):
-            resolved.append(ResolvedItem(item_index=index, party=outcome.party))
-        elif isinstance(outcome, NotFound):
-            unresolved.append(
-                UnresolvedPartyItem(
-                    item_index=index,
-                    search=outcome.search,
-                    search_type=outcome.search_type,
-                    candidates=(),
-                )
-            )
-        else:
-            unresolved.append(
-                UnresolvedPartyItem(
-                    item_index=index,
-                    search=outcome.search,
-                    search_type=outcome.search_type,
-                    candidates=outcome.candidates,
-                )
-            )
+    Takes no `Context` and never elicits, by design: prompting per item is the "modal storm"
+    the batch path exists to avoid, so the model is given every unresolved item at once and
+    asks a single question (policy step 3 in `resolution.py`).
 
-    if unresolved:
-        return BatchNeedsDisambiguation(
-            unresolved=tuple(unresolved),
-            resolved=tuple(resolved),
+    Items resolve concurrently — the per-user concurrency gate lives around each upstream
+    request, so the fan-out queues against Backstop's limit instead of breaching it.
+    """
+    outcomes = await asyncio.gather(
+        *(
+            _resolve_one(
+                client,
+                search_type=search_type,
+                party_id=item.party_id,
+                search=item.search,
+                name=item.name,
+                confirm_name=confirm_name,
+                quick_search_options=quick_search_options,
+            )
+            for item in items
         )
-    return BatchResolved(parties=tuple(item.party for item in resolved))
+    )
+    return collect_batch(
+        [
+            (item.search or item.party_id or "", outcome)
+            for item, outcome in zip(items, outcomes, strict=True)
+        ]
+    )

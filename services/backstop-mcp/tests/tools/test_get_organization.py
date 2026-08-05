@@ -1,19 +1,13 @@
-import os
+from collections.abc import Callable
 
 import httpx
 import pytest
 import respx
-from mcp.server.auth.provider import AccessToken
-from pydantic import SecretStr
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backstop_mcp.auth import context as auth_context
-from backstop_mcp.auth.credential_store import save_credential
-from backstop_mcp.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.backstop_client import BackstopResponseSchemaError
 from backstop_mcp.party_resolver import (
-    CandidateEcho,
-    NeedsDisambiguationResponse,
+    PartyAmbiguousResponse,
+    PartyCandidateEcho,
     ResolvedPartyEcho,
 )
 from backstop_mcp.tools.get_organization import OrganizationResolvedResponse, get_organization
@@ -25,50 +19,16 @@ from tests.party_resolver.helpers import (
     resource,
 )
 
-type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
-
-
-async def _connect_user(db: DatabaseFixture, subject: str, username: str, api_token: str) -> bytes:
-    _, factory = db
-    key = os.urandom(32)
-
-    async def _noop_revoke(_subject: str) -> None:
-        return None
-
-    auth_context.configure(
-        auth_context.BackstopAuthContext(
-            session_factory=factory,
-            encryption_key=key,
-            revoke_tokens_for_subject=_noop_revoke,
-        )
-    )
-    async with factory() as session:
-        await save_credential(
-            session,
-            subject,
-            BackstopCredentialSecret(username=username, api_token=SecretStr(api_token)),
-            key,
-        )
-        await session.commit()
-    return key
-
-
-def _fake_access_token(subject: str) -> AccessToken:
-    return AccessToken(token="access-token", client_id="client-1", scopes=[], subject=subject)
+type ConnectUser = Callable[..., object]
 
 
 class TestGetOrganization:
     @pytest.mark.asyncio
     @respx.mock
     async def test_unique_search_fetches_organization_and_echoes_resolved(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, connect_user: ConnectUser
     ) -> None:
-        await _connect_user(db, "user-org-1", "org-bob.smith", "token-1")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: _fake_access_token("user-org-1"),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", BASE_URL)
+        await connect_user("user-org-1", "org-bob.smith")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -76,34 +36,33 @@ class TestGetOrganization:
                 json=collection(resource("o42", "organizations", name="Capstone")),
             )
         )
-        org_body = {
-            "data": {
-                "type": "organizations",
-                "id": "o42",
-                "attributes": {"name": "Capstone", "status": "active"},
-            }
-        }
         respx.get(f"{BASE_URL}/organizations/o42").mock(
-            return_value=httpx.Response(200, json=org_body)
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "organizations",
+                        "id": "o42",
+                        "attributes": {"name": "Capstone", "status": "active"},
+                    }
+                },
+            )
         )
 
         result = await get_organization(ctx_never_elicit(), search="Capstone")
 
         assert isinstance(result, OrganizationResolvedResponse)
-        assert result.organization == org_body
+        # `organization` is the record's own fields, not the enclosing JSON:API document —
+        # `type`/`id` are already echoed under `resolved`.
+        assert result.organization == {"name": "Capstone", "status": "active"}
         assert result.resolved == ResolvedPartyEcho(id="o42", type="organizations", name="Capstone")
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_ambiguous_search_returns_candidates_without_org_get(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, connect_user: ConnectUser
     ) -> None:
-        await _connect_user(db, "user-org-2", "org-carol.diaz", "token-2")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: _fake_access_token("user-org-2"),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", BASE_URL)
+        await connect_user("user-org-2", "org-carol.diaz")  # pyright: ignore[reportGeneralTypeIssues]
 
         respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(
@@ -120,37 +79,32 @@ class TestGetOrganization:
 
         result = await get_organization(ctx_decline(), search="Capstone")
 
-        assert result == NeedsDisambiguationResponse(
-            search="Capstone",
-            search_type="organizations",
+        assert result == PartyAmbiguousResponse(
+            query="Capstone",
+            scope="organizations",
             candidates=[
-                CandidateEcho(id="o1", name="Capstone A", label="Capstone A"),
-                CandidateEcho(id="o2", name="Capstone B", label="Capstone B"),
+                PartyCandidateEcho(key="o1", label="Capstone A", id="o1", name="Capstone A"),
+                PartyCandidateEcho(key="o2", label="Capstone B", id="o2", name="Capstone B"),
             ],
         )
         assert org_get.call_count == 0
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_trusted_party_id_fetches_organization(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        await _connect_user(db, "user-org-3", "org-dave.lee", "token-3")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: _fake_access_token("user-org-3"),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", BASE_URL)
+    async def test_trusted_party_id_fetches_organization(self, connect_user: ConnectUser) -> None:
+        await connect_user("user-org-3", "org-dave.lee")  # pyright: ignore[reportGeneralTypeIssues]
 
-        org_body = {
-            "data": {
-                "type": "organizations",
-                "id": "trusted-9",
-                "attributes": {"name": "From Body"},
-            }
-        }
         respx.get(f"{BASE_URL}/organizations/trusted-9").mock(
-            return_value=httpx.Response(200, json=org_body)
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "organizations",
+                        "id": "trusted-9",
+                        "attributes": {"name": "From Body"},
+                    }
+                },
+            )
         )
         quick = respx.get(f"{BASE_URL}/quick-search").mock(
             return_value=httpx.Response(200, json=collection())
@@ -159,6 +113,8 @@ class TestGetOrganization:
         result = await get_organization(ctx_never_elicit(), party_id="trusted-9")
 
         assert isinstance(result, OrganizationResolvedResponse)
+        # The name is backfilled from the organization fetch this tool makes anyway, so no
+        # extra `confirm_name` request is needed to satisfy the echo requirement.
         assert result.resolved == ResolvedPartyEcho(
             id="trusted-9", type="organizations", name="From Body"
         )
@@ -167,27 +123,24 @@ class TestGetOrganization:
     @pytest.mark.asyncio
     @respx.mock
     async def test_trusted_party_id_is_percent_encoded_in_request_path(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, connect_user: ConnectUser
     ) -> None:
         # Defense in depth alongside the '/' rejection in resolve.py: any character that
         # could otherwise change the request's structure (here, a space) must be encoded
         # rather than interpolated raw into the path.
-        await _connect_user(db, "user-org-5", "org-frank.oz", "token-5")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: _fake_access_token("user-org-5"),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", BASE_URL)
+        await connect_user("user-org-5", "org-frank.oz")  # pyright: ignore[reportGeneralTypeIssues]
 
-        org_body = {
-            "data": {
-                "type": "organizations",
-                "id": "trusted 9",
-                "attributes": {"name": "From Body"},
-            }
-        }
         org_get = respx.get(f"{BASE_URL}/organizations/trusted%209").mock(
-            return_value=httpx.Response(200, json=org_body)
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "type": "organizations",
+                        "id": "trusted 9",
+                        "attributes": {"name": "From Body"},
+                    }
+                },
+            )
         )
 
         result = await get_organization(ctx_never_elicit(), party_id="trusted 9")
@@ -198,14 +151,9 @@ class TestGetOrganization:
     @pytest.mark.asyncio
     @respx.mock
     async def test_trusted_party_id_containing_slash_is_rejected(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, connect_user: ConnectUser
     ) -> None:
-        await _connect_user(db, "user-org-6", "org-grace.hopper", "token-6")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: _fake_access_token("user-org-6"),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", BASE_URL)
+        await connect_user("user-org-6", "org-grace.hopper")  # pyright: ignore[reportGeneralTypeIssues]
 
         with pytest.raises(ValueError, match="must not contain '/'"):
             await get_organization(ctx_never_elicit(), party_id="../admin")
@@ -213,14 +161,9 @@ class TestGetOrganization:
     @pytest.mark.asyncio
     @respx.mock
     async def test_malformed_organization_body_raises_schema_error(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, connect_user: ConnectUser
     ) -> None:
-        await _connect_user(db, "user-org-4", "org-erin.ng", "token-4")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: _fake_access_token("user-org-4"),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", BASE_URL)
+        await connect_user("user-org-4", "org-erin.ng")  # pyright: ignore[reportGeneralTypeIssues]
 
         # `id` is entirely absent from the organization resource — fails
         # `BackstopApiDocument[OrganizationAttributes]` schema validation outright.
@@ -236,3 +179,21 @@ class TestGetOrganization:
 
         assert exc_info.value.path == "/organizations/trusted-9"
         assert exc_info.value.schema_name == "BackstopApiDocument[OrganizationAttributes]"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_not_found_search_returns_the_query_it_used(
+        self, connect_user: ConnectUser
+    ) -> None:
+        """Policy step 5: name the exact term searched for, so a typo is correctable."""
+        await connect_user("user-org-7", "org-hank.p")  # pyright: ignore[reportGeneralTypeIssues]
+
+        respx.get(f"{BASE_URL}/quick-search").mock(
+            return_value=httpx.Response(200, json=collection())
+        )
+
+        result = await get_organization(ctx_never_elicit(), search="Capstoen")
+
+        assert result.status == "not_found"
+        assert getattr(result, "query", None) == "Capstoen"
+        assert getattr(result, "scope", None) == "organizations"

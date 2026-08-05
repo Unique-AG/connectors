@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
 from backstop_mcp.auth.provider import BackstopOAuthProvider
+from backstop_mcp.backstop_client import BackstopClientFactory
 from backstop_mcp.db.models import OAuthToken as OAuthTokenRow
 from backstop_mcp.db.models import PendingAuthorization
+from tests.helpers import client_factory
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
@@ -22,11 +24,13 @@ _REDIRECT_URI = "https://client.example/callback"
 
 def _make_provider(db: DatabaseFixture) -> BackstopOAuthProvider:
     _, factory = db
+    # The provider verifies submitted credentials through the shared client factory, so it
+    # reuses the same pool, base URL and timeout profile as every tool call.
     return BackstopOAuthProvider(
         base_url="https://backstop-mcp.example",
         session_factory=factory,
         encryption_key=os.urandom(32),
-        backstop_base_url="https://api.backstopsolutions.com",
+        backstop_clients=client_factory("https://api.backstopsolutions.com"),
     )
 
 
@@ -131,7 +135,7 @@ class TestLoginFormSubmission:
     async def test_valid_credentials_issue_code_and_redirect(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_valid)
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
         provider = _make_provider(db)
         client_info = await _register_client(provider, "provider-client-4")
         redirect_url = await provider.authorize(client_info, _authorization_params(state="state-1"))
@@ -154,7 +158,7 @@ class TestLoginFormSubmission:
     async def test_invalid_credentials_rerender_form_without_minting_code(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_invalid)
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_invalid)
         provider = _make_provider(db)
         client_info = await _register_client(provider, "provider-client-5")
         redirect_url = await provider.authorize(client_info, _authorization_params())
@@ -179,7 +183,7 @@ class TestTokenLifecycle:
     async def test_exchange_authorization_code_issues_working_token_pair(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_valid)
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
         provider = _make_provider(db)
         client_info = await _register_client(provider, "provider-client-6")
         redirect_url = await provider.authorize(client_info, _authorization_params())
@@ -208,7 +212,7 @@ class TestTokenLifecycle:
     async def test_refresh_token_rotates_and_detects_reuse(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_valid)
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
         provider = _make_provider(db)
         client_info = await _register_client(provider, "provider-client-7")
         redirect_url = await provider.authorize(client_info, _authorization_params())
@@ -256,7 +260,7 @@ class TestTokenLifecycle:
     async def test_concurrent_refresh_of_same_token_never_leaves_two_valid_descendants(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_valid)
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
         provider = _make_provider(db)
         client_info = await _register_client(provider, "provider-client-7c")
         redirect_url = await provider.authorize(client_info, _authorization_params())
@@ -295,7 +299,7 @@ class TestTokenLifecycle:
     async def test_refresh_token_rejects_expired_token(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_valid)
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
         provider = _make_provider(db)
         client_info = await _register_client(provider, "provider-client-7d")
         redirect_url = await provider.authorize(client_info, _authorization_params())
@@ -330,7 +334,7 @@ class TestTokenLifecycle:
     async def test_concurrent_authorization_code_exchange_only_succeeds_once(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_valid)
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
         provider = _make_provider(db)
         client_info = await _register_client(provider, "provider-client-7e")
         redirect_url = await provider.authorize(client_info, _authorization_params())
@@ -359,7 +363,7 @@ class TestTokenLifecycle:
     async def test_refresh_token_rejects_scope_escalation(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_valid)
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
         provider = _make_provider(db)
         client_info = await _register_client(provider, "provider-client-7b")
         redirect_url = await provider.authorize(client_info, _authorization_params())
@@ -388,7 +392,7 @@ class TestTokenLifecycle:
     async def test_revoke_token_invalidates_access_token(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_valid)
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
         provider = _make_provider(db)
         client_info = await _register_client(provider, "provider-client-8")
         redirect_url = await provider.authorize(client_info, _authorization_params())
@@ -411,7 +415,7 @@ class TestTokenLifecycle:
     async def test_revoke_token_family_for_subject(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("backstop_mcp.auth.provider.verify_credential", _always_valid)
+        monkeypatch.setattr(BackstopClientFactory, "verify_credential", _always_valid)
         provider = _make_provider(db)
         client_info = await _register_client(provider, "provider-client-9")
         redirect_url = await provider.authorize(client_info, _authorization_params())
@@ -430,9 +434,9 @@ class TestTokenLifecycle:
         assert await provider.load_access_token(tokens.access_token) is None
 
 
-async def _always_valid(_username: str, _api_token: str, _base_url: str) -> bool:
+async def _always_valid(_self: BackstopClientFactory, _username: str, _api_token: str) -> bool:
     return True
 
 
-async def _always_invalid(_username: str, _api_token: str, _base_url: str) -> bool:
+async def _always_invalid(_self: BackstopClientFactory, _username: str, _api_token: str) -> bool:
     return False

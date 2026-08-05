@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Generic
 
 import httpx
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter
 from typing_extensions import TypeVar
 
 FetchPage = Callable[[str, dict[str, object] | None], Awaitable[httpx.Response]]
@@ -21,6 +21,11 @@ class _PageMeta(BaseModel):
 
 class _Page(BaseModel):
     data: list[dict[str, object]]
+    # JSON:API puts `?include=`d resources in a top-level `included` array, *not* inside the
+    # primary resource's `attributes`. Backstop's `include` targets are relationships (the
+    # only value custom-field-definitions accepts is `lovSet`), so dropping this array would
+    # silently discard everything a caller asked to side-load.
+    included: list[dict[str, object]] = Field(default_factory=list)
     links: _PageLinks = _PageLinks()
     meta: _PageMeta | None = None
 
@@ -28,11 +33,20 @@ class _Page(BaseModel):
 _PAGE_ADAPTER = TypeAdapter(_Page)
 
 
+def _resource_identity(resource: dict[str, object]) -> tuple[str, str]:
+    return (str(resource.get("type", "")), str(resource.get("id", "")))
+
+
 @dataclass
 class PageResult(Generic[T]):
-    """Accumulated result of walking a JSON:API `links.next` chain."""
+    """Accumulated result of walking a JSON:API `links.next` chain.
+
+    `included` holds the side-loaded resources from every page, deduplicated by
+    (`type`, `id`) — JSON:API repeats an included resource on each page that references it.
+    """
 
     items: list[T] = field(default_factory=list)
+    included: list[dict[str, object]] = field(default_factory=list)
     total_count: int | None = None
     truncated: bool = False
 
@@ -62,6 +76,7 @@ async def paginate_all(request: PaginationRequest) -> PageResult:
     simple to reason about.
     """
     result = PageResult()
+    seen_included: set[tuple[str, str]] = set()
     path: str | None = request.first_path
     params = request.first_page_params
     max_records = request.max_records
@@ -72,6 +87,13 @@ async def paginate_all(request: PaginationRequest) -> PageResult:
         page = _PAGE_ADAPTER.validate_json(response.content)
 
         result.items.extend(page.data)
+        for resource in page.included:
+            identity = _resource_identity(resource)
+            if identity in seen_included:
+                continue
+            seen_included.add(identity)
+            result.included.append(resource)
+
         if result.total_count is None and page.meta is not None:
             result.total_count = page.meta.totalResourceCount
 

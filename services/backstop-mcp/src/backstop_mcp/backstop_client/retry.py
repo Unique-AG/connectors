@@ -2,8 +2,7 @@
 
 `tenacity` supplies the retry mechanics (backoff + jitter, attempt counting); the predicate
 and wait strategy here supply the domain decision of what's retryable and how long to wait,
-operating directly on `BackstopRateLimitError` so a later `BackstopClient._request()` can wrap
-its HTTP call with `build_retrying(config)`.
+operating directly on `BackstopRateLimitError`.
 """
 
 from collections.abc import Callable
@@ -101,7 +100,7 @@ def _before_sleep(retry_state: tenacity.RetryCallState) -> None:
 
 
 def build_retrying(config: BackstopConfig) -> tenacity.AsyncRetrying:
-    """Build the `AsyncRetrying` a future `BackstopClient._request()` wraps its HTTP call in."""
+    """Build the `AsyncRetrying` that `BackstopClient._request()` wraps its HTTP call in."""
     return tenacity.AsyncRetrying(
         retry=_build_retry_predicate(config),
         wait=_build_wait_strategy(),

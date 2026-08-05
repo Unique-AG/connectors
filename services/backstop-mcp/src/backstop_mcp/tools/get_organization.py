@@ -4,16 +4,18 @@ from urllib.parse import quote
 from fastmcp import Context
 from pydantic import BaseModel, ConfigDict
 
-from backstop_mcp.backstop_client import get_backstop_client
 from backstop_mcp.backstop_client.json_api import BackstopApiDocument
+from backstop_mcp.coerce import as_clean_str
 from backstop_mcp.party_resolver import (
-    NeedsDisambiguationResponse,
-    NotFoundResponse,
-    Resolved,
+    PartyAmbiguousResponse,
+    ResolvedParty,
     ResolvedPartyEcho,
-    early_exit_response,
+    party_echo,
     resolve_party,
+    unresolved_party_response,
 )
+from backstop_mcp.resolution import NotFoundResponse, Resolved
+from backstop_mcp.runtime import get_backstop_client
 
 
 class OrganizationAttributes(BaseModel):
@@ -29,7 +31,11 @@ class OrganizationAttributes(BaseModel):
 
 
 class OrganizationResolvedResponse(BaseModel):
-    """`get_organization`'s response once the organization was found and fetched."""
+    """`get_organization`'s response once the organization was found and fetched.
+
+    `organization` holds the record's own fields (the JSON:API resource's `attributes`) — not
+    the enclosing document, whose `type`/`id` are already echoed under `resolved`.
+    """
 
     status: Literal["resolved"] = "resolved"
     organization: dict[str, object]
@@ -37,7 +43,7 @@ class OrganizationResolvedResponse(BaseModel):
 
 
 type GetOrganizationResponse = (
-    NeedsDisambiguationResponse | NotFoundResponse | OrganizationResolvedResponse
+    PartyAmbiguousResponse | NotFoundResponse | OrganizationResolvedResponse
 )
 
 
@@ -53,34 +59,39 @@ async def get_organization(
     (organization name or email) and let the server resolve it.
     Exactly one of party_id or search must be provided.
     """
-    async with await get_backstop_client() as client:
-        result = await resolve_party(
-            ctx,
-            client,
-            search_type="organizations",
-            party_id=party_id,
-            search=search,
-        )
-
-        if not isinstance(result, Resolved):
-            return early_exit_response(result)
-
-        party = result.party
-        document = await client.get(
-            f"/organizations/{quote(party.id, safe='')}",
-            schema=BackstopApiDocument[OrganizationAttributes],
-        )
-
-    name = party.name
-    if name is None and document.data is not None:
-        if isinstance(document.data, list):
-            raise ValueError(
-                f"Backstop returned a collection for organization {party.id!r}; "
-                + "expected a single resource"
-            )
-        name = document.data.attributes.name
-
-    return OrganizationResolvedResponse(
-        organization=document.model_dump(exclude_none=True),
-        resolved=ResolvedPartyEcho(id=party.id, type=party.type, name=name),
+    client = await get_backstop_client()
+    result = await resolve_party(
+        ctx,
+        client,
+        search_type="organizations",
+        party_id=party_id,
+        search=search,
     )
+    if not isinstance(result, Resolved):
+        return unresolved_party_response(result)
+
+    party = result.value
+    document = await client.get(
+        f"/organizations/{quote(party.id, safe='')}",
+        schema=BackstopApiDocument[OrganizationAttributes],
+    )
+
+    assert not isinstance(document.data, list), (
+        f"Backstop returned a collection for organization {party.id!r}; "
+        + "expected a single resource"
+    )
+
+    attributes = (
+        document.data.attributes.model_dump(exclude_none=True) if document.data is not None else {}
+    )
+    # `confirm_name` isn't used here: the organization is fetched anyway, so the name comes
+    # from that response rather than an extra request.
+    resolved = party if party.name is not None else _with_name(party, attributes.get("name"))
+    return OrganizationResolvedResponse(organization=attributes, resolved=party_echo(resolved))
+
+
+def _with_name(party: ResolvedParty, name: object) -> ResolvedParty:
+    cleaned = as_clean_str(name)
+    if cleaned is None:
+        return party
+    return ResolvedParty(id=party.id, type=party.type, name=cleaned)

@@ -1,4 +1,5 @@
 import os
+from collections.abc import Callable
 
 import httpx
 import pytest
@@ -7,56 +8,29 @@ from mcp.server.auth.provider import AccessToken
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from backstop_mcp.auth import context as auth_context
-from backstop_mcp.auth.context import NotConnectedError
+from backstop_mcp.auth.context import BackstopAuthContext, NotConnectedError
 from backstop_mcp.auth.credential_store import save_credential
 from backstop_mcp.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.backstop_client import BackstopAuthError
 from backstop_mcp.tools.system_info import get_system_info
+from tests.helpers import BASE_URL, client_factory, custom_fields_service, install_services
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
+type ConnectUser = Callable[..., object]
 
-_BASE_URL = "https://example.backstopsolutions.com"
 
-
-async def _connect_user(db: DatabaseFixture, subject: str, username: str, api_token: str) -> bytes:
-    _, factory = db
-    key = os.urandom(32)
-
-    async def _noop_revoke(_subject: str) -> None:
-        return None
-
-    auth_context.configure(
-        auth_context.BackstopAuthContext(
-            session_factory=factory,
-            encryption_key=key,
-            revoke_tokens_for_subject=_noop_revoke,
-        )
-    )
-    async with factory() as session:
-        await save_credential(
-            session,
-            subject,
-            BackstopCredentialSecret(username=username, api_token=SecretStr(api_token)),
-            key,
-        )
-        await session.commit()
-    return key
+def _fake_access_token(subject: str) -> AccessToken:
+    return AccessToken(token="access-token", client_id="client-1", scopes=[], subject=subject)
 
 
 class TestGetSystemInfo:
     @pytest.mark.asyncio
     @respx.mock
     async def test_returns_backstop_response_for_connected_user(
-        self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
+        self, connect_user: ConnectUser
     ) -> None:
-        await _connect_user(db, "user-tool-1", "tool-bob.smith", "token-1")
-        monkeypatch.setattr(
-            "backstop_mcp.auth.context.get_access_token",
-            lambda: _fake_access_token("user-tool-1"),
-        )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", _BASE_URL)
-        respx.get(f"{_BASE_URL}/system-info").mock(
+        await connect_user("user-tool-1", "tool-bob.smith")  # pyright: ignore[reportGeneralTypeIssues]
+        respx.get(f"{BASE_URL}/system-info").mock(
             return_value=httpx.Response(200, json={"version": "1.0"})
         )
 
@@ -68,46 +42,45 @@ class TestGetSystemInfo:
     async def test_raises_not_connected_when_no_credential(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        _, factory = db
+        _, session_factory = db
 
         async def _noop_revoke(_subject: str) -> None:
             return None
 
-        auth_context.configure(
-            auth_context.BackstopAuthContext(
-                session_factory=factory,
+        factory = client_factory(
+            BASE_URL,
+            auth=BackstopAuthContext(
+                session_factory=session_factory,
                 encryption_key=os.urandom(32),
                 revoke_tokens_for_subject=_noop_revoke,
-            )
+            ),
         )
+        install_services(backstop=factory, custom_fields=custom_fields_service(session_factory))
         monkeypatch.setattr(
             "backstop_mcp.auth.context.get_access_token",
             lambda: _fake_access_token("user-never-connected"),
         )
 
-        with pytest.raises(NotConnectedError):
-            await get_system_info()
+        try:
+            with pytest.raises(NotConnectedError):
+                await get_system_info()
+        finally:
+            await factory.aclose()
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_raises_backstop_auth_error_when_credential_revoked(
         self, db: DatabaseFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """A mid-session Backstop 401 revokes the caller's MCP tokens, forcing a re-login."""
         revoked_subjects: list[str] = []
 
         async def _record_revoke(subject: str) -> None:
             revoked_subjects.append(subject)
 
-        _, factory = db
+        _, session_factory = db
         key = os.urandom(32)
-        auth_context.configure(
-            auth_context.BackstopAuthContext(
-                session_factory=factory,
-                encryption_key=key,
-                revoke_tokens_for_subject=_record_revoke,
-            )
-        )
-        async with factory() as session:
+        async with session_factory() as session:
             await save_credential(
                 session,
                 "user-tool-2",
@@ -117,18 +90,26 @@ class TestGetSystemInfo:
                 key,
             )
             await session.commit()
+
+        factory = client_factory(
+            BASE_URL,
+            auth=BackstopAuthContext(
+                session_factory=session_factory,
+                encryption_key=key,
+                revoke_tokens_for_subject=_record_revoke,
+            ),
+        )
+        install_services(backstop=factory, custom_fields=custom_fields_service(session_factory))
         monkeypatch.setattr(
             "backstop_mcp.auth.context.get_access_token",
             lambda: _fake_access_token("user-tool-2"),
         )
-        monkeypatch.setenv("BACKSTOP_BASE_URL", _BASE_URL)
-        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(401))
+        respx.get(f"{BASE_URL}/system-info").mock(return_value=httpx.Response(401))
 
-        with pytest.raises(BackstopAuthError):
-            await get_system_info()
+        try:
+            with pytest.raises(BackstopAuthError):
+                await get_system_info()
+        finally:
+            await factory.aclose()
 
         assert revoked_subjects == ["user-tool-2"]
-
-
-def _fake_access_token(subject: str) -> AccessToken:
-    return AccessToken(token="access-token", client_id="client-1", scopes=[], subject=subject)

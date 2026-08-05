@@ -3,16 +3,12 @@ import json
 import pytest
 
 from backstop_mcp.config import BackstopConfig, CustomFieldOverrideConfig
-from backstop_mcp.custom_fields.glossary import format_glossary
+from backstop_mcp.custom_fields.entity_types import normalize_entity_type
+from backstop_mcp.custom_fields.glossary import format_glossaries, format_glossary
 from backstop_mcp.custom_fields.index import build_index, resolve_in_index
-from backstop_mcp.custom_fields.overrides import normalize_entity_type, parse_override_key
-from backstop_mcp.custom_fields.types import (
-    AllowedValue,
-    CustomFieldDefinition,
-    FieldAmbiguous,
-    FieldNotFound,
-    FieldResolved,
-)
+from backstop_mcp.custom_fields.overrides import parse_override_key
+from backstop_mcp.custom_fields.types import AllowedValue, CustomFieldDefinition
+from backstop_mcp.resolution import Ambiguous, NotFound, Resolved
 
 
 def _def(
@@ -78,8 +74,8 @@ class TestResolveInIndex:
     def test_exact_crm_name(self) -> None:
         index = build_index([_def(definition_id="1", crm_name="Investor Status")])
         result = resolve_in_index(index, entity_type="organizations", query="investor status")
-        assert isinstance(result, FieldResolved)
-        assert result.definition.definition_id == "1"
+        assert isinstance(result, Resolved)
+        assert result.value.definition_id == "1"
 
     def test_alias_from_override_display(self) -> None:
         index = build_index(
@@ -93,13 +89,13 @@ class TestResolveInIndex:
             ]
         )
         result = resolve_in_index(index, entity_type="organizations", query="status")
-        assert isinstance(result, FieldResolved)
-        assert result.definition.display_name == "Investor Status"
+        assert isinstance(result, Resolved)
+        assert result.value.display_name == "Investor Status"
 
     def test_fuzzy_grade(self) -> None:
         index = build_index([_def(definition_id="2", crm_name="Investor Grade")])
         result = resolve_in_index(index, entity_type="organizations", query="grade")
-        assert isinstance(result, FieldResolved)
+        assert isinstance(result, Resolved)
 
     def test_ambiguous(self) -> None:
         index = build_index(
@@ -109,13 +105,49 @@ class TestResolveInIndex:
             ]
         )
         result = resolve_in_index(index, entity_type="organizations", query="status")
-        assert isinstance(result, FieldAmbiguous)
+        assert isinstance(result, Ambiguous)
         assert len(result.candidates) == 2
 
     def test_not_found(self) -> None:
         index = build_index([_def(definition_id="1", crm_name="Grade")])
         result = resolve_in_index(index, entity_type="organizations", query="missing")
-        assert isinstance(result, FieldNotFound)
+        assert isinstance(result, NotFound)
+
+    def test_exact_match_outranks_partial_matches(self) -> None:
+        """Without tiering, an exact hit drowns in its own near-misses and every lookup prompts."""
+        index = build_index(
+            [
+                _def(definition_id="1", crm_name="Grade"),
+                _def(definition_id="2", crm_name="Grade Review Date"),
+                _def(definition_id="3", crm_name="Investor Grade"),
+            ]
+        )
+        result = resolve_in_index(index, entity_type="organizations", query="Grade")
+        assert isinstance(result, Resolved)
+        assert result.value.definition_id == "1"
+
+    def test_several_exact_matches_are_still_ambiguous(self) -> None:
+        index = build_index(
+            [
+                _def(definition_id="1", crm_name="Grade"),
+                _def(definition_id="2", crm_name="grade"),
+            ]
+        )
+        result = resolve_in_index(index, entity_type="organizations", query="Grade")
+        assert isinstance(result, Ambiguous)
+        assert {c.key for c in result.candidates} == {"1", "2"}
+
+    def test_scope_is_reported_on_unresolved_outcomes(self) -> None:
+        """`query`/`scope` are the shared vocabulary every resolver reports (see resolution.py)."""
+        result = resolve_in_index(build_index([]), entity_type="Organization", query="grade")
+        assert isinstance(result, NotFound)
+        assert result.query == "grade"
+        assert result.scope == "organizations"
+
+    def test_blank_query_is_not_found(self) -> None:
+        index = build_index([_def(definition_id="1", crm_name="Grade")])
+        result = resolve_in_index(index, entity_type="organizations", query="   ")
+        assert isinstance(result, NotFound)
 
 
 class TestGlossary:
@@ -134,3 +166,40 @@ class TestGlossary:
         text = format_glossary(definitions, entity_type="organizations", budget_chars=400)
         assert "Custom field glossary (organizations)" in text
         assert "truncated" in text
+
+    def test_a_budget_too_small_for_any_entry_renders_nothing(self) -> None:
+        """A bare header would be noise in a tool description, and mislead about coverage."""
+        definitions = [_def(definition_id="1", crm_name="Investor Status")]
+        assert format_glossary(definitions, entity_type="organizations", budget_chars=40) == ""
+
+
+class TestGlossaries:
+    def test_several_entities_share_one_budget(self) -> None:
+        """The budget bounds the whole tool description, not each entity type separately."""
+        entities = [
+            (
+                entity,
+                [
+                    _def(definition_id=f"{entity}-{i}", entity_type=entity, crm_name=f"Field {i}")
+                    for i in range(50)
+                ],
+            )
+            for entity in ("organizations", "contacts", "people")
+        ]
+
+        text = format_glossaries(entities, budget_chars=1_000)
+
+        assert len(text) <= 1_100  # one truncation notice may overshoot the budget
+        assert "Custom field glossary (organizations)" in text
+        assert "Custom field glossary (people)" not in text
+
+    def test_entities_with_no_definitions_are_skipped(self) -> None:
+        text = format_glossaries(
+            [
+                ("organizations", []),
+                ("contacts", [_def(definition_id="1", entity_type="contacts", crm_name="Title")]),
+            ]
+        )
+
+        assert "Custom field glossary (organizations)" not in text
+        assert "Custom field glossary (contacts)" in text

@@ -1,9 +1,15 @@
 import ssl
+from datetime import timedelta
 
 import pytest
 from pydantic import SecretStr
 
-from backstop_mcp.config import BackstopConfig, DatabaseConfig, normalize_asyncpg_url
+from backstop_mcp.config import (
+    AuthConfig,
+    BackstopConfig,
+    DatabaseConfig,
+    normalize_asyncpg_url,
+)
 
 
 class TestNormalizeAsyncpgUrl:
@@ -87,6 +93,38 @@ class TestBackstopConfigDefaults:
         """A zero TTL would refetch the whole schema on every call."""
         with pytest.raises(ValueError, match="custom_field_schema_ttl_minutes"):
             BackstopConfig(custom_field_schema_ttl_minutes=0)
+
+
+class TestAuthConfig:
+    def test_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("AUTH_TOKEN_RETENTION_DAYS", raising=False)
+        monkeypatch.delenv("AUTH_CLEANUP_INTERVAL_HOURS", raising=False)
+
+        config = AuthConfig()
+
+        assert config.token_retention_days == 30
+        assert config.token_retention == timedelta(days=30)
+        assert config.cleanup_interval_hours == 6.0
+        assert config.cleanup_interval == timedelta(hours=6)
+
+    def test_env_vars_override_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("AUTH_TOKEN_RETENTION_DAYS", "7")
+        monkeypatch.setenv("AUTH_CLEANUP_INTERVAL_HOURS", "0.5")
+
+        config = AuthConfig()
+
+        assert config.token_retention == timedelta(days=7)
+        assert config.cleanup_interval == timedelta(minutes=30)
+
+    def test_zero_retention_is_rejected(self) -> None:
+        """Retaining nothing would delete a token family the moment it expired."""
+        with pytest.raises(ValueError, match="token_retention_days"):
+            AuthConfig(token_retention_days=0)
+
+    def test_zero_interval_is_rejected(self) -> None:
+        """A zero interval would spin the sweep loop without ever sleeping."""
+        with pytest.raises(ValueError, match="cleanup_interval_hours"):
+            AuthConfig(cleanup_interval_hours=0)
 
 
 class TestBackstopServiceAccount:
