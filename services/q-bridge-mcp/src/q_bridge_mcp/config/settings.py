@@ -57,6 +57,11 @@ class Settings(BaseSettings):
         default=AnyHttpUrl("https://gateway.unique.app/public/chat-gen2"),
         description="Base URL of the Unique Public API",
     )
+    skills_cache_ttl_seconds: int = Field(
+        default=300,
+        ge=0,
+        description="Seconds to cache each authenticated user's resolved skill catalog",
+    )
 
     redis_host: str | None = Field(
         default=None,

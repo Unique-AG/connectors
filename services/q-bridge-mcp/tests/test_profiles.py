@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 from key_value.aio.stores.memory import MemoryStore
-from pydantic import ValidationError
+from prefab_ui.app import ResolvedTool
 
 from q_bridge_mcp.profiles.app import (
     profile_settings,
@@ -41,6 +41,50 @@ class AcceptingCredentialsValidator:
         self.validated_company_id = company_id
 
 
+class RecordingCatalogPrewarmer:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    async def prewarm(self, *, user_id: str, company_id: str) -> bool:
+        self.calls.append((user_id, company_id))
+        return True
+
+
+def get_form_tool_action(
+    component: dict[str, object],
+    tool_name: str,
+) -> dict[str, object] | None:
+    action = component.get("onSubmit")
+    if isinstance(action, dict) and action.get("tool") == tool_name:
+        return action
+    if isinstance(action, list):
+        for item in action:
+            if isinstance(item, dict) and item.get("tool") == tool_name:
+                return item
+
+    children = component.get("children")
+    if isinstance(children, list):
+        for child in children:
+            if isinstance(child, dict):
+                tool_action = get_form_tool_action(child, tool_name)
+                if tool_action is not None:
+                    return tool_action
+
+    return None
+
+
+def get_state_update(actions: object, key: str) -> object:
+    if isinstance(actions, list):
+        for action in actions:
+            if (
+                isinstance(action, dict)
+                and action.get("action") == "setState"
+                and action.get("key") == key
+            ):
+                return action.get("value")
+    return None
+
+
 @pytest.mark.ai
 def test_user_profile__serializes_only_skills_root_folder() -> None:
     """Purpose: Verify the initial profile schema contains only the skills root.
@@ -55,13 +99,17 @@ def test_user_profile__serializes_only_skills_root_folder() -> None:
 
 
 @pytest.mark.ai
-def test_user_profile__rejects_paths_instead_of_folder_names() -> None:
-    """Purpose: Verify profile values are folder names rather than paths.
-    Why this matters: Folder resolution must not silently broaden configured scope.
-    Setup summary: Validate a slash-containing value and assert rejection.
+@pytest.mark.parametrize("folder_name", ["skills-conduct", "/skills-conduct"])
+def test_user_profile__accepts_folder_names_with_optional_leading_slash(
+    folder_name: str,
+) -> None:
+    """Purpose: Verify folder names work with or without a leading slash.
+    Why this matters: Unique folder references are commonly entered in both formats.
+    Setup summary: Validate both supported forms and assert the value is preserved.
     """
-    with pytest.raises(ValidationError, match="folder name"):
-        _ = UserProfile(skillsRootFolder="Knowledge/Skills")
+    profile = UserProfile(skillsRootFolder=folder_name)
+
+    assert profile.skills_root_folder == folder_name
 
 
 @pytest.mark.ai
@@ -151,6 +199,7 @@ def test_save_profile__uses_injected_identity() -> None:
     Setup summary: Call the backend with explicit injected values and read it back.
     """
     repository = UserProfileRepository(MemoryStore())
+    prewarmer = RecordingCatalogPrewarmer()
 
     result = asyncio.run(
         save_profile(
@@ -158,10 +207,12 @@ def test_save_profile__uses_injected_identity() -> None:
             repository,
             "user-123",
             "company-456",
+            prewarmer,
         )
     )
 
     assert result == {"skillsRootFolder": "Engineering Skills"}
+    assert prewarmer.calls == [("user-123", "company-456")]
     assert (
         asyncio.run(repository.get(company_id="company-456", user_id="user-123"))
         .skills_root_folder
@@ -177,6 +228,7 @@ def test_save_organization_credentials__validates_before_persisting() -> None:
     """
     repository = OrganizationCredentialsRepository(MemoryStore())
     validator = AcceptingCredentialsValidator()
+    prewarmer = RecordingCatalogPrewarmer()
 
     result = asyncio.run(
         save_organization_credentials(
@@ -186,6 +238,7 @@ def test_save_organization_credentials__validates_before_persisting() -> None:
             validator,
             "user-123",
             "company-456",
+            prewarmer,
         )
     )
 
@@ -193,6 +246,7 @@ def test_save_organization_credentials__validates_before_persisting() -> None:
     assert validator.validated_credentials == stored_credentials
     assert validator.validated_user_id == "user-123"
     assert validator.validated_company_id == "company-456"
+    assert prewarmer.calls == [("user-123", "company-456")]
     assert result == {
         "appId": "app-123",
         "apiKeyHint": "…-key",
@@ -259,8 +313,37 @@ def test_profile_settings__loads_current_profile_into_app_state() -> None:
     )
 
     assert app.state == {
+        "api_key": "",
         "apiKeyHint": "…-key",
-        "organizationAppId": "app-123",
+        "app_id": "app-123",
+        "organizationStatus": "Organization app configured",
+        "organizationStatusVariant": "success",
         "organizationConfigured": True,
-        "skillsRootFolder": "Research Skills",
+        "profileStatus": "Profile configured",
+        "profileStatusVariant": "success",
+        "skills_root_folder": "Research Skills",
     }
+    wire = app.to_json(
+        tool_resolver=lambda tool: ResolvedTool(name=tool.__name__),
+    )
+    profile_action = get_form_tool_action(wire["view"], "save_profile")
+    organization_action = get_form_tool_action(
+        wire["view"],
+        "save_organization_credentials",
+    )
+    assert profile_action is not None
+    assert organization_action is not None
+    assert profile_action["arguments"] == {
+        "skills_root_folder": "{{ skills_root_folder }}"
+    }
+    assert get_state_update(profile_action["onSuccess"], "profileStatus") == (
+        "Profile saved successfully"
+    )
+    assert organization_action["arguments"] == {
+        "api_key": "{{ api_key }}",
+        "app_id": "{{ app_id }}",
+    }
+    assert get_state_update(
+        organization_action["onSuccess"],
+        "organizationStatus",
+    ) == "Organization credentials saved successfully"

@@ -3,7 +3,11 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Protocol
 
-from unique_sdk import APIRequestor, AuthenticationError, InvalidRequestError
+from unique_sdk import (
+    APIRequestor,
+    AuthenticationError,
+    InvalidRequestError,
+)
 
 from q_bridge_mcp.config.settings import settings
 from q_bridge_mcp.profiles.models import OrganizationCredentials

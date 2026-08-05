@@ -22,11 +22,12 @@ class UserProfile(BaseModel):
             return None
 
         normalized_value = value.strip()
+        folder_name = normalized_value.removeprefix("/")
         if (
-            not normalized_value
-            or normalized_value in {".", ".."}
-            or "/" in normalized_value
-            or "\\" in normalized_value
+            not folder_name
+            or folder_name in {".", ".."}
+            or "/" in folder_name
+            or "\\" in folder_name
         ):
             raise ValueError("skillsRootFolder must be a folder name")
 

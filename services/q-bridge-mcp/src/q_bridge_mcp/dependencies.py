@@ -22,7 +22,6 @@ def get_company_id(
 def _get_required_claim(token: AccessToken, claim_name: str) -> str:
     claim_value = token.claims.get(claim_name)
     if not isinstance(claim_value, str) or not claim_value:
-        print(f"[q-bridge-mcp] JWT claims: {token.claims}")
         raise ValueError(f"Authenticated token is missing the '{claim_name}' claim")
 
     return claim_value
