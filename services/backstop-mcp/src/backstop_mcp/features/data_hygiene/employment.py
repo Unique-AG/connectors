@@ -13,6 +13,7 @@ it normalises the raw payload into edges, but does not yet reduce several edges 
 down to one winner.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import TypeGuard
@@ -28,6 +29,7 @@ from backstop_mcp.features.data_hygiene.types import (
     DepartedEmployment,
     DepartureSignal,
     EmploymentEdge,
+    EmploymentRecord,
     EmploymentRules,
     EmploymentStatus,
     EntityRefAttributes,
@@ -43,6 +45,75 @@ class _Employer:
 
     organization_id: str
     organization_type: str
+
+
+class EmploymentIndex:
+    """One winner per `(person_id, organization_id)` pair, folded out of `_employment_edges`.
+
+    A tenant's `entityRelationships` can carry several records for the same pair — a live `is
+    employee of` alongside an ended `is a former employee of`, or successive relationships across
+    a re-hire — and the caller needs one verdict, not a list to re-resolve on every read. The fold
+    happens once, in `__init__`; every query method after that is a plain dict lookup.
+
+    Winner per pair: the edge with the greatest `effective_date`. A tie breaks toward **departed**
+    — a same-day former record is the more recent human action, and under-reporting a departure is
+    the costlier error for a "who do we contact" answer. An edge with no usable date at all still
+    counts, but sorts behind every dated edge for its pair, so it only wins when it is the sole
+    edge for that pair.
+    """
+
+    def __init__(self, edges: Sequence[EmploymentEdge]) -> None:
+        winners: dict[tuple[str, str], EmploymentEdge] = {}
+        for edge in edges:
+            key = (edge.person_id, edge.organization_id)
+            current = winners.get(key)
+            if current is None or _outranks(edge, current):
+                winners[key] = edge
+        self._records: dict[tuple[str, str], EmploymentRecord] = {
+            key: _to_record(edge) for key, edge in winners.items()
+        }
+
+    def status(self, *, person_id: str, organization_id: str) -> EmploymentStatus:
+        """The winning edge's status, or `IRRELEVANT` — "no employment evidence" — for an unknown
+        pair. Never a false `CURRENT`: a pair this index has never seen is not a live employee.
+        """
+        record = self._records.get((person_id, organization_id))
+        if record is None:
+            return EmploymentStatus.IRRELEVANT
+        return record.status
+
+    def departure(self, *, person_id: str, organization_id: str) -> DepartedEmployment | None:
+        """The winning edge's departure evidence, when the pair's resolved status is `FORMER`."""
+        record = self._records.get((person_id, organization_id))
+        if record is None or record.status is not EmploymentStatus.FORMER:
+            return None
+        return record.departure
+
+    def pairs(self, *, status: EmploymentStatus) -> tuple[EmploymentRecord, ...]:
+        """Every resolved pair whose winning status matches `status`, for list annotation."""
+        return tuple(record for record in self._records.values() if record.status is status)
+
+
+def _outranks(edge: EmploymentEdge, current: EmploymentEdge) -> bool:
+    """Whether `edge` beats `current` as the winner for their shared pair.
+
+    Compared as `(has a date, date, is departed)` tuples so a dated edge always beats an undated
+    one, the later date wins between two dated edges, and a same-day tie breaks toward `FORMER`.
+    """
+    return _rank(edge) > _rank(current)
+
+
+def _rank(edge: EmploymentEdge) -> tuple[bool, date, bool]:
+    return (
+        edge.effective_date is not None,
+        edge.effective_date if edge.effective_date is not None else date.min,
+        edge.status is EmploymentStatus.FORMER,
+    )
+
+
+def _to_record(edge: EmploymentEdge) -> EmploymentRecord:
+    departure = edge.evidence if edge.status is EmploymentStatus.FORMER else None
+    return EmploymentRecord(status=edge.status, departure=departure)
 
 
 def detect_departed_employment(
