@@ -9,12 +9,12 @@ config injection under test are the real ones.
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from backstop_mcp.auth.context import BackstopAuthContext
-from backstop_mcp.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.backstop_client.factory import BackstopClientFactory
 from backstop_mcp.config import BackstopConfig, CustomFieldOverrideConfig
-from backstop_mcp.custom_fields import CustomFieldsService, create_custom_fields_service
-from backstop_mcp.runtime import Services, configure_services
+from backstop_mcp.features.auth.context import BackstopAuthContext
+from backstop_mcp.features.auth.crypto import BackstopCredentialSecret
+from backstop_mcp.features.custom_fields import CustomFieldsService, create_custom_fields_service
+from backstop_mcp.server.runtime import Services, configure_services
 
 BASE_URL = "https://example.backstopsolutions.com"
 

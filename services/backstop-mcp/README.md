@@ -6,10 +6,34 @@ Backstop has no OAuth, so this service *is* the OAuth 2.1 authorization server f
 clients. A client registers dynamically, gets redirected to a login form hosted here, and submits
 a Backstop username + personal API token. That credential is verified against Backstop, encrypted
 (AES-256-GCM) and stored in Postgres; every tool call then acts as that user against Backstop —
-never as a shared service account.
+never as a shared service account. Failed logins are rate-limited per username
+(`AUTH_LOGIN_MAX_ATTEMPTS`) so the form can't be used to test credentials against Backstop.
 
 Tools resolve records by name rather than by ID: "Capstone" or "Investor Status" is looked up
 against the live instance, and an ambiguous match asks the user to pick one.
+
+## Layout
+
+```
+src/backstop_mcp/
+  app.py                 composition root — every config and collaborator is built here, once
+  config.py              one BaseSettings class per concern, read only at the root
+  logging.py metrics.py coerce.py    cross-cutting, used by both sides below
+  features/              what the connector does
+    resolution.py          the shared "which record is that?" algebra + ambiguity policy
+    auth/                  Backstop credential bridging: login form, encryption, token rotation
+    custom_fields/         CRM custom-field schema discovery, caching and resolution
+    party_resolver/        name / email / trusted-ID lookup for organizations, people, contacts
+  server/                how it's exposed over MCP
+    runtime.py             the process-wide service holder tools reach through
+    tools/                 tool functions + the single registry declaring them
+    middleware/            FastMCP and ASGI middleware
+  backstop_client/       HTTP transport: auth headers, concurrency gate, retries, pagination
+  db/                    SQLAlchemy models, engine, alembic migrations
+```
+
+The layering rule is that **nothing under `features/` may import from `server/`** — the server
+wires features together, never the reverse. `tests/test_layering.py` enforces it.
 
 ## Run locally
 
@@ -47,7 +71,7 @@ running.
 
 ```bash
 uv run pytest
-uv run pytest tests/auth -k refresh   # a subset
+uv run pytest tests/features/auth -k refresh   # a subset
 ```
 
 ## Lint & type-check

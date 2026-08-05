@@ -1,0 +1,186 @@
+"""The composition root, exercised as a real ASGI app.
+
+Everything else in this suite builds its collaborators the way `create_app` does; nothing was
+testing `create_app` itself, which is where the wiring lives that is easiest to get wrong — the
+`attach_auth` cycle, the nested lifespans, middleware registration, the route table.
+
+These tests drive the app through Starlette's `TestClient` so the lifespan actually runs.
+"""
+
+import base64
+import os
+from collections.abc import Iterator
+from typing import Protocol, cast
+
+import pytest
+from starlette.testclient import TestClient
+from testcontainers.community.postgres import PostgresContainer
+
+from backstop_mcp.app import create_app
+from backstop_mcp.coerce import as_clean_str, as_object_dict
+from backstop_mcp.config import (
+    AppConfig,
+    AuthConfig,
+    BackstopConfig,
+    DatabaseConfig,
+    EncryptionConfig,
+)
+from backstop_mcp.server.runtime import get_services
+from backstop_mcp.server.tools.registry import TOOL_SPECS
+
+_BASE_URL = "https://api.backstopsolutions.com"
+
+
+# `starlette.testclient` returns httpx responses that this repo's strict type-checking sees as
+# partially unknown. Narrowed once here, the same way `features/resolution.py` narrows FastMCP's
+# request context, so every assertion below is checked rather than silently `Any`.
+class _HttpResponse(Protocol):
+    @property
+    def status_code(self) -> int: ...
+    @property
+    def text(self) -> str: ...
+    def json(self) -> dict[str, object]: ...
+
+
+def _get(client: TestClient, path: str) -> _HttpResponse:
+    return cast("_HttpResponse", client.get(path))  # pyright: ignore[reportUnknownMemberType]
+
+
+def _post_json(
+    client: TestClient, path: str, body: dict[str, object], *, headers: dict[str, str]
+) -> _HttpResponse:
+    return cast(
+        "_HttpResponse",
+        client.post(path, json=body, headers=headers),  # pyright: ignore[reportUnknownMemberType]
+    )
+
+
+def _configs(postgres: PostgresContainer) -> dict[str, object]:
+    url = postgres.get_connection_url().replace("+psycopg2", "")
+    return {
+        "config": AppConfig(public_base_url="https://backstop-mcp.example"),
+        "backstop_config": BackstopConfig(base_url=_BASE_URL),
+        "database_config": DatabaseConfig(url=url),
+        "encryption_config": EncryptionConfig(
+            encryption_key=base64.b64encode(os.urandom(32)).decode()  # pyright: ignore[reportArgumentType]
+        ),
+        "auth_config": AuthConfig(),
+    }
+
+
+@pytest.fixture
+def app_client(postgres_container: PostgresContainer) -> Iterator[TestClient]:
+    """The real app, with its lifespan run.
+
+    No `BACKSTOP_SERVICE_USERNAME` is configured, so the startup schema warm short-circuits
+    without touching Backstop — see `custom_fields/warmup.py`.
+    """
+    app = create_app(**_configs(postgres_container))  # pyright: ignore[reportArgumentType]
+    with TestClient(app) as client:
+        yield client
+
+
+class TestWiring:
+    def test_the_auth_cycle_is_closed(self, app_client: TestClient) -> None:
+        """`attach_auth` must have run: without it `for_current_caller` asserts instead of working.
+
+        The provider needs the client factory (to verify credentials at login) and the factory
+        needs the provider (for the token-revocation hook), so this is the one step in the graph
+        that can't be expressed by constructor order alone.
+        """
+        _ = app_client  # the app is built and started by the fixture
+        factory = get_services().backstop
+
+        # Reaching into the private attribute deliberately: the observable alternative is to make
+        # an authenticated tool call, and what needs asserting here is purely that the cycle was
+        # closed during construction.
+        assert factory._auth is not None  # pyright: ignore[reportPrivateUsage]
+
+    def test_the_factory_owns_the_config_create_app_was_given(self, app_client: TestClient) -> None:
+        """A second `BackstopConfig()` read from the environment would silently ignore the knobs."""
+        _ = app_client
+        assert get_services().backstop.config.base_url == _BASE_URL
+
+    def test_services_are_installed_for_tools_to_reach(self, app_client: TestClient) -> None:
+        _ = app_client
+        services = get_services()
+        assert services.custom_fields is not None
+        assert services.backstop is not None
+
+    def test_lifespan_teardown_releases_the_services(
+        self, postgres_container: PostgresContainer
+    ) -> None:
+        """`configure_services` asserts on a second install, so teardown must actually reset.
+
+        Two apps in sequence is what the test suite itself does, and what a reload does.
+        """
+        for _ in range(2):
+            app = create_app(**_configs(postgres_container))  # pyright: ignore[reportArgumentType]
+            with TestClient(app):
+                assert get_services().backstop is not None
+
+
+class TestRoutes:
+    def test_health_is_unauthenticated(self, app_client: TestClient) -> None:
+        response = _get(app_client, "/health")
+
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+
+    def test_probe_reports_the_checks_it_ran(self, app_client: TestClient) -> None:
+        """Postgres is reachable here, and the schema is absent — ready, but honest about it."""
+        response = _get(app_client, "/probe")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "healthy"
+
+        checks = as_object_dict(body["checks"])
+        assert checks is not None
+        assert checks["database"] is True
+        # No service account and no snapshot row, so the glossary legitimately hasn't loaded —
+        # and that must not gate readiness.
+        assert checks["custom_field_schema"] is False
+
+    def test_metrics_is_served(self, app_client: TestClient) -> None:
+        response = _get(app_client, "/metrics")
+
+        assert response.status_code == 200
+
+    def test_the_login_form_is_mounted_at_the_providers_path(self, app_client: TestClient) -> None:
+        """The route is registered from `auth_provider.login_path`, so the two can't disagree."""
+        response = _get(app_client, "/backstop/login?request_id=nonexistent")
+
+        # Reached the handler (which rejects the unknown request_id) rather than 404ing.
+        assert response.status_code == 400
+        assert "invalid or has expired" in response.text
+
+    def test_oauth_metadata_advertises_this_service_as_the_issuer(
+        self, app_client: TestClient
+    ) -> None:
+        response = _get(app_client, "/.well-known/oauth-authorization-server")
+
+        assert response.status_code == 200
+        issuer = as_clean_str(response.json()["issuer"])
+        assert issuer is not None
+        assert issuer.rstrip("/") == "https://backstop-mcp.example"
+
+
+class TestToolRegistration:
+    def test_mcp_endpoint_requires_authentication(self, app_client: TestClient) -> None:
+        """Every tool is behind the OAuth provider — an unauthenticated call must not reach one."""
+        response = _post_json(
+            app_client,
+            "/mcp",
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+            headers={"Accept": "application/json, text/event-stream"},
+        )
+
+        assert response.status_code == 401
+
+    def test_every_registered_spec_has_a_distinct_name(self) -> None:
+        """`create_app` registers by iterating TOOL_SPECS, so a duplicate name would shadow."""
+        names = [spec.name for spec in TOOL_SPECS]
+
+        assert len(names) == len(set(names))
+        assert names

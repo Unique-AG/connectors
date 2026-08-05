@@ -13,8 +13,6 @@ from dataclasses import dataclass, field
 
 import httpx
 
-from backstop_mcp.auth.context import BackstopAuthContext
-from backstop_mcp.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.backstop_client.client import (
     AuthFailureHook,
     BackstopClient,
@@ -22,6 +20,8 @@ from backstop_mcp.backstop_client.client import (
     build_auth_headers,
 )
 from backstop_mcp.config import BackstopConfig
+from backstop_mcp.features.auth.context import BackstopAuthContext
+from backstop_mcp.features.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.logging import get_logger
 
 logger = get_logger(__name__)

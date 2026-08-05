@@ -270,6 +270,12 @@ class AuthConfig(BaseSettings):
     # how long dead rows linger — never whether an expired token is accepted.
     cleanup_interval_hours: float = Field(default=6.0, gt=0)
 
+    # Failed-login throttling for the hosted Backstop login form (see `auth/throttle.py`).
+    # Without it, `POST /backstop/login` forwards any username/token pair to Backstop, which
+    # makes it a credential-testing oracle for anyone who can start an OAuth flow.
+    login_max_attempts: int = Field(default=10, ge=1)
+    login_attempt_window_minutes: int = Field(default=15, ge=1)
+
     @property
     def token_retention(self) -> timedelta:
         return timedelta(days=self.token_retention_days)
@@ -277,6 +283,10 @@ class AuthConfig(BaseSettings):
     @property
     def cleanup_interval(self) -> timedelta:
         return timedelta(hours=self.cleanup_interval_hours)
+
+    @property
+    def login_attempt_window(self) -> timedelta:
+        return timedelta(minutes=self.login_attempt_window_minutes)
 
 
 class EncryptionConfig(BaseSettings):

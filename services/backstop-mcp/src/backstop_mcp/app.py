@@ -10,10 +10,6 @@ from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from backstop_mcp.auth.cleanup import cleanup_lifespan
-from backstop_mcp.auth.context import BackstopAuthContext
-from backstop_mcp.auth.crypto import load_key
-from backstop_mcp.auth.provider import BackstopOAuthProvider
 from backstop_mcp.backstop_client.factory import create_backstop_client_factory
 from backstop_mcp.config import (
     AppConfig,
@@ -22,15 +18,20 @@ from backstop_mcp.config import (
     DatabaseConfig,
     EncryptionConfig,
 )
-from backstop_mcp.custom_fields import create_custom_fields_service
-from backstop_mcp.custom_fields.middleware import CustomFieldGlossaryMiddleware
-from backstop_mcp.custom_fields.warmup import warmup_lifespan
 from backstop_mcp.db.engine import create_engine, create_session_factory
+from backstop_mcp.features.auth.cleanup import cleanup_lifespan
+from backstop_mcp.features.auth.context import BackstopAuthContext
+from backstop_mcp.features.auth.crypto import load_key
+from backstop_mcp.features.auth.provider import BackstopOAuthProvider
+from backstop_mcp.features.auth.throttle import ThrottleConfig
+from backstop_mcp.features.custom_fields import create_custom_fields_service
+from backstop_mcp.features.custom_fields.warmup import warmup_lifespan
 from backstop_mcp.logging import configure_logging, get_logger
 from backstop_mcp.metrics import configure_metrics, metrics_endpoint
-from backstop_mcp.middleware import TraceContextMiddleware
-from backstop_mcp.runtime import Services, configure_services, reset_services
-from backstop_mcp.tools.registry import TOOL_SPECS
+from backstop_mcp.server.middleware.custom_field_glossary import CustomFieldGlossaryMiddleware
+from backstop_mcp.server.middleware.trace_context import TraceContextMiddleware
+from backstop_mcp.server.runtime import Services, configure_services, reset_services
+from backstop_mcp.server.tools.registry import TOOL_SPECS, glossary_entities_by_tool_name
 
 logger = get_logger(__name__)
 
@@ -71,6 +72,10 @@ def create_app(
         session_factory=session_factory,
         encryption_key=encryption_key,
         backstop_clients=backstop_clients,
+        throttle=ThrottleConfig(
+            max_attempts=auth_config.login_max_attempts,
+            window=auth_config.login_attempt_window,
+        ),
     )
     backstop_clients.attach_auth(
         BackstopAuthContext(
@@ -104,7 +109,15 @@ def create_app(
         "Backstop MCP",
         version=config.version,
         auth=auth_provider,
-        middleware=[CustomFieldGlossaryMiddleware()],
+        middleware=[
+            CustomFieldGlossaryMiddleware(
+                custom_fields_service,
+                # A bound method, safe to capture: it reads the factory's auth context at call
+                # time, and `attach_auth` above has already run.
+                client_for_caller=backstop_clients.for_current_caller,
+                glossary_entities=glossary_entities_by_tool_name(),
+            )
+        ],
         lifespan=lifespan,
     )
     for spec in TOOL_SPECS:

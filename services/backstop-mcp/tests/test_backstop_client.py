@@ -9,7 +9,6 @@ import pytest
 import respx
 from pydantic import BaseModel, ValidationError
 
-from backstop_mcp.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.backstop_client import (
     BackstopApiError,
     BackstopAuthError,
@@ -22,6 +21,7 @@ from backstop_mcp.backstop_client import (
     build_auth_headers,
 )
 from backstop_mcp.config import BackstopConfig
+from backstop_mcp.features.auth.crypto import BackstopCredentialSecret
 from tests.helpers import BASE_URL as _BASE_URL
 from tests.helpers import client_factory, credential
 

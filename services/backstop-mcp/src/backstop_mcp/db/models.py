@@ -1,7 +1,18 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, LargeBinary, String, Text, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    LargeBinary,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -116,6 +127,37 @@ class BackstopCredential(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class LoginAttempt(Base):
+    """One *failed* Backstop login submission, for rate-limiting the hosted login form.
+
+    Only failures are recorded, and a successful login deletes the username's rows — so a
+    legitimate user who mistypes twice and then succeeds carries no penalty.
+
+    Rows rather than a counter column: a counter needs a window boundary baked in at write time,
+    while rows let the window be a pure read (`attempted_at >= now - window`) and make the limit
+    hold across replicas without any coordination. `auth/cleanup.py` purges old rows.
+
+    `source_ip` is recorded for diagnosis only and is deliberately *not* rate-limited on — see
+    `auth/throttle.py` for why.
+    """
+
+    __tablename__: str = "login_attempts"
+
+    # Kept in step with the indexes created in
+    # `migrations/versions/b2c3d4e5f6a7_add_login_attempts.py`: the composite serves the
+    # throttle's `username = ? AND attempted_at >= ?` read, `attempted_at` alone serves the
+    # cleanup sweep's range delete.
+    __table_args__: tuple[Index, ...] = (
+        Index("ix_login_attempts_username_attempted_at", "username", "attempted_at"),
+        Index("ix_login_attempts_attempted_at", "attempted_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    username: Mapped[str] = mapped_column(String)
+    source_ip: Mapped[str | None] = mapped_column(String, nullable=True)
+    attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class CustomFieldSchemaSnapshot(Base):
