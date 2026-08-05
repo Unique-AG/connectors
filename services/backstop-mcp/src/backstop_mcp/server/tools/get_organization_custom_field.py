@@ -3,7 +3,13 @@ from typing import Literal
 from fastmcp import Context
 from pydantic import BaseModel
 
-from backstop_mcp.features.custom_fields import read_custom_field_value
+from backstop_mcp.features.custom_fields import (
+    CustomFieldDefinitionEcho,
+    FieldAmbiguousResponse,
+    definition_echo,
+    read_custom_field_value,
+    unresolved_field_response,
+)
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyEcho,
@@ -13,12 +19,6 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.server.runtime import get_backstop_client, get_custom_fields_service
-from backstop_mcp.server.tools.resolve_custom_field import (
-    CustomFieldDefinitionEcho,
-    FieldAmbiguousResponse,
-    definition_echo,
-    unresolved_field_response,
-)
 
 
 class OrganizationCustomFieldResolvedResponse(BaseModel):

@@ -9,11 +9,15 @@ config injection under test are the real ones.
 from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.backstop_client.factory import BackstopClientFactory
-from backstop_mcp.config import BackstopConfig, CustomFieldOverrideConfig
+from backstop_mcp.config import BackstopConfig
 from backstop_mcp.features.auth.context import BackstopAuthContext
-from backstop_mcp.features.auth.crypto import BackstopCredentialSecret
-from backstop_mcp.features.custom_fields import CustomFieldsService, create_custom_fields_service
+from backstop_mcp.features.custom_fields import (
+    CustomFieldsService,
+    FieldOverride,
+    create_custom_fields_service,
+)
 from backstop_mcp.server.runtime import Services, configure_services
 
 BASE_URL = "https://example.backstopsolutions.com"
@@ -56,7 +60,7 @@ def custom_fields_service(
     session_factory: async_sessionmaker[AsyncSession],
     *,
     base_url: str = BASE_URL,
-    overrides: dict[str, CustomFieldOverrideConfig] | None = None,
+    overrides: dict[str, FieldOverride] | None = None,
     ttl_minutes: int = 60,
 ) -> CustomFieldsService:
     return create_custom_fields_service(

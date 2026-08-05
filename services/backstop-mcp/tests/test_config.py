@@ -5,6 +5,8 @@ import pytest
 from pydantic import SecretStr
 
 from backstop_mcp.config import (
+    AppConfig,
+    AppEnv,
     AuthConfig,
     BackstopConfig,
     DatabaseConfig,
@@ -152,6 +154,48 @@ class TestBackstopServiceAccount:
     def test_rejects_token_without_username(self) -> None:
         with pytest.raises(ValueError, match="must be set together"):
             BackstopConfig(service_api_token=SecretStr("svc-token"))
+
+
+class TestPublicBaseUrl:
+    """The OAuth issuer clients are redirected to, so a leftover local default is a dead deploy."""
+
+    def test_the_local_default_is_allowed_outside_production(self) -> None:
+        config = AppConfig(app_env=AppEnv.DEVELOPMENT)
+
+        assert config.public_base_url == "http://localhost:9010"
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "http://localhost:9010",
+            "http://127.0.0.1:9010",
+            "http://[::1]:9010",
+            # A bind address, not somewhere a client can reach this service.
+            "http://0.0.0.0:9010",
+            # No host at all — `urlparse` yields None, which is just as unusable.
+            "not-a-url",
+        ],
+    )
+    def test_production_rejects_a_url_no_client_can_reach(self, url: str) -> None:
+        with pytest.raises(ValueError, match="PUBLIC_BASE_URL"):
+            AppConfig(app_env=AppEnv.PRODUCTION, public_base_url=url)
+
+    def test_production_accepts_a_real_public_url(self) -> None:
+        config = AppConfig(
+            app_env=AppEnv.PRODUCTION, public_base_url="https://backstop-mcp.example"
+        )
+
+        assert config.public_base_url == "https://backstop-mcp.example"
+
+    def test_production_is_the_default_env_so_the_bare_default_is_rejected(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`app_env` defaults to production, so an unconfigured deploy fails at startup."""
+        monkeypatch.delenv("APP_ENV", raising=False)
+        monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
+
+        with pytest.raises(ValueError, match="PUBLIC_BASE_URL"):
+            AppConfig()
 
 
 class TestDatabaseConfigSsl:

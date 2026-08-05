@@ -4,7 +4,7 @@ import httpx
 import pytest
 import respx
 
-from backstop_mcp.config import CustomFieldOverrideConfig
+from backstop_mcp.features.custom_fields import FieldOverride
 from backstop_mcp.features.party_resolver import ResolvedPartyEcho
 from backstop_mcp.server.tools.get_organization_custom_field import (
     OrganizationCustomFieldResolvedResponse,
@@ -24,10 +24,10 @@ from tests.features.party_resolver.helpers import (
 
 type ConnectUser = Callable[..., object]
 
-_OVERRIDES: dict[str, CustomFieldOverrideConfig] = {
-    "organizations:is1": CustomFieldOverrideConfig(
+_OVERRIDES: dict[str, FieldOverride] = {
+    "organizations:is1": FieldOverride(
         display_name="Investor Status",
-        aliases=["investor status"],
+        aliases=("investor status",),
     )
 }
 

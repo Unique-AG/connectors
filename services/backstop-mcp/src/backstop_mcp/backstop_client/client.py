@@ -7,6 +7,7 @@ import httpx
 from pydantic import TypeAdapter, ValidationError
 from typing_extensions import TypeVar
 
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.backstop_client.errors import (
     BackstopResponseSchemaError,
     BackstopUntrustedUrlError,
@@ -19,7 +20,6 @@ from backstop_mcp.backstop_client.pagination import (
 )
 from backstop_mcp.backstop_client.retry import build_retrying
 from backstop_mcp.config import BackstopConfig
-from backstop_mcp.features.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.logging import get_logger
 from backstop_mcp.metrics import (
     BACKSTOP_CONCURRENCY_WAIT,

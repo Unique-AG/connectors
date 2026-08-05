@@ -22,14 +22,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 
-from backstop_mcp.backstop_client import BackstopClientFactory, BackstopUnreachableError
+from backstop_mcp.backstop_client import (
+    BackstopClientFactory,
+    BackstopCredentialSecret,
+    BackstopUnreachableError,
+)
 from backstop_mcp.db.engine import read_session, transaction
 from backstop_mcp.db.models import AuthorizationCode as AuthorizationCodeRow
 from backstop_mcp.db.models import OAuthClient as OAuthClientRow
 from backstop_mcp.db.models import OAuthToken as OAuthTokenRow
 from backstop_mcp.db.models import PendingAuthorization
 from backstop_mcp.features.auth.credential_store import find_user_id_by_username, save_credential
-from backstop_mcp.features.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.features.auth.login_form import render_login_form
 from backstop_mcp.features.auth.throttle import (
     MAX_USERNAME_LENGTH,

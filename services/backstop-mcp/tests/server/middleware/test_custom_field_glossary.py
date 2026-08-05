@@ -12,12 +12,15 @@ from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client import BackstopClientFactory
-from backstop_mcp.config import CustomFieldOverrideConfig
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.db.engine import transaction
 from backstop_mcp.features.auth.context import BackstopAuthContext
 from backstop_mcp.features.auth.credential_store import save_credential
-from backstop_mcp.features.auth.crypto import BackstopCredentialSecret
-from backstop_mcp.features.custom_fields import CustomFieldsService, create_custom_fields_service
+from backstop_mcp.features.custom_fields import (
+    CustomFieldsService,
+    FieldOverride,
+    create_custom_fields_service,
+)
 from backstop_mcp.features.custom_fields.store import save_snapshot
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 from backstop_mcp.server.middleware.custom_field_glossary import CustomFieldGlossaryMiddleware
@@ -59,7 +62,7 @@ async def wire(db: DatabaseFixture) -> AsyncGenerator[ServiceBuilder]:
     def wire_up(
         base_url: str,
         *,
-        overrides: dict[str, CustomFieldOverrideConfig] | None = None,
+        overrides: dict[str, FieldOverride] | None = None,
         encryption_key: bytes | None = None,
         glossary_entities: Mapping[str, tuple[str, ...]] | None = None,
     ) -> Wired:
@@ -176,9 +179,9 @@ class TestGlossaryMiddleware:
         wired = wire(
             base_url,
             overrides={
-                "organizations:1:is1": CustomFieldOverrideConfig(
+                "organizations:1:is1": FieldOverride(
                     display_name="Investor Status",
-                    aliases=["status"],
+                    aliases=("status",),
                 )
             },
         )
@@ -336,9 +339,9 @@ class TestGlossaryMiddleware:
             base_url,
             encryption_key=key,
             overrides={
-                "organizations:is1": CustomFieldOverrideConfig(
+                "organizations:is1": FieldOverride(
                     display_name="Investor Status",
-                    aliases=["status"],
+                    aliases=("status",),
                 )
             },
         )

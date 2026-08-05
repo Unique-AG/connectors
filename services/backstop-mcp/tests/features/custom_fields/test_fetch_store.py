@@ -8,8 +8,8 @@ import respx
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
-from backstop_mcp.config import CustomFieldOverrideConfig
 from backstop_mcp.db.engine import read_session, transaction
+from backstop_mcp.features.custom_fields import FieldOverride
 from backstop_mcp.features.custom_fields.lov import inline_allowed_values
 from backstop_mcp.features.custom_fields.service import (
     CustomFieldsService,
@@ -95,9 +95,9 @@ class TestFetchStoreResolve:
         _, session_factory = db
         base_url = f"{BASE_URL}/overrides"
         overrides = {
-            "organizations:is1": CustomFieldOverrideConfig(
+            "organizations:is1": FieldOverride(
                 display_name="Investor Status",
-                aliases=["investor status"],
+                aliases=("investor status",),
             )
         }
         service = create_custom_fields_service(

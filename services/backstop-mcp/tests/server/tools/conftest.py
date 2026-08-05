@@ -15,11 +15,10 @@ from pydantic import SecretStr
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client import BackstopClientFactory
-from backstop_mcp.config import CustomFieldOverrideConfig
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.features.auth.context import BackstopAuthContext
 from backstop_mcp.features.auth.credential_store import save_credential
-from backstop_mcp.features.auth.crypto import BackstopCredentialSecret
-from backstop_mcp.features.custom_fields import CustomFieldsService
+from backstop_mcp.features.custom_fields import CustomFieldsService, FieldOverride
 from tests.helpers import BASE_URL, client_factory, custom_fields_service, install_services
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
@@ -51,7 +50,7 @@ async def connect_user(
         api_token: str = "token",
         *,
         base_url: str = BASE_URL,
-        overrides: dict[str, CustomFieldOverrideConfig] | None = None,
+        overrides: dict[str, FieldOverride] | None = None,
     ) -> ConnectedUser:
         key = os.urandom(32)
 

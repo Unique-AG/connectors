@@ -5,7 +5,6 @@ from fastmcp import Context
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backstop_mcp.backstop_client.client import BackstopClient
-from backstop_mcp.config import CustomFieldOverrideConfig
 from backstop_mcp.db.engine import read_session, transaction
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.fetch import fetch_custom_field_definitions
@@ -16,6 +15,7 @@ from backstop_mcp.features.custom_fields.index import (
     build_index,
     resolve_in_index,
 )
+from backstop_mcp.features.custom_fields.overrides import FieldOverride
 from backstop_mcp.features.custom_fields.store import load_snapshot, save_snapshot
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 from backstop_mcp.features.resolution import Ambiguous, elicit_choice
@@ -41,12 +41,12 @@ class CustomFieldsService:
         *,
         session_factory: async_sessionmaker[AsyncSession],
         base_url: str,
-        overrides: dict[str, CustomFieldOverrideConfig],
+        overrides: dict[str, FieldOverride],
         ttl: timedelta,
     ) -> None:
         self._session_factory: async_sessionmaker[AsyncSession] = session_factory
         self._base_url: str = base_url.rstrip("/")
-        self._overrides: dict[str, CustomFieldOverrideConfig] = overrides
+        self._overrides: dict[str, FieldOverride] = overrides
         self._ttl: timedelta = ttl
         self._index: DefinitionIndex = {}
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -189,7 +189,7 @@ def create_custom_fields_service(
     *,
     session_factory: async_sessionmaker[AsyncSession],
     base_url: str,
-    overrides: dict[str, CustomFieldOverrideConfig],
+    overrides: dict[str, FieldOverride],
     ttl_minutes: int,
 ) -> CustomFieldsService:
     return CustomFieldsService(

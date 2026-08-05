@@ -5,9 +5,9 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import get_access_token
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.db.engine import read_session
 from backstop_mcp.features.auth.credential_store import get_credential
-from backstop_mcp.features.auth.crypto import BackstopCredentialSecret
 
 
 class NotConnectedError(ToolError):
@@ -28,8 +28,9 @@ def current_subject() -> str | None:
 class BackstopAuthContext:
     """Resolves "whose Backstop credential" for the in-flight MCP request.
 
-    Constructed once in `create_app()` and handed to `BackstopClientFactory` — there is no
-    module-level instance.
+    The concrete implementation of `backstop_client.credential.CallerAuthContext` — satisfied
+    structurally, so the transport layer never imports this module. Constructed once in
+    `create_app()` and handed to `BackstopClientFactory`; there is no module-level instance.
     """
 
     session_factory: async_sessionmaker[AsyncSession]

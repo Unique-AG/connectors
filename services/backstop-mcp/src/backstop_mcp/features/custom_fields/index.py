@@ -7,6 +7,10 @@ from backstop_mcp.features.resolution import Candidate, NotFound, Resolution, fr
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 
 type DefinitionIndex = dict[str, list[CustomFieldDefinition]]
+
+# Custom-field resolution is one instance of the shared algebra in `resolution.py`: same result
+# types, same ambiguity policy, same status strings as party resolution.
+type FieldCandidate = Candidate[CustomFieldDefinition]
 type FieldResolution = Resolution[CustomFieldDefinition]
 
 
@@ -28,7 +32,7 @@ def _searchable_names(definition: CustomFieldDefinition) -> set[str]:
     return {normalize_query(n) for n in names if n and normalize_query(n)}
 
 
-def candidate_for(definition: CustomFieldDefinition) -> Candidate[CustomFieldDefinition]:
+def candidate_for(definition: CustomFieldDefinition) -> FieldCandidate:
     label = definition.display_name
     if definition.crm_name and definition.crm_name != definition.display_name:
         label = f"{definition.display_name} (crm: {definition.crm_name})"

@@ -19,9 +19,8 @@ from backstop_mcp.backstop_client.client import (
     BackstopUnreachableError,
     build_auth_headers,
 )
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret, CallerAuthContext
 from backstop_mcp.config import BackstopConfig
-from backstop_mcp.features.auth.context import BackstopAuthContext
-from backstop_mcp.features.auth.crypto import BackstopCredentialSecret
 from backstop_mcp.logging import get_logger
 
 logger = get_logger(__name__)
@@ -100,10 +99,10 @@ class BackstopClientFactory:
         self,
         config: BackstopConfig,
         *,
-        auth: BackstopAuthContext | None = None,
+        auth: CallerAuthContext | None = None,
     ) -> None:
         self._config: BackstopConfig = config
-        self._auth: BackstopAuthContext | None = auth
+        self._auth: CallerAuthContext | None = auth
         self._gates: _GateRegistry = _GateRegistry(limit=config.max_concurrent_requests_per_user)
         self._http_client: httpx.AsyncClient | None = None
         self._http_client_lock: asyncio.Lock = asyncio.Lock()
@@ -112,7 +111,7 @@ class BackstopClientFactory:
     def config(self) -> BackstopConfig:
         return self._config
 
-    def attach_auth(self, auth: BackstopAuthContext) -> None:
+    def attach_auth(self, auth: CallerAuthContext) -> None:
         """Supply the auth context after construction.
 
         Needed because the wiring is circular: the auth context's token-revocation hook belongs
@@ -147,7 +146,7 @@ class BackstopClientFactory:
     async def for_current_caller(self) -> BackstopClient:
         """Build a client authenticated as the in-flight MCP caller.
 
-        Resolves that caller's own stored credential via the injected `BackstopAuthContext` —
+        Resolves that caller's own stored credential via the injected `CallerAuthContext` —
         raises `auth.context.NotConnectedError` if they haven't completed the login flow. A
         mid-session Backstop 401 also revokes their MCP tokens, so the next request forces a
         re-login.
@@ -217,6 +216,6 @@ class BackstopClientFactory:
 def create_backstop_client_factory(
     config: BackstopConfig,
     *,
-    auth: BackstopAuthContext | None = None,
+    auth: CallerAuthContext | None = None,
 ) -> BackstopClientFactory:
     return BackstopClientFactory(config, auth=auth)

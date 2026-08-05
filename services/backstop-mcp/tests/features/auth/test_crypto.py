@@ -4,9 +4,9 @@ import os
 import pytest
 from pydantic import SecretStr
 
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.config import EncryptionConfig
 from backstop_mcp.features.auth.crypto import (
-    BackstopCredentialSecret,
     InvalidCredentialEnvelopeError,
     decrypt_credential,
     encrypt_credential,

@@ -11,7 +11,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class CustomFieldOverrideConfig(BaseModel):
-    """Human-facing overlay for a CRM custom-field definition (env JSON value)."""
+    """Human-facing overlay for a CRM custom-field definition (env JSON value).
+
+    The deserialization shape only. `create_app` converts these to
+    `features.custom_fields.FieldOverride` — the domain's own type — so the custom-field feature
+    never imports this module for something that isn't configuration.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
@@ -91,6 +96,11 @@ class AppEnv(StrEnum):
     TEST = "test"
 
 
+# Hosts that can't be what an external MCP client reaches this service on. `0.0.0.0`/`::` are a
+# bind address rather than a destination, so they're just as wrong as loopback here.
+_NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0", "::"})
+
+
 class LogLevel(StrEnum):
     FATAL = "fatal"
     ERROR = "error"
@@ -109,8 +119,29 @@ class AppConfig(BaseSettings):
 
     # The externally-reachable URL of this service — used as the OAuth issuer/base URL
     # (discovery metadata, /authorize, /token, and the Backstop login form all hang off it).
-    # Must be set to the real public URL in any deployed environment.
+    # The local default is only usable in development; `_reject_local_base_url_in_production`
+    # below enforces that.
     public_base_url: str = "http://localhost:9010"
+
+    @model_validator(mode="after")
+    def _reject_local_base_url_in_production(self) -> "AppConfig":
+        """Fail fast when a production deploy never set `PUBLIC_BASE_URL`.
+
+        Left at the default, this service advertises a loopback issuer in its OAuth discovery
+        metadata and redirects browsers to a login form on the client's own machine. Nothing
+        errors server-side — clients just fail to connect for a reason nothing here reports. So
+        it's rejected at startup, the same way a missing encryption key is.
+        """
+        if self.app_env != AppEnv.PRODUCTION:
+            return self
+        host = urlparse(self.public_base_url).hostname
+        if host is None or host in _NON_PUBLIC_HOSTS:
+            raise ValueError(
+                "PUBLIC_BASE_URL must be this service's externally-reachable URL in "
+                + f"{AppEnv.PRODUCTION} (got {self.public_base_url!r}); it is the OAuth issuer "
+                + "clients are redirected to"
+            )
+        return self
 
 
 class BackstopConfig(BaseSettings):

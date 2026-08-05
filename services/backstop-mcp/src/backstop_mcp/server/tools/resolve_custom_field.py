@@ -1,48 +1,17 @@
 from typing import Literal
 
 from fastmcp import Context
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-from backstop_mcp.features.custom_fields import CustomFieldDefinition, normalize_entity_type
-from backstop_mcp.features.resolution import (
-    AmbiguousResponse,
-    Candidate,
-    CandidateEcho,
-    NotFoundResponse,
-    Resolved,
-    Unresolved,
-    unresolved_response,
+from backstop_mcp.features.custom_fields import (
+    CustomFieldDefinitionEcho,
+    FieldAmbiguousResponse,
+    definition_echo,
+    normalize_entity_type,
+    unresolved_field_response,
 )
+from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.server.runtime import get_backstop_client, get_custom_fields_service
-
-
-class AllowedValueEcho(BaseModel):
-    id: str | None = None
-    label: str
-
-
-class CustomFieldDefinitionEcho(BaseModel):
-    definition_id: str
-    entity_type: str
-    crm_name: str
-    display_name: str
-    aliases: list[str] = Field(default_factory=list)
-    description: str | None = None
-    field_type: str | None = None
-    field_type_display: str | None = None
-    is_time_series: bool
-    allowed_values: list[AllowedValueEcho] = Field(default_factory=list)
-
-
-class FieldCandidateEcho(CandidateEcho):
-    definition_id: str
-    display_name: str
-    crm_name: str
-    entity_type: str
-
-
-# Concrete parameterization of the shared model — see `resolution.AmbiguousResponse`.
-FieldAmbiguousResponse = AmbiguousResponse[FieldCandidateEcho]
 
 
 class ResolveCustomFieldResolvedResponse(BaseModel):
@@ -53,45 +22,6 @@ class ResolveCustomFieldResolvedResponse(BaseModel):
 type ResolveCustomFieldResponse = (
     ResolveCustomFieldResolvedResponse | FieldAmbiguousResponse | NotFoundResponse
 )
-
-
-def definition_echo(definition: CustomFieldDefinition) -> CustomFieldDefinitionEcho:
-    return CustomFieldDefinitionEcho(
-        definition_id=definition.definition_id,
-        entity_type=definition.entity_type,
-        crm_name=definition.crm_name,
-        display_name=definition.display_name,
-        aliases=list(definition.aliases),
-        description=definition.description,
-        field_type=definition.field_type,
-        field_type_display=definition.field_type_display,
-        is_time_series=definition.is_time_series,
-        allowed_values=[
-            AllowedValueEcho(id=v.id, label=v.label) for v in definition.allowed_values
-        ],
-    )
-
-
-def field_candidate_echo(candidate: Candidate[CustomFieldDefinition]) -> FieldCandidateEcho:
-    definition = candidate.value
-    return FieldCandidateEcho(
-        key=candidate.key,
-        label=candidate.label,
-        definition_id=definition.definition_id,
-        display_name=definition.display_name,
-        crm_name=definition.crm_name,
-        entity_type=definition.entity_type,
-    )
-
-
-def unresolved_field_response(
-    result: Unresolved[CustomFieldDefinition],
-) -> FieldAmbiguousResponse | NotFoundResponse:
-    return unresolved_response(
-        result,
-        ambiguous_model=FieldAmbiguousResponse,
-        to_echo=field_candidate_echo,
-    )
 
 
 async def resolve_custom_field(

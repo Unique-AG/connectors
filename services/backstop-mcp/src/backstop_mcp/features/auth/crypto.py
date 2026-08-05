@@ -1,11 +1,11 @@
 import base64
 import os
-from dataclasses import dataclass
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pydantic import BaseModel, SecretStr, ValidationError
 
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.config import EncryptionConfig
 
 _NONCE_SIZE = 12
@@ -15,18 +15,6 @@ _KEY_SIZE = 32
 
 class InvalidCredentialEnvelopeError(ValueError):
     """Raised when a stored credential blob is malformed, tampered with, or wrong-keyed."""
-
-
-@dataclass(frozen=True)
-class BackstopCredentialSecret:
-    """A user's Backstop username + personal API token, decrypted and held in memory only.
-
-    `api_token` is a `SecretStr` so an accidental `logger.info(credential)` (or any repr/str
-    conversion) prints `**********` instead of the token — call `.get_secret_value()` to use it.
-    """
-
-    username: str
-    api_token: SecretStr
 
 
 class _CredentialPayload(BaseModel):

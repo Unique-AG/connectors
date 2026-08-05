@@ -15,6 +15,7 @@ from backstop_mcp.config import (
     AppConfig,
     AuthConfig,
     BackstopConfig,
+    CustomFieldOverrideConfig,
     DatabaseConfig,
     EncryptionConfig,
 )
@@ -24,7 +25,7 @@ from backstop_mcp.features.auth.context import BackstopAuthContext
 from backstop_mcp.features.auth.crypto import load_key
 from backstop_mcp.features.auth.provider import BackstopOAuthProvider
 from backstop_mcp.features.auth.throttle import ThrottleConfig
-from backstop_mcp.features.custom_fields import create_custom_fields_service
+from backstop_mcp.features.custom_fields import FieldOverride, create_custom_fields_service
 from backstop_mcp.features.custom_fields.warmup import warmup_lifespan
 from backstop_mcp.logging import configure_logging, get_logger
 from backstop_mcp.metrics import configure_metrics, metrics_endpoint
@@ -88,7 +89,7 @@ def create_app(
     custom_fields_service = create_custom_fields_service(
         session_factory=session_factory,
         base_url=backstop_config.base_url,
-        overrides=backstop_config.custom_field_overrides,
+        overrides=_field_overrides(backstop_config.custom_field_overrides),
         ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
     )
     configure_services(Services(backstop=backstop_clients, custom_fields=custom_fields_service))
@@ -151,6 +152,24 @@ def create_app(
             Middleware(TraceContextMiddleware),
         ]
     )
+
+
+def _field_overrides(
+    configured: dict[str, CustomFieldOverrideConfig],
+) -> dict[str, FieldOverride]:
+    """Translate the env-parsed override shape into the custom-field feature's own type.
+
+    The composition root is where a config shape becomes a domain one, which is what lets
+    `features/custom_fields` stay free of any `config` import.
+    """
+    return {
+        key: FieldOverride(
+            display_name=override.display_name,
+            aliases=tuple(override.aliases),
+            description=override.description,
+        )
+        for key, override in configured.items()
+    }
 
 
 async def _probe_response(

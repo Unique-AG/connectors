@@ -1,13 +1,16 @@
 from backstop_mcp.backstop_client.client import BackstopClient
 from backstop_mcp.backstop_client.json_api import BackstopApiResource
-from backstop_mcp.config import CustomFieldOverrideConfig
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.lov import (
     LovEntryIndex,
     allowed_values_for,
     fetch_lov_entry_index,
 )
-from backstop_mcp.features.custom_fields.overrides import OverrideIndex, index_overrides
+from backstop_mcp.features.custom_fields.overrides import (
+    FieldOverride,
+    OverrideIndex,
+    index_overrides,
+)
 from backstop_mcp.features.custom_fields.types import (
     LOV_SET_RELATIONSHIP,
     CustomFieldDefinition,
@@ -49,7 +52,7 @@ def definition_from_resource(
         else crm_name
     )
     aliases = tuple(
-        a.strip() for a in (override.aliases if override is not None else []) if a.strip()
+        a.strip() for a in (override.aliases if override is not None else ()) if a.strip()
     )
     description = (
         override.description if override is not None and override.description else attrs.description
@@ -86,7 +89,7 @@ def definition_from_resource(
 
 async def fetch_custom_field_definitions(
     client: BackstopClient,
-    overrides: dict[str, CustomFieldOverrideConfig],
+    overrides: dict[str, FieldOverride],
 ) -> list[CustomFieldDefinition]:
     """Fetch the instance's full custom-field schema, allowed values included.
 

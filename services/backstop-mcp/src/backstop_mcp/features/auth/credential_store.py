@@ -1,12 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.db.models import BackstopCredential
-from backstop_mcp.features.auth.crypto import (
-    BackstopCredentialSecret,
-    decrypt_credential,
-    encrypt_credential,
-)
+from backstop_mcp.features.auth.crypto import decrypt_credential, encrypt_credential
 
 
 async def find_user_id_by_username(session: AsyncSession, username: str) -> str | None:
