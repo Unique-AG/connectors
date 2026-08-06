@@ -17,8 +17,11 @@ def main() -> None:
     # configure_tracing, and unique_toolkit's settings read raw os.environ
     # (and unique_toolkit looks for a file named unique.env, not .env), so
     # populate the process env too — same file Settings resolved, same
-    # env-wins-over-file precedence (override=False).
-    load_dotenv(ENV_FILE, override=False)
+    # env-wins-over-file precedence (override=False). Skip entirely rather
+    # than pass None: load_dotenv(None) falls back to its own find_dotenv()
+    # search, which could load an unrelated .env (e.g. a monorepo root file).
+    if ENV_FILE is not None:
+        load_dotenv(ENV_FILE, override=False)
 
     # Config errors fail fast at boot, before any other setup.
     settings = get_settings()

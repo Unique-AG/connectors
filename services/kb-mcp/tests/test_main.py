@@ -40,3 +40,23 @@ def test_env_file_reaches_process_env_for_non_settings_consumers(tmp_path, monke
     assert os.environ["LOG_LEVEL"] == "debug"
     assert os.environ["OTEL_TRACES_EXPORTER"] == "console"
     assert os.environ["UNIQUE_APP_KEY"] == "test-key"
+
+
+def test_no_env_file_resolved_skips_load_dotenv_entirely(monkeypatch):
+    """load_dotenv(None) falls back to its own find_dotenv() search and could
+    load an unrelated .env (e.g. a monorepo root file) — when Settings
+    resolved no file, main() must not call load_dotenv at all."""
+    monkeypatch.setattr("kb_mcp.main.ENV_FILE", None)
+
+    with (
+        patch("kb_mcp.main.load_dotenv") as mock_load_dotenv,
+        patch("kb_mcp.main.configure_tracing"),
+        patch("kb_mcp.main.configure_logging"),
+        patch("kb_mcp.main.build_auth", return_value=MagicMock()),
+        patch("kb_mcp.main.FastMCP") as mock_fastmcp,
+        patch("kb_mcp.main.setup_ops", return_value=MagicMock()),
+    ):
+        mock_fastmcp.return_value.run = MagicMock()
+        main()
+
+    mock_load_dotenv.assert_not_called()
