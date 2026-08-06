@@ -23,7 +23,7 @@ from backstop_mcp.features.custom_fields import (
     create_custom_fields_service,
 )
 from backstop_mcp.features.data_hygiene import (
-    DepartedContactDetector,
+    EmploymentIndexFactory,
     EmploymentRules,
     TypeVocabulary,
 )
@@ -70,32 +70,32 @@ def install_services(
     *,
     backstop: BackstopClientFactory,
     custom_fields: CustomFieldsService,
-    departed_contacts: DepartedContactDetector | None = None,
+    employment_index_factory: EmploymentIndexFactory | None = None,
 ) -> Services:
     services = Services(
         backstop=backstop,
         custom_fields=custom_fields,
-        departed_contacts=departed_contacts or departed_contact_detector(),
+        employment_index_factory=employment_index_factory or build_employment_index_factory(),
     )
     configure_services(services)
     return services
 
 
-def departed_contact_detector(
+def build_employment_index_factory(
     *,
     employment_type_ids: Sequence[str] = (),
     employment_markers: Sequence[str] | None = None,
     former_type_ids: Sequence[str] = (),
     former_markers: Sequence[str] | None = None,
     today: date = FIXED_TODAY,
-) -> DepartedContactDetector:
-    """A detector with the configured defaults and a fixed clock.
+) -> EmploymentIndexFactory:
+    """A factory with the configured defaults and a fixed clock.
 
     Markers default to `BackstopConfig`'s rather than to empty, so a test that doesn't tune them
     exercises what a deployment actually runs.
     """
     config = backstop_config()
-    return DepartedContactDetector(
+    return EmploymentIndexFactory(
         rules=EmploymentRules(
             employment=TypeVocabulary(
                 type_ids=frozenset(employment_type_ids),

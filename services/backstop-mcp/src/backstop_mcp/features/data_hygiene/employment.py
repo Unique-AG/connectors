@@ -1,8 +1,8 @@
 """Employment detection from side-loaded `entityRelationships`.
 
 The scan and the type classification it rests on, pure and fully parameterised. Tools do not call
-any of it directly — they go through `service.DepartedContactDetector.verify`, which owns the
-employment vocabulary. List/org-contact tools should use that verdict to exclude departed people
+any of it directly — they go through `service.EmploymentIndexFactory`, which owns the employment
+vocabulary. List/org-contact tools should use that verdict to exclude departed people
 from "who do we contact at X" answers unless the user asked for historical contacts; a by-id
 person fetch returns the person with the flag set rather than hiding the record.
 

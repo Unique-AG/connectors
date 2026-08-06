@@ -37,7 +37,7 @@ from backstop_mcp.features.custom_fields import (
     create_custom_fields_service,
     warmup_lifespan,
 )
-from backstop_mcp.features.data_hygiene import create_departed_contact_detector
+from backstop_mcp.features.data_hygiene import create_employment_index_factory
 from backstop_mcp.logging import configure_logging, get_logger
 from backstop_mcp.metrics import configure_metrics, metrics_endpoint
 from backstop_mcp.server.middleware import CustomFieldGlossaryMiddleware, TraceContextMiddleware
@@ -106,7 +106,7 @@ def create_app(
         overrides=_field_overrides(backstop_config.custom_field_overrides),
         ttl_minutes=backstop_config.custom_field_schema_ttl_minutes,
     )
-    departed_contacts = create_departed_contact_detector(
+    employment_index_factory = create_employment_index_factory(
         employment_type_ids=backstop_config.employment_relationship_type_ids,
         employment_type_markers=backstop_config.employment_relationship_type_markers,
         former_type_ids=backstop_config.former_employment_relationship_type_ids,
@@ -116,7 +116,7 @@ def create_app(
         Services(
             backstop=backstop_clients,
             custom_fields=custom_fields_service,
-            departed_contacts=departed_contacts,
+            employment_index_factory=employment_index_factory,
         )
     )
 

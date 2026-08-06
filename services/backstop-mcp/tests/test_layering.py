@@ -22,14 +22,14 @@
    because a feature is allowed to be configured — a transport is only allowed to be told.
 
 4. **A package is entered through its `__init__`, never through its modules.** From outside,
-   `from backstop_mcp.features.data_hygiene import DepartedContactDetector` — not
+   `from backstop_mcp.features.data_hygiene import EmploymentIndexFactory` — not
    `...data_hygiene.service import ...`, and certainly not `...data_hygiene.employment import
    detect_departed_employment`. Each package's `__all__` is then the whole of what it promises,
    and everything else is free to move.
 
    This is what makes a package able to say "call it this way". `data_hygiene/employment.py`
    decides nothing until it is handed an employment vocabulary, the side-loaded relationship
-   types and a clock; `DepartedContactDetector` supplies all three, from configuration, once.
+   types and a clock; `EmploymentIndexFactory` supplies all three, from configuration, once.
    Reaching past it is how the original bug happened — `get_person` assembled its own vocabulary
    with `BackstopConfig()`, so whatever `create_app` had been given was silently ignored.
    `__all__` alone is only a convention; this rule is what makes it hold.
@@ -199,7 +199,7 @@ class TestTheDetectionItself:
 
     def test_does_not_fire_on_the_package_root(self) -> None:
         assert not _internal_imports(
-            "from backstop_mcp.features.data_hygiene import DepartedContactDetector\n"
+            "from backstop_mcp.features.data_hygiene import EmploymentIndexFactory\n"
             + "from backstop_mcp.server.runtime import get_services\n"
             + "from backstop_mcp.features.resolution import Resolved\n",
             _SRC / "server" / "tools",

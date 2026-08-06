@@ -131,7 +131,7 @@ class TestWiring:
         app = create_app(**configs)  # pyright: ignore[reportArgumentType]
 
         with TestClient(app):
-            rules = get_services().departed_contacts.rules
+            rules = get_services().employment_index_factory.rules
 
         assert rules.employment.type_ids == frozenset({"ert-9"})
         assert rules.employment.name_markers == frozenset({"placement at"})
