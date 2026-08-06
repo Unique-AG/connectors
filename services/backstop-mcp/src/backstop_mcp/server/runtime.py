@@ -12,6 +12,7 @@ place to reset.
 from dataclasses import dataclass
 
 from backstop_mcp.backstop_client import BackstopClient, BackstopClientFactory
+from backstop_mcp.features.custom_fields import CustomFieldsService
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,7 @@ class Services:
     """Everything a tool or middleware may need, resolved once at startup."""
 
     backstop: BackstopClientFactory
+    custom_fields: CustomFieldsService
 
 
 _services: Services | None = None
@@ -61,3 +63,7 @@ async def get_backstop_client() -> BackstopClient:
     caller hasn't completed the login flow.
     """
     return await get_services().backstop.for_current_caller()
+
+
+def get_custom_fields_service() -> CustomFieldsService:
+    return get_services().custom_fields

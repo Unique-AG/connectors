@@ -9,10 +9,12 @@ a Backstop username + personal API token. That credential is verified against Ba
 never as a shared service account. Failed logins are rate-limited per username
 (`AUTH_LOGIN_MAX_ATTEMPTS`) so the form can't be used to test credentials against Backstop.
 
-This PR adds the Backstop HTTP client, the OAuth/login bridge, and a name-to-record lookup library
-(`party_resolver`) that resolves "Capstone" or "Investor Status" against the live instance. No MCP
+This PR adds CRM custom-field schema discovery and caching (`features/custom_fields`) on top of
+the Backstop client, the OAuth/login bridge, and the `party_resolver` name-to-record lookup
+library. The schema is fetched lazily (or warmed at startup with an optional service account),
+cached in Postgres with a TTL, and enriched with human-facing glossaries per entity type. No MCP
 tools are exposed yet — `list_custom_fields`, `get_organization`, `get_person`, and
-`get_system_info` land in a later PR, once custom-field schema discovery is in place.
+`get_system_info` land in a later PR.
 
 ## Layout
 
@@ -25,11 +27,12 @@ src/backstop_mcp/
     resolution.py          the shared "which record is that?" algebra + ambiguity policy
     entity_types.py        canonical Backstop entity-type vocabulary
     auth/                  Backstop credential bridging: login form, encryption, token rotation
+    custom_fields/         CRM custom-field schema discovery, caching and resolution
     party_resolver/        name / email / trusted-ID lookup for organizations, people, contacts
   server/                how it's exposed over MCP — no tools registered yet
     runtime.py             the process-wide service holder tools will reach through
     tools/                 empty registry until the first tool lands
-    middleware/            empty until the custom-field glossary middleware lands
+    middleware/            the custom-field glossary middleware (tools/list enrichment)
   backstop_client/       HTTP transport: auth headers, concurrency gate, retries, pagination
   db/                    SQLAlchemy models, engine, alembic migrations
 ```
@@ -51,7 +54,8 @@ uv run backstop-mcp
 - MCP endpoint: `http://localhost:9010/mcp` (HTTP transport)
 - Health: `GET /health` — liveness via `unique_mcp.monitoring.setup_ops`
 - Probe: `GET /probe` — process-up (setup_ops)
-- Ready: `GET /ready` — 503 when Postgres is unreachable
+- Ready: `GET /ready` — 503 when Postgres is unreachable; also reports whether the custom-field
+  schema has loaded (never gates readiness — it fills lazily by design)
 - Metrics: `GET /metrics` — Prometheus (setup_ops)
 
 Generate an encryption key with:
