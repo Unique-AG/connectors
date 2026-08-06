@@ -29,6 +29,7 @@ from unique_toolkit.experimental.components.internal_search import (
     KnowledgeBaseInternalSearchService,
 )
 
+from kb_mcp.correlation import correlation_id
 from kb_mcp.references import (
     REFERENCE_FORMAT_INFORMATION,
     chunk_to_text_content,
@@ -82,10 +83,17 @@ async def search(
 ) -> CallToolResult:
     """Search the knowledge base using ``SearchToolConfig`` from the config meta key."""
     kb_settings = get_settings()
+    cid: str | None = None
 
     try:
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.
         settings = await get_unique_settings_async()
+        cid = correlation_id(
+            settings.authcontext.get_confidential_user_id(),
+            settings.authcontext.get_confidential_company_id(),
+        )
+        _LOGGER.info("search start correlation_id=%s", cid)
+
         service = KnowledgeBaseInternalSearchService.from_config(
             config.service_config
         ).bind_settings(settings)
@@ -98,7 +106,9 @@ async def search(
         )
         chunks = await post_processor.process(result)
     except Exception as exc:
-        _LOGGER.exception("search error")
+        _LOGGER.exception(
+            "search error correlation_id=%s error_type=%s", cid, type(exc).__name__
+        )
         return CallToolResult(
             isError=True, content=[TextContent(type="text", text=str(exc))]
         )
@@ -127,4 +137,5 @@ async def search(
     if content:
         content.append(citation_instruction_content())
 
+    _LOGGER.info("search complete correlation_id=%s result_count=%d", cid, len(chunks))
     return CallToolResult(content=cast(list[ContentBlock], content))

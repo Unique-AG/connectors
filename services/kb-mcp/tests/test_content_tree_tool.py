@@ -1,5 +1,6 @@
 """Tests for the content_tree tool — mode dispatch, validation, cache, filtering."""
 
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -89,6 +90,23 @@ async def test_mode_tree_calls_render_visible_tree_only():
     mock_tree.search_visible_files_fuzzy_async.assert_not_called()
     assert isinstance(result, CallToolResult)
     assert result.content[0].text == "tree output"  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_logs_never_contain_raw_user_or_company_id(caplog):
+    """user_id/company_id are confidential; logs must carry a correlation
+    id derived from them, never the raw values."""
+    mock_tree = _make_mock_tree()
+    with (
+        caplog.at_level(logging.INFO, logger="kb_mcp"),
+        patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree),
+    ):
+        await content_tree(mode="tree", config=ContentTreeToolConfig())
+
+    assert caplog.records, "expected at least one log record"
+    for record in caplog.records:
+        assert "user-1" not in record.getMessage()
+        assert "company-1" not in record.getMessage()
 
 
 @pytest.mark.asyncio

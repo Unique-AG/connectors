@@ -1,5 +1,6 @@
 """Tests for the search tool — config schema, routing logic, and references."""
 
+import logging
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -76,11 +77,18 @@ def _patch_post_processor(chunks: list):
     )
 
 
+def _make_identity(company_id: str = "company-1", user_id: str = "user-1"):
+    settings = MagicMock()
+    settings.authcontext.get_confidential_company_id.return_value = company_id
+    settings.authcontext.get_confidential_user_id.return_value = user_id
+    return settings
+
+
 def _patch_identity():
     """Per-request identity resolves in-body via unique_mcp; return a stub."""
     return patch(
         "kb_mcp.tools.search.tool.get_unique_settings_async",
-        new=AsyncMock(return_value=MagicMock()),
+        new=AsyncMock(return_value=_make_identity()),
     )
 
 
@@ -127,6 +135,35 @@ async def test_search_calls_kb_service():
     assert isinstance(result, CallToolResult)
     # result chunks + trailing citation instruction
     assert len(result.content) == 2
+
+
+@pytest.mark.asyncio
+async def test_logs_never_contain_raw_user_or_company_id(caplog):
+    """user_id/company_id are confidential; logs must carry a correlation
+    id derived from them, never the raw values."""
+    chunks = [_make_chunk("result A")]
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = MagicMock()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    with (
+        caplog.at_level(logging.INFO, logger="kb_mcp"),
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ),
+        _patch_post_processor(chunks),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        await search(search_string="test query", config=SearchToolConfig())
+
+    assert caplog.records, "expected at least one log record"
+    for record in caplog.records:
+        assert "user-1" not in record.getMessage()
+        assert "company-1" not in record.getMessage()
 
 
 @pytest.mark.asyncio

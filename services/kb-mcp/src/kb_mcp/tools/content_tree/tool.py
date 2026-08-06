@@ -26,6 +26,7 @@ from unique_toolkit.experimental.resources.feature_flags._ttl_cache import (
     AsyncTTLCache,
 )
 
+from kb_mcp.correlation import correlation_id
 from kb_mcp.references import file_reference_url, markdown_citation_link
 from kb_mcp.settings import Settings, get_settings
 from kb_mcp.tools.content_tree.config import (
@@ -178,6 +179,7 @@ async def content_tree(
     call with refresh=true (expect a slower ~20s refetch).
     """
     kb_settings = get_settings()
+    cid: str | None = None
     try:
         if mode == "search" and not query:
             return CallToolResult(
@@ -194,6 +196,8 @@ async def content_tree(
         settings = await get_unique_settings_async()
         company_id = settings.authcontext.get_confidential_company_id()
         user_id = settings.authcontext.get_confidential_user_id()
+        cid = correlation_id(user_id, company_id)
+        _LOGGER.info("content_tree start correlation_id=%s mode=%s", cid, mode)
 
         cache = _get_tree_cache(kb_settings)
 
@@ -219,6 +223,7 @@ async def content_tree(
                 metadata_filter=metadata_filter,
                 max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
             )
+            _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
             return CallToolResult(content=[TextContent(type="text", text=text)])
 
         if mode == "list":
@@ -246,6 +251,12 @@ async def content_tree(
                 for content_info, segments in rows
             ]
             text = "\n".join(lines) if lines else "No visible files match."
+            _LOGGER.info(
+                "content_tree complete correlation_id=%s mode=%s result_count=%d",
+                cid,
+                mode,
+                len(rows),
+            )
             return CallToolResult(content=[TextContent(type="text", text=text)])
 
         assert query is not None and mode == "search"
@@ -269,9 +280,20 @@ async def content_tree(
             for m in matches
         ]
         text = "\n".join(lines) if lines else "No matching files found."
+        _LOGGER.info(
+            "content_tree complete correlation_id=%s mode=%s result_count=%d",
+            cid,
+            mode,
+            len(matches),
+        )
         return CallToolResult(content=[TextContent(type="text", text=text)])
     except Exception as exc:
-        _LOGGER.exception("content_tree error")
+        _LOGGER.exception(
+            "content_tree error correlation_id=%s mode=%s error_type=%s",
+            cid,
+            mode,
+            type(exc).__name__,
+        )
         return CallToolResult(
             isError=True, content=[TextContent(type="text", text=str(exc))]
         )

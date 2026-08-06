@@ -1,5 +1,6 @@
 """Tests for the read_file tool — extension dispatch, size cutoff, page ranges."""
 
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -71,6 +72,23 @@ async def test_unsupported_extension_returns_error_without_downstream_calls():
     assert result.isError is True
     assert "unsupported file type for read_file: .xlsx" in result.content[0].text  # type: ignore[union-attr]
     mock_download.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_logs_never_contain_raw_user_or_company_id(caplog):
+    """user_id/company_id are confidential; logs must carry a correlation
+    id derived from them, never the raw values."""
+    content = _make_content("report.xlsx")
+    with (
+        caplog.at_level(logging.INFO, logger="kb_mcp"),
+        _patch_search_contents(content),
+    ):
+        await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert caplog.records, "expected at least one log record"
+    for record in caplog.records:
+        assert "user-1" not in record.getMessage()
+        assert "company-1" not in record.getMessage()
 
 
 @pytest.mark.asyncio
