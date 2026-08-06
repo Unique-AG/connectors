@@ -4,15 +4,11 @@ from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
-from unique_mcp.auth.zitadel.oidc_proxy import (
-    ZitadelOIDCProxySettings,
-    create_zitadel_oidc_proxy,
-)
-from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
 from unique_mcp.logging import configure_logging
 from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
 
+from kb_mcp.auth import build_auth
 from kb_mcp.references import SERVER_CITATION_INSTRUCTIONS
 from kb_mcp.settings import get_settings
 
@@ -24,22 +20,7 @@ def main() -> None:
     configure_tracing(service_name="kb-mcp")
     configure_logging()
 
-    oidc_proxy = create_zitadel_oidc_proxy(
-        mcp_server_base_url=settings.base_url.encoded_string(),
-        zitadel_oidc_proxy_settings=ZitadelOIDCProxySettings(
-            base_url=settings.zitadel_base_url,
-            client_id=settings.zitadel_client_id,
-            client_secret=settings.zitadel_client_secret.get_secret_value(),
-        ),
-        # Zitadel often issues opaque (non-JWT) access tokens even when the app
-        # is configured for JWT. Verify the OIDC id_token instead so the
-        # token-swap after /token succeeds; otherwise every /mcp call returns
-        # invalid_token despite a successful login.
-        verify_id_token=True,
-    )
-    # OIDCProxy does not advertise scopes by default; without this, DCR rejects
-    # openid/profile and clients fail authorize (invalid_scope → invalid_token).
-    oidc_proxy.update_default_scopes(list(ZITADEL_DEFAULT_MCP_SCOPES))
+    oidc_proxy = build_auth(settings)
 
     mcp = FastMCP(
         "Knowledge Base Search",
