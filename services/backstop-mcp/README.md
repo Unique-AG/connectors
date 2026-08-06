@@ -2,11 +2,16 @@
 
 An MCP server over the [Backstop](https://www.backstopsolutions.com/) CRM REST API.
 
-This PR is scaffolding only: app wiring, config, database engine, and Alembic migrations. The
-service starts, reports readiness against Postgres, and exposes no MCP tools yet. OAuth
-credential bridging to Backstop (a client registers dynamically, gets redirected to a login form
-hosted here, and submits a Backstop username + personal API token) lands next, followed by the
-feature packages and tools that use it.
+Backstop has no OAuth, so this service *is* the OAuth 2.1 authorization server for its MCP
+clients. A client registers dynamically, gets redirected to a login form hosted here, and submits
+a Backstop username + personal API token. That credential is verified against Backstop, encrypted
+(AES-256-GCM) and stored in Postgres; every tool call would then act as that user against
+Backstop — never as a shared service account. Failed logins are rate-limited per username
+(`AUTH_LOGIN_MAX_ATTEMPTS`) so the form can't be used to test credentials against Backstop.
+
+This PR adds the shared Backstop HTTP client and the OAuth credential bridge. The service starts,
+authenticates MCP clients, and lets them log in against Backstop — it still exposes no MCP tools.
+The feature packages and tools that use the client land in later PRs.
 
 ## Layout
 
@@ -15,9 +20,14 @@ src/backstop_mcp/
   app.py                 composition root — every config and collaborator is built here, once
   config.py              one BaseSettings class per concern, read only at the root
   logging.py metrics.py  cross-cutting, used by both sides below
-  features/              what the connector does — empty until the first feature lands
-  server/                how it's exposed over MCP — empty until the first tool lands
-  db/                    SQLAlchemy engine/session helpers, alembic migrations
+  features/              what the connector does
+    auth/                  Backstop credential bridging: login form, encryption, token rotation
+  server/                how it's exposed over MCP
+    runtime.py             the process-wide service holder tools reach through
+    tools/                 tool functions + the single registry declaring them — empty for now
+    middleware/             FastMCP and ASGI middleware — empty for now
+  backstop_client/       HTTP transport: auth headers, concurrency gate, retries, pagination
+  db/                    SQLAlchemy models, engine, alembic migrations
 ```
 
 The layering rule is that **nothing under `features/` may import from `server/`** — the server
@@ -28,7 +38,7 @@ each package arrives.
 
 ```bash
 cd services/backstop-mcp
-cp .env.example .env   # fill DB_*
+cp .env.example .env   # fill BACKSTOP_MCP_ENCRYPTION_KEY and DB_*
 uv sync
 uv run alembic upgrade head
 uv run backstop-mcp
@@ -40,6 +50,12 @@ uv run backstop-mcp
 - Ready: `GET /ready` — 503 when Postgres is unreachable
 - Metrics: `GET /metrics` — Prometheus (setup_ops)
 
+Generate an encryption key with:
+
+```bash
+python -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
+```
+
 ## Migrations
 
 ```bash
@@ -48,9 +64,6 @@ uv run alembic revision --autogenerate -m "message"  # create
 uv run alembic downgrade -1                          # roll back one
 ```
 
-There are no versions under `db/migrations/versions/` yet — `upgrade head` is a no-op until the
-first feature adds tables.
-
 ## Tests
 
 Integration tests start a Postgres container and run the migrations against it, so Docker must be
@@ -58,6 +71,7 @@ running.
 
 ```bash
 uv run pytest
+uv run pytest tests/features/auth -k refresh   # a subset
 ```
 
 ## Lint & type-check
