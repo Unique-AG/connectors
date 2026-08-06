@@ -116,76 +116,6 @@ def _to_record(edge: EmploymentEdge) -> EmploymentRecord:
     return EmploymentRecord(status=edge.status, departure=departure)
 
 
-def detect_departed_employment(
-    *,
-    relationships: list[dict[str, object]],
-    relationship_types: list[dict[str, object]],
-    rules: EmploymentRules,
-    today: date,
-) -> DepartedEmployment | None:
-    """The person's departed employment, or None while employment at that organization is current.
-
-    Decided per organization rather than per relationship. A tenant keeps `is employee of` and
-    `is a former employee of` as separate records against the *same* organization, and the order
-    of `included` is arbitrary, so a first-match scan would answer by array position: one live
-    relationship to an organization outranks any number of ended ones, whichever came back first.
-
-    Departed when the relationship's type says past employment, or when its `endDate` has passed.
-
-    One departure is reported even when the person has left several organizations, chosen by
-    `_strongest_departure` so the answer never depends on the order of `included`.
-
-    Keyword-only throughout: `relationships` and `relationship_types` are both
-    `list[dict[str, object]]` and would transpose without a type error, and a swap fails
-    silently — nothing parses, so every person reads as current.
-    """
-    type_names = _relationship_type_names(resources=relationship_types)
-    departures_by_organization_id: dict[str, DepartedEmployment] = {}
-    currently_employed_organization_ids: set[str] = set()
-
-    for raw in relationships:
-        parsed = _safe_parse_relationship(raw=raw)
-        if parsed is None:
-            continue
-        attrs, type_id = parsed
-        employer = _employer_side(attrs=attrs)
-        if employer is None:
-            continue
-
-        type_name = type_names.get(type_id) if type_id is not None else None
-        status = classify_employment(type_id=type_id, type_name=type_name, rules=rules)
-        if status is EmploymentStatus.IRRELEVANT:
-            # Neither vouches for the person nor speaks against them.
-            continue
-
-        # Parsed whichever way the type classified, so a former-employment record that also
-        # carries a date still reports it rather than dropping it.
-        ended = _safe_parse_date(raw=attrs.end_date)
-        if status is EmploymentStatus.FORMER:
-            signal = DepartureSignal.FORMER_TYPE
-        elif ended is not None and ended < today:
-            signal = DepartureSignal.END_DATE
-        else:
-            currently_employed_organization_ids.add(employer.organization_id)
-            continue
-
-        departures_by_organization_id.setdefault(
-            employer.organization_id,
-            DepartedEmployment(
-                signal=signal,
-                organization_id=employer.organization_id,
-                organization_type=employer.organization_type,
-                end_date=ended.isoformat() if ended is not None else None,
-                relationship_type_id=type_id,
-                relationship_type_name=type_name,
-            ),
-        )
-
-    return _strongest_departure(
-        departures=departures_by_organization_id, current=currently_employed_organization_ids
-    )
-
-
 def classify_employment(
     *,
     type_id: str | None,
@@ -217,28 +147,6 @@ def classify_employment(
         # could not classify.
         return EmploymentStatus.CURRENT
     return EmploymentStatus.IRRELEVANT
-
-
-def _strongest_departure(
-    *, departures: dict[str, DepartedEmployment], current: set[str]
-) -> DepartedEmployment | None:
-    """The one departure to report, out of every organization the person has left.
-
-    The response carries a single signal, so a person with two ended employments needs a rule
-    that does not read off array position. Stronger evidence first — the CRM naming someone a past
-    employee outranks an end date that merely elapsed — then the lowest organization id, which is
-    arbitrary but fixed for a given record.
-    """
-    unresolved = [departure for key, departure in departures.items() if key not in current]
-    if not unresolved:
-        return None
-    return min(
-        unresolved,
-        key=lambda departure: (
-            departure.signal is not DepartureSignal.FORMER_TYPE,
-            departure.organization_id,
-        ),
-    )
 
 
 def _relationship_type_names(*, resources: list[dict[str, object]]) -> dict[str, str]:
@@ -351,9 +259,10 @@ def _employment_edges(
     matched — `person_side` only needs to be threaded through for callers building an index (a
     later addition) that must record which id belongs to which entity type.
 
-    `IRRELEVANT` edges are dropped, same as in `detect_departed_employment`. An edge with no
-    usable date at all (`effective_date=None`) is kept: it sorts last downstream rather than
-    being dropped outright, so it still wins when it is the only edge for its pair.
+    `IRRELEVANT` edges are dropped — they neither vouch for the person nor speak against them, so
+    they carry no employment signal for `EmploymentIndex` to fold. An edge with no usable date at
+    all (`effective_date=None`) is kept: it sorts last downstream rather than being dropped
+    outright, so it still wins when it is the only edge for its pair.
     """
     type_names = _relationship_type_names(resources=relationship_types)
     edges: list[EmploymentEdge] = []
@@ -391,8 +300,7 @@ def _employment_edges(
             )
         elif ended is not None and ended < today:
             # A `CURRENT`-type relationship whose own end date has already passed: rewritten to a
-            # departure dated at that `endDate`, same as `detect_departed_employment`'s END_DATE
-            # branch, so the two paths agree on what "departed" means.
+            # departure dated at that `endDate`.
             status = EmploymentStatus.FORMER
             effective_date = ended
             evidence = DepartedEmployment(
