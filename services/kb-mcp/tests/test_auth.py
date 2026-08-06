@@ -60,6 +60,16 @@ def test_build_auth_never_passes_none_client_storage(durable_settings):
     assert kwargs["client_storage"] is not None
 
 
+def test_build_auth_passes_required_scopes(durable_settings):
+    with patch("kb_mcp.auth.create_zitadel_oidc_proxy") as mock_create:
+        mock_create.return_value = MagicMock()
+        build_auth(durable_settings)
+
+    _, kwargs = mock_create.call_args
+    assert kwargs["required_scopes"]
+    assert kwargs["verify_id_token"] is True
+
+
 def test_build_auth_passes_storage_even_in_ephemeral_dev_mode(ephemeral_settings):
     with patch("kb_mcp.auth.create_zitadel_oidc_proxy") as mock_create:
         mock_create.return_value = MagicMock()

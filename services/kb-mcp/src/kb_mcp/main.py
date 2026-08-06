@@ -2,8 +2,6 @@ from pathlib import Path
 
 from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
-from starlette.middleware import Middleware
-from starlette.middleware.cors import CORSMiddleware
 from unique_mcp.logging import configure_logging
 from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
@@ -29,15 +27,9 @@ def main() -> None:
         providers=[FileSystemProvider(Path(__file__).parent / "tools")],
     )
 
-    # Bearer auth (Authorization header) — no cookies, so no allow_credentials.
-    # Wildcard + credentials would reflect any Origin (credentialed CORS hole).
+    # /mcp is called server-side (not from a browser) and OAuth redirects are
+    # top-level navigation, not XHR — CORS never applies here.
     middleware = [
-        Middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_methods=["*"],
-            allow_headers=["*"],
-        ),
         # HTTP Prometheus metrics; MCP tool spans come from FastMCP + configure_tracing.
         setup_ops(mcp),
     ]

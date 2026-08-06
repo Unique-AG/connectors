@@ -22,7 +22,6 @@ from kb_mcp.references import (
     scope_id_from_folder_id_path,
 )
 from kb_mcp.tools.search import SearchToolConfig, search
-from kb_mcp.tools.search.tool import _TOOL_DESCRIPTION
 
 
 def test_json_schema_has_service_config():
@@ -52,8 +51,10 @@ def test_default_config_round_trips():
 
 
 def test_tool_description_includes_citation_rules():
-    assert "Do NOT invent placeholders like [source1]" in _TOOL_DESCRIPTION
-    assert REFERENCE_FORMAT_INFORMATION in _TOOL_DESCRIPTION
+    description = search.__fastmcp__.description
+    assert description is not None
+    assert "Do NOT invent placeholders like [source1]" in description
+    assert REFERENCE_FORMAT_INFORMATION in description
 
 
 def _make_chunk(text: str, **kwargs) -> ContentChunk:

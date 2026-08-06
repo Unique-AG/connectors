@@ -56,21 +56,6 @@ class SupportedFileExtension(RootModel[str]):
         return self.root in _CHUNKED_EXTENSIONS
 
 
-_TOOL_DESCRIPTION = (
-    "Read a specific knowledge-base file's text content. Requires "
-    "`content_id` (from a prior content_tree 'list'/'search' call). "
-    "For large files, pass `start_page`/`end_page` to read a portion — for "
-    "PDFs/DOCX these are real document pages; for plain-text formats "
-    "(.txt/.md/.html/.json/.csv) they're fixed-size virtual pages, same "
-    "semantics either way. If the file is too large and no range is given, "
-    "the call returns an informative error (with the file's total token/page "
-    "count) instead of silently truncating — use that to pick a range. Ranges "
-    "are also token-capped; if a range is too large, narrow it (a single-page "
-    "request always succeeds). Successful reads start with a markdown link "
-    "that opens the file in the Unique knowledge base — paste it as-is when "
-    "citing the file."
-)
-
 _META = merge_tool_meta(
     {
         "unique.app/icon": "file-text",
@@ -233,7 +218,6 @@ def _virtual_page_token_bounds(
 
 @tool(
     name="read_file",
-    description=_TOOL_DESCRIPTION,
     meta=_META,
     annotations=ToolAnnotations(
         readOnlyHint=True,
@@ -262,7 +246,19 @@ async def read_file(
     ] = None,
     config: ReadFileToolConfig = Depends(get_tool_config(ReadFileToolConfig)),
 ) -> CallToolResult:
-    """Read one KB file by content_id; dispatch by extension."""
+    """Read a specific knowledge-base file's text content. Requires
+    `content_id` (from a prior content_tree 'list'/'search' call).
+    For large files, pass `start_page`/`end_page` to read a portion — for
+    PDFs/DOCX these are real document pages; for plain-text formats
+    (.txt/.md/.html/.json/.csv) they're fixed-size virtual pages, same
+    semantics either way. If the file is too large and no range is given,
+    the call returns an informative error (with the file's total token/page
+    count) instead of silently truncating — use that to pick a range. Ranges
+    are also token-capped; if a range is too large, narrow it (a single-page
+    request always succeeds). Successful reads start with a markdown link
+    that opens the file in the Unique knowledge base — paste it as-is when
+    citing the file.
+    """
     kb_settings = get_settings()
     try:
         # In-body (not Depends) so identity-refusal ValueError surfaces as a tool error.

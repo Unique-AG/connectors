@@ -17,7 +17,7 @@ from kb_mcp.settings import Settings
 
 
 def build_auth(settings: Settings) -> OIDCProxy:
-    oidc_proxy = create_zitadel_oidc_proxy(
+    return create_zitadel_oidc_proxy(
         mcp_server_base_url=settings.base_url.encoded_string(),
         zitadel_oidc_proxy_settings=ZitadelOIDCProxySettings(
             base_url=settings.zitadel_base_url,
@@ -30,8 +30,12 @@ def build_auth(settings: Settings) -> OIDCProxy:
         # token-swap after /token succeeds; otherwise every /mcp call returns
         # invalid_token despite a successful login.
         verify_id_token=True,
+        # OIDCProxy's docstring warns required_scopes causes an invalid_token
+        # loop — stale for verify_id_token=True: FastMCP only wires
+        # required_scopes into the JWT verifier when verify_id_token=False.
+        # With verify_id_token=True it withholds them from the verifier (id
+        # tokens carry no scope claim) and instead records them as
+        # self.required_scopes + calls update_default_scopes for us
+        # (fastmcp.server.auth.oidc_proxy.OIDCProxy.__init__).
+        required_scopes=list(ZITADEL_DEFAULT_MCP_SCOPES),
     )
-    # OIDCProxy does not advertise scopes by default; without this, DCR rejects
-    # openid/profile and clients fail authorize (invalid_scope → invalid_token).
-    oidc_proxy.update_default_scopes(list(ZITADEL_DEFAULT_MCP_SCOPES))
-    return oidc_proxy

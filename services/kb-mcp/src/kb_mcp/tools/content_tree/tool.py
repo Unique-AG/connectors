@@ -72,23 +72,6 @@ def _get_tree_cache(settings: Settings) -> AsyncTTLCache:
     return _tree_cache
 
 
-_TOOL_DESCRIPTION = (
-    "Browse the knowledge base's visible file/folder structure. Pick a "
-    "`mode`; only that mode's args below apply, rest ignored. '*' = required.\n"
-    "- mode='tree': max_depth — first orientation view of folders/files.\n"
-    "- mode='list': folder_path, limit — flat listing; each result's "
-    "content_id is needed for a later read_file call.\n"
-    "- mode='search': query*, limit, min_score, match_on, case_sensitive — "
-    "fuzzy filename/path lookup when you know roughly what it's called but "
-    "not where.\n"
-    "'list' and 'search' rows start with a markdown link that opens the file "
-    "in the Unique knowledge base — paste it as-is when referring the user to "
-    "a file; use the content_id for read_file calls.\n"
-    "Listings are cached per user (~30 min); repeat calls are fast. When the "
-    "user says they added, deleted, or changed files and needs a fresh tree, "
-    "call with refresh=true (expect a slower ~20s refetch)."
-)
-
 _META = merge_tool_meta(
     {
         "unique.app/icon": "folder-tree",
@@ -106,7 +89,6 @@ _META = merge_tool_meta(
 
 @tool(
     name="content_tree",
-    description=_TOOL_DESCRIPTION,
     meta=_META,
     annotations=ToolAnnotations(
         readOnlyHint=True,
@@ -180,7 +162,21 @@ async def content_tree(
     ] = False,
     config: ContentTreeToolConfig = Depends(get_tool_config(ContentTreeToolConfig)),
 ) -> CallToolResult:
-    """Dispatch to ContentTree by mode; validate mode='search' needs query."""
+    """Browse the knowledge base's visible file/folder structure. Pick a
+    `mode`; only that mode's args below apply, rest ignored. '*' = required.
+    - mode='tree': max_depth — first orientation view of folders/files.
+    - mode='list': folder_path, limit — flat listing; each result's
+    content_id is needed for a later read_file call.
+    - mode='search': query*, limit, min_score, match_on, case_sensitive —
+    fuzzy filename/path lookup when you know roughly what it's called but
+    not where.
+    'list' and 'search' rows start with a markdown link that opens the file
+    in the Unique knowledge base — paste it as-is when referring the user to
+    a file; use the content_id for read_file calls.
+    Listings are cached per user (~30 min); repeat calls are fast. When the
+    user says they added, deleted, or changed files and needs a fresh tree,
+    call with refresh=true (expect a slower ~20s refetch).
+    """
     kb_settings = get_settings()
     try:
         if mode == "search" and not query:
