@@ -15,13 +15,27 @@ from pydantic import BaseModel, ConfigDict, Field
 PERSON_SIDE_TYPES: frozenset[str] = frozenset({"people", "contacts", "employees"})
 ORG_SIDE_TYPES: frozenset[str] = frozenset({"organizations"})
 
-# Including `entityRelationships` alone leaves each relationship's own `entityRelationshipType`
-# linkage empty, and the type id lives nowhere else on the record. The nested hop fills both in
-# on one GET, which is what lets the detector classify without a second request.
-ENTITY_RELATIONSHIPS_INCLUDE = "entityRelationships,entityRelationships.entityRelationshipType"
-ENTITY_RELATIONSHIPS_RELATIONSHIP = "entityRelationships"
-ENTITY_RELATIONSHIP_TYPE_RELATIONSHIP = "entityRelationshipType"
-ENTITY_RELATIONSHIP_TYPES_RESOURCE = "entity-relationship-types"
+class EntityRelationshipInclude(StrEnum):
+    """Backstop `?include=` values for side-loading employment relationships.
+
+    Nested hop is required: including `entityRelationships` alone leaves each
+    relationship's `entityRelationshipType` linkage empty.
+    """
+
+    ENTITY_RELATIONSHIPS = "entityRelationships"
+    ENTITY_RELATIONSHIP_TYPE = "entityRelationships.entityRelationshipType"
+
+    @classmethod
+    def for_employment(cls) -> str:
+        return f"{cls.ENTITY_RELATIONSHIPS},{cls.ENTITY_RELATIONSHIP_TYPE}"
+
+
+class EntityRelationshipRef(StrEnum):
+    """JSON:API names used when reading entity-relationship side-loads."""
+
+    RELATIONSHIPS = "entityRelationships"
+    TYPE = "entityRelationshipType"
+    TYPES_RESOURCE = "entity-relationship-types"
 
 
 class EntityRefAttributes(BaseModel):

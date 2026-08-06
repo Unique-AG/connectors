@@ -2,7 +2,12 @@ import asyncio
 from collections.abc import Mapping, Sequence
 from urllib.parse import quote
 
-from backstop_mcp.backstop_client import BackstopApiDocument, BackstopApiResource, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiCollectionDocument,
+    BackstopApiResource,
+    BackstopApiResourceDocument,
+    BackstopClient,
+)
 from backstop_mcp.features.party_resolver.email import looks_like_email
 from backstop_mcp.features.party_resolver.types import (
     PartyAttributes,
@@ -15,7 +20,8 @@ from backstop_mcp.features.resolution import Candidate
 
 # Plain assignments (not `type` statements) — `schema=` needs a real class object, and a PEP 695
 # type alias isn't assignable to `type[T]` even though it resolves to one at runtime.
-_PartyDocument = BackstopApiDocument[PartyAttributes]
+_PartyCollectionDocument = BackstopApiCollectionDocument[PartyAttributes]
+_PartyResourceDocument = BackstopApiResourceDocument[PartyAttributes]
 _PartyResource = BackstopApiResource[PartyAttributes]
 
 _EMAIL_FIELDS: Mapping[SearchType, tuple[str, ...]] = {
@@ -48,7 +54,7 @@ async def search_by_email(
             client.get(
                 f"/{search_type}",
                 params={f"filter[{field}][eq]": email},
-                schema=_PartyDocument,
+                schema=_PartyCollectionDocument,
             )
             for field in fields
         )
@@ -77,7 +83,7 @@ async def quick_search(
             search=search,
             options=resolved_options,
         ),
-        schema=_PartyDocument,
+        schema=_PartyCollectionDocument,
     )
     return _candidates_from_document(response, search_type=search_type)
 
@@ -93,12 +99,9 @@ async def fetch_party_name(
     document = await client.get(
         f"/{search_type}/{quote(party_id, safe='')}",
         params={"fields": "name,firstName,lastName"},
-        schema=_PartyDocument,
+        schema=_PartyResourceDocument,
     )
-    data = document.data
-    if data is None or isinstance(data, list):
-        return None
-    return _display_name(data.attributes)
+    return document.data.attributes.display_name()
 
 
 def _quick_search_params(
@@ -136,7 +139,7 @@ def _bool_param(value: bool) -> str:
 
 
 def _merge_candidates(
-    documents: Sequence[_PartyDocument], *, search_type: SearchType
+    documents: Sequence[_PartyCollectionDocument], *, search_type: SearchType
 ) -> tuple[PartyCandidate, ...]:
     seen_ids: set[str] = set()
     merged: list[PartyCandidate] = []
@@ -150,17 +153,10 @@ def _merge_candidates(
 
 
 def _candidates_from_document(
-    document: _PartyDocument, *, search_type: SearchType
+    document: _PartyCollectionDocument, *, search_type: SearchType
 ) -> tuple[PartyCandidate, ...]:
-    data = document.data
-    if data is None:
-        resources: list[_PartyResource] = []
-    elif isinstance(data, list):
-        resources = data
-    else:
-        resources = [data]
     return tuple(
-        _candidate_from_resource(resource, search_type=search_type) for resource in resources
+        _candidate_from_resource(resource, search_type=search_type) for resource in document.data
     )
 
 
@@ -171,18 +167,10 @@ def _candidate_from_resource(
     # schema validation; a blank `type` still falls back to "resource" here since that's a
     # caller-side display concern, not a structural defect the schema should reject.
     resource_type = resource.type or "resource"
-    name = _display_name(resource.attributes)
+    name = resource.attributes.display_name()
     label = name if name is not None else f"{resource_type} #{resource.id}"
     return Candidate(
         key=resource.id,
         label=label,
         value=ResolvedParty(id=resource.id, type=search_type, name=name),
     )
-
-
-def _display_name(attributes: PartyAttributes) -> str | None:
-    if attributes.name:
-        return attributes.name
-
-    composed = " ".join(part for part in (attributes.first_name, attributes.last_name) if part)
-    return composed or None

@@ -46,4 +46,4 @@ class TestSearchByEmailSchemaValidation:
             await search_by_email(client, search_type="organizations", email=email)
 
         assert exc_info.value.path == "/organizations"
-        assert exc_info.value.schema_name == "BackstopApiDocument[PartyAttributes]"
+        assert exc_info.value.schema_name == "BackstopApiCollectionDocument[PartyAttributes]"

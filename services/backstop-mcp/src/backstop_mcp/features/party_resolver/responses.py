@@ -1,9 +1,15 @@
 """Party-shaped views of the shared resolution responses (`resolution.py`)."""
 
+from collections.abc import Mapping
+
 from pydantic import BaseModel
 
 from backstop_mcp.features.entity_types import SearchType
-from backstop_mcp.features.party_resolver.types import PartyCandidate, ResolvedParty
+from backstop_mcp.features.party_resolver.types import (
+    PartyAttributes,
+    PartyCandidate,
+    ResolvedParty,
+)
 from backstop_mcp.features.resolution import (
     AmbiguousResponse,
     BatchAmbiguous,
@@ -45,8 +51,18 @@ PartyBatchResolvedEcho = BatchResolvedEcho[ResolvedPartyEcho]
 PartyBatchAmbiguousResponse = BatchAmbiguousResponse[PartyCandidateEcho, ResolvedPartyEcho]
 
 
-def party_echo(party: ResolvedParty) -> ResolvedPartyEcho:
-    return ResolvedPartyEcho(id=party.id, type=party.type, name=party.name)
+def party_echo(
+    party: ResolvedParty,
+    *,
+    attributes: Mapping[str, object] | None = None,
+) -> ResolvedPartyEcho:
+    """Echo a resolved party. When resolve left `name` blank and `attributes` are given, fill
+    it from that record's `name` / `firstName`+`lastName` (the by-id GET the caller just made).
+    """
+    name = party.name
+    if name is None and attributes is not None:
+        name = PartyAttributes.model_validate(attributes).display_name()
+    return ResolvedPartyEcho(id=party.id, type=party.type, name=name)
 
 
 def party_candidate_echo(candidate: PartyCandidate) -> PartyCandidateEcho:

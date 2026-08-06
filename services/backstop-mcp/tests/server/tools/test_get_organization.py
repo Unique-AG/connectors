@@ -183,7 +183,7 @@ class TestGetOrganization:
         await connect_user("user-org-4", "org-erin.ng")  # pyright: ignore[reportGeneralTypeIssues]
 
         # `id` is entirely absent from the organization resource — fails
-        # `BackstopApiDocument[OrganizationAttributes]` schema validation outright.
+        # `BackstopApiResourceDocument[OrganizationAttributes]` schema validation outright.
         respx.get(f"{BASE_URL}/organizations/trusted-9").mock(
             return_value=httpx.Response(
                 200,
@@ -195,7 +195,7 @@ class TestGetOrganization:
             await get_organization(ctx_never_elicit(), party_id="trusted-9")
 
         assert exc_info.value.path == "/organizations/trusted-9"
-        assert exc_info.value.schema_name == "BackstopApiDocument[OrganizationAttributes]"
+        assert exc_info.value.schema_name == "BackstopApiResourceDocument[OrganizationAttributes]"
 
     @pytest.mark.asyncio
     @respx.mock

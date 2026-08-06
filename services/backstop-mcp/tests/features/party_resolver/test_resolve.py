@@ -222,7 +222,7 @@ class TestQuickSearch:
             )
 
         assert exc_info.value.path == "/quick-search"
-        assert exc_info.value.schema_name == "BackstopApiDocument[PartyAttributes]"
+        assert exc_info.value.schema_name == "BackstopApiCollectionDocument[PartyAttributes]"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -247,7 +247,7 @@ class TestQuickSearch:
             )
 
         assert exc_info.value.path == "/quick-search"
-        assert exc_info.value.schema_name == "BackstopApiDocument[PartyAttributes]"
+        assert exc_info.value.schema_name == "BackstopApiCollectionDocument[PartyAttributes]"
 
 
 class TestHitCounts:

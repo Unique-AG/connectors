@@ -23,7 +23,6 @@ from pydantic import ValidationError
 from backstop_mcp.backstop_client import BackstopApiResource
 from backstop_mcp.coerce import as_clean_str
 from backstop_mcp.features.data_hygiene.types import (
-    ENTITY_RELATIONSHIP_TYPE_RELATIONSHIP,
     ORG_SIDE_TYPES,
     PERSON_SIDE_TYPES,
     DepartedEmployment,
@@ -34,6 +33,7 @@ from backstop_mcp.features.data_hygiene.types import (
     EmploymentStatus,
     EntityRefAttributes,
     EntityRelationshipAttributes,
+    EntityRelationshipRef,
     RelationshipTypeAttributes,
 )
 from backstop_mcp.features.entity_types import normalize_entity_type
@@ -174,7 +174,7 @@ def _safe_parse_relationship(
         resource = BackstopApiResource[EntityRelationshipAttributes].model_validate(raw)
     except ValidationError:
         return None
-    type_ids = resource.related_ids(ENTITY_RELATIONSHIP_TYPE_RELATIONSHIP)
+    type_ids = resource.related_ids(EntityRelationshipRef.TYPE)
     return resource.attributes, type_ids[0] if type_ids else None
 
 

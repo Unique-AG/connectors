@@ -4,27 +4,19 @@ from urllib.parse import quote
 from fastmcp import Context
 from pydantic import BaseModel, ConfigDict, Field
 
-from backstop_mcp.backstop_client import (
-    BackstopApiDocument,
-    included_for_relationship,
-    included_of_type,
-    single_resource,
-)
-from backstop_mcp.coerce import as_clean_str
+from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.data_hygiene import (
-    ENTITY_RELATIONSHIP_TYPES_RESOURCE,
-    ENTITY_RELATIONSHIPS_INCLUDE,
-    ENTITY_RELATIONSHIPS_RELATIONSHIP,
     AsOfEcho,
     DepartedContactEcho,
     EmploymentStatus,
+    EntityRelationshipInclude,
     as_of_echo,
     departed_echo,
+    entity_relationships,
     extract_as_of,
 )
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
-    ResolvedParty,
     ResolvedPartyEcho,
     party_echo,
     resolve_party,
@@ -99,24 +91,12 @@ async def get_person(
     path = f"/people/{quote(party.id, safe='')}"
     document = await client.get(
         path,
-        params={"include": ENTITY_RELATIONSHIPS_INCLUDE},
-        schema=BackstopApiDocument[PersonAttributes],
+        params={"include": EntityRelationshipInclude.for_employment()},
+        schema=BackstopApiResourceDocument[PersonAttributes],
     )
-    resource = single_resource(document, path=path)
-    attributes = resource.attributes.model_dump(exclude_none=True) if resource is not None else {}
-    resolved = party if party.name is not None else _with_name(party, attributes)
-    relationships: list[dict[str, object]] = (
-        included_for_relationship(document, resource, ENTITY_RELATIONSHIPS_RELATIONSHIP)
-        if resource is not None
-        else []
-    )
-    # Selected by resource type, not followed from the person: the nested include's types are
-    # linked from the relationships, so nothing on the person points at them.
-    relationship_types = included_of_type(document, ENTITY_RELATIONSHIP_TYPES_RESOURCE)
-
+    attributes = document.data.attributes.model_dump(exclude_none=True)
     index = get_employment_index_factory().index_for_person(
-        relationships=relationships,
-        relationship_types=relationship_types,
+        **entity_relationships(document),
     )
     # Every FORMER pair for this index is this same person's own former employment: the index
     # was built from the person's own side-loaded relationships, so every edge's `person_id` is
@@ -132,22 +112,8 @@ async def get_person(
 
     return PersonResolvedResponse(
         person=attributes,
-        resolved=party_echo(resolved),
+        resolved=party_echo(party, attributes=attributes),
         as_of=as_of_echo(extract_as_of(attributes)),
         departed=bool(departures),
         departures=departures,
     )
-
-
-def _with_name(party: ResolvedParty, attributes: dict[str, object]) -> ResolvedParty:
-    name = as_clean_str(attributes.get("name"))
-    if name is None:
-        first = as_clean_str(attributes.get("firstName")) or as_clean_str(
-            attributes.get("first_name")
-        )
-        last = as_clean_str(attributes.get("lastName")) or as_clean_str(attributes.get("last_name"))
-        parts = [part for part in (first, last) if part is not None]
-        name = " ".join(parts) if parts else None
-    if name is None:
-        return party
-    return ResolvedParty(id=party.id, type=party.type, name=name)

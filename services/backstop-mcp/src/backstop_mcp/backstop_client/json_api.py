@@ -2,7 +2,6 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from backstop_mcp.backstop_client.errors import BackstopUnexpectedCollectionError
 from backstop_mcp.coerce import as_clean_str
 
 # PEP 695 generic syntax (not typing.Generic/TypeVar) — pydantic 2.13 resolves
@@ -46,30 +45,31 @@ class BackstopApiResource[AttrT](BaseModel):
         return relationship.ids() if relationship is not None else ()
 
 
-class BackstopApiDocument[AttrT](BaseModel):
-    data: BackstopApiResource[AttrT] | list[BackstopApiResource[AttrT]] | None
+class _JsonApiDocument(BaseModel):
     # JSON:API puts `?include=`d resources here — same field pagination keeps on each page.
     # Without it, a by-id GET with `?include=entityRelationships` would silently drop the
     # side-loaded resources the caller paid a request to fetch.
     included: list[dict[str, object]] = Field(default_factory=list)
 
 
-def single_resource[AttrT](
-    document: BackstopApiDocument[AttrT], *, path: str
-) -> BackstopApiResource[AttrT] | None:
-    """The one resource a by-id fetch returned, or None if the document describes none.
+class BackstopApiResourceDocument[AttrT](_JsonApiDocument):
+    """A by-id JSON:API document: `data` is exactly one resource.
 
-    Raises `BackstopUnexpectedCollectionError` for a collection: `data` is a union because one
-    document shape covers both list and by-id reads, but a caller that asked for `/{entity}/{id}`
-    has no use for a list and every such caller wants the same typed failure.
+    Null primary data is a schema failure (Backstop returns 404 for missing by-id records,
+    which the client raises before deserialization).
     """
-    if isinstance(document.data, list):
-        raise BackstopUnexpectedCollectionError(path)
-    return document.data
+
+    data: BackstopApiResource[AttrT]
 
 
-def included_for_relationship[AttrT](
-    document: BackstopApiDocument[AttrT],
+class BackstopApiCollectionDocument[AttrT](_JsonApiDocument):
+    """A list JSON:API document: `data` is always an array of resources."""
+
+    data: list[BackstopApiResource[AttrT]]
+
+
+def follow_included[AttrT](
+    document: _JsonApiDocument,
     resource: BackstopApiResource[AttrT],
     relationship_name: str,
 ) -> list[dict[str, object]]:
@@ -99,9 +99,7 @@ def included_for_relationship[AttrT](
     return [by_identity[key] for key in wanted if key in by_identity]
 
 
-def included_of_type[AttrT](
-    document: BackstopApiDocument[AttrT], resource_type: str
-) -> list[dict[str, object]]:
+def included_by_type(document: _JsonApiDocument, resource_type: str) -> list[dict[str, object]]:
     """Every side-loaded resource carrying one JSON:API `type`.
 
     Selected by `type` rather than followed from a linkage, because a nested include

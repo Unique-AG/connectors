@@ -165,23 +165,6 @@ class BackstopResponseSchemaError(ToolError):
         self.cause = cause
 
 
-class BackstopUnexpectedCollectionError(ToolError):
-    """Raised when a fetch-by-id came back as a JSON:API collection instead of one resource.
-
-    `BackstopApiDocument.data` is a union because the same document shape covers both a
-    `/{entity}` list and a `/{entity}/{id}` read. A collection on the by-id path is a malformed
-    upstream response, so it belongs with the other transport failures rather than being
-    asserted on at the call site — an `AssertionError` there would surface as an internal error
-    instead of a `ToolError`, and every caller would have to hand-roll the same check.
-    """
-
-    path: str
-
-    def __init__(self, path: str) -> None:
-        super().__init__(f"Backstop returned a collection for {path!r}; expected a single resource")
-        self.path = path
-
-
 def _to_error_detail(error: _JsonApiError) -> BackstopErrorDetail:
     return BackstopErrorDetail(code=error.code, title=error.title, detail=error.detail)
 

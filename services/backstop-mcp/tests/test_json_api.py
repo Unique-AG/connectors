@@ -1,12 +1,11 @@
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from backstop_mcp.backstop_client.errors import BackstopUnexpectedCollectionError
 from backstop_mcp.backstop_client.json_api import (
-    BackstopApiDocument,
+    BackstopApiCollectionDocument,
     BackstopApiResource,
-    included_for_relationship,
-    single_resource,
+    BackstopApiResourceDocument,
+    follow_included,
 )
 
 
@@ -14,9 +13,9 @@ class _Attrs(BaseModel):
     name: str
 
 
-class TestBackstopApiDocument:
-    def test_single_resource_validates_typed_attributes(self) -> None:
-        doc = BackstopApiDocument[_Attrs].model_validate(
+class TestBackstopApiResourceDocument:
+    def test_validates_typed_attributes(self) -> None:
+        doc = BackstopApiResourceDocument[_Attrs].model_validate(
             {"data": {"id": "1", "type": "party", "attributes": {"name": "Acme"}}}
         )
 
@@ -26,26 +25,22 @@ class TestBackstopApiDocument:
         assert isinstance(doc.data.attributes, _Attrs)
         assert doc.data.attributes.name == "Acme"
 
-    def test_collection_validates_list_of_typed_resources(self) -> None:
-        doc = BackstopApiDocument[_Attrs].model_validate(
-            {
-                "data": [
-                    {"id": "1", "type": "party", "attributes": {"name": "Acme"}},
-                    {"id": "2", "type": "party", "attributes": {"name": "Globex"}},
-                ]
-            }
-        )
+    def test_rejects_null_data(self) -> None:
+        with pytest.raises(ValidationError):
+            BackstopApiResourceDocument[_Attrs].model_validate({"data": None})
 
-        assert isinstance(doc.data, list)
-        assert [item.attributes.name for item in doc.data] == ["Acme", "Globex"]
-
-    def test_null_data_validates_to_none(self) -> None:
-        doc = BackstopApiDocument[_Attrs].model_validate({"data": None})
-
-        assert doc.data is None
+    def test_rejects_a_collection(self) -> None:
+        with pytest.raises(ValidationError):
+            BackstopApiResourceDocument[_Attrs].model_validate(
+                {
+                    "data": [
+                        {"id": "1", "type": "party", "attributes": {"name": "Acme"}},
+                    ]
+                }
+            )
 
     def test_preserves_included_side_loads(self) -> None:
-        doc = BackstopApiDocument[_Attrs].model_validate(
+        doc = BackstopApiResourceDocument[_Attrs].model_validate(
             {
                 "data": {
                     "id": "1",
@@ -71,9 +66,33 @@ class TestBackstopApiDocument:
         assert doc.included[0]["id"] == "er1"
 
 
-class TestIncludedForRelationship:
+class TestBackstopApiCollectionDocument:
+    def test_validates_list_of_typed_resources(self) -> None:
+        doc = BackstopApiCollectionDocument[_Attrs].model_validate(
+            {
+                "data": [
+                    {"id": "1", "type": "party", "attributes": {"name": "Acme"}},
+                    {"id": "2", "type": "party", "attributes": {"name": "Globex"}},
+                ]
+            }
+        )
+
+        assert [item.attributes.name for item in doc.data] == ["Acme", "Globex"]
+
+    def test_rejects_a_single_resource(self) -> None:
+        with pytest.raises(ValidationError):
+            BackstopApiCollectionDocument[_Attrs].model_validate(
+                {"data": {"id": "1", "type": "party", "attributes": {"name": "Acme"}}}
+            )
+
+    def test_rejects_null_data(self) -> None:
+        with pytest.raises(ValidationError):
+            BackstopApiCollectionDocument[_Attrs].model_validate({"data": None})
+
+
+class TestFollowIncluded:
     def test_resolves_side_loaded_resources_in_linkage_order(self) -> None:
-        document = BackstopApiDocument[_Attrs].model_validate(
+        document = BackstopApiResourceDocument[_Attrs].model_validate(
             {
                 "data": {
                     "id": "1",
@@ -94,15 +113,13 @@ class TestIncludedForRelationship:
                 ],
             }
         )
-        assert isinstance(document.data, BackstopApiResource)
-
-        related = included_for_relationship(document, document.data, "entityRelationships")
+        related = follow_included(document, document.data, "entityRelationships")
 
         assert [item["id"] for item in related] == ["er2", "er1"]
 
     def test_matches_by_type_and_id_when_ids_collide_across_types(self) -> None:
         """Backstop reuses numeric ids across resource types in one `included` array."""
-        document = BackstopApiDocument[_Attrs].model_validate(
+        document = BackstopApiResourceDocument[_Attrs].model_validate(
             {
                 "data": {
                     "id": "1",
@@ -128,9 +145,7 @@ class TestIncludedForRelationship:
                 ],
             }
         )
-        assert isinstance(document.data, BackstopApiResource)
-
-        related = included_for_relationship(document, document.data, "entityRelationships")
+        related = follow_included(document, document.data, "entityRelationships")
 
         assert len(related) == 1
         assert related[0]["type"] == "entity-relationships"
@@ -157,46 +172,3 @@ class TestBackstopApiResourceIdValidation:
         )
 
         assert resource.type == ""
-
-
-class TestSingleResource:
-    """A by-id read that comes back as a list is a malformed upstream response.
-
-    `get_organization` used to `assert` on this, which would have surfaced an `AssertionError`
-    (not a `ToolError`) to the MCP client — and asserting on data from a system boundary is
-    exactly what the repo's own guidance reserves `throw` for.
-    """
-
-    def test_returns_the_resource_for_a_single_document(self) -> None:
-        document = BackstopApiDocument[_Attrs].model_validate(
-            {"data": {"id": "1", "type": "organizations", "attributes": {"name": "Capstone"}}}
-        )
-
-        resource = single_resource(document, path="/organizations/1")
-
-        assert resource is not None
-        assert resource.id == "1"
-
-    def test_returns_none_for_a_document_describing_nothing(self) -> None:
-        document = BackstopApiDocument[_Attrs].model_validate({"data": None})
-
-        assert single_resource(document, path="/organizations/1") is None
-
-    def test_raises_a_typed_error_for_a_collection(self) -> None:
-        document = BackstopApiDocument[_Attrs].model_validate(
-            {"data": [{"id": "1", "type": "organizations", "attributes": {"name": "Capstone"}}]}
-        )
-
-        with pytest.raises(BackstopUnexpectedCollectionError) as excinfo:
-            _ = single_resource(document, path="/organizations/1")
-
-        # The path is carried so the failure names the request that produced it.
-        assert excinfo.value.path == "/organizations/1"
-        assert "/organizations/1" in str(excinfo.value)
-
-    def test_raises_for_an_empty_collection_too(self) -> None:
-        """An empty list is still the wrong *shape*, not merely an absent record."""
-        document = BackstopApiDocument[_Attrs].model_validate({"data": []})
-
-        with pytest.raises(BackstopUnexpectedCollectionError):
-            _ = single_resource(document, path="/organizations/1")

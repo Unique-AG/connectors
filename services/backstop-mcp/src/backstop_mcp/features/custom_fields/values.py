@@ -5,7 +5,11 @@ from urllib.parse import quote
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from backstop_mcp.backstop_client import BackstopApiDocument, BackstopApiResource, BackstopClient
+from backstop_mcp.backstop_client import (
+    BackstopApiResource,
+    BackstopApiResourceDocument,
+    BackstopClient,
+)
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 from backstop_mcp.features.data_hygiene import AsOf, extract_as_of
@@ -169,10 +173,8 @@ async def _read_regular_value(
     document = await client.get(
         f"/{entity}/{safe_id}",
         params={"fields": _REGULAR_FIELDS},
-        schema=BackstopApiDocument[EntityWithRegularCustomFieldsAttributes],
+        schema=BackstopApiResourceDocument[EntityWithRegularCustomFieldsAttributes],
     )
-    if document.data is None or isinstance(document.data, list):
-        return CustomFieldValueRead(value=None, as_of=None)
     attrs = document.data.attributes
     as_of = extract_as_of(
         {

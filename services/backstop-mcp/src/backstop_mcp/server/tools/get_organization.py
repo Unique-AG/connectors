@@ -4,12 +4,10 @@ from urllib.parse import quote
 from fastmcp import Context
 from pydantic import BaseModel, ConfigDict
 
-from backstop_mcp.backstop_client import BackstopApiDocument, single_resource
-from backstop_mcp.coerce import as_clean_str
+from backstop_mcp.backstop_client import BackstopApiResourceDocument
 from backstop_mcp.features.data_hygiene import AsOfEcho, as_of_echo, extract_as_of
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
-    ResolvedParty,
     ResolvedPartyEcho,
     party_echo,
     resolve_party,
@@ -80,24 +78,12 @@ async def get_organization(
 
     party = result.value
     path = f"/organizations/{quote(party.id, safe='')}"
-    document = await client.get(path, schema=BackstopApiDocument[OrganizationAttributes])
-
-    # A collection here would be a malformed upstream response, so it raises a typed transport
-    # error rather than being asserted on — this is a system boundary, not an internal invariant.
-    resource = single_resource(document, path=path)
-    attributes = resource.attributes.model_dump(exclude_none=True) if resource is not None else {}
+    document = await client.get(path, schema=BackstopApiResourceDocument[OrganizationAttributes])
+    attributes = document.data.attributes.model_dump(exclude_none=True)
     # `confirm_name` isn't used here: the organization is fetched anyway, so the name comes
     # from that response rather than an extra request.
-    resolved = party if party.name is not None else _with_name(party, attributes.get("name"))
     return OrganizationResolvedResponse(
         organization=attributes,
-        resolved=party_echo(resolved),
+        resolved=party_echo(party, attributes=attributes),
         as_of=as_of_echo(extract_as_of(attributes)),
     )
-
-
-def _with_name(party: ResolvedParty, name: object) -> ResolvedParty:
-    cleaned = as_clean_str(name)
-    if cleaned is None:
-        return party
-    return ResolvedParty(id=party.id, type=party.type, name=cleaned)

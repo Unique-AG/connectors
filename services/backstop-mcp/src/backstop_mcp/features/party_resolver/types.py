@@ -23,7 +23,8 @@ class PartyAttributes(BaseModel):
     """Shape of a party resource's `attributes` in `search.py`'s JSON:API responses.
 
     A pydantic model (unlike the plain dataclasses below) because it's deserialized straight
-    off the wire via `BackstopApiDocument[PartyAttributes]` — see `backstop_client.json_api`.
+    off the wire via `BackstopApiCollectionDocument[PartyAttributes]` /
+    `BackstopApiResourceDocument[PartyAttributes]` — see `backstop_client.json_api`.
     `extra="ignore"` since only `id`/`name`/`label` (derived here) ever leave `search.py`.
     Names are stripped here so `search.py`'s display-name fallback can use plain truthiness
     checks instead of re-stripping at point of use.
@@ -38,6 +39,13 @@ class PartyAttributes(BaseModel):
     last_name: _StrippedStr | None = Field(
         default=None, validation_alias=AliasChoices("lastName", "last_name")
     )
+
+    def display_name(self) -> str | None:
+        if self.name:
+            return self.name
+        composed = " ".join(part for part in (self.first_name, self.last_name) if part)
+        return composed or None
+
 
 
 @dataclass(frozen=True)
