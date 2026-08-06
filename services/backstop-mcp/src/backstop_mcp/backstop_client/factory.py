@@ -7,6 +7,7 @@ re-reads the environment, so what `create_app` was handed is what every request 
 """
 
 import asyncio
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -22,9 +23,8 @@ from backstop_mcp.backstop_client.client import (
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret, CallerAuthContext
 from backstop_mcp.backstop_client.retry import RetryPolicy, build_retry_policy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
-from backstop_mcp.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # JSON:API content negotiation + the personal-API-token flag are identical for every user,
 # so they're baked in once as shared-client defaults; only `Authorization` varies per call.
@@ -90,7 +90,10 @@ class _GateRegistry:
         idle = [username for username, gate in self._gates.items() if gate.in_flight == 0]
         for username in idle:
             del self._gates[username]
-        logger.debug("backstop.gates.evicted", evicted=len(idle), retained=len(self._gates))
+        logger.debug(
+            "backstop.gates.evicted",
+            extra={"evicted": len(idle), "retained": len(self._gates)},
+        )
 
 
 class BackstopClientFactory:

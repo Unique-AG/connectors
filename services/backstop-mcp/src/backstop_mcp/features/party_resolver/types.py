@@ -47,7 +47,6 @@ class PartyAttributes(BaseModel):
         return composed or None
 
 
-
 @dataclass(frozen=True)
 class ResolvedParty:
     """A party identity after successful resolution."""

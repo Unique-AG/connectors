@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import ClassVar
@@ -13,9 +14,8 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 from backstop_mcp.features.data_hygiene import AsOf, extract_as_of
-from backstop_mcp.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 _REGULAR_FIELDS = "regularCustomFieldValues,modifiedTimestamp,modifiedBy"
 
@@ -89,7 +89,10 @@ def parse_effective_date(raw: str | None) -> date | None:
             return date(year, month, day)
         except ValueError:
             pass
-    logger.warning("custom_fields.time_series.unparseable_effective_date", effective_date=raw)
+    logger.warning(
+        "custom_fields.time_series.unparseable_effective_date",
+        extra={"effective_date": raw},
+    )
     return None
 
 
@@ -157,8 +160,10 @@ async def _read_time_series_value(
         return None
     logger.debug(
         "custom_fields.time_series.read",
-        definition_id=definition.definition_id,
-        entries=len(page.items),
+        extra={
+            "definition_id": definition.definition_id,
+            "entries": len(page.items),
+        },
     )
     return latest_time_series_value(page.items)
 

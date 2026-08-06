@@ -5,15 +5,15 @@ written by the previous version; a mismatch (or any validation failure) is treat
 miss and re-fetched, instead of raising from inside a cache read.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 
 from pydantic import BaseModel, Field, ValidationError
 
 from backstop_mcp.features.custom_fields.types import AllowedValue, CustomFieldDefinition
-from backstop_mcp.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Bump whenever the persisted shape changes incompatibly. Existing rows then read as a miss.
 SNAPSHOT_VERSION = 1
@@ -76,14 +76,13 @@ def load_definitions(payload: object) -> list[CustomFieldDefinition] | None:
     try:
         parsed = SnapshotPayload.model_validate(payload)
     except ValidationError as exc:
-        logger.warning("custom_fields.snapshot.unreadable", error=str(exc))
+        logger.warning("custom_fields.snapshot.unreadable", extra={"error": str(exc)})
         return None
 
     if parsed.version != SNAPSHOT_VERSION:
         logger.info(
             "custom_fields.snapshot.version_mismatch",
-            found=parsed.version,
-            expected=SNAPSHOT_VERSION,
+            extra={"found": parsed.version, "expected": SNAPSHOT_VERSION},
         )
         return None
 

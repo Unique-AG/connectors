@@ -27,7 +27,7 @@ from backstop_mcp.config import (
     EncryptionConfig,
 )
 from backstop_mcp.server.runtime import get_services
-from backstop_mcp.server.tools.registry import TOOL_SPECS
+from backstop_mcp.server.tools.registry import TOOLS
 
 _BASE_URL = "https://api.backstopsolutions.com"
 
@@ -162,11 +162,18 @@ class TestRoutes:
         response = _get(app_client, "/health")
 
         assert response.status_code == 200
+        assert response.json() == {"status": "healthy"}
+
+    def test_probe_is_process_up(self, app_client: TestClient) -> None:
+        """`setup_ops` `/probe` is liveness-style; Postgres readiness lives on `/ready`."""
+        response = _get(app_client, "/probe")
+
+        assert response.status_code == 200
         assert response.json() == {"status": "ok"}
 
-    def test_probe_reports_the_checks_it_ran(self, app_client: TestClient) -> None:
+    def test_ready_reports_the_checks_it_ran(self, app_client: TestClient) -> None:
         """Postgres is reachable here, and the schema is absent — ready, but honest about it."""
-        response = _get(app_client, "/probe")
+        response = _get(app_client, "/ready")
 
         assert response.status_code == 200
         body = response.json()
@@ -215,9 +222,9 @@ class TestToolRegistration:
 
         assert response.status_code == 401
 
-    def test_every_registered_spec_has_a_distinct_name(self) -> None:
-        """`create_app` registers by iterating TOOL_SPECS, so a duplicate name would shadow."""
-        names = [spec.name for spec in TOOL_SPECS]
+    def test_every_registered_tool_has_a_distinct_name(self) -> None:
+        """`create_app` registers by iterating TOOLS, so a duplicate name would shadow."""
+        names = [fn.__name__ for fn in TOOLS]
 
         assert len(names) == len(set(names))
         assert names

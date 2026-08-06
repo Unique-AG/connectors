@@ -145,7 +145,7 @@ class TestTheDetectionItself:
     def test_catches_the_violation_the_server_rule_exists_for(self) -> None:
         # Verbatim shape of the import that `custom_fields/middleware.py` used to carry.
         assert _imports_under(
-            "from backstop_mcp.server.tools.registry import glossary_entities_by_tool_name",
+            "from backstop_mcp.server.tools.registry import TOOLS",
             _SERVER_PREFIX,
         ) == ["backstop_mcp.server.tools.registry"]
 
@@ -166,7 +166,7 @@ class TestTheDetectionItself:
         assert not _imports_under(
             "from backstop_mcp.backstop_client.client import BackstopClient\n"
             + "from backstop_mcp.features.custom_fields.service import CustomFieldsService\n"
-            + "from backstop_mcp.logging import get_logger\n",
+            + "from backstop_mcp.logging import configure_logging\n",
             _SERVER_PREFIX,
         )
 

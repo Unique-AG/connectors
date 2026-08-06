@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -47,9 +48,8 @@ from backstop_mcp.features.auth.throttle import (
     is_throttled,
     record_failure,
 )
-from backstop_mcp.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _hash_token(token: str) -> str:
@@ -330,7 +330,7 @@ class BackstopOAuthProvider(OAuthProvider):
         except BackstopUnreachableError as exc:
             # Not recorded as a failed attempt: nothing was learned about the credential, so
             # counting it would let a Backstop outage lock users out.
-            logger.warning("auth.login.backstop_unreachable", error=str(exc))
+            logger.warning("auth.login.backstop_unreachable", extra={"error": str(exc)})
             return self._form_response(
                 request_id,
                 username=username,

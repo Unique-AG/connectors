@@ -6,6 +6,11 @@ nameOverride: backstop-mcp
 fullnameOverride: backstop-mcp
 selectorComponentLabel: server
 
+# Loki scrapes use this label to parse stderr as pino-json
+# (unique_mcp.configure_logging).
+podLabels:
+  logging.unique.app/format: pino-json
+
 env:
   APP_ENV: production
   LOG_LEVEL: info
@@ -36,7 +41,7 @@ resources:
 
 probes:
   enabled: true
-  # /health is process-up only; /probe checks Postgres. Liveness must not restart the pod
+  # /health is process-up (setup_ops); /ready checks Postgres. Liveness must not restart the pod
   # when the database is briefly unreachable — readiness alone keeps it out of service.
   liveness:
     failureThreshold: 6
@@ -48,7 +53,7 @@ probes:
   readiness:
     failureThreshold: 6
     httpGet:
-      path: /probe
+      path: /ready
       port: http
     initialDelaySeconds: 5
     periodSeconds: 5

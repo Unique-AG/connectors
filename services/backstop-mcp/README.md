@@ -46,9 +46,10 @@ uv run backstop-mcp
 ```
 
 - MCP endpoint: `http://localhost:9010/mcp` (HTTP transport)
-- Health: `GET /health` — liveness, always 200 while the process is up
-- Readiness: `GET /probe` — 503 when Postgres is unreachable
-- Metrics: `GET /metrics` — Prometheus
+- Health: `GET /health` — liveness via `unique_mcp.monitoring.setup_ops`
+- Probe: `GET /probe` — process-up (setup_ops)
+- Ready: `GET /ready` — 503 when Postgres is unreachable
+- Metrics: `GET /metrics` — Prometheus (setup_ops)
 
 Generate an encryption key with:
 

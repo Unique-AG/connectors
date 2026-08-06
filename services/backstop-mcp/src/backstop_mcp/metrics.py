@@ -2,9 +2,6 @@ from opentelemetry import metrics
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
-from prometheus_client import CONTENT_TYPE_LATEST, REGISTRY, generate_latest
-from starlette.requests import Request
-from starlette.responses import Response
 
 from backstop_mcp.config import AppConfig
 
@@ -12,6 +9,11 @@ _provider: MeterProvider | None = None
 
 
 def configure_metrics(config: AppConfig) -> MeterProvider:
+    """Install the OTel→Prometheus reader so domain instruments land on the default REGISTRY.
+
+    HTTP `/metrics` itself is served by `unique_mcp.monitoring.setup_ops` (via
+    `unique_toolkit.monitoring.get_metrics`), which reads that same registry.
+    """
     global _provider
     if _provider is not None:
         return _provider
@@ -51,8 +53,3 @@ CUSTOM_FIELD_SCHEMA_LOADS = _meter.create_counter(
     "custom_field_schema_loads_total",
     description="Custom-field schema loads, by source (backstop refresh, snapshot, stale reuse).",
 )
-
-
-async def metrics_endpoint(_request: Request) -> Response:
-    data = generate_latest(REGISTRY)
-    return Response(data, media_type=CONTENT_TYPE_LATEST)

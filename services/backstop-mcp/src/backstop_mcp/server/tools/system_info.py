@@ -1,7 +1,19 @@
+from fastmcp.tools import tool
+from mcp.types import CallToolResult, ToolAnnotations
+
 from backstop_mcp.server.runtime import get_backstop_client
+from backstop_mcp.server.tools.results import tool_result
 
 
-async def get_system_info() -> dict[str, object]:
+@tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
+async def get_system_info() -> CallToolResult:
     """Fetch Backstop's system info for the currently connected user.
 
     An example tool showing the full authenticated-call path end to end: FastMCP has
@@ -12,4 +24,6 @@ async def get_system_info() -> dict[str, object]:
     `BackstopRateLimitError`), so this tool doesn't need to check status codes itself.
     """
     client = await get_backstop_client()
-    return await client.get("/system-info")
+    payload = await client.get("/system-info")
+    assert isinstance(payload, dict), "Backstop /system-info returns a JSON object"
+    return tool_result(payload)

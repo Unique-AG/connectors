@@ -24,6 +24,7 @@ from tests.features.party_resolver.helpers import (
     ctx_never_elicit,
     resource,
 )
+from tests.server.tools.helpers import tool_model
 
 type ConnectUser = Callable[..., object]
 
@@ -81,9 +82,11 @@ class TestGetPerson:
             return_value=httpx.Response(200, json={"data": [], "links": {}})
         )
 
-        result = await get_person(ctx_never_elicit(), search="Jane Doe")
+        result = tool_model(
+            await get_person(ctx_never_elicit(), search="Jane Doe"),
+            PersonResolvedResponse,
+        )
 
-        assert isinstance(result, PersonResolvedResponse)
         assert result.resolved == ResolvedPartyEcho(id="p9", type="people", name="Jane Doe")
         assert result.departed is True
         assert len(result.departures) == 1
@@ -122,9 +125,11 @@ class TestGetPerson:
             return_value=httpx.Response(200, json=_person_document(FORMER_TYPE, EMPLOYEE_TYPE))
         )
 
-        result = await get_person(ctx_never_elicit(), search="Jane Doe")
+        result = tool_model(
+            await get_person(ctx_never_elicit(), search="Jane Doe"),
+            PersonResolvedResponse,
+        )
 
-        assert isinstance(result, PersonResolvedResponse)
         assert result.departed is True
         assert len(result.departures) == 1
         assert result.departures[0].organization_id == "o1"
@@ -147,7 +152,10 @@ class TestGetPerson:
             return_value=httpx.Response(200, json={})
         )
 
-        result = await get_person(ctx_decline(), search="Jane")
+        result = tool_model(
+            await get_person(ctx_decline(), search="Jane"),
+            PartyAmbiguousResponse,
+        )
 
         assert result == PartyAmbiguousResponse(
             query="Jane",

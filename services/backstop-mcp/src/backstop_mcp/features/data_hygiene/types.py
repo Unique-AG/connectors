@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 PERSON_SIDE_TYPES: frozenset[str] = frozenset({"people", "contacts", "employees"})
 ORG_SIDE_TYPES: frozenset[str] = frozenset({"organizations"})
 
+
 class EntityRelationshipInclude(StrEnum):
     """Backstop `?include=` values for side-loading employment relationships.
 

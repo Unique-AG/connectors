@@ -390,9 +390,9 @@ class TestBothBuildersAgree:
             organization_side, checks=checks, types=relationship_types(FORMER_MIRROR_TYPE)
         )
 
-        assert from_person.status(
+        assert from_person.status(person_id="p1", organization_id="o1") == from_organization.status(
             person_id="p1", organization_id="o1"
-        ) == from_organization.status(person_id="p1", organization_id="o1")
+        )
         person_departed = from_person.departure(person_id="p1", organization_id="o1")
         org_departed = from_organization.departure(person_id="p1", organization_id="o1")
         assert person_departed is not None

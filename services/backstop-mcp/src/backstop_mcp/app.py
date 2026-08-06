@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -9,6 +10,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+from unique_mcp.monitoring import setup_ops
 
 from backstop_mcp.backstop_client import (
     BackstopCredentialSecret,
@@ -38,13 +40,13 @@ from backstop_mcp.features.custom_fields import (
     warmup_lifespan,
 )
 from backstop_mcp.features.data_hygiene import create_employment_index_factory
-from backstop_mcp.logging import configure_logging, get_logger
-from backstop_mcp.metrics import configure_metrics, metrics_endpoint
-from backstop_mcp.server.middleware import CustomFieldGlossaryMiddleware, TraceContextMiddleware
+from backstop_mcp.logging import configure_logging
+from backstop_mcp.metrics import configure_metrics
+from backstop_mcp.server.middleware import CustomFieldGlossaryMiddleware
 from backstop_mcp.server.runtime import Services, configure_services, reset_services
-from backstop_mcp.server.tools import TOOL_SPECS, glossary_entities_by_tool_name
+from backstop_mcp.server.tools import TOOLS
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def create_app(
@@ -146,27 +148,22 @@ def create_app(
                 # A bound method, safe to capture: it reads the factory's auth context at call
                 # time, and `attach_auth` above has already run.
                 client_for_caller=backstop_clients.for_current_caller,
-                glossary_entities=glossary_entities_by_tool_name(),
             )
         ],
         lifespan=lifespan,
     )
-    for spec in TOOL_SPECS:
-        mcp.tool(spec.fn)
+    for fn in TOOLS:
+        mcp.add_tool(fn)
 
-    @mcp.custom_route("/health", methods=["GET"])
-    async def health(_request: Request) -> JSONResponse:
-        return JSONResponse({"status": "ok"})
+    # Mounts /probe, /health, /metrics and returns HTTP request-metrics middleware.
+    ops_middleware = setup_ops(mcp)
 
-    @mcp.custom_route("/probe", methods=["GET"])
-    async def probe(_request: Request) -> JSONResponse:
-        return await _probe_response(
+    @mcp.custom_route("/ready", methods=["GET"])
+    async def ready(_request: Request) -> JSONResponse:
+        """Postgres readiness — stock `setup_ops` `/probe` is process-up only."""
+        return await _ready_response(
             engine, custom_fields_schema_loaded=custom_fields_service.has_definitions
         )
-
-    @mcp.custom_route("/metrics", methods=["GET"])
-    async def metrics_route(request: Request) -> Response:
-        return await metrics_endpoint(request)
 
     @mcp.custom_route(auth_provider.login_path, methods=["GET"])
     async def login_get(request: Request) -> Response:
@@ -179,7 +176,7 @@ def create_app(
     return mcp.http_app(
         middleware=[
             Middleware(OpenTelemetryMiddleware),
-            Middleware(TraceContextMiddleware),
+            ops_middleware,
         ]
     )
 
@@ -241,14 +238,14 @@ def _field_overrides(
     }
 
 
-async def _probe_response(
+async def _ready_response(
     engine: AsyncEngine, *, custom_fields_schema_loaded: bool
 ) -> JSONResponse:
     """Readiness, reporting the checks it actually ran.
 
     Postgres is a hard dependency — OAuth token validation reads it on every request — so an
     unreachable database means not ready. The custom-field schema is reported but never gates
-    readiness: it fills lazily by design, and tools degrade to `resolve_custom_field` without it.
+    readiness: it fills lazily by design, and tools degrade to `list_custom_fields` without it.
     """
     database_ok = True
     try:
@@ -256,7 +253,7 @@ async def _probe_response(
             _ = await connection.execute(text("SELECT 1"))
     except Exception:
         database_ok = False
-        logger.warning("probe.database_unreachable", exc_info=True)
+        logger.warning("ready.database_unreachable", exc_info=True)
 
     checks = {"database": database_ok, "custom_field_schema": custom_fields_schema_loaded}
     return JSONResponse(

@@ -110,11 +110,13 @@ _NON_PUBLIC_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "0.0.0.0", "::"}
 
 
 class LogLevel(StrEnum):
-    FATAL = "fatal"
-    ERROR = "error"
-    WARN = "warn"
-    INFO = "info"
+    """Matches `unique_mcp.logging.configure_logging` accepted names (case-insensitive)."""
+
     DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
 
 
 class AppConfig(BaseSettings):

@@ -2,9 +2,12 @@ from typing import ClassVar, Literal
 from urllib.parse import quote
 
 from fastmcp import Context
+from fastmcp.tools import tool
+from mcp.types import CallToolResult, ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from backstop_mcp.backstop_client import BackstopApiResourceDocument
+from backstop_mcp.features.custom_fields import glossary_meta
 from backstop_mcp.features.data_hygiene import (
     AsOfEcho,
     DepartedContactEcho,
@@ -15,6 +18,7 @@ from backstop_mcp.features.data_hygiene import (
     entity_relationships,
     extract_as_of,
 )
+from backstop_mcp.features.entity_types import EntityType
 from backstop_mcp.features.party_resolver import (
     PartyAmbiguousResponse,
     ResolvedPartyEcho,
@@ -24,6 +28,7 @@ from backstop_mcp.features.party_resolver import (
 )
 from backstop_mcp.features.resolution import NotFoundResponse, Resolved
 from backstop_mcp.server.runtime import get_backstop_client, get_employment_index_factory
+from backstop_mcp.server.tools.results import tool_result
 
 
 class PersonAttributes(BaseModel):
@@ -55,11 +60,20 @@ class PersonResolvedResponse(BaseModel):
 type GetPersonResponse = PartyAmbiguousResponse | NotFoundResponse | PersonResolvedResponse
 
 
+@tool(
+    annotations=ToolAnnotations(
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+    meta=glossary_meta(EntityType.PEOPLE),
+)
 async def get_person(
     ctx: Context,
     party_id: str | None = None,
     search: str | None = None,
-) -> GetPersonResponse:
+) -> CallToolResult:
     """Fetch one Backstop person by trusted Party ID or by name/email search.
 
     Never invent or guess a party_id. Only pass a party_id that was previously returned
@@ -75,6 +89,9 @@ async def get_person(
 
     `as_of` is plain provenance (modifiedTimestamp / modifiedBy). Relay it; do not treat
     record age as a staleness verdict.
+
+    When the custom-field glossary on this tool is truncated or missing, call
+    `list_custom_fields` with entity_type=people.
     """
     client = await get_backstop_client()
     result = await resolve_party(
@@ -85,7 +102,7 @@ async def get_person(
         search=search,
     )
     if not isinstance(result, Resolved):
-        return unresolved_party_response(result)
+        return tool_result(unresolved_party_response(result))
 
     party = result.value
     path = f"/people/{quote(party.id, safe='')}"
@@ -98,9 +115,6 @@ async def get_person(
     index = get_employment_index_factory().index_for_person(
         **entity_relationships(document),
     )
-    # Every FORMER pair for this index is this same person's own former employment: the index
-    # was built from the person's own side-loaded relationships, so every edge's `person_id` is
-    # theirs — there is no other person to filter by.
     departures: list[DepartedContactEcho] = []
     for record in index.pairs(status=EmploymentStatus.FORMER):
         assert record.departure is not None, (
@@ -110,10 +124,12 @@ async def get_person(
         assert echo is not None
         departures.append(echo)
 
-    return PersonResolvedResponse(
-        person=attributes,
-        resolved=party_echo(party, attributes=attributes),
-        as_of=as_of_echo(extract_as_of(attributes)),
-        departed=bool(departures),
-        departures=departures,
+    return tool_result(
+        PersonResolvedResponse(
+            person=attributes,
+            resolved=party_echo(party, attributes=attributes),
+            as_of=as_of_echo(extract_as_of(attributes)),
+            departed=bool(departures),
+            departures=departures,
+        )
     )

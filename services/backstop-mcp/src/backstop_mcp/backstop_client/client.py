@@ -1,4 +1,5 @@
 import base64
+import logging
 import time
 from collections.abc import Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
@@ -22,14 +23,13 @@ from backstop_mcp.backstop_client.pagination import (
 )
 from backstop_mcp.backstop_client.retry import RetryPolicy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings
-from backstop_mcp.logging import get_logger
 from backstop_mcp.metrics import (
     BACKSTOP_CONCURRENCY_WAIT,
     BACKSTOP_REQUEST_DURATION,
     BACKSTOP_REQUESTS,
 )
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 _AUTHORIZATION_HEADER = "authorization"
 _TOKEN_HEADER = "token"
@@ -75,7 +75,10 @@ def _deserialize(content: bytes, schema: type[T] | None, *, path: str) -> T:
     try:
         return TypeAdapter(schema).validate_json(content)
     except ValidationError as exc:
-        logger.error("backstop.response.schema_error", path=path, schema=schema.__name__)
+        logger.error(
+            "backstop.response.schema_error",
+            extra={"path": path, "schema": schema.__name__},
+        )
         raise BackstopResponseSchemaError(path, schema.__name__, exc) from exc
 
 
@@ -256,7 +259,10 @@ class BackstopClient:
         try:
             items = [TypeAdapter(schema).validate_python(item) for item in raw_result.items]
         except ValidationError as exc:
-            logger.error("backstop.response.schema_error", path=path, schema=schema.__name__)
+            logger.error(
+                "backstop.response.schema_error",
+                extra={"path": path, "schema": schema.__name__},
+            )
             raise BackstopResponseSchemaError(path, schema.__name__, exc) from exc
 
         return PageResult(
@@ -329,7 +335,7 @@ class BackstopClient:
                 raise parse_json_api_error(response)
             return response
 
-        logger.debug("backstop.request.start", method=method, path=path)
+        logger.debug("backstop.request.start", extra={"method": method, "path": path})
         try:
             response: httpx.Response = await retrying(make_request)
         except BackstopApiError as exc:
@@ -338,15 +344,20 @@ class BackstopClient:
             # `logger.exception` below.
             logger.error(
                 "backstop.request.failed",
-                method=method,
-                path=path,
-                status_code=exc.status_code,
-                detail=exc.detail,
-                code=exc.code,
-                errors=_errors_for_log(exc.errors),
+                extra={
+                    "method": method,
+                    "path": path,
+                    "status_code": exc.status_code,
+                    "detail": exc.detail,
+                    "code": exc.code,
+                    "errors": _errors_for_log(exc.errors),
+                },
             )
             raise
         except Exception:
-            logger.exception("backstop.request.failed", method=method, path=path)
+            logger.exception(
+                "backstop.request.failed",
+                extra={"method": method, "path": path},
+            )
             raise
         return response

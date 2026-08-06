@@ -6,9 +6,7 @@ from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
 # to every known entity would otherwise multiply this by six and dominate the context window.
 DEFAULT_GLOSSARY_BUDGET_CHARS = 6_000
 
-_TRUNCATION_NOTICE = (
-    "\n- … glossary truncated; call resolve_custom_field to look up further fields."
-)
+_TRUNCATION_NOTICE = "\n- … glossary truncated; call list_custom_fields for the full catalog."
 
 _MAX_LISTED_ALLOWED_VALUES = 12
 

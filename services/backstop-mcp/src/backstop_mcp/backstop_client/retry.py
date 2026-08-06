@@ -8,6 +8,7 @@ The split between `RetryPolicy` (built once) and `AsyncRetrying` (built per requ
 deliberate and is explained on `RetryPolicy`.
 """
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -15,10 +16,9 @@ import tenacity
 
 from backstop_mcp.backstop_client.errors import BackstopRateLimitError
 from backstop_mcp.backstop_client.settings import RetrySettings
-from backstop_mcp.logging import get_logger
 from backstop_mcp.metrics import BACKSTOP_RATE_LIMITED
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 _BACKOFF_INITIAL_SECONDS = 1.0
 _BACKOFF_EXP_BASE = 2.0
@@ -74,7 +74,10 @@ def _build_retry_predicate(settings: RetrySettings) -> RetryPredicate:
         # minute/hour/day quota breach: retrying against the wrong (or unknown) limit wastes
         # attempts and won't resolve.
         if exc.limit_kind != "concurrency":
-            logger.info("backstop.rate_limit.quota_exceeded", limit_kind=exc.limit_kind)
+            logger.info(
+                "backstop.rate_limit.quota_exceeded",
+                extra={"limit_kind": exc.limit_kind},
+            )
             _record_rate_limit(exc, retried=False)
             return False
 
@@ -82,8 +85,10 @@ def _build_retry_predicate(settings: RetrySettings) -> RetryPredicate:
         if wait_seconds > max_wait_seconds:
             logger.info(
                 "backstop.rate_limit.wait_exceeds_ceiling",
-                wait_seconds=wait_seconds,
-                max_retry_wait_ms=settings.max_wait_ms,
+                extra={
+                    "wait_seconds": wait_seconds,
+                    "max_retry_wait_ms": settings.max_wait_ms,
+                },
             )
             _record_rate_limit(exc, retried=False)
             return False
@@ -115,8 +120,10 @@ def _before_sleep(retry_state: tenacity.RetryCallState) -> None:
     sleep_seconds = retry_state.next_action.sleep if retry_state.next_action is not None else None
     logger.info(
         "backstop.rate_limit.retry",
-        attempt_number=retry_state.attempt_number,
-        wait_seconds=sleep_seconds,
+        extra={
+            "attempt_number": retry_state.attempt_number,
+            "wait_seconds": sleep_seconds,
+        },
     )
 
 

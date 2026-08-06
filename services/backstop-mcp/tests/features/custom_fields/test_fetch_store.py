@@ -701,7 +701,7 @@ class TestSnapshotCodec:
 
 
 class TestRefreshFloor:
-    """`resolve_custom_field` hands the model a `refresh` flag, and one refresh is two uncapped
+    """`list_custom_fields` hands the model a `refresh` flag, and one refresh is two uncapped
     paginations taken under the lock every other caller's cold path waits on."""
 
     @pytest.mark.asyncio

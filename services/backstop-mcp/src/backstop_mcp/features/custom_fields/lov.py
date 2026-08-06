@@ -21,14 +21,14 @@ So allowed values are assembled from three sources, in order of reliability:
    definition itself.
 """
 
+import logging
 from dataclasses import dataclass
 
 from backstop_mcp.backstop_client import BackstopApiResource, BackstopClient
 from backstop_mcp.coerce import as_clean_str, as_object_dict, as_object_list
 from backstop_mcp.features.custom_fields.types import AllowedValue, LovEntryAttributes
-from backstop_mcp.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 _LOV_ENTRIES_PATH = "/lov-entries"
 
@@ -203,8 +203,7 @@ async def fetch_lov_entry_index(client: BackstopClient) -> LovEntryIndex:
     index = build_lov_entry_index(page.items)
     logger.info(
         "custom_fields.lov_entries.indexed",
-        entries=len(page.items),
-        sets=len(index.by_set_id),
+        extra={"entries": len(page.items), "sets": len(index.by_set_id)},
     )
     return index
 

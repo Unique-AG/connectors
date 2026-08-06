@@ -11,7 +11,9 @@ from backstop_mcp.features.party_resolver import (
     PartyCandidateEcho,
     ResolvedPartyEcho,
 )
+from backstop_mcp.features.resolution import NotFoundResponse
 from backstop_mcp.server.tools.get_organization import (
+    GetOrganizationResponse,
     OrganizationResolvedResponse,
     get_organization,
 )
@@ -22,6 +24,7 @@ from tests.features.party_resolver.helpers import (
     ctx_never_elicit,
     resource,
 )
+from tests.server.tools.helpers import tool_model, tool_model_union
 
 type ConnectUser = Callable[..., object]
 
@@ -58,9 +61,11 @@ class TestGetOrganization:
             )
         )
 
-        result = await get_organization(ctx_never_elicit(), search="Capstone")
+        result = tool_model(
+            await get_organization(ctx_never_elicit(), search="Capstone"),
+            OrganizationResolvedResponse,
+        )
 
-        assert isinstance(result, OrganizationResolvedResponse)
         # `organization` is the record's own fields, not the enclosing JSON:API document —
         # `type`/`id` are already echoed under `resolved`.
         assert result.organization == {
@@ -94,7 +99,10 @@ class TestGetOrganization:
             return_value=httpx.Response(200, json={})
         )
 
-        result = await get_organization(ctx_decline(), search="Capstone")
+        result = tool_model(
+            await get_organization(ctx_decline(), search="Capstone"),
+            PartyAmbiguousResponse,
+        )
 
         assert result == PartyAmbiguousResponse(
             query="Capstone",
@@ -127,9 +135,11 @@ class TestGetOrganization:
             return_value=httpx.Response(200, json=collection())
         )
 
-        result = await get_organization(ctx_never_elicit(), party_id="trusted-9")
+        result = tool_model(
+            await get_organization(ctx_never_elicit(), party_id="trusted-9"),
+            OrganizationResolvedResponse,
+        )
 
-        assert isinstance(result, OrganizationResolvedResponse)
         # The name is backfilled from the organization fetch this tool makes anyway, so no
         # extra `confirm_name` request is needed to satisfy the echo requirement.
         assert result.resolved == ResolvedPartyEcho(
@@ -160,7 +170,10 @@ class TestGetOrganization:
             )
         )
 
-        result = await get_organization(ctx_never_elicit(), party_id="trusted 9")
+        result = tool_model(
+            await get_organization(ctx_never_elicit(), party_id="trusted 9"),
+            OrganizationResolvedResponse,
+        )
 
         assert isinstance(result, OrganizationResolvedResponse)
         assert org_get.call_count == 1
@@ -209,8 +222,12 @@ class TestGetOrganization:
             return_value=httpx.Response(200, json=collection())
         )
 
-        result = await get_organization(ctx_never_elicit(), search="Capstoen")
+        result = tool_model_union(
+            await get_organization(ctx_never_elicit(), search="Capstoen"),
+            GetOrganizationResponse,
+        )
 
+        assert isinstance(result, NotFoundResponse)
         assert result.status == "not_found"
         assert getattr(result, "query", None) == "Capstoen"
         assert getattr(result, "scope", None) == "organizations"

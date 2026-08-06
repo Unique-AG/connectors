@@ -2,8 +2,7 @@
 
 The counterpart to `party_resolver/responses.py`, and here for the same reason: these are the
 feature's own wire vocabulary, so every tool that resolves a field returns the same shapes.
-They lived in `server/tools/resolve_custom_field.py` until a second tool needed them and had to
-import its sibling.
+They lived next to tool handlers until multiple tools needed them and had to share shapes.
 """
 
 from pydantic import BaseModel, Field

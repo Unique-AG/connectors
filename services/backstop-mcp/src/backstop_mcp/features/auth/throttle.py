@@ -18,6 +18,7 @@ concurrent burst can briefly exceed `max_attempts` by a few; that is acceptable 
 credential-guessing bound, not a hard quota.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -25,9 +26,8 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from backstop_mcp.db import LoginAttempt, read_session, transaction
-from backstop_mcp.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Submitted usernames are attacker-controlled and land in a `text` column. Backstop usernames are
 # email addresses or short handles, so anything past this is not a real username — rejected before
@@ -71,9 +71,11 @@ async def is_throttled(
         return False
     logger.warning(
         "auth.login.throttled",
-        failures=failures,
-        max_attempts=config.max_attempts,
-        window_minutes=int(config.window.total_seconds() // 60),
+        extra={
+            "failures": failures,
+            "max_attempts": config.max_attempts,
+            "window_minutes": int(config.window.total_seconds() // 60),
+        },
     )
     return True
 

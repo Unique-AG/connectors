@@ -22,6 +22,7 @@ The policy itself:
 5. Zero matches → `NotFound`, naming the query that was actually used.
 """
 
+import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol, cast
@@ -32,9 +33,7 @@ from mcp.server.elicitation import CancelledElicitation, DeclinedElicitation
 from mcp.types import ClientCapabilities, ElicitationCapability
 from pydantic import BaseModel, Field
 
-from backstop_mcp.logging import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 # --- Internal algebra -----------------------------------------------------------------------
@@ -191,7 +190,10 @@ def client_supports_elicitation(ctx: Context) -> bool:
             )
         )
     except Exception as exc:
-        logger.warning("resolution.elicit.capability_check_failed", error=str(exc))
+        logger.warning(
+            "resolution.elicit.capability_check_failed",
+            extra={"error": str(exc)},
+        )
         return False
 
 
@@ -230,14 +232,17 @@ async def elicit_choice[T](
     assert len(ambiguous.candidates) >= 2, "elicit_choice requires at least two candidates"
 
     if not client_supports_elicitation(ctx):
-        logger.info("resolution.elicit.skipped", reason="client lacks elicitation capability")
+        logger.info(
+            "resolution.elicit.skipped",
+            extra={"reason": "client lacks elicitation capability"},
+        )
         return ambiguous
 
     labels, by_label = _unique_labels(ambiguous.candidates)
     try:
         result = await ctx.elicit(message=prompt, response_type=labels)
     except Exception as exc:
-        logger.warning("resolution.elicit.degraded", error=str(exc))
+        logger.warning("resolution.elicit.degraded", extra={"error": str(exc)})
         return ambiguous
 
     if isinstance(result, AcceptedElicitation):

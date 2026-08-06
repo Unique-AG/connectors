@@ -1,12 +1,12 @@
 import asyncio
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from backstop_mcp.backstop_client import BackstopClientFactory, BackstopCredentialSecret
 from backstop_mcp.features.custom_fields.service import CustomFieldsService
-from backstop_mcp.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 async def warm_custom_field_schema(
@@ -25,7 +25,7 @@ async def warm_custom_field_schema(
     serving, and the schema will be fetched lazily by the first authenticated caller instead.
     """
     if credential is None:
-        logger.info("custom_fields.warmup.skipped", reason="no_service_account")
+        logger.info("custom_fields.warmup.skipped", extra={"reason": "no_service_account"})
         return
 
     try:
@@ -44,7 +44,7 @@ async def warmup_lifespan(
 ) -> AsyncGenerator[None, None]:
     """Run schema warming in the background for the lifetime of the app.
 
-    Detached rather than awaited so `/probe` and `/health` come up immediately — a full
+    Detached rather than awaited so `/ready` and `/health` come up immediately — a full
     `/custom-field-definitions` pagination can take seconds, and readiness shouldn't wait on
     an optional cache fill. Cancelled on shutdown if still in flight.
     """

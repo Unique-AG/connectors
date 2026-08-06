@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar
 
@@ -13,10 +14,9 @@ from backstop_mcp.features.custom_fields.index import DefinitionIndex, build_ind
 from backstop_mcp.features.custom_fields.overrides import FieldOverride
 from backstop_mcp.features.custom_fields.store import load_snapshot, save_snapshot
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
-from backstop_mcp.logging import get_logger
 from backstop_mcp.metrics import CUSTOM_FIELD_SCHEMA_LOADS
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class CustomFieldsService:
@@ -33,7 +33,7 @@ class CustomFieldsService:
     """
 
     # Floor on how often an upstream fetch can be attempted, whatever the caller asked for.
-    # `resolve_custom_field` exposes `refresh` to the model, and one refresh is two uncapped
+    # `list_custom_fields` exposes `refresh` to the model, and one refresh is two uncapped
     # paginations taken under the lock every other caller's cold path waits on — so without a
     # floor a model that habitually passes `refresh=true` serializes every concurrent caller
     # behind repeated full re-fetches and spends the user's Backstop concurrency budget on a
@@ -134,7 +134,9 @@ class CustomFieldsService:
                     raise
                 logger.warning(
                     "custom_fields.schema.refresh_failed_serving_stale",
-                    fetched_at=self._fetched_at.isoformat() if self._fetched_at else None,
+                    extra={
+                        "fetched_at": (self._fetched_at.isoformat() if self._fetched_at else None),
+                    },
                     exc_info=True,
                 )
                 CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "stale"})
@@ -151,12 +153,14 @@ class CustomFieldsService:
             if self._within_refresh_floor():
                 logger.info(
                     "custom_fields.schema.refresh_floored",
-                    attempted_at=(
-                        self._refresh_attempted_at.isoformat()
-                        if self._refresh_attempted_at
-                        else None
-                    ),
-                    min_interval_seconds=self.MIN_REFRESH_INTERVAL.total_seconds(),
+                    extra={
+                        "attempted_at": (
+                            self._refresh_attempted_at.isoformat()
+                            if self._refresh_attempted_at
+                            else None
+                        ),
+                        "min_interval_seconds": self.MIN_REFRESH_INTERVAL.total_seconds(),
+                    },
                 )
                 return self._all_definitions()
             return await self._refresh_unlocked(client)
@@ -191,7 +195,10 @@ class CustomFieldsService:
         self._index = build_index(definitions)
         self._fetched_at = fetched_at
         CUSTOM_FIELD_SCHEMA_LOADS.add(1, {"source": "backstop"})
-        logger.info("custom_fields.schema.refreshed", definitions=len(definitions))
+        logger.info(
+            "custom_fields.schema.refreshed",
+            extra={"definitions": len(definitions)},
+        )
         return definitions
 
 

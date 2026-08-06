@@ -14,6 +14,7 @@ transaction.
 """
 
 import asyncio
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -32,9 +33,8 @@ from backstop_mcp.db import (
     PendingAuthorization,
     transaction,
 )
-from backstop_mcp.logging import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _deleted(result: Result[tuple[object, ...]]) -> int:
@@ -144,11 +144,13 @@ async def purge_expired_auth_rows(
     if pending or codes or tokens or attempts or clients:
         logger.info(
             "auth.cleanup.purged",
-            pending_authorizations=pending,
-            authorization_codes=codes,
-            oauth_tokens=tokens,
-            login_attempts=attempts,
-            oauth_clients=clients,
+            extra={
+                "pending_authorizations": pending,
+                "authorization_codes": codes,
+                "oauth_tokens": tokens,
+                "login_attempts": attempts,
+                "oauth_clients": clients,
+            },
         )
 
 
@@ -158,7 +160,7 @@ async def _sweep_forever(
     """Sweep on start, then once per `config.cleanup_interval`.
 
     A failed sweep is logged and retried on the next tick rather than killing the task: nothing
-    downstream depends on it having run, and an unreachable database already fails `/probe`.
+    downstream depends on it having run, and an unreachable database already fails `/ready`.
     """
     while True:
         try:

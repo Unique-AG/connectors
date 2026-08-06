@@ -264,6 +264,7 @@ def _employment_edges(
     all (`effective_date=None`) is kept: it sorts last downstream rather than being dropped
     outright, so it still wins when it is the only edge for its pair.
     """
+    _ = person_side
     type_names = _relationship_type_names(resources=relationship_types)
     edges: list[EmploymentEdge] = []
 

@@ -14,6 +14,7 @@ from backstop_mcp.features.auth.context import BackstopAuthContext, NotConnected
 from backstop_mcp.features.auth.credential_store import save_credential
 from backstop_mcp.server.tools.system_info import get_system_info
 from tests.helpers import BASE_URL, client_factory, custom_fields_service, install_services
+from tests.server.tools.helpers import tool_payload
 
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 type ConnectUser = Callable[..., object]
@@ -34,7 +35,7 @@ class TestGetSystemInfo:
             return_value=httpx.Response(200, json={"version": "1.0"})
         )
 
-        result = await get_system_info()
+        result = tool_payload(await get_system_info())
 
         assert result == {"version": "1.0"}
 

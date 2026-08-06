@@ -14,6 +14,7 @@ Exceptions that are *not* meant for the MCP client — `BackstopAuthError`,
 that must react to it (revoke tokens, re-render the login form) rather than surface it.
 """
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Literal, cast
@@ -22,9 +23,7 @@ import httpx
 from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
-from backstop_mcp.logging import get_logger
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 type LimitKind = Literal["concurrency", "minute", "hour", "day"]
 
@@ -175,8 +174,7 @@ def _parse_error_details(response: httpx.Response) -> tuple[BackstopErrorDetail,
     except ValidationError as exc:
         logger.warning(
             "backstop.error_body.schema_error",
-            status_code=response.status_code,
-            error=str(exc),
+            extra={"status_code": response.status_code, "error": str(exc)},
         )
         return None
     if not body.errors:
@@ -201,8 +199,7 @@ def _first_code(errors: tuple[BackstopErrorDetail, ...]) -> str | None:
 def _fallback_message(response: httpx.Response) -> str:
     logger.debug(
         "backstop.error_body.unparseable",
-        status_code=response.status_code,
-        body_length=len(response.content),
+        extra={"status_code": response.status_code, "body_length": len(response.content)},
     )
     return f"Backstop returned status {response.status_code} with an unparseable response body"
 
@@ -224,7 +221,10 @@ def _parse_retry_after(response: httpx.Response) -> float | None:
     try:
         return float(retry_after)
     except ValueError:
-        logger.warning("backstop.retry_after.unparseable", retry_after=retry_after)
+        logger.warning(
+            "backstop.retry_after.unparseable",
+            extra={"retry_after": retry_after},
+        )
         return None
 
 
