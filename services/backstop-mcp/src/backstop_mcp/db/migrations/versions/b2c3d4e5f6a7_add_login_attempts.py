@@ -1,7 +1,7 @@
 """add login attempts
 
 Revision ID: b2c3d4e5f6a7
-Revises: 0be78700d2dc
+Revises: a1b2c3d4e5f6
 Create Date: 2026-08-05 00:00:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "b2c3d4e5f6a7"
-down_revision: str | Sequence[str] | None = "0be78700d2dc"
+down_revision: str | Sequence[str] | None = "a1b2c3d4e5f6"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

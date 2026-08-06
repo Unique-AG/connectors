@@ -14,6 +14,7 @@ from backstop_mcp.backstop_client import (
 from backstop_mcp.dates import parse_lenient_date
 from backstop_mcp.features.custom_fields.entity_types import normalize_entity_type
 from backstop_mcp.features.custom_fields.types import CustomFieldDefinition
+from backstop_mcp.features.data_hygiene import AsOf, extract_as_of
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +23,10 @@ _REGULAR_FIELDS = "regularCustomFieldValues,modifiedTimestamp,modifiedBy"
 
 @dataclass(frozen=True)
 class CustomFieldValueRead:
-    """One custom-field value read from Backstop.
-
-    Entity-level provenance (`as_of`) lands once `features.data_hygiene` does — this PR reads
-    only the value itself.
-    """
+    """One custom-field value plus optional entity-level provenance from the same GET."""
 
     value: object | None
+    as_of: AsOf | None = None
 
 
 class RegularCustomFieldValueAttributes(BaseModel):
@@ -110,7 +108,8 @@ async def read_custom_field_value(
     """Read one custom field's current value, via the path selected by `isTimeSeries`.
 
     Choosing the wrong path returns nothing for a field that does exist, which is why the flag
-    is honoured rather than guessed at.
+    is honoured rather than guessed at. Regular reads piggyback entity `as_of` on the same GET;
+    time-series leaves `as_of` None rather than adding a second round trip.
     """
     entity = normalize_entity_type(entity_type)
     if entity is None:
@@ -121,7 +120,7 @@ async def read_custom_field_value(
         value = await _read_time_series_value(
             client, entity=entity, safe_id=safe_id, definition=definition
         )
-        return CustomFieldValueRead(value=value)
+        return CustomFieldValueRead(value=value, as_of=None)
     return await _read_regular_value(client, entity=entity, safe_id=safe_id, definition=definition)
 
 
@@ -166,8 +165,14 @@ async def _read_regular_value(
         schema=BackstopApiResourceDocument[EntityWithRegularCustomFieldsAttributes],
     )
     attrs = document.data.attributes
+    as_of = extract_as_of(
+        {
+            "modifiedTimestamp": attrs.modified_timestamp,
+            "modifiedBy": attrs.modified_by,
+        }
+    )
     values = attrs.regular_custom_field_values or []
     for entry in values:
         if entry.definition_id == definition.definition_id:
-            return CustomFieldValueRead(value=entry.value)
-    return CustomFieldValueRead(value=None)
+            return CustomFieldValueRead(value=entry.value, as_of=as_of)
+    return CustomFieldValueRead(value=None, as_of=as_of)
