@@ -2,27 +2,34 @@
 
 1. **`features/` must not import `server/`.** `features/` is what the connector does; `server/`
    is how it's exposed over MCP. The server wires features together, so it imports them freely —
-   the reverse is an inversion.
+   the reverse is an inversion. This used to be a convention and it was already broken once:
+   `custom_fields/middleware.py` imported `tools.registry`, which only avoided a circular import
+   because `custom_fields/__init__.py` happened not to import the middleware.
 
 2. **`backstop_client/` must not import `features/`.** The HTTP client is infrastructure that
-   features consume; it importing one back is the same inversion.
+   features consume; it importing one back is the same inversion, and it had the same near-miss.
+   `client.py`/`factory.py` imported `features.auth` for the credential type and the auth
+   context while `features/auth/provider.py` imported `backstop_client` — a genuine package
+   cycle that only worked because `features/auth/__init__.py` is empty. Those two types now live
+   in `backstop_client/credential.py` (the context as a Protocol), so the direction is one-way.
 
-3. **`backstop_client/` must not import `config`.** The transport takes its own frozen settings
-   types, translated from `BackstopConfig` by `create_app`. `features/` is deliberately *not*
-   subject to this rule: it may read config freely, because a feature is allowed to be
-   configured — a transport is only allowed to be told.
+3. **`backstop_client/` must not import `config`.** The transport takes
+   `BackstopTransportSettings`/`RetrySettings` — its own frozen types, translated from
+   `BackstopConfig` by `create_app`. It used to take the `pydantic-settings` model directly, which
+   coupled the layer to the env-parsing shape and to every knob on it. `features/` is
+   deliberately *not* subject to this rule: it may read config freely (see `features/__init__.py`),
+   because a feature is allowed to be configured — a transport is only allowed to be *told*.
 
-4. **A package is entered through its `__init__`, never through its modules.** Applies to the
-   packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are not among them:
-   they are groupings whose `__init__` is documentation.
+4. **A package is entered through its `__init__`, never through its modules.** From outside,
+   `from backstop_mcp.features.auth import BackstopOAuthProvider` — not
+   `...auth.provider import BackstopOAuthProvider`. Each package's `__all__` is then the whole of
+   what it promises, and everything else is free to move.
 
-Rules 2 and 3 only apply to `backstop_client/`, which doesn't exist yet in this PR — those test
-classes no-op (skip) until it lands. Rule 1's "the tree actually has feature packages" guard
-similarly skips until `features/auth`, `features/custom_fields` and `features/party_resolver`
-exist; the import-direction check itself still runs against whatever *is* under `features/`
-(currently just `__init__.py`, which trivially passes).
+   Applies to the packages listed in `_PUBLIC_SURFACE_PACKAGES`. `features/` and `server/` are
+   not among them: they are groupings whose `__init__` is documentation, so `features.auth` and
+   `server.runtime` are themselves the unit being imported.
 
-All rules are asserted by walking the AST rather than importing anything, so a violation is
+All four are asserted by walking the AST rather than importing anything, so a violation is
 reported as a failing test with a file and line instead of an ImportError at collection time.
 """
 
@@ -39,14 +46,21 @@ _SERVER_PREFIX = "backstop_mcp.server"
 _FEATURES_PREFIX = "backstop_mcp.features"
 _CONFIG_MODULE = "backstop_mcp.config"
 
-# The feature packages rule 1's "guard the guard" test expects. Not present yet in this PR.
-_EXPECTED_FEATURE_PACKAGES: frozenset[str] = frozenset({"auth", "custom_fields", "party_resolver"})
+# The feature packages rule 1's "guard the guard" test expects. `custom_fields` and
+# `party_resolver` land in later PRs.
+_EXPECTED_FEATURE_PACKAGES: frozenset[str] = frozenset({"auth"})
 
 # Packages that publish a surface: outside code imports the package, never a module inside it.
 # Tests are deliberately exempt — they walk `src` only — so the pieces a package composes stay
 # directly testable without being callable from production code that should go through the front
 # door. A new package belongs here as soon as its `__init__` exports anything.
-_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = ("backstop_mcp.db",)
+_PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
+    "backstop_mcp.backstop_client",
+    "backstop_mcp.db",
+    "backstop_mcp.features.auth",
+    "backstop_mcp.server.middleware",
+    "backstop_mcp.server.tools",
+)
 
 
 def _imported_modules(tree: ast.AST) -> list[tuple[str, int]]:
@@ -62,7 +76,7 @@ def _imported_modules(tree: ast.AST) -> list[tuple[str, int]]:
 
 
 def _source_id(source: pathlib.Path) -> str:
-    """Test id for one module: `features/custom_fields/service.py`, not an absolute path."""
+    """Test id for one module: `features/auth/provider.py`, not an absolute path."""
     return str(source.relative_to(_SRC))
 
 
@@ -85,7 +99,7 @@ def _violations(source: pathlib.Path, prefix: str) -> list[str]:
 
 
 def _package_directory(package: str) -> pathlib.Path:
-    """`backstop_mcp.features.data_hygiene` → the directory that package's modules live in."""
+    """`backstop_mcp.features.auth` → the directory that package's modules live in."""
     return _SRC.joinpath(*package.split(".")[1:])
 
 
@@ -142,7 +156,7 @@ class TestTheDetectionItself:
     def test_does_not_fire_on_permitted_imports(self) -> None:
         assert not _imports_under(
             "from backstop_mcp.backstop_client.client import BackstopClient\n"
-            + "from backstop_mcp.features.custom_fields.service import CustomFieldsService\n"
+            + "from backstop_mcp.features.auth.provider import BackstopOAuthProvider\n"
             + "from backstop_mcp.logging import configure_logging\n",
             _SERVER_PREFIX,
         )
@@ -153,18 +167,15 @@ class TestTheDetectionItself:
         ]
 
     def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
-        # `_PUBLIC_SURFACE_PACKAGES` only lists `db` for now, so that's the stand-in package
-        # here; once `features/data_hygiene` lands and joins the list, its own modules serve
-        # this same role.
         assert _internal_imports(
-            "from backstop_mcp.db.engine import create_engine",
-            _SRC / "server",
-        ) == [("backstop_mcp.db.engine", 1)]
+            "from backstop_mcp.features.auth.provider import BackstopOAuthProvider",
+            _SRC / "server" / "tools",
+        ) == [("backstop_mcp.features.auth.provider", 1)]
 
     def test_the_same_import_is_fine_inside_the_feature(self) -> None:
         assert not _internal_imports(
-            "from backstop_mcp.db.engine import create_engine",
-            _package_directory("backstop_mcp.db"),
+            "from backstop_mcp.features.auth.provider import BackstopOAuthProvider",
+            _package_directory("backstop_mcp.features.auth"),
         )
 
     def test_catches_reaching_past_the_init_for_a_service_too(self) -> None:
@@ -177,9 +188,8 @@ class TestTheDetectionItself:
 
     def test_does_not_fire_on_the_package_root(self) -> None:
         assert not _internal_imports(
-            "from backstop_mcp.features.data_hygiene import EmploymentIndexFactory\n"
-            + "from backstop_mcp.server.runtime import get_services\n"
-            + "from backstop_mcp.features.resolution import Resolved\n",
+            "from backstop_mcp.features.auth import BackstopOAuthProvider\n"
+            + "from backstop_mcp.server.runtime import get_services\n",
             _SRC / "server" / "tools",
         )
 
@@ -190,12 +200,6 @@ class TestTheDetectionItself:
 
 
 class TestFeaturesDoNotImportServer:
-    @pytest.mark.skipif(
-        not _EXPECTED_FEATURE_PACKAGES.issubset(
-            {p.name for p in _FEATURES.iterdir() if p.is_dir()}
-        ),
-        reason="features/auth, features/custom_fields, features/party_resolver land in later PRs",
-    )
     def test_the_feature_tree_is_actually_there(self) -> None:
         """Guards the guard: a moved/renamed tree must not silently vacate the rule below."""
         sources = sorted(_FEATURES.rglob("*.py"))
@@ -213,7 +217,6 @@ class TestFeaturesDoNotImportServer:
         )
 
 
-@pytest.mark.skipif(not _BACKSTOP_CLIENT.is_dir(), reason="backstop_client/ lands in a later PR")
 class TestBackstopClientDoesNotImportFeatures:
     def test_the_client_tree_is_actually_there(self) -> None:
         """Guards the guard, same as above."""
@@ -234,7 +237,6 @@ class TestBackstopClientDoesNotImportFeatures:
         )
 
 
-@pytest.mark.skipif(not _BACKSTOP_CLIENT.is_dir(), reason="backstop_client/ lands in a later PR")
 class TestBackstopClientDoesNotImportConfig:
     def test_the_settings_module_is_actually_there(self) -> None:
         """Guards the guard: without somewhere to put them, the rule below is unsatisfiable."""
@@ -269,14 +271,20 @@ class TestPackagesAreEnteredThroughTheirInit:
             ]
             assert exported, f"{package}/__init__.py declares no __all__"
 
+    def test_a_package_still_composes_its_own_modules(self) -> None:
+        """The rule is only meaningful if something inside the package assembles the parts."""
+        provider = _package_directory("backstop_mcp.features.auth") / "provider.py"
+        imported = {module for module, _line in _imported_modules(ast.parse(provider.read_text()))}
+
+        assert "backstop_mcp.features.auth.credential_store" in imported
+
     @pytest.mark.parametrize("source", sorted(_SRC.rglob("*.py")), ids=_source_id)
     def test_no_module_reaches_past_another_packages_init(self, source: pathlib.Path) -> None:
         violations = _internal_module_violations(source)
         assert not violations, (
             "import the package, not a module inside it — a package's __all__ is the whole of "
             + "what it promises, and reaching past it means assembling collaborators the package "
-            + "is responsible for assembling (which is how a tool came to re-read "
-            + "BackstopConfig() and ignore what create_app was given). Export the name from that "
-            + "package's __init__ and import it from there:\n  "
+            + "is responsible for assembling. Export the name from that package's __init__ and "
+            + "import it from there:\n  "
             + "\n  ".join(violations)
         )

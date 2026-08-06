@@ -8,9 +8,24 @@ from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from testcontainers.community.postgres import PostgresContainer
 
+from backstop_mcp.server.runtime import reset_services
+
 type DatabaseFixture = tuple[AsyncEngine, async_sessionmaker[AsyncSession]]
 
 _SERVICE_ROOT = Path(__file__).parent.parent
+
+
+@pytest.fixture(autouse=True)
+async def _reset_runtime() -> AsyncGenerator[None]:
+    """Drop the process-wide services between tests.
+
+    One hook, because there is one holder (`runtime._services`). Necessary because each test
+    function runs on its own event loop (`asyncio_default_fixture_loop_scope = "function"`)
+    and httpx binds its connection pool to whichever loop first touches it — a pool left over
+    from a previous test would raise "bound to a different event loop".
+    """
+    yield
+    await reset_services()
 
 
 @pytest.fixture(scope="session")
@@ -21,10 +36,6 @@ def postgres_container() -> Generator[PostgresContainer]:
     `DB_URL` from the environment — so migrations are pointed at the test container by
     setting that env var directly (rather than via `Config.set_main_option`, which
     `env.py` would immediately overwrite).
-
-    `db/migrations/versions/` is tracked (via `.gitkeep`) so clones always have the path;
-    with no revision files yet, `upgrade head` is a no-op — kept so the fixture behaves the
-    same way it will once the first migration lands.
 
     The whole environment is snapshotted and restored around the upgrade, not just `DB_URL`:
     `env.py` also calls `load_dotenv()`, which is right for an operator running
