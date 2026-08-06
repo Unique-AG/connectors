@@ -609,7 +609,7 @@ class _Widget(BaseModel):
 
 
 class TestSchemaAwareDeserialization:
-    """`get`/`post`/`patch`/`delete` all funnel through the same `_deserialize` helper, so each
+    """`get`/`post`/`patch`/`delete` all funnel through the same `deserialize` helper, so each
     verb gets the same three cases: `schema=None` returns a plain dict unchanged, a schema with
     a matching body returns a parsed model, and a schema with a mismatched body raises
     `BackstopResponseSchemaError` wrapping the underlying `pydantic.ValidationError`.
@@ -837,7 +837,7 @@ class TestVerifyCredential:
     @pytest.mark.asyncio
     @respx.mock
     async def test_returns_true_on_200(self, factory: BackstopClientFactory) -> None:
-        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(200))
+        respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(200, json={}))
 
         assert await factory.verify_credential("bob.smith", "token") is True
 
@@ -876,7 +876,9 @@ class TestVerifyCredential:
     @pytest.mark.asyncio
     @respx.mock
     async def test_sends_basic_auth_and_token_header(self, factory: BackstopClientFactory) -> None:
-        route = respx.get(f"{_BASE_URL}/system-info").mock(return_value=httpx.Response(200))
+        route = respx.get(f"{_BASE_URL}/system-info").mock(
+            return_value=httpx.Response(200, json={})
+        )
 
         await factory.verify_credential("bob.smith", "p@55W0rd321!")
 

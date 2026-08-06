@@ -10,7 +10,7 @@ and no upstream detail is lost on the way out. `auth.context.NotConnectedError` 
 same rule.
 
 Exceptions that are *not* meant for the MCP client — `BackstopAuthError`,
-`BackstopUnreachableError` in `client.py` — stay plain `Exception`s, because each has a caller
+`BackstopUnreachableError` below — stay plain `Exception`s, because each has a caller
 that must react to it (revoke tokens, re-render the login form) rather than surface it.
 """
 
@@ -69,6 +69,23 @@ class BackstopErrorDetail:
             if candidate is not None and (text := candidate.strip()):
                 return text
         return None
+
+
+class BackstopAuthError(Exception):
+    """Raised when Backstop rejects the stored credential (401) while calling a real endpoint.
+
+    Unlike `BackstopUnreachableError`, this means the credential itself is no longer valid
+    (e.g. the user's personal API token was revoked in Backstop) — the caller should prompt
+    the user to reconnect rather than retry.
+    """
+
+
+class BackstopUnreachableError(Exception):
+    """Raised when Backstop can't be reached at all (network error, 5xx) during verification.
+
+    Distinct from "invalid credentials" (401/403) — the caller should show a different
+    message ("Backstop is unreachable, try again") rather than blaming the submitted token.
+    """
 
 
 class BackstopApiError(ToolError):
