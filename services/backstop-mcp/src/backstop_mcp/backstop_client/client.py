@@ -1,4 +1,3 @@
-import base64
 import logging
 import time
 from collections.abc import Awaitable, Callable
@@ -6,14 +5,13 @@ from contextlib import AbstractAsyncContextManager
 
 import httpx
 from pydantic import TypeAdapter, ValidationError
-from typing_extensions import TypeVar
 
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
+    BackstopAuthError,
     BackstopErrorDetail,
     BackstopResponseSchemaError,
-    BackstopUntrustedUrlError,
     parse_json_api_error,
 )
 from backstop_mcp.backstop_client.pagination import (
@@ -23,6 +21,14 @@ from backstop_mcp.backstop_client.pagination import (
 )
 from backstop_mcp.backstop_client.retry import RetryPolicy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings
+from backstop_mcp.backstop_client.utils import (
+    T,
+    build_auth_headers,
+    build_url,
+    deserialize,
+    is_extended_profile_path,
+    metric_route,
+)
 from backstop_mcp.metrics import (
     BACKSTOP_CONCURRENCY_WAIT,
     BACKSTOP_REQUEST_DURATION,
@@ -30,9 +36,6 @@ from backstop_mcp.metrics import (
 )
 
 logger = logging.getLogger(__name__)
-
-_AUTHORIZATION_HEADER = "authorization"
-_TOKEN_HEADER = "token"
 
 
 def _errors_for_log(errors: tuple[BackstopErrorDetail, ...]) -> list[dict[str, str | None]]:
@@ -53,103 +56,6 @@ type CallerClientProvider = Callable[[], Awaitable["BackstopClient"]]
 # a slot across an elicitation prompt or a batch of gathered calls either starves itself or
 # breaches the limit. See `BackstopClientFactory`.
 type RequestGate = Callable[[str], AbstractAsyncContextManager[None]]
-
-_DICT_ADAPTER = TypeAdapter(dict[str, object])
-
-# `typing_extensions.TypeVar` (not stdlib) so `T` can carry a PEP 696 default: native PEP 695
-# generic-method syntax can't express a default until Python 3.13, but this repo targets 3.12.
-# The default lets every schema-less call site (e.g. `client.get("/system-info")`) infer
-# `dict[str, object]` without an explicit subscript.
-T = TypeVar("T", default=dict[str, object])
-
-
-def _deserialize(content: bytes, schema: type[T] | None, *, path: str) -> T:
-    """Parse a response body, validating against `schema` if given, else the generic dict shape.
-
-    Only the schema-given case is wrapped as `BackstopResponseSchemaError`: a caller that asked
-    for a shape gets told which shape failed and where, while the schema-less path keeps
-    propagating pydantic's own error.
-    """
-    if schema is None:
-        return _DICT_ADAPTER.validate_json(content)  # pyright: ignore[reportReturnType]
-    try:
-        return TypeAdapter(schema).validate_json(content)
-    except ValidationError as exc:
-        logger.error(
-            "backstop.response.schema_error",
-            extra={"path": path, "schema": schema.__name__},
-        )
-        raise BackstopResponseSchemaError(path, schema.__name__, exc) from exc
-
-
-# /reports and /{entity}/{id}/analytics are the calls Backstop docs call out as legitimately
-# slow (up to ~30s per 500 records) — they get the extended timeout and the larger
-# report-sized page default; everything else gets the ordinary CRUD profile.
-_EXTENDED_PROFILE_MARKERS = ("/reports", "/analytics")
-
-
-class BackstopAuthError(Exception):
-    """Raised when Backstop rejects the stored credential (401) while calling a real endpoint.
-
-    Unlike `BackstopUnreachableError`, this means the credential itself is no longer valid
-    (e.g. the user's personal API token was revoked in Backstop) — the caller should prompt
-    the user to reconnect rather than retry.
-    """
-
-
-class BackstopUnreachableError(Exception):
-    """Raised when Backstop can't be reached at all (network error, 5xx) during verification.
-
-    Distinct from "invalid credentials" (401/403) — the caller should show a different
-    message ("Backstop is unreachable, try again") rather than blaming the submitted token.
-    """
-
-
-def build_auth_headers(username: str, api_token: str) -> dict[str, str]:
-    """Build the `Authorization: Basic ...` + `token: true` headers Backstop expects.
-
-    Every user connects with a personal API token (not a password), so `token: true` is
-    always sent — see https://backstopsolutions.elevio.help/en/articles/1018 and .../236.
-    """
-    basic_auth = base64.b64encode(f"{username}:{api_token}".encode()).decode()
-    return {_AUTHORIZATION_HEADER: f"Basic {basic_auth}", _TOKEN_HEADER: "true"}
-
-
-def is_extended_profile_path(path: str) -> bool:
-    return any(marker in path for marker in _EXTENDED_PROFILE_MARKERS)
-
-
-def build_url(base_url: str, path: str) -> str:
-    """Resolve a path (or an absolute `links.next` URL) against the configured base URL.
-
-    Absolute URLs arrive from `links.next` while walking a pagination chain. They are pinned
-    to the configured host: an authenticated client following an arbitrary upstream-supplied
-    origin would send `Authorization: Basic ...` wherever that origin points.
-    """
-    if not path.startswith(("http://", "https://")):
-        separator = "" if path.startswith("/") else "/"
-        return base_url.rstrip("/") + separator + path
-
-    expected = httpx.URL(base_url).netloc
-    actual = httpx.URL(path).netloc
-    if actual != expected:
-        raise BackstopUntrustedUrlError(path, expected.decode("ascii", "replace"))
-    return path
-
-
-def _metric_route(path: str) -> str:
-    """Coarse, bounded label for a request path: its first segment only.
-
-    Full paths carry record ids, which would make the metric's cardinality unbounded.
-    """
-    without_query = path.split("?", 1)[0]
-    is_absolute = without_query.startswith(("http://", "https://"))
-    stripped = without_query.removeprefix("http://").removeprefix("https://")
-    segments = [segment for segment in stripped.split("/") if segment]
-    if is_absolute:
-        # The leading segment of an absolute URL is the host, not part of the route.
-        segments = segments[1:]
-    return f"/{segments[0]}" if segments else "/"
 
 
 class BackstopClient:
@@ -183,25 +89,25 @@ class BackstopClient:
         self, path: str, *, params: dict[str, object] | None = None, schema: type[T] | None = None
     ) -> T:
         response = await self._request("GET", path, params=params)
-        return _deserialize(response.content, schema, path=path)
+        return deserialize(response.content, schema, path=path)
 
     async def post(
         self, path: str, *, json: dict[str, object] | None = None, schema: type[T] | None = None
     ) -> T:
         response = await self._request("POST", path, json=json)
-        return _deserialize(response.content, schema, path=path)
+        return deserialize(response.content, schema, path=path)
 
     async def patch(
         self, path: str, *, json: dict[str, object] | None = None, schema: type[T] | None = None
     ) -> T:
         response = await self._request("PATCH", path, json=json)
-        return _deserialize(response.content, schema, path=path)
+        return deserialize(response.content, schema, path=path)
 
     async def delete(self, path: str, *, schema: type[T] | None = None) -> T | None:
         response = await self._request("DELETE", path)
         if not response.content:
             return None
-        return _deserialize(response.content, schema, path=path)
+        return deserialize(response.content, schema, path=path)
 
     async def paginate(
         self,
@@ -296,7 +202,7 @@ class BackstopClient:
         url = build_url(self._settings.base_url, path)
         shared_client = await self._http_client()
         retrying = self._retry_policy.build_retrying()
-        route = _metric_route(path)
+        route = metric_route(path)
 
         async def make_request() -> httpx.Response:
             # The gate is entered per attempt, and released while a rate-limit backoff sleeps

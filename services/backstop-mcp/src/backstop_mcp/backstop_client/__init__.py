@@ -9,11 +9,8 @@ Nothing here imports `config` either: the tuning knobs arrive as the frozen type
 """
 
 from backstop_mcp.backstop_client.client import (
-    BackstopAuthError,
     BackstopClient,
-    BackstopUnreachableError,
     CallerClientProvider,
-    build_auth_headers,
 )
 from backstop_mcp.backstop_client.credential import (
     BackstopCredentialSecret,
@@ -21,9 +18,11 @@ from backstop_mcp.backstop_client.credential import (
 )
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
+    BackstopAuthError,
     BackstopErrorDetail,
     BackstopRateLimitError,
     BackstopResponseSchemaError,
+    BackstopUnreachableError,
     BackstopUntrustedUrlError,
 )
 from backstop_mcp.backstop_client.factory import (
@@ -39,6 +38,7 @@ from backstop_mcp.backstop_client.json_api import (
 )
 from backstop_mcp.backstop_client.pagination import PageResult
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
+from backstop_mcp.backstop_client.utils import build_auth_headers
 
 __all__ = [
     "BackstopApiCollectionDocument",

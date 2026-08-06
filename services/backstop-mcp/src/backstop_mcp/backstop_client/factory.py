@@ -13,14 +13,15 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
 import httpx
+from pydantic import SecretStr
 
-from backstop_mcp.backstop_client.client import (
-    AuthFailureHook,
-    BackstopClient,
-    BackstopUnreachableError,
-    build_auth_headers,
-)
+from backstop_mcp.backstop_client.client import AuthFailureHook, BackstopClient
 from backstop_mcp.backstop_client.credential import BackstopCredentialSecret, CallerAuthContext
+from backstop_mcp.backstop_client.errors import (
+    BackstopApiError,
+    BackstopAuthError,
+    BackstopUnreachableError,
+)
 from backstop_mcp.backstop_client.retry import RetryPolicy, build_retry_policy
 from backstop_mcp.backstop_client.settings import BackstopTransportSettings, RetrySettings
 
@@ -173,34 +174,31 @@ class BackstopClientFactory:
         """Check whether a Backstop username + personal API token actually authenticates.
 
         Called from the login form's submit handler (see `auth/provider.py`) before minting an
-        authorization code, so it cannot go through `BackstopClient` (there is no stored
-        credential yet) — but it still uses the shared pool and configured timeout. Returns
-        True/False for a definite valid/invalid answer; raises `BackstopUnreachableError` if
-        Backstop itself couldn't be reached (network error, 5xx), which is not the same
-        failure mode as "wrong token" and should be shown to the user differently.
+        authorization code — there is no stored credential yet, so the caller builds a
+        throwaway `BackstopCredentialSecret` and goes through the ordinary `BackstopClient` path
+        rather than hand-rolling the request. Returns True/False for a definite valid/invalid
+        answer; raises `BackstopUnreachableError` if Backstop itself couldn't be reached
+        (network error, 5xx), which is not the same failure mode as "wrong token" and should be
+        shown to the user differently.
         """
-        client = await self._shared_http_client()
-        url = self._settings.base_url.rstrip("/") + _VERIFICATION_PATH
+        credential = BackstopCredentialSecret(username=username, api_token=SecretStr(api_token))
+        client = self.for_credential(credential)
         try:
-            response = await client.get(
-                url,
-                headers=build_auth_headers(username, api_token),
-                timeout=self._settings.default_timeout_seconds,
-            )
+            await client.get(_VERIFICATION_PATH)
+        except BackstopAuthError:
+            return False
+        except BackstopApiError as exc:
+            if exc.status_code == 403:
+                return False
+            raise BackstopUnreachableError(
+                f"Backstop returned unexpected status {exc.status_code} "
+                + "while verifying credentials"
+            ) from exc
         except httpx.RequestError as exc:
             raise BackstopUnreachableError(
                 f"Could not reach Backstop at {self._settings.base_url}"
             ) from exc
-
-        if response.status_code == 200:
-            return True
-        if response.status_code in (401, 403):
-            return False
-
-        raise BackstopUnreachableError(
-            f"Backstop returned unexpected status {response.status_code} "
-            + "while verifying credentials"
-        )
+        return True
 
     async def aclose(self) -> None:
         """Close the shared connection pool. Wired into the app lifespan."""

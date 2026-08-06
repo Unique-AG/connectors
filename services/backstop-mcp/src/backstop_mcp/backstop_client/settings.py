@@ -19,7 +19,7 @@ class BackstopTransportSettings:
     base_url: str
 
     # Ordinary CRUD calls vs the /reports and /{entity}/{id}/analytics endpoints Backstop
-    # documents as legitimately slow. See `client.is_extended_profile_path`.
+    # documents as legitimately slow. See `utils.is_extended_profile_path`.
     default_timeout_seconds: float
     reports_timeout_seconds: float
 
